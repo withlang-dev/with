@@ -17,10 +17,12 @@ comparison approach, not approval to replace STC.
 
 ## The answer
 
-(a), with the slot shape as the arbitrary-`T` shape. A hand-written C
-unit staged beside upstream's (`facade_shapes.c`, build/stc.w, migrated
-to `std.engines.stc.facade_shapes`) instantiates STC's templates once per
-shape:
+(a), with the slot shape as the arbitrary-`T` shape. One hand-written C
+unit staged beside upstream's (`facade_shapes.c`, build/stc.w, migrated to
+`std.engines.stc.facade_shapes`) instantiates STC's templates once per
+shape (a unit named after a template header would claim every other
+includer's instantiations under the header-owner rule; the shapes unit
+keeps its own name):
 
 - the slot shape — `hset`, `sset`, `pqueue` and `deque` over
   `stc_slot_head*`: the engine indexes pointers to facade-owned slots whose
@@ -46,10 +48,15 @@ the builtin engine swap (compiler intrinsics; a brief of its own).
 
 ## Why
 
-- D37 holds: the migrator stays raw; the shape unit is a corpus build
-  input, migrated like any unit (two general migrator rules came out of
-  it: a sole-definer header function is published; a recursive `pub fn`
-  keeps `-> Unit`).
+- D37 holds: the migrator stays raw; the shape units are corpus build
+  inputs, migrated like any unit. Two general migrator rules came out of
+  it: a recursive `pub fn` keeps `-> Unit` (D143), and a `static inline`
+  function a header defines that no unit owns is published by its sole
+  includer (several includers keep a private copy each, as before). STC's
+  template headers define their functions in other headers (`hset.h` is
+  `hmap.h`, `sort.h` is `priv/sort_prv.h`), so the header-owner rule alone
+  could not reach them; the sole-includer rule is the general statement of
+  "one definition, one owner".
 - The facade is the ownership boundary (plan, "Facade rules"): the engine
   sees pointers and bytes; views, transfers and drops are the facade's.
 - STC stays the primary engine for arbitrary `T`, as ruled 2026-09-12; the
@@ -62,3 +69,6 @@ A measured case where the slot indirection costs more than a direct
 instantiation would save and matters (then that `T` gets a word-shape
 row in the unit, which is the design working as intended); the builtin
 `HashMap`/`HashSet` swap, which is its own brief.
+
+
+

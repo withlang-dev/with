@@ -7,9 +7,10 @@ use std.fs
 // of the same name publishes them once, includers import them instead of
 // keeping private copies (TommyDS's tommy_hashdyn_search lives in
 // tommyhashdyn.h; the facade calls it through std.engines.tommyds.tommyhashdyn).
-// A header no unit owns keeps a private copy per includer; only one unit
-// includes util.h here because two private copies of one name in one
-// package do not compile yet (#1139).
+// A header no unit owns: a sole includer publishes its definitions (a
+// template header instantiated in one unit, STC's facade shapes); several
+// includers keep a private copy each (two copies of one name in one
+// package do not compile yet, #1139).
 fn main:
     let case_dir = p7_prepare_case("migrate_header_inline_owner", "header_inline_owner_test")
     p7_write(case_dir, "source/engine.h", "typedef struct engine { int level; } engine;\nstatic inline int engine_peek(const engine *e) { return e->level * 2; }\nengine *engine_new(int level);\n")
@@ -23,8 +24,8 @@ fn main:
     assert(engine.contains("pub unsafe fn engine_peek("))
     assert(not user.contains("fn engine_peek("))
     assert(user.contains("use eng.engine"))
-    // util.h has no util.c: its only includer keeps a private util_twice.
-    assert(engine.contains("fn util_twice(") and not engine.contains("pub fn util_twice("))
+    // util.h has no util.c: its only includer publishes util_twice.
+    assert(engine.contains("pub fn util_twice("))
     // A unit's own static inline helper is not a header's API: it stays private.
     assert(engine.contains("fn engine_scale(") and not engine.contains("pub fn engine_scale("))
     assert(not user.contains("util_twice"))
@@ -32,3 +33,4 @@ fn main:
     let executed = p7_run(case_dir, "header_inline_run", "run\0src/main.w\0")
     p7_assert_success(executed, "call the published inline through its owner")
     print("ok")
+

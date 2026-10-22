@@ -600,15 +600,15 @@ contract before exposing it.
   each program's staging directory out of the baked `__FILE__` spellings
   (`with migrate --macro-prefix-map`), which keeps one shared `engine/`.
 - The facade half (D148, 2026-10-22, branch `stc-facades`): the
-  generic-over-templates design item is settled by the slot shape — one
-  hand-written C unit in the corpus's build inputs (`facade_shapes.c`,
+  generic-over-templates design item is settled by the slot shape —
+  one hand-written C unit in the corpus's build inputs (`facade_shapes.c`,
   build/stc.w) instantiates STC's templates per shape: `hset`, `sset`,
   `pqueue`, `deque` over pointers to facade-owned slots whose head holds the
   C-ABI callbacks that dispatch to the With comparator and hasher
   (`std.collections.stc_slot`), `deque` of words, `sort` over slot
   references and over i64/u64/f64, and `cbits`. Two general migrator rules
-  came out of it (a sole-definer header function is published; a recursive
-  `pub fn` keeps `-> Unit`, D143). Facades: `PriorityQueue`, `OrderedSet`,
+  came out of it (a recursive `pub fn` keeps `-> Unit`, D143; a header
+  function no unit owns is published by its sole includer). Facades: `PriorityQueue`, `OrderedSet`,
   `OrderedMap`, `Deque`, `BitSet`, `List.sort`/`sort_by`/`binary_search`/
   `lower_bound`/`upper_bound`/`reverse` (#940); the runtime's `remove(0)`
   advances the buffer's start (D115), so consuming iteration is O(1) per
@@ -662,5 +662,8 @@ for now").
    grouping. Optional public types (`BinaryHeap`, `SortedVec`, specialized
    indexes/storage) and detailed new API signatures remain facade-PR
    decisions.
+
+
+
 
 
