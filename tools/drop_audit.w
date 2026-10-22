@@ -708,6 +708,30 @@ fn sc_ordered_map(kind: &str):
         source = source ++ "    var cursor = map.iter()\n    var seen = 0\n    while let Some((k, v)) = cursor.next():\n        assert(v.id == *k)\n        seen = seen + 1\n    assert(seen == 8)\n"
     source
 
+fn sc_unordered_set(kind: &str):
+    var source = "use std.collections.unordered_set.UnorderedSet\nimpl Key for R:\n    fn key(self: &Self): self.id\nfn go(slot: *mut i32):\n    var set = UnorderedSet[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(set.insert(mk(9 - i, slot)))\n    assert(set.len() == 8 and set.contains(&mk(3, slot)))\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let probe = mk(i, slot)\n        let removed = set.remove(&probe).unwrap()\n        assert(removed.id == i)\n    assert(set.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    assert(not set.insert(mk(3, slot)))\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = set.iter()\n    assert(cursor.next().is_some())\n    assert(cursor.next().is_some())\n"
+    source
+
+fn sc_unordered_map(kind: &str):
+    var source = "use std.collections.unordered_map.UnorderedMap\nfn go(slot: *mut i32):\n    var map = UnorderedMap[i32, R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(map.insert(9 - i, mk(9 - i, slot)).is_none())\n    assert(map.len() == 8 and map.get(&3).unwrap().id == 3)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let removed = map.remove(&i).unwrap()\n        assert(removed.id == i)\n    assert(map.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    let old = map.insert(3, mk(3, slot)).unwrap()\n    assert(old.id == 3)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = map.iter()\n    var seen = 0\n    while let Some((k, v)) = cursor.next():\n        assert(v.id == *k)\n        seen = seen + 1\n    assert(seen == 8)\n"
+    source
+
 fn sc_deque(kind: &str):
     var source = "use std.collections.deque.Deque\nfn go(slot: *mut i32):\n    var d = Deque[R].new()\n"
     if kind == "empty": return source
@@ -770,6 +794,18 @@ fn build_cells():
     cells.push(cell("deque_full/facade", sc_deque("full"), 36))
     cells.push(cell("deque_partial/facade", sc_deque("partial"), 36))
     cells.push(cell("deque_cursor/facade", sc_deque("cursor"), 36))
+    cells.push(cell("unordered_set_empty/facade", sc_unordered_set("empty"), 0))
+    // The probe in the full cell drops too: 36 + 3.
+    cells.push(cell("unordered_set_full/facade", sc_unordered_set("full"), 39))
+    // Four probes beside the full cell's: 39 + (1 + 2 + 3 + 4).
+    cells.push(cell("unordered_set_partial/facade", sc_unordered_set("partial"), 49))
+    cells.push(cell("unordered_set_replace/facade", sc_unordered_set("replace"), 42))
+    cells.push(cell("unordered_set_cursor/facade", sc_unordered_set("cursor"), 39))
+    cells.push(cell("unordered_map_empty/facade", sc_unordered_map("empty"), 0))
+    cells.push(cell("unordered_map_full/facade", sc_unordered_map("full"), 36))
+    cells.push(cell("unordered_map_partial/facade", sc_unordered_map("partial"), 36))
+    cells.push(cell("unordered_map_replace/facade", sc_unordered_map("replace"), 39))
+    cells.push(cell("unordered_map_cursor/facade", sc_unordered_map("cursor"), 36))
     cells.push(cell("slotmap_empty/slotmap", sc_slotmap("empty"), 0))
     cells.push(cell("slotmap_full/slotmap", sc_slotmap("full"), 8256))
     cells.push(cell("slotmap_partial/slotmap", sc_slotmap("partial"), 8256))

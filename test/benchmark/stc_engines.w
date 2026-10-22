@@ -12,11 +12,15 @@ use std.collections.binary_heap.BinaryHeap
 use std.collections.ordered_set.OrderedSet
 use std.collections.sorted_list.SortedList
 use std.collections.deque.Deque
+use std.collections.unordered_set.UnorderedSet
 use std.algorithms
 use std.time
 use std.builtins
 
 type Timing { insert: i64, lookup: i64, remove: i64 }
+
+// A two-field record: not a word, so the deque's slot shape.
+type Pair { a: i32, b: i32 }
 
 fn pqueue_round(n: i32) -> Timing:
     var queue = PriorityQueue[i32].new()
@@ -102,6 +106,51 @@ fn deque_round(n: i32) -> Timing:
     assert(sum > 0 and d.is_empty())
     Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
 
+fn deque_slots_round(n: i32) -> Timing:
+    // A record is not a word: the slot shape, one allocation each.
+    var d = Deque[Pair].new()
+    let t0 = now_ns()
+    for i in 0..n:
+        if i % 2 == 0: d.push_back(Pair { a: i, b: i }) else: d.push_front(Pair { a: i, b: i })
+    let t1 = now_ns()
+    var sum: i64 = 0
+    for i in 0..n: sum = sum + d.get(i as isize).a as i64
+    let t2 = now_ns()
+    for i in 0..(n / 2):
+        assert(d.pop_front().is_some())
+        assert(d.pop_back().is_some())
+    let t3 = now_ns()
+    assert(sum > 0 and d.is_empty())
+    Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
+
+fn unordered_set_round(n: i32) -> Timing:
+    var set = UnorderedSet[i32].new()
+    let t0 = now_ns()
+    for i in 0..n: assert(set.insert(i * 7919 % n))
+    let t1 = now_ns()
+    var hits = 0
+    for i in 0..n:
+        if set.contains(&i): hits = hits + 1
+    let t2 = now_ns()
+    for i in 0..n: assert(set.remove(&i).is_some())
+    let t3 = now_ns()
+    assert(hits == n and set.is_empty())
+    Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
+
+fn hashset_round(n: i32) -> Timing:
+    var set = HashSet[i32].new()
+    let t0 = now_ns()
+    for i in 0..n: set.insert(i * 7919 % n)
+    let t1 = now_ns()
+    var hits = 0
+    for i in 0..n:
+        if set.contains(i): hits = hits + 1
+    let t2 = now_ns()
+    for i in 0..n: set.remove(i)
+    let t3 = now_ns()
+    assert(hits == n and set.len() == 0)
+    Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
+
 fn list_ends_round(n: i32) -> Timing:
     var xs: List[i32] = []
     let t0 = now_ns()
@@ -151,7 +200,12 @@ report("BinaryHeap (c-algorithms)", heap_round, n)
 report("OrderedSet (STC sset)", ordered_set_round, n)
 report("BTreeSet (native, #937)", btree_set_round, 4000)
 report("SortedList (c-algorithms, remove(0))", sorted_list_round, 20000)
-report("Deque (STC deque)", deque_round, n)
+report("Deque[i32] (STC deque, word shape)", deque_round, n)
+report("Deque[Pair] (STC deque, slot shape)", deque_slots_round, n)
 report("List push/index/pop (rt_core)", list_ends_round, n)
+report("UnorderedSet (STC hset, slot shape)", unordered_set_round, n)
+report("HashSet (rt_core, insertion-ordered)", hashset_round, n)
 print("sort\tsort_i64_ns\tsort_by_pair_ns\t-")
 report("List.sort (STC sort)", sort_round, n)
+
+
