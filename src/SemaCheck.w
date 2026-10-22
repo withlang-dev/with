@@ -15639,6 +15639,33 @@ impl Sema:
         let root = self.place_root_sym(expr)
         root != 0 and self.scope_lookup_mut(root) != 0
 
+    // §9.7 (D115): a pattern subject that is owned — a temporary, a place
+    // moved with `move`, a by-value parameter (dies with the frame) — is
+    // taken apart by value. A `self` receiver that borrows the caller's
+    // place (`fn`, `mut fn`) is a place, as a local or a field is.
+    fn pattern_subject_root_owned(subject: i32) -> bool:
+        var expr = subject
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
+            return true
+        let root = self.place_root_sym(expr)
+        if root == 0:
+            return true
+        let pi = self.param_index_for_sym(root)
+        if pi < 0 or self.current_fn_sig_idx < 0:
+            return false
+        if pi == 0:
+            let rmode = self.sig_receiver_mode(self.current_fn_sig_idx)
+            if rmode == ReceiverMode.Read or rmode == ReceiverMode.Mut:
+                return false
+        let p_ty = self.sig_param_type(self.current_fn_sig_idx, pi)
+        if p_ty != 0:
+            let p_tk = self.get_type_kind(self.resolve_alias(p_ty as TypeId))
+            if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                return false
+        true
+
     mut fn field_let_binds_as_view(value: i32, is_mut: i32, ann_type: TypeId) -> i32:
         if ann_type != 0:
             return 0
@@ -23496,7 +23523,7 @@ impl Sema:
             // the payload's place (MIR aliases it, pattern_place_bindings),
             // mutated through when the subject's root is mutable. Plain
             // bits take the value.
-            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.slice_pattern_subject_owned(subject_type) and not self.type_is_plain_bits(subject_type):
+            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
                 self.scope_set_is_view_bound(sym)
                 self.record_view_binding_from_expr(sym, self.pattern_subject_node)
