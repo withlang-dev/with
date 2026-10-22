@@ -591,12 +591,20 @@ contract before exposing it.
   shadows the builtin package-wide), #2554 (a `@[c_export]` definition
   dropped by a same-named `extern fn`; a bare `@[c_export]` exports
   nothing), #2555 (std.sync under `--no-prelude`).
+- Bitfields (D147, 2026-10-22, branch `bitfields`): a migrated record with
+  bitfields keeps C's layout (storage units, a getter and a setter per
+  member, stores that truncate, one layout per data model or a loud
+  refusal). `stc_core` joins the engine corpus and `hmap_test` the test
+  corpus: 8 of 8 ctest units pass under With, fresh and promoted. The
+  engines namespace is `std.engines.<library>` (D146). The test lane maps
+  each program's staging directory out of the baked `__FILE__` spellings
+  (`with migrate --macro-prefix-map`), which keeps one shared `engine/`.
 - Open: the facade half — the generic-over-templates design item (STC's
   `sort.h` is a quicksort with an `i_less` hook, so a comparator-slot
   instantiation can serve arbitrary `T` beside direct instantiations for
   the word-sized shapes), `std.algorithms`, the container facades, #938,
-  the complexity fixtures and drop-audit cells; bitfields (#2553) gate the
-  default map engine.
+  the complexity fixtures and drop-audit cells, the benchmark-backed
+  engine selection.
 
 **Phase 4 — M*LIB `m-bptree.h`, surgical.**
 Only the B+ tree, providing `BTreeMap`/`BTreeSet` and retiring their

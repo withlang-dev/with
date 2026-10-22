@@ -113,7 +113,7 @@ fn migrate_set_shared_fragment_path(path: &str):
 fn migrate_add_include_path(path: &str) -> Unit:
     g_migrate_include_paths.push(ci_migrate_fs_path(path))
 
-fn migrate_add_macro_prefix_map(spec: &str) -> Unit:
+fn migrate_add_macro_prefix_map(spec: &str):
     g_migrate_macro_prefix_maps.push(spec)
 
 fn migrate_add_forced_include(path: &str) -> Unit:
