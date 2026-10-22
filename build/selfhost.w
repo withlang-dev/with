@@ -4646,7 +4646,15 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, anon_w, "2.2204460492503131e-16", "hexadecimal float in decimal")
     if rc != 0: return rc
-    bs_file_contains(ctx, anon_w, "pub type isize_ = c_long", "builtin-named typedef renamed")
+    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = c_long", "builtin-named typedef renamed")
+    if rc != 0: return rc
+    // `[index] = value` designators in an array initializer, through a macro
+    // (STC's Unicode group table), the unreached elements zero.
+    let desig_src = bs_join(case_dir, "arraydesig.c")
+    let desig_w = bs_join(case_dir, "arraydesig.w")
+    rc = bs_write_fixture(ctx, desig_src, "enum { K0, K1, K2, KN };\ntypedef struct { const int* r; int n; } G;\nstatic const int a[] = {1, 2};\n#define ENTRY(k, v) [k] = v\n#define ITEM(n) { a, n }\nstatic const G groups[KN] = { ENTRY(K2, ITEM(2)), ENTRY(K0, ITEM(1)) };\nstatic const int plain[] = { [3] = 7, 8 };\nint main(void) { return (groups[K2].n == 2 && groups[K1].r == 0 && groups[K0].r[0] == 1 && sizeof plain / sizeof(int) == 5 && plain[4] == 8 && plain[0] == 0) ? 0 : 1; }\n", "array designators in initializers")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "arraydesig", &desig_src, &desig_w)
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:

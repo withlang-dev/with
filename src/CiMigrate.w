@@ -2730,7 +2730,8 @@ fn ci_migrate_translate_var(session: i64, idx: i32, count: i32, primary_path: &s
             let init_val = ci_try_eval_var_init_for_type(session, idx, array_type)
             if init_val.len() == 0:
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
-                ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ if loc.len() > 0: " at " ++ loc else: "")
+                let why = if ci_get_bail_message().len() > 0: ": " ++ ci_get_bail_message() else: ""
+                ci_migrate_set_error("migrate: untranslatable global initializer for " ++ name ++ (if loc.len() > 0: " at " ++ loc else: "") ++ why)
                 return ""
             if stable_binding:
                 rendered = tl_attr ++ "let " ++ safe_name ++ ": " ++ resolved_type ++ " = " ++ init_val ++ "\n"

@@ -8592,6 +8592,22 @@ fn ci_init_child_has_designator(session: i64, child: i32) -> i32:
     let first = src[1]
     if (first >= 65 and first <= 90) or (first >= 97 and first <= 122) or first == 95: 1 else: 0
 
+// `[index] = value` in an array initializer: the index, or -1 when the
+// child is not that. libclang's DesignatedInitExpr lists the value as its
+// last child and the index expression before it.
+fn ci_init_child_array_designator_index(session: i64, child: i32) -> i64:
+    if with_ci_cursor_kind(session, child) != 100:
+        return -1
+    let src = ci_trim(with_ci_cursor_source_text(session, child))
+    if src.len() == 0 or src[0] != 91:
+        if with_ci_cursor_spelling_designator(session, child) != "[": return -1
+    if with_ci_num_children(session, child) != 2:
+        return -1
+    let index = ci_peel_transparent(session, with_ci_child(session, child, 0))
+    if not ci_fold_int_ok(session, index):
+        return -1
+    with_ci_eval_int_value(session, index)
+
 fn ci_init_child_designated_value(session: i64, child: i32) -> i32:
     let nc = with_ci_num_children(session, child)
     if nc < 1:
@@ -9033,6 +9049,53 @@ impl CiExprPool:
         let _ = self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, types.named_type_from_text(member_name))
 
+    // An array initializer with `[index] = value` designators: a designator
+    // sets the position, the next element follows it, and every element no
+    // initializer reaches is the element type's zero. The array is the
+    // declared length, or one past the last element when it is `[]`.
+    fn lower_array_init_designated_ir(session: i64, cursor: i32, nc: i32, init_ty: i32, elem_ty_id: CiTypeId, init_ty_id: CiTypeId, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let declared = with_ci_type_array_size(session, init_ty)
+        var items: List[i32] = List.new()
+        var pos: i64 = 0
+        var ai = 0
+        while ai < nc:
+            let child = with_ci_child(session, cursor, ai)
+            var value_cursor = child
+            if ci_init_child_has_designator(session, child) != 0:
+                let index = ci_init_child_array_designator_index(session, child)
+                if index < 0:
+                    g_ci_bail_message = "array designator index did not evaluate"
+                    return 0 as CiExprId
+                pos = index
+                value_cursor = ci_init_child_designated_value(session, child)
+            var item_id = self.lower_expr_ir(session, value_cursor, types, scope)
+            if (item_id as i32) == 0:
+                if g_ci_bail_message.len() == 0: g_ci_bail_message = "array element initializer did not lower"
+                return 0 as CiExprId
+            item_id = self.coerce_value_expr_for_target(session, elem_ty_id, value_cursor, item_id, types)
+            if (item_id as i32) == 0:
+                if g_ci_bail_message.len() == 0: g_ci_bail_message = "array element initializer did not coerce to the element type"
+                return 0 as CiExprId
+            while items.len() <= pos: items.push(0)
+            items[pos as i32] = item_id as i32
+            pos = pos + 1
+            ai = ai + 1
+        while items.len() < declared: items.push(0)
+        for i in 0..items.len():
+            if items[i] == 0:
+                var zero = self.default_for_ci_type(elem_ty_id, types)
+                let elem_cx = with_ci_type_array_element(session, init_ty)
+                if (zero as i32) == 0 and ci_init_list_record_field_count(session, ci_print_type(types, elem_ty_id), elem_cx) > 0:
+                    zero = self.add(CiExprKind.CIE_DESIGNATED_INIT, self.extra_len() as i32, 0, 0, elem_ty_id)
+                if (zero as i32) == 0:
+                    g_ci_bail_message = "array element type has no zero for the elements no initializer reaches"
+                    return 0 as CiExprId
+                items[i] = zero as i32
+        let items_start = self.extra_len() as i32
+        for id in items:
+            let _ = self.add_extra(id)
+        self.init_list(items_start, items.len() as i32, init_ty_id)
+
     fn lower_init_list_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let nc = with_ci_num_children(session, cursor)
         let init_ty = with_ci_cursor_type(session, cursor)
@@ -9044,6 +9107,13 @@ impl CiExprPool:
             let elem_ty_str = ci_array_elem_type(ty_str)
             let elem_field_count = ci_init_list_record_field_count(session, elem_ty_str, elem_cxtype)
             let elem_ty_id = if elem_cxtype >= 0: types.type_from_libclang(session, elem_cxtype) else: 0 as CiTypeId
+            // `[index] = value` designators place elements (C99 §6.7.9);
+            // the positional form below is unchanged for the corpora.
+            var designated = false
+            for di in 0..nc:
+                if ci_init_child_array_designator_index(session, with_ci_child(session, cursor, di)) >= 0: designated = true
+            if designated:
+                return self.lower_array_init_designated_ir(session, cursor, nc, init_ty, elem_ty_id, init_ty_id, types, scope)
             var item_ids: List[i32] = List.new()
             var ai = 0
             while ai < nc:
