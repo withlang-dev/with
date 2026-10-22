@@ -3,6 +3,7 @@ module build.stc
 use std.build
 use build.corpus
 use build.wo
+use build.par
 
 // STC (stclib/STC), MIT (its LICENSE ships beside the migration). Phase 3
 // of docs/proposals/stdlib_sourcing_plan.md: the macro-migrator campaign.
@@ -89,9 +90,8 @@ fn stc_stage_headers(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
         if corpus_copy(ctx, path, destination) != 0: return 1
     0
 
-// The production corpus: the library units and the drift harness.
-fn stc_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
-    if stc_stage_headers(ctx, reference, source) != 0: return 1
+// The library units into `source`: the `src/` units and the staged ucd unit.
+fn stc_stage_library(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
     for name in stc_lib_units():
         if corpus_copy(ctx, reference ++ "/src/" ++ name ++ ".c", source ++ "/" ++ name ++ ".c") != 0: return 1
     // The Unicode category tables (`priv/ucd_prv.c`, which cutf8_isalpha and
@@ -99,18 +99,42 @@ fn stc_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) ->
     // not migrated (setjmp); they are staged as a unit of their own, in the
     // one-line shape of upstream's `src/` units.
     if ctx.fs().write_text(source ++ "/ucd.c", "#include \"../include/stc/common.h\"\n#include \"../include/stc/types.h\"\n#include \"../include/stc/priv/utf8_prv.h\"\n#include \"../include/stc/priv/ucd_prv.c\"\n") != 0: return corpus_fail(ctx, "cannot write the ucd unit")
+    0
+
+// The production corpus: the library units and the drift harness.
+fn stc_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:
+    if stc_stage_headers(ctx, reference, source) != 0: return 1
+    if stc_stage_library(ctx, reference, source) != 0: return 1
     corpus_copy(ctx, reference ++ "/examples/strings/replace.c", source ++ "/replace.c")
 
-fn stc_tests_options(source: &str, output: &str) -> MigrateOptions:
-    MigrateOptions {
-        source_path: source, output_path: output,
-        include_paths: [source, corpus_dirname(source) ++ "/include"], forced_includes: List.new(),
-        defines: List.new(), exclude_basenames: List.new(), check_mode: false,
-        diff_mode: false, stats_mode: false, no_c_export: true, c_export_functions: false,
-        convert_goto_to_structured: false, block_style: 2, width_slice: 8,
-        shared_defs: STC_TESTS_PACKAGE ++ ".defs", migrate_one: "",
-        shared_fragment: "", ir_roundtrip: false,
-    }
+// The migrate command for one test program: its own staging directory and
+// output, project-relative paths. ctest.h bakes `__FILE__` into every
+// assertion, so the text carries the path the migrator saw; a relative one is
+// the same on every machine (corpus_migrate_argv's absolute paths named this
+// worktree).
+fn stc_test_migrate_argv(ctx: &ActionCtx, compiler: &str, source: &str, output: &str) -> List[str]:
+    var argv: List[str] = List.new()
+    argv.push(corpus_abs(ctx, compiler))
+    argv.push("migrate")
+    argv.push(source)
+    argv.push("-o")
+    argv.push(output)
+    argv.push("--c-target")
+    argv.push(corpus_c_model_target())
+    argv.push("--c-sysroot")
+    argv.push(corpus_abs(ctx, corpus_c_model_dir()))
+    argv.push("-I")
+    argv.push(source)
+    argv.push("-I")
+    argv.push(corpus_dirname(source) ++ "/include")
+    argv.push("--no-prelude")
+    argv.push("--no-c-export")
+    argv.push("--prefer-brace")
+    argv.push("--width-slice")
+    argv.push("8")
+    argv.push("--shared-defs")
+    argv.push(STC_TESTS_PACKAGE ++ ".defs")
+    argv
 
 // ── the runner each test module gains ────────────────────────────
 //
@@ -198,57 +222,105 @@ fn stc_finish_test_module(ctx: &ActionCtx, path: &str) -> i32:
     0
 
 // One migration of every test unit in STC's default linkage.
+// One migration per test program, as c-algorithms' lane: a unit defines
+// its containers under its own names (`#define T Intmap ..` is an hmap in
+// hmap_test.c and a sorted map in smap_test.c), so two units cannot share
+// one defs.w. Each program migrates whole: the test, ctest.h, the library
+// units it links (upstream's shared libstc) and the ucd unit. The
+// migrations run together (par_run).
 pub fn run_stc_migrate_tests_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let reference = ctx.inputs()[0]
     let output = ctx.output()
     let scratch = corpus_scratch(ctx)
-    let source = scratch ++ "/source"
     let generated = scratch ++ "/generated"
-    if corpus_reset_dir(ctx, source) != 0 or corpus_reset_dir(ctx, generated) != 0: return 1
-    if stc_stage_headers(ctx, reference, source) != 0: return 1
+    if corpus_reset_dir(ctx, generated) != 0: return 1
+    if stc_stage_headers(ctx, reference, scratch ++ "/source") != 0: return 1
+    let migrator = corpus_migrator_arg(ctx)
+    if migrator.len() == 0: return corpus_fail(ctx, "a corpus migration names its migrator (corpus_migrating_target)")
+    var jobs: List[ParJob] = List.new()
+    var labels: List[str] = List.new()
     for name in stc_test_units():
+        let source = scratch ++ "/source-" ++ name
+        if corpus_reset_dir(ctx, source) != 0: return 1
+        if stc_stage_library(ctx, reference, source) != 0: return 1
         if corpus_copy(ctx, reference ++ "/tests/" ++ name ++ ".c", source ++ "/" ++ name ++ ".c") != 0: return 1
-    if corpus_copy(ctx, reference ++ "/tests/ctest.h", source ++ "/ctest.h") != 0: return 1
-    if corpus_run_migration(ctx, "stc-migrate-tests", stc_tests_options(source, generated)) != 0: return 1
+        if corpus_copy(ctx, reference ++ "/tests/ctest.h", source ++ "/ctest.h") != 0: return 1
+        let test_output = generated ++ "/tests/" ++ name
+        if fs.mkdir_all(test_output) != 0: return 1
+        let label = "stc-test-" ++ name
+        let stdout = corpus_abs(&ctx, scratch ++ "/" ++ label ++ ".stdout")
+        let stderr = corpus_abs(&ctx, scratch ++ "/" ++ label ++ ".stderr")
+        jobs.push(par_job(stc_test_migrate_argv(&ctx, migrator, source, test_output), stdout, stderr, 1200000))
+        labels.push(label)
+    let rcs = par_run(&ctx, &jobs, par_width(&jobs))
+    for i in 0..rcs.len():
+        if rcs[i] != 0: return corpus_fail(ctx, labels[i] ++ f": `migrate` exited {rcs[i]}; see " ++ jobs[i].stderr)
     for name in stc_test_units():
-        if stc_finish_test_module(ctx, generated ++ "/" ++ name ++ ".w") != 0: return 1
+        if stc_finish_test_module(ctx, generated ++ "/tests/" ++ name ++ "/" ++ name ++ ".w") != 0: return 1
     if fs.write_text(generated ++ "/UPSTREAM", STC_REVISION ++ "\nsha256=" ++ STC_SHA256 ++ "\nconfiguration=tests\n") != 0: return 1
     if fs.exists(output) and fs.remove_tree(output) != 0: return corpus_fail(ctx, "cannot replace " ++ output)
     if fs.rename(generated, output) != 0: return corpus_fail(ctx, "cannot publish " ++ output)
-    print(f"migrated {stc_test_units().len()} STC test units into " ++ corpus_abs(ctx, output))
+    print(f"migrated {stc_test_units().len()} STC test programs into " ++ corpus_abs(ctx, output))
     0
 
-// Promotes the test migration into the tree, flat: defs.w and the units.
+// Promotes the test migration into the tree. Every program's migration
+// carries its own copy of the library; those copies are byte-identical
+// across programs (the same translation units), so one engine/ is checked
+// in and each programs/<name>/ keeps only what differs: the program's
+// defs.w (its types and globals) and its test module.
 pub fn run_stc_promote_tests_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    let generated = ctx.inputs()[0]
+    let generated = ctx.inputs()[0] ++ "/tests"
     let destination = ctx.output()
     if corpus_reset_dir(ctx, destination) != 0: return 1
-    if corpus_copy_w_files(ctx, generated, destination) != 0: return 1
+    let engine = destination ++ "/engine"
+    if fs.mkdir_all(engine) != 0: return corpus_fail(ctx, "cannot create " ++ engine)
+    var engine_from = ""
+    for name in stc_test_units():
+        let program = generated ++ "/" ++ name
+        let test_module = name ++ ".w"
+        let target = destination ++ "/programs/" ++ name
+        if fs.mkdir_all(target) != 0: return corpus_fail(ctx, "cannot create " ++ target)
+        for path in fs.list_files(program):
+            if not path.ends_with(".w"): continue
+            let base = corpus_basename(path)
+            if base == "defs.w" or base == test_module:
+                if corpus_copy(ctx, path, target ++ "/" ++ base) != 0: return 1
+                continue
+            let shared = engine ++ "/" ++ base
+            if engine_from.len() == 0 or not fs.exists(shared):
+                if corpus_copy(ctx, path, shared) != 0: return 1
+            else if fs.read_text(shared) != fs.read_text(path):
+                return corpus_fail(ctx, "engine module " ++ base ++ " differs between programs " ++ engine_from ++ " and " ++ name ++ "; the shared engine/ layout no longer holds")
+        if engine_from.len() == 0: engine_from = name
     if fs.write_text(destination ++ "/UPSTREAM", STC_REVISION ++ "\nsha256=" ++ STC_SHA256 ++ "\nconfiguration=tests\n") != 0: return 1
-    print(f"promoted {stc_test_units().len()} STC test units into " ++ corpus_abs(ctx, destination))
+    print(f"promoted {stc_test_units().len()} STC test programs into " ++ corpus_abs(ctx, destination))
     0
 
 // The corpora lane: every test program is assembled into its own module
-// tree with the harness, compiled by the release binary and run; its
-// failed assertions are counted by the harness and the exit code is the
-// failure.
+// tree with the shared engine and the harness, compiled by the release
+// binary and run; the harness counts failed assertions and the exit code
+// is the count.
 pub fn run_stc_test_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let compiler = corpus_abs(ctx, ctx.inputs()[0])
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     var report = "upstream=" ++ STC_REVISION ++ "\nconfiguration=tests\n"
-    // D112: `fresh=<dir>` runs the fresh migration for the migrator gate;
-    // otherwise the promoted units.
+    // D112: `fresh=<dir>` runs the fresh migration (each program whole under
+    // <dir>/tests/<name>) for the migrator gate; otherwise the promoted
+    // programs and their shared engine.
     let fresh = wo_arg_value(ctx.args(), "fresh=")
-    let modules = if fresh.len() > 0: fresh else: STC_TESTS_DIR
     for name in stc_test_programs():
         let program_root = output ++ "/" ++ name
         let module_dir = program_root ++ "/" ++ stc_tests_package_dir()
         if fs.mkdir_all(module_dir) != 0: return 1
-        if corpus_copy_w_files(ctx, modules, module_dir) != 0: return 1
+        if fresh.len() > 0:
+            if corpus_copy_w_files(ctx, fresh ++ "/tests/" ++ name, module_dir) != 0: return 1
+        else:
+            if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/engine", module_dir) != 0: return 1
+            if corpus_copy_w_files(ctx, STC_TESTS_DIR ++ "/programs/" ++ name, module_dir) != 0: return 1
         if corpus_copy_w_files(ctx, STC_HARNESS_DIR, module_dir) != 0: return 1
         let binary = output ++ "/" ++ name ++ ".bin"
         var compile_args: List[str] = List.new()
