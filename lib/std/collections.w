@@ -461,6 +461,20 @@ impl[T] Iterable[T] for List[T]:
     @[iter_of_self]
     fn iter() -> ListIter[T]: ListIter { list: self, idx: 0 }
 
+/// A slice's `iter()` (D142, §13.1): the view iterator a List has, over the
+/// slice's elements; `next()` yields `&T` through the element place. The
+/// compiler resolves `s.iter()` on a `[]T` here (no `impl` can name a slice).
+pub type SliceIter[T] ephemeral { data: []T, idx: isize }
+
+impl[T] Iter[&T] for SliceIter[T]:
+    mut fn next() -> Option[&T]:
+        if self.idx >= self.data.len(): return None
+        let i = self.idx
+        self.idx += 1
+        &self.data[i]
+
+pub fn slice_iter[T](s: []T) -> SliceIter[T]: SliceIter { data: s, idx: 0 }
+
 /// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
 impl[T] List[T]:
     // D100 (§18.3): List's fields are private to std. The buffer's address,

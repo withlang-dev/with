@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D143 — A function that calls itself infers its return type from the paths that do not (the ML rule); a `pub fn` declares it (Law 6); mutual recursion is written, naming the cycle (amends D43)](2026-10-21-D143-a-function-that-calls-itself-infers-its-return-from-the-other-paths.md)
+- [D142 — A sequence on the left of `|>` iterates by the `for` rule; a slice has `iter()`; collecting views of values builds values (extends §13.5; D111, D139)](2026-10-21-D142-a-sequence-on-the-left-of-a-pipeline-iterates.md)
 - [D141 — An inferred return type joins `None` with `T` into `Option[T]`; `None` beside an `Option[T]` is written (amends D43, carves a case out of D103)](2026-10-21-D141-an-inferred-return-joins-none-with-t-into-option-t.md)
 - [D140 — Impl methods take their signature from the trait: parameter and return types may be omitted and are the trait's, instantiated for the impl; written ones must match](2026-10-21-D140-impl-methods-take-their-signature-from-the-trait.md)
 - [D139 — A view of a view of a Copy value satisfies an owned-value demand at every layer (D22 §7.4 applied as written)](2026-10-20-D139-a-view-of-a-view-materializes-at-every-layer.md)

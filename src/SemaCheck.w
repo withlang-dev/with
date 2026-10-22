@@ -1133,6 +1133,11 @@ impl Sema:
                             "add `-> " ++ lhs_name ++ "` or `-> Unit`"
                         else:
                             "add `-> " ++ lhs_name ++ "`, `-> " ++ rhs_name ++ "`, or `-> Unit`"
+                        // D143: in a self-calling body's first pass the arm
+                        // that disagrees is reported after it, with the type
+                        // the other paths decided.
+                        if self.recursion_open_sym != 0 and self.recursion_pass1_mismatch == 0:
+                            self.recursion_pass1_mismatch = arm_nodes[ai]
                         self.emit_error("cannot infer return type: " ++ join_name ++ " arms have types " ++ lhs_name ++ " and " ++ rhs_name ++ "; " ++ remedy, report_node)
                     else if report_node == self.display_join_node:
                         self.emit_display_join_mismatch(join_name, prior_candidate, arm_ty, arm_nodes[ai], report_node)
@@ -4481,9 +4486,63 @@ impl Sema:
     // cannot take that type reports both uses. A body that records nothing
     // is checked once, so no local in a program that compiles without the
     // rule changes type. Every body, plain or instantiated, comes through here.
+    // D143: whether this function's body calls the function itself, by name
+    // (the declaration's nodes precede it, as prepare_body_order walks them).
+    fn body_calls_itself(node: i32, decl_index: i32) -> bool:
+        if decl_index < 0 or decl_index >= self.body_order_lower.len():
+            return false
+        let fn_name = self.ast.get_data0(node)
+        var n: i32 = self.body_order_lower[decl_index] + 1
+        while n < node:
+            if self.ast.kind(n) == NodeKind.NK_CALL:
+                let callee = self.ast.get_data0(n)
+                if self.ast.kind(callee) == NodeKind.NK_IDENT and self.ast.get_data0(callee) == fn_name:
+                    return true
+            n = n + 1
+        false
+
     mut fn check_fn_body_with_sig_at(node: i32, sig_idx: i32, decl_index: i32):
         let demands_start = self.int_local_demands.len()
         let diags_start = self.diags.items.len()
+        // D143 (§9.1): a package-local function without a return type whose
+        // body calls itself. A first pass with the self-calls open (`Never`)
+        // lets the other paths decide the type; the body is then checked
+        // with it as the demand, and a self-call path that disagrees is
+        // named. A `pub fn` declares its return type (Law 6).
+        let meta = self.ast.find_fn_meta(node)
+        if meta >= 0 and self.ast.fn_meta_ret(meta) == 0 and self.fn_decl_is_entry_point(node) == 0 and self.body_calls_itself(node, decl_index):
+            let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
+            let flags = self.ast.get_data2(node)
+            if (flags / FnFlags.PUB) % 2 == 1:
+                self.emit_error(f"`{self.pool_resolve(fn_name)}` is `pub` and calls itself: a `pub fn` declares its return type (Law 6); write `->` (D143)", node)
+                return
+            self.recursion_open_sym = fn_name
+            self.recursion_pass1_mismatch = 0
+            self.suppress_errors = self.suppress_errors + 1
+            self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
+            self.suppress_errors = self.suppress_errors - 1
+            self.recursion_open_sym = 0
+            while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
+            while self.diags.items.len() > diags_start: self.diags.items.pop()
+            let decided = self.resolve_alias(self.sig_return_type(sig_idx) as TypeId)
+            if decided == 0 or decided == self.ty_never:
+                self.emit_error(f"cannot infer the return type of `{self.pool_resolve(fn_name)}`: every path returns a call of `{self.pool_resolve(fn_name)}` itself; write `->` (D143)", node)
+                return
+            if self.recursion_pass1_mismatch != 0:
+                self.emit_error(f"a path that calls `{self.pool_resolve(fn_name)}` itself disagrees with the return type the other paths gave it, `{self.type_name(decided as i32)}` (D143)", self.recursion_pass1_mismatch)
+                self.recursion_pass1_mismatch = 0
+                return
+            // The second pass retypes what the first decided (D128's
+            // recheck rule lets a join settle again).
+            self.recursion_inferred_type = decided as i32
+            self.int_local_rechecking += 1
+            self.check_fn_body_with_sig_at_settled(node, sig_idx, decl_index, demands_start, diags_start)
+            self.int_local_rechecking -= 1
+            self.recursion_inferred_type = 0
+            return
+        self.check_fn_body_with_sig_at_settled(node, sig_idx, decl_index, demands_start, diags_start)
+
+    mut fn check_fn_body_with_sig_at_settled(node: i32, sig_idx: i32, decl_index: i32, demands_start: isize, diags_start: isize):
         // A decision can make a new demand (`sum: i32` then `sum = sum + i`
         // demands of `i`), so the body is checked until no undecided local is
         // demanded; each pass decides at least one, so it ends.
@@ -4756,6 +4815,10 @@ impl Sema:
             // For async functions, the sig return type is Task[T] but the
             // body should type-check against the unwrapped T.
             var body_ret_type = if has_ret_annotation: ret_type as TypeId else: 0 as TypeId
+            // D143: the second pass over a self-calling body checks it under
+            // the type the other paths decided (`[] => []` takes it).
+            if not has_ret_annotation and self.recursion_inferred_type != 0:
+                body_ret_type = self.recursion_inferred_type as TypeId
             if trait_contract.ok != 0 and trait_contract.ret_type != 0:
                 body_ret_type = trait_contract.ret_type as TypeId
             if (flags / FnFlags.ASYNC) % 2 == 1:
@@ -4928,7 +4991,7 @@ impl Sema:
             // tail under an `Option[T]` return is `Some(tail)`.
             let tail_to_option = self.value_to_option_at_demand(tail_demand, body_expected_ret, body_ty) != body_ty
             if not tail_to_option and self.return_value_type_compatible(body_expected_ret as i32, body_ty as i32) == 0 and body_materializes_copy == 0 and not tail_copies and not self.note_int_local_arg_demand(tail_demand, body_expected_ret as i32, body_ty as i32):
-                self.emit_error("return type mismatch", body)
+                self.report_inferred_return_mismatch(body)
         if not has_ret_annotation:
             // §14.4: calling an `async fn` returns a `Task[T]` handle; the body
             // yields the T. An annotated signature is wrapped at declaration
@@ -10150,13 +10213,27 @@ impl Sema:
             self.convert_body_values_to_option(body, 1, inferred)
         inferred
 
+    // "return type mismatch" under an inferred return; in the second pass
+    // of a self-calling body (D143) the message names what disagreed.
+    mut fn report_inferred_return_mismatch(node: i32):
+        // The first pass is silent; the disagreement is reported after it,
+        // once the other paths' type is known.
+        if self.recursion_open_sym != 0:
+            if self.recursion_pass1_mismatch == 0: self.recursion_pass1_mismatch = node
+            return
+        if self.recursion_inferred_type != 0 and self.current_fn_symbol != 0:
+            let name: str = with_str_clone_ref(self.pool_resolve(self.current_fn_symbol))
+            self.emit_error(f"a path that calls `{name}` itself disagrees with the return type the other paths gave it, `{self.type_name(self.recursion_inferred_type)}` (D143)", node)
+            return
+        self.emit_error("return type mismatch", node)
+
     mut fn infer_unannotated_function_return_type_raw(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
         let info = self.body_return_type_info(body)
         if info.mismatch != 0:
-            self.emit_error("return type mismatch", info.mismatch_node)
+            self.report_inferred_return_mismatch(info.mismatch_node)
         if info.saw_bare_return != 0:
             if info.saw_value_return != 0:
-                self.emit_error("return type mismatch", info.mismatch_node)
+                self.report_inferred_return_mismatch(info.mismatch_node)
             return self.ty_void as i32
         if info.saw_value_return != 0:
             // §4.10 / D43 (#1494): a body that returns a value on one path and
@@ -10178,7 +10255,7 @@ impl Sema:
                     if self.none_value_join(info.value_type, body_ty as i32) < 0:
                         self.emit_error("cannot infer return type: `None` beside an `Option` could mean `Option[Option[T]]`; write the return type (D141)", body)
                     else:
-                        self.emit_error("return type mismatch", body)
+                        self.report_inferred_return_mismatch(body)
                 return joined.value_type
             if info.literal_type == 0:
                 return info.value_type
@@ -10195,7 +10272,7 @@ impl Sema:
                 let literal_ty: i32 = info.literal_type
                 let joined = self.merge_body_return_type_info(info, literal_ty, body)
                 if joined.mismatch != 0 and had_mismatch == 0:
-                    self.emit_error("return type mismatch", body)
+                    self.report_inferred_return_mismatch(body)
                 return joined.value_type
             if anchor != info.literal_type:
                 let saved_retype: i32 = self.literal_return_retype
@@ -14727,6 +14804,14 @@ impl Sema:
         // An unresolved type parameter may become str. An instantiated generic
         // such as Result[str, E] is already a known non-str container.
         if op == BinaryOp.OP_CONCAT:
+            // A `Never` operand (a self-call in D143's first pass, a panic)
+            // takes the other side's type, as it does under `+`.
+            if lhs != 0 and rhs != 0 and self.resolve_alias(lhs) == self.ty_never and self.resolve_alias(rhs) != self.ty_never:
+                self.typed_expr_types.insert(node, rhs as i32)
+                return rhs as i32
+            if lhs != 0 and rhs != 0 and self.resolve_alias(rhs) == self.ty_never:
+                self.typed_expr_types.insert(node, lhs as i32)
+                return lhs as i32
             if self.reject_unit_operand("++", lhs_node, lhs as i32) or self.reject_unit_operand("++", rhs_node, rhs as i32):
                 return 0
             let sequence = self.sequence_concat_result(node, lhs_node, rhs_node, lhs as i32, rhs as i32)
@@ -18914,6 +18999,10 @@ impl Sema:
         var resolved = self.resolve_alias(iter_type as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_REF:
             resolved = self.resolve_alias(self.get_type_d0(resolved as TypeId) as TypeId) as i32
+        // D142 (§13.1): a slice's `.iter()` is std's slice_iter, a free
+        // generic function over the slice (no `impl` names a slice type).
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_SLICE:
+            return self.demand_slice_implicit_iter(resolved, iterable, key_node)
         let owner_sym = self.method_owner_symbol_for_type(resolved)
         if owner_sym == 0:
             return 0
@@ -18987,6 +19076,38 @@ impl Sema:
     // substitution (as demand_generic_gen_each does for `each`); the call
     // contract it records under `key_node` moves to for_iter_types (the
     // result type) and the returned signature.
+    // D142: the `slice_iter` instance a `for` or `|>` over a slice steps,
+    // recorded under `key_node` as a method `iter()` would be
+    // (for_iter_fn_syms/sigs/monos/types), so MIR calls it the same way.
+    mut fn demand_slice_implicit_iter(slice_type: i32, iterable: i32, key_node: i32) -> i32:
+        let fn_sym = self.pool_lookup_symbol("slice_iter")
+        let fn_node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        if fn_node == 0:
+            return 0
+        let had_ty = self.typed_expr_types.contains(key_node)
+        let saved_ty: i32 = if had_ty: self.typed_expr_types.get(key_node).unwrap() else: 0
+        let had_sig = self.resolved_call_sigs.contains(key_node)
+        let saved_sig: i32 = if had_sig: self.resolved_call_sigs.get(key_node).unwrap() else: 0
+        let had_mono = self.resolved_call_mono_syms.contains(key_node)
+        let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
+        let arg_types: List[i32] = List.new()
+        arg_types.push(slice_type)
+        let arg_nodes: List[i32] = List.new()
+        arg_nodes.push(iterable)
+        let iterator_type = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, 1, key_node)
+        let iter_sig: i32 = self.resolved_call_sigs.get(key_node) ?? -1
+        let iter_mono: i32 = self.resolved_call_mono_syms.get(key_node) ?? 0
+        if had_ty: self.typed_expr_types.insert(key_node, saved_ty) else: self.typed_expr_types.remove(key_node)
+        if had_sig: self.resolved_call_sigs.insert(key_node, saved_sig) else: self.resolved_call_sigs.remove(key_node)
+        if had_mono: self.resolved_call_mono_syms.insert(key_node, saved_mono) else: self.resolved_call_mono_syms.remove(key_node)
+        if iterator_type == 0 or iter_sig < 0:
+            return 0
+        self.for_iter_types.insert(key_node, iterator_type)
+        self.for_iter_fn_syms.insert(key_node, fn_sym)
+        self.for_iter_sigs.insert(key_node, iter_sig)
+        if iter_mono != 0: self.for_iter_monos.insert(key_node, iter_mono)
+        iterator_type
+
     mut fn demand_generic_implicit_iter(owner_sym: i32, owner_type: i32, iter_fn: i32, iterable: i32, key_node: i32) -> i32:
         let had_ty = self.typed_expr_types.contains(key_node)
         let saved_ty: i32 = if had_ty: self.typed_expr_types.get(key_node).unwrap() else: 0
@@ -20670,7 +20791,24 @@ impl Sema:
             else if self.d32_is_field_access(elem) != 0 and self.type_needs_drop(et as i32) != 0:
                 self.mark_moved_if_consumed(elem)
 
-        let elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
+        var elem_type = self.resolve_contextual_join(expected_elem, &elem_nodes, &elem_origins, &elem_types, &elem_roles, node, "sequence literal")
+        // An element is an owned-value demand (§13.5, D22 §6.2): with no
+        // outer demand, a view of a Copy value, through every layer (D139),
+        // stores the value — `[pivot]` with `pivot: &isize` is a
+        // `List[isize]`, never a list of borrows into the matched place.
+        if expected_elem == 0 and elem_type != 0:
+            var elem_value = elem_type
+            for level in 0..8:
+                let ev_resolved = self.resolve_alias(elem_value as TypeId)
+                if self.get_type_kind(ev_resolved) != TypeKind.TY_REF or self.get_type_d1(ev_resolved) != 0: break
+                elem_value = self.get_type_d0(ev_resolved)
+            if elem_value != elem_type and self.is_copy(elem_value) != 0:
+                var all_adjusted = true
+                for ei in 0..elem_nodes.len():
+                    if self.record_contextual_copy_adjustment(elem_nodes[ei], elem_value, elem_types[ei]) == 0:
+                        all_adjusted = false
+                if all_adjusted:
+                    elem_type = elem_value
         // #2348: the demanded element and the elements' own type must agree;
         // a literal typed as the demanded collection regardless held a str
         // where `List[i32]` was declared.
@@ -24528,10 +24666,21 @@ impl Sema:
     // a declared `next()` and no method of that name of its own; 0 for the
     // compiler's built-in iterator types (their intrinsics stay) and every
     // other receiver.
+    fn receiver_is_slice(recv_type: i32) -> bool:
+        if recv_type == 0: return false
+        var resolved = self.resolve_alias(recv_type as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        self.get_type_kind(resolved) == TypeKind.TY_SLICE
+
     mut fn user_iter_adapter_fn(recv_type: i32, method: i32) -> i32:
         if recv_type == 0 or method == 0:
             return 0
         let name: str = with_str_clone_ref(self.pool_resolve(method))
+        // D142 (§13.1): a slice's `iter()` is std's slice_iter (no `impl`
+        // names a slice type).
+        if name == "iter" and self.receiver_is_slice(recv_type):
+            return self.generic_fn_node_for_symbol(self.pool_lookup_symbol("slice_iter"))
         if not sema_iter_adapter_name(name):
             return 0
         let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
@@ -24575,7 +24724,7 @@ impl Sema:
         // instance building the unspellable `List[&T]`. A view of a
         // non-Copy value has no implicit copy to store; say so here
         // instead of inside std's push.
-        var fn_name: str = "iter_" ++ self.pool_resolve(field)
+        var fn_name: str = if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter" else: "iter_" ++ self.pool_resolve(field)
         // `collect[HashSet]` / `collect[BTreeSet]` name their own builders
         // (check_pipeline recorded the bracket's target).
         if field == self.syms.collect:
@@ -24800,6 +24949,22 @@ impl Sema:
             return 0
         1
 
+    // The method a pipeline stage names (`|> map(f)`, `|> collect[List]()`,
+    // `|> count`), or 0.
+    fn pipeline_stage_method_sym(rhs: i32) -> i32:
+        let kind = self.ast.kind(rhs)
+        if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_GENERIC:
+            return self.ast.get_data0(rhs)
+        if kind != NodeKind.NK_CALL:
+            return 0
+        let callee = self.ast.get_data0(rhs)
+        let callee_kind = self.ast.kind(callee)
+        if callee_kind == NodeKind.NK_IDENT or callee_kind == NodeKind.NK_TYPE_GENERIC:
+            return self.ast.get_data0(callee)
+        if callee_kind == NodeKind.NK_INDEX and self.ast.kind(self.ast.get_data0(callee)) == NodeKind.NK_IDENT:
+            return self.ast.get_data0(self.ast.get_data0(callee))
+        0
+
     mut fn check_pipeline(node: i32) -> i32:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
@@ -24809,7 +24974,18 @@ impl Sema:
             let stage_meta = if stage_fn != 0: self.ast.find_fn_meta(stage_fn) else: -1
             if stage_meta >= 0 and self.ast.fn_meta_param_count(stage_meta) > 0:
                 self.hint_collection_literal(lhs, self.ast.fn_param_type(self.ast.fn_meta_param_start(stage_meta), 0))
-        let lhs_ty = self.check_expr(lhs)
+        var lhs_ty = self.check_expr(lhs)
+        // D142 (§13.5): a sequence on the left of `|>` iterates by the rule
+        // `for` uses: when the stage is no method of the value but is one of
+        // the iterator its `.iter()` returns, the stage sees `lhs.iter()`.
+        // MIR calls it (pipeline_implicit_iter; for_iter_* keyed by node).
+        if rhs != 0 and lhs_ty != 0:
+            let pipe_method = self.pipeline_stage_method_sym(rhs)
+            if pipe_method != 0 and self.pipeline_method_exists(lhs_ty as i32, pipe_method) == 0:
+                let implicit = self.resolve_implicit_iter_for(node, lhs, lhs_ty as i32)
+                if implicit != 0 and self.pipeline_method_exists(implicit, pipe_method) != 0:
+                    self.pipeline_implicit_iter.insert(node, implicit)
+                    lhs_ty = implicit as TypeId
         if rhs != 0:
             if self.ast.kind(rhs) == NodeKind.NK_CALL:
                 let rhs_callee = self.ast.get_data0(rhs)
@@ -26955,6 +27131,13 @@ impl Sema:
             self.note_allocating_callee(node, fn_sym)
             self.ensure_body_typed(fn_sym, sig_idx)
             var ret = self.sig_return_type(sig_idx) as i32
+            // D143: in the first pass over an unannotated body, a call of the
+            // function itself is the open result, `Never`: every join and
+            // operator takes the other side's type, and the other paths
+            // decide the function's; the second pass reads the decided type.
+            if fn_sym != 0 and fn_sym == self.recursion_open_sym:
+                self.recursion_self_calls.insert(node, 1)
+                ret = self.ty_never as i32
             // D51 stage 7 (spec §16.2b.8): a presented text-view return —
             // `returns borrow CStr …` / `returns static CStr` on a function
             // that is no resource's method — is `Option[CStr]` at the call,
@@ -26978,6 +27161,14 @@ impl Sema:
                 let callee_decl: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
                 let callee_meta = self.ast.find_fn_meta(callee_decl)
                 if callee_meta >= 0 and self.ast.fn_meta_ret(callee_meta) == 0 and self.ast.fn_meta_tp_count(callee_meta) == 0 and self.fn_decl_is_entry_point(callee_decl) == 0:
+                    // D143: the callee's body is in progress and reached
+                    // this one — mutual recursion with neither return type
+                    // written is named, not left to the inference.
+                    let callee_di: i32 = self.body_decl_by_fn.get(fn_sym) ?? -1
+                    let current_decl: i32 = self.fn_decl_nodes.get(self.current_fn_symbol) ?? 0
+                    let current_meta = if current_decl != 0: self.ast.find_fn_meta(current_decl) else: -1
+                    if callee_di >= 0 and callee_di < self.body_order_state.len() and self.body_order_state[callee_di] == 1 and current_meta >= 0 and self.ast.fn_meta_ret(current_meta) == 0:
+                        self.emit_error(f"`{self.pool_resolve(self.current_fn_symbol)}` and `{self.pool_resolve(fn_sym)}` call each other and neither declares a return type; write `->` on one of them (D143)", node)
                     self.untyped_callee_calls.push(node)
                     self.untyped_callee_calls.push(sig_idx)
                     self.untyped_callee_calls.push(fn_sym)
