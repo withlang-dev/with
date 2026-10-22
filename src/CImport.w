@@ -2601,7 +2601,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     var flex_accessor = ""
     if field_count > 0 and not is_union:
         let last_ftype = with_cimport_struct_field_type_translated(session, idx, field_count - 1)
-        if ci_array_is_flexible(last_ftype):
+        if ci_array_is_flexible(session, last_ftype):
             let elem_type = ci_array_text_elem(last_ftype)
             let last_fname = with_cimport_struct_field_name(session, idx, field_count - 1)
             let accessor_name = if last_fname.len() > 0: last_fname else: "data"
@@ -3270,8 +3270,8 @@ fn ci_offsetof_text_args(expr: &str) -> List[str]:
 // The name c_import gives field `fi` of `count` (typed `ty`): a trailing
 // `[T; 0]` or `[T; 1]` array in a struct is the flexible array member,
 // renamed `_name` beside its accessor method (ci_build_struct).
-fn ci_offsetof_field_emitted_name(field: &str, ty: &str, fi: i32, count: i32, is_union: bool) -> str:
-    if not is_union and fi == count - 1 and ci_array_is_flexible(ty):
+fn ci_offsetof_field_emitted_name(session: i64, field: &str, ty: &str, fi: i32, count: i32, is_union: bool) -> str:
+    if not is_union and fi == count - 1 and ci_array_is_flexible(session, ty):
         return "_" ++ ci_escape_reserved(field)
     ci_escape_reserved(field)
 
@@ -3279,8 +3279,16 @@ fn ci_offsetof_field_emitted_name(field: &str, ty: &str, fi: i32, count: i32, is
 // flexible array member idiom. A `[T; 1]` is a one-element array: STC's
 // `cspan_tuple1 { isize d[1]; }` and `_pos[1]` are read as arrays by
 // value, and guessing them flexible renamed the field under its uses.
-fn ci_array_is_flexible(ty: &str) -> bool:
-    ci_array_text_count(ty) == "0"
+// A trailing array of no elements is C99's flexible array member. The
+// one-element form (`long long items[1]`, Windows' ANYSIZE_ARRAY) is the same
+// idiom in a program's c_import of a system header (#1915); a migrated corpus
+// reads it as the one-element array it declares (STC's `cspan_tuple1 { d[1] }`
+// and `cspan_iter.pos[1]` are real arrays, and the renamed field broke their
+// designated initializers), D37: the migrator is faithful.
+fn ci_array_is_flexible(session: i64, ty: &str) -> bool:
+    let count = ci_array_text_count(ty)
+    count == "0" or (count == "1" and with_cimport_session_is_migration(session) == 0)
+
 
 // Field `field` of the record `record` names (a tag, or a typedef of one
 // resolved through typedefs, or a typedef of an anonymous record), as
@@ -3300,7 +3308,7 @@ fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> List
                 if with_cimport_struct_field_name(session, sidx, fi) == field:
                     let ty = with_cimport_struct_field_type_translated(session, sidx, fi)
                     out.push(ty.clone())
-                    out.push(ci_offsetof_field_emitted_name(field, ty, fi, count, is_union))
+                    out.push(ci_offsetof_field_emitted_name(session, field, ty, fi, count, is_union))
                     return out
             return out
         let tidx = ci_record_index_typedef(session, cur)
@@ -3314,7 +3322,7 @@ fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> List
                 if with_cimport_typedef_anon_field_name(session, tidx, fi) == field:
                     let ty = with_cimport_typedef_anon_field_type(session, tidx, fi)
                     out.push(ty.clone())
-                    out.push(ci_offsetof_field_emitted_name(field, ty, fi, count, is_union))
+                    out.push(ci_offsetof_field_emitted_name(session, field, ty, fi, count, is_union))
                     return out
             return out
         cur = target
