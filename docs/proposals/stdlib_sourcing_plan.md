@@ -555,6 +555,49 @@ code; facade complexity fixtures and drop audit green; #938, #939, and
 #940 closed. Evaluate `stable_sort` separately against its stability
 contract before exposing it.
 
+**Phase 3 status (2026-10-22, branch `stc-migrator`): the pipeline half.**
+- Corpus: pinned (`build/stc.w`, stclib/STC `fc5c0587`), the `src/` library
+  units migrated whole in STC_HEADER linkage against the header tree
+  (`Corpus.include_dirs`), plus a staged `ucd` unit for the Unicode tables
+  upstream compiles only into cregex; promoted to `lib/std/stc/` as the
+  fifth `.wo` bundle (drift harness: `examples/strings/replace.c`). Out,
+  loudly: `cregex` (setjmp) and `stc_core` (the coroutine runtime: its
+  records carry bitfields); the same rule keeps `hmap_test` migrated but
+  not compiled. A record with bitfields imports opaque (§16.9); the brief
+  is #2553 and STC's `hmap`/`hset`, the ruled default `HashMap`/`HashSet`
+  engine, wait on it.
+- Upstream tests: 7 of the 8 ctest units run under With, 19 tests, all
+  pass (`stc-test-fresh`, `stc-test`). Each unit is its own whole migration
+  (a unit's `#define T Intmap ..` is an hmap in one test and a sorted map in
+  another) with the library units upstream links; a generated runner calls
+  every registered test from its `ctest` record, fixtures through
+  setup/teardown; the assertions are a With harness
+  (`test/corpora/stc_harness`) exporting ctest.h's C names and counting
+  failures instead of longjmp. Promoted under `test/corpora/stc/` (one
+  shared `engine/`, `programs/<name>/`).
+- Migrator rules made for it, all general (basic-test cases in
+  `bs_check_migrate_stc_expression_forms`): `va_copy`, and `va_start`/
+  `va_copy` in goto bodies; hexadecimal float literals; a C type declared
+  under a builtin type's name is renamed (#2552); an unnamed member record
+  referenced outside its parent is named as its parent's translation names
+  it; a string literal in a variadic position is a C string; `[index] =
+  value` array designators; a record copied from a value is bound before
+  its address is taken (#2551); one definition two units include is one
+  symbol; a std corpus's foreign externs need no `unsafe` wrapper.
+  `std.libc` gained `rewind`, `putchar`, `struct tm`, `strftime`, `mktime`,
+  `timeval`/`gettimeofday` (the runtime's new wall clock in nanoseconds).
+  The pinned corpora re-promoted under this migrator (D112).
+- Compiler defects found and filed: #2552 (a std-package `pub type isize`
+  shadows the builtin package-wide), #2554 (a `@[c_export]` definition
+  dropped by a same-named `extern fn`; a bare `@[c_export]` exports
+  nothing), #2555 (std.sync under `--no-prelude`).
+- Open: the facade half — the generic-over-templates design item (STC's
+  `sort.h` is a quicksort with an `i_less` hook, so a comparator-slot
+  instantiation can serve arbitrary `T` beside direct instantiations for
+  the word-sized shapes), `std.algorithms`, the container facades, #938,
+  the complexity fixtures and drop-audit cells; bitfields (#2553) gate the
+  default map engine.
+
 **Phase 4 — M*LIB `m-bptree.h`, surgical.**
 Only the B+ tree, providing `BTreeMap`/`BTreeSet` and retiring their
 sorted-Vec implementation (#937). Benchmark against Phase 1's RB/AVL
