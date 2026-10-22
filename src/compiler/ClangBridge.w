@@ -4777,6 +4777,16 @@ fn with_ci_cursor_spelling_designator(session: i64, cursor_idx: i32) -> str:
 
 /// The definition the declaration at `cursor_idx` has (a record's body
 /// after its forward declaration), stored; -1 when it has none.
+/// The stored cursor's semantic parent (the record a member record is
+/// declared in), or -1.
+fn with_ci_cursor_semantic_parent(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+        let parent = clang_getCursorSemanticParent(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
+        if clang_Cursor_isNull(parent) != 0: return -1
+        store_cursor(s, parent)
+
 fn with_ci_cursor_definition(session: i64, cursor_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession

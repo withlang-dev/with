@@ -4618,7 +4618,35 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, va_w, "var __local_args2: c_va_list = __param_args", "va_copy as a declaration")
     if rc != 0: return rc
-    bs_file_contains(ctx, va_w, "rewind(", "rewind through std.libc")
+    rc = bs_file_contains(ctx, va_w, "rewind(", "rewind through std.libc")
+    if rc != 0: return rc
+    // A goto body: its lists are declared started at the top, a va_copy is
+    // the hoisted copy's assignment; struct tm, strftime, gettimeofday and
+    // putchar through std.libc.
+    let goto_src = bs_join(case_dir, "vagoto.c")
+    let goto_w = bs_join(case_dir, "vagoto.w")
+    rc = bs_write_fixture(ctx, goto_src, "#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <time.h>\n#include <sys/time.h>\ntypedef struct { char* data; long len, cap; int overwrite; } stream;\nstatic void sprint(stream* ss, const char* fmt, ...) {\n    va_list args, args2;\n    va_start(args, fmt);\n    if (ss == NULL) {\n        vprintf(fmt, args); putchar(10);\n        goto done1;\n    }\n    va_copy(args2, args);\n    const int n = vsnprintf(NULL, 0U, fmt, args);\n    if (n < 0) goto done2;\n    const long pos = ss->overwrite ? 0 : ss->len;\n    ss->len = pos + n;\n    if (ss->len > ss->cap) {\n        ss->cap = ss->len + ss->cap/2;\n        ss->data = (char*)realloc(ss->data, (size_t)ss->cap + 1U);\n    }\n    vsnprintf(ss->data + pos, (size_t)n+1, fmt, args2);\n    done2: va_end(args2);\n    done1: va_end(args);\n}\nstatic int count(int nargs, ...) {\n    int n = 0;\n    va_list args;\n    va_start(args, nargs);\n    while (1) {\n        const char* arg = va_arg(args, const char*);\n        if (arg[0] == 0) goto done;\n        n += (int)strlen(arg);\n    }\n    done:\n    va_end(args);\n    return n;\n}\nstatic const char* stamp(const struct tm* t, char* buf, int size) {\n    strftime(buf, (size_t)size, \"%Y\", t);\n    return buf;\n}\nstatic long long micros(void) { struct timeval tv; gettimeofday(&tv, NULL); return tv.tv_sec * 1000000LL + tv.tv_usec; }\nint main(void) {\n    stream s = {0, 0, 0, 0};\n    sprint(&s, \"%d-%s\", 42, \"x\");\n    sprint(&s, \"+%d\", 7);\n    struct tm t; memset(&t, 0, sizeof t); t.tm_year = 100; t.tm_mday = 1;\n    char buf[16];\n    int ok = strcmp(s.data, \"42-x+7\") == 0 && count(3, \"ab\", \"cde\", \"\") == 5 && strcmp(stamp(&t, buf, 16), \"2000\") == 0 && micros() > 1600000000000000LL;\n    free(s.data);\n    return ok ? 0 : 1;\n}\n", "va_start and va_copy in goto bodies, struct tm, strftime, gettimeofday, putchar")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "vagoto", &goto_src, &goto_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, goto_w, ": c_va_list = va_start()", "a goto body's list is declared started")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, goto_w, "gettimeofday(", "gettimeofday through std.libc")
+    if rc != 0: return rc
+    // sizeof of a member record names it as its parent's translation does; a
+    // hexadecimal float is written in decimal; a typedef spelling a With
+    // builtin type is renamed.
+    let anon_src = bs_join(case_dir, "memberrec.c")
+    let anon_w = bs_join(case_dir, "memberrec.w")
+    rc = bs_write_fixture(ctx, anon_src, "#include <string.h>\ntypedef long isize;\ntypedef union U { struct { char data[7]; unsigned char size; } sml; struct { char* data; isize size; } lon; } U;\nstatic isize small(U* u) { return (isize)sizeof u->sml; }\nstatic double tiny(void) { return 0x1.0p-52; }\nint main(void) { U u; memset(&u, 0, sizeof u); return (small(&u) == 8 && sizeof u == 16 && tiny() * 4503599627370496.0 == 1.0) ? 0 : 1; }\n", "sizeof of a member record, a hexadecimal float, a builtin-named typedef")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "memberrec", &anon_src, &anon_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, anon_w, "sizeof[U_sml]()", "sizeof of a member record")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, anon_w, "2.2204460492503131e-16", "hexadecimal float in decimal")
+    if rc != 0: return rc
+    bs_file_contains(ctx, anon_w, "pub type isize_ = c_long", "builtin-named typedef renamed")
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:

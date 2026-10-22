@@ -1250,6 +1250,50 @@ fn ci_find_child_of_kind(session: i64, cursor: i32, kind: i32) -> i32:
         i = i + 1
     -1
 
+// The renderer's name for the member record at `slot` of a record it
+// renders as `ty_name`: `ty_name_field`, or `ty_name_anon_N` with N counting
+// every member-record field before it.
+fn ci_member_record_synth_name(session: i64, decl_cursor: i32, slot: i32, ty_name: &str) -> str:
+    let field_name = with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, slot))
+    if field_name.len() > 0:
+        return ci_escape_reserved(ty_name ++ "_" ++ field_name)
+    var ordinal = 0
+    for fi in 0..slot:
+        if ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, fi)) >= 0:
+            ordinal = ordinal + 1
+    ci_escape_reserved(f"{ty_name}_anon_{ordinal}")
+
+// A member record's With name, as the record translation that embeds it
+// spells it (`Parent_field`, ci_member_record_synth_name): the bridge
+// translates the type of an unnamed member record to `c_void` and leaves
+// the naming to that translation, so a reference to the type outside the
+// parent (`sizeof self->sml`, a local of the member's type) is named here
+// the same way. "" when the type is not an unnamed member record.
+fn ci_member_record_type_name(session: i64, cxtype: i32) -> str:
+    if cxtype < 0: return ""
+    let decl = with_ci_type_declaration(session, cxtype)
+    if decl < 0 or with_ci_cursor_is_anonymous(session, decl) == 0: return ""
+    let parent = with_ci_cursor_semantic_parent(session, decl)
+    if parent < 0: return ""
+    let parent_kind = with_ci_cursor_kind(session, parent)
+    if parent_kind != CK_STRUCT and parent_kind != CK_UNION: return ""
+    var parent_name = ""
+    if with_ci_cursor_is_anonymous(session, parent) != 0:
+        parent_name = ci_member_record_type_name(session, with_ci_cursor_type(session, parent))
+        if parent_name.len() == 0: parent_name = with_ci_anon_record_name(session, parent)
+    else:
+        parent_name = ci_escape_reserved(with_ci_cursor_spelling(session, parent))
+    if parent_name.len() == 0: return ""
+    var slot = 0
+    while true:
+        let field = ci_decl_field_cursor(session, parent, slot)
+        if field < 0: break
+        let member = ci_field_cursor_anon_record_decl(session, field)
+        if member >= 0 and with_ci_cursors_equal(session, member, decl) != 0:
+            return ci_member_record_synth_name(session, parent, slot, parent_name)
+        slot = slot + 1
+    ""
+
 fn ci_decl_field_cursor(session: i64, decl_cursor: i32, field_idx: i32) -> i32:
     if decl_cursor < 0 or field_idx < 0:
         return -1
@@ -6573,6 +6617,13 @@ fn ci_escape_reserved(name: &str) -> str:
     if name == "assert" or name == "require" or name == "check": return name ++ "_"
     if name == "assert_eq" or name == "assert_ne" or name == "assert_matches_failed": return name ++ "_"
     if name == "int_to_string": return name ++ "_"
+    // A C typedef spelling a With builtin type (STC's `typedef ptrdiff_t
+    // isize;`): a module's `pub type isize` shadows the builtin in every
+    // module of its package (D100), the standard library's own included.
+    if name == "isize" or name == "usize" or name == "bool" or name == "str" or name == "char": return name ++ "_"
+    if name == "i8" or name == "i16" or name == "i32" or name == "i64" or name == "i128": return name ++ "_"
+    if name == "u8" or name == "u16" or name == "u32" or name == "u64" or name == "u128": return name ++ "_"
+    if name == "f32" or name == "f64" or name == "Unit" or name == "Never": return name ++ "_"
     if name == "and": return "and_"
     if name == "as": return "as_"
     if name == "asm": return "asm_"
@@ -6940,6 +6991,9 @@ impl CiExprPool:
             return self.bool_lit(0, 0 as CiTypeId)
         if default_text == "true":
             return self.bool_lit(1, 0 as CiTypeId)
+        if default_text == "va_start()":
+            let no_args: List[i32] = List.new()
+            return self.build_named_call_expr_typed("va_start", &no_args, 0 as CiTypeId)
         if default_text == "null":
             return self.null_ptr(0 as CiTypeId)
         // D119: a hoisted `List` local's zero fill (`[0; 64]`).
@@ -7862,7 +7916,12 @@ impl CiTypePool:
 
         if kind == CXT_Record:
             ci_trace_port("STRUCTURAL[b11.3.ty_struct]")
-            let name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
+            var name = ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype))
+            // An unnamed member record is `c_void` to the bridge: its name is
+            // the embedding record's (ci_member_record_type_name).
+            if name == "c_void":
+                let member_name = ci_member_record_type_name(session, cxtype)
+                if member_name.len() > 0: name = member_name
             if name.len() == 0:
                 return 0 as CiTypeId
             let name_idx = self.add_string(name)
@@ -8938,14 +8997,7 @@ impl CiExprPool:
     // counting every member-record field before it (as the renderer's
     // anon_idx does).
     fn member_record_synth_name(session: i64, decl_cursor: i32, slot: i32, ty_name: &str) -> str:
-        let field_name = with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, slot))
-        if field_name.len() > 0:
-            return ci_escape_reserved(ty_name ++ "_" ++ field_name)
-        var ordinal = 0
-        for fi in 0..slot:
-            if ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, fi)) >= 0:
-                ordinal = ordinal + 1
-        ci_escape_reserved(f"{ty_name}_anon_{ordinal}")
+        ci_member_record_synth_name(session, decl_cursor, slot, ty_name)
 
     // The field name the renderer emits for `slot`: its own, or `anon_N`.
     fn member_slot_emitted_name(session: i64, decl_cursor: i32, slot: i32) -> str:
@@ -10606,6 +10658,19 @@ impl CiExprPool:
             return self.int_lit(s, 0 as CiTypeId)
 
         if kind == CXK_FLOAT_LITERAL:
+            // A hexadecimal float (`0x1.0p-52`) has no With spelling: it is
+            // evaluated and written as the decimal that reads back to the
+            // same binary64 (17 significant digits).
+            let literal_text = with_ci_cursor_source_text(session, cursor)
+            if ci_is_hex_float_text(literal_text):
+                var value: f64 = 0.0
+                if unsafe { with_ci_eval_as_float(session, cursor, &raw mut value) } == 0:
+                    g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                    g_ci_bail_kind = kind
+                    g_ci_bail_message = "hexadecimal float literal did not evaluate"
+                    return 0 as CiExprId
+                let s = self.add_string(with_fmt_f64_spec(value, 0, 0, 16, 101))
+                return self.add(CiExprKind.CIE_FLOAT_LIT, s, 0, 0, 0 as CiTypeId)
             var src = with_ci_cursor_source_text(session, cursor)
             if src.len() > 0:
                 let last = src[src.len() - 1]
@@ -11027,6 +11092,7 @@ fn ci_migrate_preamble_extern_call_requires_unsafe(name: &str) -> bool:
         return not ci_translate_in_migrate_mode()
     // std.libc models this one as `unsafe fn` (it writes through its pointer).
     if name == "mach_timebase_info": return true
+    if name == "gettimeofday": return true
     false
 
 impl CiExprPool:
@@ -12620,6 +12686,13 @@ impl CiStmtPool:
                         arg_id = exprs.coerce_value_expr_for_target(session, target_ty, arg_cursor, arg_id, types)
                         if (arg_id as i32) == 0:
                             return ci_value_ir_invalid()
+                if param_index >= callee_param_count and with_ci_cursor_kind(session, arg_peeled) == CXK_STRING_LITERAL and exprs.kind(arg_id) == CiExprKind.CIE_STRING_LIT:
+                    // A string literal in a variadic position is C's `const char*`
+                    // (`printf("%s", "x")`), never a With `str` value.
+                    let c_string = types.type_from_translated_text("*const c_char")
+                    arg_id = exprs.coerce_value_expr_for_target(session, c_string, arg_cursor, arg_id, types)
+                    if (arg_id as i32) == 0:
+                        return ci_value_ir_invalid()
                 arg_ids.push(arg_id as i32)
                 ai = ai + 1
             let has_mapped_call = callee_text.len() > 0 and ci_has_value_libc_call_mapping(callee_text)
@@ -14325,6 +14398,28 @@ impl CiStmtPool:
         let decl_id = self.var_decl(self.add_string(storage_name), list_ty, source.value_expr, 1)
         CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
 
+    // `va_copy(dst, src);` in a goto body: `dst` is hoisted, declared
+    // uninitialized at the top, and the copy is its assignment here.
+    fn lower_va_copy_assign(session: i64, call: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
+        let list = ci_va_list_operand(session, call)
+        if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
+            let _ = ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
+            return 0 as CiStmtId
+        let storage = ci_scope_lookup(scope, ci_escape_reserved(with_ci_cursor_spelling(session, list)))
+        if storage.len() == 0:
+            let _ = ci_va_bail(session, call, "va_copy's destination is not a va_list this body declares")
+            return 0 as CiStmtId
+        if with_ci_num_children(session, call) < 3:
+            let _ = ci_va_bail(session, call, "va_copy names no source list")
+            return 0 as CiStmtId
+        let source = self.lower_value_expr_ir(session, with_ci_child(session, call, 2), exprs, types, scope)
+        if not ci_value_ir_valid(source) or (source.setup_stmt as i32) != 0:
+            let _ = ci_va_bail(session, call, "va_copy's source is not a plain list expression")
+            return 0 as CiStmtId
+        let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
+        let lhs = exprs.ident(exprs.add_string(storage), list_ty)
+        self.assign(lhs, source.value_expr)
+
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
         let nc = with_ci_num_children(session, cursor)
         var new_scope = scope
@@ -14341,9 +14436,16 @@ impl CiStmtPool:
             if va_key.len() > 0 and ci_str_contains(g_ci_va_started_decls, va_key):
                 // D75: a list va_start starts is declared there, as
                 // `var ap = va_start()` (lower_va_start_decl).
-                if hoisted or with_ci_var_initializer(session, child) >= 0:
-                    let _ = ci_va_bail(session, child, "va_start's list is declared with an initializer or in a hoisted body")
+                if with_ci_var_initializer(session, child) >= 0:
+                    let _ = ci_va_bail(session, child, "va_start's list is declared with an initializer")
                     return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+                // A hoisted body declares its lists at the top
+                // (ci_collect_var_decls); here the name only enters the scope.
+                if hoisted:
+                    let hoisted_escaped = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                    new_scope = ci_scope_add_mangled(new_scope, hoisted_escaped, ci_goto_hoisted_var_name(session, child))
+                    i = i + 1
+                    continue
                 g_ci_va_deferred_decls = g_ci_va_deferred_decls ++ va_key
                 deferred_va_list = true
             else if with_ci_cursor_kind(session, child) == CK_STRUCT or with_ci_cursor_kind(session, child) == CK_UNION:
@@ -14680,9 +14782,15 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     g_ci_va_deferred_decls = ""
     if not ci_collect_va_started_decls(session, body_cursor):
         return ""
+    // A goto body hoists its locals, and a list is declared only where it
+    // starts: every va_start must be a top-level statement of the body,
+    // each list started once, so the hoisted declaration is its start.
+    g_ci_va_hoisted_starts = ""
     if g_ci_va_started_decls.len() > 0 and ci_has_goto(session, body_cursor):
-        let _ = ci_va_bail(session, body_cursor, "va_start in a function with goto is not supported: the list's declaration cannot move to its start in a hoisted body")
-        return ""
+        g_ci_va_hoisted_starts = ci_va_top_level_starts(session, body_cursor)
+        if g_ci_va_hoisted_starts.len() == 0:
+            let _ = ci_va_bail(session, body_cursor, "va_start in a function with goto is supported only as a top-level statement of the body that starts its list once: the list's declaration is its start, hoisted")
+            return ""
 
     // Build initial scope from parameter names + return type.
     // Use cursor API for param names (old API returns "" for many functions).
@@ -15529,6 +15637,11 @@ fn ci_byte_array_literal_value(byte: i32, elem_ty: &str) -> str:
 
 fn ci_is_hex_digit(c: i32) -> bool:
     (c >= 48 and c <= 57) or (c >= 65 and c <= 70) or (c >= 97 and c <= 102)
+
+// `0x` or `0X`, then a binary exponent `p`/`P`: C's hexadecimal float.
+fn ci_is_hex_float_text(text: &str) -> bool:
+    if text.len() < 4 or text[0] != 48 or (text[1] != 120 and text[1] != 88): return false
+    text.contains("p") or text.contains("P")
 
 fn ci_hex_digit_value(c: i32) -> i32:
     if c >= 48 and c <= 57: return c - 48
@@ -17252,6 +17365,10 @@ var g_ci_bail_message: str = ""
 // declaration this body has reached and deferred.
 var g_ci_va_started_decls: str = ""
 var g_ci_va_deferred_decls: str = ""
+// The lists a goto body starts at its top level, once each: declared at the
+// top of the hoisted body as `var ap: c_va_list = va_start()` (a start is a
+// declaration, never an assignment), keyed like g_ci_va_started_decls.
+var g_ci_va_hoisted_starts: str = ""
 
 // Whether the expression under `cursor` reads the declaration `decl`
 // (a DeclRefExpr whose referenced declaration is at decl's location).
@@ -17312,6 +17429,36 @@ fn ci_va_list_operand(session: i64, call: i32) -> i32:
     if with_ci_num_children(session, call) < 2:
         return -1
     ci_peel_transparent(session, with_ci_child(session, call, 1))
+
+// The lists a body starts at its top level, keyed as g_ci_va_started_decls
+// is, when every va_start of the body is such a statement and no list is
+// started twice; "" otherwise. A goto body declares these at its top.
+fn ci_va_top_level_starts(session: i64, body: i32) -> str:
+    var keys = ""
+    var top_level = 0
+    let nc = with_ci_num_children(session, body)
+    var i = 0
+    while i < nc:
+        let child = ci_peel_transparent(session, with_ci_child(session, body, i))
+        if ci_stdarg_call_name(session, child) == "va_start":
+            let list = ci_va_list_operand(session, child)
+            if list < 0: return ""
+            let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
+            if ci_str_contains(keys, key): return ""
+            keys = keys ++ key
+            top_level = top_level + 1
+        i = i + 1
+    if top_level == 0 or ci_count_stdarg_calls(session, body, "va_start") != top_level: return ""
+    keys
+
+fn ci_count_stdarg_calls(session: i64, cursor: i32, operation: &str) -> i32:
+    var count = if ci_stdarg_call_name(session, cursor) == operation: 1 else: 0
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        count = count + ci_count_stdarg_calls(session, with_ci_child(session, cursor, i), operation)
+        i = i + 1
+    count
 
 // Before a body lowers: every va_start's list must be a local variable,
 // named directly; its declaration is keyed for deferral.
@@ -17945,6 +18092,11 @@ fn ci_collect_var_decls(session: i64, cursor: i32, decls_in: List[CiHoistedVarDe
                     vty_id = ci_nullable_fn_type(types, vty_id)
                     vty_str = ci_print_type(types, vty_id)
                 var default_text = ci_default_for_type(vty_str)
+                // D75: a list a goto body starts at its top level is declared
+                // started; one it only copies into (va_copy) is declared
+                // uninitialized and assigned at the copy.
+                if ci_str_contains(g_ci_va_hoisted_starts, "|" ++ with_ci_cursor_location(session, child) ++ "|"):
+                    default_text = "va_start()"
                 // D119: a hoisted local array is a `List` of its length too,
                 // declared with its zero fill and assigned where C wrote it.
                 if (vty_id as i32) != 0 and types.kind(vty_id) == CiTypeKind.CT_ARRAY:
@@ -18662,6 +18814,23 @@ impl CiGotoCfgContext:
             if inner_expr >= 0 and self.state.current >= 0:
                 self.append_lowered_leaf(session, cursor, stmts, exprs, types, scope)
             return
+        if kind == CXK_CALL_EXPR:
+            // D75 in a goto body: a top-level va_start is the hoisted
+            // declaration (nothing here); va_copy assigns the hoisted copy.
+            let stdarg = ci_stdarg_call_name(session, cursor)
+            if stdarg == "va_start":
+                let list = ci_va_list_operand(session, cursor)
+                if list >= 0 and ci_str_contains(g_ci_va_hoisted_starts, "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"):
+                    return
+            if stdarg == "va_copy":
+                if self.state.current < 0:
+                    return
+                let copied = stmts.lower_va_copy_assign(session, cursor, scope, exprs, types)
+                if (copied as i32) != 0:
+                    self.append_stmt(stmts, copied)
+                else:
+                    self.fail(ci_get_bail_message(), ci_get_bail_location())
+                return
         if kind == CXK_NULL_STMT:
             return
         if kind == CXK_LABEL_STMT:
@@ -19143,7 +19312,10 @@ impl CiStmtPool:
                 g_ci_bail_kind = CXK_COMPOUND_STMT
                 g_ci_bail_message = "unsupported hoisted local type in goto CFG"
                 return 0 as CiStmtId
-            var init_id = exprs.default_for_ci_type(ty_id, types)
+            // A list has no default: a started one is `= va_start()`, a copied-into
+            // one is declared uninitialized (uninitialized_list, below).
+            let is_list = ci_print_type(types, ty_id) == "c_va_list"
+            var init_id = if is_list: 0 as CiExprId else: exprs.default_for_ci_type(ty_id, types)
             if (init_id as i32) == 0 and decl.default_text.len() > 0:
                 init_id = exprs.default_expr_from_text(decl.default_text)
             // #740 class 4: flat record locals carry C's `{0}` as `Ty {  }` —
@@ -19152,7 +19324,10 @@ impl CiStmtPool:
             if (init_id as i32) == 0 and ci_type_needs_memcpy_assignment(types, ty_id):
                 if ci_record_all_fields_defaulted(session, ci_print_type(types, ty_id)):
                     init_id = exprs.add(CiExprKind.CIE_DESIGNATED_INIT, exprs.extra_len() as i32, 0, 0, ty_id)
-            if (init_id as i32) == 0 and not ci_type_needs_memcpy_assignment(types, ty_id):
+            // A copied-into list (va_copy) is declared uninitialized; its
+            // assignment is the copy.
+            let uninitialized_list = (init_id as i32) == 0 and is_list
+            if (init_id as i32) == 0 and not uninitialized_list and not ci_type_needs_memcpy_assignment(types, ty_id):
                 g_ci_bail_location = with_ci_cursor_location(session, body_cursor)
                 g_ci_bail_kind = CXK_COMPOUND_STMT
                 g_ci_bail_message = "unsupported hoisted local default in goto CFG"
@@ -19582,6 +19757,8 @@ fn ci_is_libm_fn(name: &str) -> bool: math_fn_lookup(name) >= 0
 
 fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rlimit": return CI_LIBC_KIND_TYPE
+    if name == "tm": return CI_LIBC_KIND_TYPE
+    if name == "strftime" or name == "mktime": return CI_LIBC_KIND_FN
     // The stdio globals (Darwin __std*p, glibc stdin/stdout/stderr): allowed
     // as variables so the reference is not a filtered system symbol, then
     // lowered as the std.libc accessor call (ci_libc_stream_accessor).
@@ -19599,6 +19776,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "rewind": return CI_LIBC_KIND_FN
+    if name == "putchar": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
     if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN
@@ -19616,6 +19794,8 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "qsort" or name == "rand" or name == "srand": return CI_LIBC_KIND_FN
     // Darwin's mach clock, modeled portably (std.libc: nanoseconds, 1/1).
     if name == "mach_absolute_time": return CI_LIBC_KIND_FN
+    if name == "gettimeofday": return CI_LIBC_KIND_FN
+    if name == "timeval": return CI_LIBC_KIND_TYPE
     // `mach_timebase_info` is both the function and the struct tag.
     if name == "mach_timebase_info": return CI_LIBC_KIND_FN | CI_LIBC_KIND_TYPE
     if name == "mach_timebase_info_data_t" or name == "kern_return_t": return CI_LIBC_KIND_TYPE
