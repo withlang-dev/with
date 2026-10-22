@@ -15847,7 +15847,12 @@ impl Sema:
             else if self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId)
             else if self.std_generic_of(have) == StdGeneric.List: self.get_generic_inst_arg(have, 0)
             else: 0
-        if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
+        // D142: a view of a value demands the value (D139); a view of a
+        // resource is the element, the list a list of views (§22.1 rule 7).
+        if elem == 0 and first_arg_ty != 0:
+            let arg_resolved = self.resolve_alias(first_arg_ty as TypeId)
+            let deref = self.auto_deref_ref_ptr_type(arg_resolved) as i32
+            elem = if self.get_type_kind(arg_resolved) == TypeKind.TY_REF and self.get_type_d1(arg_resolved) == 0 and self.is_copy(deref as TypeId) == 0: arg_resolved as i32 else: deref
         if elem == 0:
             return
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
@@ -16164,8 +16169,9 @@ impl Sema:
             else:
                 self.mark_moved_if_consumed(value)
 
-        if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
-            self.emit_error("ephemeral references cannot be stored in generic containers", node)
+        // §22.1 rules 3 and 7: a local `List[&T]` is an ephemeral container
+        // (its binding carries the views' origins, add_binding_view_deps);
+        // a struct field or a global of one stays refused (§3.3).
         let _ = self.reject_opaque_value_type(bind_type as i32, if ann_type_node != 0: ann_type_node else: value, "create")
         if self.pool_resolve(name) == "_" and self.expr_is_task_value(value) != 0 and self.expr_is_scoped_task_value(value) == 0:
             self.emit_error("`let _ = ...` is not the detach spelling for Task values; use statement position to detach, or bind and cancel(task)", node)
@@ -24833,10 +24839,16 @@ impl Sema:
                 if self.get_type_kind(cv_resolved) == TypeKind.TY_REF and self.get_type_d1(cv_resolved) == 0:
                     let cv_pointee = self.get_type_d0(cv_resolved)
                     if cv_pointee != 0 and self.get_type_kind(self.resolve_alias(cv_pointee)) != TypeKind.TY_REF:
-                        if self.is_copy(cv_pointee) == 0:
+                        // D142: views of resources stay views; `collect`
+                        // builds the `List[&T]` (plain iter_collect with T =
+                        // &T, §22.1 rule 7). The value-building terminals
+                        // have no view to hand back.
+                        let collects_views = field == self.syms.collect and self.user_collect_target == self.syms.list
+                        if self.is_copy(cv_pointee) == 0 and not collects_views:
                             self.emit_error(f"`{name_text}` over views of `{self.type_name(cv_pointee)}` cannot copy them out (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
                             return 0
-                        fn_name = fn_name ++ "_views"
+                        if self.is_copy(cv_pointee) != 0:
+                            fn_name = fn_name ++ "_views"
         var arg_types: List[i32] = List.new()
         let arg_nodes: List[i32] = List.new()
         let deferred: List[i32] = List.new()
@@ -32264,18 +32276,15 @@ impl Sema:
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
                 let list_copy = self.collect_copy_target(self.syms.list, iter_elem_ty, node)
                 if list_copy != 0: return list_copy
-                // #2271: even undemanded, collecting views stores the values
-                // (D22 §6.2): `List[&T]` is no spelling a result can own, so
-                // a Copy view's element copies in, as the user-adapter
-                // dispatch to iter_collect_views does. A non-Copy view has
-                // no implicit copy to store.
+                // #2271 / D142: even undemanded, collecting views of values
+                // stores the values (D22 §6.2, D139), as the user-adapter
+                // dispatch to iter_collect_views does; views of resources
+                // stay views, the result an ephemeral `List[&T]` (§22.1
+                // rule 7).
                 let elem_resolved = self.resolve_alias(iter_elem_ty as TypeId)
                 if self.get_type_kind(elem_resolved) == TypeKind.TY_REF and self.get_type_d1(elem_resolved) == 0:
                     let pointee = self.get_type_d0(elem_resolved)
-                    if pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF:
-                        if self.is_copy(pointee) == 0:
-                            self.emit_error(f"`collect[List]()` over views of `{self.type_name(pointee)}` cannot copy them into the List (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
-                            return 0
+                    if pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF and self.is_copy(pointee) != 0:
                         self.collect_copy_elements.insert(node, pointee)
                         return self.ensure_list_type_for(pointee)
                 return self.ensure_list_type_for(iter_elem_ty)
