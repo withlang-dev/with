@@ -3156,7 +3156,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         let is_forward_union = ci_starts_with(underlying, "union ")
         if is_forward_struct or is_forward_union:
             if not ci_record_definition_exists(session, name, is_forward_union):
-                let safe_name = ci_escape_reserved(name)
+                let safe_name = ci_escape_type_name(name)
                 with_cimport_mark_name_emitted(name)
                 // `typedef struct node node;`: the struct's own forward
                 // declaration already declared the opaque `node`. A second
@@ -3182,7 +3182,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
         ci_mark_type_name_emitted(name)
         return ""
 
-    let safe_name = ci_escape_reserved(name)
+    let safe_name = ci_escape_type_name(name)
     with_cimport_mark_name_emitted(name)
     ci_mark_type_name_emitted(name)
     // `typedef void H;` (curl's `CURL`) names an incomplete object type C
