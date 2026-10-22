@@ -1453,10 +1453,13 @@ impl Codegen:
         let global_ty = self.sema_type_to_llvm(result_tid)
         if global_ty == 0:
             return false
-        let _ = self.record_runtime_init_storage_global(name_sym, global_ty)
-        // Runtime-init storage is writable even for `let` bindings, so its
-        // heap-owning value registers for the exit drop regardless of mut.
-        self.register_module_global_drop(name_sym, result_tid)
+        // A `Unit` binding has no storage (a void global traps in LLVM): its
+        // initializer still runs before main, for its effects.
+        if global_ty != wl_void_type(self.context):
+            let _ = self.record_runtime_init_storage_global(name_sym, global_ty)
+            // Runtime-init storage is writable even for `let` bindings, so its
+            // heap-owning value registers for the exit drop regardless of mut.
+            self.register_module_global_drop(name_sym, result_tid)
         if self.current_decl_is_imported_module_symbol():
             return true
         self.module_runtime_init_syms.push(name_sym)
@@ -1686,18 +1689,22 @@ impl Codegen:
             let name_sym: i32 = self.module_runtime_init_syms[i]
             let value_node: i32 = self.module_runtime_init_nodes[i]
             let result_tid: i32 = self.module_runtime_init_type_ids[i]
-            let global_opt = self.module_constants.get(name_sym)
-            if not global_opt.is_some():
+            let stored = self.module_constants.get(name_sym)
+            let global_val: i64 = if stored.is_some(): stored.unwrap() as i64 else: 0
+            let init_ty = self.sema_type_to_llvm(result_tid)
+            // A `Unit` binding has no storage (a void global traps in LLVM):
+            // its initializer runs for its effects and nothing is stored.
+            let unit_binding = init_ty != 0 and init_ty == wl_void_type(self.context)
+            if global_val == 0 and not unit_binding:
                 with_eprint("error: missing global storage for runtime-initialized module constant '" ++ self.intern.resolve(name_sym) ++ "'")
                 self.had_error = 1
                 return
             let init_fn = self.emit_module_runtime_init_fn(name_sym, value_node, result_tid)
-            let init_ty = self.sema_type_to_llvm(result_tid)
             if init_fn == 0 or init_ty == 0:
                 with_eprint("error: failed to emit runtime initializer for module constant '" ++ self.intern.resolve(name_sym) ++ "'")
                 self.had_error = 1
                 return
-            self.module_runtime_init_globals.push(global_opt.unwrap() as i64)
+            self.module_runtime_init_globals.push(if unit_binding: 0 else: global_val)
             self.module_runtime_init_fns.push(init_fn)
             self.module_runtime_init_types.push(init_ty)
 
@@ -2514,6 +2521,11 @@ impl Codegen:
                 0
         if runtime_tid != 0:
             let resolved_runtime = self.sema.resolve_alias(runtime_tid as TypeId)
+            // A `Unit` binding whose value the comptime transform already
+            // evaluated (an empty block, D147's layout assertion) has no
+            // storage and nothing to run: it is done.
+            if self.sema.get_type_kind(resolved_runtime) == TypeKind.TY_VOID and self.pool.kind(value_node) == NodeKind.NK_BLOCK and self.pool.get_data1(value_node) == 0 and self.pool.get_data2(value_node) == 0:
+                return
             // #880's rule for the whole global, not only a struct field: an
             // address constant — a C string's `.ptr`, a global's address, a
             // function, a struct or array of them — is initialized data, never

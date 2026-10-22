@@ -8107,11 +8107,13 @@ impl Codegen:
             let init_fn = self.module_runtime_init_fns[i]
             let init_ty = self.module_runtime_init_types[i]
             let init_global = self.module_runtime_init_globals[i]
-            if init_fn == 0 or init_ty == 0 or init_global == 0:
+            if init_fn == 0 or init_ty == 0:
                 continue
             let init_ft = wl_global_get_value_type(init_fn)
             let init_value = wl_build_call(self.builder, init_ft, init_fn, 0, 0)
-            wl_build_store(self.builder, init_value, init_global)
+            // A `Unit` binding has no storage: its initializer ran for its effects.
+            if init_global != 0:
+                wl_build_store(self.builder, init_value, init_global)
 
         let main_param_count = wl_count_param_types(main_ft)
         var main_call: i64 = 0
