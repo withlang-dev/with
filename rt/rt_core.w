@@ -3728,6 +3728,11 @@ pub fn with_vec_set_i64(v: *mut u8, idx: i64, val: i64):
 pub fn with_vec_remove_es(v: *mut u8, idx: i64, es: i64):
     let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen: return
+    // #938: the head comes off by advancing the start (D115), O(1); the
+    // caller has already read the element out (LIST_REMOVE loads it first).
+    if idx == 0:
+        with_vec_take_front_es(v, es)
+        return
     let base = list_get_ptr_field(v)
     var i = idx
     while i < vlen - 1:
@@ -5386,3 +5391,4 @@ c facade libc:
     fn rt_libc_free
         preserves domain environ
         preserves domain locale
+

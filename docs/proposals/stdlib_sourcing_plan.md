@@ -610,8 +610,10 @@ contract before exposing it.
   came out of it (a sole-definer header function is published; a recursive
   `pub fn` keeps `-> Unit`, D143). Facades: `PriorityQueue`, `OrderedSet`,
   `OrderedMap`, `Deque`, `BitSet`, `List.sort`/`sort_by`/`binary_search`/
-  `lower_bound`/`upper_bound`/`reverse` (#940); `ListIntoIter` takes the
-  head in O(1) (#938). Each has a behavior fixture, complexity rows
+  `lower_bound`/`upper_bound`/`reverse` (#940); the runtime's `remove(0)`
+  advances the buffer's start (D115), so consuming iteration is O(1) per
+  element (#938; the native `BTreeMap`'s descending rebuild became linear
+  with it, its ascending scan and `BTreeSet` stay #937). Each has a behavior fixture, complexity rows
   (`test/complexity/stdlib.w`) and drop-audit cells. Benchmark
   (`test/benchmark/stc_engines.w`, n = 100000 i32, ns per operation,
   insert/lookup/remove): PriorityQueue 18/0/109 against the c-algorithms
@@ -660,4 +662,5 @@ for now").
    grouping. Optional public types (`BinaryHeap`, `SortedVec`, specialized
    indexes/storage) and detailed new API signatures remain facade-PR
    decisions.
+
 

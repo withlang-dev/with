@@ -526,20 +526,12 @@ pub trait IntoIter[T]:
 impl[T] IntoIter[T] for List[T]:
     move fn into_iter() -> ListIntoIter[T]: ListIntoIter { list: self }
 
-/// The one-field view of an element through which the head moves out
-/// (`move` takes a field path; a bare `*p` is not one).
-type ListHead[T] { value: T }
-
 impl[T] Iter[T] for ListIntoIter[T]:
-    // #938: the head moves out through its own address and the buffer's
-    // start advances (D115, O(1)); the vacated element is never dropped by
-    // the list, which no longer owns it.
+    // remove(0) is D27's proven element transfer, and the runtime takes the
+    // head by advancing the buffer's start (D115), O(1) per element (#938).
     mut fn next() -> Option[T]:
         if self.list.len() == 0: return None
-        var head = (&raw mut self.list[0]) as *mut ListHead[T]
-        let value: T = unsafe { move head.value }
-        with_vec_take_front_es((&raw mut self.list) as *mut u8, sizeof[T]())
-        Some(value)
+        self.list.remove(0)
 
 // ── Map traversal (D44) ───────────────────────────────────────────
 // The observing traversals of a keyed map: concrete ephemeral structs over a
@@ -1191,4 +1183,5 @@ pub fn iter_unzip_views[A, B, I: Iter[(&A, &B)]](iter: I) -> (List[A], List[B]):
                 firsts.push(pair.0)
                 seconds.push(pair.1)
     (firsts, seconds)
+
 

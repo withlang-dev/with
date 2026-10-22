@@ -379,7 +379,10 @@ else:
     measure("hashset", hashset_work, 4000, 0)
     measure("vec-into-iter", consuming_work, 4000, 0)
     measure("btree-map-ascending", btree_map_ascending, 1000, 937)
-    measure("btree-map-descending", btree_map_descending, 128, 937)
+    // #938's root fix (remove(0) advances the buffer's start) made the
+    // map's descending rebuild linear; the set's and the ascending rows stay
+    // #937's linear scan.
+    measure("btree-map-descending", btree_map_descending, 128, 0)
     measure("btree-set-ascending", btree_set_ascending, 1000, 937)
     measure("btree-set-descending", btree_set_descending, 1000, 937)
     measure("sorted-vec", sorted_list_work, 4000, 0)
