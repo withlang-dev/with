@@ -134,7 +134,7 @@ impl XmlParser:
 
     // Advances past `close`, counting lines; an error when it never comes.
     mut fn skip_past(close: &str, what: &str) -> Result[Unit, XmlError]:
-        let start_line: i32 = self.line
+        let start_line = self.line
         let at = self.src.find(close, self.pos)
         if at < 0: return Err(xml_error(start_line, "unterminated " ++ what))
         self.advance(at + close.len() - self.pos)
@@ -153,7 +153,7 @@ impl XmlParser:
     mut fn skip_prolog() -> Result[Unit, XmlError]:
         self.skip_misc()?
         if self.looking_at("<!DOCTYPE"):
-            let start_line: i32 = self.line
+            let start_line = self.line
             var depth = 0
             while true:
                 if self.at_end(): return Err(xml_error(start_line, "unterminated document type declaration"))
@@ -168,7 +168,7 @@ impl XmlParser:
 
     mut fn parse_name() -> Result[str, XmlError]:
         if not xml_is_name_start(self.peek()): return Err(xml_error(self.line, "expected a name"))
-        let start: isize = self.pos
+        let start = self.pos
         while xml_is_name_char(self.peek()): self.advance(1)
         Ok(self.src.slice(start, self.pos))
 
@@ -221,7 +221,7 @@ impl XmlParser:
     mut fn parse_text(sb: StringBuilder) -> Result[StringBuilder, XmlError]:
         var out = sb
         while true:
-            let start: isize = self.pos
+            let start = self.pos
             while not self.at_end() and self.peek() != '<' and self.peek() != '&': self.advance(1)
             if self.pos > start: out.push_str(self.src.slice(start, self.pos))
             if self.peek() == '&': out = self.parse_reference(out)?
@@ -230,7 +230,7 @@ impl XmlParser:
 
     // With the cursor on the `<` of a start tag.
     mut fn parse_element() -> Result[XmlElement, XmlError]:
-        let open_line: i32 = self.line
+        let open_line = self.line
         self.advance(1)
         let name = self.parse_name()?
         var attrs: List[XmlAttr] = List.new()
@@ -270,7 +270,7 @@ impl XmlParser:
             if self.looking_at("<!--"): self.skip_past("-->", "comment")?
             else if self.looking_at("<?"): self.skip_past("?>", "processing instruction")?
             else if self.looking_at("<![CDATA["):
-                let start_line: i32 = self.line
+                let start_line = self.line
                 self.advance(9)
                 let end = self.src.find("]]>", self.pos)
                 if end < 0: return Err(xml_error(start_line, "unterminated CDATA section"))
