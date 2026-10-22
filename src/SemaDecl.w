@@ -3501,7 +3501,9 @@ impl Sema:
         if kind == NodeKind.NK_TYPE_GENERIC:
             let base_sym = self.ast.get_data0(node)
             let base_prim = self.primitive_type_by_sym(base_sym)
-            if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, base_sym) == 0:
+            // `Range[T]` / `RangeInclusive[T]` are the built-in range
+            // constructors (§4.7), spellable in a generic signature.
+            if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, base_sym) == 0 and self.canonical_range_type_constructor_inclusive(base_sym) < 0:
                 self.debug_unknown_type(base_sym, node, "validate_type_generic")
                 self.emit_unknown_type_error(base_sym, node)
             let extra_start = self.ast.get_data1(node)

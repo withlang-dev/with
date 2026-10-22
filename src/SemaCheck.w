@@ -19009,7 +19009,11 @@ impl Sema:
         // D142 (§13.1): a slice's `.iter()` is std's slice_iter, a free
         // generic function over the slice (no `impl` names a slice type).
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_SLICE:
-            return self.demand_slice_implicit_iter(resolved, iterable, key_node)
+            return self.demand_free_fn_implicit_iter("slice_iter", resolved, iterable, key_node)
+        // #2544 (§4.7, §13.5): a range is a sequence; its iterator is std's
+        // range_iter over the bounds (`for` keeps its counter loop).
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_RANGE:
+            return self.demand_free_fn_implicit_iter(self.range_iter_fn_name(resolved), resolved, iterable, key_node)
         let owner_sym = self.method_owner_symbol_for_type(resolved)
         if owner_sym == 0:
             return 0
@@ -19083,11 +19087,23 @@ impl Sema:
     // substitution (as demand_generic_gen_each does for `each`); the call
     // contract it records under `key_node` moves to for_iter_types (the
     // result type) and the returned signature.
-    // D142: the `slice_iter` instance a `for` or `|>` over a slice steps,
-    // recorded under `key_node` as a method `iter()` would be
-    // (for_iter_fn_syms/sigs/monos/types), so MIR calls it the same way.
-    mut fn demand_slice_implicit_iter(slice_type: i32, iterable: i32, key_node: i32) -> i32:
-        let fn_sym = self.pool_lookup_symbol("slice_iter")
+    // §4.7: a range's std iterator by its inclusiveness (the type's d1).
+    fn range_iter_fn_name(range_type: i32) -> str:
+        if self.get_type_d1(self.resolve_alias(range_type as TypeId)) != 0: "range_iter_inclusive" else: "range_iter"
+
+    fn receiver_is_range(recv_type: i32) -> bool:
+        if recv_type == 0: return false
+        var resolved = self.resolve_alias(recv_type as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        self.get_type_kind(resolved) == TypeKind.TY_RANGE
+
+    // D142: the std free-function iterator (`slice_iter`, `range_iter`) a
+    // `for` or `|>` over a built-in sequence steps, recorded under
+    // `key_node` as a method `iter()` would be (for_iter_fn_syms/sigs/
+    // monos/types), so MIR calls it the same way.
+    mut fn demand_free_fn_implicit_iter(fn_name: str, seq_type: i32, iterable: i32, key_node: i32) -> i32:
+        let fn_sym = self.pool_lookup_symbol(fn_name)
         let fn_node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
         if fn_node == 0:
             return 0
@@ -19098,7 +19114,7 @@ impl Sema:
         let had_mono = self.resolved_call_mono_syms.contains(key_node)
         let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
         let arg_types: List[i32] = List.new()
-        arg_types.push(slice_type)
+        arg_types.push(seq_type)
         let arg_nodes: List[i32] = List.new()
         arg_nodes.push(iterable)
         let iterator_type = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, 1, key_node)
@@ -20139,6 +20155,16 @@ impl Sema:
             let field_name: str = with_str_clone_ref(self.pool_resolve(field))
             if field_name == "len":
                 return self.ty_i64 as i32
+            self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
+            return 0
+
+        // §4.7: a range's bounds are its `start` and `end` (read-only; the
+        // value is its two elements, MIR's fields 0 and 1).
+        if ftk == TypeKind.TY_RANGE:
+            let field_name: str = with_str_clone_ref(self.pool_resolve(field))
+            if field_name == "start" or field_name == "end":
+                self.range_bound_fields.insert(node, if field_name == "end": 1 else: 0)
+                return self.get_type_d0(field_base)
             self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
 
@@ -24701,6 +24727,9 @@ impl Sema:
         // names a slice type).
         if name == "iter" and self.receiver_is_slice(recv_type):
             return self.generic_fn_node_for_symbol(self.pool_lookup_symbol("slice_iter"))
+        // #2544 (§4.7): a range's `iter()` is std's range_iter.
+        if name == "iter" and self.receiver_is_range(recv_type):
+            return self.generic_fn_node_for_symbol(self.pool_lookup_symbol(self.range_iter_fn_name(recv_type)))
         if not sema_iter_adapter_name(name):
             return 0
         let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
@@ -24744,7 +24773,10 @@ impl Sema:
         // instance building the unspellable `List[&T]`. A view of a
         // non-Copy value has no implicit copy to store; say so here
         // instead of inside std's push.
-        var fn_name: str = if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter" else: "iter_" ++ self.pool_resolve(field)
+        var fn_name: str =
+            if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter"
+            else if self.receiver_is_range(recv_type) and self.pool_resolve(field) == "iter": self.range_iter_fn_name(recv_type)
+            else: "iter_" ++ self.pool_resolve(field)
         // `collect[HashSet]` / `collect[BTreeSet]` name their own builders
         // (check_pipeline recorded the bracket's target).
         if field == self.syms.collect:
@@ -29363,6 +29395,11 @@ impl Sema:
                             self.emit_error(f"cannot infer one lane count for '{self.pool_resolve(self.ast.get_data0(count_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3d)", err_node)
                             return
                         self.put_generic_subst(self.ast.get_data0(count_node), count_ty, err_node)
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                return
+            // `Range[T]` binds T from a range argument's element type (§4.7).
+            if self.canonical_range_type_constructor_inclusive(base_sym) >= 0:
+                if self.get_type_kind(resolved) == TypeKind.TY_RANGE and self.ast.get_data2(type_node) == 1:
                     self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
                 return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:

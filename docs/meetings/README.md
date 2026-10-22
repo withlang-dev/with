@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D145 — A range has `iter()` and its bounds are `start` and `end`; `Range[T]` is spellable in a generic signature (delegated)](2026-10-22-D145-a-range-has-iter-and-its-bounds-are-start-and-end.md)
 - [D144 — A binding from a place of a plain-bits type takes the value; any other binding from a place observes it, mutated through when the subject is mutable (#2541; D44's rule for every binding; amends #1531)](2026-10-21-D144-a-binding-from-a-place-of-plain-bits-takes-the-value-any-other-observes.md)
 - [D143 — A function that calls itself infers its return type from the paths that do not (the ML rule); a `pub fn` declares it (Law 6); mutual recursion is written, naming the cycle (amends D43)](2026-10-21-D143-a-function-that-calls-itself-infers-its-return-from-the-other-paths.md)
 - [D142 — A sequence on the left of `|>` iterates by the `for` rule; a slice has `iter()`; collecting views of values builds values (extends §13.5; D111, D139)](2026-10-21-D142-a-sequence-on-the-left-of-a-pipeline-iterates.md)

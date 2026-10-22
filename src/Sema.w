@@ -1664,6 +1664,9 @@ type Sema {
     // bits); MIR aliases them. And the bindings (by symbol) observing a
     // place whose root is mutable: a mutating call through one writes it.
     pattern_place_bindings: HashMap[i32, i32],
+    // §4.7: a `start`/`end` field access on a range, keyed by the access
+    // node, with the bound's field index (0 or 1) for MIR (D65).
+    range_bound_fields: HashMap[i32, i32],
     binding_observes_mutable_place: HashMap[i32, i32],
     // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
     // appended to the narrowing diagnostic; "" when not known.
@@ -3720,6 +3723,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
         pattern_place_bindings: sema_new_map_i32_i32(),
+        range_bound_fields: sema_new_map_i32_i32(),
         binding_observes_mutable_place: sema_new_map_i32_i32(),
         narrowing_target_note: "",
         owned_slice_patterns: sema_new_map_i32_i32(),

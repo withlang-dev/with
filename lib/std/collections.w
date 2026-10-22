@@ -475,6 +475,27 @@ impl[T] Iter[&T] for SliceIter[T]:
 
 pub fn slice_iter[T](s: []T) -> SliceIter[T]: SliceIter { data: s, idx: 0 }
 
+/// A range's `iter()` (#2544, §4.7, §13.5): counts from `start` up to `end`
+/// (through it for `..=`); `next()` yields the values. The compiler
+/// resolves `r.iter()`, and a range on the left of `|>`, here; `for` keeps
+/// its counter loop.
+pub type RangeIter[T] { cur: T, end: T, inclusive: bool, done: bool }
+
+impl[T: One + Ord] Iter[T] for RangeIter[T]:
+    mut fn next() -> Option[T]:
+        if self.done: return None
+        if self.inclusive:
+            if self.cur > self.end: return None
+            if self.cur == self.end: self.done = true
+        else if self.cur >= self.end:
+            return None
+        let v = self.cur
+        self.cur = self.cur + T.one()
+        v
+
+pub fn range_iter[T](r: Range[T]) -> RangeIter[T]: RangeIter { cur: r.start, end: r.end, inclusive: false, done: false }
+pub fn range_iter_inclusive[T](r: RangeInclusive[T]) -> RangeIter[T]: RangeIter { cur: r.start, end: r.end, inclusive: true, done: false }
+
 /// Each element with its index (§13.5): `for (i, x) in xs.enumerate():`.
 impl[T] List[T]:
     // D100 (§18.3): List's fields are private to std. The buffer's address,
