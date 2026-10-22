@@ -2359,6 +2359,33 @@ impl Sema:
             if self.typed_expr_types.contains(expr_node):
                 return self.typed_expr_types.get(expr_node).unwrap()
             sema_phase_bug("BUG: frozen @TypeOf has no checked expression type")
+        // `[T; N]` as a type (resolve_type_level_arg_expr): the array type the
+        // check created, found, never made (frozen).
+        if kind == NodeKind.NK_ARRAY_LIT:
+            let elem_count = self.ast.get_data1(node)
+            let fill_count = self.ast.get_data2(node)
+            if fill_count != 0 and elem_count == 1:
+                let elem = self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node)))
+                if elem == 0:
+                    return 0
+                let count = self.int_literal_i64_value(fill_count)
+                if count.ok == 0 or count.value < 0:
+                    return 0
+                return self.find_exact_type(TypeKind.TY_ARRAY, elem, count.value as i32, 0) as i32
+            if fill_count == 0 and elem_count > 0:
+                let first = self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node)))
+                if first == 0:
+                    return 0
+                for ei in 1..elem_count:
+                    if self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node) + ei)) != first:
+                        return 0
+                return self.find_exact_type(TypeKind.TY_ARRAY, first, elem_count, 0) as i32
+            return 0
+        if kind == NodeKind.NK_TYPE_ARRAY and self.ast.get_data2(node) == 0:
+            let elem = self.resolve_type_level_arg_expr_frozen(self.ast.get_data0(node))
+            if elem == 0:
+                return 0
+            return self.find_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(node), 0) as i32
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             let inner = self.resolve_type_level_arg_expr_frozen(self.ast.get_data1(node))
