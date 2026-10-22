@@ -46,6 +46,17 @@ semantics via copy-on-write), the known gotcha; Scala binds the object. Law
 1: two meanings remained and the compiler chose the one that loses the
 write. Prediction was observe at 80%.
 
+**Open for Eric (implemented narrowly).** §9.7 lists a temporary, a `move`
+place and a parameter as owned subjects; a bare local is a place. The
+channel idiom `let pair = channel(); let (tx, rx) = pair` destructures a
+local holding resources and then moves `tx` on, which observing would
+refuse until `let (tx, rx) = move pair` is written. The implementation
+keeps D115's implicit take for a bare local whose payload is not Copy (a
+resource), and observes every projection and every value payload. Whether
+that local should observe and spell `move` (D115's letter) is his call;
+a plain enum (`enum E: A(i32)`) is not Copy today, so it falls on the
+resource side of that line.
+
 **Consequence.** Sema: `type_is_plain_bits` (Copy with no drop glue);
 `field_let_binds_as_view` returns no view for plain bits; a pattern
 identifier on an observed subject of a non-plain-bits payload is marked

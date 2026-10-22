@@ -15643,6 +15643,12 @@ impl Sema:
     // moved with `move`, a by-value parameter (dies with the frame) — is
     // taken apart by value. A `self` receiver that borrows the caller's
     // place (`fn`, `mut fn`) is a place, as a local or a field is.
+    fn pattern_subject_is_bare_local(subject: i32) -> bool:
+        var expr = subject
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        expr != 0 and self.ast.kind(expr) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(expr)) != 0 and self.param_index_for_sym(self.ast.get_data0(expr)) < 0
+
     fn pattern_subject_root_owned(subject: i32) -> bool:
         var expr = subject
         while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
@@ -23523,7 +23529,12 @@ impl Sema:
             // the payload's place (MIR aliases it, pattern_place_bindings),
             // mutated through when the subject's root is mutable. Plain
             // bits take the value.
-            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
+            // A bare local holding a resource payload (`let (tx, rx) =
+            // pair`) keeps D115's implicit take: the local is this frame's
+            // own, and the pattern is its last word on it. Open for Eric's
+            // ruling whether that local should observe and spell `move`.
+            let bare_local_resource = self.pattern_subject_is_bare_local(self.pattern_subject_node) and self.is_copy(subject_type as TypeId) == 0
+            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not bare_local_resource and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
                 self.scope_set_is_view_bound(sym)
                 self.record_view_binding_from_expr(sym, self.pattern_subject_node)
