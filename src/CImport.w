@@ -7462,6 +7462,56 @@ impl CiStmtPool:
         // is failure.
         if (effects as i32) == 0: self.empty_stmt_ir() else: effects
 
+    // An initializer element that carries statements of its own — a comma
+    // expression (`a + ((void)sizeof(..), i)`, STC's cspan_at), a compound
+    // literal of array type, a call whose arguments do — is computed into a
+    // temporary before the initializer, and the initializer reads the
+    // temporary (ci_expr_substitution_for). Nested initializer lists are
+    // walked; a designated element's value is the element. Returns the
+    // merged setup statements (0 when none), -1 when an element fails.
+    fn hoist_init_list_element_setups(session: i64, list_cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope) -> i32:
+        var setup: CiStmtId = 0 as CiStmtId
+        let nc = with_ci_num_children(session, list_cursor)
+        for ci in 0..nc:
+            let child = with_ci_child(session, list_cursor, ci)
+            var value = if ci_init_child_has_designator(session, child) != 0: ci_init_child_designated_value(session, child) else: child
+            if value < 0:
+                continue
+            value = ci_peel_transparent(session, value)
+            let value_kind = with_ci_cursor_kind(session, value)
+            if value_kind == CXK_INIT_LIST:
+                let nested = self.hoist_init_list_element_setups(session, value, exprs, types, scope)
+                if nested < 0: return -1
+                setup = self.merge_ir(setup, nested as CiStmtId)
+                continue
+            if not ci_cursor_kind_is_expression(value_kind):
+                continue
+            let lowered = self.lower_value_expr_ir(session, value, exprs, types, scope)
+            if not ci_value_ir_valid(lowered):
+                return -1
+            if (lowered.setup_stmt as i32) == 0:
+                continue
+            // The element already names a temporary (an array compound
+            // literal): read it; otherwise compute it into one.
+            var read: CiExprId = lowered.value_expr
+            var element_setup: CiStmtId = lowered.setup_stmt
+            if exprs.kind(lowered.value_expr) != CiExprKind.CIE_IDENT:
+                let temp = ci_expr_temp_name(session, value, "init")
+                let temp_ty = types.type_from_libclang(session, with_ci_cursor_type(session, value))
+                if (temp_ty as i32) == 0:
+                    return -1
+                let decl_id = self.var_decl(self.add_string(temp), temp_ty, lowered.value_expr, 1)
+                element_setup = self.merge_ir(lowered.setup_stmt, decl_id)
+                read = exprs.ident(exprs.add_string(temp), temp_ty)
+            setup = self.merge_ir(setup, element_setup)
+            g_ci_expr_substitution_cursors.push(value)
+            g_ci_expr_substitution_exprs.push(read as i32)
+            // The unpeeled element reads as the temporary too.
+            if child != value and ci_init_child_has_designator(session, child) == 0:
+                g_ci_expr_substitution_cursors.push(child)
+                g_ci_expr_substitution_exprs.push(read as i32)
+        setup as i32
+
     fn prepare_stmt_subject_ir(session: i64, cursor: i32, exprs: CiExprPool, types: CiTypePool, scope: CiScope, tag: &str) -> CiValueExprIR:
         let lowered = self.lower_value_expr_ir(session, cursor, exprs, types, scope)
         if not ci_value_ir_valid(lowered):
@@ -8896,6 +8946,11 @@ impl CiExprPool:
         self.init_list(items_start, item_ids.len() as i32, init_ty_id)
 
     fn lower_expr_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        // An initializer element already computed into a temporary reads
+        // as that temporary (hoist_init_list_element_setups).
+        let substituted = ci_expr_substitution_for(cursor)
+        if substituted != 0:
+            return substituted as CiExprId
         let kind = with_ci_cursor_kind(session, cursor)
 
         // D90: a libc constant is named. The literal kind holds its text,
@@ -12396,19 +12451,42 @@ impl CiStmtPool:
         if kind == CXK_COMPOUND_LITERAL and nc > 0:
             let init_cursor = ci_find_child_of_kind(session, cursor, CXK_INIT_LIST)
             if init_cursor >= 0:
+                let mark = g_ci_expr_substitution_cursors.len()
+                let hoisted = self.hoist_init_list_element_setups(session, init_cursor, exprs, types, scope)
+                if hoisted < 0:
+                    ci_expr_substitutions_truncate(mark)
+                    return ci_value_ir_invalid()
                 let init_id = exprs.lower_init_list_ir(session, init_cursor, types, scope)
+                ci_expr_substitutions_truncate(mark)
                 if (init_id as i32) == 0:
                     return ci_value_ir_invalid()
-                let literal_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
-                if (literal_ty as i32) != 0 and exprs.get_type(init_id) != literal_ty:
-                    return ci_value_ir_plain(exprs.cast(literal_ty, init_id))
-                return ci_value_ir_plain(init_id)
+                let literal_cxtype = with_ci_cursor_type(session, cursor)
+                let literal_ty = types.type_from_libclang(session, literal_cxtype)
+                // A compound literal of array type is an object of the
+                // enclosing block (C11 6.5.2.5): its uses decay to its
+                // address, so it is a local of its own, never a temporary
+                // whose storage ends with the statement.
+                if (literal_ty as i32) != 0 and with_ci_type_kind(session, literal_cxtype) == CXT_ConstantArray:
+                    let temp = ci_expr_temp_name(session, cursor, "lit")
+                    let decl_id = self.var_decl(self.add_string(temp), literal_ty, init_id, 1)
+                    return CiValueExprIR {
+                        setup_stmt: self.merge_ir(hoisted as CiStmtId, decl_id),
+                        value_expr: exprs.ident(exprs.add_string(temp), literal_ty),
+                    }
+                let value = if (literal_ty as i32) != 0 and exprs.get_type(init_id) != literal_ty: exprs.cast(literal_ty, init_id) else: init_id
+                return CiValueExprIR { setup_stmt: hoisted as CiStmtId, value_expr: value }
             return ci_value_ir_invalid()
 
         if kind == CXK_INIT_LIST:
+            let mark = g_ci_expr_substitution_cursors.len()
+            let hoisted = self.hoist_init_list_element_setups(session, cursor, exprs, types, scope)
+            if hoisted < 0:
+                ci_expr_substitutions_truncate(mark)
+                return ci_value_ir_invalid()
             let init_id = exprs.lower_init_list_ir(session, cursor, types, scope)
+            ci_expr_substitutions_truncate(mark)
             if (init_id as i32) != 0:
-                return ci_value_ir_plain(init_id)
+                return CiValueExprIR { setup_stmt: hoisted as CiStmtId, value_expr: init_id }
             return ci_value_ir_invalid()
 
         if kind == 122 and nc > 0:
@@ -12594,6 +12672,10 @@ fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
         let header_len = body_start - for_start
         let limit = if header_len < for_src.len() as i32: header_len else: for_src.len() as i32
         var paren_depth = 0
+        // A `;` inside braces is a record body's (`for (struct { int i; }
+        // it = ..; ..; ..)`), never the header's: counting those lost the
+        // condition and the loop ran forever.
+        var brace_depth = 0
         var i: i32 = 0
         while i < limit:
             let c = for_src[i]
@@ -12601,7 +12683,11 @@ fn ci_extract_for_parts(session: i64, cursor: i32) -> CiForParts:
                 paren_depth = paren_depth + 1
             else if c == 41:
                 paren_depth = paren_depth - 1
-            else if c == 59 and paren_depth == 1:
+            else if c == 123:
+                brace_depth = brace_depth + 1
+            else if c == 125:
+                brace_depth = brace_depth - 1
+            else if c == 59 and paren_depth == 1 and brace_depth == 0:
                 if sc1_off < 0:
                     sc1_off = for_start + i
                 else if sc2_off < 0:
@@ -13988,6 +14074,24 @@ impl CiStmtPool:
                         return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                     g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
                     hoisted_record = true
+            else if with_ci_cursor_kind(session, child) == CK_ENUM:
+                // An enum declared in a body (`enum {TSIZE = 4, N = 64};`)
+                // is its constants, each a `let` of the block (C: int
+                // constants in the enclosing scope); its type names nothing
+                // a body can spell.
+                let c_int_ty = types.named_type_from_text("c_int")
+                let ecount = with_ci_num_children(session, child)
+                for ei in 0..ecount:
+                    let constant = with_ci_child(session, child, ei)
+                    if with_ci_cursor_kind(session, constant) != CXCursor_EnumConstantDecl:
+                        continue
+                    let cname = ci_escape_reserved(with_ci_cursor_spelling(session, constant))
+                    let value_text = i64_to_string(with_ci_enum_const_value_new(session, constant))
+                    let lit = exprs.int_lit(exprs.add_string(value_text), c_int_ty)
+                    new_scope = ci_scope_add_mangled(new_scope, cname, cname)
+                    ci_fn_var_names_register(cname)
+                    child_stmt_ids.push((self.var_decl(self.add_string(cname), c_int_ty, lit, 0)) as i32)
+                hoisted_record = true
             else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
                 let raw_name = with_ci_cursor_spelling(session, child)
                 let escaped = ci_escape_reserved(raw_name)
@@ -14122,7 +14226,18 @@ impl CiStmtPool:
                     // assignment renders the designated init as stores in
                     // order, so the read sees the field stored before it.
                     let init_reads_self = init_cursor >= 0 and ci_expr_references_decl(session, init_cursor, child)
-                    if (init_setup_id as i32) == 0 and not init_reads_self:
+                    if init_reads_self:
+                        // Declared zeroed (a plain declaration the printers
+                        // never fuse with what follows), then the setup and
+                        // the assignment, which reads the fields stored
+                        // before it.
+                        let zero_start = exprs.extra_len() as i32
+                        let decl_id = self.var_decl(name_idx, decl_ty_id, exprs.designated_init(zero_start, 0, vty_id), 1)
+                        let lhs_idx = exprs.add_string(storage_name)
+                        let lhs_id = exprs.ident(lhs_idx, vty_id)
+                        let assign_id = self.assign(lhs_id, init_id)
+                        child_stmt_ids.push((self.merge3_ir( decl_id, init_setup_id, assign_id)) as i32)
+                    else if (init_setup_id as i32) == 0:
                         // Non-hoisted simple init: CIS_VAR_DECL with is_mut=1.
                         let decl_id = self.var_decl(name_idx, decl_ty_id, init_id, 1)
                         child_stmt_ids.push(decl_id as i32)
@@ -14202,6 +14317,23 @@ fn ci_try_translate_fn_body(session: i64, decl_idx: i32) -> str:
 // with no tag a local declares), taken by the caller that renders the
 // function and emitted beside it.
 var g_ci_body_hoisted_decls: str = ""
+
+// An initializer element computed into a temporary before its initializer
+// (hoist_init_list_element_setups): the element's cursor reads as that
+// temporary while the initializer is lowered. Parallel lists, scoped by
+// length.
+var g_ci_expr_substitution_cursors: List[i32] = List.new()
+var g_ci_expr_substitution_exprs: List[i32] = List.new()
+
+fn ci_expr_substitution_for(cursor: i32) -> i32:
+    for i in 0..g_ci_expr_substitution_cursors.len():
+        if g_ci_expr_substitution_cursors[i] == cursor: return g_ci_expr_substitution_exprs[i]
+    0
+
+fn ci_expr_substitutions_truncate(len: isize):
+    while g_ci_expr_substitution_cursors.len() > len:
+        let _ = g_ci_expr_substitution_cursors.pop()
+        let _ = g_ci_expr_substitution_exprs.pop()
 
 fn ci_take_body_hoisted_decls() -> str:
     let taken = g_ci_body_hoisted_decls.clone()

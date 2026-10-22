@@ -4533,7 +4533,7 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     let root = ctx.project_info().project_root()
     let member_src = bs_join(case_dir, "member.c")
     let member_w = bs_join(case_dir, "member.w")
-    var rc = bs_write_fixture(ctx, member_src, "#include <stddef.h>\ntypedef struct { const char* buf; long size; } view;\ntypedef union {\n    struct { view chr; int dec; } u8;\n    view chr;\n    const char* ref;\n} str_iter;\nstr_iter begin(const char* s) {\n    str_iter it = {.u8={{s, 0}}};\n    it.chr.size = 1;\n    if (*it.ref == '\\0') it.ref = NULL;\n    return it;\n}\nint main(void) { str_iter i = begin(\"x\"); return (int)i.chr.size - 1; }\n")
+    var rc = bs_write_fixture(ctx, member_src, "#include <stddef.h>\ntypedef struct { const char* buf; long size; } view;\ntypedef union {\n    struct { view chr; int dec; } u8;\n    view chr;\n    const char* ref;\n} str_iter;\nstr_iter begin(const char* s) {\n    str_iter it = {.u8={{s, 0}}};\n    it.chr.size = 1;\n    if (*it.ref == '\\0') it.ref = NULL;\n    return it;\n}\nint main(void) { str_iter i = begin(\"x\"); return (int)i.chr.size - 1; }\n", "member record designator")
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "member", &member_src, &member_w)
     if rc != 0: return rc
@@ -4541,7 +4541,7 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     let loop_src = bs_join(case_dir, "loop.c")
     let loop_w = bs_join(case_dir, "loop.w")
-    rc = bs_write_fixture(ctx, loop_src, "#include <stdio.h>\nint main(void) {\n    int total = 0;\n    for (struct { int const* _ref; int* ref; int size, index; } it = {._ref=((int[]){1, 2, 3}), .ref=(int*)it._ref, .size=3}; it.index < it.size; ++it.ref, ++it.index)\n        total += *it.ref;\n    printf(\"%d\\n\", total);\n    return total - 6;\n}\n")
+    rc = bs_write_fixture(ctx, loop_src, "#include <stdio.h>\nint main(void) {\n    int total = 0;\n    for (struct { int const* _ref; int* ref; int size, index; } it = {._ref=((int[]){1, 2, 3}), .ref=(int*)it._ref, .size=3}; it.index < it.size; ++it.ref, ++it.index)\n        total += *it.ref;\n    printf(\"%d\\n\", total);\n    return total - 6;\n}\n", "local record in a for-init")
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "loop", &loop_src, &loop_w)
     if rc != 0: return rc
@@ -4551,11 +4551,25 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     let tag_src = bs_join(case_dir, "tag.c")
     let tag_w = bs_join(case_dir, "tag.w")
-    rc = bs_write_fixture(ctx, tag_src, "#include <stdio.h>\nint main(void) {\n    struct roman { int d; const char* r; };\n    struct roman rs[] = {{1000, \"M\"}, {900, \"CM\"}};\n    printf(\"%d %s\\n\", rs[1].d, rs[1].r);\n    return rs[0].d - 1000;\n}\n")
+    rc = bs_write_fixture(ctx, tag_src, "#include <stdio.h>\nint main(void) {\n    struct roman { int d; const char* r; };\n    struct roman rs[] = {{1000, \"M\"}, {900, \"CM\"}};\n    printf(\"%d %s\\n\", rs[1].d, rs[1].r);\n    return rs[0].d - 1000;\n}\n", "tagged local record")
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "tag", &tag_src, &tag_w)
     if rc != 0: return rc
-    bs_file_contains(ctx, tag_w, "@[repr(C)]\ntype roman {", "tagged body-local record hoisted")
+    rc = bs_file_contains(ctx, tag_w, "@[repr(C)]\ntype roman {", "tagged body-local record hoisted")
+    if rc != 0: return rc
+    // The `;` inside the record body are not the for header's: the loop
+    // keeps its condition (it ran forever before).
+    let forrec_src = bs_join(case_dir, "forrec.c")
+    let forrec_w = bs_join(case_dir, "forrec.w")
+    rc = bs_write_fixture(ctx, forrec_src, "int main(void) { int t = 0; for (struct { int i; int n; } it = {.i = 0, .n = 3}; it.i < it.n; ++it.i) t += it.i; return t - 3; }\n", "record in a for header")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "forrec", &forrec_src, &forrec_w)
+    if rc != 0: return rc
+    let enum_src = bs_join(case_dir, "localenum.c")
+    let enum_w = bs_join(case_dir, "localenum.w")
+    rc = bs_write_fixture(ctx, enum_src, "int main(void) {\n    enum {TSIZE = 4, CUBE = 64, N = CUBE*CUBE*CUBE};\n    int total = 0;\n    for (int i = 0; i < TSIZE; ++i) total += i;\n    return total - 6 + (N - 262144);\n}\n", "enum declared in a body")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "localenum", &enum_src, &enum_w)
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
