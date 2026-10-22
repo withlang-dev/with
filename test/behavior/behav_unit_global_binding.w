@@ -12,12 +12,12 @@
 pub type P { pub a: u16 = 0, pub b: u16 = 0 }
 impl Copy for P
 
-comptime fn layout_check() -> Unit:
+comptime fn layout_check():
     if sizeof[P]() != 4 or offsetof[P](b) != 2: comptime_error("P: layout differs")
 
 const layout_checked: Unit = layout_check()
 
-fn announce() -> Unit:
+fn announce():
     print("ran")
 
 let announced: Unit = announce()
