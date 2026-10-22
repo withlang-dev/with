@@ -1413,11 +1413,14 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
     if field_count == 0:
         if is_union:
             return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
-        return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+        return nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " { __pad0: u8 = 0 }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
 
     if is_union:
         return nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " = union { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
-    nested_decls ++ "type " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
+    // A C record has C's layout (§16.1), a member or body-local one as a
+    // top-level one does (ci_translate_struct): `@[repr(C)]`, which is also
+    // what offers `T.zeroed()` (§16.2b.3) to its `{0}` and declarations.
+    nested_decls ++ "@[repr(C)]\ntype " ++ ci_escape_reserved(synth_name) ++ " { " ++ fields ++ " }\nimpl Copy for " ++ ci_escape_reserved(synth_name) ++ "\n"
 
 // ── Opaque demotion pre-scan ─────────────────────────────────
 // Two-pass analysis: first collect directly demoted types (bitfield, forward
@@ -8472,6 +8475,14 @@ impl CiExprPool:
             return self.designated_init(zero_start, 0, init_ty_id)
         let decl_idx = ci_record_decl_idx_for_name(session, ty_str)
         if decl_idx < 0:
+            // A record the declaration index does not name — one declared
+            // in a body (#1878's hoisted local, STC's `c_each_item` cursor
+            // struct), a member record a field holds directly — is lowered
+            // against its declaration cursor; only a record with no
+            // declaration at all is refused.
+            let by_cursor = ci_record_decl_cursor_for_type(session, with_ci_cursor_type(session, cursor))
+            if by_cursor >= 0:
+                return self.lower_record_init_by_cursor(session, cursor, nc, by_cursor, ty_str, init_ty_id, types, scope)
             if g_ci_bail_message.len() == 0:
                 g_ci_bail_message = "record initializer type '" ++ ty_str ++ "' has no resolvable declaration"
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
@@ -8505,10 +8516,12 @@ impl CiExprPool:
                 next_positional = next_positional + 1
             else:
                 var fi2: i32 = 0
+                // A named field matches its designator whatever its type
+                // (`.u8 = {{..}}` names a field of member-record type; an
+                // unnamed member has no name to match).
                 while fi2 < field_count and slot < 0:
-                    if with_cimport_struct_field_is_anonymous_record(session, decl_idx, fi2) == 0:
-                        if with_cimport_struct_field_name(session, decl_idx, fi2) == designator:
-                            slot = fi2
+                    if with_cimport_struct_field_name(session, decl_idx, fi2) == designator:
+                        slot = fi2
                     fi2 = fi2 + 1
                 if slot < 0:
                     fi2 = 0
@@ -8533,11 +8546,23 @@ impl CiExprPool:
             let value_cursor = if designator.len() > 0: ci_init_child_designated_value(session, child) else: child
             if value_cursor < 0:
                 return 0 as CiExprId
-            if arm_idx < 0 and not record_is_union and with_cimport_struct_field_is_anonymous_record(session, decl_idx, slot) != 0:
+            let slot_is_member_record = with_cimport_struct_field_is_anonymous_record(session, decl_idx, slot) != 0
+            let slot_is_named = with_cimport_struct_field_name(session, decl_idx, slot).len() > 0
+            if arm_idx < 0 and not record_is_union and slot_is_member_record and not slot_is_named:
                 // A positional value landing on an anonymous member
                 // initializes its first arm (C semantics).
                 arm_idx = 0
-            if arm_idx >= 0 and not record_is_union:
+            if arm_idx < 0 and slot_is_member_record and slot_is_named and with_ci_cursor_kind(session, value_cursor) == CXK_INIT_LIST:
+                // A named field of member-record type takes its brace value
+                // as that record's own initializer (`.u8 = {{s, 0}}` fills
+                // `Parent_u8`), lowered against the member's declaration.
+                let member_decl = ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, slot))
+                let member_name = ci_anon_member_synth_type_name(session, decl_idx, slot)
+                let lowered = self.lower_record_init_by_cursor(session, value_cursor, with_ci_num_children(session, value_cursor), member_decl, member_name, types.named_type_from_text(member_name), types, scope)
+                if (lowered as i32) == 0:
+                    return 0 as CiExprId
+                slot_exprs[slot] = lowered as i32
+            else if arm_idx >= 0 and not record_is_union:
                 let lowered = self.lower_anon_member_arm_init(session, decl_idx, decl_cursor, slot, arm_idx, value_cursor, ty_str, types, scope)
                 if (lowered as i32) == 0:
                     return 0 as CiExprId
@@ -8616,6 +8641,159 @@ impl CiExprPool:
         let _ = self.add_extra(self.add_string(arm_name))
         let _ = self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, union_ty)
+
+    // A record initializer lowered against the record's declaration cursor,
+    // for a record the declaration index does not name: one declared in a
+    // body (#1878's hoisted local), a member record a field holds directly.
+    // The fields come from the cursor exactly as the renderer's do
+    // (ci_translate_anon_record_cursor), under the names it gives them: a
+    // named member record `Parent_field`, an unnamed one `Parent_anon_N`.
+    fn lower_record_init_by_cursor(session: i64, cursor: i32, nc: i32, decl_cursor: i32, ty_name: &str, init_ty_id: CiTypeId, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let record_is_union = with_ci_cursor_kind(session, decl_cursor) == CK_UNION
+        var field_count: i32 = 0
+        while ci_decl_field_cursor(session, decl_cursor, field_count) >= 0:
+            field_count = field_count + 1
+        if nc == 0 or ci_init_children_all_zero_ints(session, cursor, nc):
+            let invalid = ci_record_zero_invalid_field(session, ty_name, with_ci_cursor_type(session, cursor))
+            if invalid.len() > 0:
+                if g_ci_bail_message.len() == 0:
+                    g_ci_bail_message = "`{0}` initializer of '" ++ ty_name ++ "' has no `zeroed()`: " ++ invalid ++ " is not zero-valid (D101)"
+                    g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                return 0 as CiExprId
+            ci_note_rule("D101 a {0} record initializer is T.zeroed()", ty_name)
+            let zero_start = self.extra_len() as i32
+            return self.designated_init(zero_start, 0, init_ty_id)
+        var slot_exprs: List[i32] = List.new()
+        for _ in 0..field_count: slot_exprs.push(0)
+        var next_positional: i32 = 0
+        for ci2 in 0..nc:
+            let child = with_ci_child(session, cursor, ci2)
+            let designator = if ci_init_child_has_designator(session, child) != 0: ci_init_child_designator_name(session, child) else: ""
+            var slot: i32 = -1
+            var arm_idx: i32 = -1
+            if designator.len() == 0:
+                if ci_init_child_has_designator(session, child) != 0:
+                    if g_ci_bail_message.len() == 0:
+                        g_ci_bail_message = "unsupported initializer designator shape in '" ++ ty_name ++ "'"
+                        g_ci_bail_location = with_ci_cursor_location(session, child)
+                    return 0 as CiExprId
+                slot = next_positional
+                next_positional = next_positional + 1
+            else:
+                for fi in 0..field_count:
+                    if slot < 0 and with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, fi)) == designator:
+                        slot = fi
+                if slot < 0:
+                    for fi in 0..field_count:
+                        if slot < 0 and with_ci_cursor_is_anon_record_member(session, ci_decl_field_cursor(session, decl_cursor, fi)) != 0:
+                            let probe = ci_anon_member_field_index(session, decl_cursor, fi, designator)
+                            if probe >= 0:
+                                slot = fi
+                                arm_idx = probe
+                if slot < 0:
+                    if g_ci_bail_message.len() == 0:
+                        g_ci_bail_message = "initializer designator '" ++ designator ++ "' not found in '" ++ ty_name ++ "'"
+                        g_ci_bail_location = with_ci_cursor_location(session, child)
+                    return 0 as CiExprId
+                next_positional = slot + 1
+            if slot >= field_count:
+                if g_ci_bail_message.len() == 0:
+                    g_ci_bail_message = "initializer has more values than fields in '" ++ ty_name ++ "'"
+                    g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                return 0 as CiExprId
+            let value_cursor = if designator.len() > 0: ci_init_child_designated_value(session, child) else: child
+            if value_cursor < 0:
+                return 0 as CiExprId
+            let field_cursor = ci_decl_field_cursor(session, decl_cursor, slot)
+            let member_decl = ci_field_cursor_anon_record_decl(session, field_cursor)
+            let field_name = with_ci_cursor_spelling(session, field_cursor)
+            let member_name = self.member_record_synth_name(session, decl_cursor, slot, ty_name)
+            if member_decl >= 0 and arm_idx < 0 and not record_is_union and field_name.len() == 0:
+                // A positional value landing on an anonymous member
+                // initializes its first arm (C semantics).
+                arm_idx = 0
+            var lowered: CiExprId = 0 as CiExprId
+            if member_decl >= 0 and field_name.len() > 0 and with_ci_cursor_kind(session, value_cursor) == CXK_INIT_LIST:
+                lowered = self.lower_record_init_by_cursor(session, value_cursor, with_ci_num_children(session, value_cursor), member_decl, member_name, types.named_type_from_text(member_name), types, scope)
+            else if member_decl >= 0 and arm_idx >= 0 and not record_is_union:
+                lowered = self.lower_member_arm_init_by_cursor(session, member_decl, member_name, arm_idx, value_cursor, types, scope)
+            else:
+                let raw_id = self.lower_expr_ir(session, value_cursor, types, scope)
+                if (raw_id as i32) == 0:
+                    return 0 as CiExprId
+                var field_ty = ci_record_type_field_type(session, with_ci_cursor_type(session, cursor), slot)
+                if field_ty.len() == 0:
+                    field_ty = with_ci_type_translated(session, with_ci_cursor_type(session, field_cursor))
+                lowered = self.coerce_init_expr_to_type(types, raw_id, field_ty)
+            if (lowered as i32) == 0:
+                return 0 as CiExprId
+            slot_exprs[slot] = lowered as i32
+        var pair_names: List[i32] = List.new()
+        var pair_values: List[i32] = List.new()
+        for si in 0..field_count:
+            let v = slot_exprs[si]
+            if v != 0:
+                pair_names.push(self.add_string(self.member_slot_emitted_name(session, decl_cursor, si)))
+                pair_values.push(v)
+        if record_is_union and pair_values.len() > 1:
+            if g_ci_bail_message.len() == 0:
+                g_ci_bail_message = "union initializer sets multiple arms in '" ++ ty_name ++ "'"
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+            return 0 as CiExprId
+        let fields_start = self.extra_len() as i32
+        for pj in 0..pair_names.len():
+            let _ = self.add_extra(pair_names[pj])
+            let _ = self.add_extra(pair_values[pj])
+        ci_trace_port("STRUCTURAL[b11.11.init_list]")
+        self.designated_init(fields_start, pair_names.len() as i32, init_ty_id)
+
+    // The renderer's name for the member record at `slot` of a record it
+    // renders as `ty_name`: `ty_name_field`, or `ty_name_anon_N` with N
+    // counting every member-record field before it (as the renderer's
+    // anon_idx does).
+    fn member_record_synth_name(session: i64, decl_cursor: i32, slot: i32, ty_name: &str) -> str:
+        let field_name = with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, slot))
+        if field_name.len() > 0:
+            return ci_escape_reserved(ty_name ++ "_" ++ field_name)
+        var ordinal = 0
+        for fi in 0..slot:
+            if ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, fi)) >= 0:
+                ordinal = ordinal + 1
+        ci_escape_reserved(f"{ty_name}_anon_{ordinal}")
+
+    // The field name the renderer emits for `slot`: its own, or `anon_N`.
+    fn member_slot_emitted_name(session: i64, decl_cursor: i32, slot: i32) -> str:
+        let field_name = with_ci_cursor_spelling(session, ci_decl_field_cursor(session, decl_cursor, slot))
+        if field_name.len() > 0:
+            return ci_escape_reserved(field_name)
+        var ordinal = 0
+        for fi in 0..slot:
+            if ci_field_cursor_anon_record_decl(session, ci_decl_field_cursor(session, decl_cursor, fi)) >= 0:
+                ordinal = ordinal + 1
+        ci_escape_reserved(f"anon_{ordinal}")
+
+    // `Member { arm: value }` for the unnamed member record `member_decl`,
+    // rendered as `member_name` (the cursor twin of lower_anon_member_arm_init).
+    fn lower_member_arm_init_by_cursor(session: i64, member_decl: i32, member_name: &str, arm_idx: i32, value_cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        let arm_cursor = ci_decl_field_cursor(session, member_decl, arm_idx)
+        if arm_cursor < 0:
+            return 0 as CiExprId
+        let arm_name = ci_escape_reserved(with_ci_cursor_spelling(session, arm_cursor))
+        let arm_ty = with_ci_type_translated(session, with_ci_cursor_type(session, arm_cursor))
+        // #886: a braced arm value (`{12}`) initializes the arm with its inner expression.
+        var arm_value_cursor = value_cursor
+        if with_ci_cursor_kind(session, value_cursor) == CXK_INIT_LIST:
+            let inner = ci_find_last_expr_child(session, value_cursor)
+            if inner >= 0:
+                arm_value_cursor = inner
+        let raw_id = self.lower_expr_ir(session, arm_value_cursor, types, scope)
+        if (raw_id as i32) == 0:
+            return 0 as CiExprId
+        let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
+        let fields_start = self.extra_len() as i32
+        let _ = self.add_extra(self.add_string(arm_name))
+        let _ = self.add_extra(coerced as i32)
+        self.designated_init(fields_start, 1, types.named_type_from_text(member_name))
 
     fn lower_init_list_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let nc = with_ci_num_children(session, cursor)
@@ -13770,6 +13948,10 @@ impl CiStmtPool:
         var new_scope = scope
         var child_stmt_ids: List[i32] = List.new()
         var deferred_va_list = false
+        // A statement that only declares a record (`struct roman { .. };`)
+        // hoists it and lowers to nothing; a zero stmt_id would read as a
+        // bail.
+        var hoisted_record = false
         var i = 0
         while i < nc:
             let child = with_ci_child(session, cursor, i)
@@ -13788,13 +13970,24 @@ impl CiStmtPool:
                 // type of its own, declared beside the function under the
                 // bridge's name for it (§16.1); its layout is the record's,
                 // never opaque — an opaque one is a loud omission.
-                let synth = with_ci_anon_record_name(session, child)
+                var synth = with_ci_anon_record_name(session, child)
+                // A tagged record defined in a body (`struct roman { .. };`)
+                // is hoisted under its tag, which is how its uses translate
+                // (`struct roman` is `roman`); a second definition under the
+                // same tag would silently share the first's layout, so it
+                // is refused.
+                if synth.len() == 0 and with_ci_cursor_is_definition(session, child) != 0 and with_ci_cursor_spelling(session, child).len() > 0:
+                    synth = ci_escape_reserved(with_ci_cursor_spelling(session, child))
+                    if with_cimport_is_name_emitted(synth) != 0:
+                        let _ = ci_va_bail(session, child, "local record '" ++ synth ++ "' shares its tag with another record definition (§16.9)")
+                        return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                 if synth.len() > 0:
                     let rendered = ci_translate_anon_record_cursor(session, child, synth)
                     if rendered.ends_with("= opaque\n"):
                         let _ = ci_va_bail(session, child, "local record '" ++ synth ++ "' has no With layout (§16.9)")
                         return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                     g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
+                    hoisted_record = true
             else if with_ci_cursor_kind(session, child) == CXK_VAR_DECL:
                 let raw_name = with_ci_cursor_spelling(session, child)
                 let escaped = ci_escape_reserved(raw_name)
@@ -13923,7 +14116,13 @@ impl CiStmtPool:
                         let assign_id = self.assign(lhs_id, init_id)
                         child_stmt_ids.push((self.merge_ir( init_setup_id, assign_id)) as i32)
                 else:
-                    if (init_setup_id as i32) == 0:
+                    // An initializer that reads the variable it initializes
+                    // (`it = {._ref = a, .ref = (T*)it._ref}`, STC's
+                    // c_each_item) is declared first and assigned after: the
+                    // assignment renders the designated init as stores in
+                    // order, so the read sees the field stored before it.
+                    let init_reads_self = init_cursor >= 0 and ci_expr_references_decl(session, init_cursor, child)
+                    if (init_setup_id as i32) == 0 and not init_reads_self:
                         // Non-hoisted simple init: CIS_VAR_DECL with is_mut=1.
                         let decl_id = self.var_decl(name_idx, decl_ty_id, init_id, 1)
                         child_stmt_ids.push(decl_id as i32)
@@ -13946,7 +14145,7 @@ impl CiStmtPool:
                 let _ = self.add_extra(child_stmt_ids[cj])
                 cj = cj + 1
             stmt_id = self.block(extra_start, count)
-        else if deferred_va_list:
+        else if deferred_va_list or hoisted_record:
             stmt_id = self.empty_stmt_ir()
         CiDeclLoweringIR {
             updated_scope: new_scope,
@@ -16625,6 +16824,21 @@ var g_ci_bail_message: str = ""
 // declaration this body has reached and deferred.
 var g_ci_va_started_decls: str = ""
 var g_ci_va_deferred_decls: str = ""
+
+// Whether the expression under `cursor` reads the declaration `decl`
+// (a DeclRefExpr whose referenced declaration is at decl's location).
+fn ci_expr_references_decl(session: i64, cursor: i32, decl: i32) -> bool:
+    if cursor < 0 or decl < 0:
+        return false
+    if with_ci_cursor_kind(session, cursor) == CXK_DECL_REF:
+        let target = with_ci_cursor_referenced_location(session, cursor)
+        if target.len() > 0 and target == with_ci_cursor_location(session, decl):
+            return true
+    let nc = with_ci_num_children(session, cursor)
+    for i in 0..nc:
+        if ci_expr_references_decl(session, with_ci_child(session, cursor, i), decl):
+            return true
+    false
 
 fn ci_va_bail(session: i64, cursor: i32, reason: &str) -> bool:
     if g_ci_bail_message.len() == 0:

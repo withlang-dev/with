@@ -4521,6 +4521,67 @@ fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_di
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-zeroed-records", check_args)
     checked.rc
 
+// Records the declaration index does not name, found by STC's tests: a
+// named field of member-record type takes its brace value as that record's
+// init (`.u8 = {{..}}`); a record declared in a body — tagless in a for-init
+// (`c_each_item`'s cursor struct), or tagged (`struct roman {..};` on its
+// own statement) — is hoisted with C's layout and initialized against its
+// declaration cursor; an initializer that reads the variable it initializes
+// (`.ref = (T*)it._ref`) is declared first and assigned after. Each program
+// migrates, checks and runs.
+fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let member_src = bs_join(case_dir, "member.c")
+    let member_w = bs_join(case_dir, "member.w")
+    var rc = bs_write_fixture(ctx, member_src, "#include <stddef.h>\ntypedef struct { const char* buf; long size; } view;\ntypedef union {\n    struct { view chr; int dec; } u8;\n    view chr;\n    const char* ref;\n} str_iter;\nstr_iter begin(const char* s) {\n    str_iter it = {.u8={{s, 0}}};\n    it.chr.size = 1;\n    if (*it.ref == '\\0') it.ref = NULL;\n    return it;\n}\nint main(void) { str_iter i = begin(\"x\"); return (int)i.chr.size - 1; }\n")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "member", &member_src, &member_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, member_w, "str_iter { u8: str_iter_u8 { chr: view {", "member record designator")
+    if rc != 0: return rc
+    let loop_src = bs_join(case_dir, "loop.c")
+    let loop_w = bs_join(case_dir, "loop.w")
+    rc = bs_write_fixture(ctx, loop_src, "#include <stdio.h>\nint main(void) {\n    int total = 0;\n    for (struct { int const* _ref; int* ref; int size, index; } it = {._ref=((int[]){1, 2, 3}), .ref=(int*)it._ref, .size=3}; it.index < it.size; ++it.ref, ++it.index)\n        total += *it.ref;\n    printf(\"%d\\n\", total);\n    return total - 6;\n}\n")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "loop", &loop_src, &loop_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, loop_w, "@[repr(C)]\ntype main_it_anon {", "body-local record hoisted with C layout")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, loop_w, "= main_it_anon.zeroed()", "self-referencing initializer declared first")
+    if rc != 0: return rc
+    let tag_src = bs_join(case_dir, "tag.c")
+    let tag_w = bs_join(case_dir, "tag.w")
+    rc = bs_write_fixture(ctx, tag_src, "#include <stdio.h>\nint main(void) {\n    struct roman { int d; const char* r; };\n    struct roman rs[] = {{1000, \"M\"}, {900, \"CM\"}};\n    printf(\"%d %s\\n\", rs[1].d, rs[1].r);\n    return rs[0].d - 1000;\n}\n")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "tag", &tag_src, &tag_w)
+    if rc != 0: return rc
+    bs_file_contains(ctx, tag_w, "@[repr(C)]\ntype roman {", "tagged body-local record hoisted")
+
+// Migrate `src` to `out_w`, check it, build and run it (exit 0).
+fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let migrated = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-" ++ label, args)
+    if migrated.rc != 0: return migrated.rc
+    let binary = bs_join(case_dir, label ++ ".bin")
+    var build_args: List[str] = List.new()
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, out_w))
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, binary))
+    let built = bs_migrate_expect_success(ctx, compiler_path, case_dir, "build-" ++ label, build_args)
+    if built.rc != 0: return built.rc
+    var run_args: List[str] = List.new()
+    run_args |> push(bs_abs(root, binary))
+    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(case_dir, label ++ ".stdout")), bs_abs(root, bs_join(case_dir, label ++ ".stderr")), 120000)
+    if ran.rc != 0: return bs_fail(ctx, label ++ f" exited {ran.rc}: " ++ ran.stdout ++ ran.stderr)
+    0
+
 fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "initlist.c")
@@ -5482,6 +5543,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
     if rc != 0: return rc
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_local_and_member_records(ctx, compiler_path, bs_join(output_dir, "local_and_member_records"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
     if rc != 0: return rc
