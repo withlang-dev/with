@@ -1186,10 +1186,18 @@ impl CiProject:
                     continue
                 let existing_path = self.owner_module_path(symbol_id)
                 if self.symbols[symbol_id].owner_module >= 0 and existing_path != input_path:
-                    return self.scan_fail(session, "duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
+                    // One definition both units include (the same file and line,
+                    // an included .c under a header's switch): the first owner
+                    // publishes it and this unit imports it, as the C link of
+                    // upstream's own build resolves the two to one.
+                    if loc.len() > 0 and self.symbols[symbol_id].definition_location == ci_migrate_definition_identity(loc):
+                        i = i + 1
+                        continue
+                    return self.scan_fail(session, "duplicate function definition for " ++ name ++ " in " ++ existing_path ++ " (" ++ self.symbols[symbol_id].definition_location ++ ") and " ++ input_path ++ " (" ++ loc ++ ")")
                 self.symbols[symbol_id].owner_module = module_id
                 self.symbols[symbol_id].owner_rank = 1
                 self.symbols[symbol_id].owner_definition_kind = 1
+                self.symbols[symbol_id].definition_location = ci_migrate_definition_identity(loc)
                 // D107: the evidence this definition's body gives.
                 self.record_fn_evidence(session, i, cursor, symbol_id)
             i = i + 1
@@ -1452,6 +1460,15 @@ fn ci_migrate_path_stem(basename: &str) -> str:
     if end == 0: basename.clone() else: basename.slice(0, (end - 1) as i64)
 
 // The file of a cursor location (`path:line:col`), "" when absent.
+// A definition's identity across units: the real path of its file and its
+// line and column, so an included file reached by two spellings (`-I include`
+// and `../include`) is one place.
+fn ci_migrate_definition_identity(location: &str) -> str:
+    let file = ci_migrate_location_file(location)
+    if file.len() == 0: return ""
+    let real = with_cimport_realpath(file)
+    (if real.len() > 0: real else: file) ++ location.slice(file.len(), location.len())
+
 fn ci_migrate_location_file(location: &str) -> str:
     var end = location.len()
     var colons = 0
@@ -2565,7 +2582,13 @@ fn ci_migrate_collect_unsafe_extern_fns(session: i64, count: i32, primary_path: 
             continue
         if (owner_path.len() > 0 and owner_path != primary_path) and ci_migrate_fn_is_unsafe_to_call(session, i):
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
-        if owner_path.len() == 0 and local_def < 0:
+        // A declaration no unit defines (ctest.h's assertions, which the
+        // With harness provides): in a corpus migrated into a std package
+        // Sema's policy for an extern declaration is the compiler-
+        // implementation one (safe to call), so a wrapper there is vacuous
+        // (R4c); a user module's raw extern calls keep it.
+        let foreign_is_safe = ci_migrate_shared_defs_active() and ci_migrate_shared_defs_targets_std_zone()
+        if owner_path.len() == 0 and local_def < 0 and not foreign_is_safe:
             ci_migrate_note_unsafe_extern_fn(ci_migrate_c_function_name(name))
         i = i + 1
     return
