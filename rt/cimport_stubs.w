@@ -606,6 +606,9 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
 @[weak] pub fn with_cimport_add_include_path(path: str):
     let _ = path
 
+@[weak] pub fn with_cimport_add_clang_arg(arg: str):
+    0
+
 @[weak] pub fn with_cimport_clear_include_paths():
     let _ = 0
 

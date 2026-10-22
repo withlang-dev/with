@@ -69,6 +69,9 @@ var g_migrate_directory_one_basename: str = ""
 var g_migrate_shared_fragment_path: str = ""
 var g_migrate_include_paths: List[str] = List.new()
 var g_migrate_forced_includes: List[str] = List.new()
+// `--macro-prefix-map OLD=NEW`: clang's -fmacro-prefix-map, so a `__FILE__`
+// a migration bakes (an assertion's, ctest's) names no staging directory.
+var g_migrate_macro_prefix_maps: List[str] = List.new()
 var g_migrate_directory_input_dir: str = ""
 
 type CiMigratePendingSharedExternVar {
@@ -110,6 +113,9 @@ fn migrate_set_shared_fragment_path(path: &str):
 fn migrate_add_include_path(path: &str) -> Unit:
     g_migrate_include_paths.push(ci_migrate_fs_path(path))
 
+fn migrate_add_macro_prefix_map(spec: &str) -> Unit:
+    g_migrate_macro_prefix_maps.push(spec)
+
 fn migrate_add_forced_include(path: &str) -> Unit:
     g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 
@@ -121,6 +127,7 @@ fn migrate_reset_options():
     g_migrate_shared_fragment_path = ""
     g_migrate_include_paths = List.new()
     g_migrate_forced_includes = List.new()
+    g_migrate_macro_prefix_maps = List.new()
     g_migrate_directory_input_dir = ""
     g_migrate_defines = ""
     g_migrate_file_error = ""
@@ -967,6 +974,8 @@ fn ci_migrate_prepare_include_path(input_path: &str):
         with_cimport_add_include_path(input_path.slice(0, dir_end as i64))
     for i in 0..g_migrate_include_paths.len():
         with_cimport_add_include_path(g_migrate_include_paths[i])
+    for i in 0..g_migrate_macro_prefix_maps.len():
+        with_cimport_add_clang_arg("-fmacro-prefix-map=" ++ g_migrate_macro_prefix_maps[i])
 
 // Portable-baseline migration preamble: undefine host CPU-feature macros so C
 // libraries select their generic, portable code path instead of host-specific

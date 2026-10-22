@@ -122,6 +122,13 @@ fn stc_test_migrate_argv(ctx: &ActionCtx, compiler: &str, source: &str, output: 
     argv.push(source)
     argv.push("-I")
     argv.push(corpus_dirname(source) ++ "/include")
+    // A `__FILE__` the unit bakes (stc_core's coroutine.h diagnostics)
+    // names the header relative to the program's staging directory, which
+    // would differ per program: it is spelled from that directory instead
+    // (`../include/stc/coroutine.h`), the same in every program, so the
+    // engine modules stay shared.
+    argv.push("--macro-prefix-map")
+    argv.push(source ++ "/=")
     argv.push("--no-prelude")
     argv.push("--no-c-export")
     argv.push("--prefer-brace")
@@ -267,7 +274,11 @@ pub fn run_stc_migrate_tests_action(ctx: ActionCtx) -> i32:
 pub fn run_stc_promote_tests_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let generated = ctx.inputs()[0] ++ "/tests"
-    let destination = ctx.output()
+    let final_destination = ctx.output()
+    // Assembled beside the tree and published whole once every program's
+    // engine copy agreed: a refused promotion leaves the checked-in corpus
+    // as it was (one once deleted every program's defs.w before refusing).
+    let destination = corpus_scratch(ctx) ++ "/promoted"
     if corpus_reset_dir(ctx, destination) != 0: return 1
     let engine = destination ++ "/engine"
     if fs.mkdir_all(engine) != 0: return corpus_fail(ctx, "cannot create " ++ engine)
@@ -290,7 +301,9 @@ pub fn run_stc_promote_tests_action(ctx: ActionCtx) -> i32:
                 return corpus_fail(ctx, "engine module " ++ base ++ " differs between programs " ++ engine_from ++ " and " ++ name ++ "; the shared engine/ layout no longer holds")
         if engine_from.len() == 0: engine_from = name
     if fs.write_text(destination ++ "/UPSTREAM", STC_REVISION ++ "\nsha256=" ++ STC_SHA256 ++ "\nconfiguration=tests\n") != 0: return 1
-    print(f"promoted {stc_test_units().len()} STC test programs into " ++ corpus_abs(ctx, destination))
+    if fs.exists(final_destination) and fs.remove_tree(final_destination) != 0: return corpus_fail(ctx, "cannot replace " ++ final_destination)
+    if fs.rename(destination, final_destination) != 0: return corpus_fail(ctx, "cannot publish " ++ final_destination)
+    print(f"promoted {stc_test_units().len()} STC test programs into " ++ corpus_abs(ctx, final_destination))
     0
 
 // The corpora lane: every test program is assembled into its own module

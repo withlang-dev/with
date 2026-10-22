@@ -727,6 +727,11 @@ var g_cimport_include_paths: *mut *mut u8 = 0 as *mut *mut u8
 var g_cimport_include_count: i32 = 0
 var g_cimport_include_capacity: i32 = 0
 var g_cimport_include_error: bool = false
+// Further clang arguments a migration asks for (`--macro-prefix-map`), one
+// NUL-terminated argument each, cleared with the include paths.
+var g_cimport_extra_args: *mut *mut u8 = 0 as *mut *mut u8
+var g_cimport_extra_arg_count: i32 = 0
+var g_cimport_extra_arg_capacity: i32 = 0
 // The macOS SDK c_import parses against (empty = none), resolved by
 // compiler.EmbeddedSysroot's darwin_sdk_root (#1915): WITH_SDKROOT, SDKROOT,
 // with.toml [c_import] sdk_path (§16.1), else the embedded sysroot. This
@@ -2137,6 +2142,38 @@ fn with_cimport_add_include_path(path: &str) -> i32:
         g_cimport_include_count = g_cimport_include_count + 1
         0
 
+// A whole clang argument beside the include paths (`-fmacro-prefix-map=OLD=NEW`
+// for a migration whose `__FILE__` spellings must not name the staging
+// directory). Cleared with the include paths.
+fn with_cimport_add_clang_arg(arg: &str) -> i32:
+    unsafe:
+        if arg.len() <= 0: return 0
+        if g_cimport_include_error or g_cimport_extra_arg_count >= 1073741818:
+            g_cimport_include_error = true
+            return 0
+        if g_cimport_extra_arg_count == g_cimport_extra_arg_capacity:
+            let capacity = if g_cimport_extra_arg_capacity == 0: 8 else: g_cimport_extra_arg_capacity * 2
+            let args = with_alloc(capacity as i64 * 8) as *mut *mut u8
+            if args as i64 == 0:
+                g_cimport_include_error = true
+                return 0
+            if g_cimport_extra_arg_count > 0:
+                with_memcpy(args as *mut u8, g_cimport_extra_args as *const u8, g_cimport_extra_arg_count as i64 * 8)
+            if g_cimport_extra_args as i64 != 0:
+                with_free(g_cimport_extra_args as *mut u8)
+            g_cimport_extra_args = args
+            g_cimport_extra_arg_capacity = capacity
+        let buf = with_alloc(arg.len() + 1)
+        if buf as i64 == 0:
+            g_cimport_include_error = true
+            return 0
+        let sp = *(arg as *const str as *const *const u8)
+        with_memcpy(buf, sp, arg.len())
+        *((buf as i64 + arg.len()) as *mut u8) = 0
+        g_cimport_extra_args[g_cimport_extra_arg_count] = buf
+        g_cimport_extra_arg_count = g_cimport_extra_arg_count + 1
+        0
+
 fn with_cimport_clear_include_paths() -> i32:
     unsafe:
         var i: i32 = 0
@@ -2149,6 +2186,16 @@ fn with_cimport_clear_include_paths() -> i32:
     g_cimport_include_count = 0
     g_cimport_include_capacity = 0
     g_cimport_include_error = false
+    unsafe:
+        var ea: i32 = 0
+        while ea < g_cimport_extra_arg_count:
+            with_free(g_cimport_extra_args[ea])
+            ea = ea + 1
+        if g_cimport_extra_args as i64 != 0:
+            with_free(g_cimport_extra_args as *mut u8)
+    g_cimport_extra_args = 0 as *mut *mut u8
+    g_cimport_extra_arg_count = 0
+    g_cimport_extra_arg_capacity = 0
     0
 
 fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
@@ -2299,6 +2346,11 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
         args[n + 1] = g_cimport_include_paths[ip] as *const u8
         n += 2
         ip += 1
+    var ea = 0
+    while ea < g_cimport_extra_arg_count:
+        args[n] = g_cimport_extra_args[ea] as *const u8
+        n += 1
+        ea += 1
     n
 
 // The bridge is compiled without the prelude. Own the temporary pointer
@@ -2308,7 +2360,7 @@ unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: b
     // At most fifteen fixed arguments: sysroot(2), host library dirs(4),
     // target(3), resource(2), mode(4) — or, with a C model, target(5) in
     // place of the first nine.
-    let capacity = 15 + g_cimport_include_count as i64 * 2
+    let capacity = 15 + g_cimport_include_count as i64 * 2 + g_cimport_extra_arg_count as i64
     let args = with_alloc(capacity * 8) as *mut *const u8
     if args as i64 == 0: return 0 as *mut u8
     let nargs = cimport_build_args(args, cxx)
