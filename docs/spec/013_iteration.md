@@ -282,7 +282,9 @@ a List has, over the slice's elements (§13.1). Collecting views of value
 elements builds a list of the values (D111, D139): a view of a value
 carries nothing but the value, so `collect[List]()` over `rest`'s views is
 a `List[isize]`, never a list of borrows into `rest`; views of resources
-stay views, since those have identity.
+stay views, since those have identity. A range is a sequence too: `(0..n)
+|> map(it * 2)` iterates it through its `iter()` (§4.7); `for i in 0..n`
+is the counter loop it always was.
 
 For a keyed map, `for (k, v) in map:` is `for (k, v) in map.iter():`, so
 `k: &K` and `v: &V`. `for (k, v) in map.into_iter():` consumes the map and

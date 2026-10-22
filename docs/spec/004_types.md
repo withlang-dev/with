@@ -1441,10 +1441,13 @@ not cross compilation unit boundaries.
 0..=10      // inclusive: 0, 1, 2, ..., 10
 ```
 
-Ranges are values of type `Range[T]` or `RangeInclusive[T]`. They
-implement `Iter[T]` for integer types and `Contains[T]` for ordered
-types, making them usable in `for` loops, slicing, pattern matching,
-and membership tests.
+Ranges are values of type `Range[T]` or `RangeInclusive[T]`, spellable
+as parameter and return types. A range's bounds are its `start` and
+`end`, read-only. A range has `iter()` for every `T` with a one and an
+order (`T: One + Ord`), the iterator yielding the values from `start`
+toward `end` (through it for `..=`), and implements `Contains[T]` for
+ordered types, making ranges usable in `for` loops, pipelines (§13.5),
+slicing, pattern matching, and membership tests.
 
 Ranges are ordinary first-class values: they can be stored in
 variables, passed to functions, and returned like any other value.

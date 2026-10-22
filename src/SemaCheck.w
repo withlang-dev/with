@@ -15591,12 +15591,6 @@ impl Sema:
     // moved with `move`, a by-value parameter (dies with the frame) — is
     // taken apart by value. A `self` receiver that borrows the caller's
     // place (`fn`, `mut fn`) is a place, as a local or a field is.
-    fn pattern_subject_is_bare_local(subject: i32) -> bool:
-        var expr = subject
-        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
-            expr = self.ast.get_data0(expr)
-        expr != 0 and self.ast.kind(expr) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(expr)) != 0 and self.param_index_for_sym(self.ast.get_data0(expr)) < 0
-
     fn pattern_subject_root_owned(subject: i32) -> bool:
         var expr = subject
         while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
@@ -15853,7 +15847,12 @@ impl Sema:
             else if self.get_type_kind(have as TypeId) == TypeKind.TY_ARRAY: self.get_type_d0(have as TypeId)
             else if self.std_generic_of(have) == StdGeneric.List: self.get_generic_inst_arg(have, 0)
             else: 0
-        if elem == 0 and first_arg_ty != 0: elem = self.auto_deref_ref_ptr_type(self.resolve_alias(first_arg_ty as TypeId)) as i32
+        // D142: a view of a value demands the value (D139); a view of a
+        // resource is the element, the list a list of views (§22.1 rule 7).
+        if elem == 0 and first_arg_ty != 0:
+            let arg_resolved = self.resolve_alias(first_arg_ty as TypeId)
+            let deref = self.auto_deref_ref_ptr_type(arg_resolved) as i32
+            elem = if self.get_type_kind(arg_resolved) == TypeKind.TY_REF and self.get_type_d1(arg_resolved) == 0 and self.is_copy(deref as TypeId) == 0: arg_resolved as i32 else: deref
         if elem == 0:
             return
         let method_name: str = with_str_clone_ref(self.pool_resolve(field))
@@ -16170,8 +16169,9 @@ impl Sema:
             else:
                 self.mark_moved_if_consumed(value)
 
-        if ann_type_node != 0 and self.type_expr_is_collection_with_ref(ann_type_node) != 0:
-            self.emit_error("ephemeral references cannot be stored in generic containers", node)
+        // §22.1 rules 3 and 7: a local `List[&T]` is an ephemeral container
+        // (its binding carries the views' origins, add_binding_view_deps);
+        // a struct field or a global of one stays refused (§3.3).
         let _ = self.reject_opaque_value_type(bind_type as i32, if ann_type_node != 0: ann_type_node else: value, "create")
         if self.pool_resolve(name) == "_" and self.expr_is_task_value(value) != 0 and self.expr_is_scoped_task_value(value) == 0:
             self.emit_error("`let _ = ...` is not the detach spelling for Task values; use statement position to detach, or bind and cancel(task)", node)
@@ -17305,6 +17305,10 @@ impl Sema:
             return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
+            // D144: an identifier that observes its place (check_pattern's
+            // mark) takes nothing out of the subject.
+            if self.pattern_place_bindings.contains(node):
+                return 0
             return if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0: 1 else: 0
         // D115: a slice pattern over an owned subject takes it apart.
         if kind == NodeKind.NK_PAT_SLICE:
@@ -19011,7 +19015,11 @@ impl Sema:
         // D142 (§13.1): a slice's `.iter()` is std's slice_iter, a free
         // generic function over the slice (no `impl` names a slice type).
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_SLICE:
-            return self.demand_slice_implicit_iter(resolved, iterable, key_node)
+            return self.demand_free_fn_implicit_iter("slice_iter", resolved, iterable, key_node)
+        // #2544 (§4.7, §13.5): a range is a sequence; its iterator is std's
+        // range_iter over the bounds (`for` keeps its counter loop).
+        if self.get_type_kind(resolved as TypeId) == TypeKind.TY_RANGE:
+            return self.demand_free_fn_implicit_iter(self.range_iter_fn_name(resolved), resolved, iterable, key_node)
         let owner_sym = self.method_owner_symbol_for_type(resolved)
         if owner_sym == 0:
             return 0
@@ -19085,11 +19093,23 @@ impl Sema:
     // substitution (as demand_generic_gen_each does for `each`); the call
     // contract it records under `key_node` moves to for_iter_types (the
     // result type) and the returned signature.
-    // D142: the `slice_iter` instance a `for` or `|>` over a slice steps,
-    // recorded under `key_node` as a method `iter()` would be
-    // (for_iter_fn_syms/sigs/monos/types), so MIR calls it the same way.
-    mut fn demand_slice_implicit_iter(slice_type: i32, iterable: i32, key_node: i32) -> i32:
-        let fn_sym = self.pool_lookup_symbol("slice_iter")
+    // §4.7: a range's std iterator by its inclusiveness (the type's d1).
+    fn range_iter_fn_name(range_type: i32) -> str:
+        if self.get_type_d1(self.resolve_alias(range_type as TypeId)) != 0: "range_iter_inclusive" else: "range_iter"
+
+    fn receiver_is_range(recv_type: i32) -> bool:
+        if recv_type == 0: return false
+        var resolved = self.resolve_alias(recv_type as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        self.get_type_kind(resolved) == TypeKind.TY_RANGE
+
+    // D142: the std free-function iterator (`slice_iter`, `range_iter`) a
+    // `for` or `|>` over a built-in sequence steps, recorded under
+    // `key_node` as a method `iter()` would be (for_iter_fn_syms/sigs/
+    // monos/types), so MIR calls it the same way.
+    mut fn demand_free_fn_implicit_iter(fn_name: str, seq_type: i32, iterable: i32, key_node: i32) -> i32:
+        let fn_sym = self.pool_lookup_symbol(fn_name)
         let fn_node = if fn_sym != 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
         if fn_node == 0:
             return 0
@@ -19100,7 +19120,7 @@ impl Sema:
         let had_mono = self.resolved_call_mono_syms.contains(key_node)
         let saved_mono: i32 = if had_mono: self.resolved_call_mono_syms.get(key_node).unwrap() else: 0
         let arg_types: List[i32] = List.new()
-        arg_types.push(slice_type)
+        arg_types.push(seq_type)
         let arg_nodes: List[i32] = List.new()
         arg_nodes.push(iterable)
         let iterator_type = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, 1, key_node)
@@ -20141,6 +20161,16 @@ impl Sema:
             let field_name: str = with_str_clone_ref(self.pool_resolve(field))
             if field_name == "len":
                 return self.ty_i64 as i32
+            self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
+            return 0
+
+        // §4.7: a range's bounds are its `start` and `end` (read-only; the
+        // value is its two elements, MIR's fields 0 and 1).
+        if ftk == TypeKind.TY_RANGE:
+            let field_name: str = with_str_clone_ref(self.pool_resolve(field))
+            if field_name == "start" or field_name == "end":
+                self.range_bound_fields.insert(node, if field_name == "end": 1 else: 0)
+                return self.get_type_d0(field_base)
             self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
 
@@ -23477,12 +23507,9 @@ impl Sema:
             // the payload's place (MIR aliases it, pattern_place_bindings),
             // mutated through when the subject's root is mutable. Plain
             // bits take the value.
-            // A bare local holding a resource payload (`let (tx, rx) =
-            // pair`) keeps D115's implicit take: the local is this frame's
-            // own, and the pattern is its last word on it. Open for Eric's
-            // ruling whether that local should observe and spell `move`.
-            let bare_local_resource = self.pattern_subject_is_bare_local(self.pattern_subject_node) and self.is_copy(subject_type as TypeId) == 0
-            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not bare_local_resource and not self.type_is_plain_bits(subject_type):
+            // A bare local is a place too (Eric, 2026-10-22): `let (tx, rx)
+            // = pair` observes `pair`; taking it apart is spelled `move pair`.
+            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not self.type_is_plain_bits(subject_type):
                 self.pattern_place_bindings.insert(node, 1)
                 self.scope_set_is_view_bound(sym)
                 self.record_view_binding_from_expr(sym, self.pattern_subject_node)
@@ -24706,6 +24733,9 @@ impl Sema:
         // names a slice type).
         if name == "iter" and self.receiver_is_slice(recv_type):
             return self.generic_fn_node_for_symbol(self.pool_lookup_symbol("slice_iter"))
+        // #2544 (§4.7): a range's `iter()` is std's range_iter.
+        if name == "iter" and self.receiver_is_range(recv_type):
+            return self.generic_fn_node_for_symbol(self.pool_lookup_symbol(self.range_iter_fn_name(recv_type)))
         if not sema_iter_adapter_name(name):
             return 0
         let resolved = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
@@ -24749,7 +24779,10 @@ impl Sema:
         // instance building the unspellable `List[&T]`. A view of a
         // non-Copy value has no implicit copy to store; say so here
         // instead of inside std's push.
-        var fn_name: str = if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter" else: "iter_" ++ self.pool_resolve(field)
+        var fn_name: str =
+            if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter"
+            else if self.receiver_is_range(recv_type) and self.pool_resolve(field) == "iter": self.range_iter_fn_name(recv_type)
+            else: "iter_" ++ self.pool_resolve(field)
         // `collect[HashSet]` / `collect[BTreeSet]` name their own builders
         // (check_pipeline recorded the bracket's target).
         if field == self.syms.collect:
@@ -24806,10 +24839,16 @@ impl Sema:
                 if self.get_type_kind(cv_resolved) == TypeKind.TY_REF and self.get_type_d1(cv_resolved) == 0:
                     let cv_pointee = self.get_type_d0(cv_resolved)
                     if cv_pointee != 0 and self.get_type_kind(self.resolve_alias(cv_pointee)) != TypeKind.TY_REF:
-                        if self.is_copy(cv_pointee) == 0:
+                        // D142: views of resources stay views; `collect`
+                        // builds the `List[&T]` (plain iter_collect with T =
+                        // &T, §22.1 rule 7). The value-building terminals
+                        // have no view to hand back.
+                        let collects_views = field == self.syms.collect and self.user_collect_target == self.syms.list
+                        if self.is_copy(cv_pointee) == 0 and not collects_views:
                             self.emit_error(f"`{name_text}` over views of `{self.type_name(cv_pointee)}` cannot copy them out (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
                             return 0
-                        fn_name = fn_name ++ "_views"
+                        if self.is_copy(cv_pointee) != 0:
+                            fn_name = fn_name ++ "_views"
         var arg_types: List[i32] = List.new()
         let arg_nodes: List[i32] = List.new()
         let deferred: List[i32] = List.new()
@@ -29370,6 +29409,11 @@ impl Sema:
                         self.put_generic_subst(self.ast.get_data0(count_node), count_ty, err_node)
                     self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
                 return
+            // `Range[T]` binds T from a range argument's element type (§4.7).
+            if self.canonical_range_type_constructor_inclusive(base_sym) >= 0:
+                if self.get_type_kind(resolved) == TypeKind.TY_RANGE and self.ast.get_data2(type_node) == 1:
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
                 return
             if self.get_generic_inst_base(resolved as i32) != base_sym:
@@ -32232,18 +32276,15 @@ impl Sema:
             if self.ast.kind(type_node) == NodeKind.NK_IDENT or self.ast.kind(type_node) == NodeKind.NK_TYPE_NAMED:
                 let list_copy = self.collect_copy_target(self.syms.list, iter_elem_ty, node)
                 if list_copy != 0: return list_copy
-                // #2271: even undemanded, collecting views stores the values
-                // (D22 §6.2): `List[&T]` is no spelling a result can own, so
-                // a Copy view's element copies in, as the user-adapter
-                // dispatch to iter_collect_views does. A non-Copy view has
-                // no implicit copy to store.
+                // #2271 / D142: even undemanded, collecting views of values
+                // stores the values (D22 §6.2, D139), as the user-adapter
+                // dispatch to iter_collect_views does; views of resources
+                // stay views, the result an ephemeral `List[&T]` (§22.1
+                // rule 7).
                 let elem_resolved = self.resolve_alias(iter_elem_ty as TypeId)
                 if self.get_type_kind(elem_resolved) == TypeKind.TY_REF and self.get_type_d1(elem_resolved) == 0:
                     let pointee = self.get_type_d0(elem_resolved)
-                    if pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF:
-                        if self.is_copy(pointee) == 0:
-                            self.emit_error(f"`collect[List]()` over views of `{self.type_name(pointee)}` cannot copy them into the List (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
-                            return 0
+                    if pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF and self.is_copy(pointee) != 0:
                         self.collect_copy_elements.insert(node, pointee)
                         return self.ensure_list_type_for(pointee)
                 return self.ensure_list_type_for(iter_elem_ty)

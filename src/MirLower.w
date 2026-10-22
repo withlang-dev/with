@@ -2213,6 +2213,14 @@ impl MirBuilder:
                 let tuple_idx = self.tuple_index_from_field_token(resolved as i32, field_token)
                 if tuple_idx >= 0:
                     return self.body.new_tuple_index_place(base, tuple_idx, field_ty)
+            // §4.7: a range's `start` and `end` are its fields 0 and 1
+            // (lower_range_value_membership reads them the same way); Sema
+            // recorded which under the access node (range_bound_fields).
+            if tk == TypeKind.TY_RANGE:
+                let bound_idx = self.sema.range_bound_fields.get(node) ?? -1
+                if bound_idx < 0:
+                    sema_phase_bug(f"BUG: range field access node {node} reached MIR with no Sema bound record")
+                return self.body.new_field_place(base, bound_idx, field_ty)
         self.named_field_place(base, field_token, field_ty, node)
 
     fn indexed_element_type(collection_tid: i32) -> i32:

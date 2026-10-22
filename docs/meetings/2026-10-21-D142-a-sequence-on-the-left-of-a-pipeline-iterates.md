@@ -40,6 +40,20 @@ wherever it read the piped expression. A slice's `iter()` is std's
 spelled call, `for`, and `|>`. Collecting views of Copy values already built
 values (`iter_collect_views`, #2271); a collection literal's elements with
 no outer demand follow the same owned-demand rule, so `[pivot]` with
-`pivot: &isize` is a `List[isize]`. Views of resources keep today's refusal
-with the `map(it.clone())` hint. Fixture
+`pivot: &isize` is a `List[isize]`. Fixture
 `behav_d142_pipeline_over_sequence.w` is the quicksort as written.
+
+**Amendment (Eric, 2026-10-22: "fix it").** The first implementation kept a
+refusal for views of resources ("cannot copy them out, `map(it.clone())`").
+The ruling's letter is that they stay views, so collecting them builds a
+list of views: an ephemeral `List[&T]`, as §22.1 rules 3 and 7 already
+describe (the container holding a view is ephemeral; returned, the caller's
+binding is; a struct field or a global of one stays refused). A local
+`List[&T]` is no longer refused at its `let`; `var vs = []` fed a resource
+view is a `List[&T]` (a Copy view still demands the value, D139); `collect`
+over resource views is plain `iter_collect` with `T = &T`; the escape
+checks are the ones every ephemeral value has (`returned ephemeral value
+may outlive its origin`). §3.3's bullet "elements of heap containers" is
+the one sentence that still says otherwise; its amendment is Eric's.
+Fixtures `behav_d142_resource_views_collect.w`,
+`err_d142_resource_views_escape.w`.

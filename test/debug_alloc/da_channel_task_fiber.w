@@ -23,7 +23,7 @@ async fn consumer(rx: Receiver[i32]) -> i32:
 
 async fn main:
     let pair = chan[i32](2)
-    let (tx, rx) = pair
+    let (tx, rx) = move pair
     let p = producer(move tx)
     let c = consumer(move rx)
     let sum = c.await

@@ -49,7 +49,7 @@ fn main:
     let none = Database.new(-1)
     for mode in 0..4:
         let (_, d) = Database.open(mode)
-        match d:
+        match move d:
             Some(db) => v.push(take(db))
             None => {}
     let failed_but_produced = opened(2)
