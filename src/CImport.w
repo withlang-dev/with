@@ -7537,7 +7537,7 @@ impl CiStmtPool:
                 let _ = ci_va_bail(session, cursor, "va_start is translated as a statement of a block: `var ap = va_start()`; this one is nested in another statement")
                 return 0 as CiStmtId
             if stdarg == "va_copy":
-                let _ = ci_va_bail(session, cursor, "va_copy is translated as a statement of a block: `var dst = src`; this one is nested in another statement")
+                ci_va_bail(session, cursor, "va_copy is translated as a statement of a block: `var dst = src`; this one is nested in another statement")
                 return 0 as CiStmtId
             let cfp = self.lower_cfprintf_effect_ir(session, cursor, exprs, types, scope)
             if (cfp as i32) != 0:
@@ -8840,13 +8840,15 @@ impl CiExprPool:
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
             return 0 as CiExprId
         let fields_start = self.extra_len() as i32
+        var pair_count: i32 = 0
         var pj: i64 = 0
         while pj < pair_names.len():
-            let _ = self.add_extra(pair_names[pj])
-            let _ = self.add_extra(pair_values[pj])
+            self.add_extra(pair_names[pj])
+            self.add_extra(pair_values[pj])
+            pair_count = pair_count + 1
             pj = pj + 1
         ci_trace_port("STRUCTURAL[b11.11.init_list]")
-        self.designated_init(fields_start, pair_names.len() as i32, init_ty_id)
+        self.designated_init(fields_start, pair_count, init_ty_id)
 
     // Build `SynthUnion { arm: value }` for the anonymous member at `slot`.
     fn lower_anon_member_arm_init(session: i64, decl_idx: i32, decl_cursor: i32, slot: i32, arm_idx: i32, value_cursor: i32, ty_str: &str, types: CiTypePool, scope: CiScope) -> CiExprId:
@@ -8886,8 +8888,8 @@ impl CiExprPool:
         let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
         let union_ty = types.named_type_from_text(ci_anon_member_synth_type_name(session, decl_idx, slot))
         let fields_start = self.extra_len() as i32
-        let _ = self.add_extra(self.add_string(arm_name))
-        let _ = self.add_extra(coerced as i32)
+        self.add_extra(self.add_string(arm_name))
+        self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, union_ty)
 
     // A record initializer lowered against the record's declaration cursor,
@@ -9002,11 +9004,13 @@ impl CiExprPool:
                 g_ci_bail_location = with_ci_cursor_location(session, cursor)
             return 0 as CiExprId
         let fields_start = self.extra_len() as i32
+        var pair_count: i32 = 0
         for pj in 0..pair_names.len():
-            let _ = self.add_extra(pair_names[pj])
-            let _ = self.add_extra(pair_values[pj])
+            self.add_extra(pair_names[pj])
+            self.add_extra(pair_values[pj])
+            pair_count = pair_count + 1
         ci_trace_port("STRUCTURAL[b11.11.init_list]")
-        self.designated_init(fields_start, pair_names.len() as i32, init_ty_id)
+        self.designated_init(fields_start, pair_count, init_ty_id)
 
     // The renderer's name for the member record at `slot` of a record it
     // renders as `ty_name`: `ty_name_field`, or `ty_name_anon_N` with N
@@ -9045,8 +9049,8 @@ impl CiExprPool:
             return 0 as CiExprId
         let coerced = self.coerce_init_expr_to_type(types, raw_id, arm_ty)
         let fields_start = self.extra_len() as i32
-        let _ = self.add_extra(self.add_string(arm_name))
-        let _ = self.add_extra(coerced as i32)
+        self.add_extra(self.add_string(arm_name))
+        self.add_extra(coerced as i32)
         self.designated_init(fields_start, 1, types.named_type_from_text(member_name))
 
     // An array initializer with `[index] = value` designators: a designator
@@ -9092,9 +9096,11 @@ impl CiExprPool:
                     return 0 as CiExprId
                 items[i] = zero as i32
         let items_start = self.extra_len() as i32
+        var count: i32 = 0
         for id in items:
-            let _ = self.add_extra(id)
-        self.init_list(items_start, items.len() as i32, init_ty_id)
+            self.add_extra(id)
+            count = count + 1
+        self.init_list(items_start, count, init_ty_id)
 
     fn lower_init_list_ir(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         let nc = with_ci_num_children(session, cursor)
@@ -14442,18 +14448,18 @@ impl CiStmtPool:
         let failed = CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
         let list = ci_va_list_operand(session, call)
         if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
-            let _ = ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
+            ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
             return failed
         let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
         if not ci_str_contains(g_ci_va_deferred_decls, key):
-            let _ = ci_va_bail(session, call, "va_copy's destination is not a va_list declared in an enclosing block of this function")
+            ci_va_bail(session, call, "va_copy's destination is not a va_list declared in an enclosing block of this function")
             return failed
         if with_ci_num_children(session, call) < 3:
-            let _ = ci_va_bail(session, call, "va_copy names no source list")
+            ci_va_bail(session, call, "va_copy names no source list")
             return failed
         let source = self.lower_value_expr_ir(session, with_ci_child(session, call, 2), exprs, types, scope)
         if not ci_value_ir_valid(source) or (source.setup_stmt as i32) != 0:
-            let _ = ci_va_bail(session, call, "va_copy's source is not a plain list expression")
+            ci_va_bail(session, call, "va_copy's source is not a plain list expression")
             return failed
         let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
         if (list_ty as i32) == 0:
@@ -14473,18 +14479,18 @@ impl CiStmtPool:
     fn lower_va_copy_assign(session: i64, call: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         let list = ci_va_list_operand(session, call)
         if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
-            let _ = ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
+            ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
             return 0 as CiStmtId
         let storage = ci_scope_lookup(scope, ci_escape_reserved(with_ci_cursor_spelling(session, list)))
         if storage.len() == 0:
-            let _ = ci_va_bail(session, call, "va_copy's destination is not a va_list this body declares")
+            ci_va_bail(session, call, "va_copy's destination is not a va_list this body declares")
             return 0 as CiStmtId
         if with_ci_num_children(session, call) < 3:
-            let _ = ci_va_bail(session, call, "va_copy names no source list")
+            ci_va_bail(session, call, "va_copy names no source list")
             return 0 as CiStmtId
         let source = self.lower_value_expr_ir(session, with_ci_child(session, call, 2), exprs, types, scope)
         if not ci_value_ir_valid(source) or (source.setup_stmt as i32) != 0:
-            let _ = ci_va_bail(session, call, "va_copy's source is not a plain list expression")
+            ci_va_bail(session, call, "va_copy's source is not a plain list expression")
             return 0 as CiStmtId
         let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
         let lhs = exprs.ident(exprs.add_string(storage), list_ty)
@@ -14507,7 +14513,7 @@ impl CiStmtPool:
                 // D75: a list va_start starts is declared there, as
                 // `var ap = va_start()` (lower_va_start_decl).
                 if with_ci_var_initializer(session, child) >= 0:
-                    let _ = ci_va_bail(session, child, "va_start's list is declared with an initializer")
+                    ci_va_bail(session, child, "va_start's list is declared with an initializer")
                     return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                 // A hoisted body declares its lists at the top
                 // (ci_collect_var_decls); here the name only enters the scope.
@@ -14533,7 +14539,7 @@ impl CiStmtPool:
                 if synth.len() == 0 and with_ci_cursor_is_definition(session, child) != 0 and with_ci_cursor_spelling(session, child).len() > 0:
                     synth = ci_escape_reserved(with_ci_cursor_spelling(session, child))
                     if with_cimport_is_name_emitted(synth) != 0:
-                        let _ = ci_va_bail(session, child, "local record '" ++ synth ++ "' shares its tag with another record definition (§16.9)")
+                        ci_va_bail(session, child, "local record '" ++ synth ++ "' shares its tag with another record definition (§16.9)")
                         return CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
                 if synth.len() > 0:
                     let rendered = ci_translate_anon_record_cursor(session, child, synth)
@@ -14800,8 +14806,8 @@ fn ci_expr_substitution_for(cursor: i32) -> i32:
 
 fn ci_expr_substitutions_truncate(len: isize):
     while g_ci_expr_substitution_cursors.len() > len:
-        let _ = g_ci_expr_substitution_cursors.pop()
-        let _ = g_ci_expr_substitution_exprs.pop()
+        g_ci_expr_substitution_cursors.pop()
+        g_ci_expr_substitution_exprs.pop()
 
 fn ci_take_body_hoisted_decls() -> str:
     let taken = g_ci_body_hoisted_decls.clone()
@@ -14859,7 +14865,7 @@ fn ci_try_translate_fn_body_at(session: i64, decl_idx: i32, found_cursor: i32) -
     if g_ci_va_started_decls.len() > 0 and ci_has_goto(session, body_cursor):
         g_ci_va_hoisted_starts = ci_va_top_level_starts(session, body_cursor)
         if g_ci_va_hoisted_starts.len() == 0:
-            let _ = ci_va_bail(session, body_cursor, "va_start in a function with goto is supported only as a top-level statement of the body that starts its list once: the list's declaration is its start, hoisted")
+            ci_va_bail(session, body_cursor, "va_start in a function with goto is supported only as a top-level statement of the body that starts its list once: the list's declaration is its start, hoisted")
             return ""
 
     // Build initial scope from parameter names + return type.
