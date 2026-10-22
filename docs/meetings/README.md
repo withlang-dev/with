@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D150 — A `static inline` function a header defines that no unit owns is published by its sole includer; several includers keep a private copy each](2026-10-22-D150-a-header-function-no-unit-owns-is-published-by-its-sole-includer.md)
+- [D149 — The hash family's engine is rt_core's insertion-ordered layout; STC `hmap`/`hset` is the comparison engine and backs an unordered map under its own name (amends the 2026-09-12 facade map)](2026-10-22-D149-the-hash-family-engine-is-rt-core-s-insertion-ordered-layout-stc-hmap-is-the-comparison-engine.md)
 - [D148 — A templated engine serves an arbitrary `T` through the slot shape; the shape set is one C unit in the corpus's build inputs (delegated)](2026-10-22-D148-templated-engines-serve-arbitrary-T-through-the-slot-shape.md)
 - [D147 — A migrated record with bitfields keeps C's layout: storage units under `@[repr(C)]`, accessors per member, stores that truncate as C does, one layout for every target or a loud refusal (#2553)](2026-10-22-D147-bitfield-records-in-with-migrate.md)
 - [D146 — The engine corpora live under `std.engines`; facades are named for their function, engines for their provenance, and neither maps onto the other (delegated)](2026-10-22-D146-engine-corpora-live-under-std-engines.md)

@@ -98,7 +98,10 @@ The facade map is explicit. The corpora are implementation engines; their
 names do not automatically become permanent standard-library API names.
 This ruling supersedes the earlier open engine choices in this plan.
 Benchmarks validate the selected engines and compare alternatives; changing
-a primary engine requires a new ruling.
+a primary engine requires a new ruling. **D149 (2026-10-22) amended the
+hash family**: `HashMap`/`HashSet` keep rt_core's insertion-ordered layout
+(D96 was ruled after this map); STC `hmap`/`hset` is their comparison
+engine and backs `UnorderedMap`/`UnorderedSet` under their own names.
 
 | `lib/std` facade | Primary engine | Secondary / comparison engine | Notes |
 | --- | --- | --- | --- |
@@ -108,8 +111,9 @@ a primary engine requires a new ruling.
 | `Queue[T]` | **STC `queue`** | c-algorithms queue | FIFO queue |
 | `PriorityQueue[T]` | **STC `pqueue`** | c-algorithms binary heap | Heap-backed priority queue |
 | `List[T]` | **STC `list`** | c-algorithms list / TommyDS list | General linked list |
-| `HashMap[K, V]` | **STC `hmap`** | TommyDS `hashdyn` / `hashlin`; c-algorithms hash table | Default owning hash map |
-| `HashSet[T]` | **STC `hset`** | TommyDS hashing machinery | Same hash-table family as `HashMap` |
+| `HashMap[K, V]` | **rt_core's insertion-ordered layout** (D96, D149) | STC `hmap`; TommyDS `hashdyn` / `hashlin`; c-algorithms hash table | Default owning hash map; iterates in insertion order |
+| `HashSet[T]` | **rt_core's insertion-ordered layout** (D96, D149) | STC `hset`; TommyDS hashing machinery | Same hash-table family as `HashMap` |
+| `UnorderedMap[K, V]` / `UnorderedSet[T]` | **STC `hmap` / `hset`** (the slot shape, D148) | — | No stated order, for hot paths that need none (D149; Zig ships both) |
 | `OrderedMap[K, V]` | **STC `smap`** | c-algorithms RB tree / AVL tree | Public ordered associative map |
 | `OrderedSet[T]` | **STC `sset`** | c-algorithms RB tree / AVL tree | Public ordered set |
 | `BTreeMap[K, V]` | **M*LIB `m-bptree`** | — | B+ tree-backed ordered/indexed map |
@@ -623,9 +627,21 @@ contract before exposing it.
   allocation per element: the word shape is the next row when a Copy
   `T` needs it); `List.sort` 34 ns per i64, 200 ns per pair through
   references.
-- Open: `HashMap`/`HashSet` over `hset` (the builtin engine swap is a
-  compiler change: a brief of its own); `d[i]` on `Deque` waits on #2560;
-  `stable_sort` evaluated separately; Phase 4.
+- Ruled on the briefs (2026-10-22): D149 — `HashMap`/`HashSet` keep
+  rt_core's insertion-ordered layout (D96); STC `hmap`/`hset` is the
+  comparison engine and backs `UnorderedMap`/`UnorderedSet` under their own
+  names. D148 blessed with two conditions, both met: `Deque` stores the
+  integer scalars inline (the word shape) and says so in its doc; the
+  sole-includer publication rule is its own ruling, D150, with a fixture.
+  Measured (`test/benchmark/stc_engines.w`, n = 100000 i32, ns per
+  operation insert/lookup/remove): `Deque[i32]` 2/0/0 (word shape) against
+  `Deque[Pair]` 12/0/10 (slot shape) and `List` 2/0/1; `UnorderedSet`
+  69/53/105 against `HashSet` 75/26/25 — the facade allocates a probe slot
+  per lookup and dispatches through its callbacks, so lookup and remove
+  trail the inline builtin; a direct word-key instantiation of `hset` is
+  the next row when a hot path needs it.
+- Open: `d[i]` on `Deque` waits on #2560; `stable_sort` evaluated
+  separately; Phase 4.
 
 **Phase 4 — M*LIB `m-bptree.h`, surgical.**
 Only the B+ tree, providing `BTreeMap`/`BTreeSet` and retiring their
@@ -662,6 +678,8 @@ for now").
    grouping. Optional public types (`BinaryHeap`, `SortedVec`, specialized
    indexes/storage) and detailed new API signatures remain facade-PR
    decisions.
+
+
 
 
 

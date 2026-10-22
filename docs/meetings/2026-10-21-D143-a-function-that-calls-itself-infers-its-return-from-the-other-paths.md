@@ -40,3 +40,11 @@ operand takes the other side's type, as `+` did. Fixtures
 `behav_d143_recursive_inferred_return.w` (the quicksort with no return
 type), `err_d143_every_path_recursive.w`, `err_d143_pub_recursive_declares.w`,
 `err_d143_mutual_recursion.w`, `err_d143_self_call_path_disagrees.w`.
+
+## Implementation note (2026-10-22)
+
+`with migrate` applies the rule to migrated output: a `pub` C function that
+calls itself keeps `-> Unit` whatever its tail reads (STC's quicksort,
+`_sort_lowhigh`). Fixture: the `recvoid` case of
+`bs_check_migrate_stc_expression_forms` (build/selfhost.w, the migrator
+basic tests). Implementation: `ci_migrate_body_calls` (src/CiMigrate.w).

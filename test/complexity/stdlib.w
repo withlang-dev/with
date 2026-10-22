@@ -7,6 +7,8 @@ use std.collections.priority_queue.PriorityQueue
 use std.collections.ordered_set.OrderedSet
 use std.collections.ordered_map.OrderedMap
 use std.collections.deque.Deque
+use std.collections.unordered_set.UnorderedSet
+use std.collections.unordered_map.UnorderedMap
 use std.algorithms
 use std.time
 use std.process
@@ -195,6 +197,37 @@ fn deque_work(n: i32):
         assert(d.pop_front().is_some())
         assert(d.pop_back().is_some())
     assert(d.is_empty())
+    n
+
+fn unordered_set_work(n: i32):
+    var set = UnorderedSet[i32].new()
+    for i in 0..n: assert(set.insert(i * 7919 % n))
+    for i in 0..n: assert(set.contains(&i))
+    for i in 0..n:
+        if i % 2 == 0: assert(set.remove(&i).unwrap() == i)
+    assert(set.len() == n / 2)
+    n
+
+fn unordered_map_work(n: i32):
+    var map = UnorderedMap[i32, i32].new()
+    for i in 0..n: assert(map.insert(i * 7919 % n, i).is_none())
+    for i in 0..n: assert(map.get(&i).is_some())
+    for i in 0..n:
+        if i % 2 == 0: assert(map.remove(&i).is_some())
+    assert(map.len() == n / 2)
+    n
+
+// The word shape of the deque (D148 as ruled): integer scalars inline.
+fn deque_words_work(n: i32):
+    var d = Deque[i64].new()
+    for i in 0..n:
+        if i % 2 == 0: d.push_back(i as i64) else: d.push_front(i as i64)
+    var sum: i64 = 0
+    for i in 0..n: sum = sum + *d.get(i as isize)
+    for i in 0..(n / 2):
+        assert(d.pop_front().is_some())
+        assert(d.pop_back().is_some())
+    assert(d.is_empty() and sum > 0)
     n
 
 fn sort_work(n: i32):
@@ -397,4 +430,7 @@ else:
     measure("ordered-map", ordered_map_work, 4000, 0)
     measure("deque", deque_work, 4000, 0)
     measure("sort", sort_work, 4000, 0)
+    measure("unordered-set", unordered_set_work, 4000, 0)
+    measure("unordered-map", unordered_map_work, 4000, 0)
+    measure("deque-words", deque_words_work, 4000, 0)
     measure("quadratic-control", quadratic_work, 2000, -1)

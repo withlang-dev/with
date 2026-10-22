@@ -37,6 +37,22 @@ fn ints():
     d.clear()
     assert(d.is_empty())
 
+// The word shape: integer scalars live inline in the engine's ring.
+fn words():
+    var d = Deque[i64].new()
+    for i in 0..1000: d.push_back(i as i64 * 3)
+    for i in 0..500: assert(d.pop_front().unwrap() == i as i64 * 3)
+    for i in 0..500: d.push_front(-(i as i64))
+    assert(d.len() == 1000 and *d.front().unwrap() == -499 and *d.back().unwrap() == 2997)
+    assert(*d.get(500) == 1500)
+    var bytes = Deque[u8].new()
+    bytes.push_back(255)
+    bytes.push_front(1)
+    assert(bytes.pop_back().unwrap() == 255 and bytes.pop_back().unwrap() == 1 and bytes.is_empty())
+    var negatives = Deque[i32].new()
+    negatives.push_back(-7)
+    assert(*negatives.get(0) == -7 and negatives.pop_front().unwrap() == -7)
+
 fn drops():
     var total: i32 = 0
     let slot = &raw mut total
@@ -51,5 +67,7 @@ fn drops():
 
 fn main:
     ints()
+    words()
     drops()
     print("ok")
+
