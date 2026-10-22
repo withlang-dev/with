@@ -4654,7 +4654,15 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     let desig_w = bs_join(case_dir, "arraydesig.w")
     rc = bs_write_fixture(ctx, desig_src, "enum { K0, K1, K2, KN };\ntypedef struct { const int* r; int n; } G;\nstatic const int a[] = {1, 2};\n#define ENTRY(k, v) [k] = v\n#define ITEM(n) { a, n }\nstatic const G groups[KN] = { ENTRY(K2, ITEM(2)), ENTRY(K0, ITEM(1)) };\nstatic const int plain[] = { [3] = 7, 8 };\nint main(void) { return (groups[K2].n == 2 && groups[K1].r == 0 && groups[K0].r[0] == 1 && sizeof plain / sizeof(int) == 5 && plain[4] == 8 && plain[0] == 0) ? 0 : 1; }\n", "array designators in initializers")
     if rc != 0: return rc
-    bs_migrate_check_run(ctx, compiler_path, case_dir, "arraydesig", &desig_src, &desig_w)
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "arraydesig", &desig_src, &desig_w)
+    if rc != 0: return rc
+    // A record stored through a pointer from a value (a call's result, a
+    // compound literal): the value is bound, then copied (#2551).
+    let store_src = bs_join(case_dir, "recstore.c")
+    let store_w = bs_join(case_dir, "recstore.w")
+    rc = bs_write_fixture(ctx, store_src, "typedef struct { int a, b; } P;\nstatic P mk(int n) { P p = {n, n + 1}; return p; }\nstatic void set(P* out, int n) { *out = mk(n); }\nstatic void lit(P* out) { *out = (P){3, 4}; }\nint main(void) { P q = {0, 0}; set(&q, 7); int ok = q.b == 8; lit(&q); return (ok && q.a == 3) ? 0 : 1; }\n", "record stores from values through a pointer")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "recstore", &store_src, &store_w)
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
