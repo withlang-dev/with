@@ -1672,6 +1672,12 @@ type Sema {
     // binds a non-Copy value by value, or a Drop type is taken apart). Every
     // other by-value place subject is observed in place by MirLower.
     consuming_pattern_subjects: HashMap[i32, i32],
+    // D144: pattern identifier nodes bound in place as a view of the
+    // payload's place (an observed subject, a payload that is not plain
+    // bits); MIR aliases them. And the bindings (by symbol) observing a
+    // place whose root is mutable: a mutating call through one writes it.
+    pattern_place_bindings: HashMap[i32, i32],
+    binding_observes_mutable_place: HashMap[i32, i32],
     // §4.2.6: where a narrowed integer is going (" (argument 2 of `get_tag`)"),
     // appended to the narrowing diagnostic; "" when not known.
     narrowing_target_note: str,
@@ -3739,6 +3745,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         autoderef_step_tys: List.new(),
         pattern_value_syms: sema_new_map_i32_i32(),
         consuming_pattern_subjects: sema_new_map_i32_i32(),
+        pattern_place_bindings: sema_new_map_i32_i32(),
+        binding_observes_mutable_place: sema_new_map_i32_i32(),
         narrowing_target_note: "",
         owned_slice_patterns: sema_new_map_i32_i32(),
         slice_rest_types: sema_new_map_i32_i32(),

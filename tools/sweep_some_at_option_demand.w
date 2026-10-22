@@ -57,14 +57,13 @@ for ri in 2..argv.len():
         site_starts.push(start)
         site_ends.push(end)
 
-// Typed by hand: `[]` fed from another by-use list is refused today (#2532).
-var files: List[str] = List.new()
+var files = []
 for p in site_paths:
     if not files.contains(p): files.push(p)
 var total = 0
 for path in files:
-    var starts: List[i32] = List.new()
-    var ends: List[i32] = List.new()
+    var starts = []
+    var ends = []
     for i in 0..site_paths.len():
         if site_paths[i] == path:
             starts.push(site_starts[i])

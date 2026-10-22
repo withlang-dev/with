@@ -263,6 +263,20 @@ unannotated `let` binds the view unchanged, while a typed binding is an
 owned-value demand (D22 §6.2, D27). This is uniform across field
 projections and collection element access.
 
+**A binding from a place (D144).** A binding from a place of a plain-bits
+type (integers, floats, `bool`, pointers, plain structs of those) takes the
+value: `let i = self.idx` snapshots the `isize`, and `self.idx += 1` after
+it is fine. Any other binding from a place observes it, in a `let` and in
+a pattern alike: `match self.current: Some(c) => c.push(9)` observes the
+`List` in place, so the push lands in the field. A mutating call through
+an observing binding writes the place when the subject's root is mutable
+(`mut self`, a `var`) and is refused when it is not; a copy is spelled. The
+binding is a view of the place, so writing the place while it is live is
+refused like any other conflict with a live view. A plain-bits payload
+(`Some(n)` on an `Option[isize]`) takes the value; bindings are immutable
+unless declared `var`, so a write to it is refused rather than lost. This
+is D44's traversal rule stated once for every binding.
+
 When `T: Copy`, an expression of type `&T` may satisfy an independently
 established owned-value demand. The compiler copies the pointee, then applies
 ordinary value coercions. Thus an `&i32` may satisfy an owned `i32` or `i64`

@@ -659,8 +659,8 @@ impl StackifyContext:
 
     mut fn tree_add_block_params(block: i32) -> i32:
         let b = self.graph.blocks[block]
-        let params_start: i32 = b.params_start
-        let params_count: i32 = b.params_count
+        let params_start = b.params_start
+        let params_count = b.params_count
         let start = self.tree.values.len() as i32
         var i = 0
         while i < params_count:
@@ -778,10 +778,10 @@ impl StackifyContext:
 
     mut fn do_select(block: i32):
         let b = self.graph.blocks[block]
-        let selector_value: i32 = b.selector_value
-        let targets_start: i32 = b.targets_start
-        let targets_count: i32 = b.targets_count
-        let default_target: i32 = b.default_target
+        let selector_value = b.selector_value
+        let targets_start = b.targets_start
+        let targets_count = b.targets_count
+        let default_target = b.default_target
         let labels_start = self.tree.labels.len() as i32
         var ti: i32 = 0
         while ti < targets_count:
@@ -903,11 +903,11 @@ impl StackifyContext:
         let leaf_id = self.tree_add_node(move leaf)
         self.result_push(leaf_id)
         let b = self.graph.blocks[block]
-        let term_kind: i32 = b.term_kind
-        let targets_start: i32 = b.targets_start
-        let cond_value: i32 = b.cond_value
-        let return_values_start: i32 = b.return_values_start
-        let return_values_count: i32 = b.return_values_count
+        let term_kind = b.term_kind
+        let targets_start = b.targets_start
+        let cond_value = b.cond_value
+        let return_values_start = b.return_values_start
+        let return_values_count = b.return_values_count
         if term_kind == StackifyTermKind.Br:
             self.push_process(StackifyProcessKind.DoBranch, block, 0, 0, targets_start)
             return

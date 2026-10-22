@@ -15627,8 +15627,53 @@ impl Sema:
     // a named base — the alias-eligible binding MirLower binds as a view
     // (D22 "a binding names what's there"). Returns 1 for the shape alone;
     // the drop-body variant below adds the §2.4 owner check.
+    // D144: plain bits — integers, floats, bool, pointers, structs of those:
+    // a Copy type with no drop glue. A binding from a place of one takes the
+    // value; any other binding from a place observes it.
+    mut fn type_is_plain_bits(ty: i32) -> bool:
+        ty != 0 and self.is_copy(ty as TypeId) != 0 and self.type_needs_drop(ty) == 0
+
+    // D144: the root of `expr`'s place is a mutable binding (a `var`, a
+    // `mut self`), so an observing binding into it may be mutated through.
+    fn place_root_is_mutable(expr: i32) -> bool:
+        let root = self.place_root_sym(expr)
+        root != 0 and self.scope_lookup_mut(root) != 0
+
+    // §9.7 (D115): a pattern subject that is owned — a temporary, a place
+    // moved with `move`, a by-value parameter (dies with the frame) — is
+    // taken apart by value. A `self` receiver that borrows the caller's
+    // place (`fn`, `mut fn`) is a place, as a local or a field is.
+    fn pattern_subject_is_bare_local(subject: i32) -> bool:
+        var expr = subject
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        expr != 0 and self.ast.kind(expr) == NodeKind.NK_IDENT and self.scope_has(self.ast.get_data0(expr)) != 0 and self.param_index_for_sym(self.ast.get_data0(expr)) < 0
+
+    fn pattern_subject_root_owned(subject: i32) -> bool:
+        var expr = subject
+        while expr != 0 and (self.ast.kind(expr) == NodeKind.NK_GROUPED or self.ast.kind(expr) == NodeKind.NK_NO_SUSPEND):
+            expr = self.ast.get_data0(expr)
+        if expr == 0 or self.ast.kind(expr) == NodeKind.NK_MOVE_ARG:
+            return true
+        let root = self.place_root_sym(expr)
+        if root == 0:
+            return true
+        let pi = self.param_index_for_sym(root)
+        if pi < 0 or self.current_fn_sig_idx < 0:
+            return false
+        if pi == 0:
+            let rmode = self.sig_receiver_mode(self.current_fn_sig_idx)
+            if rmode == ReceiverMode.Read or rmode == ReceiverMode.Mut:
+                return false
+        let p_ty = self.sig_param_type(self.current_fn_sig_idx, pi)
+        if p_ty != 0:
+            let p_tk = self.get_type_kind(self.resolve_alias(p_ty as TypeId))
+            if p_tk == TypeKind.TY_REF or p_tk == TypeKind.TY_PTR:
+                return false
+        true
+
     mut fn field_let_binds_as_view(value: i32, is_mut: i32, ann_type: TypeId) -> i32:
-        if is_mut != 0 or ann_type != 0:
+        if ann_type != 0:
             return 0
         var expr = value
         while expr != 0 and self.ast.kind(expr) == NodeKind.NK_GROUPED:
@@ -15647,6 +15692,14 @@ impl Sema:
         let v_fty_opt = self.typed_expr_types.get(expr)
         let v_fty = if v_fty_opt.is_some(): v_fty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
         if v_fty != 0 and self.type_carries_user_drop(v_fty) != 0:
+            return 0
+        // D144: `let i = self.idx` takes the isize; `self.idx += 1` after it
+        // is fine (the annotation that forced the copy, #1531, is no longer
+        // written). A `var` of plain bits is the value too; of anything else
+        // it keeps the value semantics it had.
+        if v_fty != 0 and self.type_is_plain_bits(v_fty):
+            return 0
+        if is_mut != 0:
             return 0
         var vbase = self.ast.get_data0(expr)
         while vbase != 0:
@@ -16128,6 +16181,10 @@ impl Sema:
             value_core = self.ast.get_data0(value_core)
         if self.pool_resolve(name) == "_" and self.ast.kind(value_core) == NodeKind.NK_IDENT:
             self.discard_lets.insert(self.ast.get_data0(value_core), node)
+        // D144 census: `let i: isize = self.idx` written to force the copy a
+        // plain-bits field read is anyway; the sweep removes the annotation.
+        if ann_type != 0 and ann_type_node != 0 and val_type != 0 and self.ast.kind(value_core) == NodeKind.NK_FIELD_ACCESS and self.types_identical(ann_type as i32, val_type as i32) and self.type_is_plain_bits(val_type as i32) and self.place_root_sym(value_core) != 0:
+            self.ceremony_sites.insert(ann_type_node, 4)
         if not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
@@ -16153,6 +16210,10 @@ impl Sema:
                 // element (`let x = v[0]`); `let x: T = s.f` is the copy.
                 if val_type != 0:
                     field_view_let = 1
+                    // D144: the view is the field; a mutating call through
+                    // it writes the field when its root is mutable.
+                    if self.place_root_is_mutable(value):
+                        self.binding_observes_mutable_place.insert(name, 1)
             else if ann_type != 0 and val_type != 0 and self.can_auto_ref_arg(ann_type as i32, val_type as i32) != 0 and self.place_root_sym(value) != 0:
                 // #1244 / §3.8: `let s: &T = place` auto-references — the
                 // binding observes the place, it does not consume it. The
@@ -23463,6 +23524,22 @@ impl Sema:
         if kind == NodeKind.NK_PAT_IDENT:
             let sym = self.ast.get_data0(node)
             self.scope_put_at(sym, subject_type, self.pattern_bind_mut, node)
+            // D144 (§9.7): a pattern on a place observes it. A payload that
+            // is not plain bits binds in place — the binding is a view of
+            // the payload's place (MIR aliases it, pattern_place_bindings),
+            // mutated through when the subject's root is mutable. Plain
+            // bits take the value.
+            // A bare local holding a resource payload (`let (tx, rx) =
+            // pair`) keeps D115's implicit take: the local is this frame's
+            // own, and the pattern is its last word on it. Open for Eric's
+            // ruling whether that local should observe and spell `move`.
+            let bare_local_resource = self.pattern_subject_is_bare_local(self.pattern_subject_node) and self.is_copy(subject_type as TypeId) == 0
+            if self.pattern_subject_node != 0 and self.pattern_subject_ref_mutability(subject_type) < 0 and not self.pattern_subject_root_owned(self.pattern_subject_node) and not bare_local_resource and not self.type_is_plain_bits(subject_type):
+                self.pattern_place_bindings.insert(node, 1)
+                self.scope_set_is_view_bound(sym)
+                self.record_view_binding_from_expr(sym, self.pattern_subject_node)
+                if self.place_root_is_mutable(self.pattern_subject_node):
+                    self.binding_observes_mutable_place.insert(sym, 1)
             return
 
         if kind == NodeKind.NK_PAT_INT or kind == NodeKind.NK_PAT_BOOL or kind == NodeKind.NK_PAT_STRING:
@@ -37155,6 +37232,12 @@ impl Sema:
     // the pointer writes its pointee, not the place the binding views.
     mut fn reject_mutation_through_view_binding(root: i32, node: i32):
         if root == 0 or self.scope_is_view_bound(root) == 0 or self.suppress_errors != 0:
+            return
+        // D144: a binding observing a mutable place (`match self.current:
+        // Some(c) => c.push(9)` under `mut self`, `let p = self.items`) is
+        // the place; a mutating call through it writes the field. Under
+        // an immutable subject it stays refused.
+        if self.binding_observes_mutable_place.contains(root):
             return
         if self.get_type_kind(self.resolve_alias(self.scope_lookup(root) as TypeId)) == TypeKind.TY_PTR:
             return
