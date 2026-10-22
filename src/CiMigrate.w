@@ -92,6 +92,23 @@ var g_ci_translate_migrate_mode: i32 = 0
 fn ci_translate_in_migrate_mode -> bool: g_ci_translate_migrate_mode != 0
 var g_migrate_unsafe_extern_fn_names: str = ""
 
+// Whether a rendered body calls `name` (a token, followed by `(`): a
+// function that calls itself declares its return type (D143, Law 6), so a
+// void one keeps `-> Unit` however its tail reads. A name inside a longer
+// identifier is not a call; a false hit only spells `-> Unit`.
+fn ci_migrate_body_calls(body: &str, name: &str) -> bool:
+    let needle = name ++ "("
+    var from: i64 = 0
+    while from + needle.len() <= body.len():
+        let at = ci_find_substr(body.slice(from, body.len()), needle)
+        if at < 0: return false
+        let start = from + at
+        let before = if start > 0: body[start - 1] else: 32
+        let ident_before = (before >= 48 and before <= 57) or (before >= 65 and before <= 90) or (before >= 97 and before <= 122) or before == 95
+        if not ident_before: return true
+        from = start + 1
+    false
+
 fn ci_migrate_text_is_blank(text: &str) -> bool:
     var i: i64 = 0
     while i < text.len():
@@ -1042,6 +1059,21 @@ impl CiProject:
     // The module that owns a header's inline definitions: the registered
     // unit whose stem equals the header's (`dir/tommyhashdyn.h:12:1` ->
     // the module for `.../tommyhashdyn.c`), or -1 when no unit has it.
+    // A `static inline` header function no unit owns, defined by exactly
+    // one unit of the project (a template header instantiated once): that
+    // unit publishes it, as a header's own unit would. Two definers keep a
+    // private copy each.
+    mut fn resolve_header_definers():
+        for symbol_id in 0..self.symbols.len():
+            if self.symbols[symbol_id].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[symbol_id].owner_module >= 0: continue
+            let definers = self.symbols[symbol_id].header_definers
+            if definers.len() == 0: continue
+            let sole = ci_pipe_i32_sole(definers)
+            if sole < 0: continue
+            self.symbols[symbol_id].owner_module = sole
+            self.symbols[symbol_id].owner_rank = 1
+            self.symbols[symbol_id].owner_definition_kind = 1
+
     fn header_owner_module(location: &str) -> i32:
         // Only a HEADER's definition is API; a unit's own `static inline`
         // helpers (tommyhashdyn.c's hashdyn_grow_step) stay private.
@@ -1162,7 +1194,14 @@ impl CiProject:
                     // header's code. That unit publishes the one definition;
                     // includers import it. A header no unit owns keeps a
                     // private copy per includer (tommytypes.h's tommy_ilog2).
-                    let header_owner = if with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0: self.header_owner_module(loc) else: -1
+                    let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
+                    let header_owner = if header_inline_definition: self.header_owner_module(loc) else: -1
+                    // A header no unit owns: each includer that defines it is
+                    // recorded; a sole definer publishes it once the scan is
+                    // done (a template instantiated in one unit, STC's).
+                    if header_owner < 0 and header_inline_definition:
+                        let definer_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
+                        self.symbols[definer_symbol].add_header_definer(module_id)
                     if header_owner >= 0:
                         let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[symbol_id].add_consumer(module_id)
@@ -1442,6 +1481,7 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     one.push(input_path.clone())
     project.register_modules(&one)
     if project.migrate_scan_file(input_path) != 0: return 1
+    project.resolve_header_definers()
     project.resolve_fn_ptr_nullability()
     project.export_fn_ptr_nullability(true)
     let rc = ci_migrate_file_inner(input_path, output_path, false, &project)
@@ -1883,6 +1923,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
 
         // D107: the corpus-wide nullability verdicts, drawn once the whole
         // project is scanned; said once per directory.
+        project.resolve_header_definers()
         project.resolve_fn_ptr_nullability()
         project.export_fn_ptr_nullability(i == 0)
         let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
@@ -2084,6 +2125,7 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
             return 1
         scan_i = scan_i + 1
     // D107: the corpus-wide nullability verdicts, drawn once, said once.
+    project.resolve_header_definers()
     project.resolve_fn_ptr_nullability()
     project.export_fn_ptr_nullability(true)
 
@@ -2479,7 +2521,8 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         g_migrate_fn_translated = g_migrate_fn_translated + 1
         let ret_render = ci_unsafe_fn_ptr_type(ret)
         // A blank body is emitted as `return`, whose tail is Unit.
-        let ret_suffix = ci_def_ret_suffix(ret_render, body_tail_unit or ci_migrate_text_is_blank(body))
+        // D143: a function that calls itself declares its return type.
+        let ret_suffix = ci_def_ret_suffix(ret_render, (body_tail_unit or ci_migrate_text_is_blank(body)) and not ci_migrate_body_calls(body, safe_name))
         let body_for_emit = if ret == "Unit" and ci_migrate_text_is_blank(body): "    return\n" else: body
         let visibility = if g_migrate_no_c_export != 0 and (storage != CX_SC_STATIC or header_owner.len() > 0): "pub " else: ""
         let fn_keyword = visibility ++ if ci_migrate_extern_fn_call_requires_unsafe(safe_name): "unsafe fn " else: "fn "

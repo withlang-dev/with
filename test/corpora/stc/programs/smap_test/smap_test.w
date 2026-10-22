@@ -1430,22 +1430,22 @@ unsafe fn Mymap_next(__param_it_: *mut Mymap_iter) -> Unit {
 
 }
 
-unsafe fn Mymap_is_empty(__param_self_: *const Mymap) -> bool {
+pub unsafe fn Mymap_is_empty(__param_self_: *const Mymap) -> bool {
     return (((*__param_self_).size == 0))
 
 }
 
-unsafe fn Mymap_size(__param_self_: *const Mymap) -> c_long {
+pub unsafe fn Mymap_size(__param_self_: *const Mymap) -> c_long {
     return (((*__param_self_).size as c_long))
 
 }
 
-unsafe fn Mymap_capacity(__param_self_: *const Mymap) -> c_long {
+pub unsafe fn Mymap_capacity(__param_self_: *const Mymap) -> c_long {
     return (((*__param_self_).capacity as c_long))
 
 }
 
-unsafe fn Mymap_find(__param_self_: *const Mymap, __param_rkey: c_int) -> Mymap_iter {
+pub unsafe fn Mymap_find(__param_self_: *const Mymap, __param_rkey: c_int) -> Mymap_iter {
     var __local_it_: Mymap_iter
 
     Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter))
@@ -1454,40 +1454,40 @@ unsafe fn Mymap_find(__param_self_: *const Mymap, __param_rkey: c_int) -> Mymap_
 
 }
 
-unsafe fn Mymap_contains(__param_self_: *const Mymap, __param_rkey: c_int) -> bool {
+pub unsafe fn Mymap_contains(__param_self_: *const Mymap, __param_rkey: c_int) -> bool {
     var __local_it_: Mymap_iter
 
     return ((Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) != null))
 
 }
 
-unsafe fn Mymap_get(__param_self_: *const Mymap, __param_rkey: c_int) -> *const Mymap_value {
+pub unsafe fn Mymap_get(__param_self_: *const Mymap, __param_rkey: c_int) -> *const Mymap_value {
     var __local_it_: Mymap_iter
 
     return ((Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) as *const Mymap_value))
 
 }
 
-unsafe fn Mymap_get_mut(__param_self_: *mut Mymap, __param_rkey: c_int) -> *mut Mymap_value {
+pub unsafe fn Mymap_get_mut(__param_self_: *mut Mymap, __param_rkey: c_int) -> *mut Mymap_value {
     var __local_it_: Mymap_iter
 
     return ((Mymap_find_it((__param_self_ as *const Mymap), __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) as *mut Mymap_value))
 
 }
 
-unsafe fn Mymap_value_toraw(__param_val: *const Mymap_value) -> Mymap_raw {
+pub unsafe fn Mymap_value_toraw(__param_val: *const Mymap_value) -> Mymap_raw {
     return ((Mymap_raw { first: ((*(&raw const (*__param_val).first as *const c_int))), second: cstr_toraw((&raw const (*__param_val).second as *const cstr)) } as Mymap_raw))
 
 }
 
-unsafe fn Mymap_value_drop(__param_self_: *const Mymap, __param_val: *mut Mymap_value) {
+pub unsafe fn Mymap_value_drop(__param_self_: *const Mymap, __param_val: *mut Mymap_value) {
 
 
     cstr_drop((((&raw const (*__param_val).second as *const cstr) as *mut cstr) as *const cstr))
 
 }
 
-unsafe fn Mymap_move(__param_self_: *mut Mymap) -> Mymap {
+pub unsafe fn Mymap_move(__param_self_: *mut Mymap) -> Mymap {
     var __local_m: Mymap = (*__param_self_)
 
     ((*__param_self_).head = ((0 as c_int)))
@@ -1507,21 +1507,21 @@ unsafe fn Mymap_move(__param_self_: *mut Mymap) -> Mymap {
 
 }
 
-unsafe fn Mymap_clear(__param_self_: *mut Mymap) -> Unit {
+pub unsafe fn Mymap_clear(__param_self_: *mut Mymap) -> Unit {
     Mymap_drop((__param_self_ as *const Mymap))
 
     Mymap_move(__param_self_)
 
 }
 
-unsafe fn Mymap_take(__param_self_: *mut Mymap, __param_unowned: Mymap) -> Unit {
+pub unsafe fn Mymap_take(__param_self_: *mut Mymap, __param_unowned: Mymap) -> Unit {
     Mymap_drop((__param_self_ as *const Mymap))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Mymap]())
 
 }
 
-unsafe fn Mymap_value_clone(__param_self_: *const Mymap, __param__val: Mymap_value) -> Mymap_value {
+pub unsafe fn Mymap_value_clone(__param_self_: *const Mymap, __param__val: Mymap_value) -> Mymap_value {
 
     ((*((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const c_int) as *mut c_int)) = (*((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const c_int) as *mut c_int)))
 
@@ -1532,7 +1532,7 @@ unsafe fn Mymap_value_clone(__param_self_: *const Mymap, __param__val: Mymap_val
 
 }
 
-unsafe fn Mymap_copy(__param_self_: *mut Mymap, __param_other: *const Mymap) -> Unit {
+pub unsafe fn Mymap_copy(__param_self_: *mut Mymap, __param_other: *const Mymap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -1544,7 +1544,7 @@ unsafe fn Mymap_copy(__param_self_: *mut Mymap, __param_other: *const Mymap) -> 
 
 }
 
-unsafe fn Mymap_shrink_to_fit(__param_self_: *mut Mymap) -> Unit {
+pub unsafe fn Mymap_shrink_to_fit(__param_self_: *mut Mymap) -> Unit {
     if ((if (*__param_self_).size == (*__param_self_).capacity: 1 else: 0) != 0) {
         return
     }
@@ -1610,21 +1610,21 @@ unsafe fn Mymap_emplace_or_assign(__param_self_: *mut Mymap, __param_rkey: c_int
 
 }
 
-unsafe fn Mymap_at(__param_self_: *const Mymap, __param_rkey: c_int) -> *const cstr {
+pub unsafe fn Mymap_at(__param_self_: *const Mymap, __param_rkey: c_int) -> *const cstr {
     var __local_it_: Mymap_iter
 
     return ((((&raw const Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)).second as *const cstr) as *mut cstr) as *const cstr))
 
 }
 
-unsafe fn Mymap_at_mut(__param_self_: *mut Mymap, __param_rkey: c_int) -> *mut cstr {
+pub unsafe fn Mymap_at_mut(__param_self_: *mut Mymap, __param_rkey: c_int) -> *mut cstr {
     var __local_it_: Mymap_iter
 
     return (((&raw const Mymap_find_it((__param_self_ as *const Mymap), __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)).second as *const cstr) as *mut cstr))
 
 }
 
-unsafe fn Mymap_end(__param_self_: *const Mymap) -> Mymap_iter {
+pub unsafe fn Mymap_end(__param_self_: *const Mymap) -> Mymap_iter {
     var __local_it_: Mymap_iter
 
 
@@ -1639,7 +1639,7 @@ unsafe fn Mymap_end(__param_self_: *const Mymap) -> Mymap_iter {
 
 }
 
-fn Mymap_advance(__param_it_: Mymap_iter, __param_n: c_ulong) -> Mymap_iter {
+pub fn Mymap_advance(__param_it_: Mymap_iter, __param_n: c_ulong) -> Mymap_iter {
     var __local_n = __param_n
     while true {
         var __ci_expr_logic_1: c_int = 0
@@ -1664,7 +1664,7 @@ fn Mymap_advance(__param_it_: Mymap_iter, __param_n: c_ulong) -> Mymap_iter {
 
 }
 
-unsafe fn Mymap_eq(__param_self_: *const Mymap, __param_other: *const Mymap) -> bool {
+pub unsafe fn Mymap_eq(__param_self_: *const Mymap, __param_other: *const Mymap) -> bool {
     if ((if Mymap_size(__param_self_) != Mymap_size(__param_other): 1 else: 0) != 0) {
         return false
     }
@@ -1696,7 +1696,7 @@ unsafe fn Mymap_eq(__param_self_: *const Mymap, __param_other: *const Mymap) -> 
 
 }
 
-unsafe fn Mymap_insert(__param_self_: *mut Mymap, __param__key: c_int, __param__mapped: cstr) -> Mymap_result {
+pub unsafe fn Mymap_insert(__param_self_: *mut Mymap, __param__key: c_int, __param__mapped: cstr) -> Mymap_result {
     var __local__res: Mymap_result = Mymap_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut c_int)))
 
     if (*(&raw const __local__res as *const Mymap_result)).inserted {
@@ -1714,7 +1714,7 @@ unsafe fn Mymap_insert(__param_self_: *mut Mymap, __param__key: c_int, __param__
 
 }
 
-unsafe fn Mymap_push(__param_self_: *mut Mymap, __param__val: Mymap_value) -> *mut Mymap_value {
+pub unsafe fn Mymap_push(__param_self_: *mut Mymap, __param__val: Mymap_value) -> *mut Mymap_value {
     var __local__res: Mymap_result = Mymap_insert_entry_(__param_self_, (*((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const c_int) as *mut c_int)))
 
     if ((if not (*(&raw const __local__res as *const Mymap_result)).inserted: 1 else: 0) != 0) {
@@ -1727,12 +1727,12 @@ unsafe fn Mymap_push(__param_self_: *mut Mymap, __param__val: Mymap_value) -> *m
 
 }
 
-unsafe fn Mymap_put(__param_self_: *mut Mymap, __param_rkey: c_int, __param_rmapped: *const i8) -> Mymap_result {
+pub unsafe fn Mymap_put(__param_self_: *mut Mymap, __param_rkey: c_int, __param_rmapped: *const i8) -> Mymap_result {
     return Mymap_emplace_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
-unsafe fn Mymap_put_n(__param_self_: *mut Mymap, __param_raw: *const Mymap_raw, __param_n: c_long) {
+pub unsafe fn Mymap_put_n(__param_self_: *mut Mymap, __param_raw: *const Mymap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -1752,14 +1752,14 @@ unsafe fn Mymap_put_n(__param_self_: *mut Mymap, __param_raw: *const Mymap_raw, 
 
 }
 
-fn Mymap_init() -> Mymap {
+pub fn Mymap_init() -> Mymap {
     var __local_cx: Mymap = Mymap.zeroed()
 
     return __local_cx
 
 }
 
-unsafe fn Mymap_from_n(__param_raw: *const Mymap_raw, __param_n: c_long) -> Mymap {
+pub unsafe fn Mymap_from_n(__param_raw: *const Mymap_raw, __param_n: c_long) -> Mymap {
     var __local_cx: Mymap = Mymap.zeroed()
 
     Mymap_put_n((&raw mut __local_cx as *mut Mymap), __param_raw, __param_n)
@@ -1768,7 +1768,7 @@ unsafe fn Mymap_from_n(__param_raw: *const Mymap_raw, __param_n: c_long) -> Myma
 
 }
 
-fn Mymap_with_capacity(__param_cap: c_long) -> Mymap {
+pub fn Mymap_with_capacity(__param_cap: c_long) -> Mymap {
     var __local_cx: Mymap = Mymap.zeroed()
 
     unsafe { Mymap_reserve((&raw mut __local_cx as *mut Mymap), __param_cap) }
@@ -2064,7 +2064,7 @@ unsafe fn Mymap_clone_r_(__param_self_: *mut Mymap, __param_src: *mut Mymap_node
 
 }
 
-unsafe fn Mymap_drop_r_(__param_s: *mut Mymap, __param_tn: c_int) {
+unsafe fn Mymap_drop_r_(__param_s: *mut Mymap, __param_tn: c_int) -> Unit {
     if ((if __param_tn != 0: 1 else: 0) != 0) {
         Mymap_drop_r_(__param_s, (((*__param_s).nodes[__param_tn]).link[0] as c_int))
 
@@ -2492,22 +2492,22 @@ unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) -> Unit {
 
 }
 
-unsafe fn Intmap_is_empty(__param_self_: *const Intmap) -> bool {
+pub unsafe fn Intmap_is_empty(__param_self_: *const Intmap) -> bool {
     return (((*__param_self_).size == 0))
 
 }
 
-unsafe fn Intmap_size(__param_self_: *const Intmap) -> c_long {
+pub unsafe fn Intmap_size(__param_self_: *const Intmap) -> c_long {
     return (((*__param_self_).size as c_long))
 
 }
 
-unsafe fn Intmap_capacity(__param_self_: *const Intmap) -> c_long {
+pub unsafe fn Intmap_capacity(__param_self_: *const Intmap) -> c_long {
     return (((*__param_self_).capacity as c_long))
 
 }
 
-unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intmap_iter {
+pub unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intmap_iter {
     var __local_it_: Intmap_iter
 
     Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter))
@@ -2516,37 +2516,37 @@ unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intm
 
 }
 
-unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: c_int) -> bool {
+pub unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: c_int) -> bool {
     var __local_it_: Intmap_iter
 
     return ((Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) != null))
 
 }
 
-unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: c_int) -> *const Intmap_value {
+pub unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: c_int) -> *const Intmap_value {
     var __local_it_: Intmap_iter
 
     return ((Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) as *const Intmap_value))
 
 }
 
-unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut Intmap_value {
+pub unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut Intmap_value {
     var __local_it_: Intmap_iter
 
     return ((Intmap_find_it((__param_self_ as *const Intmap), __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) as *mut Intmap_value))
 
 }
 
-unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
+pub unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
     return ((Intmap_raw { first: ((*(&raw const (*__param_val).first as *const c_int))), second: ((*(&raw const (*__param_val).second as *const c_int))) } as Intmap_raw))
 
 }
 
-unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param_val: *mut Intmap_value) {
+pub unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param_val: *mut Intmap_value) {
     return
 }
 
-unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
+pub unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
     var __local_m: Intmap = (*__param_self_)
 
     ((*__param_self_).head = ((0 as c_int)))
@@ -2566,21 +2566,21 @@ unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
 
 }
 
-unsafe fn Intmap_clear(__param_self_: *mut Intmap) -> Unit {
+pub unsafe fn Intmap_clear(__param_self_: *mut Intmap) -> Unit {
     Intmap_drop((__param_self_ as *const Intmap))
 
     Intmap_move(__param_self_)
 
 }
 
-unsafe fn Intmap_take(__param_self_: *mut Intmap, __param_unowned: Intmap) -> Unit {
+pub unsafe fn Intmap_take(__param_self_: *mut Intmap, __param_unowned: Intmap) -> Unit {
     Intmap_drop((__param_self_ as *const Intmap))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Intmap]())
 
 }
 
-unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
+pub unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
 
     ((*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)) = (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)))
 
@@ -2590,7 +2590,7 @@ unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_
 
 }
 
-unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) -> Unit {
+pub unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -2602,7 +2602,7 @@ unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) 
 
 }
 
-unsafe fn Intmap_shrink_to_fit(__param_self_: *mut Intmap) -> Unit {
+pub unsafe fn Intmap_shrink_to_fit(__param_self_: *mut Intmap) -> Unit {
     if ((if (*__param_self_).size == (*__param_self_).capacity: 1 else: 0) != 0) {
         return
     }
@@ -2646,21 +2646,21 @@ unsafe fn Intmap_insert_or_assign(__param_self_: *mut Intmap, __param__key: c_in
 
 }
 
-unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: c_int) -> *const c_int {
+pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: c_int) -> *const c_int {
     var __local_it_: Intmap_iter
 
     return ((((&raw const Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)).second as *const c_int) as *mut c_int) as *const c_int))
 
 }
 
-unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut c_int {
+pub unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut c_int {
     var __local_it_: Intmap_iter
 
     return (((&raw const Intmap_find_it((__param_self_ as *const Intmap), __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)).second as *const c_int) as *mut c_int))
 
 }
 
-unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
+pub unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
     var __local_it_: Intmap_iter
 
 
@@ -2675,7 +2675,7 @@ unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
 
 }
 
-fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
+pub fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
     var __local_n = __param_n
     while true {
         var __ci_expr_logic_1: c_int = 0
@@ -2700,7 +2700,7 @@ fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
 
 }
 
-unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
+pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
     if ((if Intmap_size(__param_self_) != Intmap_size(__param_other): 1 else: 0) != 0) {
         return false
     }
@@ -2732,7 +2732,7 @@ unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) 
 
 }
 
-unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param__mapped: c_int) -> Intmap_result {
+pub unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param__mapped: c_int) -> Intmap_result {
     var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut c_int)))
 
     if (*(&raw const __local__res as *const Intmap_result)).inserted {
@@ -2749,7 +2749,7 @@ unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param
 
 }
 
-unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) -> *mut Intmap_value {
+pub unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) -> *mut Intmap_value {
     var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)))
 
     if ((if not (*(&raw const __local__res as *const Intmap_result)).inserted: 1 else: 0) != 0) {
@@ -2762,12 +2762,12 @@ unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) ->
 
 }
 
-unsafe fn Intmap_put(__param_self_: *mut Intmap, __param_rkey: c_int, __param_rmapped: c_int) -> Intmap_result {
+pub unsafe fn Intmap_put(__param_self_: *mut Intmap, __param_rkey: c_int, __param_rmapped: c_int) -> Intmap_result {
     return Intmap_insert_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
-unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_raw, __param_n: c_long) {
+pub unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -2787,14 +2787,14 @@ unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_ra
 
 }
 
-fn Intmap_init() -> Intmap {
+pub fn Intmap_init() -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     return __local_cx
 
 }
 
-unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Intmap {
+pub unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     Intmap_put_n((&raw mut __local_cx as *mut Intmap), __param_raw, __param_n)
@@ -2803,7 +2803,7 @@ unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> In
 
 }
 
-fn Intmap_with_capacity(__param_cap: c_long) -> Intmap {
+pub fn Intmap_with_capacity(__param_cap: c_long) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     unsafe { Intmap_reserve((&raw mut __local_cx as *mut Intmap), __param_cap) }
@@ -3099,7 +3099,7 @@ unsafe fn Intmap_clone_r_(__param_self_: *mut Intmap, __param_src: *mut Intmap_n
 
 }
 
-unsafe fn Intmap_drop_r_(__param_s: *mut Intmap, __param_tn: c_int) {
+unsafe fn Intmap_drop_r_(__param_s: *mut Intmap, __param_tn: c_int) -> Unit {
     if ((if __param_tn != 0: 1 else: 0) != 0) {
         Intmap_drop_r_(__param_s, (((*__param_s).nodes[__param_tn]).link[0] as c_int))
 
@@ -3250,11 +3250,11 @@ unsafe fn Pairvec_insert_uninit(__param_self_: *mut Pairvec, __param_idx: c_long
 
 }
 
-unsafe fn Pairvec_value_drop(__param_self_: *const Pairvec, __param_val: *mut Intmap_raw) {
+pub unsafe fn Pairvec_value_drop(__param_self_: *const Pairvec, __param_val: *mut Intmap_raw) {
     return
 }
 
-unsafe fn Pairvec_move(__param_self_: *mut Pairvec) -> Pairvec {
+pub unsafe fn Pairvec_move(__param_self_: *mut Pairvec) -> Pairvec {
     var __local_m: Pairvec = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -3268,14 +3268,14 @@ unsafe fn Pairvec_move(__param_self_: *mut Pairvec) -> Pairvec {
 
 }
 
-unsafe fn Pairvec_take(__param_self_: *mut Pairvec, __param_unowned: Pairvec) -> Unit {
+pub unsafe fn Pairvec_take(__param_self_: *mut Pairvec, __param_unowned: Pairvec) -> Unit {
     Pairvec_drop((__param_self_ as *const Pairvec))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Pairvec]())
 
 }
 
-unsafe fn Pairvec_push(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -> *mut Intmap_raw {
+pub unsafe fn Pairvec_push(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -> *mut Intmap_raw {
     if ((if (*__param_self_).size == (*__param_self_).capacity: 1 else: 0) != 0) {
         if ((if not Pairvec_reserve(__param_self_, ((((*__param_self_).size * 2) + 4) as c_long)): 1 else: 0) != 0) {
             return ((null as *mut Intmap_raw))
@@ -3294,7 +3294,7 @@ unsafe fn Pairvec_push(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -
 
 }
 
-unsafe fn Pairvec_put_n(__param_self_: *mut Pairvec, __param_raw: *const Intmap_raw, __param_n: c_long) {
+pub unsafe fn Pairvec_put_n(__param_self_: *mut Pairvec, __param_raw: *const Intmap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -3403,53 +3403,53 @@ fn Pairvec_clone(__param_vec: Pairvec) -> Pairvec {
 
 }
 
-unsafe fn Pairvec_value_clone(__param_self_: *const Pairvec, __param_val: Intmap_raw) -> Intmap_raw {
+pub unsafe fn Pairvec_value_clone(__param_self_: *const Pairvec, __param_val: Intmap_raw) -> Intmap_raw {
 
     return __param_val
 
 }
 
-unsafe fn Pairvec_size(__param_self_: *const Pairvec) -> c_long {
+pub unsafe fn Pairvec_size(__param_self_: *const Pairvec) -> c_long {
     return (*__param_self_).size
 
 }
 
-unsafe fn Pairvec_capacity(__param_self_: *const Pairvec) -> c_long {
+pub unsafe fn Pairvec_capacity(__param_self_: *const Pairvec) -> c_long {
     return (*__param_self_).capacity
 
 }
 
-unsafe fn Pairvec_is_empty(__param_self_: *const Pairvec) -> bool {
+pub unsafe fn Pairvec_is_empty(__param_self_: *const Pairvec) -> bool {
     return ((not ((*__param_self_).size != 0)))
 
 }
 
-unsafe fn Pairvec_value_toraw(__param_val: *const Intmap_raw) -> Intmap_raw {
+pub unsafe fn Pairvec_value_toraw(__param_val: *const Intmap_raw) -> Intmap_raw {
     return (*__param_val)
 
 }
 
-unsafe fn Pairvec_front(__param_self_: *const Pairvec) -> *const Intmap_raw {
+pub unsafe fn Pairvec_front(__param_self_: *const Pairvec) -> *const Intmap_raw {
     return (((*__param_self_).data as *const Intmap_raw))
 
 }
 
-unsafe fn Pairvec_front_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
+pub unsafe fn Pairvec_front_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
     return (*__param_self_).data
 
 }
 
-unsafe fn Pairvec_back(__param_self_: *const Pairvec) -> *const Intmap_raw {
+pub unsafe fn Pairvec_back(__param_self_: *const Pairvec) -> *const Intmap_raw {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Intmap_raw) as *mut Intmap_raw) as *const Intmap_raw))
 
 }
 
-unsafe fn Pairvec_back_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
+pub unsafe fn Pairvec_back_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Intmap_raw) as *mut Intmap_raw))
 
 }
 
-unsafe fn Pairvec_pop(__param_self_: *mut Pairvec) {
+pub unsafe fn Pairvec_pop(__param_self_: *mut Pairvec) {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Pairvec_pop".ptr, c"vec.h".ptr, (151 as c_int), c"self->size".ptr)
     } else {
@@ -3464,7 +3464,7 @@ unsafe fn Pairvec_pop(__param_self_: *mut Pairvec) {
 
 }
 
-unsafe fn Pairvec_pull(__param_self_: *mut Pairvec) -> Intmap_raw {
+pub unsafe fn Pairvec_pull(__param_self_: *mut Pairvec) -> Intmap_raw {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Pairvec_pull".ptr, c"vec.h".ptr, (153 as c_int), c"self->size".ptr)
     } else {
@@ -3478,36 +3478,36 @@ unsafe fn Pairvec_pull(__param_self_: *mut Pairvec) -> Intmap_raw {
 
 }
 
-unsafe fn Pairvec_push_back(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -> *mut Intmap_raw {
+pub unsafe fn Pairvec_push_back(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -> *mut Intmap_raw {
     return ((Pairvec_push(__param_self_, __param_value) as *mut Intmap_raw))
 
 }
 
-unsafe fn Pairvec_pop_back(__param_self_: *mut Pairvec) {
+pub unsafe fn Pairvec_pop_back(__param_self_: *mut Pairvec) {
     Pairvec_pop(__param_self_)
 
 }
 
-fn Pairvec_init() -> Pairvec {
+pub fn Pairvec_init() -> Pairvec {
     return ((Pairvec.zeroed() as Pairvec))
 
 }
 
-fn Pairvec_with_capacity(__param_cap: c_long) -> Pairvec {
+pub fn Pairvec_with_capacity(__param_cap: c_long) -> Pairvec {
     var __local_out: Pairvec = Pairvec { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[Intmap_raw]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Intmap_raw)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
-fn Pairvec_with_size_uninit(__param_size: c_long) -> Pairvec {
+pub fn Pairvec_with_size_uninit(__param_size: c_long) -> Pairvec {
     var __local_out: Pairvec = Pairvec { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[Intmap_raw]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Intmap_raw)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
 }
 
-fn Pairvec_with_size(__param_size: c_long, __param_default_raw: Intmap_raw) -> Pairvec {
+pub fn Pairvec_with_size(__param_size: c_long, __param_default_raw: Intmap_raw) -> Pairvec {
     var __local_size = __param_size
     var __local_out: Pairvec = Pairvec { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[Intmap_raw]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Intmap_raw)), size: __local_size, capacity: __local_size }
 
@@ -3522,7 +3522,7 @@ fn Pairvec_with_size(__param_size: c_long, __param_default_raw: Intmap_raw) -> P
 
 }
 
-unsafe fn Pairvec_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Pairvec {
+pub unsafe fn Pairvec_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Pairvec {
     var __local_out: Pairvec = Pairvec_with_capacity(__param_n)
 
     Pairvec_put_n((&raw mut __local_out as *mut Pairvec), __param_raw, __param_n)
@@ -3531,12 +3531,12 @@ unsafe fn Pairvec_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> P
 
 }
 
-unsafe fn Pairvec_shrink_to_fit(__param_self_: *mut Pairvec) -> Unit {
+pub unsafe fn Pairvec_shrink_to_fit(__param_self_: *mut Pairvec) -> Unit {
     Pairvec_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn Pairvec_insert_n(__param_self_: *mut Pairvec, __param_idx: c_long, __param_arr: *mut Intmap_raw, __param_n: c_long) -> Pairvec_iter {
+pub unsafe fn Pairvec_insert_n(__param_self_: *mut Pairvec, __param_idx: c_long, __param_arr: *mut Intmap_raw, __param_n: c_long) -> Pairvec_iter {
     var __local_it_: Pairvec_iter = Pairvec_insert_uninit(__param_self_, __param_idx, __param_n)
 
     if ((*(&raw const __local_it_ as *const Pairvec_iter)).ref != null) {
@@ -3547,17 +3547,17 @@ unsafe fn Pairvec_insert_n(__param_self_: *mut Pairvec, __param_idx: c_long, __p
 
 }
 
-unsafe fn Pairvec_insert_at(__param_self_: *mut Pairvec, __param_it_: Pairvec_iter, __param_value: Intmap_raw) -> Pairvec_iter {
+pub unsafe fn Pairvec_insert_at(__param_self_: *mut Pairvec, __param_it_: Pairvec_iter, __param_value: Intmap_raw) -> Pairvec_iter {
     return Pairvec_insert_n(__param_self_, ((((((if (*(&raw const __param_it_ as *const Pairvec_iter)).ref != null: (*(&raw const __param_it_ as *const Pairvec_iter)).ref else: (*(&raw const __param_it_ as *const Pairvec_iter)).end) as usize) -% ((*__param_self_).data as usize)) as c_long) / (sizeof[Intmap_raw]() as c_long)) as c_long), ((&raw const __param_value as *const Intmap_raw) as *mut Intmap_raw), (1 as c_long))
 
 }
 
-unsafe fn Pairvec_erase_at(__param_self_: *mut Pairvec, __param_it_: Pairvec_iter) -> Pairvec_iter {
+pub unsafe fn Pairvec_erase_at(__param_self_: *mut Pairvec, __param_it_: Pairvec_iter) -> Pairvec_iter {
     return Pairvec_erase_n(__param_self_, ((((((*(&raw const __param_it_ as *const Pairvec_iter)).ref as usize) -% ((*__param_self_).data as usize)) as c_long) / (sizeof[Intmap_raw]() as c_long)) as c_long), (1 as c_long))
 
 }
 
-unsafe fn Pairvec_erase_range(__param_self_: *mut Pairvec, __param_i1: Pairvec_iter, __param_i2: Pairvec_iter) -> Pairvec_iter {
+pub unsafe fn Pairvec_erase_range(__param_self_: *mut Pairvec, __param_i1: Pairvec_iter, __param_i2: Pairvec_iter) -> Pairvec_iter {
     var __ci_expr_ternary_1: *mut Intmap_raw = null
 
     var __ci_expr_logic_0: c_int = 0
@@ -3577,7 +3577,7 @@ unsafe fn Pairvec_erase_range(__param_self_: *mut Pairvec, __param_i1: Pairvec_i
 
 }
 
-unsafe fn Pairvec_at(__param_self_: *const Pairvec, __param_idx: c_long) -> *const Intmap_raw {
+pub unsafe fn Pairvec_at(__param_self_: *const Pairvec, __param_idx: c_long) -> *const Intmap_raw {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Pairvec_at".ptr, c"vec.h".ptr, (206 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -3588,7 +3588,7 @@ unsafe fn Pairvec_at(__param_self_: *const Pairvec, __param_idx: c_long) -> *con
 
 }
 
-unsafe fn Pairvec_at_mut(__param_self_: *mut Pairvec, __param_idx: c_long) -> *mut Intmap_raw {
+pub unsafe fn Pairvec_at_mut(__param_self_: *mut Pairvec, __param_idx: c_long) -> *mut Intmap_raw {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Pairvec_at_mut".ptr, c"vec.h".ptr, (210 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -3599,7 +3599,7 @@ unsafe fn Pairvec_at_mut(__param_self_: *mut Pairvec, __param_idx: c_long) -> *m
 
 }
 
-unsafe fn Pairvec_begin(__param_self_: *const Pairvec) -> Pairvec_iter {
+pub unsafe fn Pairvec_begin(__param_self_: *const Pairvec) -> Pairvec_iter {
     var __local_it_: Pairvec_iter = Pairvec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -3612,7 +3612,7 @@ unsafe fn Pairvec_begin(__param_self_: *const Pairvec) -> Pairvec_iter {
 
 }
 
-unsafe fn Pairvec_rbegin(__param_self_: *const Pairvec) -> Pairvec_iter {
+pub unsafe fn Pairvec_rbegin(__param_self_: *const Pairvec) -> Pairvec_iter {
     var __local_it_: Pairvec_iter = Pairvec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -3628,7 +3628,7 @@ unsafe fn Pairvec_rbegin(__param_self_: *const Pairvec) -> Pairvec_iter {
 
 }
 
-unsafe fn Pairvec_end(__param_self_: *const Pairvec) -> Pairvec_iter {
+pub unsafe fn Pairvec_end(__param_self_: *const Pairvec) -> Pairvec_iter {
 
     var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
 
@@ -3636,7 +3636,7 @@ unsafe fn Pairvec_end(__param_self_: *const Pairvec) -> Pairvec_iter {
 
 }
 
-unsafe fn Pairvec_rend(__param_self_: *const Pairvec) -> Pairvec_iter {
+pub unsafe fn Pairvec_rend(__param_self_: *const Pairvec) -> Pairvec_iter {
 
     var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
 
@@ -3644,7 +3644,7 @@ unsafe fn Pairvec_rend(__param_self_: *const Pairvec) -> Pairvec_iter {
 
 }
 
-unsafe fn Pairvec_next(__param_it_: *mut Pairvec_iter) {
+pub unsafe fn Pairvec_next(__param_it_: *mut Pairvec_iter) {
     ((*__param_it_).ref = (*__param_it_).ref + 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -3654,7 +3654,7 @@ unsafe fn Pairvec_next(__param_it_: *mut Pairvec_iter) {
 
 }
 
-unsafe fn Pairvec_rnext(__param_it_: *mut Pairvec_iter) {
+pub unsafe fn Pairvec_rnext(__param_it_: *mut Pairvec_iter) {
     ((*__param_it_).ref = (*__param_it_).ref - 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -3664,7 +3664,7 @@ unsafe fn Pairvec_rnext(__param_it_: *mut Pairvec_iter) {
 
 }
 
-fn Pairvec_advance(__param_it_: Pairvec_iter, __param_n: c_ulong) -> Pairvec_iter {
+pub fn Pairvec_advance(__param_it_: Pairvec_iter, __param_n: c_ulong) -> Pairvec_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Pairvec_iter)).ref + (__param_n as usize))
 
     if ((if (unsafe *(&raw const __param_it_ as *const Pairvec_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Pairvec_iter)).end: 1 else: 0) != 0) {
@@ -3676,12 +3676,12 @@ fn Pairvec_advance(__param_it_: Pairvec_iter, __param_n: c_ulong) -> Pairvec_ite
 
 }
 
-unsafe fn Pairvec_index(__param_self_: *const Pairvec, __param_it_: Pairvec_iter) -> c_long {
+pub unsafe fn Pairvec_index(__param_self_: *const Pairvec, __param_it_: Pairvec_iter) -> c_long {
     return (((((*(&raw const __param_it_ as *const Pairvec_iter)).ref as usize) -% ((*__param_self_).data as usize)) as c_long) / (sizeof[Intmap_raw]() as c_long))
 
 }
 
-unsafe fn Pairvec_adjust_end_(__param_self_: *mut Pairvec, __param_n: c_long) {
+pub unsafe fn Pairvec_adjust_end_(__param_self_: *mut Pairvec, __param_n: c_long) {
     ((*__param_self_).size = (*__param_self_).size + __param_n)
 
 }

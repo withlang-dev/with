@@ -4704,7 +4704,18 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     let packed_src = bs_join(case_dir, "bitfields_packed.c")
     rc = bs_write_fixture(ctx, packed_src, "typedef struct __attribute__((packed)) { char tag; unsigned int a:12; unsigned int b:20; } pk;\nint main(void) { pk p = {1, 2, 3}; return p.b - 3; }\n", "a packed bitfield unit")
     if rc != 0: return rc
-    bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-packed", &packed_src, "untranslatable record 'pk': pk: bitfield 'b' straddles its 4-byte unit")
+    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-packed", &packed_src, "untranslatable record 'pk': pk: bitfield 'b' straddles its 4-byte unit")
+    if rc != 0: return rc
+    // D143: a `pub fn` that calls itself declares its return type, so a
+    // recursive void function keeps `-> Unit` (STC's quicksort,
+    // `_sort_lowhigh`, is one).
+    let rec_src = bs_join(case_dir, "recvoid.c")
+    let rec_w = bs_join(case_dir, "recvoid.w")
+    rc = bs_write_fixture(ctx, rec_src, "void countdown(int* out, int n) { if (n > 0) { out[n - 1] = n; countdown(out, n - 1); } }\nint main(void) { int v[3] = {0, 0, 0}; countdown(v, 3); return (v[0] == 1 && v[2] == 3) ? 0 : 1; }\n", "a recursive void function")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "recvoid", &rec_src, &rec_w)
+    if rc != 0: return rc
+    bs_file_contains(ctx, rec_w, "fn countdown(__param_out: *mut c_int, __param_n: c_int) -> Unit", "a recursive void function declares Unit")
 
 // Migrate `src` expecting the migrator to refuse it with `needle` on stderr.
 fn bs_migrate_expect_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, needle: &str) -> i32:

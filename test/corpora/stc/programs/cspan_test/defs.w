@@ -577,6 +577,150 @@ pub type fn_tocase_anon { pub conv_asc: Option[extern "C" fn(c_int) -> c_int] = 
 impl Copy for fn_tocase_anon
 
 @[repr(C)]
+pub type stc_slot_head { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub hash: Option[unsafe extern "C" fn(*const c_void) -> c_ulong] = null }
+impl Copy for stc_slot_head
+
+pub type stc_slot = *mut stc_slot_head
+
+@[repr(C)]
+pub type hmap_meta { pub __bits_0: u16 = 0 }
+impl Copy for hmap_meta
+impl hmap_meta:
+    pub fn hashx() -> c_ushort: ((self.__bits_0 >> 0) & 63) as c_ushort
+    pub mut fn set_hashx(v: c_ushort): self.__bits_0 = (self.__bits_0 & ~((63 as u16) << 0)) | (((v as u16) & 63) << 0)
+    pub fn dist() -> c_ushort: ((self.__bits_0 >> 6) & 1023) as c_ushort
+    pub mut fn set_dist(v: c_ushort): self.__bits_0 = (self.__bits_0 & ~((1023 as u16) << 6)) | (((v as u16) & 1023) << 6)
+comptime fn __ci_layout_hmap_meta() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[hmap_meta]() != 2 or offsetof[hmap_meta](__bits_0) != 0): comptime_error("hmap_meta: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_hmap_meta_check: Unit = __ci_layout_hmap_meta()
+
+pub type stc_slot_set_key = *mut stc_slot_head
+
+pub type stc_slot_set_mapped = *mut stc_slot_head
+
+pub type stc_slot_set_value = *mut stc_slot_head
+
+pub type stc_slot_set_entry = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_set_result { pub ref: *mut *mut stc_slot_head = null, pub idx: c_ulong = 0, pub inserted: bool = false, pub hashx: u8 = 0, pub dist: c_ushort = 0 }
+impl Copy for stc_slot_set_result
+
+@[repr(C)]
+pub type stc_slot_set_iter { pub ref: *mut *mut stc_slot_head = null, pub _end: *mut *mut stc_slot_head = null, pub _mref: *mut hmap_meta = null }
+impl Copy for stc_slot_set_iter
+
+@[repr(C)]
+pub type stc_slot_set { pub table: *mut *mut stc_slot_head = null, pub meta: *mut hmap_meta = null, pub size: c_long = 0, pub bucket_count: c_long = 0 }
+impl Copy for stc_slot_set
+
+pub type stc_slot_set_keyraw = *mut stc_slot_head
+
+pub type stc_slot_set_rmapped = *mut stc_slot_head
+
+pub type stc_slot_set_raw = *mut stc_slot_head
+
+pub type stc_slot_sset_key = *mut stc_slot_head
+
+pub type stc_slot_sset_mapped = *mut stc_slot_head
+
+pub type stc_slot_sset_value = *mut stc_slot_head
+
+pub type stc_slot_sset_entry = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_sset_result { pub ref: *mut *mut stc_slot_head = null, pub inserted: bool = false }
+impl Copy for stc_slot_sset_result
+
+@[repr(C)]
+pub type stc_slot_sset_iter { pub ref: *mut *mut stc_slot_head = null, pub _d: *mut stc_slot_sset_node = null, pub _top: c_int = 0, pub _tn: c_int = 0, pub _st: [c_int; 36] = [0 as c_int; 36] }
+impl Copy for stc_slot_sset_iter
+
+@[repr(C)]
+pub type stc_slot_sset { pub nodes: *mut stc_slot_sset_node = null, pub root: c_int = 0, pub disp: c_int = 0, pub head: c_int = 0, pub size: c_int = 0, pub capacity: c_int = 0 }
+impl Copy for stc_slot_sset
+
+@[repr(C)]
+pub type stc_slot_sset_node { pub link: [c_int; 2] = [0 as c_int; 2], pub level: c_char = 0, pub value: *mut stc_slot_head = null }
+impl Copy for stc_slot_sset_node
+
+pub type stc_slot_sset_keyraw = *mut stc_slot_head
+
+pub type stc_slot_sset_rmapped = *mut stc_slot_head
+
+pub type stc_slot_sset_raw = *mut stc_slot_head
+
+pub type stc_slot_pqueue_value = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_pqueue_iter { pub ref: *mut *mut stc_slot_head = null, pub end: *mut *mut stc_slot_head = null }
+impl Copy for stc_slot_pqueue_iter
+
+@[repr(C)]
+pub type stc_slot_pqueue { pub data: *mut *mut stc_slot_head = null, pub size: c_long = 0, pub capacity: c_long = 0 }
+impl Copy for stc_slot_pqueue
+
+pub type stc_slot_pqueue_raw = *mut stc_slot_head
+
+pub type stc_slot_deque_value = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_deque { pub cbuf: *mut *mut stc_slot_head = null, pub start: c_long = 0, pub end: c_long = 0, pub capmask: c_long = 0 }
+impl Copy for stc_slot_deque
+
+@[repr(C)]
+pub type stc_slot_deque_iter { pub ref: *mut *mut stc_slot_head = null, pub pos: c_long = 0, pub _s: *const stc_slot_deque = null }
+impl Copy for stc_slot_deque_iter
+
+pub type stc_slot_deque_raw = *mut stc_slot_head
+
+pub type stc_word_deque_value = c_ulonglong
+
+@[repr(C)]
+pub type stc_word_deque { pub cbuf: *mut c_ulonglong = null, pub start: c_long = 0, pub end: c_long = 0, pub capmask: c_long = 0 }
+impl Copy for stc_word_deque
+
+@[repr(C)]
+pub type stc_word_deque_iter { pub ref: *mut c_ulonglong = null, pub pos: c_long = 0, pub _s: *const stc_word_deque = null }
+impl Copy for stc_word_deque_iter
+
+pub type stc_word_deque_raw = c_ulonglong
+
+@[repr(C)]
+pub type stc_slotref { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub ptr: *const c_void = null, pub with_cmp: *const c_void = null }
+impl Copy for stc_slotref
+
+pub type stc_slotrefs = stc_slotref
+
+pub type stc_slotrefs_value = stc_slotref
+
+pub type stc_slotrefs_raw = stc_slotref
+
+pub type stc_i64s = c_longlong
+
+pub type stc_i64s_value = c_longlong
+
+pub type stc_i64s_raw = c_longlong
+
+pub type stc_u64s = c_ulonglong
+
+pub type stc_u64s_value = c_ulonglong
+
+pub type stc_u64s_raw = c_ulonglong
+
+pub type stc_f64s = f64
+
+pub type stc_f64s_value = f64
+
+pub type stc_f64s_raw = f64
+
+@[repr(C)]
+pub type cbits { pub buffer: *mut c_ulong = null, pub _size: c_long = 0 }
+impl Copy for cbits
+
+pub let i_max_load_factor: f32 = 0.80
+pub type Self = cbits
+@[repr(C)]
 pub type fmt_stream { pub data: *mut i8 = null, pub cap: c_long = 0, pub len: c_long = 0, pub overwrite: bool = false }
 impl Copy for fmt_stream
 

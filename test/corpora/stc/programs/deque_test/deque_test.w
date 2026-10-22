@@ -333,7 +333,7 @@ fn IDeq_advance(__param_it_: IDeq_iter, __param_n: c_long) -> IDeq_iter {
 
 }
 
-unsafe fn IDeq_put_n(__param_self_: *mut IDeq, __param_raw: *const c_int, __param_n: c_long) {
+pub unsafe fn IDeq_put_n(__param_self_: *mut IDeq, __param_raw: *const c_int, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -353,18 +353,18 @@ unsafe fn IDeq_put_n(__param_self_: *mut IDeq, __param_raw: *const c_int, __para
 
 }
 
-unsafe fn IDeq_value_drop(__param_self_: *const IDeq, __param_val: *mut c_int) {
+pub unsafe fn IDeq_value_drop(__param_self_: *const IDeq, __param_val: *mut c_int) {
     return
 }
 
-fn IDeq_init() -> IDeq {
+pub fn IDeq_init() -> IDeq {
     var __local_out: IDeq = IDeq.zeroed()
 
     return __local_out
 
 }
 
-fn IDeq_with_capacity(__param_cap: c_long) -> IDeq {
+pub fn IDeq_with_capacity(__param_cap: c_long) -> IDeq {
     var __local_cap = __param_cap
     (__local_cap = ((c_next_pow2(((__local_cap + 1) as c_long)) as c_long)))
 
@@ -374,7 +374,7 @@ fn IDeq_with_capacity(__param_cap: c_long) -> IDeq {
 
 }
 
-fn IDeq_with_size_uninit(__param_size: c_long) -> IDeq {
+pub fn IDeq_with_size_uninit(__param_size: c_long) -> IDeq {
     var __local_out: IDeq = IDeq_with_capacity(__param_size)
 
     (__local_out.end = __param_size)
@@ -383,7 +383,7 @@ fn IDeq_with_size_uninit(__param_size: c_long) -> IDeq {
 
 }
 
-fn IDeq_with_size(__param_size: c_long, __param_default_raw: c_int) -> IDeq {
+pub fn IDeq_with_size(__param_size: c_long, __param_default_raw: c_int) -> IDeq {
     var __local_out: IDeq = IDeq_with_capacity(__param_size)
 
     while ((if (unsafe *(&raw const __local_out as *const IDeq)).end < __param_size: 1 else: 0) != 0) {
@@ -399,7 +399,7 @@ fn IDeq_with_size(__param_size: c_long, __param_default_raw: c_int) -> IDeq {
 
 }
 
-unsafe fn IDeq_from_n(__param_raw: *const c_int, __param_n: c_long) -> IDeq {
+pub unsafe fn IDeq_from_n(__param_raw: *const c_int, __param_n: c_long) -> IDeq {
     var __local_out: IDeq = IDeq_with_capacity(__param_n)
 
     IDeq_put_n((&raw mut __local_out as *mut IDeq), __param_raw, __param_n)
@@ -479,13 +479,13 @@ fn IDeq_clone(__param_q: IDeq) -> IDeq {
 
 }
 
-unsafe fn IDeq_value_clone(__param_self_: *const IDeq, __param_val: c_int) -> c_int {
+pub unsafe fn IDeq_value_clone(__param_self_: *const IDeq, __param_val: c_int) -> c_int {
 
     return __param_val
 
 }
 
-unsafe fn IDeq_copy(__param_self_: *mut IDeq, __param_other: *const IDeq) -> Unit {
+pub unsafe fn IDeq_copy(__param_self_: *mut IDeq, __param_other: *const IDeq) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -497,47 +497,47 @@ unsafe fn IDeq_copy(__param_self_: *mut IDeq, __param_other: *const IDeq) -> Uni
 
 }
 
-unsafe fn IDeq_size(__param_self_: *const IDeq) -> c_long {
+pub unsafe fn IDeq_size(__param_self_: *const IDeq) -> c_long {
     return ((((*__param_self_).end - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long))
 
 }
 
-unsafe fn IDeq_capacity(__param_self_: *const IDeq) -> c_long {
+pub unsafe fn IDeq_capacity(__param_self_: *const IDeq) -> c_long {
     return (*__param_self_).capmask
 
 }
 
-unsafe fn IDeq_is_empty(__param_self_: *const IDeq) -> bool {
+pub unsafe fn IDeq_is_empty(__param_self_: *const IDeq) -> bool {
     return (((*__param_self_).start == (*__param_self_).end))
 
 }
 
-unsafe fn IDeq_value_toraw(__param_pval: *const c_int) -> c_int {
+pub unsafe fn IDeq_value_toraw(__param_pval: *const c_int) -> c_int {
     return (*__param_pval)
 
 }
 
-unsafe fn IDeq_front(__param_self_: *const IDeq) -> *const c_int {
+pub unsafe fn IDeq_front(__param_self_: *const IDeq) -> *const c_int {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as c_long) as usize)) as *const c_int))
 
 }
 
-unsafe fn IDeq_front_mut(__param_self_: *mut IDeq) -> *mut c_int {
+pub unsafe fn IDeq_front_mut(__param_self_: *mut IDeq) -> *mut c_int {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as c_long) as usize)) as *mut c_int))
 
 }
 
-unsafe fn IDeq_back(__param_self_: *const IDeq) -> *const c_int {
+pub unsafe fn IDeq_back(__param_self_: *const IDeq) -> *const c_int {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as c_long) & ((*__param_self_).capmask as c_long)) as c_long) as usize)) as *const c_int))
 
 }
 
-unsafe fn IDeq_back_mut(__param_self_: *mut IDeq) -> *mut c_int {
+pub unsafe fn IDeq_back_mut(__param_self_: *mut IDeq) -> *mut c_int {
     return ((IDeq_back((__param_self_ as *const IDeq)) as *mut c_int))
 
 }
 
-unsafe fn IDeq_move(__param_self_: *mut IDeq) -> IDeq {
+pub unsafe fn IDeq_move(__param_self_: *mut IDeq) -> IDeq {
     var __local_m: IDeq = (*__param_self_)
 
     ((*__param_self_).end = ((0 as c_long)))
@@ -553,14 +553,14 @@ unsafe fn IDeq_move(__param_self_: *mut IDeq) -> IDeq {
 
 }
 
-unsafe fn IDeq_take(__param_self_: *mut IDeq, __param_unowned: IDeq) -> Unit {
+pub unsafe fn IDeq_take(__param_self_: *mut IDeq, __param_unowned: IDeq) -> Unit {
     IDeq_drop((__param_self_ as *const IDeq))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[IDeq]())
 
 }
 
-unsafe fn IDeq_pop_front(__param_self_: *mut IDeq) {
+pub unsafe fn IDeq_pop_front(__param_self_: *mut IDeq) {
     if (((if not ((if not IDeq_is_empty((__param_self_ as *const IDeq)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"IDeq_pop_front".ptr, c"queue_prv.h".ptr, (133 as c_int), c"!IDeq_is_empty(self)".ptr)
     } else {
@@ -572,7 +572,7 @@ unsafe fn IDeq_pop_front(__param_self_: *mut IDeq) {
 
 }
 
-unsafe fn IDeq_pull_front(__param_self_: *mut IDeq) -> c_int {
+pub unsafe fn IDeq_pull_front(__param_self_: *mut IDeq) -> c_int {
     if (((if not ((if not IDeq_is_empty((__param_self_ as *const IDeq)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"IDeq_pull_front".ptr, c"queue_prv.h".ptr, (139 as c_int), c"!IDeq_is_empty(self)".ptr)
     } else {
@@ -587,31 +587,31 @@ unsafe fn IDeq_pull_front(__param_self_: *mut IDeq) -> c_int {
 
 }
 
-unsafe fn IDeq_begin(__param_self_: *const IDeq) -> IDeq_iter {
+pub unsafe fn IDeq_begin(__param_self_: *const IDeq) -> IDeq_iter {
     return ((IDeq_iter { ref: (if IDeq_is_empty(__param_self_): ((null) as *mut c_int) else: ((*__param_self_).cbuf + (((*__param_self_).start as c_long) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as IDeq_iter))
 
 }
 
-unsafe fn IDeq_rbegin(__param_self_: *const IDeq) -> IDeq_iter {
+pub unsafe fn IDeq_rbegin(__param_self_: *const IDeq) -> IDeq_iter {
     var __local_pos: c_long = ((((((*__param_self_).end - 1) as c_long) & ((*__param_self_).capmask as c_long)) as c_long))
 
     return ((IDeq_iter { ref: (if IDeq_is_empty(__param_self_): ((null) as *mut c_int) else: ((*__param_self_).cbuf + ((__local_pos as c_long) as usize))), pos: __local_pos, _s: __param_self_ } as IDeq_iter))
 
 }
 
-unsafe fn IDeq_end(__param_self_: *const IDeq) -> IDeq_iter {
+pub unsafe fn IDeq_end(__param_self_: *const IDeq) -> IDeq_iter {
 
     return ((IDeq_iter.zeroed() as IDeq_iter))
 
 }
 
-unsafe fn IDeq_rend(__param_self_: *const IDeq) -> IDeq_iter {
+pub unsafe fn IDeq_rend(__param_self_: *const IDeq) -> IDeq_iter {
 
     return ((IDeq_iter.zeroed() as IDeq_iter))
 
 }
 
-unsafe fn IDeq_next(__param_it_: *mut IDeq_iter) {
+pub unsafe fn IDeq_next(__param_it_: *mut IDeq_iter) {
     if ((if (*__param_it_).pos != (*(*__param_it_)._s).capmask: 1 else: 0) != 0) {
         ((*__param_it_).ref = (*__param_it_).ref + 1)
 
@@ -630,7 +630,7 @@ unsafe fn IDeq_next(__param_it_: *mut IDeq_iter) {
 
 }
 
-unsafe fn IDeq_rnext(__param_it_: *mut IDeq_iter) -> Unit {
+pub unsafe fn IDeq_rnext(__param_it_: *mut IDeq_iter) -> Unit {
     if ((if (*__param_it_).pos == (*(*__param_it_)._s).start: 1 else: 0) != 0) {
         ((*__param_it_).ref = ((null as *mut c_int)))
     } else {
@@ -649,12 +649,12 @@ unsafe fn IDeq_rnext(__param_it_: *mut IDeq_iter) -> Unit {
 
 }
 
-unsafe fn IDeq_index(__param_self_: *const IDeq, __param_it_: IDeq_iter) -> c_long {
+pub unsafe fn IDeq_index(__param_self_: *const IDeq, __param_it_: IDeq_iter) -> c_long {
     return ((((*(&raw const __param_it_ as *const IDeq_iter)).pos - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long))
 
 }
 
-unsafe fn IDeq_adjust_end_(__param_self_: *mut IDeq, __param_n: c_long) {
+pub unsafe fn IDeq_adjust_end_(__param_self_: *mut IDeq, __param_n: c_long) {
     ((*__param_self_).end = ((((((*__param_self_).end + __param_n) as c_long) & ((*__param_self_).capmask as c_long)) as c_long)))
 
 }
@@ -784,7 +784,7 @@ unsafe fn IDeq_erase_n(__param_self_: *mut IDeq, __param_idx: c_long, __param_n:
 
 }
 
-unsafe fn IDeq_at(__param_self_: *const IDeq, __param_idx: c_long) -> *const c_int {
+pub unsafe fn IDeq_at(__param_self_: *const IDeq, __param_idx: c_long) -> *const c_int {
     if (((if not ((if ((__param_idx as c_ulong)) < ((IDeq_size(__param_self_) as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"IDeq_at".ptr, c"deque.h".ptr, (53 as c_int), c"((size_t)(idx) < (size_t)(IDeq_size(self)))".ptr)
     } else {
@@ -795,17 +795,17 @@ unsafe fn IDeq_at(__param_self_: *const IDeq, __param_idx: c_long) -> *const c_i
 
 }
 
-unsafe fn IDeq_at_mut(__param_self_: *mut IDeq, __param_idx: c_long) -> *mut c_int {
+pub unsafe fn IDeq_at_mut(__param_self_: *mut IDeq, __param_idx: c_long) -> *mut c_int {
     return ((IDeq_at((__param_self_ as *const IDeq), __param_idx) as *mut c_int))
 
 }
 
-unsafe fn IDeq_push_back(__param_self_: *mut IDeq, __param_val: c_int) -> *mut c_int {
+pub unsafe fn IDeq_push_back(__param_self_: *mut IDeq, __param_val: c_int) -> *mut c_int {
     return ((IDeq_push(__param_self_, __param_val) as *mut c_int))
 
 }
 
-unsafe fn IDeq_pop_back(__param_self_: *mut IDeq) {
+pub unsafe fn IDeq_pop_back(__param_self_: *mut IDeq) {
     if (((if not ((if not IDeq_is_empty((__param_self_ as *const IDeq)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"IDeq_pop_back".ptr, c"deque.h".ptr, (67 as c_int), c"!IDeq_is_empty(self)".ptr)
     } else {
@@ -817,7 +817,7 @@ unsafe fn IDeq_pop_back(__param_self_: *mut IDeq) {
 
 }
 
-unsafe fn IDeq_pull_back(__param_self_: *mut IDeq) -> c_int {
+pub unsafe fn IDeq_pull_back(__param_self_: *mut IDeq) -> c_int {
     if (((if not ((if not IDeq_is_empty((__param_self_ as *const IDeq)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"IDeq_pull_back".ptr, c"deque.h".ptr, (73 as c_int), c"!IDeq_is_empty(self)".ptr)
     } else {
@@ -830,14 +830,14 @@ unsafe fn IDeq_pull_back(__param_self_: *mut IDeq) -> c_int {
 
 }
 
-unsafe fn IDeq_insert_at(__param_self_: *mut IDeq, __param_it_: IDeq_iter, __param_val: c_int) -> IDeq_iter {
+pub unsafe fn IDeq_insert_at(__param_self_: *mut IDeq, __param_it_: IDeq_iter, __param_val: c_int) -> IDeq_iter {
     var __local_idx: c_long = ((((((*(&raw const __param_it_ as *const IDeq_iter)).pos - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long)) as c_long))
 
     return IDeq_insert_n(__param_self_, __local_idx, (&raw const __param_val as *const c_int), (1 as c_long))
 
 }
 
-unsafe fn IDeq_erase_at(__param_self_: *mut IDeq, __param_it_: IDeq_iter) -> IDeq_iter {
+pub unsafe fn IDeq_erase_at(__param_self_: *mut IDeq, __param_it_: IDeq_iter) -> IDeq_iter {
     IDeq_erase_n(__param_self_, (((((*(&raw const __param_it_ as *const IDeq_iter)).pos - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long)) as c_long), (1 as c_long))
 
     if ((if (*(&raw const __param_it_ as *const IDeq_iter)).pos == (*__param_self_).end: 1 else: 0) != 0) {
@@ -848,7 +848,7 @@ unsafe fn IDeq_erase_at(__param_self_: *mut IDeq, __param_it_: IDeq_iter) -> IDe
 
 }
 
-unsafe fn IDeq_erase_range(__param_self_: *mut IDeq, __param_it1: IDeq_iter, __param_it2: IDeq_iter) -> IDeq_iter {
+pub unsafe fn IDeq_erase_range(__param_self_: *mut IDeq, __param_it1: IDeq_iter, __param_it2: IDeq_iter) -> IDeq_iter {
     var __local_idx1: c_long = ((((((*(&raw const __param_it1 as *const IDeq_iter)).pos - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long)) as c_long))
 
     var __local_idx2: c_long = ((((((*(&raw const __param_it2 as *const IDeq_iter)).pos - (*__param_self_).start) as c_long) & ((*__param_self_).capmask as c_long)) as c_long))
@@ -881,12 +881,12 @@ unsafe fn IDeq_find_in(__param_self_: *const IDeq, __param_i1: IDeq_iter, __para
 
 }
 
-unsafe fn IDeq_find(__param_self_: *const IDeq, __param_raw: c_int) -> IDeq_iter {
+pub unsafe fn IDeq_find(__param_self_: *const IDeq, __param_raw: c_int) -> IDeq_iter {
     return IDeq_find_in(__param_self_, IDeq_begin(__param_self_), IDeq_end(__param_self_), __param_raw)
 
 }
 
-unsafe fn IDeq_contains(__param_self_: *const IDeq, __param_raw: c_int) -> bool {
+pub unsafe fn IDeq_contains(__param_self_: *const IDeq, __param_raw: c_int) -> bool {
     return ((IDeq_find(__param_self_, __param_raw).ref != null))
 
 }

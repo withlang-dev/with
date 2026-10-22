@@ -511,12 +511,12 @@ pub unsafe fn _cco_throw(__param_caller: *mut cco_task, __param_err: cco_err_t) 
 
 }
 
-unsafe fn _cco_resume_task(__param_task: *mut cco_task) -> c_int {
+pub unsafe fn _cco_resume_task(__param_task: *mut cco_task) -> c_int {
     return (*(&raw const (*__param_task).base as *const cco_task_base)).func.unwrap()(__param_task)
 
 }
 
-unsafe fn _cco_cancel_fiber(__param_fib: *mut cco_task_fiber, __param_err: cco_err_t) -> *mut cco_task_fiber {
+pub unsafe fn _cco_cancel_fiber(__param_fib: *mut cco_task_fiber, __param_err: cco_err_t) -> *mut cco_task_fiber {
     with_memcpy((&raw mut (*__param_fib).error_ as *mut u8), (&raw const __param_err as *const u8), sizeof[cco_err_t]())
 
     loop {
@@ -538,14 +538,14 @@ unsafe fn _cco_cancel_fiber(__param_fib: *mut cco_task_fiber, __param_err: cco_e
 
 }
 
-unsafe fn _cco_cancel_task(__param_tsk: *mut cco_task, __param_err: cco_err_t) -> *mut cco_task {
+pub unsafe fn _cco_cancel_task(__param_tsk: *mut cco_task, __param_err: cco_err_t) -> *mut cco_task {
     _cco_cancel_fiber((*(&raw const (*__param_tsk).base.state as *const cco_task_state)).fib, __param_err)
 
     return __param_tsk
 
 }
 
-fn cco_timer_ticks() -> c_longlong {
+pub fn cco_timer_ticks() -> c_longlong {
     var __local_tv: timeval
 
     unsafe { gettimeofday((&raw mut __local_tv as *mut timeval), null) }
@@ -554,36 +554,36 @@ fn cco_timer_ticks() -> c_longlong {
 
 }
 
-fn cco_make_timer(__param_sec: f64) -> cco_timer {
+pub fn cco_make_timer(__param_sec: f64) -> cco_timer {
     var __local_tm: cco_timer = cco_timer { duration: __param_sec, start_time: cco_timer_ticks() }
 
     return __local_tm
 
 }
 
-unsafe fn cco_start_timer(__param_tm: *mut cco_timer, __param_sec: f64) {
+pub unsafe fn cco_start_timer(__param_tm: *mut cco_timer, __param_sec: f64) {
     ((*__param_tm).duration = __param_sec)
 
     ((*__param_tm).start_time = ((cco_timer_ticks() as c_longlong)))
 
 }
 
-unsafe fn cco_restart_timer(__param_tm: *mut cco_timer) {
+pub unsafe fn cco_restart_timer(__param_tm: *mut cco_timer) {
     ((*__param_tm).start_time = ((cco_timer_ticks() as c_longlong)))
 
 }
 
-unsafe fn cco_timer_elapsed(__param_tm: *mut cco_timer) -> f64 {
+pub unsafe fn cco_timer_elapsed(__param_tm: *mut cco_timer) -> f64 {
     return (((cco_timer_ticks() - (*__param_tm).start_time) as f64) * (1.0 / (1000000 as f64)))
 
 }
 
-unsafe fn cco_timer_expired(__param_tm: *mut cco_timer) -> bool {
+pub unsafe fn cco_timer_expired(__param_tm: *mut cco_timer) -> bool {
     return ((cco_timer_elapsed(__param_tm) >= (*__param_tm).duration))
 
 }
 
-unsafe fn cco_timer_remaining(__param_tm: *mut cco_timer) -> f64 {
+pub unsafe fn cco_timer_remaining(__param_tm: *mut cco_timer) -> f64 {
     return ((*__param_tm).duration - cco_timer_elapsed(__param_tm))
 
 }
