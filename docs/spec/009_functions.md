@@ -53,6 +53,20 @@ are arms, `return` statements or the tail. A branch already of type
 be a second meaning, and the type is written. The value-to-Option
 conversion (§4.9a) still never solves a type variable.
 
+**A function that calls itself (D143).** Where a return type is inferred
+and the body calls the function itself, the paths that do not call it
+decide the type, and the calls have it: while they decide, a call of the
+function is open (`Never`), which every join and operator takes the other
+side's type from; the body is then checked under the decided type as its
+demand, so `[] => []` beside `quicksort(smaller) ++ [pivot] ++
+quicksort(larger)` is a `List[isize]`. A path through a self-call that
+produces another type is reported, naming the type the other paths gave.
+A body whose every path calls the function has no type and is written. A
+`pub fn` declares its return type (Law 6): the inference is for
+package-local functions, the same scope as D141. Two functions that call
+each other with neither return type written are refused, naming the
+cycle; one of them is written.
+
 An assignment `place = value` is an expression; its value is a read of
 `place` after the store (C's rule, C11 §6.5.16, under With's view semantics:
 a read of a place yields a view of it, §3.8, D22). In statement position the

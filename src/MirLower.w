@@ -16315,7 +16315,24 @@ impl MirBuilder:
 
     // `call_node` holds the stage's Sema-filled arguments: its call
     // (`x |> f(a)`), or the pipeline itself for a bare stage (`x |> f`).
+    // D142 (§13.5): a sequence on the left of `|>` iterates: Sema recorded
+    // the `.iter()` it inserted (pipeline_implicit_iter, the for_iter_*
+    // records keyed by the pipeline node); the stage receives that iterator
+    // wherever it would have read the piped expression.
     mut fn lower_pipeline(lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32, call_node: i32) -> i32:
+        if not self.sema.pipeline_implicit_iter.contains(node):
+            return self.lower_pipeline_stage(lhs_expr, fn_expr, args_start, args_count, node, call_node)
+        let iter_place = self.lower_for_implicit_iter_call(node, lhs_expr)
+        let saved_override_node = self.pipeline_receiver_override_node
+        let saved_override_place = self.pipeline_receiver_override_place
+        self.pipeline_receiver_override_node = lhs_expr
+        self.pipeline_receiver_override_place = iter_place
+        let result = self.lower_pipeline_stage(lhs_expr, fn_expr, args_start, args_count, node, call_node)
+        self.pipeline_receiver_override_node = saved_override_node
+        self.pipeline_receiver_override_place = saved_override_place
+        result
+
+    mut fn lower_pipeline_stage(lhs_expr: i32, fn_expr: i32, args_start: i32, args_count: i32, node: i32, call_node: i32) -> i32:
         if self.sema.pipeline_method_calls.contains(node):
             let method_sym: i32 = self.sema.pipeline_method_calls.get(node).unwrap()
             if self.sema.pipeline_carrier_kinds.contains(node) and self.sema.pipeline_carrier_kinds.get(node).unwrap() != 0:

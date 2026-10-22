@@ -273,6 +273,17 @@ and a position whose `next()` yields `&T` through the element place
 wherever a value is demanded (§3, D139), so `for x in xs.iter()`,
 `map(it * 2)` and `filter(it % 2 == 1)` see the value.
 
+**A pipeline iterates a sequence (D142).** The same rule applies to the
+left of `|>`: when the stage is no method of the value but is one of the
+iterator its `.iter()` returns, the pipeline iterates the value, the same
+traversal at another altitude (`rest |> filter(it < pivot)` over a slice,
+`xs |> map(it * 2)` over a List). A slice has `iter()`: the view iterator
+a List has, over the slice's elements (§13.1). Collecting views of value
+elements builds a list of the values (D111, D139): a view of a value
+carries nothing but the value, so `collect[List]()` over `rest`'s views is
+a `List[isize]`, never a list of borrows into `rest`; views of resources
+stay views, since those have identity.
+
 For a keyed map, `for (k, v) in map:` is `for (k, v) in map.iter():`, so
 `k: &K` and `v: &V`. `for (k, v) in map.into_iter():` consumes the map and
 binds `k: K`, `v: V`.
