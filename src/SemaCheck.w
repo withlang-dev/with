@@ -2115,6 +2115,37 @@ impl Sema:
             if named == 0 and (self.named_type_candidate_head(sym) >= 0 or self.private_symbol_path_from_current(sym).len() > 0 or self.std_gated_import_note(sym).len() > 0):
                 self.emit_private_symbol_error(sym, node)
             return named
+        // `sizeof[[T; N]]()`: an array type in type-level position parses as
+        // the fill literal `[T; N]` (one element, a count); it names the
+        // array type (a migrated whole-array copy sizes it this way).
+        if kind == NodeKind.NK_ARRAY_LIT:
+            let elem_count = self.ast.get_data1(node)
+            let fill_count = self.ast.get_data2(node)
+            if fill_count != 0 and elem_count == 1:
+                // `[T; N]` with a non-literal N holds T and the count.
+                let elem = self.resolve_type_level_arg_expr(self.ast.get_extra(self.ast.get_data0(node)))
+                if elem == 0:
+                    return 0
+                let count = self.int_literal_i64_value(fill_count)
+                if count.ok == 0 or count.value < 0:
+                    return 0
+                return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, count.value as i32, 0) as i32
+            if fill_count == 0 and elem_count > 0:
+                // `[T; 9]` with a literal count is written out as its nine
+                // elements: the array type when every element names one type.
+                let first = self.resolve_type_level_arg_expr(self.ast.get_extra(self.ast.get_data0(node)))
+                if first == 0:
+                    return 0
+                for ei in 1..elem_count:
+                    if self.resolve_type_level_arg_expr(self.ast.get_extra(self.ast.get_data0(node) + ei)) != first:
+                        return 0
+                return self.ensure_exact_type(TypeKind.TY_ARRAY, first, elem_count, 0) as i32
+            return 0
+        if kind == NodeKind.NK_TYPE_ARRAY and self.ast.get_data2(node) == 0:
+            let elem = self.resolve_type_level_arg_expr(self.ast.get_data0(node))
+            if elem == 0:
+                return 0
+            return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(node), 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type(node)
         if kind == NodeKind.NK_INDEX:
@@ -2328,6 +2359,33 @@ impl Sema:
             if self.typed_expr_types.contains(expr_node):
                 return self.typed_expr_types.get(expr_node).unwrap()
             sema_phase_bug("BUG: frozen @TypeOf has no checked expression type")
+        // `[T; N]` as a type (resolve_type_level_arg_expr): the array type the
+        // check created, found, never made (frozen).
+        if kind == NodeKind.NK_ARRAY_LIT:
+            let elem_count = self.ast.get_data1(node)
+            let fill_count = self.ast.get_data2(node)
+            if fill_count != 0 and elem_count == 1:
+                let elem = self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node)))
+                if elem == 0:
+                    return 0
+                let count = self.int_literal_i64_value(fill_count)
+                if count.ok == 0 or count.value < 0:
+                    return 0
+                return self.find_exact_type(TypeKind.TY_ARRAY, elem, count.value as i32, 0) as i32
+            if fill_count == 0 and elem_count > 0:
+                let first = self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node)))
+                if first == 0:
+                    return 0
+                for ei in 1..elem_count:
+                    if self.resolve_type_level_arg_expr_frozen(self.ast.get_extra(self.ast.get_data0(node) + ei)) != first:
+                        return 0
+                return self.find_exact_type(TypeKind.TY_ARRAY, first, elem_count, 0) as i32
+            return 0
+        if kind == NodeKind.NK_TYPE_ARRAY and self.ast.get_data2(node) == 0:
+            let elem = self.resolve_type_level_arg_expr_frozen(self.ast.get_data0(node))
+            if elem == 0:
+                return 0
+            return self.find_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(node), 0) as i32
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             let inner = self.resolve_type_level_arg_expr_frozen(self.ast.get_data1(node))
@@ -5012,7 +5070,10 @@ impl Sema:
             // also after an early `return Err(...)`.
             if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) != 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(body_expected_ret as i32) == 0:
                 self.emit_error("missing return", body)
-            else if self.type_has_default_value(body_expected_ret as i32) == 0:
+            else if self.body_can_fall_through(body) != 0 and self.type_has_default_value(body_expected_ret as i32) == 0:
+                // A body that cannot fall through (its last statement is
+                // `while true` with no break, or diverges) returns on every
+                // path it has; only one that can reach its end needs a value.
                 self.emit_error("return type does not implement Default", body)
         else if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_never and self.resolve_alias(body_expected_ret) == self.ty_never:
             // #1493: a `-> Never` body must diverge on every path; a valued
@@ -10368,6 +10429,11 @@ impl Sema:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
             return 1
+        // An `unsafe fn` body is its block under NK_UNSAFE_BLOCK (and an
+        // unsafe block is its block): read through it, or a body ending in
+        // `while true` was judged to fall through and asked for a Default.
+        if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+            return self.body_can_fall_through(self.ast.get_data0(node))
         if kind == NodeKind.NK_RETURN:
             return 0
         if kind == NodeKind.NK_GOTO:
@@ -13536,6 +13602,11 @@ impl Sema:
     mut fn check_binary_operator_method(node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
         let method_name = sema_operator_method_name(op)
         if method_name.len() == 0:
+            return 0
+        // A raw pointer compares by address (§16): the pointee's own `eq`
+        // (a migrated `cstr_eq` presented as `cstr.eq`) is no candidate for
+        // `*mut cstr != null`.
+        if self.get_type_kind(self.resolve_alias(lhs as TypeId)) == TypeKind.TY_PTR or self.get_type_kind(self.resolve_alias(rhs as TypeId)) == TypeKind.TY_PTR:
             return 0
         var method_sym = self.pool_intern(method_name)
         var lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
@@ -20068,7 +20139,10 @@ impl Sema:
         // §16.4: reading a union field other than the last-written one requires
         // unsafe. Only tracked local union variables (literal-initialized or
         // directly assigned) are checked; untracked unions are never flagged.
-        if self.union_in_assign_target == 0 and self.ast.kind(expr) == NodeKind.NK_IDENT:
+        // A C union (`@[repr(C)]`, a c_import's) reads any arm: punning is
+        // what the C code it mirrors does (STC's cstr_iter reads `.ref`
+        // after writing `.u8`), and the layout is C's.
+        if self.union_in_assign_target == 0 and self.ast.kind(expr) == NodeKind.NK_IDENT and not self.type_is_c_record(obj_type as i32):
             let union_recv_sym = self.ast.get_data0(expr)
             if self.union_last_written.contains(union_recv_sym):
                 if self.union_last_written.get(union_recv_sym).unwrap() != field:
@@ -26596,7 +26670,7 @@ impl Sema:
                 return 0
             let layout_ty = self.resolve_type_level_arg_expr(type_arg_node)
             if layout_ty == 0:
-                self.emit_error(self.sizeof_alignof_name(callee) ++ " type argument could not be resolved", type_arg_node)
+                self.emit_error(self.sizeof_alignof_name(callee) ++ f" type argument could not be resolved (a {self.ast.kind(type_arg_node) as i32} node)", type_arg_node)
                 return 0
             if self.reject_opaque_value_type(layout_ty, type_arg_node, self.sizeof_alignof_name(callee)) != 0:
                 return 0

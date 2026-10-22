@@ -336,6 +336,13 @@ pub fn rt_clock_ns() -> i64:
         return 0
     ts.tv_sec * 1000000000 + ts.tv_nsec
 
+// CLOCK_REALTIME, in nanoseconds (std.libc's gettimeofday).
+pub fn rt_wall_clock_ns() -> i64:
+    var ts = Timespec { tv_sec: 0, tv_nsec: 0 }
+    if rt_libc_clock_gettime(0, &raw mut ts) != 0:
+        return 0
+    ts.tv_sec * 1000000000 + ts.tv_nsec
+
 pub fn rt_wall_clock_sec() -> i64:
     // CLOCK_REALTIME
     var ts = Timespec { tv_sec: 0, tv_nsec: 0 }

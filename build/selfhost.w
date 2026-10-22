@@ -4521,6 +4521,174 @@ fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_di
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-zeroed-records", check_args)
     checked.rc
 
+// Records the declaration index does not name, found by STC's tests: a
+// named field of member-record type takes its brace value as that record's
+// init (`.u8 = {{..}}`); a record declared in a body — tagless in a for-init
+// (`c_each_item`'s cursor struct), or tagged (`struct roman {..};` on its
+// own statement) — is hoisted with C's layout and initialized against its
+// declaration cursor; an initializer that reads the variable it initializes
+// (`.ref = (T*)it._ref`) is declared first and assigned after. Each program
+// migrates, checks and runs.
+fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let member_src = bs_join(case_dir, "member.c")
+    let member_w = bs_join(case_dir, "member.w")
+    var rc = bs_write_fixture(ctx, member_src, "#include <stddef.h>\ntypedef struct { const char* buf; long size; } view;\ntypedef union {\n    struct { view chr; int dec; } u8;\n    view chr;\n    const char* ref;\n} str_iter;\nstr_iter begin(const char* s) {\n    str_iter it = {.u8={{s, 0}}};\n    it.chr.size = 1;\n    if (*it.ref == '\\0') it.ref = NULL;\n    return it;\n}\nint main(void) { str_iter i = begin(\"x\"); return (int)i.chr.size - 1; }\n", "member record designator")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "member", &member_src, &member_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, member_w, "str_iter { u8: str_iter_u8 { chr: view {", "member record designator")
+    if rc != 0: return rc
+    let loop_src = bs_join(case_dir, "loop.c")
+    let loop_w = bs_join(case_dir, "loop.w")
+    rc = bs_write_fixture(ctx, loop_src, "#include <stdio.h>\nint main(void) {\n    int total = 0;\n    for (struct { int const* _ref; int* ref; int size, index; } it = {._ref=((int[]){1, 2, 3}), .ref=(int*)it._ref, .size=3}; it.index < it.size; ++it.ref, ++it.index)\n        total += *it.ref;\n    printf(\"%d\\n\", total);\n    return total - 6;\n}\n", "local record in a for-init")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "loop", &loop_src, &loop_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, loop_w, "@[repr(C)]\npub type main_it_anon {", "body-local record hoisted with C layout")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, loop_w, "= main_it_anon.zeroed()", "self-referencing initializer declared first")
+    if rc != 0: return rc
+    let tag_src = bs_join(case_dir, "tag.c")
+    let tag_w = bs_join(case_dir, "tag.w")
+    rc = bs_write_fixture(ctx, tag_src, "#include <stdio.h>\nint main(void) {\n    struct roman { int d; const char* r; };\n    struct roman rs[] = {{1000, \"M\"}, {900, \"CM\"}};\n    printf(\"%d %s\\n\", rs[1].d, rs[1].r);\n    return rs[0].d - 1000;\n}\n", "tagged local record")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "tag", &tag_src, &tag_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, tag_w, "@[repr(C)]\npub type roman {", "tagged body-local record hoisted")
+    if rc != 0: return rc
+    // The `;` inside the record body are not the for header's: the loop
+    // keeps its condition (it ran forever before).
+    let forrec_src = bs_join(case_dir, "forrec.c")
+    let forrec_w = bs_join(case_dir, "forrec.w")
+    rc = bs_write_fixture(ctx, forrec_src, "int main(void) { int t = 0; for (struct { int i; int n; } it = {.i = 0, .n = 3}; it.i < it.n; ++it.i) t += it.i; return t - 3; }\n", "record in a for header")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "forrec", &forrec_src, &forrec_w)
+    if rc != 0: return rc
+    let enum_src = bs_join(case_dir, "localenum.c")
+    let enum_w = bs_join(case_dir, "localenum.w")
+    rc = bs_write_fixture(ctx, enum_src, "int main(void) {\n    enum {TSIZE = 4, CUBE = 64, N = CUBE*CUBE*CUBE};\n    int total = 0;\n    for (int i = 0; i < TSIZE; ++i) total += i;\n    return total - 6 + (N - 262144);\n}\n", "enum declared in a body")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "localenum", &enum_src, &enum_w)
+
+// Expression forms STC's tests use, each a general rule: a `T*` beside a
+// `const T*` compares as one pointer type; `b |= x` on a _Bool computes in
+// int and converts back; a designator spelled in a macro body (`.Tag`)
+// resolves by the value's type; `&((T*)0)->a.b` is the symbolic offsetof
+// (c_container_of); a comma expression in an initializer element is
+// computed before the initializer.
+fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let ptr_src = bs_join(case_dir, "ptreq.c")
+    let ptr_w = bs_join(case_dir, "ptreq.w")
+    var rc = bs_write_fixture(ctx, ptr_src, "typedef struct { int n; } T;\nstatic int same(T* a, const T* b) { return a == b; }\nint main(void) { T t = {1}; return same(&t, &t) - 1; }\n", "pointer constness in a comparison")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "ptreq", &ptr_src, &ptr_w)
+    if rc != 0: return rc
+    let bool_src = bs_join(case_dir, "boolor.c")
+    let bool_w = bs_join(case_dir, "boolor.w")
+    rc = bs_write_fixture(ctx, bool_src, "#include <stdbool.h>\ntypedef struct { bool done; int n; } S;\nint main(void) { S s = {false, 2}; s.done |= (s.n > 1); s.n += s.done; return s.n - 3; }\n", "bitwise or on a _Bool")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "boolor", &bool_src, &bool_w)
+    if rc != 0: return rc
+    let variant_src = bs_join(case_dir, "variant.c")
+    let variant_w = bs_join(case_dir, "variant.w")
+    rc = bs_write_fixture(ctx, variant_src, "typedef union U U;\nenum U_tag { TagA = 1, TagB };\nunion U { int tag_id; enum U_tag tag; struct { enum U_tag id; int item; } TagA; };\n#define c_variant(Tag, ...) ((U){.Tag = {.id = Tag, .item = __VA_ARGS__}})\nint main(void) { U u = c_variant(TagA, 42); return u.TagA.item - 42; }\n", "designator in a macro body")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "variant", &variant_src, &variant_w)
+    if rc != 0: return rc
+    let off_src = bs_join(case_dir, "containerof.c")
+    let off_w = bs_join(case_dir, "containerof.w")
+    rc = bs_write_fixture(ctx, off_src, "#include <stddef.h>\ntypedef struct { int a; struct { int id; long item; } inner; } Rec;\nint main(void) { Rec r = {1, {2, 3}}; long* p = &r.inner.item; char* base = (char*)p - (size_t)&((Rec*)0)->inner.item; return ((Rec*)base)->a - 1; }\n", "null-based member address as offsetof")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "containerof", &off_src, &off_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, off_w, "offsetof[Rec](inner) + offsetof[Rec_inner](item)", "containerof as offsetof")
+    if rc != 0: return rc
+    let comma_src = bs_join(case_dir, "commainit.c")
+    let comma_w = bs_join(case_dir, "commainit.w")
+    rc = bs_write_fixture(ctx, comma_src, "typedef struct { const int* data; long n; } S;\nint main(void) { int a[4] = {1,2,3,4}; long i = 1;\n  S s = {.data = (a + ((void)sizeof(int[(4 == 4) ? 1 : -1]), i)), .n = 2};\n  return (int)(s.data[0]) - 2; }\n", "comma expression in an initializer element")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "commainit", &comma_src, &comma_w)
+    if rc != 0: return rc
+    let va_src = bs_join(case_dir, "vacopy.c")
+    let va_w = bs_join(case_dir, "vacopy.w")
+    rc = bs_write_fixture(ctx, va_src, "#include <stdarg.h>\n#include <stdio.h>\n#include <string.h>\nstatic int vfmt_twice(char* out, const char* fmt, va_list args) {\n    va_list args2;\n    va_copy(args2, args);\n    const int n = vsnprintf(NULL, 0ULL, fmt, args);\n    vsnprintf(out, (size_t)n + 1, fmt, args2);\n    va_end(args2);\n    return n;\n}\nstatic int fmt_twice(char* out, const char* fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    int n = vfmt_twice(out, fmt, args);\n    va_end(args);\n    return n;\n}\nint main(void) {\n    char buf[32];\n    int n = fmt_twice(buf, \"%d-%s\", 42, \"x\");\n    FILE* fp = fopen(\"/dev/null\", \"rb\");\n    if (fp) { rewind(fp); fclose(fp); }\n    return (n == 4 && strcmp(buf, \"42-x\") == 0) ? 0 : 1;\n}\n", "va_copy of a va_list parameter, and rewind")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "vacopy", &va_src, &va_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, va_w, "var __local_args2: c_va_list = __param_args", "va_copy as a declaration")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, va_w, "rewind(", "rewind through std.libc")
+    if rc != 0: return rc
+    // A goto body: its lists are declared started at the top, a va_copy is
+    // the hoisted copy's assignment; struct tm, strftime, gettimeofday and
+    // putchar through std.libc.
+    let goto_src = bs_join(case_dir, "vagoto.c")
+    let goto_w = bs_join(case_dir, "vagoto.w")
+    rc = bs_write_fixture(ctx, goto_src, "#include <stdarg.h>\n#include <stdio.h>\n#include <stdlib.h>\n#include <string.h>\n#include <time.h>\n#include <sys/time.h>\ntypedef struct { char* data; long len, cap; int overwrite; } stream;\nstatic void sprint(stream* ss, const char* fmt, ...) {\n    va_list args, args2;\n    va_start(args, fmt);\n    if (ss == NULL) {\n        vprintf(fmt, args); putchar(10);\n        goto done1;\n    }\n    va_copy(args2, args);\n    const int n = vsnprintf(NULL, 0U, fmt, args);\n    if (n < 0) goto done2;\n    const long pos = ss->overwrite ? 0 : ss->len;\n    ss->len = pos + n;\n    if (ss->len > ss->cap) {\n        ss->cap = ss->len + ss->cap/2;\n        ss->data = (char*)realloc(ss->data, (size_t)ss->cap + 1U);\n    }\n    vsnprintf(ss->data + pos, (size_t)n+1, fmt, args2);\n    done2: va_end(args2);\n    done1: va_end(args);\n}\nstatic int count(int nargs, ...) {\n    int n = 0;\n    va_list args;\n    va_start(args, nargs);\n    while (1) {\n        const char* arg = va_arg(args, const char*);\n        if (arg[0] == 0) goto done;\n        n += (int)strlen(arg);\n    }\n    done:\n    va_end(args);\n    return n;\n}\nstatic const char* stamp(const struct tm* t, char* buf, int size) {\n    strftime(buf, (size_t)size, \"%Y\", t);\n    return buf;\n}\nstatic long long micros(void) { struct timeval tv; gettimeofday(&tv, NULL); return tv.tv_sec * 1000000LL + tv.tv_usec; }\nint main(void) {\n    stream s = {0, 0, 0, 0};\n    sprint(&s, \"%d-%s\", 42, \"x\");\n    sprint(&s, \"+%d\", 7);\n    struct tm t; memset(&t, 0, sizeof t); t.tm_year = 100; t.tm_mday = 1;\n    char buf[16];\n    int ok = strcmp(s.data, \"42-x+7\") == 0 && count(3, \"ab\", \"cde\", \"\") == 5 && strcmp(stamp(&t, buf, 16), \"2000\") == 0 && micros() > 1600000000000000LL;\n    free(s.data);\n    return ok ? 0 : 1;\n}\n", "va_start and va_copy in goto bodies, struct tm, strftime, gettimeofday, putchar")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "vagoto", &goto_src, &goto_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, goto_w, ": c_va_list = va_start()", "a goto body's list is declared started")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, goto_w, "gettimeofday(", "gettimeofday through std.libc")
+    if rc != 0: return rc
+    // sizeof of a member record names it as its parent's translation does; a
+    // hexadecimal float is written in decimal; a typedef spelling a With
+    // builtin type is renamed.
+    let anon_src = bs_join(case_dir, "memberrec.c")
+    let anon_w = bs_join(case_dir, "memberrec.w")
+    rc = bs_write_fixture(ctx, anon_src, "#include <string.h>\ntypedef long isize;\ntypedef union U { struct { char data[7]; unsigned char size; } sml; struct { char* data; isize size; } lon; } U;\nstatic isize small(U* u) { return (isize)sizeof u->sml; }\nstatic double tiny(void) { return 0x1.0p-52; }\nint main(void) { U u; memset(&u, 0, sizeof u); return (small(&u) == 8 && sizeof u == 16 && tiny() * 4503599627370496.0 == 1.0) ? 0 : 1; }\n", "sizeof of a member record, a hexadecimal float, a builtin-named typedef")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "memberrec", &anon_src, &anon_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, anon_w, "sizeof[U_sml]()", "sizeof of a member record")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, anon_w, "2.2204460492503131e-16", "hexadecimal float in decimal")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = c_long", "builtin-named typedef renamed")
+    if rc != 0: return rc
+    // `[index] = value` designators in an array initializer, through a macro
+    // (STC's Unicode group table), the unreached elements zero.
+    let desig_src = bs_join(case_dir, "arraydesig.c")
+    let desig_w = bs_join(case_dir, "arraydesig.w")
+    rc = bs_write_fixture(ctx, desig_src, "enum { K0, K1, K2, KN };\ntypedef struct { const int* r; int n; } G;\nstatic const int a[] = {1, 2};\n#define ENTRY(k, v) [k] = v\n#define ITEM(n) { a, n }\nstatic const G groups[KN] = { ENTRY(K2, ITEM(2)), ENTRY(K0, ITEM(1)) };\nstatic const int plain[] = { [3] = 7, 8 };\nint main(void) { return (groups[K2].n == 2 && groups[K1].r == 0 && groups[K0].r[0] == 1 && sizeof plain / sizeof(int) == 5 && plain[4] == 8 && plain[0] == 0) ? 0 : 1; }\n", "array designators in initializers")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "arraydesig", &desig_src, &desig_w)
+    if rc != 0: return rc
+    // A record stored through a pointer from a value (a call's result, a
+    // compound literal): the value is bound, then copied (#2551).
+    let store_src = bs_join(case_dir, "recstore.c")
+    let store_w = bs_join(case_dir, "recstore.w")
+    rc = bs_write_fixture(ctx, store_src, "typedef struct { int a, b; } P;\nstatic P mk(int n) { P p = {n, n + 1}; return p; }\nstatic void set(P* out, int n) { *out = mk(n); }\nstatic void lit(P* out) { *out = (P){3, 4}; }\nint main(void) { P q = {0, 0}; set(&q, 7); int ok = q.b == 8; lit(&q); return (ok && q.a == 3) ? 0 : 1; }\n", "record stores from values through a pointer")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "recstore", &store_src, &store_w)
+
+// Migrate `src` to `out_w`, check it, build and run it (exit 0).
+fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let migrated = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-" ++ label, args)
+    if migrated.rc != 0: return migrated.rc
+    let binary = bs_join(case_dir, label ++ ".bin")
+    var build_args: List[str] = List.new()
+    build_args |> push("build")
+    build_args |> push(bs_abs(root, out_w))
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, binary))
+    let built = bs_migrate_expect_success(ctx, compiler_path, case_dir, "build-" ++ label, build_args)
+    if built.rc != 0: return built.rc
+    var run_args: List[str] = List.new()
+    run_args |> push(bs_abs(root, binary))
+    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(case_dir, label ++ ".stdout")), bs_abs(root, bs_join(case_dir, label ++ ".stderr")), 120000)
+    if ran.rc != 0: return bs_fail(ctx, label ++ f" exited {ran.rc}: " ++ ran.stdout ++ ran.stderr)
+    0
+
 fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "initlist.c")
@@ -5482,6 +5650,10 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
     if rc != 0: return rc
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_local_and_member_records(ctx, compiler_path, bs_join(output_dir, "local_and_member_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_stc_expression_forms(ctx, compiler_path, bs_join(output_dir, "stc_expression_forms"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
     if rc != 0: return rc

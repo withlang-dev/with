@@ -406,8 +406,10 @@ pub type z_word_t = c_ulong
 pub let N: c_int = 5
 pub let W: c_int = 8
 pub let POLY: c_uint = 0xedb88320
+@[repr(C)]
 pub type ct_data_s_fc = union { freq: c_ushort = 0, code: c_ushort = 0 }
 impl Copy for ct_data_s_fc
+@[repr(C)]
 pub type ct_data_s_dl = union { dad: c_ushort = 0, len: c_ushort = 0 }
 impl Copy for ct_data_s_dl
 @[repr(C)]

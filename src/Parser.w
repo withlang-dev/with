@@ -1992,7 +1992,11 @@ impl Parser:
             self.pool.add_extra(is_pub)
             self.pool.add_extra(tp_start)
             self.pool.add_extra(tp_count)
-            let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, pack_type_decl_kind(TypeDeclKind.Union, is_ephemeral))
+            // §16.4: a union carries `@[repr(C)]` as a struct does (a
+            // migrated C union, `cstr s = {0}`: its `zeroed()` needs it).
+            var union_kind = pack_type_decl_kind(TypeDeclKind.Union, is_ephemeral)
+            if self.pending_repr_c != 0: union_kind = union_kind + TDK_FLAG_REPR_C
+            let node = self.pool.add_node(NodeKind.NK_TYPE_DECL, start, self.prev_end(), name, extra_start, union_kind)
             return self.finish_type_decl(node)
 
         if self.peek() == TokenKind.TK_IDENT and self.is_ident_named("distinct"):

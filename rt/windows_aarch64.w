@@ -547,6 +547,13 @@ pub fn rt_clock_ns() -> i64:
     let remainder = now % qpc_freq
     seconds * 1000000000 + (remainder * 1000000000) / qpc_freq
 
+// The system time in nanoseconds since the Unix epoch (std.libc's
+// gettimeofday): FILETIME's 100 ns intervals, rebased.
+pub fn rt_wall_clock_ns() -> i64:
+    var ft: i64 = 0
+    GetSystemTimeAsFileTime(&raw mut ft)
+    (ft - 116444736000000000) * 100
+
 pub fn rt_wall_clock_sec() -> i64:
     // FILETIME: 100ns intervals since 1601-01-01; rebase to the Unix epoch.
     var ft: i64 = 0

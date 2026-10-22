@@ -54,6 +54,9 @@ pub type Corpus ephemeral {
     // preprocessor defines and excluded basenames for the directory migration
     defines: List[str],
     excludes: List[str],
+    // extra include directories for the migration, relative to the staging
+    // root beside `source` (STC's headers live beside its units)
+    include_dirs: List[str],
     // functions upstream declares in its own headers but never defines (the
     // migrated extern has no body anywhere; it links only while unreferenced)
     declared_externs: List[str],
@@ -137,6 +140,13 @@ pub fn corpus_provenance(ctx: &ActionCtx, output: &str, path: &str) -> i32:
     if fs.write_text(record, earlier ++ line ++ "\n") != 0: return corpus_fail(ctx, "could not write " ++ record)
     0
 
+/// The directory a path is in ("" for a bare name).
+pub fn corpus_dirname(path: &str) -> str:
+    var cut: isize = -1
+    for i in 0..path.len():
+        if path[i] == '/': cut = i
+    if cut < 0: "" else: path.slice(0, cut)
+
 pub fn corpus_basename(path: &str) -> str:
     let parts = path.split("/")
     parts[parts.len() - 1].clone()
@@ -202,6 +212,14 @@ pub fn corpus_is_harness(corpus: &Corpus, name: &str) -> bool:
 /// The migration every corpus runs: one directory, prelude-free output
 /// (the .wo build compiles it --no-prelude, so its defs carry c_void and the
 /// unreachable shim), no foreign ABI surface, one shared definitions module.
+/// The migration's include paths: the staged units' directory and the
+/// corpus's extra directories beside it.
+fn corpus_include_paths(corpus: &Corpus, source: &str) -> List[str]:
+    var paths: List[str] = List.new()
+    paths.push(corpus_owned_text(source))
+    for dir in corpus.include_dirs: paths.push(corpus_dirname(source) ++ "/" ++ dir)
+    paths
+
 pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> MigrateOptions:
     var defines: List[str] = List.new()
     for define in corpus.defines: defines.push(define.clone())
@@ -209,7 +227,7 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
     for exclude in corpus.excludes: excludes.push(exclude.clone())
     MigrateOptions {
         source_path: corpus_owned_text(source), output_path: corpus_owned_text(output),
-        include_paths: [corpus_owned_text(source)], forced_includes: List.new(),
+        include_paths: corpus_include_paths(corpus, source), forced_includes: List.new(),
         defines: defines, exclude_basenames: excludes, check_mode: false,
         diff_mode: false, stats_mode: false, no_c_export: true,
         c_export_functions: false, convert_goto_to_structured: false,

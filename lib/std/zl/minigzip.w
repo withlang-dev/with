@@ -414,8 +414,6 @@ pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int {
 
             }
 
-            var __ci_expr_old_3: *mut *mut i8 = __local_argv
-
             (__local_argv = __local_argv + 1)
 
             (__local_argc = __local_argc - 1)

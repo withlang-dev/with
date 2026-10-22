@@ -5,9 +5,18 @@ use std.fs
 use std.process
 use UnitReturnReview
 
+fn corpus_dir_of(path: &str) -> str:
+    var end = path.len()
+    while end > 0 and path[end - 1] != '/': end = end - 1
+    if end == 0: "." else: path.slice(0, end - 1)
+
 fn review_file(path: &str, before: &str, after: &str, reviews: &str) -> i32:
     var missing: i32 = 0
     if not path.ends_with(".w"): return missing
+    // A migrated corpus (a directory carrying corpus.stamp, the checked-in
+    // test corpora) is the migrator's spelling, reviewed once at the migrator
+    // (#1838), never per generated file.
+    if path.starts_with("test/corpora/") or file_exists(corpus_dir_of(path) ++ "/corpus.stamp"): return missing
     for signature in added_unit_returns(before, after):
         if unit_return_reviewed(reviews, path, signature):
             print("reviewed: " ++ path ++ "\t" ++ signature)

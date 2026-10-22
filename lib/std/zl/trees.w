@@ -64,7 +64,7 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
 
 
     if ((if __local_dist == 0: 1 else: 0) != 0) {
-        ((*__param_s).dyn_ltree[__param_lc].fc.freq = ((*__param_s).dyn_ltree[__param_lc].fc.freq +% 1))
+        ((*__param_s).dyn_ltree[__param_lc].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[__param_lc].fc as *const ct_data_s_fc)).freq +% 1))
 
     } else {
         ((*__param_s).matches = ((*__param_s).matches +% 1))
@@ -72,9 +72,9 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
         (__local_dist = (__local_dist -% 1))
 
 
-        ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq +% 1))
+        ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[(((_length_code[__param_lc] as c_int) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
 
-        ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc.freq = ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc.freq +% 1))
+        ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int))].fc as *const ct_data_s_fc)).freq +% 1))
 
     }
 
@@ -289,10 +289,10 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) {
 
 
 
-    var __local_len_1: c_int = ((static_ltree[256].dl.len as c_int))
+    var __local_len_1: c_int = (((*(&raw const static_ltree[256].dl as *const ct_data_s_dl)).len as c_int))
 
     if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-        var __local_val_1: c_int = ((static_ltree[256].fc.code as c_int))
+        var __local_val_1: c_int = (((*(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as c_int))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -321,7 +321,7 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) {
         ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
     } else {
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | (((static_ltree[256].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
         ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
@@ -564,7 +564,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: c_int, __par
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
-        var __local_len: c_int = (((__param_tree[__local_n]).dl.len as c_int))
+        var __local_len: c_int = (((*(&raw const (__param_tree[__local_n]).dl as *const ct_data_s_dl)).len as c_int))
 
         if ((if __local_len == 0: 1 else: 0) != 0) {
             (__local_n = __local_n + 1)
@@ -652,12 +652,12 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
         if ((if __local_j < (*__param_s).heap_len: 1 else: 0) != 0) {
             var __ci_expr_logic_1: c_int
 
-            if ((if (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc.freq < (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+            if ((if (*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_0: c_int = 0
 
-                if ((if (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc.freq == (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+                if ((if (*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
                     (__ci_expr_logic_0 = (if (if (*__param_s).depth[(*__param_s).heap[(__local_j + 1)]] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
                 }
 
@@ -677,12 +677,12 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
         var __ci_expr_logic_4: c_int
 
-        if ((if (__param_tree[__local_v]).fc.freq < (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+        if ((if (*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_3: c_int = 0
 
-            if ((if (__param_tree[__local_v]).fc.freq == (__param_tree[(*__param_s).heap[__local_j]]).fc.freq: 1 else: 0) != 0) {
+            if ((if (*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
                 (__ci_expr_logic_3 = (if (if (*__param_s).depth[__local_v] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
             }
 
@@ -752,7 +752,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     while ((if __local_h < ((2 * ((256 + 1) + 29)) + 1): 1 else: 0) != 0) {
         (__local_n = (((*__param_s).heap[__local_h] as c_int)))
 
-        (__local_bits = (((((__local_tree[(__local_tree[__local_n]).dl.dad]).dl.len as c_int) + 1) as c_int)))
+        (__local_bits = (((((*(&raw const (__local_tree[(*(&raw const (__local_tree[__local_n]).dl as *const ct_data_s_dl)).dad]).dl as *const ct_data_s_dl)).len as c_int) + 1) as c_int)))
 
         if ((if __local_bits > __local_max_length: 1 else: 0) != 0) {
             (__local_bits = __local_max_length)
@@ -778,12 +778,12 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
             (__local_xbits = (((__local_extra[(__local_n - __local_base)]) as c_int)))
         }
 
-        (__local_f = (__local_tree[__local_n]).fc.freq)
+        (__local_f = (*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq)
 
         ((*__param_s).opt_len = ((*__param_s).opt_len +% ((__local_f as c_ulong) *% (((__local_bits + __local_xbits) as c_uint) as c_ulong))))
 
         if (__local_stree != null) {
-            ((*__param_s).static_len = ((*__param_s).static_len +% ((__local_f as c_ulong) *% (((((__local_stree[__local_n]).dl.len as c_int) + __local_xbits) as c_uint) as c_ulong))))
+            ((*__param_s).static_len = ((*__param_s).static_len +% ((__local_f as c_ulong) *% (((((*(&raw const (__local_stree[__local_n]).dl as *const ct_data_s_dl)).len as c_int) + __local_xbits) as c_uint) as c_ulong))))
         }
 
 
@@ -832,9 +832,9 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
                 continue
             }
 
-            if ((if (((__local_tree[__local_m]).dl.len as c_uint)) != ((__local_bits as c_uint)): 1 else: 0) != 0) {
+            if ((if (((*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).len as c_uint)) != ((__local_bits as c_uint)): 1 else: 0) != 0) {
 
-                ((*__param_s).opt_len = ((*__param_s).opt_len +% ((((__local_bits as c_ulong) -% (((__local_tree[__local_m]).dl.len as c_int) as c_ulong)) as c_ulong) *% (((__local_tree[__local_m]).fc.freq as c_int) as c_ulong))))
+                ((*__param_s).opt_len = ((*__param_s).opt_len +% ((((__local_bits as c_ulong) -% (((*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).len as c_int) as c_ulong)) as c_ulong) *% (((*(&raw const (__local_tree[__local_m]).fc as *const ct_data_s_fc)).freq as c_int) as c_ulong))))
 
                 ((__local_tree[__local_m]).dl.len = ((__local_bits as c_ushort)))
 
@@ -876,7 +876,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
     (__local_n = ((0 as c_int)))
 
     while ((if __local_n < __local_elems: 1 else: 0) != 0) {
-        if ((if (__local_tree[__local_n]).fc.freq != 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
             ((*__param_s).heap_len = (*__param_s).heap_len + 1)
 
             (__local_max_code = __local_n)
@@ -923,7 +923,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
         ((*__param_s).opt_len = ((*__param_s).opt_len -% 1))
 
         if (__local_stree != null) {
-            ((*__param_s).static_len = ((*__param_s).static_len -% ((__local_stree[__local_node]).dl.len as c_ulong)))
+            ((*__param_s).static_len = ((*__param_s).static_len -% ((*(&raw const (__local_stree[__local_node]).dl as *const ct_data_s_dl)).len as c_ulong)))
         }
 
     }
@@ -968,13 +968,13 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
         ((*__param_s).heap[(*__param_s).heap_max] = __local_m)
 
 
-        ((__local_tree[__local_node]).fc.freq = (((((__local_tree[__local_n]).fc.freq as c_int) + ((__local_tree[__local_m]).fc.freq as c_int)) as c_ushort)))
+        ((__local_tree[__local_node]).fc.freq = (((((*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq as c_int) + ((*(&raw const (__local_tree[__local_m]).fc as *const ct_data_s_fc)).freq as c_int)) as c_ushort)))
 
         ((*__param_s).depth[__local_node] = ((((if (if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: 1 else: 0) != 0: ((*__param_s).depth[__local_n] as c_int) else: ((*__param_s).depth[__local_m] as c_int)) + 1) as u8)))
 
         ((__local_tree[__local_m]).dl.dad = ((__local_node as c_ushort)))
 
-        ((__local_tree[__local_n]).dl.dad = (__local_tree[__local_m]).dl.dad)
+        ((__local_tree[__local_n]).dl.dad = (*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).dad)
 
 
         var __ci_expr_old_2: c_int = __local_node
@@ -1009,7 +1009,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_curlen: c_int
 
-    var __local_nextlen: c_int = (((__param_tree[0]).dl.len as c_int))
+    var __local_nextlen: c_int = (((*(&raw const (__param_tree[0]).dl as *const ct_data_s_dl)).len as c_int))
 
     var __local_count: c_int = ((0 as c_int))
 
@@ -1031,7 +1031,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
         (__local_curlen = __local_nextlen)
 
-        (__local_nextlen = (((__param_tree[(__local_n + 1)]).dl.len as c_int)))
+        (__local_nextlen = (((*(&raw const (__param_tree[(__local_n + 1)]).dl as *const ct_data_s_dl)).len as c_int)))
 
         var __ci_expr_logic_0: c_int = 0
 
@@ -1049,22 +1049,22 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
-            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*__param_s).bl_tree[__local_curlen].fc.freq as c_int) +% (__local_count as c_ushort)) as c_ushort)))
+            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq as c_int) +% (__local_count as c_ushort)) as c_ushort)))
 
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {
                 if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
-                    ((*__param_s).bl_tree[__local_curlen].fc.freq = ((*__param_s).bl_tree[__local_curlen].fc.freq +% 1))
+                    ((*__param_s).bl_tree[__local_curlen].fc.freq = ((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq +% 1))
                 }
 
-                ((*__param_s).bl_tree[16].fc.freq = ((*__param_s).bl_tree[16].fc.freq +% 1))
+                ((*__param_s).bl_tree[16].fc.freq = ((*(&raw const (*__param_s).bl_tree[16].fc as *const ct_data_s_fc)).freq +% 1))
 
             } else {
                 if ((if __local_count <= 10: 1 else: 0) != 0) {
-                    ((*__param_s).bl_tree[17].fc.freq = ((*__param_s).bl_tree[17].fc.freq +% 1))
+                    ((*__param_s).bl_tree[17].fc.freq = ((*(&raw const (*__param_s).bl_tree[17].fc as *const ct_data_s_fc)).freq +% 1))
 
                 } else {
-                    ((*__param_s).bl_tree[18].fc.freq = ((*__param_s).bl_tree[18].fc.freq +% 1))
+                    ((*__param_s).bl_tree[18].fc.freq = ((*(&raw const (*__param_s).bl_tree[18].fc as *const ct_data_s_fc)).freq +% 1))
 
                 }
             }
@@ -1112,7 +1112,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_curlen: c_int
 
-    var __local_nextlen: c_int = (((__param_tree[0]).dl.len as c_int))
+    var __local_nextlen: c_int = (((*(&raw const (__param_tree[0]).dl as *const ct_data_s_dl)).len as c_int))
 
     var __local_count: c_int = ((0 as c_int))
 
@@ -1132,7 +1132,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
     while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
         (__local_curlen = __local_nextlen)
 
-        (__local_nextlen = (((__param_tree[(__local_n + 1)]).dl.len as c_int)))
+        (__local_nextlen = (((*(&raw const (__param_tree[(__local_n + 1)]).dl as *const ct_data_s_dl)).len as c_int)))
 
         var __ci_expr_logic_0: c_int = 0
 
@@ -1151,10 +1151,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
             loop {
-                var __local_len: c_int = (((*__param_s).bl_tree[__local_curlen].dl.len as c_int))
+                var __local_len: c_int = (((*(&raw const (*__param_s).bl_tree[__local_curlen].dl as *const ct_data_s_dl)).len as c_int))
 
                 if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
-                    var __local_val: c_int = (((*__param_s).bl_tree[__local_curlen].fc.code as c_int))
+                    var __local_val: c_int = (((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as c_int))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1183,7 +1183,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
                 } else {
-                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
@@ -1200,10 +1200,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {
                 if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
-                    var __local_len_1: c_int = (((*__param_s).bl_tree[__local_curlen].dl.len as c_int))
+                    var __local_len_1: c_int = (((*(&raw const (*__param_s).bl_tree[__local_curlen].dl as *const ct_data_s_dl)).len as c_int))
 
                     if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-                        var __local_val_1: c_int = (((*__param_s).bl_tree[__local_curlen].fc.code as c_int))
+                        var __local_val_1: c_int = (((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as c_int))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1232,7 +1232,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
                     } else {
-                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[__local_curlen].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
@@ -1245,10 +1245,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                 }
 
 
-                var __local_len_2: c_int = (((*__param_s).bl_tree[16].dl.len as c_int))
+                var __local_len_2: c_int = (((*(&raw const (*__param_s).bl_tree[16].dl as *const ct_data_s_dl)).len as c_int))
 
                 if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
-                    var __local_val_2: c_int = (((*__param_s).bl_tree[16].fc.code as c_int))
+                    var __local_val_2: c_int = (((*(&raw const (*__param_s).bl_tree[16].fc as *const ct_data_s_fc)).code as c_int))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_2 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1277,7 +1277,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_2 - 16))
 
                 } else {
-                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[16].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[16].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_2)
 
@@ -1327,10 +1327,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
             } else {
                 if ((if __local_count <= 10: 1 else: 0) != 0) {
-                    var __local_len_4: c_int = (((*__param_s).bl_tree[17].dl.len as c_int))
+                    var __local_len_4: c_int = (((*(&raw const (*__param_s).bl_tree[17].dl as *const ct_data_s_dl)).len as c_int))
 
                     if ((if (*__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
-                        var __local_val_4: c_int = (((*__param_s).bl_tree[17].fc.code as c_int))
+                        var __local_val_4: c_int = (((*(&raw const (*__param_s).bl_tree[17].fc as *const ct_data_s_fc)).code as c_int))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_4 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1359,7 +1359,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_4 - 16))
 
                     } else {
-                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[17].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[17].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_4)
 
@@ -1408,10 +1408,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
                 } else {
-                    var __local_len_6: c_int = (((*__param_s).bl_tree[18].dl.len as c_int))
+                    var __local_len_6: c_int = (((*(&raw const (*__param_s).bl_tree[18].dl as *const ct_data_s_dl)).len as c_int))
 
                     if ((if (*__param_s).bi_valid > (16 - __local_len_6): 1 else: 0) != 0) {
-                        var __local_val_6: c_int = (((*__param_s).bl_tree[18].fc.code as c_int))
+                        var __local_val_6: c_int = (((*(&raw const (*__param_s).bl_tree[18].fc as *const ct_data_s_fc)).code as c_int))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_6 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1440,7 +1440,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_6 - 16))
 
                     } else {
-                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[18].fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[18].fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                         ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_6)
 
@@ -1539,7 +1539,7 @@ unsafe fn build_bl_tree(__param_s: *mut internal_state) -> c_int {
     (__local_max_blindex = (((19 - 1) as c_int)))
 
     while ((if __local_max_blindex >= 3: 1 else: 0) != 0) {
-        if ((if (*__param_s).bl_tree[bl_order[__local_max_blindex]].dl.len != 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__param_s).bl_tree[bl_order[__local_max_blindex]].dl as *const ct_data_s_dl)).len != 0: 1 else: 0) != 0) {
             break
         }
 
@@ -1689,7 +1689,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
         var __local_len_3: c_int = ((3 as c_int))
 
         if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
-            var __local_val_3: c_int = (((*__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int))
+            var __local_val_3: c_int = (((*(&raw const (*__param_s).bl_tree[bl_order[__local_rank]].dl as *const ct_data_s_dl)).len as c_int))
 
             ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1718,7 +1718,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: c_int, 
             ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_3 - 16))
 
         } else {
-            ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*__param_s).bl_tree[bl_order[__local_rank]].dl.len as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+            ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (*__param_s).bl_tree[bl_order[__local_rank]].dl as *const ct_data_s_dl)).len as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
             ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_3)
 
@@ -1776,10 +1776,10 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
 
             if ((if __local_dist == 0: 1 else: 0) != 0) {
-                var __local_len: c_int = (((__param_ltree[__local_lc]).dl.len as c_int))
+                var __local_len: c_int = (((*(&raw const (__param_ltree[__local_lc]).dl as *const ct_data_s_dl)).len as c_int))
 
                 if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
-                    var __local_val: c_int = (((__param_ltree[__local_lc]).fc.code as c_int))
+                    var __local_val: c_int = (((*(&raw const (__param_ltree[__local_lc]).fc as *const ct_data_s_fc)).code as c_int))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1808,7 +1808,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
 
                 } else {
-                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[__local_lc]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (__param_ltree[__local_lc]).fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
 
@@ -1820,10 +1820,10 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
             } else {
                 (__local_code = ((_length_code[__local_lc] as c_uint)))
 
-                var __local_len_1: c_int = (((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).dl.len as c_int))
+                var __local_len_1: c_int = (((*(&raw const (__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).dl as *const ct_data_s_dl)).len as c_int))
 
                 if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-                    var __local_val_1: c_int = (((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int))
+                    var __local_val_1: c_int = (((*(&raw const (__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc as *const ct_data_s_fc)).code as c_int))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_1 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1852,7 +1852,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
 
                 } else {
-                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (__param_ltree[((((__local_code as c_uint) +% (256 as c_uint)) as c_uint) +% (1 as c_uint))]).fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
 
@@ -1912,10 +1912,10 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                 (__local_code = (((if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as c_int) else: (_dist_code[((256 as c_uint) +% (((__local_dist as c_uint) >> (7 as c_uint)) as c_uint))] as c_int)) as c_uint)))
 
 
-                var __local_len_3: c_int = (((__param_dtree[__local_code]).dl.len as c_int))
+                var __local_len_3: c_int = (((*(&raw const (__param_dtree[__local_code]).dl as *const ct_data_s_dl)).len as c_int))
 
                 if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
-                    var __local_val_3: c_int = (((__param_dtree[__local_code]).fc.code as c_int))
+                    var __local_val_3: c_int = (((*(&raw const (__param_dtree[__local_code]).fc as *const ct_data_s_fc)).code as c_int))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_3 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -1944,7 +1944,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_3 - 16))
 
                 } else {
-                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_dtree[__local_code]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+                    ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (__param_dtree[__local_code]).fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
                     ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_3)
 
@@ -2008,10 +2008,10 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
         }
     }
 
-    var __local_len_5: c_int = (((__param_ltree[256]).dl.len as c_int))
+    var __local_len_5: c_int = (((*(&raw const (__param_ltree[256]).dl as *const ct_data_s_dl)).len as c_int))
 
     if ((if (*__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
-        var __local_val_5: c_int = (((__param_ltree[256]).fc.code as c_int))
+        var __local_val_5: c_int = (((*(&raw const (__param_ltree[256]).fc as *const ct_data_s_fc)).code as c_int))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__local_val_5 as c_ushort) as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
@@ -2040,7 +2040,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
         ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_5 - 16))
 
     } else {
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((__param_ltree[256]).fc.code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
+        ((*__param_s).bi_buf = ((*__param_s).bi_buf as c_ushort) | ((((*(&raw const (__param_ltree[256]).fc as *const ct_data_s_fc)).code as c_int) << ((*__param_s).bi_valid as c_uint)) as c_ushort))
 
         ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_5)
 
@@ -2061,7 +2061,7 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
         var __ci_expr_logic_0: c_int = 0
 
         if (((__local_block_mask as c_ulong) & (1 as c_ulong)) != 0) {
-            (__ci_expr_logic_0 = (if (if (*__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_0 != 0) {
@@ -2081,16 +2081,16 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
 
     var __ci_expr_logic_1: c_int
 
-    if ((if (*__param_s).dyn_ltree[9].fc.freq != 0: 1 else: 0) != 0) {
+    if ((if (*(&raw const (*__param_s).dyn_ltree[9].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__param_s).dyn_ltree[10].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (if (*(&raw const (*__param_s).dyn_ltree[10].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_1 != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (*__param_s).dyn_ltree[13].fc.freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (if (*(&raw const (*__param_s).dyn_ltree[13].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
@@ -2101,7 +2101,7 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> c_int {
     (__local_n = ((32 as c_int)))
 
     while ((if __local_n < 256: 1 else: 0) != 0) {
-        if ((if (*__param_s).dyn_ltree[__local_n].fc.freq != 0: 1 else: 0) != 0) {
+        if ((if (*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
             return 1
         }
 
@@ -2118,8 +2118,8 @@ let extra_lbits: List[c_int] = [0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 2, 2, 2, 2, 
 let extra_dbits: List[c_int] = [0, 0, 0, 0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 13, 13]
 let extra_blbits: List[c_int] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 3, 7]
 let bl_order: List[u8] = [16, 17, 18, 0, 8, 7, 9, 6, 10, 5, 11, 4, 12, 3, 13, 2, 14, 1, 15]
-let static_ltree: List[ct_data_s] = [ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 140 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 76 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 204 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 44 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 172 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 108 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 236 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 156 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 92 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 220 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 60 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 188 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 124 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 252 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 130 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 66 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 194 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 34 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 162 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 98 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 226 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 146 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 82 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 210 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 50 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 178 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 114 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 242 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 138 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 74 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 202 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 42 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 170 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 106 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 234 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 154 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 90 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 218 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 58 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 186 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 122 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 250 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 134 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 70 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 198 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 38 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 166 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 102 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 230 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 150 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 86 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 214 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 54 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 182 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 118 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 246 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 142 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 78 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 206 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 46 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 174 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 110 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 238 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 158 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 94 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 222 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 62 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 190 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 126 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 254 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 129 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 65 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 193 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 33 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 161 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 97 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 225 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 145 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 81 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 209 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 49 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 177 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 113 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 241 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 137 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 73 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 201 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 41 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 169 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 105 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 233 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 153 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 89 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 217 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 57 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 185 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 121 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 249 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 133 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 69 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 197 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 37 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 165 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 101 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 229 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 149 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 85 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 213 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 53 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 181 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 117 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 245 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 141 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 77 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 205 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 45 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 173 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 109 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 237 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 157 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 93 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 221 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 61 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 189 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 125 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 253 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 275 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 147 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 403 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 83 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 339 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 211 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 467 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 51 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 307 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 179 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 435 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 115 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 371 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 243 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 499 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 267 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 139 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 395 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 75 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 331 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 203 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 459 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 43 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 299 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 171 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 427 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 107 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 363 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 235 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 491 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 283 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 155 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 411 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 91 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 347 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 219 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 475 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 59 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 315 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 187 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 443 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 123 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 379 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 251 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 507 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 263 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 135 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 391 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 71 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 327 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 199 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 455 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 39 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 295 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 167 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 423 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 103 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 359 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 231 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 487 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 279 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 151 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 407 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 87 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 343 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 215 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 471 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 55 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 311 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 183 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 439 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 119 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 375 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 247 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 503 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 15 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 271 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 143 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 399 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 79 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 335 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 207 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 463 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 47 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 303 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 175 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 431 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 111 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 367 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 239 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 495 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 31 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 287 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 159 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 415 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 95 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 351 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 223 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 479 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 63 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 319 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 191 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 447 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 127 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 383 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 255 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 511 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 64 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 32 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 96 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 80 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 48 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 112 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 72 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 40 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 104 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 88 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 56 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 120 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 68 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 36 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 100 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 84 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 52 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 116 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 131 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 67 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 195 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 35 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 163 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 99 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 227 }, dl: ct_data_s_dl { dad: 8 } }]
-let static_dtree: List[ct_data_s] = [ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 5 } }]
+let static_ltree: List[ct_data_s] = [ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 140 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 76 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 204 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 44 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 172 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 108 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 236 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 156 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 92 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 220 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 60 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 188 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 124 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 252 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 130 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 66 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 194 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 34 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 162 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 98 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 226 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 146 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 82 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 210 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 50 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 178 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 114 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 242 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 138 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 74 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 202 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 42 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 170 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 106 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 234 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 154 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 90 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 218 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 58 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 186 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 122 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 250 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 134 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 70 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 198 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 38 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 166 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 102 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 230 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 150 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 86 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 214 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 54 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 182 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 118 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 246 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 142 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 78 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 206 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 46 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 174 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 110 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 238 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 158 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 94 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 222 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 62 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 190 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 126 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 254 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 129 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 65 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 193 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 33 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 161 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 97 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 225 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 145 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 81 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 209 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 49 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 177 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 113 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 241 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 137 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 73 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 201 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 41 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 169 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 105 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 233 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 153 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 89 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 217 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 57 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 185 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 121 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 249 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 133 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 69 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 197 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 37 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 165 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 101 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 229 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 149 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 85 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 213 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 53 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 181 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 117 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 245 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 141 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 77 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 205 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 45 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 173 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 109 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 237 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 157 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 93 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 221 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 61 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 189 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 125 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 253 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 275 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 147 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 403 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 83 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 339 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 211 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 467 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 51 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 307 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 179 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 435 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 115 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 371 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 243 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 499 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 267 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 139 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 395 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 75 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 331 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 203 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 459 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 43 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 299 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 171 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 427 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 107 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 363 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 235 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 491 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 283 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 155 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 411 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 91 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 347 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 219 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 475 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 59 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 315 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 187 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 443 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 123 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 379 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 251 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 507 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 263 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 135 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 391 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 71 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 327 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 199 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 455 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 39 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 295 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 167 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 423 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 103 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 359 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 231 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 487 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 279 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 151 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 407 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 87 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 343 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 215 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 471 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 55 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 311 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 183 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 439 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 119 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 375 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 247 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 503 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 15 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 271 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 143 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 399 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 79 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 335 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 207 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 463 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 47 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 303 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 175 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 431 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 111 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 367 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 239 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 495 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 31 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 287 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 159 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 415 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 95 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 351 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 223 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 479 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 63 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 319 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 191 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 447 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 127 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 383 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 255 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc { freq: 511 }, dl: ct_data_s_dl { dad: 9 } }, ct_data_s { fc: ct_data_s_fc.zeroed(), dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 64 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 32 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 96 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 80 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 48 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 112 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 72 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 40 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 104 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 88 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 56 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 120 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 68 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 36 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 100 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 84 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 52 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 116 }, dl: ct_data_s_dl { dad: 7 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 131 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 67 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 195 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 35 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 163 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 99 }, dl: ct_data_s_dl { dad: 8 } }, ct_data_s { fc: ct_data_s_fc { freq: 227 }, dl: ct_data_s_dl { dad: 8 } }]
+let static_dtree: List[ct_data_s] = [ct_data_s { fc: ct_data_s_fc.zeroed(), dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 16 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 8 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 24 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 4 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 20 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 12 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 28 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 2 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 18 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 10 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 26 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 6 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 22 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 14 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 30 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 1 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 17 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 9 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 25 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 5 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 21 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 13 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 29 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 3 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 19 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 11 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 27 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 7 }, dl: ct_data_s_dl { dad: 5 } }, ct_data_s { fc: ct_data_s_fc { freq: 23 }, dl: ct_data_s_dl { dad: 5 } }]
 let base_length: List[c_int] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 12, 14, 16, 20, 24, 28, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 0]
 let base_dist: List[c_int] = [0, 1, 2, 3, 4, 6, 8, 12, 16, 24, 32, 48, 64, 96, 128, 192, 256, 384, 512, 768, 1024, 1536, 2048, 3072, 4096, 6144, 8192, 12288, 16384, 24576]
 let static_l_desc: static_tree_desc_s = static_tree_desc_s { static_tree: (&raw const static_ltree[0] as *const ct_data_s), extra_bits: (&raw const extra_lbits[0] as *const c_int), extra_base: (256 + 1), elems: ((256 + 1) + 29), max_length: 15 }

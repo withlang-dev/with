@@ -875,6 +875,7 @@ impl Copy for class_ranges
 pub type recurse_arguments { pub header: compile_data, pub size: c_ulong = 0, pub skip_size: c_ulong = 0 }
 impl Copy for recurse_arguments
 
+@[repr(C)]
 pub type class_bits_storage = union { pub classbits: [u8; 32] = [0 as u8; 32], pub classwords: [c_uint; 8] = [0 as c_uint; 8] }
 impl Copy for class_bits_storage
 

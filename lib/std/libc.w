@@ -15,6 +15,27 @@ use std.os.Target
 use rt.rt_core
 
 
+// time.h: `struct tm` as POSIX lays it out (Darwin and glibc agree: nine
+// ints, the UTC offset, the zone name). The UCRT record ends after the nine
+// ints; this record is 12 bytes longer than it, which every C write fits,
+// and `tm_gmtoff`/`tm_zone` read nothing meaningful there.
+@[repr(C)]
+pub type tm {
+    pub tm_sec: c_int,
+    pub tm_min: c_int,
+    pub tm_hour: c_int,
+    pub tm_mday: c_int,
+    pub tm_mon: c_int,
+    pub tm_year: c_int,
+    pub tm_wday: c_int,
+    pub tm_yday: c_int,
+    pub tm_isdst: c_int,
+    pub tm_gmtoff: c_long,
+    pub tm_zone: *const i8,
+}
+pub extern fn strftime(buf: *mut i8, max: u64, fmt: *const i8, timeptr: *const tm) -> u64
+pub extern fn mktime(timeptr: *mut tm) -> i64
+
 pub type rlimit {
     pub rlim_cur: u64,
     pub rlim_max: u64,
@@ -60,9 +81,11 @@ pub extern fn fgetc(stream: *mut c_void) -> i32
 pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
 pub extern fn fputs(s: *const i8, stream: *mut c_void) -> i32
 pub extern fn putc(c: i32, stream: *mut c_void) -> i32
+pub extern fn putchar(c: i32) -> i32
 pub extern fn perror(s: *const i8) -> Unit
 pub extern fn feof(stream: *mut c_void) -> i32
 pub extern fn ferror(stream: *mut c_void) -> i32
+pub extern fn rewind(stream: *mut c_void)
 pub extern fn fread(ptr: *mut c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 // POSIX fileno (UCRT `_fileno`): a seam.
@@ -144,6 +167,18 @@ pub type mach_timebase_info { pub numer: u32 = 0, pub denom: u32 = 0 }
 impl Copy for mach_timebase_info
 pub type mach_timebase_info_data_t = mach_timebase_info
 pub fn mach_absolute_time() -> u64: with_libc_mach_absolute_time()
+
+// sys/time.h's gettimeofday, modeled portably: the runtime's wall clock in
+// nanoseconds on every target, split as C splits it. `struct timeval` is
+// this record (its C layouts differ per libc; nothing passes it to C).
+@[repr(C)]
+pub type timeval { pub tv_sec: i64 = 0, pub tv_usec: i64 = 0 }
+impl Copy for timeval
+pub unsafe fn gettimeofday(tv: *mut timeval, tz: *mut c_void) -> i32:
+    let ns = with_wall_clock_nanos()
+    (*tv).tv_sec = ns / 1000000000
+    (*tv).tv_usec = (ns % 1000000000) / 1000
+    0
 pub unsafe fn mach_timebase_info(info: *mut mach_timebase_info) -> kern_return_t:
     (*info).numer = 1 as u32
     (*info).denom = 1 as u32

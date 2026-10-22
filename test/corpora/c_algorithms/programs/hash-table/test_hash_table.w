@@ -243,7 +243,8 @@ pub fn test_hash_table_iterating() writes allocation_limit {
         0
     }
 
-    unsafe { with_memcpy((&raw mut __local_pair as *mut u8), (&raw const unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) } as *const u8), sizeof[_HashTablePair]()) }
+    let __ci_copy_69: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
+    with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_69 as *const u8), sizeof[_HashTablePair]())
 
     if (((if not ((if (unsafe *(&raw const __local_pair as *const _HashTablePair)).value == null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (189 as c_int), c"pair.value == HASH_TABLE_NULL".ptr)
@@ -293,7 +294,8 @@ pub fn test_hash_table_iterating_remove() writes allocation_limit {
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
     while (unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } != 0) {
-        unsafe { with_memcpy((&raw mut __local_pair as *mut u8), (&raw const unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) } as *const u8), sizeof[_HashTablePair]()) }
+        let __ci_copy_32: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
+        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_32 as *const u8), sizeof[_HashTablePair]())
 
         (__local_val = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).value as *mut c_char)))
 
@@ -598,7 +600,8 @@ pub fn test_hash_iterator_key_pair() writes allocation_limit, value1, value2 {
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
     while (unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } != 0) {
-        unsafe { with_memcpy((&raw mut __local_pair as *mut u8), (&raw const unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) } as *const u8), sizeof[_HashTablePair]()) }
+        let __ci_copy_55: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
+        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_55 as *const u8), sizeof[_HashTablePair]())
 
         (__local_key = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).key as *mut c_int)))
 

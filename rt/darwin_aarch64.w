@@ -48,6 +48,8 @@ extern fn rt_libc_chmod(path: *const u8, mode: i32) -> i32
 extern fn rt_libc_exit(code: i32) -> Never
 @[link_name("mach_absolute_time")]
 extern fn rt_libc_mach_absolute_time() -> u64
+@[link_name("clock_gettime")]
+extern fn rt_libc_clock_gettime(clk_id: i32, tp: *mut Timespec) -> i32
 @[link_name("time")]
 extern fn rt_libc_time(t: *mut i64) -> i64
 @[link_name("__error")]
@@ -338,6 +340,13 @@ pub fn rt_clock_ns() -> i64:
         timebase_denom = info.denom as i64
     let ticks = rt_libc_mach_absolute_time() as i64
     ticks * timebase_numer / timebase_denom
+
+// CLOCK_REALTIME, in nanoseconds (std.libc's gettimeofday).
+pub fn rt_wall_clock_ns() -> i64:
+    var ts = Timespec { tv_sec: 0, tv_nsec: 0 }
+    if rt_libc_clock_gettime(0, &raw mut ts) != 0:
+        return 0
+    ts.tv_sec * 1000000000 + ts.tv_nsec
 
 pub fn rt_wall_clock_sec() -> i64:
     rt_libc_time(0 as *mut i64)
@@ -1626,6 +1635,9 @@ c facade libsystem:
         preserves domain environ
         preserves domain locale
     fn rt_libc_mach_absolute_time
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_clock_gettime
         preserves domain environ
         preserves domain locale
     fn rt_libc_time

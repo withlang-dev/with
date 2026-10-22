@@ -1451,7 +1451,7 @@ fn comp_libc_standard_externs() -> str:
     "|fprintf|printf|snprintf|sprintf|vsnprintf|vfprintf|vprintf|fopen|fclose|fflush|" ++
     "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
-    "abort|exit|clock|time|rand|srand|qsort|"
+    "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|"
 
 /// The identifier at the start of `text` ("" when none).
 fn comp_ident_prefix(text: &str) -> str:

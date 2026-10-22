@@ -973,6 +973,11 @@ type CiProjectSymbol {
     // location's file), "" for a function no header declares. The facade
     // `with get` writes imports the headers that declare what it presents.
     header_file: str,
+    // Where the owning definition is (a cursor location): a second unit whose
+    // definition is at the same place includes the same file and is a
+    // consumer, as C links one definition (STC's tests and library both
+    // include priv/utf8_prv.c).
+    definition_location: str,
     // D121 step 3: the GNU attributes any of its declarations carry
     // (`malloc;nonnull(1);returns_nonnull`), annotation evidence below a
     // proof and above the registry (§16.2b.2).
@@ -1029,6 +1034,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         variadic: 0,
         header_declared: 0,
         header_file: "",
+        definition_location: "",
         attrs: "",
     }
 

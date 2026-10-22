@@ -578,10 +578,11 @@ var g_ci_print_in_unsafe_fn: bool = false
 fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
     g_ci_print_in_unsafe_fn = enabled
 
+// D30 R4c: with_memcpy is the runtime's own safe definition wherever a
+// migration declares it, so the copy needs no `unsafe` of its own in a
+// plain fn either; a block holding only that call is vacuous and refused.
 fn ci_print_unsafe_stmt(indent: &str, call: &str) -> str:
-    if g_ci_print_in_unsafe_fn:
-        return indent ++ call ++ "\n"
-    indent ++ "unsafe { " ++ call ++ " }\n"
+    indent ++ call ++ "\n"
 
 fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> str:
     let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
@@ -611,6 +612,15 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
                 out = out ++ indent ++ lhs_str ++ "." ++ field_name ++ " = " ++ ci_print_expr(exprs, types, val_id, 0, 0) ++ "\n"
             i = i + 1
         return out
+    // The source must be a place: `&raw const` of a value (a call's result, a
+    // literal, a cast, a conditional) is no address (#2551: it compiled to a
+    // read from nowhere), so a value is bound first and copied from there.
+    let rhs_kind = exprs.kind(rhs)
+    let rhs_is_place = rhs_kind == CiExprKind.CIE_IDENT or rhs_kind == CiExprKind.CIE_FIELD or rhs_kind == CiExprKind.CIE_INDEX or rhs_kind == CiExprKind.CIE_DEREF
+    if not rhs_is_place:
+        let copy_name = "__ci_copy_" ++ i32_to_string(rhs as i32)
+        let bound = indent ++ "let " ++ copy_name ++ ": " ++ ci_print_type(types, ty) ++ " = " ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
+        return bound ++ ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ copy_name ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
     let rhs_str = ci_print_expr(exprs, types, rhs, 0, 1)
     ci_print_unsafe_stmt(indent, "with_memcpy((&raw mut " ++ lhs_str ++ " as " ++ ci_rt_ptr_mut() ++ "), (&raw const " ++ rhs_str ++ " as " ++ ci_rt_ptr_const() ++ "), sizeof[" ++ ty_text ++ "]())")
 

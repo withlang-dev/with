@@ -283,6 +283,21 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
     let _ = c
     empty_str()
 
+@[weak] pub fn with_ci_cursor_references_decl(s: i64, c: i32, d: i32) -> i32:
+    0
+
+@[weak] pub fn with_ci_cursors_equal(s: i64, a: i32, b: i32) -> i32:
+    0
+
+@[weak] pub fn with_ci_cursor_spelling_designator(s: i64, c: i32) -> str:
+    empty_str()
+
+@[weak] pub fn with_ci_cursor_semantic_parent(s: i64, c: i32) -> i32:
+    -1
+
+@[weak] pub fn with_ci_cursor_definition(s: i64, c: i32) -> i32:
+    -1
+
 @[weak] pub fn with_ci_cursor_source_text(s: i64, c: i32) -> str:
     let _ = s
     let _ = c
@@ -326,6 +341,9 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
 @[weak] pub fn with_ci_eval_int_valid(s: i64, c: i32) -> i32:
     let _ = s
     let _ = c
+    0
+
+@[weak] pub unsafe fn with_ci_eval_as_float(s: i64, c: i32, out: *mut f64) -> i32:
     0
 
 @[weak] pub fn with_ci_eval_int_is_unsigned(s: i64, c: i32) -> i32:

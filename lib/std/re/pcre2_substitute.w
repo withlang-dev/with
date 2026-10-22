@@ -590,7 +590,8 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_33 {
-        with_memcpy((&raw mut __local_gcontext__goto_876_25.memctl as *mut u8), (&raw const (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl) as *const u8), sizeof[pcre2_memctl]())
+        let __ci_copy_570: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
+        with_memcpy((&raw mut __local_gcontext__goto_876_25.memctl as *mut u8), (&raw const __ci_copy_570 as *const u8), sizeof[pcre2_memctl]())
         (__local_internal_match_data__goto_748_19 = pcre2_match_data_create_from_pattern_8(__param_code, (&raw mut __local_gcontext__goto_876_25 as *mut pcre2_real_general_context_8)))
         (__local_match_data = __local_internal_match_data__goto_748_19)
         if ((if __local_internal_match_data__goto_748_19 == null: 1 else: 0) != 0) {
@@ -625,7 +626,8 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_38 {
-        with_memcpy((&raw mut __local_gcontext__goto_888_25.memctl as *mut u8), (&raw const (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl) as *const u8), sizeof[pcre2_memctl]())
+        let __ci_copy_609: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
+        with_memcpy((&raw mut __local_gcontext__goto_888_25.memctl as *mut u8), (&raw const __ci_copy_609 as *const u8), sizeof[pcre2_memctl]())
         (__local_pairs__goto_887_7 = (((if (if (((*__param_code).top_bracket as c_int) + 1) < (*__local_match_data).oveccount: 1 else: 0) != 0: ((((*__param_code).top_bracket as c_int) + 1) as c_int) else: ((*__local_match_data).oveccount as c_int)) as c_int)))
         (__local_internal_match_data__goto_748_19 = pcre2_match_data_create_8(((*__local_match_data).oveccount as c_uint), (&raw mut __local_gcontext__goto_888_25 as *mut pcre2_real_general_context_8)))
         if ((if __local_internal_match_data__goto_748_19 == null: 1 else: 0) != 0) {

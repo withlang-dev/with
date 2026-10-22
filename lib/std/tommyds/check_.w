@@ -236,12 +236,12 @@ pub fn cache_clear() {
 
 }
 
-pub unsafe fn start(__param_str: *const i8) writes compare_counter {
+pub unsafe fn start(__param_str_: *const i8) writes compare_counter {
     cache_clear()
 
     (compare_counter = ((0 as c_uint)))
 
-    (the_str = ((__param_str as *const c_char)))
+    (the_str = ((__param_str_ as *const c_char)))
 
     (the_start = ((nano() as c_ulonglong)))
 

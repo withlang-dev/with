@@ -7,6 +7,7 @@ use build.pcre2
 use build.zlib
 use build.c_algorithms
 use build.tommyds
+use build.stc
 use std.crypto.sha256
 
 // The corpus registry (docs/spec/toolchain/wo_bundles.md, docs/proposals/stdlib_sourcing_plan.md):
@@ -17,13 +18,14 @@ use std.crypto.sha256
 // module under build/; nothing else names it. Indexed, not a List: a Corpus
 // is ephemeral (its hooks take references), and the seed's comptime
 // evaluator iterates a List of ephemeral records as strings.
-pub fn corpus_count() -> i32: 4
+pub fn corpus_count() -> i32: 5
 
 pub fn corpus_at(index: i32) -> Corpus:
     if index == 0: return pcre2_corpus()
     if index == 1: return zlib_corpus()
     if index == 2: return c_algorithms_corpus()
-    tommyds_corpus()
+    if index == 3: return tommyds_corpus()
+    stc_corpus()
 
 pub fn corpus_by_name(name: &str) -> Corpus:
     for i in 0..corpus_count():

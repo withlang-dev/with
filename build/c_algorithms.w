@@ -54,7 +54,7 @@ pub fn c_algorithms_corpus() -> Corpus:
         harness: ["alloc_testing", "framework", "test_cpp"], drift_harness: "test_cpp.w", drift_harness_arg: "",
         module_floor: 20, defines: List.new(), excludes: List.new(),
         // rb-tree.h declares rb_tree_subtree_height; rb-tree.c never defines it.
-        declared_externs: ["rb_tree_subtree_height"],
+        include_dirs: List.new(), declared_externs: ["rb_tree_subtree_height"],
         promote_after: ["c-algorithms-promote-tests"], test_lane: "c-algorithms-test",
         fresh_test_lanes: ["c-algorithms-test-fresh"], extra_generated_dirs: [CALG_TESTS_DIR],
         prepare_reference: corpus_no_prepare, stage: calg_stage,
