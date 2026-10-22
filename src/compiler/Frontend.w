@@ -2263,14 +2263,25 @@ impl Zcu:
         // fields do: the check above heard the demands, and this one has
         // every such binding at the type decided. A program with no demand
         // is checked once.
-        if sema.literal_demands.len() > 0 and sema.literal_demands_change_types():
-            let literal_decisions = sema.literal_decisions_from_demands()
+        // #2532: a decision can make a new demand (`files.push(p)` demands
+        // of `files` only once `p`, an element of a decided `site_paths`,
+        // has a type), so the program is checked until no demand changes a
+        // binding's type; each round decides at least one, so it ends.
+        // A round hears demands only of the bindings still undecided, so
+        // the decisions accumulate: a later round's entry for a binding
+        // comes after an earlier one and wins (literal_decision reads the
+        // last), and a binding no later round mentions keeps its decision.
+        var literal_rounds = 0
+        var literal_decisions: List[i32] = List.new()
+        while sema.literal_demands.len() > 0 and sema.literal_demands_change_types() and literal_rounds < 8:
+            for code in sema.literal_decisions_from_demands(): literal_decisions.push(code)
             self.diagnostics = move sema.diags
             self.diagnostics.truncate(reported_before_check)
             sema = self.new_module_sema(text, pool)
-            sema.field_decisions = field_decisions
-            sema.literal_decisions = literal_decisions
+            sema.field_decisions = sema_clone_i32_list(&field_decisions)
+            sema.literal_decisions = sema_clone_i32_list(&literal_decisions)
             sema.check_module()
+            literal_rounds += 1
         if do_profile:
             let sema_ns = runtime_clock_nanos() - t_sema
             runtime_eprint(f"[profile] frontend.sema  {sema_ns / 1000000}.{(sema_ns % 1000000) / 1000} ms  decls={pool.decl_count()}  int-local-rechecks={sema.int_local_rechecks}")
