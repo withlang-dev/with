@@ -2446,7 +2446,10 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     var rt_bundle_joined = false
     for boi in 0..bundle_objects.len():
         // The embedded slot's extraction, or the runtime root's own rt.o.
-        if bundle_objects[boi].ends_with("/wo_rt.o") or bundle_objects[boi].ends_with("/rt.o"):
+        // The extracted runtime bundle is `wo_rt_<interface sha>.o` (named by
+        // the bundle it is); a runtime root's is `rt.o`.
+        let bundle_name = link_stage_basename(bundle_objects[boi])
+        if (bundle_name.starts_with("wo_rt_") and bundle_name.ends_with(".o")) or bundle_name == "rt.o":
             rt_bundle_joined = true
         extras.push(with_str_clone_ref(bundle_objects[boi]))
     if needs_fiber_runtime != 0 or (rt_bundle_joined and not target_spec_is_wasm()):
