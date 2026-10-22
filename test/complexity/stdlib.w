@@ -3,6 +3,11 @@ use std.collections.sorted_list.SortedList
 use std.collections.binary_heap.BinaryHeap
 use std.collections.trie.Trie
 use std.collections.hash_index.HashIndex
+use std.collections.priority_queue.PriorityQueue
+use std.collections.ordered_set.OrderedSet
+use std.collections.ordered_map.OrderedMap
+use std.collections.deque.Deque
+use std.algorithms
 use std.time
 use std.process
 use std.builtins
@@ -144,6 +149,63 @@ fn binary_heap_work(n: i32):
         assert(top <= previous)
         previous = top
     assert(heap.is_empty())
+    n
+
+// Phase 3 facades over the STC engines (docs/proposals/stdlib_sourcing_plan.md):
+// the contracts their rows pin are O(log n) push/pop, O(log n) ordered
+// insert/lookup/remove, O(1) deque ends, O(n log n) sort.
+fn priority_queue_work(n: i32):
+    var queue = PriorityQueue[i32].new()
+    for i in 0..n: queue.push(if i % 2 == 0: i else: n - i)
+    var previous = n
+    for i in 0..n:
+        let top = queue.pop().unwrap()
+        assert(top <= previous)
+        previous = top
+    assert(queue.is_empty())
+    n
+
+fn ordered_set_work(n: i32, descending: bool):
+    var set = OrderedSet[i32].new()
+    for i in 0..n: assert(set.insert(if descending: n - 1 - i else: i))
+    for i in 0..n: assert(set.contains(&i))
+    for i in 0..n:
+        if i % 2 == 0: assert(set.remove(&i).unwrap() == i)
+    assert(set.len() == n / 2)
+    n
+
+fn ordered_set_ascending(n: i32): ordered_set_work(n, false)
+fn ordered_set_descending(n: i32): ordered_set_work(n, true)
+
+fn ordered_map_work(n: i32):
+    var map = OrderedMap[i32, i32].new()
+    for i in 0..n: assert(map.insert(n - i, i).is_none())
+    for i in 0..n: assert(*map.get(&(n - i)).unwrap() == i)
+    for i in 0..n:
+        if i % 2 == 0: assert(map.remove(&(n - i)).unwrap() == i)
+    assert(map.len() == n / 2)
+    n
+
+fn deque_work(n: i32):
+    var d = Deque[i32].new()
+    for i in 0..n:
+        if i % 2 == 0: d.push_back(i) else: d.push_front(i)
+    for i in 0..n: assert(*d.get(i as isize) >= 0)
+    for i in 0..(n / 2):
+        assert(d.pop_front().is_some())
+        assert(d.pop_back().is_some())
+    assert(d.is_empty())
+    n
+
+fn sort_work(n: i32):
+    var xs: List[i64] = []
+    for i in 0..n: xs.push(((i as i64) * 7919) % (n as i64))
+    xs.sort()
+    for i in 1..n: assert(xs[i - 1] <= xs[i])
+    var tags: List[(i32, i32)] = []
+    for i in 0..n: tags.push((n - i, i))
+    tags.sort_by((a, b) => if a.0 < b.0: -1 else if a.0 > b.0: 1 else: 0)
+    for i in 1..n: assert(tags[i - 1].0 <= tags[i].0)
     n
 
 fn trie_work(n: i32):
@@ -315,7 +377,7 @@ else:
     measure("slotmap", slotmap_work, 2000, 0)
     measure("hashmap", hashmap_work, 4000, 0)
     measure("hashset", hashset_work, 4000, 0)
-    measure("vec-into-iter", consuming_work, 4000, 938)
+    measure("vec-into-iter", consuming_work, 4000, 0)
     measure("btree-map-ascending", btree_map_ascending, 1000, 937)
     measure("btree-map-descending", btree_map_descending, 128, 937)
     measure("btree-set-ascending", btree_set_ascending, 1000, 937)
@@ -326,4 +388,10 @@ else:
     measure("stdin-lines", stdin_lines_work, 10000, 0)
     measure("stdin-read-all", read_all_work, 100000, 0)
     measure("hash-index", hash_index_work, 4000, 0)
+    measure("priority-queue", priority_queue_work, 4000, 0)
+    measure("ordered-set-ascending", ordered_set_ascending, 4000, 0)
+    measure("ordered-set-descending", ordered_set_descending, 4000, 0)
+    measure("ordered-map", ordered_map_work, 4000, 0)
+    measure("deque", deque_work, 4000, 0)
+    measure("sort", sort_work, 4000, 0)
     measure("quadratic-control", quadratic_work, 2000, -1)

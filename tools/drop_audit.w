@@ -673,6 +673,51 @@ fn sc_trie(kind: &str):
         source = source ++ "    var cursor = trie.iter_prefix(\"k\")\n    assert(cursor.next().unwrap().id == 1)\n"
     source
 
+// Phase 3 facade cells over the STC engines (std.collections.stc_slot): the
+// facade owns every slot; pops and removes transfer, a replaced value
+// transfers out, the container drops the rest exactly once.
+fn sc_priority_queue(kind: &str):
+    var source = sc_facade_prelude("priority_queue.PriorityQueue") ++ "fn go(slot: *mut i32):\n    var queue = PriorityQueue[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: queue.push(mk(i, slot))\n    assert(queue.peek().unwrap().id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let top = queue.pop().unwrap()\n        assert(top.id == 8 - i)\n    assert(queue.len() == 4)\n"
+    source
+
+fn sc_ordered_set(kind: &str):
+    var source = sc_facade_prelude("ordered_set.OrderedSet") ++ "fn go(slot: *mut i32):\n    var set = OrderedSet[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(set.insert(mk(9 - i, slot)))\n    assert(set.first().unwrap().id == 1 and set.last().unwrap().id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let probe = mk(i, slot)\n        let removed = set.remove(&probe).unwrap()\n        assert(removed.id == i)\n    assert(set.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    assert(not set.insert(mk(3, slot)))\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = set.iter()\n    assert(cursor.next().unwrap().id == 1)\n    assert(cursor.next().unwrap().id == 2)\n"
+    source
+
+fn sc_ordered_map(kind: &str):
+    var source = "use std.collections.ordered_map.OrderedMap\nfn go(slot: *mut i32):\n    var map = OrderedMap[i32, R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: assert(map.insert(9 - i, mk(9 - i, slot)).is_none())\n    assert(map.len() == 8 and map.get(&3).unwrap().id == 3)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let removed = map.remove(&i).unwrap()\n        assert(removed.id == i)\n    assert(map.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    let old = map.insert(3, mk(3, slot)).unwrap()\n    assert(old.id == 3)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = map.iter()\n    var seen = 0\n    while let Some((k, v)) = cursor.next():\n        assert(v.id == *k)\n        seen = seen + 1\n    assert(seen == 8)\n"
+    source
+
+fn sc_deque(kind: &str):
+    var source = "use std.collections.deque.Deque\nfn go(slot: *mut i32):\n    var d = Deque[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9:\n        if i % 2 == 0: d.push_back(mk(i, slot)) else: d.push_front(mk(i, slot))\n    assert(d.len() == 8 and d.get(0).id == 7)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let front = d.pop_front().unwrap()\n        drop(front)\n    assert(d.len() == 4)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = d.iter()\n    assert(cursor.next().unwrap().id == 7)\n    assert(cursor.next().unwrap().id == 5)\n"
+    source
+
 // HashIndex[i32, R] over the TommyDS hashdyn engine (Phase 2): the facade
 // owns every node; a replaced value transfers out, removals transfer, the
 // index drops the rest exactly once.
@@ -707,6 +752,24 @@ fn build_cells():
     cells.push(cell("trie_partial/facade", sc_trie("partial"), 36))
     cells.push(cell("trie_replace/facade", sc_trie("replace"), 39))
     cells.push(cell("trie_cursor/facade", sc_trie("cursor"), 36))
+    cells.push(cell("priority_queue_empty/facade", sc_priority_queue("empty"), 0))
+    cells.push(cell("priority_queue_full/facade", sc_priority_queue("full"), 36))
+    cells.push(cell("priority_queue_partial/facade", sc_priority_queue("partial"), 36))
+    cells.push(cell("ordered_set_empty/facade", sc_ordered_set("empty"), 0))
+    cells.push(cell("ordered_set_full/facade", sc_ordered_set("full"), 36))
+    // The four probes drop too: 36 + (1 + 2 + 3 + 4).
+    cells.push(cell("ordered_set_partial/facade", sc_ordered_set("partial"), 46))
+    cells.push(cell("ordered_set_replace/facade", sc_ordered_set("replace"), 39))
+    cells.push(cell("ordered_set_cursor/facade", sc_ordered_set("cursor"), 36))
+    cells.push(cell("ordered_map_empty/facade", sc_ordered_map("empty"), 0))
+    cells.push(cell("ordered_map_full/facade", sc_ordered_map("full"), 36))
+    cells.push(cell("ordered_map_partial/facade", sc_ordered_map("partial"), 36))
+    cells.push(cell("ordered_map_replace/facade", sc_ordered_map("replace"), 39))
+    cells.push(cell("ordered_map_cursor/facade", sc_ordered_map("cursor"), 36))
+    cells.push(cell("deque_empty/facade", sc_deque("empty"), 0))
+    cells.push(cell("deque_full/facade", sc_deque("full"), 36))
+    cells.push(cell("deque_partial/facade", sc_deque("partial"), 36))
+    cells.push(cell("deque_cursor/facade", sc_deque("cursor"), 36))
     cells.push(cell("slotmap_empty/slotmap", sc_slotmap("empty"), 0))
     cells.push(cell("slotmap_full/slotmap", sc_slotmap("full"), 8256))
     cells.push(cell("slotmap_partial/slotmap", sc_slotmap("partial"), 8256))

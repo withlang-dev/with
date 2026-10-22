@@ -526,12 +526,20 @@ pub trait IntoIter[T]:
 impl[T] IntoIter[T] for List[T]:
     move fn into_iter() -> ListIntoIter[T]: ListIntoIter { list: self }
 
+/// The one-field view of an element through which the head moves out
+/// (`move` takes a field path; a bare `*p` is not one).
+type ListHead[T] { value: T }
+
 impl[T] Iter[T] for ListIntoIter[T]:
-    // remove(0) is D27's proven element transfer; the memmove-per-next
-    // cost stands until a front-cursor variant earns its unsafe.
+    // #938: the head moves out through its own address and the buffer's
+    // start advances (D115, O(1)); the vacated element is never dropped by
+    // the list, which no longer owns it.
     mut fn next() -> Option[T]:
         if self.list.len() == 0: return None
-        self.list.remove(0)
+        var head = (&raw mut self.list[0]) as *mut ListHead[T]
+        let value: T = unsafe { move head.value }
+        with_vec_take_front_es((&raw mut self.list) as *mut u8, sizeof[T]())
+        Some(value)
 
 // ── Map traversal (D44) ───────────────────────────────────────────
 // The observing traversals of a keyed map: concrete ephemeral structs over a

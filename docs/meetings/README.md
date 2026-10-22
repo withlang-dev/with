@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D148 — A templated engine serves an arbitrary `T` through the slot shape; the shape set is one C unit in the corpus's build inputs (delegated)](2026-10-22-D148-templated-engines-serve-arbitrary-T-through-the-slot-shape.md)
 - [D147 — A migrated record with bitfields keeps C's layout: storage units under `@[repr(C)]`, accessors per member, stores that truncate as C does, one layout for every target or a loud refusal (#2553)](2026-10-22-D147-bitfield-records-in-with-migrate.md)
 - [D146 — The engine corpora live under `std.engines`; facades are named for their function, engines for their provenance, and neither maps onto the other (delegated)](2026-10-22-D146-engine-corpora-live-under-std-engines.md)
 - [D145 — A range has `iter()` and its bounds are `start` and `end`; `Range[T]` is spellable in a generic signature (delegated)](2026-10-22-D145-a-range-has-iter-and-its-bounds-are-start-and-end.md)
