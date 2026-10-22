@@ -317,7 +317,7 @@ fn parse(input: str) -> Result[JsonValue, JsonError]:
 // The tree is observed, never consumed (§3.8): every accessor takes
 // `&JsonValue` and the lookups return views (Option[&JsonValue], D27).
 
-fn json_to_string(val: &JsonValue) -> str:
+fn json_to_string(val: &JsonValue):
     match val:
         .Null       => "null"
         .Bool(b)    => f"{b}"
