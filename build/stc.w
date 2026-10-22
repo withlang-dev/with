@@ -142,6 +142,7 @@ fn stc_facade_shapes_source() -> str:
     "    int (*cmp)(const void*, const void*);\n" ++
     "    const void* ptr;\n" ++
     "    const void* with_cmp;\n" ++
+    "    const void* with_env;\n" ++
     "} stc_slotref;\n" ++
     "\n" ++
     "#define T stc_slotrefs, stc_slotref\n" ++

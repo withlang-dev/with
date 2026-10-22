@@ -2,4 +2,4 @@
 # produced these modules (a hash of the migrator's sources) and a hash of
 # the modules; the integrity check compares the second.
 migrated_by b4f08cd7bbd65f38e35daf4b3cbb2df9e07cbef6772461c2033b8de183b26e3e
-modules 64c504ee0d670a74d8ba3f0732ad17eb5459a3694978bfe36366538a906b0f61
+modules 42149e58d666518efb9abca70b1433894d9a3913e99263e1dd64b0ec9df8c5d7

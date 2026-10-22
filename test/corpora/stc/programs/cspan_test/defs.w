@@ -687,7 +687,7 @@ impl Copy for stc_word_deque_iter
 pub type stc_word_deque_raw = c_ulonglong
 
 @[repr(C)]
-pub type stc_slotref { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub ptr: *const c_void = null, pub with_cmp: *const c_void = null }
+pub type stc_slotref { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub ptr: *const c_void = null, pub with_cmp: *const c_void = null, pub with_env: *const c_void = null }
 impl Copy for stc_slotref
 
 pub type stc_slotrefs = stc_slotref
