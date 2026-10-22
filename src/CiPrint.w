@@ -432,6 +432,8 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
             let op = exprs.get_d0(rhs)
             if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
                 rhs_str = ci_strip_one_outer_paren(rhs_str)
+        if ci_bitfield_accessor_call(exprs, lhs):
+            return indent ++ ci_print_bitfield_setter(exprs, types, lhs, rhs_str) ++ "\n"
         return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 1) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_BREAK:
@@ -584,6 +586,29 @@ fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
 fn ci_print_unsafe_stmt(indent: &str, call: &str) -> str:
     indent ++ call ++ "\n"
 
+// D147: a designated-init pair of a bitfield member is a setter pair,
+// its name index encoded negative; the record is built from the plain
+// pairs and the setters run on it after.
+fn ci_init_pair_setter_encode(name_idx: i32) -> i32: -name_idx - 1
+
+fn ci_init_pair_is_setter(raw: i32) -> bool: raw < 0
+
+fn ci_init_pair_name(exprs: CiExprPool, raw: i32) -> str: exprs.get_string(if raw < 0: -raw - 1 else: raw)
+
+// A bitfield member read is a getter call whose callee is a field marked
+// d2 == 3 (CiExprPool.bitfield_getter_call); an assignment to one is the
+// setter, `base.set_member(value)`, which masks the value to the width.
+fn ci_bitfield_accessor_call(exprs: CiExprPool, id: CiExprId) -> bool:
+    if exprs.kind(id) != CiExprKind.CIE_CALL: return false
+    let callee = (exprs.get_d0(id)) as CiExprId
+    exprs.kind(callee) == CiExprKind.CIE_FIELD and exprs.get_d2(callee) == 3
+
+fn ci_print_bitfield_setter(exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs_str: &str) -> str:
+    let callee = (exprs.get_d0(lhs)) as CiExprId
+    let member = exprs.get_string(exprs.get_d1(callee))
+    let getter = ci_print_expr(exprs, types, callee, 0, 0)
+    getter.slice(0, getter.len() - member.len()) ++ "set_" ++ member ++ "(" ++ rhs_str ++ ")"
+
 fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> str:
     let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
     let ty_text = ci_print_sizeof_type_text(ci_print_type(types, ty))
@@ -601,13 +626,16 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
         let count = exprs.get_d1(rhs)
         var i = 0
         while i < count:
-            let field_name = exprs.get_string(exprs.get_extra(start + i * 2))
+            let pair_raw = exprs.get_extra(start + i * 2)
+            let field_name = ci_init_pair_name(exprs, pair_raw)
             let val_id = (exprs.get_extra(start + i * 2 + 1)) as CiExprId
             if exprs.kind(val_id) == CiExprKind.CIE_DESIGNATED_INIT and exprs.get_d1(val_id) == 1:
                 let inner_start = exprs.get_d0(val_id)
                 let inner_name = exprs.get_string(exprs.get_extra(inner_start))
                 let inner_val = (exprs.get_extra(inner_start + 1)) as CiExprId
                 out = out ++ indent ++ lhs_str ++ "." ++ field_name ++ "." ++ inner_name ++ " = " ++ ci_print_expr(exprs, types, inner_val, 0, 0) ++ "\n"
+            else if ci_init_pair_is_setter(pair_raw):
+                out = out ++ indent ++ lhs_str ++ ".set_" ++ field_name ++ "(" ++ ci_print_expr(exprs, types, val_id, 0, 0) ++ ")\n"
             else:
                 out = out ++ indent ++ lhs_str ++ "." ++ field_name ++ " = " ++ ci_print_expr(exprs, types, val_id, 0, 0) ++ "\n"
             i = i + 1
@@ -729,6 +757,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if (base_ty as i32) != 0 and types.kind(base_ty) == CiTypeKind.CT_POINTER:
             let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 0)
             return ci_wrap_unsafe("*" ++ base_text) ++ "." ++ field
+        if exprs.get_d2(id) == 3:
+            // D147: a bitfield accessor on the record place (the setter is a
+            // `mut fn`: a borrowed read-only view of the place cannot take it).
+            return ci_print_wrapped_operand(exprs, types, base, 0, 1) ++ "." ++ field
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
             let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 1)
             return ci_wrap_unsafe(f"*(&raw const {base_text} as *const {ci_print_type(types, base_ty)})") ++ "." ++ field
@@ -915,9 +947,15 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         let count = exprs.get_d1(id)
         let ty_id = exprs.get_type(id)
         var fields = ""
+        var setters = ""
         var i: i32 = 0
         while i < count:
-            if i > 0:
+            let pair_raw = exprs.get_extra(start + i * 2)
+            if ci_init_pair_is_setter(pair_raw):
+                setters = setters ++ "; __ci_bits.set_" ++ ci_init_pair_name(exprs, pair_raw) ++ "(" ++ ci_print_expr(exprs, types, (exprs.get_extra(start + i * 2 + 1)) as CiExprId, 0, 0) ++ ")"
+                i = i + 1
+                continue
+            if fields.len() > 0:
                 fields = fields ++ ", "
             let name_idx = exprs.get_extra(start + i * 2)
             let value_id = (exprs.get_extra(start + i * 2 + 1)) as CiExprId
@@ -927,6 +965,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
         if ty_text.len() > 0 and ty_text != "i32" and not ci_starts_with_str(ty_text, "__UNSUPPORTED"):
             // D101 (#2214): a whole-record zero (C's `{0}`) is `T.zeroed()`;
             // the lowering refused any record that is not zero-valid.
+            // D147: the bitfield members' setters run on the built record.
+            if setters.len() > 0:
+                let built = if fields.len() > 0: ty_text ++ " { " ++ fields ++ " }" else: ty_text ++ ".zeroed()"
+                return "with 0 as __ci_bits_seq_" ++ i32_to_string(id as i32) ++ " { var __ci_bits: " ++ ty_text ++ " = " ++ built ++ setters ++ "; __ci_bits }"
             if count == 0:
                 return ty_text ++ ".zeroed()"
             return ty_text ++ " { " ++ fields ++ " }"
@@ -1204,6 +1246,8 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
             let op = exprs.get_d0(rhs)
             if op == CiBinOp.CIBO_ADD or op == CiBinOp.CIBO_SUB or op == CiBinOp.CIBO_MUL or op == CiBinOp.CIBO_DIV or op == CiBinOp.CIBO_MOD or op == CiBinOp.CIBO_BIT_AND or op == CiBinOp.CIBO_BIT_OR or op == CiBinOp.CIBO_BIT_XOR or op == CiBinOp.CIBO_SHL or op == CiBinOp.CIBO_SHR:
                 rhs_str = ci_strip_one_outer_paren(rhs_str)
+        if ci_bitfield_accessor_call(exprs, lhs):
+            return indent ++ ci_print_bitfield_setter(exprs, types, lhs, rhs_str) ++ "\n"
         return indent ++ "(" ++ ci_print_expr(exprs, types, lhs, 0, 1) ++ " = " ++ rhs_str ++ ")\n"
 
     if kind == CiStmtKind.CIS_LABEL:

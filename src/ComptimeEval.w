@@ -7806,6 +7806,37 @@ impl ComptimeEvaluator:
             if recv_type == 0:
                 return self.fail(type_node, "TypeInfo." ++ method_name ++ " type argument could not be resolved")
             return self.eval_static_type_method_call(recv_type, typeinfo_field, self.ast.get_data1(node), arg_count, node)
+        // D147: a layout fact in a comptime body — `sizeof[T]()`, `alignof[T]()`,
+        // `offsetof[T](field)` — is Sema's own (TypeLayout), read here so a
+        // migrated record asserts its layout where the file is built.
+        let layout_callee = self.ast.kind(callee)
+        if layout_callee == NodeKind.NK_TYPE_GENERIC or layout_callee == NodeKind.NK_INDEX:
+            let layout_name = self.sema.generic_builtin_callee_name(callee)
+            if layout_name == "sizeof" or layout_name == "alignof" or layout_name == "align_of" or layout_name == "offsetof":
+                let type_node = if layout_callee == NodeKind.NK_TYPE_GENERIC: self.ast.get_extra(self.ast.get_data1(callee)) else: self.ast.get_data1(callee)
+                var tid = self.sema.resolve_type_level_arg_expr_frozen(type_node)
+                if tid == 0: tid = self.sema.resolve_type_level_arg_expr(type_node)
+                if tid == 0:
+                    return self.fail(type_node, layout_name ++ " type argument could not be resolved at comptime")
+                var fact: i64 = 0
+                if layout_name == "sizeof":
+                    fact = self.sema.type_layout_size_of(tid)
+                else if layout_name == "offsetof":
+                    // The field is a name in T's declaration (D109); a body
+                    // evaluated before its check resolves it here the same way.
+                    var field_index = self.sema.offsetof_field_indices.get(node) ?? -1
+                    if field_index < 0 and arg_count == 1:
+                        let field_node = self.ast.get_extra(self.ast.get_data1(node))
+                        if self.ast.kind(field_node) == NodeKind.NK_IDENT:
+                            let field_sym = self.ast.get_data0(field_node)
+                            for fi in 0..self.sema.type_reflection_field_count(tid):
+                                if self.sema.type_reflection_field_name(tid, fi) == field_sym: field_index = fi
+                    if field_index < 0:
+                        return self.fail(node, "offsetof's field is not a field of " ++ self.sema.type_name(tid))
+                    fact = self.sema.type_layout_struct_field_offset(tid, field_index)
+                else:
+                    fact = self.sema.type_layout_align_of(tid)
+                return comptime_control_value(comptime_value_int(self.sema.ty_i64 as i32, fact))
         if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
             let recv_node = self.ast.get_data0(callee)
             let field = self.ast.get_data1(callee)

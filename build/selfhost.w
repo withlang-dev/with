@@ -4662,7 +4662,62 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     let store_w = bs_join(case_dir, "recstore.w")
     rc = bs_write_fixture(ctx, store_src, "typedef struct { int a, b; } P;\nstatic P mk(int n) { P p = {n, n + 1}; return p; }\nstatic void set(P* out, int n) { *out = mk(n); }\nstatic void lit(P* out) { *out = (P){3, 4}; }\nint main(void) { P q = {0, 0}; set(&q, 7); int ok = q.b == 8; lit(&q); return (ok && q.a == 3) ? 0 : 1; }\n", "record stores from values through a pointer")
     if rc != 0: return rc
-    bs_migrate_check_run(ctx, compiler_path, case_dir, "recstore", &store_src, &store_w)
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "recstore", &store_src, &store_w)
+    if rc != 0: return rc
+    // D147: a record with bitfields keeps C's layout: storage units under
+    // `@[repr(C)]`, a getter and a setter per named member (an enum's getter
+    // returns its integer alias, a signed member sign-extends), stores that
+    // truncate to the width (`dist++` at 1023 is 0), unnamed and zero-width
+    // members as padding only, a comptime assertion of the size and every
+    // unit's offset; a layout Itanium and MSVC disagree on, a volatile member
+    // and a unit that is not a whole aligned integer are refused loudly.
+    let bits_src = bs_join(case_dir, "bitfields.c")
+    let bits_w = bs_join(case_dir, "bitfields.w")
+    rc = bs_write_fixture(ctx, bits_src, "#include <stdint.h>\n#include <string.h>\ntypedef struct { uint32_t hashx:8, dist:10, rest:14; } meta;\ntypedef struct { int32_t count:24; int32_t err:7; int32_t flag:1; } grp;\nenum color { RED, GREEN, BLUE };\ntypedef struct { unsigned short tag:3, :2, next:5; } odd;\ntypedef struct { enum color c:3; unsigned int n:5; } ec;\ntypedef struct { uint8_t a:3, b:5; uint8_t c:4, :0; uint8_t d:2; } two;\nstatic int bump(meta* m) { m->dist++; return m->dist; }\nint main(void) {\n    meta m = {.hashx = 1, .dist = 1023};\n    int ok = m.hashx == 1 && m.dist == 1023 && sizeof(meta) == 4;\n    ok = ok && bump(&m) == 0;\n    m.hashx = 300;\n    ok = ok && m.hashx == 44;\n    m.rest += 5;\n    ok = ok && m.rest == 5;\n    meta n = m;\n    n.dist = 7;\n    ok = ok && m.dist == 0 && n.dist == 7 && n.hashx == 44;\n    grp g;\n    memset(&g, 0, sizeof g);\n    g.count = -5; g.err = 3; g.flag = 1;\n    g.count--;\n    ok = ok && g.count == -6 && g.err == 3 && g.flag == -1 && sizeof(grp) == 4;\n    odd o = {.tag = 5, .next = 17};\n    ok = ok && o.tag == 5 && o.next == 17 && sizeof(odd) == 2;\n    ec e = {.c = BLUE, .n = 31};\n    ok = ok && e.c == BLUE && e.n == 31;\n    two t = {.a = 7, .b = 9, .c = 15, .d = 3};\n    ok = ok && t.a == 7 && t.b == 9 && t.c == 15 && t.d == 3 && sizeof(two) == 3;\n    return ok ? 0 : 1;\n}\n", "bitfield records")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "bitfields", &bits_src, &bits_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "pub type meta { pub __bits_0: u32 = 0 }", "a bitfield record's storage unit")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "pub mut fn set_dist(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((1023 as u32) << 8)) | (((v as u32) & 1023) << 8)", "a setter masks to the width")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "pub fn count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int", "a signed member sign-extends")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "pub fn c() -> color:", "an enum member's getter returns the integer alias")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "offsetof[two](__bits_2) != 2: comptime_error(", "the layout assertion")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, bits_w, "var __local_m: meta = with 0 as __ci_bits_seq_", "a designated init runs the setters")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, bits_w, "= opaque", "no bitfield record is demoted")
+    if rc != 0: return rc
+    let msvc_src = bs_join(case_dir, "bitfields_msvc.c")
+    rc = bs_write_fixture(ctx, msvc_src, "typedef struct { int a:3; char b:2; } mixed;\nint main(void) { mixed m = {1, 1}; return m.a - 1; }\n", "a unit Itanium and MSVC lay out differently")
+    if rc != 0: return rc
+    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-msvc", &msvc_src, "untranslatable record 'mixed': mixed: bitfield 'b' shares a storage unit with a member of another declared size; Itanium packs across and MSVC starts a new unit")
+    if rc != 0: return rc
+    let volatile_src = bs_join(case_dir, "bitfields_volatile.c")
+    rc = bs_write_fixture(ctx, volatile_src, "typedef struct { volatile unsigned int ready:1; unsigned int n:7; } reg;\nint main(void) { reg r = {1, 2}; return r.n - 2; }\n", "a volatile bitfield")
+    if rc != 0: return rc
+    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-volatile", &volatile_src, "untranslatable record 'reg': reg: bitfield 'ready' is volatile")
+    if rc != 0: return rc
+    let packed_src = bs_join(case_dir, "bitfields_packed.c")
+    rc = bs_write_fixture(ctx, packed_src, "typedef struct __attribute__((packed)) { char tag; unsigned int a:12; unsigned int b:20; } pk;\nint main(void) { pk p = {1, 2, 3}; return p.b - 3; }\n", "a packed bitfield unit")
+    if rc != 0: return rc
+    bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-packed", &packed_src, "untranslatable record 'pk': pk: bitfield 'b' straddles its 4-byte unit")
+
+// Migrate `src` expecting the migrator to refuse it with `needle` on stderr.
+fn bs_migrate_expect_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, needle: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, bs_join(case_dir, label ++ ".w")))
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    if result.rc == 0: return bs_fail(ctx, label ++ ": the migration was expected to refuse the record")
+    bs_assert_contains(ctx, result.stderr, needle, label)
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:

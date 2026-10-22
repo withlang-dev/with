@@ -1330,6 +1330,9 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
             output_parts.push(ci_migrate_translate_function(session, i, translated_structs, input_path, project_active, project))
         else if kind == CK_STRUCT or kind == CK_UNION:
             let struct_result = ci_translate_struct(session, i, kind == CK_UNION, translated_structs, demoted_types, count)
+            // D147: a bitfield record whose layout cannot be kept is refused loudly.
+            let refused = ci_take_refused_records()
+            if refused.len() > 0: output_parts.push(ci_migrate_fail_function(refused.slice(0, refused.len() - 1)))
             let struct_result_len = struct_result.len()
             output_parts.push(struct_result)
             if struct_result_len > 0:
@@ -2907,3 +2910,4 @@ fn ci_cursor_kind_name(kind: i32) -> str:
     if kind == 230: return "NullStmt"
     if kind == 231: return "DeclStmt"
     f"kind={kind}"
+

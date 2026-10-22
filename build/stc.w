@@ -39,23 +39,18 @@ fn stc_tests_package_dir(): "lib/" ++ STC_TESTS_PACKAGE.replace(".", "/")
 // The With half of ctest.h (its assertions), beside the generated modules.
 const STC_HARNESS_DIR = "test/corpora/stc_harness"
 
-// The library units: every `src/` unit but cregex (setjmp) and stc_core, the
-// coroutine runtime, whose records carry bitfields (`struct cco_group {
-// int32_t spawn_count:24; ..}`), which import opaque (§16.9) until bitfield
-// records land (the brief at the bitfields issue); hmap waits on the same.
+// The library units: every `src/` unit but cregex (setjmp).
 fn stc_lib_units() -> List[str]:
-    ["cspan", "cstr_core", "cstr_io", "cstr_misc", "cstr_utf8", "csview", "fmt", "random", "utf8_misc"]
+    ["cspan", "cstr_core", "cstr_io", "cstr_misc", "cstr_utf8", "csview", "fmt", "random", "stc_core", "utf8_misc"]
 
 // The test units: every `tests/*_test.c` but cregex_test (cregex) and
 // main.c (CTEST_MAIN: the section walk and setjmp, replaced by the harness).
 fn stc_test_units() -> List[str]:
     ["algorithm_test", "cspan_test", "deque_test", "hmap_test", "list_test", "smap_test", "utf8_test", "vec_test"]
 
-// The test programs the lane compiles and runs. hmap_test waits on bitfield
-// records (`struct hmap_meta { uint16_t hashx:6, dist:10; }` imports
-// opaque, §16.9): it migrates, and joins this list with that rule.
+// The test programs the lane compiles and runs.
 fn stc_test_programs() -> List[str]:
-    ["algorithm_test", "cspan_test", "deque_test", "list_test", "smap_test", "utf8_test", "vec_test"]
+    ["algorithm_test", "cspan_test", "deque_test", "hmap_test", "list_test", "smap_test", "utf8_test", "vec_test"]
 
 pub fn stc_corpus() -> Corpus:
     Corpus {
