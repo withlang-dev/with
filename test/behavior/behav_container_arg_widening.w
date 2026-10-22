@@ -102,7 +102,7 @@ async fn main:
     print(f"atomic {a0} {a.load(.SeqCst)}")
 
     let pair = chan[i64](8)
-    let (tx, rx) = pair
+    let (tx, rx) = move pair
     let p = produce(move tx)
     let q = consume(move rx)
     q.await
