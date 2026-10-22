@@ -4545,7 +4545,7 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "loop", &loop_src, &loop_w)
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, loop_w, "@[repr(C)]\ntype main_it_anon {", "body-local record hoisted with C layout")
+    rc = bs_file_contains(ctx, loop_w, "@[repr(C)]\npub type main_it_anon {", "body-local record hoisted with C layout")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, loop_w, "= main_it_anon.zeroed()", "self-referencing initializer declared first")
     if rc != 0: return rc
@@ -4555,7 +4555,7 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "tag", &tag_src, &tag_w)
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, tag_w, "@[repr(C)]\ntype roman {", "tagged body-local record hoisted")
+    rc = bs_file_contains(ctx, tag_w, "@[repr(C)]\npub type roman {", "tagged body-local record hoisted")
     if rc != 0: return rc
     // The `;` inside the record body are not the for header's: the loop
     // keeps its condition (it ran forever before).
@@ -4570,6 +4570,45 @@ fn bs_check_migrate_local_and_member_records(ctx: &ActionCtx, compiler_path: &st
     rc = bs_write_fixture(ctx, enum_src, "int main(void) {\n    enum {TSIZE = 4, CUBE = 64, N = CUBE*CUBE*CUBE};\n    int total = 0;\n    for (int i = 0; i < TSIZE; ++i) total += i;\n    return total - 6 + (N - 262144);\n}\n", "enum declared in a body")
     if rc != 0: return rc
     bs_migrate_check_run(ctx, compiler_path, case_dir, "localenum", &enum_src, &enum_w)
+
+// Expression forms STC's tests use, each a general rule: a `T*` beside a
+// `const T*` compares as one pointer type; `b |= x` on a _Bool computes in
+// int and converts back; a designator spelled in a macro body (`.Tag`)
+// resolves by the value's type; `&((T*)0)->a.b` is the symbolic offsetof
+// (c_container_of); a comma expression in an initializer element is
+// computed before the initializer.
+fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let ptr_src = bs_join(case_dir, "ptreq.c")
+    let ptr_w = bs_join(case_dir, "ptreq.w")
+    var rc = bs_write_fixture(ctx, ptr_src, "typedef struct { int n; } T;\nstatic int same(T* a, const T* b) { return a == b; }\nint main(void) { T t = {1}; return same(&t, &t) - 1; }\n", "pointer constness in a comparison")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "ptreq", &ptr_src, &ptr_w)
+    if rc != 0: return rc
+    let bool_src = bs_join(case_dir, "boolor.c")
+    let bool_w = bs_join(case_dir, "boolor.w")
+    rc = bs_write_fixture(ctx, bool_src, "#include <stdbool.h>\ntypedef struct { bool done; int n; } S;\nint main(void) { S s = {false, 2}; s.done |= (s.n > 1); s.n += s.done; return s.n - 3; }\n", "bitwise or on a _Bool")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "boolor", &bool_src, &bool_w)
+    if rc != 0: return rc
+    let variant_src = bs_join(case_dir, "variant.c")
+    let variant_w = bs_join(case_dir, "variant.w")
+    rc = bs_write_fixture(ctx, variant_src, "typedef union U U;\nenum U_tag { TagA = 1, TagB };\nunion U { int tag_id; enum U_tag tag; struct { enum U_tag id; int item; } TagA; };\n#define c_variant(Tag, ...) ((U){.Tag = {.id = Tag, .item = __VA_ARGS__}})\nint main(void) { U u = c_variant(TagA, 42); return u.TagA.item - 42; }\n", "designator in a macro body")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "variant", &variant_src, &variant_w)
+    if rc != 0: return rc
+    let off_src = bs_join(case_dir, "containerof.c")
+    let off_w = bs_join(case_dir, "containerof.w")
+    rc = bs_write_fixture(ctx, off_src, "#include <stddef.h>\ntypedef struct { int a; struct { int id; long item; } inner; } Rec;\nint main(void) { Rec r = {1, {2, 3}}; long* p = &r.inner.item; char* base = (char*)p - (size_t)&((Rec*)0)->inner.item; return ((Rec*)base)->a - 1; }\n", "null-based member address as offsetof")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "containerof", &off_src, &off_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, off_w, "offsetof[Rec](inner) + offsetof[Rec_inner](item)", "containerof as offsetof")
+    if rc != 0: return rc
+    let comma_src = bs_join(case_dir, "commainit.c")
+    let comma_w = bs_join(case_dir, "commainit.w")
+    rc = bs_write_fixture(ctx, comma_src, "typedef struct { const int* data; long n; } S;\nint main(void) { int a[4] = {1,2,3,4}; long i = 1;\n  S s = {.data = (a + ((void)sizeof(int[(4 == 4) ? 1 : -1]), i)), .n = 2};\n  return (int)(s.data[0]) - 2; }\n", "comma expression in an initializer element")
+    if rc != 0: return rc
+    bs_migrate_check_run(ctx, compiler_path, case_dir, "commainit", &comma_src, &comma_w)
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
@@ -5559,6 +5598,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
     if rc != 0: return rc
     rc = bs_check_migrate_local_and_member_records(ctx, compiler_path, bs_join(output_dir, "local_and_member_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_stc_expression_forms(ctx, compiler_path, bs_join(output_dir, "stc_expression_forms"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
     if rc != 0: return rc

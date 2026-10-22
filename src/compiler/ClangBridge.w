@@ -4727,6 +4727,71 @@ fn with_ci_cursor_references_parameter(session: i64, cursor_idx: i32) -> bool:
         let referenced = clang_getCursorReferenced(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
         clang_Cursor_isNull(referenced) == 0 and clang_getCursorKind(referenced) == CXCursor_ParmDecl
 
+/// 1 when the reference at `cursor_idx` names the declaration at `decl_idx`
+/// (cursor identity: a location would conflate every declaration a macro
+/// expansion makes).
+fn with_ci_cursor_references_decl(session: i64, cursor_idx: i32, decl_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count or decl_idx < 0 or decl_idx >= (*s).cursor_count: return 0
+        let referenced = clang_getCursorReferenced(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
+        if clang_Cursor_isNull(referenced) != 0: return 0
+        if clang_equalCursors(referenced, *(((*s).cursors as i64 + decl_idx as i64 * 32) as *const CXCursor)) != 0: 1 else: 0
+
+/// The designator spelled at the cursor's spelling START — `.name` (with
+/// the identifier that follows the dot) or `[` — or "" when none. Read at
+/// the spelling location because a designator inside a macro body has no
+/// extent text of its own (the extent is the invocation).
+fn with_ci_cursor_spelling_designator(session: i64, cursor_idx: i32) -> str:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return ""
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let range = clang_getCursorExtent(cursor)
+        var file: *mut u8 = 0 as *mut u8
+        var start_off: u32 = 0
+        source_location_spelling_offset(clang_getRangeStart(range), &raw mut file, &raw mut start_off)
+        if file as i64 == 0: return ""
+        var buf_size: u64 = 0
+        let contents = clang_getFileContents((*s).tu, file, &raw mut buf_size)
+        if contents as i64 == 0 or start_off as u64 >= buf_size: return ""
+        let base = contents as i64 + start_off as i64
+        let first = *(base as *const u8)
+        if first == 91: return "["
+        if first != 46: return ""
+        let maxn = (buf_size - start_off as u64) as i64
+        var n: i64 = 1
+        while n < maxn:
+            let c = *((base + n) as *const u8)
+            let is_ident = (c >= 65 and c <= 90) or (c >= 97 and c <= 122) or (c >= 48 and c <= 57) or c == 95
+            if not is_ident:
+                break
+            n = n + 1
+        if n == 1: return ""
+        let text = with_alloc(n + 1)
+        with_memcpy(text, base as *const u8, n)
+        *((text as i64 + n) as *mut u8) = 0
+        let result = session_make_str(s, text as *const u8)
+        with_free(text)
+        result
+
+/// The definition the declaration at `cursor_idx` has (a record's body
+/// after its forward declaration), stored; -1 when it has none.
+fn with_ci_cursor_definition(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+        let def = clang_getCursorDefinition(*(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor))
+        if clang_Cursor_isNull(def) != 0: return -1
+        store_cursor(s, def)
+
+/// 1 when the two stored cursors are one declaration (clang_equalCursors).
+fn with_ci_cursors_equal(session: i64, a: i32, b: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or a < 0 or b < 0 or a >= (*s).cursor_count or b >= (*s).cursor_count: return 0
+        if clang_equalCursors(*(((*s).cursors as i64 + a as i64 * 32) as *const CXCursor), *(((*s).cursors as i64 + b as i64 * 32) as *const CXCursor)) != 0: 1 else: 0
+
 fn with_ci_cursor_referenced_location(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession

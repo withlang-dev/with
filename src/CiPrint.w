@@ -578,10 +578,11 @@ var g_ci_print_in_unsafe_fn: bool = false
 fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
     g_ci_print_in_unsafe_fn = enabled
 
+// D30 R4c: with_memcpy is the runtime's own safe definition wherever a
+// migration declares it, so the copy needs no `unsafe` of its own in a
+// plain fn either; a block holding only that call is vacuous and refused.
 fn ci_print_unsafe_stmt(indent: &str, call: &str) -> str:
-    if g_ci_print_in_unsafe_fn:
-        return indent ++ call ++ "\n"
-    indent ++ "unsafe { " ++ call ++ " }\n"
+    indent ++ call ++ "\n"
 
 fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool, lhs: CiExprId, rhs: CiExprId, ty: CiTypeId) -> str:
     let lhs_str = ci_print_expr(exprs, types, lhs, 0, 1)
