@@ -1,7 +1,7 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
-use std.calg_testing.framework
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
+use std.engines.c_algorithms_testing.framework
 use std.libc
 use std.option
 use std.collections
@@ -353,7 +353,7 @@ fn test_calloc() {
 }
 
 fn test_strdup() {
-    var __local_str_: *mut c_char
+    var __local_str: *mut c_char
 
     if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_strdup".ptr, c"test-alloc-testing.c".ptr, (186 as c_int), c"alloc_test_get_allocated() == 0".ptr)
@@ -361,15 +361,15 @@ fn test_strdup() {
         0
     }
 
-    (__local_str_ = ((unsafe { alloc_test_strdup(c"hello world".ptr) } as *mut c_char)))
+    (__local_str = ((unsafe { alloc_test_strdup(c"hello world".ptr) } as *mut c_char)))
 
-    if (((if not ((if __local_str_ != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if __local_str != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_strdup".ptr, c"test-alloc-testing.c".ptr, (191 as c_int), c"str != NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if strcmp((__local_str_ as *const i8), c"hello world".ptr) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if strcmp((__local_str as *const i8), c"hello world".ptr) == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_strdup".ptr, c"test-alloc-testing.c".ptr, (192 as c_int), c"strcmp(str, \"hello world\") == 0".ptr)
     } else {
         0
@@ -381,7 +381,7 @@ fn test_strdup() {
         0
     }
 
-    unsafe { alloc_test_free((__local_str_ as *mut c_void)) }
+    unsafe { alloc_test_free((__local_str as *mut c_void)) }
 
     if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_strdup".ptr, c"test-alloc-testing.c".ptr, (198 as c_int), c"alloc_test_get_allocated() == 0".ptr)
@@ -391,9 +391,9 @@ fn test_strdup() {
 
     alloc_test_set_limit((1 as c_int))
 
-    (__local_str_ = ((unsafe { alloc_test_strdup(c"hello world".ptr) } as *mut c_char)))
+    (__local_str = ((unsafe { alloc_test_strdup(c"hello world".ptr) } as *mut c_char)))
 
-    if (((if not ((if __local_str_ != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
+    if (((if not ((if __local_str != null: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"test_strdup".ptr, c"test-alloc-testing.c".ptr, (204 as c_int), c"str != NULL".ptr)
     } else {
         0
@@ -417,7 +417,7 @@ fn test_strdup() {
         0
     }
 
-    unsafe { alloc_test_free((__local_str_ as *mut c_void)) }
+    unsafe { alloc_test_free((__local_str as *mut c_void)) }
 
 }
 

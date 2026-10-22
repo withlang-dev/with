@@ -1,5 +1,5 @@
 // Migrated from C
-use std.stc_testing.defs
+use std.engines.stc_testing.defs
 use std.libc
 use std.collections
 
@@ -78,8 +78,8 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str_: *const i8) -> c_ulong {
-    var __local_msg: *const u8 = ((__param_str_ as *const u8))
+unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+    var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
 
@@ -136,11 +136,11 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str_: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
-    var __local_str_ = __param_str_
+unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+    var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str_ as *mut c_char) as *mut i8))
+        return (((__local_str as *mut c_char) as *mut i8))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
@@ -152,16 +152,16 @@ unsafe fn c_strnstrn(__param_str_: *const i8, __param_slen: c_long, __param_need
     loop {
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if (*__local_str_) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str_ as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str_ as *mut c_char) as *mut i8))
+            return (((__local_str as *mut c_char) as *mut i8))
         }
 
 
-        (__local_str_ = __local_str_ + 1)
+        (__local_str = __local_str + 1)
 
         var __ci_expr_old_0: c_long = __local_slen
 

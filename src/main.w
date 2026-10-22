@@ -3011,7 +3011,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 break
         // Survey keeps going past a failure, never through one: a target whose
         // dependency failed or was itself skipped does not run (zlib-promote
-        // once overwrote lib/std/zl after zlib-test failed), and counts as a
+        // once overwrote lib/std/engines/zlib after zlib-test failed), and counts as a
         // failure of the run.
         if survey:
             let broken_dep = build_graph_first_broken_dep(target, &survey_failed)

@@ -7,7 +7,7 @@ use std.fs
 // Survey (the default) keeps going past a failed target, never through it:
 // a target whose dependency failed does not run, directly or through a
 // Group, and an unrelated target still does. zlib-promote once ran after
-// zlib-test failed and overwrote lib/std/zl with a corpus that did not
+// zlib-test failed and overwrote lib/std/engines/zlib with a corpus that did not
 // compile.
 fn main:
     let case_dir = p7_prepare_case("survey_skips_dependents", "p7survey")

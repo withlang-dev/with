@@ -204,7 +204,7 @@ fn bench_zlib(root: &str, compiler: &str, before_dir: &str, after_dir: &str, run
     c_args.push(reference ++ "/test/minigzip.c")
     let c_bin = work ++ "/c_bin"
     cc(work, &c_args, c_bin)
-    let (before, after) = build_with_pair(compiler, work, "std/zl", before_dir, after_dir, "minigzip.w", &List.new())
+    let (before, after) = build_with_pair(compiler, work, "std/engines/zlib", before_dir, after_dir, "minigzip.w", &List.new())
     let input = work ++ "/input.txt"
     if write_file(input, zlib_text()) != 0: fail("cannot write " ++ input)
     var compress = Row { corpus: "zlib", workload: "minigzip compress 32 MiB", c: 0.0, before: 0.0, after: 0.0 }
@@ -255,7 +255,7 @@ fn bench_pcre2(root: &str, compiler: &str, before_dir: &str, after_dir: &str, ru
     objects.push(test_object)
     let c_bin = work ++ "/c_bin"
     cc(work, &objects, c_bin)
-    let (before, after) = build_with_pair(compiler, work, "std/re", before_dir, after_dir, "pcre2test.w", &List.new())
+    let (before, after) = build_with_pair(compiler, work, "std/engines/pcre2", before_dir, after_dir, "pcre2test.w", &List.new())
     for input in ["testinput1", "testinput4"]:
         var row = Row { corpus: "pcre2", workload: "pcre2test " ++ input, c: 0.0, before: 0.0, after: 0.0 }
         let data = reference ++ "/testdata/" ++ input
@@ -280,7 +280,7 @@ fn bench_tommyds(root: &str, compiler: &str, before_dir: &str, after_dir: &str, 
     // it defines each symbol twice.
     let c_bin = work ++ "/c_bin"
     cc(work, &["-I" ++ reference, reference ++ "/check.c", reference ++ "/tommyds/tommy.c"], c_bin)
-    let (before, after) = build_with_pair(compiler, work, "std/tommyds", before_dir, after_dir, "check_.w", &["-O1"])
+    let (before, after) = build_with_pair(compiler, work, "std/engines/tommyds", before_dir, after_dir, "check_.w", &["-O1"])
     var row = Row { corpus: "tommyds", workload: "check", c: 0.0, before: 0.0, after: 0.0 }
     for (label, bin) in [("c", c_bin), ("before", before), ("after", after)]:
         if bin.len() == 0: continue
@@ -354,7 +354,7 @@ if corpora.len() == 0: corpora = ["zlib", "pcre2", "tommyds", "c_algorithms"]
 ensure_dir(root ++ "/out/corpus_bench")
 var rows: List[Row] = List.new()
 for name in corpora:
-    let promoted = if name == "zlib": "lib/std/zl" else if name == "pcre2": "lib/std/re" else: "lib/std/" ++ name
+    let promoted = "lib/std/engines/" ++ name
     let before_dir = root ++ "/" ++ arg_value(&argv, "--before", promoted)
     // c-algorithms' fresh test programs are migrated whole, each under
     // out/c_algorithms_tests_migrated/tests/<name> (build/c_algorithms.w).

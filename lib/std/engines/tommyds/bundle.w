@@ -1,17 +1,17 @@
-// lib/std/tommyds/bundle.w — the tommyds .wo bundle root (docs/spec/toolchain/wo_bundles.md).
+// lib/std/engines/tommyds/bundle.w — the tommyds .wo bundle root (docs/spec/toolchain/wo_bundles.md).
 // Written by build/corpora.w (tommyds-migrate) from the migrated module list:
 // one `use` per corpus module; the harness (check_) is excluded.
-use std.tommyds.defs
-use std.tommyds.tommyalloc
-use std.tommyds.tommyarray
-use std.tommyds.tommyarrayblk
-use std.tommyds.tommyarrayblkof
-use std.tommyds.tommyarrayof
-use std.tommyds.tommyhash
-use std.tommyds.tommyhashdyn
-use std.tommyds.tommyhashlin
-use std.tommyds.tommyhashtbl
-use std.tommyds.tommylist
-use std.tommyds.tommytree
-use std.tommyds.tommytrie
-use std.tommyds.tommytrieinp
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyalloc
+use std.engines.tommyds.tommyarray
+use std.engines.tommyds.tommyarrayblk
+use std.engines.tommyds.tommyarrayblkof
+use std.engines.tommyds.tommyarrayof
+use std.engines.tommyds.tommyhash
+use std.engines.tommyds.tommyhashdyn
+use std.engines.tommyds.tommyhashlin
+use std.engines.tommyds.tommyhashtbl
+use std.engines.tommyds.tommylist
+use std.engines.tommyds.tommytree
+use std.engines.tommyds.tommytrie
+use std.engines.tommyds.tommytrieinp

@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.option
 
 pub fn binary_heap_new(__param_heap_type: i32, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _BinaryHeap {

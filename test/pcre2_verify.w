@@ -1,7 +1,7 @@
 // pcre2_verify — ground-truth integration harness for migrated PCRE2.
 //
 // Takes pattern and subject from argv, compiles with the migrated
-// PCRE2 library in lib/std/re, matches once, and prints output in
+// PCRE2 library in lib/std/engines/pcre2, matches once, and prints output in
 // the same line format as upstream pcre2test:
 //   " N: <matched text>"     — capture group N
 //   "No match"               — subject doesn't match pattern
@@ -10,37 +10,37 @@
 // This lets scripts/verify_pcre2_works.sh diff our output against
 // `pcre2test` byte-for-byte across a corpus of patterns.
 
-use std.re.defs
-use std.re.pcre2_tables
-use std.re.pcre2_ucd
-use std.re.pcre2_chartables
-use std.re.pcre2_string_utils
-use std.re.pcre2_newline
-use std.re.pcre2_valid_utf
-use std.re.pcre2_ord2utf
-use std.re.pcre2_extuni
-use std.re.pcre2_find_bracket
-use std.re.pcre2_context
-use std.re.pcre2_error
-use std.re.pcre2_auto_possess
-use std.re.pcre2_study
-use std.re.pcre2_xclass
-use std.re.pcre2_chkdint
-use std.re.pcre2_compile_class
-use std.re.pcre2_compile_cgroup
-use std.re.pcre2_compile
-use std.re.pcre2_config
-use std.re.pcre2_match_data
-use std.re.pcre2_match_next
-use std.re.pcre2_match
-use std.re.pcre2_dfa_match
-use std.re.pcre2_substitute
-use std.re.pcre2_substring
-use std.re.pcre2_pattern_info
-use std.re.pcre2_serialize
-use std.re.pcre2_convert
-use std.re.pcre2_script_run
-use std.re.pcre2_maketables
+use std.engines.pcre2.defs
+use std.engines.pcre2.pcre2_tables
+use std.engines.pcre2.pcre2_ucd
+use std.engines.pcre2.pcre2_chartables
+use std.engines.pcre2.pcre2_string_utils
+use std.engines.pcre2.pcre2_newline
+use std.engines.pcre2.pcre2_valid_utf
+use std.engines.pcre2.pcre2_ord2utf
+use std.engines.pcre2.pcre2_extuni
+use std.engines.pcre2.pcre2_find_bracket
+use std.engines.pcre2.pcre2_context
+use std.engines.pcre2.pcre2_error
+use std.engines.pcre2.pcre2_auto_possess
+use std.engines.pcre2.pcre2_study
+use std.engines.pcre2.pcre2_xclass
+use std.engines.pcre2.pcre2_chkdint
+use std.engines.pcre2.pcre2_compile_class
+use std.engines.pcre2.pcre2_compile_cgroup
+use std.engines.pcre2.pcre2_compile
+use std.engines.pcre2.pcre2_config
+use std.engines.pcre2.pcre2_match_data
+use std.engines.pcre2.pcre2_match_next
+use std.engines.pcre2.pcre2_match
+use std.engines.pcre2.pcre2_dfa_match
+use std.engines.pcre2.pcre2_substitute
+use std.engines.pcre2.pcre2_substring
+use std.engines.pcre2.pcre2_pattern_info
+use std.engines.pcre2.pcre2_serialize
+use std.engines.pcre2.pcre2_convert
+use std.engines.pcre2.pcre2_script_run
+use std.engines.pcre2.pcre2_maketables
 
 extern fn with_arg_count() -> i32
 extern fn with_arg_at(idx: isize) -> str

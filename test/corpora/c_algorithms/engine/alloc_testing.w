@@ -1,5 +1,5 @@
 // Migrated from C
-use std.calg_testing.defs
+use std.engines.c_algorithms_testing.defs
 use std.libc
 
 pub fn alloc_test_malloc(__param_bytes: c_ulong) -> *mut c_void writes allocation_limit {

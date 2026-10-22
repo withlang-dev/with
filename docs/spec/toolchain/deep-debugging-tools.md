@@ -231,7 +231,7 @@ sites, three rebuilds, and the failure was not in the text). The order:
 2. **What the migrator changed, as MIR.** The migration differential:
 
    ```sh
-   with run tools/migrate_diff.w lib/std/re out/pcre2_migrated pcre2test.w re
+   with run tools/migrate_diff.w lib/std/engines/pcre2 out/pcre2_migrated pcre2test.w engines/pcre2
    ```
 
    lays each side out as `lib/std/<subdir>/` under `out/tmp/migrate-diff/`,
@@ -239,7 +239,7 @@ sites, three rebuilds, and the failure was not in the text). The order:
    (the corpus on its source: the embedded interface would answer every
    `use std.<subdir>.X` and the dump would hold no corpus body; the prelude
    off, as the bundle builds, or its std.regex reaches the checkout's
-   lib/std/re beside this tree), splits the dump per function and
+   lib/std/engines/pcre2 beside this tree), splits the dump per function and
    compares the statements with every id normalized (`symN`, `_N`, `bbN`,
    `tyN`, `.fN` are positions, not meaning). It names each function whose
    lowering differs and prints the statements present on one side only;
@@ -686,14 +686,14 @@ typed the node is a missing demand source, not a missing type.
 ```
 explain:visible is_alnum
   from module test/behavior/behav_1362_std_helper_resolves_unimported.w (package <program>)
-  value declared in lib/std/re/defs.w (package <std>, pub=1, engine=1, prelude-closure=0, corpus-private=0)
+  value declared in lib/std/engines/pcre2/defs.w (package <std>, pub=1, engine=1, prelude-closure=0, corpus-private=0)
     gate: … not an enumerated prelude name; engine=1 prelude-closure=0 corpus-private=0
       no-prelude walk: skip <embedded-std>/std/prelude.w (the synthetic prelude edge)
       refused: an engine or prelude-closure module needs an explicit import path
     verdict: 0
   displaced value (#1350) declared in <embedded-std>/std/string.w (… prelude-closure=1 …)
     verdict: 0
-    bridge: 1 non-engine std module(s) declare it; engine twin lib/std/re/defs.w
+    bridge: 1 non-engine std module(s) declare it; engine twin lib/std/engines/pcre2/defs.w
   fallback bridge: resolves the bare name to <embedded-std>/std/string.w
 ```
 

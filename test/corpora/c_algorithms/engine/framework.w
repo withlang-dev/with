@@ -1,6 +1,6 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
 use std.libc
 use std.option
 

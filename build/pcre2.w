@@ -165,7 +165,7 @@ fn pcre2_module_name(path: &str) -> str:
     base
 
 fn pcre2_insert_after_defs_import(text: &str, insertion: &str) -> str:
-    let marker = "use std.re.defs\n"
+    let marker = "use std.engines.pcre2.defs\n"
     var out = ""
     var inserted = false
     var line_start = 0
@@ -180,7 +180,7 @@ fn pcre2_insert_after_defs_import(text: &str, insertion: &str) -> str:
     if line_start < text.len():
         let line = text.slice(line_start as i64, text.len())
         out = out ++ line
-        if not inserted and line == "use std.re.defs":
+        if not inserted and line == "use std.engines.pcre2.defs":
             out = out ++ "\n" ++ insertion
             inserted = true
     if inserted:
@@ -232,21 +232,21 @@ fn pcre2_compile_binary(ctx: &ActionCtx, workspace_name: &str, source_path: &str
 fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> i32:
     let compile_path = pcre2_join(generated_dir, "pcre2_compile.w")
     let compile_imports =
-        "use std.re.pcre2_auto_possess\n" ++
-        "use std.re.pcre2_chkdint\n" ++
-        "use std.re.pcre2_compile_cgroup\n" ++
-        "use std.re.pcre2_compile_class\n" ++
-        "use std.re.pcre2_find_bracket\n" ++
-        "use std.re.pcre2_newline\n" ++
-        "use std.re.pcre2_ord2utf\n" ++
-        "use std.re.pcre2_string_utils\n" ++
-        "use std.re.pcre2_study\n" ++
-        "use std.re.pcre2_valid_utf\n"
-    if pcre2_add_imports(ctx, compile_path, "use std.re.pcre2_auto_possess", compile_imports) != 0:
+        "use std.engines.pcre2.pcre2_auto_possess\n" ++
+        "use std.engines.pcre2.pcre2_chkdint\n" ++
+        "use std.engines.pcre2.pcre2_compile_cgroup\n" ++
+        "use std.engines.pcre2.pcre2_compile_class\n" ++
+        "use std.engines.pcre2.pcre2_find_bracket\n" ++
+        "use std.engines.pcre2.pcre2_newline\n" ++
+        "use std.engines.pcre2.pcre2_ord2utf\n" ++
+        "use std.engines.pcre2.pcre2_string_utils\n" ++
+        "use std.engines.pcre2.pcre2_study\n" ++
+        "use std.engines.pcre2.pcre2_valid_utf\n"
+    if pcre2_add_imports(ctx, compile_path, "use std.engines.pcre2.pcre2_auto_possess", compile_imports) != 0:
         return pcre2_fail(ctx, "could not update imports in " ++ compile_path)
 
     let auto_path = pcre2_join(generated_dir, "pcre2_auto_possess.w")
-    if pcre2_add_imports(ctx, auto_path, "use std.re.pcre2_xclass", "use std.re.pcre2_xclass\n") != 0:
+    if pcre2_add_imports(ctx, auto_path, "use std.engines.pcre2.pcre2_xclass", "use std.engines.pcre2.pcre2_xclass\n") != 0:
         return pcre2_fail(ctx, "could not update imports in " ++ auto_path)
 
     let pcre2test_path = pcre2_join(generated_dir, "pcre2test.w")
@@ -254,14 +254,14 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
     if not fs.exists(pcre2test_path):
         return 0
     let pcre2test_text = fs.read_text(pcre2test_path)
-    if pcre2test_text.contains("use std.re.pcre2_context"):
+    if pcre2test_text.contains("use std.engines.pcre2.pcre2_context"):
         return 0
     let modules = fs.list_files(generated_dir)
     var imports = ""
     for mi in 0..modules.len():
         let mod_name = pcre2_module_name(modules[mi])
         if mod_name != "defs" and mod_name != "pcre2test" and mod_name != "bundle":
-            imports = imports ++ "use std.re." ++ mod_name ++ "\n"
+            imports = imports ++ "use std.engines.pcre2." ++ mod_name ++ "\n"
     let updated = pcre2_insert_after_defs_import(pcre2test_text, imports)
     if updated != pcre2test_text:
         if fs.write_text(pcre2test_path, updated) != 0:
@@ -276,20 +276,20 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
     if pcre2_ensure_generated_dependencies(ctx, generated_dir) != 0:
         return -1
     // Cohesive check: compile pcre2test.w (whose imports pull in every module)
-    // from a lib/std/re layout, so `use std.re.X` resolves to the migrated siblings
+    // from a lib/std/engines/pcre2 layout, so `use std.engines.pcre2.X` resolves to the migrated siblings
     // and the whole library is type-checked and MIR-validated together — matching
     // how std.regex is actually built. The old per-module check compiled each module
-    // in isolation with its `use std.re.*` imports stripped, so every cross-module
+    // in isolation with its `use std.engines.pcre2.*` imports stripped, so every cross-module
     // reference was undefined: it manufactured hundreds of false errors and never
     // validated a real migration (it was added after the last promote).
-    // The release compiler runs it with `--bundle-corpus std/re --no-prelude`, as
+    // The release compiler runs it with `--bundle-corpus std/engines/pcre2 --no-prelude`, as
     // corpus_check_every_module and the bundle build do: without it the
-    // compiler's embedded std.re interface answers every `use std.re.X`
+    // compiler's embedded std.engines.pcre2 interface answers every `use std.engines.pcre2.X`
     // and the migrated siblings are never read, so a migration that changed
     // a signature could not pass (D107's first re-promote found it; the
     // Workspace API has no corpus option, so this is a subprocess). The
     // corpus is migrated C and compiles without the prelude, as its bundle
-    // does: with the prelude on, std.regex reaches the checkout's lib/std/re
+    // does: with the prelude on, std.regex reaches the checkout's lib/std/engines/pcre2
     // while the harness reaches the tree under check, and one std module
     // loaded from two files is refused (Zcu add_imported_path).
     let check_root = pcre2_join(pcre2_scratch_dir(ctx), "cohesive-check-" ++ ctx.target_name())
@@ -309,7 +309,7 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
     argv.push("check")
     argv.push(pcre2_abs(root, pcre2test))
     argv.push("--bundle-corpus")
-    argv.push("std/re")
+    argv.push("std/engines/pcre2")
     argv.push("--no-prelude")
     let stdout = pcre2_abs(root, pcre2_join(check_root, "check.stdout"))
     let stderr = pcre2_abs(root, pcre2_join(check_root, "check.stderr"))
@@ -485,15 +485,15 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
     if not fs.exists(pcre2test_src):
         return pcre2_fail(ctx, "missing pcre2test source after copy: " ++ pcre2test_src)
     // The harness over the MIGRATED corpus, compiled in-unit by the release
-    // compiler (`--bundle-corpus std/re`, as the cohesive check above):
-    // through the Workspace API the embedded std.re bundle would stand in
+    // compiler (`--bundle-corpus std/engines/pcre2`, as the cohesive check above):
+    // through the Workspace API the embedded std.engines.pcre2 bundle would stand in
     // for the sources just copied.
     var build_argv: List[str] = List.new()
     build_argv.push(pcre2_abs(root, compiler))
     build_argv.push("build")
     build_argv.push(pcre2_abs(root, pcre2test_src))
     build_argv.push("--bundle-corpus")
-    build_argv.push("std/re")
+    build_argv.push("std/engines/pcre2")
     build_argv.push("--no-prelude")
     build_argv.push("-o")
     build_argv.push(pcre2_abs(root, pcre2test_bin))
@@ -581,8 +581,8 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
 
 pub fn pcre2_corpus() -> Corpus:
     Corpus {
-        name: "pcre2", stem: "pcre2", package: "std.re",
-        corpus_rel: "std/re", corpus_dir: "lib/std/re",
+        name: "pcre2", stem: "pcre2", package: "std.engines.pcre2",
+        corpus_rel: "std/engines/pcre2", corpus_dir: "lib/std/engines/pcre2",
         upstream: upstream_release("pcre2", PCRE2_RELEASE, "https://github.com/PCRE2Project/pcre2/releases/download/" ++ PCRE2_RELEASE ++ "/" ++ PCRE2_RELEASE ++ ".tar.gz", PCRE2_SHA256),
         license: "",
         // pcre2test and pcre2posix are the harness, never the bundle
@@ -631,7 +631,7 @@ fn pcre2_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
 
     var test_smoke = target_new(.Action, "pcre2-test-smoke", "").output("out/test-graph/pcre2-test-smoke")
     test_smoke.action = run_pcre2_test_smoke_action
-    test_smoke = test_smoke.input("lib/std/re/pcre2test.w").input(reference ++ "/RunTest").arg(reference.clone())
+    test_smoke = test_smoke.input("lib/std/engines/pcre2/pcre2test.w").input(reference ++ "/RunTest").arg(reference.clone())
     test_smoke = test_smoke.dep("pcre2-prepare-reference").dep("selfcheck")
     graph = graph.add_target(test_smoke)
 
@@ -649,11 +649,11 @@ fn pcre2_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &s
 
     // The upstream suite against the STORED bundle: pcre2test as the drift
     // lane built it. The root file, never the directory, names the corpus
-    // (lib/std/re is pcre2-promote's output; naming it would pull the whole
+    // (lib/std/engines/pcre2 is pcre2-promote's output; naming it would pull the whole
     // migration pipeline in as a producer, D36).
     let plan = wo_bundle_plan(ctx, corpus.name, corpus.corpus_rel, corpus.corpus_dir ++ "/bundle.w")
     var wo_test = target_new(.Action, "pcre2-wo-test", "").output("out/corpus/pcre2-wo-test")
     wo_test.action = run_pcre2_test_action
-    wo_test = wo_test.input(corpus.corpus_dir ++ "/bundle.w").input(wo_drift_harness_bin(&plan, "lib/std/re/pcre2test.w")).input(reference ++ "/RunTest").arg(reference.clone())
+    wo_test = wo_test.input(corpus.corpus_dir ++ "/bundle.w").input(wo_drift_harness_bin(&plan, "lib/std/engines/pcre2/pcre2test.w")).input(reference ++ "/RunTest").arg(reference.clone())
     wo_test = wo_test.dep(wo_drift_target_name(&plan)).dep("pcre2-prepare-reference")
     graph.add_target(wo_test)

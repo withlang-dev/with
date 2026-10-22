@@ -1,6 +1,6 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
 use std.option
 
 pub fn rb_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _RBTree writes allocation_limit {

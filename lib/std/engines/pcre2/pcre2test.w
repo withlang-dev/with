@@ -1,21 +1,21 @@
 // Migrated from C
-use std.re.defs
-use std.re.pcre2_config
-use std.re.pcre2_context
-use std.re.pcre2_convert
-use std.re.pcre2_compile
-use std.re.pcre2_pattern_info
-use std.re.pcre2_match_data
-use std.re.pcre2_dfa_match
-use std.re.pcre2_match
-use std.re.pcre2_match_next
-use std.re.pcre2_substring
-use std.re.pcre2_serialize
-use std.re.pcre2_substitute
-use std.re.pcre2_jit_compile
-use std.re.pcre2_error
-use std.re.pcre2_maketables
-use std.re.pcre2posix
+use std.engines.pcre2.defs
+use std.engines.pcre2.pcre2_config
+use std.engines.pcre2.pcre2_context
+use std.engines.pcre2.pcre2_convert
+use std.engines.pcre2.pcre2_compile
+use std.engines.pcre2.pcre2_pattern_info
+use std.engines.pcre2.pcre2_match_data
+use std.engines.pcre2.pcre2_dfa_match
+use std.engines.pcre2.pcre2_match
+use std.engines.pcre2.pcre2_match_next
+use std.engines.pcre2.pcre2_substring
+use std.engines.pcre2.pcre2_serialize
+use std.engines.pcre2.pcre2_substitute
+use std.engines.pcre2.pcre2_jit_compile
+use std.engines.pcre2.pcre2_error
+use std.engines.pcre2.pcre2_maketables
+use std.engines.pcre2.pcre2posix
 use std.libc
 use std.option
 use std.collections
@@ -4801,14 +4801,14 @@ unsafe fn pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) ->
 
 }
 
-unsafe fn pcre2_strlen_8(__param_str_: *const u8) -> c_ulong {
-    var __local_str_ = __param_str_
+unsafe fn pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
+    var __local_str = __param_str
     var __local_c: c_ulong = ((0 as c_ulong))
 
     while true {
-        var __ci_expr_old_0: *const u8 = __local_str_
+        var __ci_expr_old_0: *const u8 = __local_str
 
-        (__local_str_ = __local_str_ + 1)
+        (__local_str = __local_str + 1)
 
         if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
             break
@@ -8277,7 +8277,7 @@ fn process_pattern_8() -> c_int {
 
     var __local_bsize__goto_2437_12: c_ulong = 0
 
-    var __local_usize___goto_2437_19: c_ulong = 0
+    var __local_usize__goto_2437_19: c_ulong = 0
 
     var __local_strsize__goto_2437_26: c_ulong = 0
 
@@ -9560,8 +9560,8 @@ fn process_pattern_8() -> c_int {
         }
         (__local_bsize__goto_2437_12 = __ci_expr_ternary_16)
         (__local_regbuffer__goto_2436_11 = ((((pbuffer8 as *mut c_char) + (((pbuffer8_size as c_ulong) -% (__local_bsize__goto_2437_12 as c_ulong)) as usize)) as *mut c_char)))
-        (__local_usize___goto_2437_19 = ((unsafe { pcre2_regerror(__local_rc__goto_2015_5, ((&raw mut preg as *mut regex_t) as *const regex_t), __local_regbuffer__goto_2436_11, __local_bsize__goto_2437_12) } as c_ulong)))
-        (__local_strsize__goto_2437_26 = (((((if (if __local_usize___goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0: __local_bsize__goto_2437_12 else: __local_usize___goto_2437_19) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
+        (__local_usize__goto_2437_19 = ((unsafe { pcre2_regerror(__local_rc__goto_2015_5, ((&raw mut preg as *mut regex_t) as *const regex_t), __local_regbuffer__goto_2436_11, __local_bsize__goto_2437_12) } as c_ulong)))
+        (__local_strsize__goto_2437_26 = (((((if (if __local_usize__goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0: __local_bsize__goto_2437_12 else: __local_usize__goto_2437_19) as c_ulong) -% (1 as c_ulong)) as c_ulong)))
         unsafe { colour_begin(35, outfile) }
         fprintf(outfile, c"Failed: POSIX code %d: ".ptr, __local_rc__goto_2015_5)
         unsafe { colour_end(outfile) }
@@ -9607,7 +9607,7 @@ fn process_pattern_8() -> c_int {
 
     '__ci_bb_169 {
         fputs(c"\n".ptr, outfile)
-        if ((if __local_usize___goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0) {
+        if ((if __local_usize__goto_2437_19 > __local_bsize__goto_2437_12: 1 else: 0) != 0) {
             goto '__ci_bb_170
         } else {
             goto '__ci_bb_171
@@ -12297,7 +12297,7 @@ fn process_data_8() -> c_int {
 
     var __local_msg__goto_4396_15: *const c_char = null
 
-    var __local_usize___goto_4453_12: c_ulong = 0
+    var __local_usize__goto_4453_12: c_ulong = 0
 
     var __local_i__goto_4464_12: c_ulong = 0
 
@@ -14418,11 +14418,11 @@ fn process_data_8() -> c_int {
     }
 
     '__ci_bb_239 {
-        (__local_usize___goto_4453_12 = ((unsafe { pcre2_regerror(__local_rc__goto_4392_7, ((&raw mut preg as *mut regex_t) as *const regex_t), ((pbuffer8 as *mut c_char) as *mut i8), pbuffer8_size) } as c_ulong)))
+        (__local_usize__goto_4453_12 = ((unsafe { pcre2_regerror(__local_rc__goto_4392_7, ((&raw mut preg as *mut regex_t) as *const regex_t), ((pbuffer8 as *mut c_char) as *mut i8), pbuffer8_size) } as c_ulong)))
         unsafe { colour_begin(35, outfile) }
         fprintf(outfile, c"No match: POSIX code %d: ".ptr, __local_rc__goto_4392_7)
         unsafe { colour_end(outfile) }
-        unsafe { pchars_8((35 as c_int), (pbuffer8 as *const u8), (((__local_usize___goto_4453_12 as c_ulong) -% (1 as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
+        unsafe { pchars_8((35 as c_int), (pbuffer8 as *const u8), (((__local_usize__goto_4453_12 as c_ulong) -% (1 as c_ulong)) as c_long), __local_utf__goto_3844_6, outfile) }
         fputs(c"\n".ptr, outfile)
         goto '__ci_bb_241
     }

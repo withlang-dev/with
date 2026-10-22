@@ -8,8 +8,8 @@
 
 use std.option
 use std.traits
-use std.c_algorithms.defs
-use std.c_algorithms.sortedarray
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.sortedarray
 use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
 use rt.rt_core

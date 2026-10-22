@@ -1436,7 +1436,7 @@ impl Codegen:
             self.di_builder, self.di_file, "with", is_opt, 5, wl_dwarf_lang_with())
 
     // A source file's DIFile, named by its canonical module path. A
-    // stdlib-tree module reads `<embedded-std>/std/re/bundle.w`, so a .wo
+    // stdlib-tree module reads `<embedded-std>/std/engines/pcre2/bundle.w`, so a .wo
     // bundle object is byte-identical from every checkout — the identity its
     // symbols already carry (D38 C0; #949: the checkout's absolute directory
     // made one key hash to a different object per tree). Any other file keeps

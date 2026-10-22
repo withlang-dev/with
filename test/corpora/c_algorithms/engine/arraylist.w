@@ -1,6 +1,6 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
 use std.option
 
 pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList writes allocation_limit {

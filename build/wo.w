@@ -622,10 +622,10 @@ pub fn run_wo_bundle_build_action(ctx: ActionCtx) -> i32:
     // module file that shares the corpus package's name — lib/std/zlib.w
     // beside lib/std/zlib/ — would be pulled into the bundle and fail under
     // --no-prelude with a screen of "unknown type" errors. The facade must
-    // live under another name (pcre2: std.regex over the std.re corpus).
+    // live under another name (pcre2: std.regex over the std.engines.pcre2 corpus).
     let same_named_module = corpus_dir ++ ".w"
     if fs.exists(same_named_module):
-        return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.re corpus).")
+        return wo_fail(ctx, "corpus " ++ corpus ++ " shares its package name with the module " ++ same_named_module ++ "; the frontend would load that module into the bundle. Name the corpus package apart from its facade (pcre2's facade std.regex sits over the std.engines.pcre2 corpus).")
     let corpus_sha = compiler_tree_sha(fs, corpus_dir)
     let key = compiler_sha256_text(fs, corpus_sha ++ "|" ++ target ++ "|" ++ abi_sha)
     let rt_manifest = fs.read_text(rt_manifest_path)

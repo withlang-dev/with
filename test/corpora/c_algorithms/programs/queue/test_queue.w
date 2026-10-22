@@ -1,8 +1,8 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
-use std.calg_testing.framework
-use std.calg_testing.queue
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
+use std.engines.c_algorithms_testing.framework
+use std.engines.c_algorithms_testing.queue
 use std.libc
 use std.option
 use std.collections

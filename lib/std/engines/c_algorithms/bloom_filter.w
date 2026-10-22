@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.option
 use std.collections
 

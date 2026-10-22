@@ -1,17 +1,17 @@
 // Migrated from C
-use std.zl.defs
-use std.zl.zutil
-use std.zl.deflate
-use std.zl.inflate
-use std.zl.infback
-use std.zl.compress
-use std.zl.uncompr
-use std.zl.gzlib
-use std.zl.gzwrite
-use std.zl.gzread
-use std.zl.gzclose
-use std.zl.adler32
-use std.zl.inftrees
+use std.engines.zlib.defs
+use std.engines.zlib.zutil
+use std.engines.zlib.deflate
+use std.engines.zlib.inflate
+use std.engines.zlib.infback
+use std.engines.zlib.compress
+use std.engines.zlib.uncompr
+use std.engines.zlib.gzlib
+use std.engines.zlib.gzwrite
+use std.engines.zlib.gzread
+use std.engines.zlib.gzclose
+use std.engines.zlib.adler32
+use std.engines.zlib.inftrees
 use std.collections
 
 pub unsafe fn crc32(__param_crc: c_ulong, __param_buf: *const u8, __param_len: c_uint) -> c_ulong {

@@ -1,10 +1,10 @@
 // Migrated from C
-use std.calg_testing.defs
-use std.calg_testing.alloc_testing
-use std.calg_testing.framework
-use std.calg_testing.hash_int
-use std.calg_testing.hash_pointer
-use std.calg_testing.hash_string
+use std.engines.c_algorithms_testing.defs
+use std.engines.c_algorithms_testing.alloc_testing
+use std.engines.c_algorithms_testing.framework
+use std.engines.c_algorithms_testing.hash_int
+use std.engines.c_algorithms_testing.hash_pointer
+use std.engines.c_algorithms_testing.hash_string
 use std.libc
 use std.option
 use std.collections

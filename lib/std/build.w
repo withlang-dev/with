@@ -9,8 +9,8 @@ use std.libc.fopen
 use std.libc.fclose
 use std.libc.fread
 use std.libc.fwrite
-use std.zl.defs
-use std.zl.deflate
+use std.engines.zlib.defs
+use std.engines.zlib.deflate
 use rt.rt_core
 use rt.compat_runtime
 

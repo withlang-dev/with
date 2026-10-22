@@ -34,7 +34,7 @@ const STC_SHA256 = "df2925f76604e774a55a0aba71c4c320dc7d2adf42ac2d65d06552bc6ce8
 // --no-prelude, std.libc reaches c_void through the std tier's view of the
 // defs, and a user package cannot provide that.
 const STC_TESTS_DIR = "test/corpora/stc"
-const STC_TESTS_PACKAGE = "std.stc_testing"
+const STC_TESTS_PACKAGE = "std.engines.stc_testing"
 fn stc_tests_package_dir(): "lib/" ++ STC_TESTS_PACKAGE.replace(".", "/")
 // The With half of ctest.h (its assertions), beside the generated modules.
 const STC_HARNESS_DIR = "test/corpora/stc_harness"
@@ -59,8 +59,8 @@ fn stc_test_programs() -> List[str]:
 
 pub fn stc_corpus() -> Corpus:
     Corpus {
-        name: "stc", stem: "stc", package: "std.stc",
-        corpus_rel: "std/stc", corpus_dir: "lib/std/stc",
+        name: "stc", stem: "stc", package: "std.engines.stc",
+        corpus_rel: "std/engines/stc", corpus_dir: "lib/std/engines/stc",
         upstream: upstream_github("stc", "stclib/STC", STC_REVISION, STC_SHA256),
         license: "LICENSE",
         // upstream's cstr example is the drift harness: a program over the

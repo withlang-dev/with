@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 pub unsafe fn int_hash(__param_vlocation: *mut c_void) -> c_uint {
     var __local_location: *mut c_int

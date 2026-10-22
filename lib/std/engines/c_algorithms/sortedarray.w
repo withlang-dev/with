@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.option
 
 pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: c_uint) -> *mut c_void {

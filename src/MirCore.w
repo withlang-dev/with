@@ -1140,7 +1140,7 @@ enum MirDropState: i32:
 // state per block made every body cost blocks × keys cells and blocks × keys
 // work per sweep: pcre2's `match_` (41,818 blocks, 43,194 keys) needed 1.8 G
 // cells, 7 GB, and never finished — and every stage1 compile reaches it,
-// because a stage1 has no embedded bundles and lowers std.re from source. A
+// because a stage1 has no embedded bundles and lowers std.engines.pcre2 from source. A
 // block touches a handful of keys, so its row shares every other chunk with
 // its input by id, and a join or equality test on two equal chunks is one
 // id comparison.

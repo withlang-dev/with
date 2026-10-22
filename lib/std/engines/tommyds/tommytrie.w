@@ -1,7 +1,7 @@
 // Migrated from C
-use std.tommyds.defs
-use std.tommyds.tommyalloc
-use std.tommyds.tommylist
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyalloc
+use std.engines.tommyds.tommylist
 use std.libc
 use std.collections
 

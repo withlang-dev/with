@@ -17,7 +17,7 @@ runs:
         path: |
           out/sdk-release/with-llvm-sdk-*.tar.gz*
           out/test-graph/sdk-contract-tests
-        key: source-sdk-${{ inputs.host-tag }}-22.1.6-${{ hashFiles('build.w', 'build/*.w', 'lib/std/build.w', 'lib/std/zl/*.w', 'lib/std/crypto/bigint.w', 'seed.lock', '.github/actions/source-sdk/action.yml') }}
+        key: source-sdk-${{ inputs.host-tag }}-22.1.6-${{ hashFiles('build.w', 'build/*.w', 'lib/std/build.w', 'lib/std/engines/zlib/*.w', 'lib/std/crypto/bigint.w', 'seed.lock', '.github/actions/source-sdk/action.yml') }}
 
     # Generation zero. The SDK build bootstraps from the fetched SDK's own
     # clang, clang++, cmake (with its module tree) and ninja, and its package

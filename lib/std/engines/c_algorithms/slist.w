@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.option
 
 pub unsafe fn slist_free(__param_list: *mut _SListEntry) {

@@ -1,16 +1,16 @@
 // Migrated from C
-use std.zl.defs
-use std.zl.zutil
-use std.zl.deflate
-use std.zl.inflate
-use std.zl.infback
-use std.zl.compress
-use std.zl.uncompr
-use std.zl.gzlib
-use std.zl.gzwrite
-use std.zl.gzclose
-use std.zl.adler32
-use std.zl.crc32
+use std.engines.zlib.defs
+use std.engines.zlib.zutil
+use std.engines.zlib.deflate
+use std.engines.zlib.inflate
+use std.engines.zlib.infback
+use std.engines.zlib.compress
+use std.engines.zlib.uncompr
+use std.engines.zlib.gzlib
+use std.engines.zlib.gzwrite
+use std.engines.zlib.gzclose
+use std.engines.zlib.adler32
+use std.engines.zlib.crc32
 use std.libc
 use std.collections
 
@@ -142,7 +142,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     var __local_n: c_uint
 
 
-    var __local_str_: *mut c_char
+    var __local_str: *mut c_char
 
     var __local_eol: *mut u8
 
@@ -205,7 +205,7 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
     }
 
 
-    (__local_str_ = ((__local_buf as *mut c_char)))
+    (__local_str = ((__local_buf as *mut c_char)))
 
     (__local_left = ((((__param_len as c_uint) -% (1 as c_uint)) as c_uint)))
 
@@ -261,13 +261,13 @@ pub unsafe fn gzgets(__param_file: *mut gzFile_s, __param_buf: *mut i8, __param_
         }
     }
 
-    if ((if __local_buf == __local_str_: 1 else: 0) != 0) {
+    if ((if __local_buf == __local_str: 1 else: 0) != 0) {
         return ((null as *mut i8))
     }
 
     ((__local_buf[0]) = ((0 as c_char)))
 
-    return ((__local_str_ as *mut i8))
+    return ((__local_str as *mut i8))
 
 }
 

@@ -1,18 +1,18 @@
 // Migrated from C
-use std.zl.defs
-use std.zl.zutil
-use std.zl.inflate
-use std.zl.infback
-use std.zl.compress
-use std.zl.uncompr
-use std.zl.gzlib
-use std.zl.gzwrite
-use std.zl.gzread
-use std.zl.gzclose
-use std.zl.adler32
-use std.zl.crc32
-use std.zl.inftrees
-use std.zl.trees
+use std.engines.zlib.defs
+use std.engines.zlib.zutil
+use std.engines.zlib.inflate
+use std.engines.zlib.infback
+use std.engines.zlib.compress
+use std.engines.zlib.uncompr
+use std.engines.zlib.gzlib
+use std.engines.zlib.gzwrite
+use std.engines.zlib.gzread
+use std.engines.zlib.gzclose
+use std.engines.zlib.adler32
+use std.engines.zlib.crc32
+use std.engines.zlib.inftrees
+use std.engines.zlib.trees
 use std.option
 use std.collections
 
@@ -1075,7 +1075,7 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
     var __local_dictLength = __param_dictLength
     var __local_s: *mut internal_state
 
-    var __local_str_: c_uint
+    var __local_str: c_uint
 
     var __local_n: c_uint
 
@@ -1176,18 +1176,18 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
     fill_window(__local_s)
 
     while ((if (*__local_s).lookahead >= 3: 1 else: 0) != 0) {
-        (__local_str_ = (*__local_s).strstart)
+        (__local_str = (*__local_s).strstart)
 
         (__local_n = (((((*__local_s).lookahead as c_uint) -% (2 as c_uint)) as c_uint)))
 
         loop {
-            ((*__local_s).ins_h = (((((((((*__local_s).ins_h as c_uint) << ((*__local_s).hash_shift as c_uint)) as c_uint) ^ ((((*__local_s).window[((((__local_str_ as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__local_s).hash_mask as c_uint)) as c_uint)))
+            ((*__local_s).ins_h = (((((((((*__local_s).ins_h as c_uint) << ((*__local_s).hash_shift as c_uint)) as c_uint) ^ ((((*__local_s).window[((((__local_str as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__local_s).hash_mask as c_uint)) as c_uint)))
 
-            (((*__local_s).prev[((__local_str_ as c_uint) & ((*__local_s).w_mask as c_uint))]) = ((((*__local_s).head[(*__local_s).ins_h]) as c_ushort)))
+            (((*__local_s).prev[((__local_str as c_uint) & ((*__local_s).w_mask as c_uint))]) = ((((*__local_s).head[(*__local_s).ins_h]) as c_ushort)))
 
-            (((*__local_s).head[(*__local_s).ins_h]) = ((__local_str_ as c_ushort)))
+            (((*__local_s).head[(*__local_s).ins_h]) = ((__local_str as c_ushort)))
 
-            (__local_str_ = (__local_str_ +% 1))
+            (__local_str = (__local_str +% 1))
 
             (__local_n = (__local_n -% 1))
             if not ((__local_n != 0)) {
@@ -1195,7 +1195,7 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
             }
         }
 
-        ((*__local_s).strstart = __local_str_)
+        ((*__local_s).strstart = __local_str)
 
         ((*__local_s).lookahead = ((2 as c_uint)))
 
@@ -1600,21 +1600,21 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: c
                 (__local_wraplen = ((18 as c_ulong)))
 
                 if ((if (*__local_s).gzhead != 0: 1 else: 0) != 0) {
-                    var __local_str_: *mut u8
+                    var __local_str: *mut u8
 
                     if ((if (*__local_s).gzhead.extra != 0: 1 else: 0) != 0) {
                         (__local_wraplen = (__local_wraplen +% ((2 as c_uint) +% ((*__local_s).gzhead.extra_len as c_uint))))
                     }
 
-                    (__local_str_ = (*__local_s).gzhead.name)
+                    (__local_str = (*__local_s).gzhead.name)
 
-                    if ((if __local_str_ != 0: 1 else: 0) != 0) {
+                    if ((if __local_str != 0: 1 else: 0) != 0) {
                         loop {
                             (__local_wraplen = (__local_wraplen +% 1))
 
-                            var __ci_expr_old_0: *mut u8 = __local_str_
+                            var __ci_expr_old_0: *mut u8 = __local_str
 
-                            (__local_str_ = __local_str_ + 1)
+                            (__local_str = __local_str + 1)
 
                             if not (((*__ci_expr_old_0) != 0)) {
                                 break
@@ -1622,15 +1622,15 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: c
                         }
                     }
 
-                    (__local_str_ = (*__local_s).gzhead.comment)
+                    (__local_str = (*__local_s).gzhead.comment)
 
-                    if ((if __local_str_ != 0: 1 else: 0) != 0) {
+                    if ((if __local_str != 0: 1 else: 0) != 0) {
                         loop {
                             (__local_wraplen = (__local_wraplen +% 1))
 
-                            var __ci_expr_old_1: *mut u8 = __local_str_
+                            var __ci_expr_old_1: *mut u8 = __local_str
 
-                            (__local_str_ = __local_str_ + 1)
+                            (__local_str = __local_str + 1)
 
                             if not (((*__ci_expr_old_1) != 0)) {
                                 break
@@ -3594,20 +3594,20 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
         ((*__param_s).lookahead = ((*__param_s).lookahead +% __local_n))
 
         if ((if (((*__param_s).lookahead as c_uint) +% ((*__param_s).insert as c_uint)) >= 3: 1 else: 0) != 0) {
-            var __local_str_: c_uint = (((((*__param_s).strstart as c_uint) -% ((*__param_s).insert as c_uint)) as c_uint))
+            var __local_str: c_uint = (((((*__param_s).strstart as c_uint) -% ((*__param_s).insert as c_uint)) as c_uint))
 
-            ((*__param_s).ins_h = ((((*__param_s).window[__local_str_]) as c_uint)))
+            ((*__param_s).ins_h = ((((*__param_s).window[__local_str]) as c_uint)))
 
-            ((*__param_s).ins_h = (((((((((*__param_s).ins_h as c_uint) << ((*__param_s).hash_shift as c_uint)) as c_uint) ^ ((((*__param_s).window[((__local_str_ as c_uint) +% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__param_s).hash_mask as c_uint)) as c_uint)))
+            ((*__param_s).ins_h = (((((((((*__param_s).ins_h as c_uint) << ((*__param_s).hash_shift as c_uint)) as c_uint) ^ ((((*__param_s).window[((__local_str as c_uint) +% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__param_s).hash_mask as c_uint)) as c_uint)))
 
             while ((*__param_s).insert != 0) {
-                ((*__param_s).ins_h = (((((((((*__param_s).ins_h as c_uint) << ((*__param_s).hash_shift as c_uint)) as c_uint) ^ ((((*__param_s).window[((((__local_str_ as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__param_s).hash_mask as c_uint)) as c_uint)))
+                ((*__param_s).ins_h = (((((((((*__param_s).ins_h as c_uint) << ((*__param_s).hash_shift as c_uint)) as c_uint) ^ ((((*__param_s).window[((((__local_str as c_uint) +% (3 as c_uint)) as c_uint) -% (1 as c_uint))]) as c_int) as c_uint)) as c_uint) & ((*__param_s).hash_mask as c_uint)) as c_uint)))
 
-                (((*__param_s).prev[((__local_str_ as c_uint) & ((*__param_s).w_mask as c_uint))]) = ((((*__param_s).head[(*__param_s).ins_h]) as c_ushort)))
+                (((*__param_s).prev[((__local_str as c_uint) & ((*__param_s).w_mask as c_uint))]) = ((((*__param_s).head[(*__param_s).ins_h]) as c_ushort)))
 
-                (((*__param_s).head[(*__param_s).ins_h]) = ((__local_str_ as c_ushort)))
+                (((*__param_s).head[(*__param_s).ins_h]) = ((__local_str as c_ushort)))
 
-                (__local_str_ = (__local_str_ +% 1))
+                (__local_str = (__local_str +% 1))
 
                 ((*__param_s).insert = ((*__param_s).insert -% 1))
 

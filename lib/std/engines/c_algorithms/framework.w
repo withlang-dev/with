@@ -1,6 +1,6 @@
 // Migrated from C
-use std.c_algorithms.defs
-use std.c_algorithms.alloc_testing
+use std.engines.c_algorithms.defs
+use std.engines.c_algorithms.alloc_testing
 use std.libc
 use std.option
 

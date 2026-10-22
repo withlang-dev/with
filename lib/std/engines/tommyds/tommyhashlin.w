@@ -1,7 +1,7 @@
 // Migrated from C
-use std.tommyds.defs
-use std.tommyds.tommyhash
-use std.tommyds.tommylist
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyhash
+use std.engines.tommyds.tommylist
 use std.collections
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {

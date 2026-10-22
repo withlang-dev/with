@@ -1,4 +1,4 @@
-// std.tommyds.defs — shared definitions for migrated PCRE2
+// std.engines.tommyds.defs — shared definitions for migrated PCRE2
 use std.option
 use std.collections
 use rt.rt_core

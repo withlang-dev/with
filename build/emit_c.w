@@ -586,7 +586,7 @@ fn emitc_compile_runtime_args(root: &str, argv: List[str]) -> List[str]:
 
 // The compiler emitted to one C unit by `compiler_path` as a subprocess —
 // the binary under test emits, never the build driver's seed (the #761
-// mixed-world class). `--bundle-corpus std/re` compiles the pcre2 corpus
+// mixed-world class). `--bundle-corpus std/engines/pcre2` compiles the pcre2 corpus
 // in-unit from its source: the emit-C lane links no .wo bundle, so the
 // prelude's std.regex reaches the engine as C in the same file
 // (docs/spec/toolchain/wo_bundles.md "Retiring the shim", #955).
@@ -598,7 +598,7 @@ fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) ->
     argv |> push(emitc_abs(root, "out/gen/versioned_main.w"))
     argv |> push("--emit-c")
     argv |> push("--bundle-corpus")
-    argv |> push("std/re")
+    argv |> push("std/engines/pcre2")
     argv |> push("-o")
     argv |> push(emitc_abs(root, main_c))
     emitc_run_capture(ctx, "emit-compiler-c", argv, 900000)

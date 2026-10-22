@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 pub unsafe fn pointer_equal(__param_location1: *mut c_void, __param_location2: *mut c_void) -> c_int {
     return (if __param_location1 == __param_location2: 1 else: 0)

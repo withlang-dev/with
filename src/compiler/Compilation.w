@@ -1202,7 +1202,7 @@ impl Compilation:
 
     // Every compile entry registers the embedded bundle interfaces (and any
     // --link-bundle) before the first import resolves: the prelude's
-    // std.regex reaches std.re.* in every program, so an entry that skipped
+    // std.regex reaches std.engines.pcre2.* in every program, so an entry that skipped
     // this read the corpus source from the checkout (six seconds of Sema per
     // test) and found nothing outside one.
     mut fn compile_entry_source_texts(source_paths: &List[str], source_texts: &List[str]) -> AstPool:

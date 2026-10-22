@@ -238,12 +238,12 @@ impl Zcu:
         0
 
     // A `std` module has ONE source in a compilation. Its identity is the
-    // canonical module path (`<embedded-std>/std/re/defs.w`, the spelling
+    // canonical module path (`<embedded-std>/std/engines/pcre2/defs.w`, the spelling
     // every checkout's lib/std tree maps to); two different files under
     // that identity are two module instances of one source — two sets of
     // globals, two copies of every function — and the program that mixes
     // them panics (pcre2test over a migrated tree, with the prelude's
-    // std.regex reaching the checked-in lib/std/re). Recorded here, emitted
+    // std.regex reaching the checked-in lib/std/engines/pcre2). Recorded here, emitted
     // once the graph is loaded (Frontend check_internal_imports_frontend).
     fn add_imported_path(path: &str) -> Unit:
         let key = resolve_canonical_module_key(path)

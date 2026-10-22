@@ -1169,7 +1169,7 @@ impl CCodegen:
 
     // A declaration's own type node resolves where it is declared: frozen
     // resolution judges visibility from sema.current_module_path, and the
-    // globals of an engine corpus compiled in-unit (std.re's
+    // globals of an engine corpus compiled in-unit (std.engines.pcre2's
     // `extern var _pcre2_utf8_table1: *c_int`) name types user code cannot
     // see (#705, #1362).
     mut fn resolve_decl_type_frozen(decl: NodeId, type_node: i32) -> i32:
@@ -10913,7 +10913,7 @@ impl CCodegen:
         // resolve_type_level_arg_expr_frozen) judges visibility from
         // sema.current_module_path. Point it at the DECLARING module, as
         // Codegen.enter_decl does for the LLVM backend (#705). Left at the
-        // root, std.re.pcre2_study's find_minlength (compiled in-unit under
+        // root, std.engines.pcre2.pcre2_study's find_minlength (compiled in-unit under
         // --emit-c) resolved `sizeof[pcre2_real_code_8]` as if the user had
         // written it, and an engine corpus type is invisible to user code
         // (#1362): the emitter failed before any LLVM-only refusal fired.

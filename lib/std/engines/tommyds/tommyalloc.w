@@ -1,5 +1,5 @@
 // Migrated from C
-use std.tommyds.defs
+use std.engines.tommyds.defs
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
     return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))

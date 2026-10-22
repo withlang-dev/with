@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 pub fn trie_new() -> *mut _Trie {
     var __local_new_trie: *mut _Trie

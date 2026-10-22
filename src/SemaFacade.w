@@ -3870,7 +3870,7 @@ impl Sema:
             // is `Option[CStr]` at each call site in a module that imported
             // it (SemaCheck.w check_call; MirLower.w lower_call turns the
             // pointer into the view) — and its declaration stays what C
-            // declared, so a module with its own `strchr` extern (std.re)
+            // declared, so a module with its own `strchr` extern (std.engines.pcre2)
             // is untouched; the origin goes on the call through the effect
             // record (facade_index_call_effects: the C string parameter or
             // the domain; static needs none).
@@ -4215,7 +4215,7 @@ impl Sema:
     // Whether a call to `fn_sym` from the module being checked is a
     // presented text-view call (spec §16.2b.8): the fn item presents it,
     // the symbol is the c_import's, and this module imported it — a module
-    // with its own same-named extern (std.re's `strchr`) is not presented.
+    // with its own same-named extern (std.engines.pcre2's `strchr`) is not presented.
     fn facade_call_is_presented(fn_sym: i32) -> bool:
         self.facade_presented_syms.contains(fn_sym) and self.ci_syms.contains(fn_sym) and self.current_module_uses_c_import()
 

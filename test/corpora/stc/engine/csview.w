@@ -1,8 +1,8 @@
 // Migrated from C
-use std.stc_testing.defs
-use std.stc_testing.utf8_misc
-use std.stc_testing.cstr_utf8
-use std.stc_testing.ucd
+use std.engines.stc_testing.defs
+use std.engines.stc_testing.utf8_misc
+use std.engines.stc_testing.cstr_utf8
+use std.engines.stc_testing.ucd
 use std.libc
 
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: c_long) -> *mut c_void {
@@ -80,8 +80,8 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str_: *const i8) -> c_ulong {
-    var __local_msg: *const u8 = ((__param_str_ as *const u8))
+unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+    var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
 
@@ -138,11 +138,11 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str_: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
-    var __local_str_ = __param_str_
+unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+    var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str_ as *mut c_char) as *mut i8))
+        return (((__local_str as *mut c_char) as *mut i8))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
@@ -154,16 +154,16 @@ unsafe fn c_strnstrn(__param_str_: *const i8, __param_slen: c_long, __param_need
     loop {
         var __ci_expr_logic_1: c_int = 0
 
-        if ((if (*__local_str_) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str_ as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
+            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str_ as *mut c_char) as *mut i8))
+            return (((__local_str as *mut c_char) as *mut i8))
         }
 
 
-        (__local_str_ = __local_str_ + 1)
+        (__local_str = __local_str + 1)
 
         var __ci_expr_old_0: c_long = __local_slen
 
@@ -459,7 +459,7 @@ pub fn csview_advance(__param_it_: csview_iter, __param_u8pos: c_long) -> csview
         var __ci_expr_logic_0: c_int = 0
 
         if (__local_u8pos != 0) {
-            (__ci_expr_logic_0 = (if (if (unsafe *(&raw const __param_it_ as *const csview_iter)).ref != (unsafe *(&raw const __param_it_.u8_ as *const csview_iter_u8)).end: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (unsafe *(&raw const __param_it_ as *const csview_iter)).ref != (unsafe *(&raw const __param_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
@@ -472,10 +472,10 @@ pub fn csview_advance(__param_it_: csview_iter, __param_u8pos: c_long) -> csview
 
     }
 
-    if ((if (unsafe *(&raw const __param_it_ as *const csview_iter)).ref == (unsafe *(&raw const __param_it_.u8_ as *const csview_iter_u8)).end: 1 else: 0) != 0) {
+    if ((if (unsafe *(&raw const __param_it_ as *const csview_iter)).ref == (unsafe *(&raw const __param_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
         (__param_it_.ref = ((null as *mut c_char)))
     } else {
-        (__param_it_.chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __param_it_ as *const csview_iter)).u8_ as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __param_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __param_it_.u8_ as *const csview_iter_u8)).end as *const i8)) } as c_long)))
+        (__param_it_.chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __param_it_ as *const csview_iter)).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __param_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __param_it_.u8 as *const csview_iter_u8)).end as *const i8)) } as c_long)))
     }
 
     return __param_it_
@@ -553,7 +553,7 @@ pub unsafe fn csview_strtok(__param_sv: csview, __param_delims: *const i8, __par
             var __ci_expr_logic_0: c_int = 0
 
             if ((if cutf8_decode((&raw mut __local_dec as *mut cutf8_decode_t), (((*__local_m) as u8) as c_uint)) == 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if (*(&raw const __local_i.u8_.dec as *const cutf8_decode_t)).codep == (*(&raw const __local_dec as *const cutf8_decode_t)).codep: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_0 = (if (if (*(&raw const __local_i.u8.dec as *const cutf8_decode_t)).codep == (*(&raw const __local_dec as *const cutf8_decode_t)).codep: 1 else: 0) != 0: 1 else: 0))
             }
 
             if (__ci_expr_logic_0 != 0) {
@@ -646,9 +646,9 @@ pub fn csview_u8_tail(__param_sv: csview, __param_u8len: c_long) -> csview {
 
 pub fn csview_u8_at(__param_sv: csview, __param_u8pos: c_long) -> csview_iter {
     var __local_u8pos = __param_u8pos
-    var __local_it_: csview_iter = csview_iter { u8_: csview_iter_u8 { chr: __param_sv, end: ((unsafe *(&raw const __param_sv as *const csview)).buf + (((unsafe *(&raw const __param_sv as *const csview)).size as c_long) as usize)), dec: cutf8_decode_t.zeroed() } }
+    var __local_it_: csview_iter = csview_iter { u8: csview_iter_u8 { chr: __param_sv, end: ((unsafe *(&raw const __param_sv as *const csview)).buf + (((unsafe *(&raw const __param_sv as *const csview)).size as c_long) as usize)), dec: cutf8_decode_t.zeroed() } }
 
-    while ((((if __local_u8pos > 0: 1 else: 0) as c_int) & ((if (unsafe *(&raw const __local_it_ as *const csview_iter)).ref != (unsafe *(&raw const __local_it_.u8_ as *const csview_iter_u8)).end: 1 else: 0) as c_int)) != 0) {
+    while ((((if __local_u8pos > 0: 1 else: 0) as c_int) & ((if (unsafe *(&raw const __local_it_ as *const csview_iter)).ref != (unsafe *(&raw const __local_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) as c_int)) != 0) {
         (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const csview_iter)).ref + 1)
 
         (__local_u8pos = __local_u8pos - (if (((unsafe *((*(&raw const __local_it_ as *const csview_iter)).ref)) as c_int) & (192 as c_int)) != 128: 1 else: 0))
@@ -661,19 +661,19 @@ pub fn csview_u8_at(__param_sv: csview, __param_u8pos: c_long) -> csview_iter {
         0
     }
 
-    (__local_it_.chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8_ as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __local_it_.u8_ as *const csview_iter_u8)).end as *const i8)) } as c_long)))
+    (__local_it_.chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __local_it_.u8 as *const csview_iter_u8)).end as *const i8)) } as c_long)))
 
     return __local_it_
 
 }
 
-pub unsafe fn csview_from(__param_str_: *const i8) -> csview {
-    return ((csview { buf: __param_str_, size: (strlen(__param_str_) as c_long) } as csview))
+pub unsafe fn csview_from(__param_str: *const i8) -> csview {
+    return ((csview { buf: __param_str, size: (strlen(__param_str) as c_long) } as csview))
 
 }
 
-pub unsafe fn csview_from_n(__param_str_: *const i8, __param_n: c_long) -> csview {
-    return ((csview { buf: __param_str_, size: __param_n } as csview))
+pub unsafe fn csview_from_n(__param_str: *const i8, __param_n: c_long) -> csview {
+    return ((csview { buf: __param_str, size: __param_n } as csview))
 
 }
 
@@ -705,8 +705,8 @@ pub fn csview_equals_sv(__param_sv1: csview, __param_sv2: csview) -> bool {
 
 }
 
-pub unsafe fn csview_equals(__param_sv: csview, __param_str_: *const i8) -> bool {
-    return csview_equals_sv(__param_sv, (csview { buf: __param_str_, size: (strlen(__param_str_) as c_long) } as csview))
+pub unsafe fn csview_equals(__param_sv: csview, __param_str: *const i8) -> bool {
+    return csview_equals_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as c_long) } as csview))
 
 }
 
@@ -722,23 +722,23 @@ pub fn csview_find_sv(__param_sv: csview, __param_search: csview) -> c_long {
 
 }
 
-pub unsafe fn csview_find(__param_sv: csview, __param_str_: *const i8) -> c_long {
-    return csview_find_sv(__param_sv, (csview { buf: __param_str_, size: (strlen(__param_str_) as c_long) } as csview))
+pub unsafe fn csview_find(__param_sv: csview, __param_str: *const i8) -> c_long {
+    return csview_find_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as c_long) } as csview))
 
 }
 
-pub unsafe fn csview_contains(__param_sv: csview, __param_str_: *const i8) -> bool {
-    return ((csview_find(__param_sv, __param_str_) != 9223372036854775807))
+pub unsafe fn csview_contains(__param_sv: csview, __param_str: *const i8) -> bool {
+    return ((csview_find(__param_sv, __param_str) != 9223372036854775807))
 
 }
 
-pub unsafe fn csview_starts_with(__param_sv: csview, __param_str_: *const i8) -> bool {
-    var __local_n: c_long = ((strlen(__param_str_) as c_long))
+pub unsafe fn csview_starts_with(__param_sv: csview, __param_str: *const i8) -> bool {
+    var __local_n: c_long = ((strlen(__param_str) as c_long))
 
     var __ci_expr_logic_0: c_int = 0
 
     if ((if __local_n <= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not (with_memcmp((((*(&raw const __param_sv as *const csview)).buf as *const c_void) as *const u8), ((__param_str_ as *const c_void) as *const u8), (((if 1 != 0: __local_n else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if not (with_memcmp((((*(&raw const __param_sv as *const csview)).buf as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), (((if 1 != 0: __local_n else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
     }
 
     return (__ci_expr_logic_0 != 0)
@@ -746,13 +746,13 @@ pub unsafe fn csview_starts_with(__param_sv: csview, __param_str_: *const i8) ->
 
 }
 
-pub unsafe fn csview_ends_with(__param_sv: csview, __param_str_: *const i8) -> bool {
-    var __local_n: c_long = ((strlen(__param_str_) as c_long))
+pub unsafe fn csview_ends_with(__param_sv: csview, __param_str: *const i8) -> bool {
+    var __local_n: c_long = ((strlen(__param_str) as c_long))
 
     var __ci_expr_logic_0: c_int = 0
 
     if ((if __local_n <= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not (with_memcmp((((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as c_long) as usize)) - ((__local_n as c_long) as usize)) as *const c_void) as *const u8), ((__param_str_ as *const c_void) as *const u8), (((if 1 != 0: __local_n else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if not (with_memcmp((((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as c_long) as usize)) - ((__local_n as c_long) as usize)) as *const c_void) as *const u8), ((__param_str as *const c_void) as *const u8), (((if 1 != 0: __local_n else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
     }
 
     return (__ci_expr_logic_0 != 0)
@@ -855,12 +855,12 @@ pub fn csview_tail(__param_sv: csview, __param_len: c_long) -> csview {
 }
 
 pub unsafe fn csview_begin(__param_self_: *const csview) -> csview_iter {
-    var __local_it_: csview_iter = csview_iter { u8_: csview_iter_u8 { chr: csview { buf: (*__param_self_).buf }, end: ((*__param_self_).buf + (((*__param_self_).size as c_long) as usize)), dec: cutf8_decode_t.zeroed() } }
+    var __local_it_: csview_iter = csview_iter { u8: csview_iter_u8 { chr: csview { buf: (*__param_self_).buf }, end: ((*__param_self_).buf + (((*__param_self_).size as c_long) as usize)), dec: cutf8_decode_t.zeroed() } }
 
-    if ((if (*(&raw const __local_it_ as *const csview_iter)).ref == (*(&raw const __local_it_.u8_ as *const csview_iter_u8)).end: 1 else: 0) != 0) {
+    if ((if (*(&raw const __local_it_ as *const csview_iter)).ref == (*(&raw const __local_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
         (__local_it_.ref = ((null as *mut c_char)))
     } else {
-        (__local_it_.u8_.chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8_ as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __local_it_.u8_ as *const csview_iter_u8)).end as *const i8)) as c_long)))
+        (__local_it_.u8.chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const i8), ((*(&raw const __local_it_.u8 as *const csview_iter_u8)).end as *const i8)) as c_long)))
     }
 
     return __local_it_
@@ -878,21 +878,21 @@ pub unsafe fn csview_end(__param_self_: *const csview) -> csview_iter {
 pub unsafe fn csview_next(__param_it_: *mut csview_iter) -> Unit {
     ((*__param_it_).ref = (*__param_it_).ref + (((*(&raw const (*__param_it_).chr as *const csview)).size as c_long) as usize))
 
-    if ((if (*__param_it_).ref == (*(&raw const (*__param_it_).u8_ as *const csview_iter_u8)).end: 1 else: 0) != 0) {
+    if ((if (*__param_it_).ref == (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
         ((*__param_it_).ref = ((null as *mut c_char)))
     } else {
-        ((*__param_it_).chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*__param_it_).u8_ as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*__param_it_).ref as *const i8), ((*(&raw const (*__param_it_).u8_ as *const csview_iter_u8)).end as *const i8)) as c_long)))
+        ((*__param_it_).chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*__param_it_).ref as *const i8), ((*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end as *const i8)) as c_long)))
     }
 
 }
 
 pub unsafe fn csview_codepoint(__param_it_: *const csview_iter) -> c_uint {
-    return (*(&raw const (*__param_it_).u8_.dec as *const cutf8_decode_t)).codep
+    return (*(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
 
 }
 
-pub unsafe fn csview_u8_from(__param_str_: *const i8, __param_u8pos: c_long, __param_u8len: c_long) -> csview {
-    return cutf8_subview(__param_str_, __param_u8pos, __param_u8len)
+pub unsafe fn csview_u8_from(__param_str: *const i8, __param_u8pos: c_long, __param_u8len: c_long) -> csview {
+    return cutf8_subview(__param_str, __param_u8pos, __param_u8len)
 
 }
 
@@ -939,8 +939,8 @@ pub fn csview_iequals_sv(__param_sv1: csview, __param_sv2: csview) -> bool {
 
 }
 
-pub unsafe fn csview_iequals(__param_sv: csview, __param_str_: *const i8) -> bool {
-    return csview_iequals_sv(__param_sv, (csview { buf: __param_str_, size: (strlen(__param_str_) as c_long) } as csview))
+pub unsafe fn csview_iequals(__param_sv: csview, __param_str: *const i8) -> bool {
+    return csview_iequals_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as c_long) } as csview))
 
 }
 
@@ -954,13 +954,13 @@ pub unsafe fn csview_icmp(__param_x: *const csview, __param_y: *const csview) ->
 
 }
 
-pub unsafe fn csview_istarts_with(__param_sv: csview, __param_str_: *const i8) -> bool {
-    var __local_n: c_long = ((strlen(__param_str_) as c_long))
+pub unsafe fn csview_istarts_with(__param_sv: csview, __param_str: *const i8) -> bool {
+    var __local_n: c_long = ((strlen(__param_str) as c_long))
 
     var __ci_expr_logic_0: c_int = 0
 
     if ((if __local_n <= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not (cutf8_icmp_sv(__param_sv, (csview { buf: __param_str_, size: __local_n } as csview)) != 0): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if not (cutf8_icmp_sv(__param_sv, (csview { buf: __param_str, size: __local_n } as csview)) != 0): 1 else: 0) != 0: 1 else: 0))
     }
 
     return (__ci_expr_logic_0 != 0)
@@ -968,13 +968,13 @@ pub unsafe fn csview_istarts_with(__param_sv: csview, __param_str_: *const i8) -
 
 }
 
-pub unsafe fn csview_iends_with(__param_sv: csview, __param_str_: *const i8) -> bool {
-    var __local_n: c_long = ((strlen(__param_str_) as c_long))
+pub unsafe fn csview_iends_with(__param_sv: csview, __param_str: *const i8) -> bool {
+    var __local_n: c_long = ((strlen(__param_str) as c_long))
 
     var __ci_expr_logic_0: c_int = 0
 
     if ((if __local_n <= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not (cutf8_icmp(((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as c_long) as usize)) - ((__local_n as c_long) as usize)) as *const i8), __param_str_) != 0): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if not (cutf8_icmp(((((*(&raw const __param_sv as *const csview)).buf + (((*(&raw const __param_sv as *const csview)).size as c_long) as usize)) - ((__local_n as c_long) as usize)) as *const i8), __param_str) != 0): 1 else: 0) != 0: 1 else: 0))
     }
 
     return (__ci_expr_logic_0 != 0)

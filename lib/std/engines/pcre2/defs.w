@@ -1,4 +1,4 @@
-// std.re.defs — shared definitions for migrated PCRE2
+// std.engines.pcre2.defs — shared definitions for migrated PCRE2
 use std.option
 use std.collections
 use rt.rt_core

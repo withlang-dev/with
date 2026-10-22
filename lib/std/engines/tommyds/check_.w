@@ -1,18 +1,18 @@
 // Migrated from C
-use std.tommyds.defs
-use std.tommyds.tommyhash
-use std.tommyds.tommyalloc
-use std.tommyds.tommyarray
-use std.tommyds.tommyarrayof
-use std.tommyds.tommyarrayblk
-use std.tommyds.tommyarrayblkof
-use std.tommyds.tommylist
-use std.tommyds.tommytree
-use std.tommyds.tommytrie
-use std.tommyds.tommytrieinp
-use std.tommyds.tommyhashtbl
-use std.tommyds.tommyhashdyn
-use std.tommyds.tommyhashlin
+use std.engines.tommyds.defs
+use std.engines.tommyds.tommyhash
+use std.engines.tommyds.tommyalloc
+use std.engines.tommyds.tommyarray
+use std.engines.tommyds.tommyarrayof
+use std.engines.tommyds.tommyarrayblk
+use std.engines.tommyds.tommyarrayblkof
+use std.engines.tommyds.tommylist
+use std.engines.tommyds.tommytree
+use std.engines.tommyds.tommytrie
+use std.engines.tommyds.tommytrieinp
+use std.engines.tommyds.tommyhashtbl
+use std.engines.tommyds.tommyhashdyn
+use std.engines.tommyds.tommyhashlin
 use std.libc
 use std.option
 use std.collections
@@ -236,12 +236,12 @@ pub fn cache_clear() {
 
 }
 
-pub unsafe fn start(__param_str_: *const i8) writes compare_counter {
+pub unsafe fn start(__param_str: *const i8) writes compare_counter {
     cache_clear()
 
     (compare_counter = ((0 as c_uint)))
 
-    (the_str = ((__param_str_ as *const c_char)))
+    (the_str = ((__param_str as *const c_char)))
 
     (the_start = ((nano() as c_ulonglong)))
 

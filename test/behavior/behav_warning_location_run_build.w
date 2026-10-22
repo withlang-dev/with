@@ -9,7 +9,7 @@ use pre_d_build_runner
 // warnings printed after a build rendered against an empty file, at 1:1.
 // One facade warning (§16.2b.11 presentation ambiguity) and one ordinary
 // Sema warning (a loop concatenation). The core prelude keeps the case off
-// the std.re corpus, which the case directory's own project cannot see from
+// the std.engines.pcre2 corpus, which the case directory's own project cannot see from
 // a compiler that does not embed it.
 fn check_located(case_dir: &str, command: &str):
     let r = p7_run(case_dir, "warning-location-" ++ command, command ++ "\0--prelude=core\0main.w\0")

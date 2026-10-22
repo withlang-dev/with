@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 
 pub fn queue_new() -> *mut _Queue {
     var __local_queue: *mut _Queue

@@ -533,7 +533,7 @@ fn ci_migrate_render_preamble_fn(signature: &str, colon_expr: &str, brace_expr: 
 // The helper a `__builtin_<op>_overflow` call names. The migrator's preamble
 // defines `__with_builtin_<op>_overflow_<ty>` for every width; a c_import
 // translation defines the same name beside the bodies that call it (#1877).
-// The `.wo` bundles' shared defs (lib/std/re/defs.w) reach every
+// The `.wo` bundles' shared defs (lib/std/engines/pcre2/defs.w) reach every
 // compilation over the prelude edge with their own definitions of these
 // names; an import's definition is its importer's, displaced to the
 // importer's identity when another owner holds the name
@@ -770,7 +770,7 @@ fn ci_migrate_preamble_text() -> str:
     //
     // Exception (#880, generalized for every .wo corpus): output that
     // compiles WITHOUT the prelude — a bundled corpus (build/wo.w builds
-    // std.re, std.zl, ... `--no-prelude`) — has no builtin c_void, so its
+    // std.engines.pcre2, std.engines.zlib, ... `--no-prelude`) — has no builtin c_void, so its
     // preamble must carry the declaration, as the pre-#750 promotion always
     // did (both modes built green with it for months). Keyed on the migrate
     // workspace's prelude mode, never on a corpus name, so ordinary

@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.option
 
 pub fn arraylist_new(__param_length: c_uint) -> *mut _ArrayList {

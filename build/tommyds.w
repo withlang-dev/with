@@ -19,8 +19,8 @@ fn tommy_headers() -> List[str]: ["tommy", "tommychain", "tommytypes"]
 
 pub fn tommyds_corpus() -> Corpus:
     Corpus {
-        name: "tommyds", stem: "tommyds", package: "std.tommyds",
-        corpus_rel: "std/tommyds", corpus_dir: "lib/std/tommyds",
+        name: "tommyds", stem: "tommyds", package: "std.engines.tommyds",
+        corpus_rel: "std/engines/tommyds", corpus_dir: "lib/std/engines/tommyds",
         upstream: upstream_github("tommyds", "amadvance/tommyds", "1f3727fc89174902c48e3933ac4610cb7fb13f4a",
             "cf2036f73af8a5e20e50b42d36352ec932d6eee7b7e847bebeef2efd296385d3"),
         license: "LICENSE",
@@ -56,18 +56,18 @@ fn tommy_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) 
 pub fn run_tommy_test_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
-    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/tommyds/check_.w"], ".")
+    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/tommyds/check_.w"], ".")
 
 // D112: upstream's check program on a fresh migration, for the migrator
-// gate: the fresh modules in a scratch lib/std/tommyds, compiled from
+// gate: the fresh modules in a scratch lib/std/engines/tommyds, compiled from
 // source (`--bundle-corpus`) rather than from the bundle the compiler embeds.
 pub fn run_tommy_test_fresh_action(ctx: ActionCtx) -> i32:
     let output = ctx.output()
     if corpus_reset_dir(ctx, output) != 0: return 1
     let tree = output ++ "/tree"
-    if corpus_reset_dir(ctx, tree ++ "/lib/std/tommyds") != 0: return 1
-    if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/tommyds") != 0: return 1
-    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/tommyds/check_.w", "--bundle-corpus", "std/tommyds"], tree)
+    if corpus_reset_dir(ctx, tree ++ "/lib/std/engines/tommyds") != 0: return 1
+    if corpus_copy_w_files(ctx, ctx.inputs()[1], tree ++ "/lib/std/engines/tommyds") != 0: return 1
+    tommy_compile_and_run(ctx, ["build", "-O1", "lib/std/engines/tommyds/check_.w", "--bundle-corpus", "std/engines/tommyds"], tree)
 
 fn tommy_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i32:
     let fs = ctx.fs()
@@ -95,7 +95,7 @@ fn tommy_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i
 fn tommy_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
     var tests = target_new(.Action, "tommyds-test", "").output("out/corpus/tommyds-test")
     tests.action = run_tommy_test_action
-    tests = tests.input(release_compiler.clone()).input("lib/std/tommyds/check_.w").dep("build")
+    tests = tests.input(release_compiler.clone()).input("lib/std/engines/tommyds/check_.w").dep("build")
     var fresh = target_new(.Action, "tommyds-test-fresh", "").output("out/corpus/tommyds-test-fresh")
     fresh.action = run_tommy_test_fresh_action
     fresh = fresh.input(release_compiler.clone()).input("out/tommyds_migrated").dep("build").dep("tommyds-migrate")

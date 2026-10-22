@@ -1,5 +1,5 @@
 // Migrated from C
-use std.c_algorithms.defs
+use std.engines.c_algorithms.defs
 use std.libc
 
 pub unsafe fn string_hash(__param_string: *mut c_void) -> c_uint {

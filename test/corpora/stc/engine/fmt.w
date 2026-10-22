@@ -1,5 +1,5 @@
 // Migrated from C
-use std.stc_testing.defs
+use std.engines.stc_testing.defs
 use std.libc
 
 pub unsafe fn _fmt_time(__param_fmt: *const i8, __param_tm: *const tm, __param_buf: *mut i8, __param_bufsize: c_int) -> *const i8 {

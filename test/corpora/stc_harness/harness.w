@@ -1,4 +1,4 @@
-module std.stc_testing.harness
+module std.engines.stc_testing.harness
 
 // The With half of STC's test harness. Upstream's tests are ctest.h
 // programs: the TEST bodies are plain C and migrate (test/corpora/stc), but

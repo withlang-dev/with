@@ -1,5 +1,5 @@
 // Migrated from C
-use std.tommyds.defs
+use std.engines.tommyds.defs
 use std.libc
 
 fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {

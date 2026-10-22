@@ -1,33 +1,33 @@
 // Migrated from C
-use std.re.defs
-use std.re.pcre2_config
-use std.re.pcre2_context
-use std.re.pcre2_convert
-use std.re.pcre2_compile
-use std.re.pcre2_pattern_info
-use std.re.pcre2_match_data
-use std.re.pcre2_dfa_match
-use std.re.pcre2_match
-use std.re.pcre2_match_next
-use std.re.pcre2_substring
-use std.re.pcre2_serialize
-use std.re.pcre2_substitute
-use std.re.pcre2_jit_compile
-use std.re.pcre2_error
-use std.re.pcre2_maketables
-use std.re.pcre2_tables
-use std.re.pcre2_chartables
-use std.re.pcre2_ucd
-use std.re.pcre2_auto_possess
-use std.re.pcre2_chkdint
-use std.re.pcre2_extuni
-use std.re.pcre2_find_bracket
-use std.re.pcre2_newline
-use std.re.pcre2_ord2utf
-use std.re.pcre2_script_run
-use std.re.pcre2_study
-use std.re.pcre2_valid_utf
-use std.re.pcre2_xclass
+use std.engines.pcre2.defs
+use std.engines.pcre2.pcre2_config
+use std.engines.pcre2.pcre2_context
+use std.engines.pcre2.pcre2_convert
+use std.engines.pcre2.pcre2_compile
+use std.engines.pcre2.pcre2_pattern_info
+use std.engines.pcre2.pcre2_match_data
+use std.engines.pcre2.pcre2_dfa_match
+use std.engines.pcre2.pcre2_match
+use std.engines.pcre2.pcre2_match_next
+use std.engines.pcre2.pcre2_substring
+use std.engines.pcre2.pcre2_serialize
+use std.engines.pcre2.pcre2_substitute
+use std.engines.pcre2.pcre2_jit_compile
+use std.engines.pcre2.pcre2_error
+use std.engines.pcre2.pcre2_maketables
+use std.engines.pcre2.pcre2_tables
+use std.engines.pcre2.pcre2_chartables
+use std.engines.pcre2.pcre2_ucd
+use std.engines.pcre2.pcre2_auto_possess
+use std.engines.pcre2.pcre2_chkdint
+use std.engines.pcre2.pcre2_extuni
+use std.engines.pcre2.pcre2_find_bracket
+use std.engines.pcre2.pcre2_newline
+use std.engines.pcre2.pcre2_ord2utf
+use std.engines.pcre2.pcre2_script_run
+use std.engines.pcre2.pcre2_study
+use std.engines.pcre2.pcre2_valid_utf
+use std.engines.pcre2.pcre2_xclass
 
 pub unsafe fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) -> c_int {
     var __local_str1 = __param_str1
@@ -138,14 +138,14 @@ pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8)
 
 }
 
-pub unsafe fn _pcre2_strlen_8(__param_str_: *const u8) -> c_ulong {
-    var __local_str_ = __param_str_
+pub unsafe fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
+    var __local_str = __param_str
     var __local_c: c_ulong = ((0 as c_ulong))
 
     while true {
-        var __ci_expr_old_0: *const u8 = __local_str_
+        var __ci_expr_old_0: *const u8 = __local_str
 
-        (__local_str_ = __local_str_ + 1)
+        (__local_str = __local_str + 1)
 
         if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
             break

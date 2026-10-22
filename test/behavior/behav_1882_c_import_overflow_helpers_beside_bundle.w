@@ -2,7 +2,7 @@
 
 // #1882 retires #1877's workaround: an import's overflow helpers now carry
 // the migrator's spelling (`__with_builtin_mul_overflow_<ty>`, the shared
-// `u128_mul_would_overflow`), the names lib/std/re/defs.w defines for
+// `u128_mul_would_overflow`), the names lib/std/engines/pcre2/defs.w defines for
 // itself over the prelude edge. Each owner's definitions are its own: the
 // header's inline bodies call the import's helpers, the bundle's code its
 // own — including the 128-bit multiply's shared limb check.

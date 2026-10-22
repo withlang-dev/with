@@ -12,10 +12,10 @@
 // the ratio candidate/baseline, and the spread of the per-round ratios. A
 // regression counts only when every round's ratio exceeds 1.05.
 //
-// pcre2: lib/std/re/pcre2test.w over upstream's RunTest (-8 0-29, the same
+// pcre2: lib/std/engines/pcre2/pcre2test.w over upstream's RunTest (-8 0-29, the same
 // run as the pcre2-test lane, over the pinned release the lane prepares in
 // out/pcre2_reference).
-// zlib: lib/std/zl/minigzip.w compressing and decompressing a 16 MB text
+// zlib: lib/std/engines/zlib/minigzip.w compressing and decompressing a 16 MB text
 // (the lane's round trip is 14 bytes, which times process start, not zlib).
 use std.fs
 use std.process
@@ -132,11 +132,11 @@ fn main:
     mkdir_p(cand_dir)
     if suite == "pcre2":
         if not file_exists("out/pcre2_reference/pcre2-10.47/RunTest"): fail("no out/pcre2_reference/pcre2-10.47/RunTest; run `src/main build :pcre2-prepare-reference` first")
-        build_program(baseline, "lib/std/re/pcre2test.w", base_dir ++ "/pcre2test")
-        build_program(candidate, "lib/std/re/pcre2test.w", cand_dir ++ "/pcre2test")
+        build_program(baseline, "lib/std/engines/pcre2/pcre2test.w", base_dir ++ "/pcre2test")
+        build_program(candidate, "lib/std/engines/pcre2/pcre2test.w", cand_dir ++ "/pcre2test")
     else:
-        build_program(baseline, "lib/std/zl/minigzip.w", base_dir ++ "/minigzip")
-        build_program(candidate, "lib/std/zl/minigzip.w", cand_dir ++ "/minigzip")
+        build_program(baseline, "lib/std/engines/zlib/minigzip.w", base_dir ++ "/minigzip")
+        build_program(candidate, "lib/std/engines/zlib/minigzip.w", cand_dir ++ "/minigzip")
     var a: List[f64] = List.new()
     var b: List[f64] = List.new()
     var ratios: List[f64] = List.new()
