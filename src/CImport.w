@@ -7483,7 +7483,7 @@ impl CiStmtPool:
                 let _ = ci_va_bail(session, cursor, "va_start is translated as a statement of a block: `var ap = va_start()`; this one is nested in another statement")
                 return 0 as CiStmtId
             if stdarg == "va_copy":
-                let _ = ci_va_bail(session, cursor, "va_copy is not supported: a With list starts only at va_start (D75)")
+                let _ = ci_va_bail(session, cursor, "va_copy is translated as a statement of a block: `var dst = src`; this one is nested in another statement")
                 return 0 as CiStmtId
             let cfp = self.lower_cfprintf_effect_ir(session, cursor, exprs, types, scope)
             if (cfp as i32) != 0:
@@ -13549,6 +13549,14 @@ impl CiStmtPool:
                         child_ids.push(start_ir.stmt_id as i32)
                     else:
                         bailed = true
+                else if g_ci_va_started_decls.len() > 0 and ci_stdarg_call_name(session, ci_peel_transparent(session, child)) == "va_copy":
+                    // va_copy(dst, src): the copy's declaration, where it is made.
+                    let copy_ir = self.lower_va_copy_decl(session, ci_peel_transparent(session, child), block_scope, exprs, types)
+                    if (copy_ir.stmt_id as i32) != 0:
+                        block_scope = copy_ir.updated_scope
+                        child_ids.push(copy_ir.stmt_id as i32)
+                    else:
+                        bailed = true
                 else:
                     let child_id = self.lower_stmt_ir(session, child, exprs, types, 0, block_scope)
                     if (child_id as i32) != 0:
@@ -14281,6 +14289,40 @@ impl CiStmtPool:
         let no_args: List[i32] = List.new()
         let start = exprs.build_named_call_expr_typed("va_start", &no_args, list_ty)
         let decl_id = self.var_decl(self.add_string(storage_name), list_ty, start, 1)
+        CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
+
+    // `va_copy(dst, src);` is where `dst` starts: a `c_va_list` is a value on
+    // every target (the SysV x86_64 record, the AArch64 record, the Darwin
+    // and Windows pointer), so the copy is `var dst = src` and the deferred
+    // declaration lands here, as a started list's does.
+    fn lower_va_copy_decl(session: i64, call: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
+        let failed = CiDeclLoweringIR { updated_scope: scope, stmt_id: 0 as CiStmtId }
+        let list = ci_va_list_operand(session, call)
+        if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF:
+            let _ = ci_va_bail(session, call, "va_copy's destination is not a local va_list variable")
+            return failed
+        let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
+        if not ci_str_contains(g_ci_va_deferred_decls, key):
+            let _ = ci_va_bail(session, call, "va_copy's destination is not a va_list declared in an enclosing block of this function")
+            return failed
+        if with_ci_num_children(session, call) < 3:
+            let _ = ci_va_bail(session, call, "va_copy names no source list")
+            return failed
+        let source = self.lower_value_expr_ir(session, with_ci_child(session, call, 2), exprs, types, scope)
+        if not ci_value_ir_valid(source) or (source.setup_stmt as i32) != 0:
+            let _ = ci_va_bail(session, call, "va_copy's source is not a plain list expression")
+            return failed
+        let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
+        if (list_ty as i32) == 0:
+            return failed
+        let escaped = ci_escape_reserved(with_ci_cursor_spelling(session, list))
+        let base_name = ci_local_storage_name(escaped, list)
+        var storage_name = ci_scope_mangle(scope, base_name)
+        if storage_name == base_name and ci_fn_var_names_contains(base_name):
+            storage_name = ci_fn_var_names_unique(base_name)
+        let new_scope = ci_scope_add_mangled(scope, escaped, storage_name)
+        ci_fn_var_names_register(storage_name)
+        let decl_id = self.var_decl(self.add_string(storage_name), list_ty, source.value_expr, 1)
         CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
 
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
@@ -17274,10 +17316,11 @@ fn ci_va_list_operand(session: i64, call: i32) -> i32:
 // Before a body lowers: every va_start's list must be a local variable,
 // named directly; its declaration is keyed for deferral.
 fn ci_collect_va_started_decls(session: i64, cursor: i32) -> bool:
-    if ci_stdarg_call_name(session, cursor) == "va_start":
+    let operation = ci_stdarg_call_name(session, cursor)
+    if operation == "va_start" or operation == "va_copy":
         let list = ci_va_list_operand(session, cursor)
         if list < 0 or with_ci_cursor_kind(session, list) != CXK_DECL_REF or with_ci_cursor_references_parameter(session, list):
-            return ci_va_bail(session, cursor, "va_start's list is not a local va_list variable")
+            return ci_va_bail(session, cursor, operation ++ "'s list is not a local va_list variable")
         let key = "|" ++ with_ci_cursor_referenced_location(session, list) ++ "|"
         if not ci_str_contains(g_ci_va_started_decls, key):
             g_ci_va_started_decls = g_ci_va_started_decls ++ key
@@ -19555,6 +19598,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fopen64" or name == "fseeko64" or name == "ftello64" or name == "_fseeki64" or name == "_ftelli64": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
+    if name == "rewind": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
     if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN

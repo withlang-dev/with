@@ -63,6 +63,7 @@ pub extern fn putc(c: i32, stream: *mut c_void) -> i32
 pub extern fn perror(s: *const i8) -> Unit
 pub extern fn feof(stream: *mut c_void) -> i32
 pub extern fn ferror(stream: *mut c_void) -> i32
+pub extern fn rewind(stream: *mut c_void) -> Unit
 pub extern fn fread(ptr: *mut c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 pub extern fn fwrite(ptr: *const c_void, size: u64, count: u64, stream: *mut c_void) -> u64
 // POSIX fileno (UCRT `_fileno`): a seam.

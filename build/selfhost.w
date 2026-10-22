@@ -4608,7 +4608,17 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     let comma_w = bs_join(case_dir, "commainit.w")
     rc = bs_write_fixture(ctx, comma_src, "typedef struct { const int* data; long n; } S;\nint main(void) { int a[4] = {1,2,3,4}; long i = 1;\n  S s = {.data = (a + ((void)sizeof(int[(4 == 4) ? 1 : -1]), i)), .n = 2};\n  return (int)(s.data[0]) - 2; }\n", "comma expression in an initializer element")
     if rc != 0: return rc
-    bs_migrate_check_run(ctx, compiler_path, case_dir, "commainit", &comma_src, &comma_w)
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "commainit", &comma_src, &comma_w)
+    if rc != 0: return rc
+    let va_src = bs_join(case_dir, "vacopy.c")
+    let va_w = bs_join(case_dir, "vacopy.w")
+    rc = bs_write_fixture(ctx, va_src, "#include <stdarg.h>\n#include <stdio.h>\n#include <string.h>\nstatic int vfmt_twice(char* out, const char* fmt, va_list args) {\n    va_list args2;\n    va_copy(args2, args);\n    const int n = vsnprintf(NULL, 0ULL, fmt, args);\n    vsnprintf(out, (size_t)n + 1, fmt, args2);\n    va_end(args2);\n    return n;\n}\nstatic int fmt_twice(char* out, const char* fmt, ...) {\n    va_list args;\n    va_start(args, fmt);\n    int n = vfmt_twice(out, fmt, args);\n    va_end(args);\n    return n;\n}\nint main(void) {\n    char buf[32];\n    int n = fmt_twice(buf, \"%d-%s\", 42, \"x\");\n    FILE* fp = fopen(\"/dev/null\", \"rb\");\n    if (fp) { rewind(fp); fclose(fp); }\n    return (n == 4 && strcmp(buf, \"42-x\") == 0) ? 0 : 1;\n}\n", "va_copy of a va_list parameter, and rewind")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "vacopy", &va_src, &va_w)
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, va_w, "var __local_args2: c_va_list = __param_args", "va_copy as a declaration")
+    if rc != 0: return rc
+    bs_file_contains(ctx, va_w, "rewind(", "rewind through std.libc")
 
 // Migrate `src` to `out_w`, check it, build and run it (exit 0).
 fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, out_w: &str) -> i32:
