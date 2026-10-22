@@ -1215,7 +1215,7 @@ fn ci_render_missing_pointer_opaques(session: i64, count: i32) -> str:
                 let name = names.slice(start as i64, i as i64)
                 if name.len() > 0 and not ci_type_name_is_emitted(name):
                     ci_mark_type_name_emitted(name)
-                    out = out ++ "type " ++ ci_escape_reserved(name) ++ " = opaque\n"
+                    out = out ++ "type " ++ ci_escape_type_name(name) ++ " = opaque\n"
             start = i + 1
         i = i + 1
     out
@@ -2514,7 +2514,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     // unsupported field, or cascaded from a field whose type was demoted)
     if ci_str_contains(demoted_types, "|" ++ name ++ "|"):
         ci_mark_type_name_emitted(name)
-        let safe_name = ci_escape_reserved(name)
+        let safe_name = ci_escape_type_name(name)
         let loc = ci_get_decl_location(session, name)
         let loc_comment = if loc.len() > 0: "// " ++ loc ++ ": demoted to opaque\n" else: ""
         let rendered = loc_comment ++ "type " ++ safe_name ++ " = opaque\n"
@@ -2528,7 +2528,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     // (c-algorithms' test-trie.c sorts before trie.c, which defines _Trie).
     if with_cimport_struct_is_opaque(session, idx) != 0:
         ci_mark_type_name_emitted(name)
-        let safe_name = ci_escape_reserved(name)
+        let safe_name = ci_escape_type_name(name)
         let rendered = "type " ++ safe_name ++ " = opaque\n"
         if ci_migrate_shared_decl_add("type", name, rendered):
             return ""
@@ -2538,14 +2538,14 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     if field_count == 0:
         // Empty struct definition → emit with padding byte for ABI compatibility
         ci_mark_type_name_emitted(name)
-        let safe_name = ci_escape_reserved(name)
+        let safe_name = ci_escape_type_name(name)
         let empty_rendered = if is_union: "type " ++ safe_name ++ " = union \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n" else: "type " ++ safe_name ++ " \{ __pad0: u8 = 0 }\nimpl Copy for " ++ safe_name ++ "\n"
         if ci_migrate_shared_decl_add("type", name, empty_rendered):
             return ""
         return empty_rendered
 
     ci_mark_type_name_emitted(name)
-    let safe_name = ci_escape_reserved(name)
+    let safe_name = ci_escape_type_name(name)
     let decl_cursor = ci_find_decl_cursor_for_idx(session, idx)
 
     // Emit anonymous sub-record types before the parent.
@@ -2904,7 +2904,7 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
                 ci_mark_type_name_emitted(fwd_name)
                 let enum_loc = ci_get_decl_location(session, fwd_name)
                 let enum_loc_comment = if enum_loc.len() > 0: "// " ++ enum_loc ++ ": forward-declared enum\n" else: ""
-                let fwd_rendered = enum_loc_comment ++ "type " ++ ci_escape_reserved(fwd_name) ++ " = opaque\n"
+                let fwd_rendered = enum_loc_comment ++ "type " ++ ci_escape_type_name(fwd_name) ++ " = opaque\n"
                 if ci_migrate_shared_decl_add("type", fwd_name, fwd_rendered):
                     return ""
                 return fwd_rendered
@@ -2978,7 +2978,7 @@ fn ci_translate_var(session: i64, idx: i32, known_structs: &str) -> str:
 
     let is_const = with_cimport_var_is_const(session, idx)
     let is_threadlocal = with_cimport_var_is_threadlocal(session, idx)
-    let safe_name = ci_escape_reserved(name)
+    let safe_name = ci_escape_type_name(name)
     with_cimport_mark_name_emitted(name)
 
     // Convert incomplete arrays ([T; 0]) to pointer types
@@ -3077,7 +3077,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
     // Check builtin typedef map first (short-circuits common types)
     let mapped = ci_map_builtin_typedef(name)
     if mapped.len() > 0:
-        let safe_name = ci_escape_reserved(name)
+        let safe_name = ci_escape_type_name(name)
         with_cimport_mark_name_emitted(name)
         ci_mark_type_name_emitted(name)
         let rendered = "type " ++ safe_name ++ " = " ++ mapped ++ "\n"
@@ -3088,7 +3088,7 @@ fn ci_translate_typedef(session: i64, idx: i32, count: i32) -> str:
     // Check if typedef aliases an anonymous struct/union — inline its fields
     let anon_field_count = with_cimport_typedef_anon_record_field_count(session, idx)
     if anon_field_count > 0:
-        let anon_safe_name = ci_escape_reserved(name)
+        let anon_safe_name = ci_escape_type_name(name)
         // Check for bitfields or unsupported field types → demote to opaque
         var anon_has_bitfield = false
         var anon_has_unsupported = false
@@ -6606,6 +6606,23 @@ fn ci_map_base_type(name: &str) -> str:
 
 // ── Reserved word escaping ──────────────────────────────────
 
+// A With builtin type name. A C type declared under one (STC's `typedef
+// ptrdiff_t isize;`) is renamed at its declaration (ci_escape_type_name):
+// a std-package `pub type isize` shadows the builtin in every module of
+// the package, the standard library's own included (#2552). References
+// need nothing: the bridge spells a typedef by its underlying type.
+fn ci_is_builtin_type_name(name: &str) -> bool:
+    if name == "isize" or name == "usize" or name == "bool" or name == "str" or name == "char": return true
+    if name == "i8" or name == "i16" or name == "i32" or name == "i64" or name == "i128": return true
+    if name == "u8" or name == "u16" or name == "u32" or name == "u64" or name == "u128": return true
+    name == "f32" or name == "f64" or name == "Unit" or name == "Never"
+
+// The emitted name of a declared type: a builtin's spelling gets `_`, any
+// other name escapes as an identifier does.
+fn ci_escape_type_name(name: &str) -> str:
+    if ci_is_builtin_type_name(name): return name ++ "_"
+    ci_escape_reserved(name)
+
 fn ci_escape_reserved(name: &str) -> str:
     // #749: names that collide with the With prelude surface rename the
     // same way keywords do; extern declarations preserve C linkage via
@@ -6617,13 +6634,6 @@ fn ci_escape_reserved(name: &str) -> str:
     if name == "assert" or name == "require" or name == "check": return name ++ "_"
     if name == "assert_eq" or name == "assert_ne" or name == "assert_matches_failed": return name ++ "_"
     if name == "int_to_string": return name ++ "_"
-    // A C typedef spelling a With builtin type (STC's `typedef ptrdiff_t
-    // isize;`): a module's `pub type isize` shadows the builtin in every
-    // module of its package (D100), the standard library's own included.
-    if name == "isize" or name == "usize" or name == "bool" or name == "str" or name == "char": return name ++ "_"
-    if name == "i8" or name == "i16" or name == "i32" or name == "i64" or name == "i128": return name ++ "_"
-    if name == "u8" or name == "u16" or name == "u32" or name == "u64" or name == "u128": return name ++ "_"
-    if name == "f32" or name == "f64" or name == "Unit" or name == "Never": return name ++ "_"
     if name == "and": return "and_"
     if name == "as": return "as_"
     if name == "asm": return "asm_"

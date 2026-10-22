@@ -1209,6 +1209,12 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             if synthesized as i64 != 0:
                 return session_strdup(s, synthesized)
             return session_strdup(s, "c_void\0" as *const u8)
+        // A tag spelling a With builtin type name is declared renamed
+        // (CImport.ci_escape_type_name); its references follow it.
+        if bridge_builtin_type_name(bare) != 0:
+            let renamed = session_make_str(s, bare) ++ "_"
+            clang_disposeString(spelling)
+            return session_strdup(s, str_to_cstr(renamed) as *const u8)
         let result = session_strdup(s, bare)
         clang_disposeString(spelling)
         return result
@@ -4374,6 +4380,13 @@ fn with_ci_type_declaration(session: i64, type_idx: i32) -> i32:
         let decl = clang_getTypeDeclaration(ty)
         if decl.kind == 0: return -1
         store_cursor(s, decl)
+
+// 1 when the C spelling is a With builtin type name (CImport.ci_is_builtin_type_name).
+unsafe fn bridge_builtin_type_name(bare: *const u8) -> i32:
+    let names = ["isize", "usize", "bool", "str", "char", "i8", "i16", "i32", "i64", "i128", "u8", "u16", "u32", "u64", "u128", "f32", "f64", "Unit", "Never"]
+    for name in names:
+        if c_strcmp(bare, str_to_cstr(name) as *const u8) == 0: return 1
+    0
 
 fn with_ci_type_translated(session: i64, type_idx: i32) -> str:
     unsafe:
