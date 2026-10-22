@@ -819,7 +819,7 @@ fn ctest_vec_basics_run() {
         unsafe { IVec_from_n((&__ci_expr_lit_0[0] as *mut c_int), (12 as c_long)) }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (12 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (9 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (12 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"vec_test.c".ptr, (9 as c_int))
 
     unsafe { IVec_erase_n((&raw mut __local_d as *mut IVec), (0 as c_long), (5 as c_long)) }
 
@@ -841,9 +841,9 @@ fn ctest_vec_basics_run() {
         unsafe { IVec_from_n((&__ci_expr_lit_1[0] as *mut c_int), (14 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (16 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (16 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (17 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"vec_test.c".ptr, (17 as c_int))
 
     unsafe { IVec_erase_n((&raw mut __local_d as *mut IVec), (7 as c_long), (4 as c_long)) }
 
@@ -852,7 +852,7 @@ fn ctest_vec_basics_run() {
     unsafe { IVec_take((&raw mut __local_res as *mut IVec), unsafe { IVec_from_n((&__ci_expr_lit_2[0] as *mut c_int), (10 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (22 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (22 as c_int))
 
     var __local_nums: List[c_int] = [200, 300, 400, 500]
 
@@ -863,11 +863,11 @@ fn ctest_vec_basics_run() {
     unsafe { IVec_take((&raw mut __local_res as *mut IVec), unsafe { IVec_from_n((&__ci_expr_lit_3[0] as *mut c_int), (14 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (28 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (28 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (30 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as c_long), c"vec_test.c".ptr, (30 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { IVec_at(((&raw mut __local_d as *mut IVec) as *const IVec), (7 as c_long)) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-vec_test/vec_test.c".ptr, (31 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { IVec_at(((&raw mut __local_d as *mut IVec) as *const IVec), (7 as c_long)) }) as c_long), c"vec_test.c".ptr, (31 as c_int))
 
     loop {
         var __local__c_i2: ctest_vec_basics_run__c_i2_anon = ctest_vec_basics_run__c_i2_anon.zeroed()

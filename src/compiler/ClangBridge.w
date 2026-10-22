@@ -98,6 +98,7 @@ extern fn clang_Cursor_getNumArguments(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getArgument(cursor: CXCursor, idx: u32) -> CXCursor
 extern fn clang_Cursor_isFunctionInlined(cursor: CXCursor) -> i32
 extern fn clang_Cursor_isBitField(cursor: CXCursor) -> i32
+extern fn clang_getFieldDeclBitWidth(cursor: CXCursor) -> i32
 extern fn clang_Cursor_isAnonymous(cursor: CXCursor) -> i32
 extern fn clang_Cursor_isAnonymousRecordDecl(cursor: CXCursor) -> i32
 extern fn clang_Cursor_getOffsetOfField(cursor: CXCursor) -> i64
@@ -341,6 +342,8 @@ type FieldInfo:
     name: *mut u8
     type_spelling: *mut u8
     is_bitfield: i32
+    // D147: the declared width of a bitfield member, 0 otherwise.
+    bit_width: i32
     clang_type: CXType
     // #749: the field's own cursor. A C11 anonymous record member has no
     // name, so by-name offset lookups fail; clang_Cursor_getOffsetOfField
@@ -724,6 +727,11 @@ var g_cimport_include_paths: *mut *mut u8 = 0 as *mut *mut u8
 var g_cimport_include_count: i32 = 0
 var g_cimport_include_capacity: i32 = 0
 var g_cimport_include_error: bool = false
+// Further clang arguments a migration asks for (`--macro-prefix-map`), one
+// NUL-terminated argument each, cleared with the include paths.
+var g_cimport_extra_args: *mut *mut u8 = 0 as *mut *mut u8
+var g_cimport_extra_arg_count: i32 = 0
+var g_cimport_extra_arg_capacity: i32 = 0
 // The macOS SDK c_import parses against (empty = none), resolved by
 // compiler.EmbeddedSysroot's darwin_sdk_root (#1915): WITH_SDKROOT, SDKROOT,
 // with.toml [c_import] sdk_path (§16.1), else the embedded sysroot. This
@@ -1976,6 +1984,7 @@ unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i3
     (*fi).type_spelling = c_strdup(clang_getCString(type_str))
     (*fi).clang_type = ty
     (*fi).is_bitfield = if clang_Cursor_isBitField(cursor) != 0: 1 else: 0
+    (*fi).bit_width = if clang_Cursor_isBitField(cursor) != 0: clang_getFieldDeclBitWidth(cursor) else: 0
     (*fi).cursor = cursor
     (*fc).count = (*fc).count + 1
     clang_disposeString(name)
@@ -2133,6 +2142,38 @@ fn with_cimport_add_include_path(path: &str) -> i32:
         g_cimport_include_count = g_cimport_include_count + 1
         0
 
+// A whole clang argument beside the include paths (`-fmacro-prefix-map=OLD=NEW`
+// for a migration whose `__FILE__` spellings must not name the staging
+// directory). Cleared with the include paths.
+fn with_cimport_add_clang_arg(arg: &str) -> i32:
+    unsafe:
+        if arg.len() <= 0: return 0
+        if g_cimport_include_error or g_cimport_extra_arg_count >= 1073741818:
+            g_cimport_include_error = true
+            return 0
+        if g_cimport_extra_arg_count == g_cimport_extra_arg_capacity:
+            let capacity = if g_cimport_extra_arg_capacity == 0: 8 else: g_cimport_extra_arg_capacity * 2
+            let args = with_alloc(capacity as i64 * 8) as *mut *mut u8
+            if args as i64 == 0:
+                g_cimport_include_error = true
+                return 0
+            if g_cimport_extra_arg_count > 0:
+                with_memcpy(args as *mut u8, g_cimport_extra_args as *const u8, g_cimport_extra_arg_count as i64 * 8)
+            if g_cimport_extra_args as i64 != 0:
+                with_free(g_cimport_extra_args as *mut u8)
+            g_cimport_extra_args = args
+            g_cimport_extra_arg_capacity = capacity
+        let buf = with_alloc(arg.len() + 1)
+        if buf as i64 == 0:
+            g_cimport_include_error = true
+            return 0
+        let sp = *(arg as *const str as *const *const u8)
+        with_memcpy(buf, sp, arg.len())
+        *((buf as i64 + arg.len()) as *mut u8) = 0
+        g_cimport_extra_args[g_cimport_extra_arg_count] = buf
+        g_cimport_extra_arg_count = g_cimport_extra_arg_count + 1
+        0
+
 fn with_cimport_clear_include_paths() -> i32:
     unsafe:
         var i: i32 = 0
@@ -2145,6 +2186,16 @@ fn with_cimport_clear_include_paths() -> i32:
     g_cimport_include_count = 0
     g_cimport_include_capacity = 0
     g_cimport_include_error = false
+    unsafe:
+        var ea: i32 = 0
+        while ea < g_cimport_extra_arg_count:
+            with_free(g_cimport_extra_args[ea])
+            ea = ea + 1
+        if g_cimport_extra_args as i64 != 0:
+            with_free(g_cimport_extra_args as *mut u8)
+    g_cimport_extra_args = 0 as *mut *mut u8
+    g_cimport_extra_arg_count = 0
+    g_cimport_extra_arg_capacity = 0
     0
 
 fn with_cimport_add_windows_incdir(var_name: &str) -> i32:
@@ -2295,6 +2346,11 @@ unsafe fn cimport_build_args(args: *mut *const u8, cxx: bool):
         args[n + 1] = g_cimport_include_paths[ip] as *const u8
         n += 2
         ip += 1
+    var ea = 0
+    while ea < g_cimport_extra_arg_count:
+        args[n] = g_cimport_extra_args[ea] as *const u8
+        n += 1
+        ea += 1
     n
 
 // The bridge is compiled without the prelude. Own the temporary pointer
@@ -2304,7 +2360,7 @@ unsafe fn cimport_parse_translation_unit(index: *mut u8, path: *const u8, cxx: b
     // At most fifteen fixed arguments: sysroot(2), host library dirs(4),
     // target(3), resource(2), mode(4) — or, with a C model, target(5) in
     // place of the first nine.
-    let capacity = 15 + g_cimport_include_count as i64 * 2
+    let capacity = 15 + g_cimport_include_count as i64 * 2 + g_cimport_extra_arg_count as i64
     let args = with_alloc(capacity * 8) as *mut *const u8
     if args as i64 == 0: return 0 as *mut u8
     let nargs = cimport_build_args(args, cxx)
@@ -2904,6 +2960,18 @@ fn with_cimport_struct_field_type(session: i64, idx: i32, field: i32) -> str:
         if field < 0 or field >= (*cache).field_count: return ""
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
         make_str((*fi).type_spelling as *const u8)
+
+// D147: the declared width of bitfield `field`, 0 for any other field.
+fn with_cimport_struct_field_bit_width(session: i64, idx: i32, field: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0: return 0
+        ensure_fields_cached(s, idx)
+        if (*s).caches as i64 == 0: return 0
+        let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *const DeclCache
+        if field < 0 or field >= (*cache).field_count: return 0
+        let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
+        (*fi).bit_width
 
 fn with_cimport_struct_field_is_bitfield(session: i64, idx: i32, field: i32) -> i32:
     unsafe:
@@ -4442,6 +4510,14 @@ fn with_ci_cursor_is_anonymous(session: i64, cursor_idx: i32) -> i32:
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         clang_Cursor_isAnonymous(cursor)
 
+// D147: a field cursor's offset in bits from its record's start, or -1.
+fn with_ci_cursor_field_bit_offset(session: i64, cursor_idx: i32) -> i64:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return -1
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        clang_Cursor_getOffsetOfField(cursor)
+
 fn with_ci_cursor_is_bitfield(session: i64, cursor_idx: i32) -> i32:
     unsafe:
         let s = session as *mut CImportSession
@@ -5315,6 +5391,25 @@ unsafe fn count_anon_member_ordinal(cursor: CXCursor, parent: CXCursor, data: *m
 // and the field. C flattens `x.payload0` through an unnamed union member;
 // the With rendering needs `x.anon_0.payload0` — the same anon_N ordinals
 // the decl renderer and ci_struct_field_emitted_name synthesize.
+// D147: 1 when the member a MemberRefExpr names is a bitfield, and its width.
+fn with_ci_member_is_bitfield(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let referenced = clang_getCursorReferenced(cursor)
+        if clang_getCursorKind(referenced) != CXCursor_FieldDecl: return 0
+        clang_Cursor_isBitField(referenced)
+
+fn with_ci_member_bit_width(session: i64, cursor_idx: i32) -> i32:
+    unsafe:
+        let s = session as *mut CImportSession
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
+        let referenced = clang_getCursorReferenced(cursor)
+        if clang_getCursorKind(referenced) != CXCursor_FieldDecl or clang_Cursor_isBitField(referenced) == 0: return 0
+        clang_getFieldDeclBitWidth(referenced)
+
 fn with_ci_member_field_name(session: i64, cursor_idx: i32) -> str:
     unsafe:
         let s = session as *mut CImportSession

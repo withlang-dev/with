@@ -635,7 +635,7 @@ fn ctest_cspan_subdim_run() {
                     0
                 }
 
-                assert_compare((1 as c_int), c"==".ptr, ((unsafe *((*(&raw mut __local_sub_i_j as *mut Span)).data + (((__local_k * (*(&raw const (*(&raw mut __local_sub_i_j as *mut Span)).stride as *const cspan_tuple1)).d[0]) as c_long) as usize))) as c_long), ((unsafe *((*(&raw mut __local_m as *mut Span3)).data + (((((__local_i * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[0]) + (__local_j * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[1])) + (__local_k * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[2])) as c_long) as usize))) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (16 as c_int))
+                assert_compare((1 as c_int), c"==".ptr, ((unsafe *((*(&raw mut __local_sub_i_j as *mut Span)).data + (((__local_k * (*(&raw const (*(&raw mut __local_sub_i_j as *mut Span)).stride as *const cspan_tuple1)).d[0]) as c_long) as usize))) as c_long), ((unsafe *((*(&raw mut __local_m as *mut Span3)).data + (((((__local_i * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[0]) + (__local_j * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[1])) + (__local_k * (*(&raw const (*(&raw mut __local_m as *mut Span3)).stride as *const cspan_tuple3)).d[2])) as c_long) as usize))) as c_long), c"cspan_test.c".ptr, (16 as c_int))
 
 
 
@@ -759,9 +759,9 @@ fn ctest_cspan_slice_run() {
     }
 
 
-    assert_compare((1 as c_int), c"==".ptr, (78 as c_long), (__local_sum1 as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (42 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (78 as c_long), (__local_sum1 as c_long), c"cspan_test.c".ptr, (42 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (45 as c_long), (__local_sum2 as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (43 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (45 as c_long), (__local_sum2 as c_long), c"cspan_test.c".ptr, (43 as c_int))
 
 }
 
@@ -1309,7 +1309,7 @@ fn ctest_cspan_slice2_run() {
 
             }
 
-            assert_compare((1 as c_int), c"==".ptr, (65112 as c_long), (__local_sum as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (67 as c_int))
+            assert_compare((1 as c_int), c"==".ptr, (65112 as c_long), (__local_sum as c_long), c"cspan_test.c".ptr, (67 as c_int))
 
             (__local_sum = ((0 as c_int)))
 
@@ -1322,7 +1322,7 @@ fn ctest_cspan_slice2_run() {
 
             }
 
-            assert_compare((1 as c_int), c"==".ptr, (65112 as c_long), (__local_sum as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (72 as c_int))
+            assert_compare((1 as c_int), c"==".ptr, (65112 as c_long), (__local_sum as c_long), c"cspan_test.c".ptr, (72 as c_int))
 
             unsafe { Stack_drop(((&raw mut __local_stack as *mut Stack) as *const Stack)) }
 
@@ -1390,7 +1390,7 @@ fn ctest_cspan_equality_run() {
 
             (sizeof[c_int]() as usize)
 
-            assert_compare((1 as c_int), c"==".ptr, (__local_expect_eq as c_long), (Span2_equals(__local_test2, unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_9[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (101 as c_int))
+            assert_compare((1 as c_int), c"==".ptr, (__local_expect_eq as c_long), (Span2_equals(__local_test2, unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_9[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }) as c_long), c"cspan_test.c".ptr, (101 as c_int))
 
 
 
@@ -1413,7 +1413,7 @@ fn ctest_cspan_equality_run() {
 
     (sizeof[c_int]() as usize)
 
-    assert_bool((1 as c_int), (true as bool), (Span2_equals(unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_10[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }, unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_11[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }) as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (107 as c_int))
+    assert_bool((1 as c_int), (true as bool), (Span2_equals(unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_10[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }, unsafe { Span2_slice_((*(&raw mut __local_base2 as *mut Span2)).data, (&(*(&raw mut __local_base2 as *mut Span2)).shape[0] as *mut c_int), (&(*(&raw const (*(&raw mut __local_base2 as *mut Span2)).stride as *const cspan_tuple2)).d[0] as *mut c_int), (&__ci_expr_lit_11[0] as *mut [c_long; 3]), (((((&raw mut __local_base2 as *mut Span2)).shape.len() as c_ulong) as c_long) as c_int)) }) as bool), c"cspan_test.c".ptr, (107 as c_int))
 
 
 }
@@ -1976,7 +1976,7 @@ unsafe fn ctest_cspan_cube_slice3_run(__param_fixt: *mut ctest_cspan_cube_data) 
     }
 
 
-    assert_compare((1 as c_int), c"==".ptr, (__local_sum as c_long), (((__local_n * (__local_n + 1)) / 2) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-cspan_test/cspan_test.c".ptr, (157 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (__local_sum as c_long), (((__local_n * (__local_n + 1)) / 2) as c_long), c"cspan_test.c".ptr, (157 as c_int))
 
 }
 

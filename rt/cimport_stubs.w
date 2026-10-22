@@ -295,6 +295,15 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
 @[weak] pub fn with_ci_cursor_semantic_parent(s: i64, c: i32) -> i32:
     -1
 
+@[weak] pub fn with_ci_member_is_bitfield(s: i64, c: i32) -> i32:
+    0
+
+@[weak] pub fn with_ci_member_bit_width(s: i64, c: i32) -> i32:
+    0
+
+@[weak] pub fn with_ci_cursor_field_bit_offset(s: i64, c: i32) -> i64:
+    -1
+
 @[weak] pub fn with_ci_cursor_definition(s: i64, c: i32) -> i32:
     -1
 
@@ -457,6 +466,9 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
 @[weak] pub fn with_cimport_reset_names():
     let _ = 0
 
+@[weak] pub fn with_cimport_struct_field_bit_width(s: i64, i: i32, f: i32) -> i32:
+    0
+
 @[weak] pub fn with_cimport_struct_field_is_bitfield(s: i64, i: i32, f: i32) -> i32:
     let _ = s
     let _ = i
@@ -593,6 +605,9 @@ pub fn with_llvm_wasm_backend_missing() -> Unit:
 
 @[weak] pub fn with_cimport_add_include_path(path: str):
     let _ = path
+
+@[weak] pub fn with_cimport_add_clang_arg(arg: str):
+    0
 
 @[weak] pub fn with_cimport_clear_include_paths():
     let _ = 0

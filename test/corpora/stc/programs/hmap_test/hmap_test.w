@@ -1141,7 +1141,7 @@ fn Intmap_clone(__param_map: Intmap) -> Intmap {
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (unsafe *(&raw const __param_map as *const Intmap)).bucket_count: 1 else: 0) != 0) {
-            if ((unsafe (*(&raw const __param_map as *const Intmap)).meta[__local_i]).dist != 0) {
+            if (((unsafe __param_map.meta[__local_i])).dist() != 0) {
                 ((unsafe __local_out.table[__local_i]) = unsafe { Intmap_value_clone((__local_self_ as *const Intmap), ((*(&raw const __param_map as *const Intmap)).table[__local_i])) })
             }
 
@@ -1245,7 +1245,7 @@ unsafe fn Intmap_reserve(__param__self: *mut Intmap, __param__cap: c_long) -> bo
     }
 
     if __local_ok {
-        ((__local_map.meta[__local__newbucks]).dist = ((1023 as c_ushort)))
+        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as c_ushort)))
 
         var __local_d: *const Intmap_value = (((*__param__self).table as *const Intmap_value))
 
@@ -1254,7 +1254,7 @@ unsafe fn Intmap_reserve(__param__self: *mut Intmap, __param__cap: c_long) -> bo
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
-            if ((if (__local_m[__local_i]).dist != 0: 1 else: 0) != 0) {
+            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
                 var __local_r: c_int = (*(&raw const (*__local_d).first as *const c_int))
 
                 with_memcpy((&raw mut (*(Intmap_bucket_insert_(((&raw mut __local_map as *mut Intmap) as *const Intmap), ((&raw mut __local_r as *mut c_int) as *const c_int)).ref)) as *mut u8), (&raw const (*__local_d) as *const u8), sizeof[Intmap_value]())
@@ -1319,7 +1319,7 @@ unsafe fn Intmap_erase_entry(__param_self_: *mut Intmap, __param__val: *mut Intm
     while true {
         (__local_j = ((((((__local_j as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-        if ((if (__local_m[__local_j]).dist < 2: 1 else: 0) != 0) {
+        if ((if ((__local_m[__local_j])).dist() < 2: 1 else: 0) != 0) {
             break
         }
 
@@ -1327,13 +1327,13 @@ unsafe fn Intmap_erase_entry(__param_self_: *mut Intmap, __param__val: *mut Intm
 
         ((__local_m[__local_i]) = (__local_m[__local_j]))
 
-        ((__local_m[__local_i]).dist = ((__local_m[__local_i]).dist -% 1))
+        ((__local_m[__local_i])).set_dist((((__local_m[__local_i])).dist() -% 1))
 
         (__local_i = __local_j)
 
     }
 
-    ((__local_m[__local_i]).dist = ((0 as c_ushort)))
+    ((__local_m[__local_i])).set_dist(((0 as c_ushort)))
 
     ((*__param_self_).size = (*__param_self_).size - 1)
 
@@ -1357,8 +1357,8 @@ unsafe fn Intmap_bucket_lookup_(__param_self_: *const Intmap, __param_rkeyptr: *
 
     var __local__res: Intmap_result = Intmap_result { idx: ((__local__hash as c_ulong) & (__local__idxmask as c_ulong)), hashx: (((((((__local__hash as c_ulong) >> (24 as c_uint))) as c_ulong) & (63 as c_ulong))) as u8), dist: 1 }
 
-    while ((if (*(&raw const __local__res as *const Intmap_result)).dist <= ((*__param_self_).meta[(*(&raw const __local__res as *const Intmap_result)).idx]).dist: 1 else: 0) != 0) {
-        if ((if ((*__param_self_).meta[(*(&raw const __local__res as *const Intmap_result)).idx]).hashx == (*(&raw const __local__res as *const Intmap_result)).hashx: 1 else: 0) != 0) {
+    while ((if (*(&raw const __local__res as *const Intmap_result)).dist <= (((*__param_self_).meta[(*(&raw const __local__res as *const Intmap_result)).idx])).dist(): 1 else: 0) != 0) {
+        if ((if (((*__param_self_).meta[(*(&raw const __local__res as *const Intmap_result)).idx])).hashx() == (*(&raw const __local__res as *const Intmap_result)).hashx: 1 else: 0) != 0) {
             var __local__raw: c_int = (*((&raw const (*((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const Intmap_result)).idx]) as *const Intmap_value) as *mut Intmap_value)).first as *const c_int) as *mut c_int))
 
             if ((if (*(&raw const __local__raw as *const c_int)) == (*__param_rkeyptr): 1 else: 0) != 0) {
@@ -1391,13 +1391,13 @@ unsafe fn Intmap_bucket_insert_(__param_self_: *const Intmap, __param_rkeyptr: *
 
     (__local_res.inserted = true)
 
-    var __local_mnew: hmap_meta = hmap_meta { hashx: (((((((*(&raw const __local_res as *const Intmap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort), dist: (((((((*(&raw const __local_res as *const Intmap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort) }
+    var __local_mnew: hmap_meta = with 0 as __ci_bits_seq_59 { var __ci_bits: hmap_meta = hmap_meta.zeroed(); __ci_bits.set_hashx((((((((*(&raw const __local_res as *const Intmap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort)); __ci_bits.set_dist((((((((*(&raw const __local_res as *const Intmap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort)); __ci_bits }
 
     var __local_mcur: hmap_meta = ((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx])
 
     (((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx]) = __local_mnew)
 
-    if ((if (*(&raw const __local_mcur as *const hmap_meta)).dist != 0: 1 else: 0) != 0) {
+    if ((if __local_mcur.dist() != 0: 1 else: 0) != 0) {
         var __local_mask: c_ulong = (((((*__param_self_).bucket_count as c_ulong) -% (1 as c_ulong)) as c_ulong))
 
         var __local_dcur: Intmap_value = (*((*(&raw const __local_res as *const Intmap_result)).ref))
@@ -1405,13 +1405,13 @@ unsafe fn Intmap_bucket_insert_(__param_self_: *const Intmap, __param_rkeyptr: *
         while true {
             (__local_res.idx = (((((((*(&raw const __local_res as *const Intmap_result)).idx as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-            (__local_mcur.dist = ((*(&raw const __local_mcur as *const hmap_meta)).dist +% 1))
+            __local_mcur.set_dist((__local_mcur.dist() +% 1))
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx]).dist == 0: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx])).dist() == 0: 1 else: 0) != 0) {
                 break
             }
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx]).dist < (*(&raw const __local_mcur as *const hmap_meta)).dist: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const Intmap_result)).idx])).dist() < __local_mcur.dist(): 1 else: 0) != 0) {
                 loop {
                     var __local__xp: *mut hmap_meta = ((&raw mut __local_mcur as *mut hmap_meta))
 
@@ -1686,7 +1686,7 @@ unsafe fn Intmap_begin(__param_self_: *const Intmap) -> Intmap_iter {
 
     (__local_it_._end = (*(&raw const __local_it_ as *const Intmap_iter))._end + (((*__param_self_).bucket_count as c_long) as usize))
 
-    while ((if (*(*(&raw const __local_it_ as *const Intmap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    while ((if (*(*(&raw const __local_it_ as *const Intmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         (__local_it_.ref = (*(&raw const __local_it_ as *const Intmap_iter)).ref + 1)
 
         (__local_it_._mref = (*(&raw const __local_it_ as *const Intmap_iter))._mref + 1)
@@ -1713,7 +1713,7 @@ unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) {
 
         ((*__param_it_)._mref = (*__param_it_)._mref + 1)
 
-        if (not ((if (*(*__param_it_)._mref).dist == 0: 1 else: 0) != 0)) {
+        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
             break
         }
 
@@ -1808,7 +1808,7 @@ unsafe fn Intmap_erase(__param_self_: *mut Intmap, __param_rkey: c_int) -> c_int
 unsafe fn Intmap_erase_at(__param_self_: *mut Intmap, __param_it_: Intmap_iter) -> Intmap_iter {
     Intmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Intmap_iter)).ref)
 
-    if ((if (*(*(&raw const __param_it_ as *const Intmap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    if ((if (*(*(&raw const __param_it_ as *const Intmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         Intmap_next((&raw mut __param_it_ as *mut Intmap_iter))
     }
 
@@ -1854,7 +1854,7 @@ unsafe fn Intmap_wipe_(__param_self_: *mut Intmap) {
 
         (__local_m = __local_m + 1)
 
-        if ((*__ci_expr_old_0).dist != 0) {
+        if ((*__ci_expr_old_0).dist() != 0) {
             Intmap_value_drop((__param_self_ as *const Intmap), ((&raw const (__local_d[__local_i]) as *const Intmap_value) as *mut Intmap_value))
         }
 
@@ -1873,7 +1873,7 @@ fn ctest_hashmap_mapdemo1_run() {
 
     unsafe { Intmap_insert((&raw mut __local_nums as *mut Intmap), (11 as c_int), (121 as c_int)) }
 
-    assert_compare((1 as c_int), c"==".ptr, (64 as c_long), ((unsafe *unsafe { Intmap_at(((&raw mut __local_nums as *mut Intmap) as *const Intmap), (8 as c_int)) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-hmap_test/hmap_test.c".ptr, (13 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (64 as c_long), ((unsafe *unsafe { Intmap_at(((&raw mut __local_nums as *mut Intmap) as *const Intmap), (8 as c_int)) }) as c_long), c"hmap_test.c".ptr, (13 as c_int))
 
     unsafe { Intmap_drop(((&raw mut __local_nums as *mut Intmap) as *const Intmap)) }
 
@@ -1907,7 +1907,7 @@ fn SImap_clone(__param_map: SImap) -> SImap {
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (unsafe *(&raw const __param_map as *const SImap)).bucket_count: 1 else: 0) != 0) {
-            if ((unsafe (*(&raw const __param_map as *const SImap)).meta[__local_i]).dist != 0) {
+            if (((unsafe __param_map.meta[__local_i])).dist() != 0) {
                 ((unsafe __local_out.table[__local_i]) = unsafe { SImap_value_clone((__local_self_ as *const SImap), ((*(&raw const __param_map as *const SImap)).table[__local_i])) })
             }
 
@@ -2011,7 +2011,7 @@ unsafe fn SImap_reserve(__param__self: *mut SImap, __param__cap: c_long) -> bool
     }
 
     if __local_ok {
-        ((__local_map.meta[__local__newbucks]).dist = ((1023 as c_ushort)))
+        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as c_ushort)))
 
         var __local_d: *const SImap_value = (((*__param__self).table as *const SImap_value))
 
@@ -2020,7 +2020,7 @@ unsafe fn SImap_reserve(__param__self: *mut SImap, __param__cap: c_long) -> bool
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
-            if ((if (__local_m[__local_i]).dist != 0: 1 else: 0) != 0) {
+            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
                 var __local_r: *const i8 = cstr_toraw((&raw const (*__local_d).first as *const cstr))
 
                 with_memcpy((&raw mut (*(SImap_bucket_insert_(((&raw mut __local_map as *mut SImap) as *const SImap), ((&raw mut __local_r as *mut *const i8) as *const *const i8)).ref)) as *mut u8), (&raw const (*__local_d) as *const u8), sizeof[SImap_value]())
@@ -2085,7 +2085,7 @@ unsafe fn SImap_erase_entry(__param_self_: *mut SImap, __param__val: *mut SImap_
     while true {
         (__local_j = ((((((__local_j as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-        if ((if (__local_m[__local_j]).dist < 2: 1 else: 0) != 0) {
+        if ((if ((__local_m[__local_j])).dist() < 2: 1 else: 0) != 0) {
             break
         }
 
@@ -2093,13 +2093,13 @@ unsafe fn SImap_erase_entry(__param_self_: *mut SImap, __param__val: *mut SImap_
 
         ((__local_m[__local_i]) = (__local_m[__local_j]))
 
-        ((__local_m[__local_i]).dist = ((__local_m[__local_i]).dist -% 1))
+        ((__local_m[__local_i])).set_dist((((__local_m[__local_i])).dist() -% 1))
 
         (__local_i = __local_j)
 
     }
 
-    ((__local_m[__local_i]).dist = ((0 as c_ushort)))
+    ((__local_m[__local_i])).set_dist(((0 as c_ushort)))
 
     ((*__param_self_).size = (*__param_self_).size - 1)
 
@@ -2123,8 +2123,8 @@ unsafe fn SImap_bucket_lookup_(__param_self_: *const SImap, __param_rkeyptr: *co
 
     var __local__res: SImap_result = SImap_result { idx: ((__local__hash as c_ulong) & (__local__idxmask as c_ulong)), hashx: (((((((__local__hash as c_ulong) >> (24 as c_uint))) as c_ulong) & (63 as c_ulong))) as u8), dist: 1 }
 
-    while ((if (*(&raw const __local__res as *const SImap_result)).dist <= ((*__param_self_).meta[(*(&raw const __local__res as *const SImap_result)).idx]).dist: 1 else: 0) != 0) {
-        if ((if ((*__param_self_).meta[(*(&raw const __local__res as *const SImap_result)).idx]).hashx == (*(&raw const __local__res as *const SImap_result)).hashx: 1 else: 0) != 0) {
+    while ((if (*(&raw const __local__res as *const SImap_result)).dist <= (((*__param_self_).meta[(*(&raw const __local__res as *const SImap_result)).idx])).dist(): 1 else: 0) != 0) {
+        if ((if (((*__param_self_).meta[(*(&raw const __local__res as *const SImap_result)).idx])).hashx() == (*(&raw const __local__res as *const SImap_result)).hashx: 1 else: 0) != 0) {
             var __local__raw: *const i8 = cstr_toraw((((&raw const (*((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const SImap_result)).idx]) as *const SImap_value) as *mut SImap_value)).first as *const cstr) as *mut cstr) as *const cstr))
 
             if ((if strcmp((*(&raw const __local__raw as *const *const i8)), (*__param_rkeyptr)) == 0: 1 else: 0) != 0) {
@@ -2157,13 +2157,13 @@ unsafe fn SImap_bucket_insert_(__param_self_: *const SImap, __param_rkeyptr: *co
 
     (__local_res.inserted = true)
 
-    var __local_mnew: hmap_meta = hmap_meta { hashx: (((((((*(&raw const __local_res as *const SImap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort), dist: (((((((*(&raw const __local_res as *const SImap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort) }
+    var __local_mnew: hmap_meta = with 0 as __ci_bits_seq_59 { var __ci_bits: hmap_meta = hmap_meta.zeroed(); __ci_bits.set_hashx((((((((*(&raw const __local_res as *const SImap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort)); __ci_bits.set_dist((((((((*(&raw const __local_res as *const SImap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort)); __ci_bits }
 
     var __local_mcur: hmap_meta = ((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx])
 
     (((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx]) = __local_mnew)
 
-    if ((if (*(&raw const __local_mcur as *const hmap_meta)).dist != 0: 1 else: 0) != 0) {
+    if ((if __local_mcur.dist() != 0: 1 else: 0) != 0) {
         var __local_mask: c_ulong = (((((*__param_self_).bucket_count as c_ulong) -% (1 as c_ulong)) as c_ulong))
 
         var __local_dcur: SImap_value = (*((*(&raw const __local_res as *const SImap_result)).ref))
@@ -2171,13 +2171,13 @@ unsafe fn SImap_bucket_insert_(__param_self_: *const SImap, __param_rkeyptr: *co
         while true {
             (__local_res.idx = (((((((*(&raw const __local_res as *const SImap_result)).idx as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-            (__local_mcur.dist = ((*(&raw const __local_mcur as *const hmap_meta)).dist +% 1))
+            __local_mcur.set_dist((__local_mcur.dist() +% 1))
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx]).dist == 0: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx])).dist() == 0: 1 else: 0) != 0) {
                 break
             }
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx]).dist < (*(&raw const __local_mcur as *const hmap_meta)).dist: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const SImap_result)).idx])).dist() < __local_mcur.dist(): 1 else: 0) != 0) {
                 loop {
                     var __local__xp: *mut hmap_meta = ((&raw mut __local_mcur as *mut hmap_meta))
 
@@ -2493,7 +2493,7 @@ unsafe fn SImap_begin(__param_self_: *const SImap) -> SImap_iter {
 
     (__local_it_._end = (*(&raw const __local_it_ as *const SImap_iter))._end + (((*__param_self_).bucket_count as c_long) as usize))
 
-    while ((if (*(*(&raw const __local_it_ as *const SImap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    while ((if (*(*(&raw const __local_it_ as *const SImap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         (__local_it_.ref = (*(&raw const __local_it_ as *const SImap_iter)).ref + 1)
 
         (__local_it_._mref = (*(&raw const __local_it_ as *const SImap_iter))._mref + 1)
@@ -2520,7 +2520,7 @@ unsafe fn SImap_next(__param_it_: *mut SImap_iter) {
 
         ((*__param_it_)._mref = (*__param_it_)._mref + 1)
 
-        if (not ((if (*(*__param_it_)._mref).dist == 0: 1 else: 0) != 0)) {
+        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
             break
         }
 
@@ -2615,7 +2615,7 @@ unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const i8) -> c_i
 unsafe fn SImap_erase_at(__param_self_: *mut SImap, __param_it_: SImap_iter) -> SImap_iter {
     SImap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const SImap_iter)).ref)
 
-    if ((if (*(*(&raw const __param_it_ as *const SImap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    if ((if (*(*(&raw const __param_it_ as *const SImap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         SImap_next((&raw mut __param_it_ as *mut SImap_iter))
     }
 
@@ -2661,7 +2661,7 @@ unsafe fn SImap_wipe_(__param_self_: *mut SImap) {
 
         (__local_m = __local_m + 1)
 
-        if ((*__ci_expr_old_0).dist != 0) {
+        if ((*__ci_expr_old_0).dist() != 0) {
             SImap_value_drop((__param_self_ as *const SImap), ((&raw const (__local_d[__local_i]) as *const SImap_value) as *mut SImap_value))
         }
 
@@ -2684,9 +2684,9 @@ fn ctest_hashmap_mapdemo2_run() {
 
     unsafe { SImap_put((&raw mut __local_nums as *mut SImap), c"Groovy".ptr, (200 as c_int)) }
 
-    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { SImap_at(((&raw mut __local_nums as *mut SImap) as *const SImap), c"Groovy".ptr) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-hmap_test/hmap_test.c".ptr, (28 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { SImap_at(((&raw mut __local_nums as *mut SImap) as *const SImap), c"Groovy".ptr) }) as c_long), c"hmap_test.c".ptr, (28 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (64 as c_long), ((unsafe *unsafe { SImap_at(((&raw mut __local_nums as *mut SImap) as *const SImap), c"Hello".ptr) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-hmap_test/hmap_test.c".ptr, (29 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (64 as c_long), ((unsafe *unsafe { SImap_at(((&raw mut __local_nums as *mut SImap) as *const SImap), c"Hello".ptr) }) as c_long), c"hmap_test.c".ptr, (29 as c_int))
 
     unsafe { SImap_drop(((&raw mut __local_nums as *mut SImap) as *const SImap)) }
 
@@ -2720,7 +2720,7 @@ fn Strmap_clone(__param_map: Strmap) -> Strmap {
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (unsafe *(&raw const __param_map as *const Strmap)).bucket_count: 1 else: 0) != 0) {
-            if ((unsafe (*(&raw const __param_map as *const Strmap)).meta[__local_i]).dist != 0) {
+            if (((unsafe __param_map.meta[__local_i])).dist() != 0) {
                 ((unsafe __local_out.table[__local_i]) = unsafe { Strmap_value_clone((__local_self_ as *const Strmap), ((*(&raw const __param_map as *const Strmap)).table[__local_i])) })
             }
 
@@ -2824,7 +2824,7 @@ unsafe fn Strmap_reserve(__param__self: *mut Strmap, __param__cap: c_long) -> bo
     }
 
     if __local_ok {
-        ((__local_map.meta[__local__newbucks]).dist = ((1023 as c_ushort)))
+        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as c_ushort)))
 
         var __local_d: *const Strmap_value = (((*__param__self).table as *const Strmap_value))
 
@@ -2833,7 +2833,7 @@ unsafe fn Strmap_reserve(__param__self: *mut Strmap, __param__cap: c_long) -> bo
         var __local_i: c_long = ((0 as c_long))
 
         while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
-            if ((if (__local_m[__local_i]).dist != 0: 1 else: 0) != 0) {
+            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
                 var __local_r: *const i8 = cstr_toraw((&raw const (*__local_d).first as *const cstr))
 
                 with_memcpy((&raw mut (*(Strmap_bucket_insert_(((&raw mut __local_map as *mut Strmap) as *const Strmap), ((&raw mut __local_r as *mut *const i8) as *const *const i8)).ref)) as *mut u8), (&raw const (*__local_d) as *const u8), sizeof[Strmap_value]())
@@ -2898,7 +2898,7 @@ unsafe fn Strmap_erase_entry(__param_self_: *mut Strmap, __param__val: *mut Strm
     while true {
         (__local_j = ((((((__local_j as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-        if ((if (__local_m[__local_j]).dist < 2: 1 else: 0) != 0) {
+        if ((if ((__local_m[__local_j])).dist() < 2: 1 else: 0) != 0) {
             break
         }
 
@@ -2906,13 +2906,13 @@ unsafe fn Strmap_erase_entry(__param_self_: *mut Strmap, __param__val: *mut Strm
 
         ((__local_m[__local_i]) = (__local_m[__local_j]))
 
-        ((__local_m[__local_i]).dist = ((__local_m[__local_i]).dist -% 1))
+        ((__local_m[__local_i])).set_dist((((__local_m[__local_i])).dist() -% 1))
 
         (__local_i = __local_j)
 
     }
 
-    ((__local_m[__local_i]).dist = ((0 as c_ushort)))
+    ((__local_m[__local_i])).set_dist(((0 as c_ushort)))
 
     ((*__param_self_).size = (*__param_self_).size - 1)
 
@@ -2936,8 +2936,8 @@ unsafe fn Strmap_bucket_lookup_(__param_self_: *const Strmap, __param_rkeyptr: *
 
     var __local__res: Strmap_result = Strmap_result { idx: ((__local__hash as c_ulong) & (__local__idxmask as c_ulong)), hashx: (((((((__local__hash as c_ulong) >> (24 as c_uint))) as c_ulong) & (63 as c_ulong))) as u8), dist: 1 }
 
-    while ((if (*(&raw const __local__res as *const Strmap_result)).dist <= ((*__param_self_).meta[(*(&raw const __local__res as *const Strmap_result)).idx]).dist: 1 else: 0) != 0) {
-        if ((if ((*__param_self_).meta[(*(&raw const __local__res as *const Strmap_result)).idx]).hashx == (*(&raw const __local__res as *const Strmap_result)).hashx: 1 else: 0) != 0) {
+    while ((if (*(&raw const __local__res as *const Strmap_result)).dist <= (((*__param_self_).meta[(*(&raw const __local__res as *const Strmap_result)).idx])).dist(): 1 else: 0) != 0) {
+        if ((if (((*__param_self_).meta[(*(&raw const __local__res as *const Strmap_result)).idx])).hashx() == (*(&raw const __local__res as *const Strmap_result)).hashx: 1 else: 0) != 0) {
             var __local__raw: *const i8 = cstr_toraw((((&raw const (*((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const Strmap_result)).idx]) as *const Strmap_value) as *mut Strmap_value)).first as *const cstr) as *mut cstr) as *const cstr))
 
             if ((if strcmp((*(&raw const __local__raw as *const *const i8)), (*__param_rkeyptr)) == 0: 1 else: 0) != 0) {
@@ -2970,13 +2970,13 @@ unsafe fn Strmap_bucket_insert_(__param_self_: *const Strmap, __param_rkeyptr: *
 
     (__local_res.inserted = true)
 
-    var __local_mnew: hmap_meta = hmap_meta { hashx: (((((((*(&raw const __local_res as *const Strmap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort), dist: (((((((*(&raw const __local_res as *const Strmap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort) }
+    var __local_mnew: hmap_meta = with 0 as __ci_bits_seq_59 { var __ci_bits: hmap_meta = hmap_meta.zeroed(); __ci_bits.set_hashx((((((((*(&raw const __local_res as *const Strmap_result)).hashx as c_uint) as c_int) as c_uint) & (63 as c_uint))) as c_ushort)); __ci_bits.set_dist((((((((*(&raw const __local_res as *const Strmap_result)).dist as c_uint) as c_int) as c_uint) & (1023 as c_uint))) as c_ushort)); __ci_bits }
 
     var __local_mcur: hmap_meta = ((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx])
 
     (((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx]) = __local_mnew)
 
-    if ((if (*(&raw const __local_mcur as *const hmap_meta)).dist != 0: 1 else: 0) != 0) {
+    if ((if __local_mcur.dist() != 0: 1 else: 0) != 0) {
         var __local_mask: c_ulong = (((((*__param_self_).bucket_count as c_ulong) -% (1 as c_ulong)) as c_ulong))
 
         var __local_dcur: Strmap_value = (*((*(&raw const __local_res as *const Strmap_result)).ref))
@@ -2984,13 +2984,13 @@ unsafe fn Strmap_bucket_insert_(__param_self_: *const Strmap, __param_rkeyptr: *
         while true {
             (__local_res.idx = (((((((*(&raw const __local_res as *const Strmap_result)).idx as c_ulong) +% (1 as c_ulong)) as c_ulong) & (__local_mask as c_ulong)) as c_ulong)))
 
-            (__local_mcur.dist = ((*(&raw const __local_mcur as *const hmap_meta)).dist +% 1))
+            __local_mcur.set_dist((__local_mcur.dist() +% 1))
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx]).dist == 0: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx])).dist() == 0: 1 else: 0) != 0) {
                 break
             }
 
-            if ((if ((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx]).dist < (*(&raw const __local_mcur as *const hmap_meta)).dist: 1 else: 0) != 0) {
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const Strmap_result)).idx])).dist() < __local_mcur.dist(): 1 else: 0) != 0) {
                 loop {
                     var __local__xp: *mut hmap_meta = ((&raw mut __local_mcur as *mut hmap_meta))
 
@@ -3313,7 +3313,7 @@ unsafe fn Strmap_begin(__param_self_: *const Strmap) -> Strmap_iter {
 
     (__local_it_._end = (*(&raw const __local_it_ as *const Strmap_iter))._end + (((*__param_self_).bucket_count as c_long) as usize))
 
-    while ((if (*(*(&raw const __local_it_ as *const Strmap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    while ((if (*(*(&raw const __local_it_ as *const Strmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         (__local_it_.ref = (*(&raw const __local_it_ as *const Strmap_iter)).ref + 1)
 
         (__local_it_._mref = (*(&raw const __local_it_ as *const Strmap_iter))._mref + 1)
@@ -3340,7 +3340,7 @@ unsafe fn Strmap_next(__param_it_: *mut Strmap_iter) {
 
         ((*__param_it_)._mref = (*__param_it_)._mref + 1)
 
-        if (not ((if (*(*__param_it_)._mref).dist == 0: 1 else: 0) != 0)) {
+        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
             break
         }
 
@@ -3435,7 +3435,7 @@ unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const i8) -> c
 unsafe fn Strmap_erase_at(__param_self_: *mut Strmap, __param_it_: Strmap_iter) -> Strmap_iter {
     Strmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Strmap_iter)).ref)
 
-    if ((if (*(*(&raw const __param_it_ as *const Strmap_iter))._mref).dist == 0: 1 else: 0) != 0) {
+    if ((if (*(*(&raw const __param_it_ as *const Strmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
         Strmap_next((&raw mut __param_it_ as *mut Strmap_iter))
     }
 
@@ -3481,7 +3481,7 @@ unsafe fn Strmap_wipe_(__param_self_: *mut Strmap) {
 
         (__local_m = __local_m + 1)
 
-        if ((*__ci_expr_old_0).dist != 0) {
+        if ((*__ci_expr_old_0).dist() != 0) {
             Strmap_value_drop((__param_self_ as *const Strmap), ((&raw const (__local_d[__local_i]) as *const Strmap_value) as *mut Strmap_value))
         }
 
@@ -3523,9 +3523,9 @@ fn ctest_hashmap_mapdemo3_run() {
         unsafe { Strmap_from_n((&__ci_expr_lit_1[0] as *mut Strmap_raw), (2 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Strmap_eq(((&raw mut __local_res1 as *mut Strmap) as *const Strmap), ((&raw mut __local_map as *mut Strmap) as *const Strmap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-hmap_test/hmap_test.c".ptr, (53 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Strmap_eq(((&raw mut __local_res1 as *mut Strmap) as *const Strmap), ((&raw mut __local_map as *mut Strmap) as *const Strmap)) } as bool), c"hmap_test.c".ptr, (53 as c_int))
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Strmap_eq(((&raw mut __local_res2 as *mut Strmap) as *const Strmap), ((&raw mut __local_map as *mut Strmap) as *const Strmap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-hmap_test/hmap_test.c".ptr, (54 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Strmap_eq(((&raw mut __local_res2 as *mut Strmap) as *const Strmap), ((&raw mut __local_map as *mut Strmap) as *const Strmap)) } as bool), c"hmap_test.c".ptr, (54 as c_int))
 
     loop {
         var __local__c_i2: ctest_hashmap_mapdemo3_run__c_i2_anon = ctest_hashmap_mapdemo3_run__c_i2_anon.zeroed()

@@ -1113,11 +1113,11 @@ fn ctest_list_splice_run() {
         unsafe { IList_from_n((&__ci_expr_lit_2[0] as *mut c_int), (10 as c_long)) }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, ((unsafe *((*(&raw const __local_pos as *const IList_iter)).ref)) as c_long), (3 as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (18 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, ((unsafe *((*(&raw const __local_pos as *const IList_iter)).ref)) as c_long), (3 as c_long), c"list_test.c".ptr, (18 as c_int))
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_list1 as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (19 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_list1 as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (19 as c_int))
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_is_empty(((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (20 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_is_empty(((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (20 as c_int))
 
     unsafe { IList_splice_range((&raw mut __local_list2 as *mut IList), unsafe { IList_begin(((&raw mut __local_list2 as *mut IList) as *const IList)) }, (&raw mut __local_list1 as *mut IList), __local_pos, unsafe { IList_end(((&raw mut __local_list1 as *mut IList) as *const IList)) }) }
 
@@ -1126,16 +1126,16 @@ fn ctest_list_splice_run() {
         unsafe { IList_from_n((&__ci_expr_lit_3[0] as *mut c_int), (7 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_list1 as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (26 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_list1 as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (26 as c_int))
 
     var __local_res3: IList = with 0 as __ci_expr_seq_32 {
         var __ci_expr_lit_4: [c_int; 3] = [3, 4, 5]
         unsafe { IList_from_n((&__ci_expr_lit_4[0] as *mut c_int), (3 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res3 as *mut IList) as *const IList), ((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (29 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res3 as *mut IList) as *const IList), ((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (29 as c_int))
 
-    assert_bool((1 as c_int), (false as bool), (unsafe { IList_eq(((&raw mut __local_list1 as *mut IList) as *const IList), ((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (30 as c_int))
+    assert_bool((1 as c_int), (false as bool), (unsafe { IList_eq(((&raw mut __local_list1 as *mut IList) as *const IList), ((&raw mut __local_list2 as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (30 as c_int))
 
     loop {
         var __local__c_i2: ctest_list_splice_run__c_i2_anon = ctest_list_splice_run__c_i2_anon.zeroed()
@@ -1187,7 +1187,7 @@ fn ctest_list_erase_run() {
         unsafe { IList_from_n((&__ci_expr_lit_1[0] as *mut c_int), (4 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_L as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (44 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_L as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (44 as c_int))
 
     unsafe { IList_next((&raw mut __local_it_ as *mut IList_iter)) }
 
@@ -1199,7 +1199,7 @@ fn ctest_list_erase_run() {
         unsafe { IList_from_n((&__ci_expr_lit_2[0] as *mut c_int), (2 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_L as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (50 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_L as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (50 as c_int))
 
     loop {
         var __local__c_i2: ctest_list_erase_run__c_i2_anon = ctest_list_erase_run__c_i2_anon.zeroed()
@@ -1268,7 +1268,7 @@ fn ctest_list_misc_run() {
         unsafe { IList_from_n((&__ci_expr_lit_0[0] as *mut c_int), (20 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (70 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (70 as c_int))
 
     ((unsafe *(unsafe { IList_find(((&raw mut __local_nums as *mut IList) as *const IList), (104 as c_int)) }.ref)) = (unsafe *(unsafe { IList_find(((&raw mut __local_nums as *mut IList) as *const IList), (104 as c_int)) }.ref)) + 50)
 
@@ -1279,7 +1279,7 @@ fn ctest_list_misc_run() {
         unsafe { IList_from_n((&__ci_expr_lit_1[0] as *mut c_int), (19 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (75 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res2 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (75 as c_int))
 
     var __local_it_: IList_iter = unsafe { IList_begin(((&raw mut __local_nums as *mut IList) as *const IList)) }
 
@@ -1290,7 +1290,7 @@ fn ctest_list_misc_run() {
         unsafe { IList_from_n((&__ci_expr_lit_2[0] as *mut c_int), (9 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res3 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (80 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res3 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (80 as c_int))
 
     unsafe { IList_pop_front((&raw mut __local_nums as *mut IList)) }
 
@@ -1303,7 +1303,7 @@ fn ctest_list_misc_run() {
         unsafe { IList_from_n((&__ci_expr_lit_3[0] as *mut c_int), (9 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res4 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-list_test/list_test.c".ptr, (86 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IList_eq(((&raw mut __local_res4 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (86 as c_int))
 
     loop {
         var __local__c_i2: ctest_list_misc_run__c_i2_anon = ctest_list_misc_run__c_i2_anon.zeroed()

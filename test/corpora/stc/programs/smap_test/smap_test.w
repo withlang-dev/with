@@ -2099,7 +2099,7 @@ fn ctest_sortedmap_erase_run() {
     unsafe { Mymap_take((&raw mut __local_res as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_0[0] as *mut Mymap_raw), (5 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m1 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (23 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m1 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (23 as c_int))
 
     unsafe { Mymap_erase_at((&raw mut __local_m1 as *mut Mymap), Mymap_advance(unsafe { Mymap_begin(((&raw mut __local_m1 as *mut Mymap) as *const Mymap)) }, (1 as c_ulong))) }
 
@@ -2108,7 +2108,7 @@ fn ctest_sortedmap_erase_run() {
     unsafe { Mymap_take((&raw mut __local_res as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_1[0] as *mut Mymap_raw), (4 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m1 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (28 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m1 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (28 as c_int))
 
     var __local_m2: Mymap = with 0 as __ci_expr_seq_21 {
         var __ci_expr_lit_2: [Mymap_raw; 5] = [Mymap_raw { first: 10, second: (("Bob" as *mut c_char) as *const i8) }, Mymap_raw { first: 11, second: (("Rob" as *mut c_char) as *const i8) }, Mymap_raw { first: 12, second: (("Robert" as *mut c_char) as *const i8) }, Mymap_raw { first: 13, second: (("Bert" as *mut c_char) as *const i8) }, Mymap_raw { first: 14, second: (("Bobby" as *mut c_char) as *const i8) }]
@@ -2126,7 +2126,7 @@ fn ctest_sortedmap_erase_run() {
     unsafe { Mymap_take((&raw mut __local_res as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_3[0] as *mut Mymap_raw), (2 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m2 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (48 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m2 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (48 as c_int))
 
     var __local_m3: Mymap = Mymap.zeroed()
 
@@ -2149,18 +2149,18 @@ fn ctest_sortedmap_erase_run() {
     unsafe { Mymap_take((&raw mut __local_res as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_4[0] as *mut Mymap_raw), (7 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (63 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (63 as c_int))
 
     var __local_count: c_int = ((unsafe { Mymap_erase((&raw mut __local_m3 as *mut Mymap), (2 as c_int)) } as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (1 as c_long), (__local_count as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (67 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (1 as c_long), (__local_count as c_long), c"smap_test.c".ptr, (67 as c_int))
 
     var __ci_expr_lit_5: [Mymap_raw; 6] = [Mymap_raw { first: 1, second: (("red" as *mut c_char) as *const i8) }, Mymap_raw { first: 3, second: (("blue" as *mut c_char) as *const i8) }, Mymap_raw { first: 4, second: (("green" as *mut c_char) as *const i8) }, Mymap_raw { first: 5, second: (("orange" as *mut c_char) as *const i8) }, Mymap_raw { first: 6, second: (("purple" as *mut c_char) as *const i8) }, Mymap_raw { first: 7, second: (("pink" as *mut c_char) as *const i8) }]
 
     unsafe { Mymap_take((&raw mut __local_res as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_5[0] as *mut Mymap_raw), (6 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (70 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (70 as c_int))
 
     loop {
         var __local__c_i2: ctest_sortedmap_erase_run__c_i2_anon = ctest_sortedmap_erase_run__c_i2_anon.zeroed()
@@ -3709,11 +3709,11 @@ fn ctest_sortedmap_insert_run() {
     unsafe { Intmap_take((&raw mut __local_res as *mut Intmap), unsafe { Intmap_from_n((&__ci_expr_lit_0[0] as *mut Intmap_raw), (2 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m1 as *mut Intmap) as *const Intmap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (97 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m1 as *mut Intmap) as *const Intmap)) } as bool), c"smap_test.c".ptr, (97 as c_int))
 
     var __local_ret: Intmap_result = unsafe { Intmap_insert((&raw mut __local_m1 as *mut Intmap), (1 as c_int), (111 as c_int)) }
 
-    assert_bool((1 as c_int), (false as bool), (unsafe *(&raw const __local_ret as *const Intmap_result)).inserted, c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (101 as c_int))
+    assert_bool((1 as c_int), (false as bool), (unsafe *(&raw const __local_ret as *const Intmap_result)).inserted, c"smap_test.c".ptr, (101 as c_int))
 
     unsafe { Intmap_insert((&raw mut __local_m1 as *mut Intmap), (3 as c_int), (30 as c_int)) }
 
@@ -3722,7 +3722,7 @@ fn ctest_sortedmap_insert_run() {
     unsafe { Intmap_take((&raw mut __local_res as *mut Intmap), unsafe { Intmap_from_n((&__ci_expr_lit_1[0] as *mut Intmap_raw), (3 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m1 as *mut Intmap) as *const Intmap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (106 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m1 as *mut Intmap) as *const Intmap)) } as bool), c"smap_test.c".ptr, (106 as c_int))
 
     var __local_m2: Intmap = Intmap.zeroed()
 
@@ -3745,7 +3745,7 @@ fn ctest_sortedmap_insert_run() {
     unsafe { Intmap_take((&raw mut __local_res as *mut Intmap), unsafe { Intmap_from_n((&__ci_expr_lit_2[0] as *mut Intmap_raw), (5 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m2 as *mut Intmap) as *const Intmap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (122 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Intmap_eq(((&raw mut __local_res as *mut Intmap) as *const Intmap), ((&raw mut __local_m2 as *mut Intmap) as *const Intmap)) } as bool), c"smap_test.c".ptr, (122 as c_int))
 
     var __local_m3: Mymap = Mymap.zeroed()
 
@@ -3763,7 +3763,7 @@ fn ctest_sortedmap_insert_run() {
     unsafe { Mymap_take((&raw mut __local_res3 as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_3[0] as *mut Mymap_raw), (1 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res3 as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (134 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res3 as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (134 as c_int))
 
     unsafe { Mymap_insert((&raw mut __local_m3 as *mut Mymap), (*(&raw const __local_ip2 as *const Mymap_value)).first, unsafe { cstr_move(((&raw const (*(&raw const __local_ip2 as *const Mymap_value)).second as *const cstr) as *mut cstr)) }) }
 
@@ -3772,7 +3772,7 @@ fn ctest_sortedmap_insert_run() {
     unsafe { Mymap_take((&raw mut __local_res3 as *mut Mymap), unsafe { Mymap_from_n((&__ci_expr_lit_4[0] as *mut Mymap_raw), (2 as c_long)) }) }
 
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res3 as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-smap_test/smap_test.c".ptr, (140 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { Mymap_eq(((&raw mut __local_res3 as *mut Mymap) as *const Mymap), ((&raw mut __local_m3 as *mut Mymap) as *const Mymap)) } as bool), c"smap_test.c".ptr, (140 as c_int))
 
     loop {
         var __local__c_i2: ctest_sortedmap_insert_run__c_i2_anon = ctest_sortedmap_insert_run__c_i2_anon.zeroed()

@@ -900,7 +900,7 @@ fn ctest_deque_basics_run() {
         unsafe { IDeq_from_n((&__ci_expr_lit_0[0] as *mut c_int), (12 as c_long)) }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (12 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (9 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (12 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"deque_test.c".ptr, (9 as c_int))
 
     var __local__c_i1: c_long = ((0 as c_long))
 
@@ -933,9 +933,9 @@ fn ctest_deque_basics_run() {
         unsafe { IDeq_from_n((&__ci_expr_lit_1[0] as *mut c_int), (14 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res1 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (17 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res1 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"deque_test.c".ptr, (17 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (18 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"deque_test.c".ptr, (18 as c_int))
 
     unsafe { IDeq_erase_n((&raw mut __local_d as *mut IDeq), (7 as c_long), (4 as c_long)) }
 
@@ -944,7 +944,7 @@ fn ctest_deque_basics_run() {
         unsafe { IDeq_from_n((&__ci_expr_lit_2[0] as *mut c_int), (10 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res2 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (23 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res2 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"deque_test.c".ptr, (23 as c_int))
 
     var __local_nums: List[c_int] = [200, 300, 400, 500]
 
@@ -955,18 +955,18 @@ fn ctest_deque_basics_run() {
         unsafe { IDeq_from_n((&__ci_expr_lit_3[0] as *mut c_int), (14 as c_long)) }
     }
 
-    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (29 as c_int))
+    assert_bool((1 as c_int), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"deque_test.c".ptr, (29 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, ((unsafe *(unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (400 as c_int)) }.ref)) as c_long), (400 as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (30 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, ((unsafe *(unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (400 as c_int)) }.ref)) as c_long), (400 as c_long), c"deque_test.c".ptr, (30 as c_int))
 
     (sizeof[c_int]() as usize)
 
-    assert_pointers((1 as c_int), c"==".ptr, (null as *const c_void), (unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (401 as c_int)) }.ref as *const c_void), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (31 as c_int))
+    assert_pointers((1 as c_int), c"==".ptr, (null as *const c_void), (unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (401 as c_int)) }.ref as *const c_void), c"deque_test.c".ptr, (31 as c_int))
 
 
-    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (33 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (14 as c_long), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as c_long), c"deque_test.c".ptr, (33 as c_int))
 
-    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { IDeq_at(((&raw mut __local_d as *mut IDeq) as *const IDeq), (7 as c_long)) }) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-deque_test/deque_test.c".ptr, (34 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (200 as c_long), ((unsafe *unsafe { IDeq_at(((&raw mut __local_d as *mut IDeq) as *const IDeq), (7 as c_long)) }) as c_long), c"deque_test.c".ptr, (34 as c_int))
 
     loop {
         var __local__c_i2: ctest_deque_basics_run__c_i2_anon = ctest_deque_basics_run__c_i2_anon.zeroed()

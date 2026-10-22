@@ -547,6 +547,97 @@ pub type crand32_uniform_dist { pub low: c_int = 0, pub range: c_uint = 0, pub t
 impl Copy for crand32_uniform_dist
 
 pub type crandWS = crand64
+pub type cco_position = c_int
+
+pub let cco_POS_INIT: c_int = 0
+pub let cco_POS_DONE: c_int = -1
+pub let cco_POS_FINAL: c_int = -2
+pub type cco_status_bits = c_uint
+
+pub let cco_DONE: c_int = 0
+pub let cco_AWAIT: c_int = 1073741824
+pub let cco_SUSPEND: c_int = 536870912
+pub let cco_YIELD: c_int = 268435456
+pub let cco_RECEIVE: c_int = 134217728
+@[repr(C)]
+pub type cco_group { pub await_count: c_int = 0, pub __bits_0: u32 = 0 }
+impl Copy for cco_group
+impl cco_group:
+    pub fn spawn_count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int
+    pub mut fn set_spawn_count(v: c_int): self.__bits_0 = (self.__bits_0 & ~((16777215 as u32) << 0)) | (((v as u32) & 16777215) << 0)
+    pub fn on_error() -> c_uint: ((self.__bits_0 >> 24) & 127) as c_uint
+    pub mut fn set_on_error(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((127 as u32) << 24)) | (((v as u32) & 127) << 24)
+    pub fn cancelled() -> c_uint: ((self.__bits_0 >> 31) & 1) as c_uint
+    pub mut fn set_cancelled(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 31)) | (((v as u32) & 1) << 31)
+comptime fn __ci_layout_cco_group() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[cco_group]() != 8 or offsetof[cco_group](__bits_0) != 4): comptime_error("cco_group: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_cco_group_check: Unit = __ci_layout_cco_group()
+
+@[repr(C)]
+pub type cco_info = union { pub num: c_long = 0, pub str: *const i8 = null, pub ptr: *mut c_void = null }
+impl Copy for cco_info
+
+@[repr(C)]
+pub type cco_err_t { pub code: c_int = 0, pub line: c_int = 0, pub file: *const i8 = null, pub info: cco_info }
+impl Copy for cco_err_t
+
+@[repr(C)]
+pub type cco_task_state { pub fib: *mut cco_task_fiber = null, pub parent_grp: *mut cco_group = null, pub tmp_grp: *mut cco_group = null, pub pos: c_int = 0, pub finalizing: bool = false, pub scope_idx: c_char = 0, pub curr_scope: c_char = 0, pub __bits_0: u8 = 0, pub group: [cco_group; 1] }
+impl Copy for cco_task_state
+impl cco_task_state:
+    pub fn n_scopes() -> c_char: (((self.__bits_0 << 1) as i8) >> 1) as c_char
+    pub mut fn set_n_scopes(v: c_char): self.__bits_0 = (self.__bits_0 & ~((127 as u8) << 0)) | (((v as u8) & 127) << 0)
+    pub fn scoped() -> u8: ((self.__bits_0 >> 7) & 1) as u8
+    pub mut fn set_scoped(v: u8): self.__bits_0 = (self.__bits_0 & ~((1 as u8) << 7)) | (((v as u8) & 1) << 7)
+comptime fn __ci_layout_cco_task_state() -> Unit:
+    if sizeof[*const u8]() == 8 and (sizeof[cco_task_state]() != 40 or offsetof[cco_task_state](__bits_0) != 31): comptime_error("cco_task_state: the bitfield layout this migration recorded (D147) differs on this target")
+const __ci_layout_cco_task_state_check: Unit = __ci_layout_cco_task_state()
+
+pub type cco_base_state = cco_task_state
+
+@[repr(C)]
+pub type cco_base { pub state: cco_task_state }
+impl Copy for cco_base
+
+pub type cco_task_data_ptr_check = [c_int; 4]
+
+pub type cco_task_data_ptr = *mut c_void
+
+@[repr(C)]
+pub type cco_task_fiber { pub task: *mut cco_task = null, pub data: *mut c_void = null, pub failed_grp: *mut cco_group = null, pub cur_awaiter: *mut cco_task = null, pub next: *mut cco_task_fiber = null, pub parent: *mut cco_task_fiber = null, pub recover_state: cco_task_state, pub error_: cco_err_t, pub cur_awaitbits: c_int = 0, pub status: c_int = 0 }
+impl Copy for cco_task_fiber
+
+@[repr(C)]
+pub type cco_task_base { pub func: Option[unsafe extern "C" fn(*mut cco_task) -> c_int] = null, pub awaiter: *mut cco_task = null, pub awaitbits: c_int = 0, pub state: cco_task_state }
+impl Copy for cco_task_base
+
+@[repr(C)]
+pub type cco_task { pub base: cco_task_base }
+impl Copy for cco_task
+
+pub type cco_fiber = cco_task_fiber
+
+pub type cco_err_policy = c_uint
+
+pub let cco_POLICY_SHUTDOWN: c_int = 0
+pub let cco_POLICY_NOTIFY: c_int = 1
+pub let cco_POLICY_IGNORE: c_int = 2
+@[repr(C)]
+pub type cco_semaphore { pub acq_count: c_long = 0 }
+impl Copy for cco_semaphore
+
+@[repr(C)]
+pub type cco_timer { pub duration: f64 = 0.0, pub start_time: c_longlong = 0 }
+impl Copy for cco_timer
+
+pub let cco_OK: c_int = 0
+pub let cco_CANCEL: c_uint = 1073741824
+pub let cco_SHUTDOWN: c_uint = 536870912
+pub let cco_SUBTASK_FAIL: c_uint = 536870913
+pub let cco_NONE: c_int = 0
+pub fn cco_timer_freq() -> i64 {
+    1000000i64
+}
 @[repr(C)]
 pub type URange16 { pub lo: c_ushort = 0, pub hi: c_ushort = 0 }
 impl Copy for URange16
