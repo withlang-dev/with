@@ -1515,7 +1515,7 @@ fn ctest_utf8_utf8_casefold_run() {
     var __local_ch: c_uint = ((0 as c_uint))
 
     while ((if __local_ch < 131072: 1 else: 0) != 0) {
-        assert_compare((1 as c_int), c"==".ptr, (cutf8_casefold(__local_ch) as c_long), (utf8_casefold_bruteforce(__local_ch) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-utf8_test/utf8_test.c".ptr, (47 as c_int))
+        assert_compare((1 as c_int), c"==".ptr, (cutf8_casefold(__local_ch) as c_long), (utf8_casefold_bruteforce(__local_ch) as c_long), c"utf8_test.c".ptr, (47 as c_int))
 
         (__local_ch = (__local_ch +% 1))
 
@@ -1528,7 +1528,7 @@ fn ctest_utf8_utf8_tolower_run() {
     var __local_ch: c_uint = ((0 as c_uint))
 
     while ((if __local_ch < 131072: 1 else: 0) != 0) {
-        assert_compare((1 as c_int), c"==".ptr, (cutf8_tolower(__local_ch) as c_long), (utf8_tolower_bruteforce(__local_ch) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-utf8_test/utf8_test.c".ptr, (53 as c_int))
+        assert_compare((1 as c_int), c"==".ptr, (cutf8_tolower(__local_ch) as c_long), (utf8_tolower_bruteforce(__local_ch) as c_long), c"utf8_test.c".ptr, (53 as c_int))
 
         (__local_ch = (__local_ch +% 1))
 
@@ -1541,7 +1541,7 @@ fn ctest_utf8_utf8_toupper_run() {
     var __local_ch: c_uint = ((0 as c_uint))
 
     while ((if __local_ch < 131072: 1 else: 0) != 0) {
-        assert_compare((1 as c_int), c"==".ptr, (cutf8_toupper(__local_ch) as c_long), (utf8_toupper_bruteforce(__local_ch) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-utf8_test/utf8_test.c".ptr, (59 as c_int))
+        assert_compare((1 as c_int), c"==".ptr, (cutf8_toupper(__local_ch) as c_long), (utf8_toupper_bruteforce(__local_ch) as c_long), c"utf8_test.c".ptr, (59 as c_int))
 
         (__local_ch = (__local_ch +% 1))
 

@@ -266,7 +266,18 @@ fn ci_set_windows_target(triple: &str, sysroot: &str):
     with_cimport_set_windows_target(triple, sysroot)
 
 // #2060: the C model a migration names; see ClangBridge.
+// The C model's triple (`--c-target`), "" for the host: the data model a
+// migration's layout facts were read under (ci_c_model_pointer_bytes).
+var g_ci_c_model_triple: str = ""
+
+fn ci_c_model_pointer_bytes() -> i64:
+    let t = g_ci_c_model_triple
+    if t.len() == 0: return target_spec_ptr_bytes()
+    if t.starts_with("wasm32") or t.starts_with("i386") or t.starts_with("i686") or t.starts_with("arm-") or t.starts_with("armv7") or t.starts_with("thumb"): return 4
+    8
+
 fn ci_set_c_model(triple: &str, sysroot: &str):
+    g_ci_c_model_triple = triple
     with_cimport_set_c_model(triple, sysroot)
 
 fn ci_add_windows_system_includes():
@@ -1350,12 +1361,12 @@ fn ci_record_decl_directly_demoted_cursor(session: i64, decl_cursor: i32) -> boo
     while i < nc:
         let child = with_ci_child(session, decl_cursor, i)
         if with_ci_cursor_kind(session, child) == CK_FIELD:
-            // §16.9: a record with bitfields is opaque, named or not; under
+            // §16.9: a record with bitfields is opaque, named or not. Under
             // `with migrate` a file-scope record keeps its layout (D147,
-            // ci_is_directly_demoted) and a local or member one is refused.
-            if with_ci_cursor_is_bitfield(session, child) != 0:
-                if ci_translate_in_migrate_mode(): g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ with_ci_cursor_spelling(session, decl_cursor) ++ "': a bitfield in a local or member record is not supported yet (D147)\n"
-                return true
+            // ci_is_directly_demoted); a member record with one is refused
+            // where it would render (ci_translate_anon_record_cursor), not
+            // here: this predicate runs over every declaration the headers
+            // bring in (sys/wait.h's `union wait`), emitted or not.
             if with_ci_cursor_is_bitfield(session, child) != 0:
                 return true
             let anon_decl = ci_field_cursor_anon_record_decl(session, child)
@@ -1411,6 +1422,14 @@ fn ci_record_decl_has_demoted_field_cursor(session: i64, decl_cursor: i32, demot
         i = i + 1
     false
 
+// Whether a record declaration's own fields include a bitfield.
+fn ci_record_cursor_has_bitfield(session: i64, decl_cursor: i32) -> bool:
+    let nc = with_ci_num_children(session, decl_cursor)
+    for i in 0..nc:
+        let child = with_ci_child(session, decl_cursor, i)
+        if with_ci_cursor_kind(session, child) == CK_FIELD and with_ci_cursor_is_bitfield(session, child) != 0: return true
+    false
+
 fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &str) -> str:
     if decl_cursor < 0 or synth_name.len() == 0:
         return ""
@@ -1418,6 +1437,10 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
         return ""
     with_cimport_mark_name_emitted(synth_name)
     if ci_record_decl_directly_demoted_cursor(session, decl_cursor):
+        // D147: a migration never demotes a bitfield record silently; a
+        // member record with one is refused until it, too, keeps its layout.
+        if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor):
+            g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': a bitfield in a member record is not supported yet (D147)\n"
         return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
 
     let is_union = with_ci_cursor_kind(session, decl_cursor) == CK_UNION
@@ -2649,12 +2672,15 @@ fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &
         // The store masks the value to the width: C's store, whatever the
         // project's overflow setting (D147 point 2).
         out = out ++ "    pub mut fn set_" ++ member ++ "(v: " ++ m.ty ++ "): " ++ storage ++ " = (" ++ storage ++ " & ~((" ++ mask ++ " as " ++ utype ++ ") << " ++ i64_to_string(m.shift as i64) ++ ")) | (((v as " ++ utype ++ ") & " ++ mask ++ ") << " ++ i64_to_string(m.shift as i64) ++ ")\n"
-    // The layout this migration saw, asserted where the file is built.
+    // The layout this migration saw, asserted where the file is built — on
+    // the targets of its data model: a pointer-sized member before a unit
+    // moves it on wasm32 legitimately, and the bitfield units themselves
+    // sit where C puts a whole integer member on every target.
     let size = with_cimport_struct_size(session, idx)
     var checks = "sizeof[" ++ safe_name ++ "]() != " ++ i64_to_string(size)
     for ui in 0..plan.units.len():
         checks = checks ++ " or offsetof[" ++ safe_name ++ "](__bits_" ++ i64_to_string(ui as i64) ++ ") != " ++ i64_to_string(plan.units[ui].byte_offset)
-    out = out ++ "comptime fn __ci_layout_" ++ safe_name ++ "() -> Unit:\n    if " ++ checks ++ ": comptime_error(\"" ++ safe_name ++ ": the bitfield layout this migration recorded (D147) differs on this target\")\n"
+    out = out ++ "comptime fn __ci_layout_" ++ safe_name ++ "() -> Unit:\n    if sizeof[*const u8]() == " ++ i64_to_string(ci_c_model_pointer_bytes()) ++ " and (" ++ checks ++ "): comptime_error(\"" ++ safe_name ++ ": the bitfield layout this migration recorded (D147) differs on this target\")\n"
     out = out ++ "const __ci_layout_" ++ safe_name ++ "_check: Unit = __ci_layout_" ++ safe_name ++ "()\n"
     out
 

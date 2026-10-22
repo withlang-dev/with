@@ -2016,7 +2016,7 @@ fn ctest_algorithm_cstr_append_run() {
                 break
             }
 
-            assert_str((1 as c_int), c"==".ptr, c"MMXXIV".ptr, unsafe { cstr_str(((&raw mut __local_s as *mut cstr) as *const cstr)) }, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (40 as c_int))
+            assert_str((1 as c_int), c"==".ptr, c"MMXXIV".ptr, unsafe { cstr_str(((&raw mut __local_s as *mut cstr) as *const cstr)) }, c"algorithm_test.c".ptr, (40 as c_int))
 
             unsafe { cstr_drop(((&raw mut __local_s as *mut cstr) as *const cstr)) }
 
@@ -2066,7 +2066,7 @@ fn ctest_algorithm_c_find_if_run() -> Unit {
     }
 
     '__ci_bb_3 {
-        assert_compare((1 as c_int), c"==".ptr, (13 as c_long), ((unsafe *((*(&raw const __local_it___goto_49_16 as *const ISpan_iter)).ref)) as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (52 as c_int))
+        assert_compare((1 as c_int), c"==".ptr, (13 as c_long), ((unsafe *((*(&raw const __local_it___goto_49_16 as *const ISpan_iter)).ref)) as c_long), c"algorithm_test.c".ptr, (52 as c_int))
         return
     }
 
@@ -2184,7 +2184,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (42 as c_long), __local_sum, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (70 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (42 as c_long), __local_sum, c"algorithm_test.c".ptr, (70 as c_int))
 
     var __local_hash: c_ulonglong = ((0 as c_ulonglong))
 
@@ -2222,7 +2222,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (658 as c_long), (__local_hash as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (74 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (658 as c_long), (__local_hash as c_long), c"algorithm_test.c".ptr, (74 as c_int))
 
     (__local_hash = ((0 as c_ulonglong)))
 
@@ -2260,7 +2260,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (10897 as c_long), (__local_hash as c_long), c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (78 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (10897 as c_long), (__local_hash as c_long), c"algorithm_test.c".ptr, (78 as c_int))
 
     (__local_sum = ((0 as c_long)))
 
@@ -2295,7 +2295,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (98 as c_long), __local_sum, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (82 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (98 as c_long), __local_sum, c"algorithm_test.c".ptr, (82 as c_int))
 
     (__local_sum = ((0 as c_long)))
 
@@ -2330,7 +2330,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (98 as c_long), __local_sum, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (86 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (98 as c_long), __local_sum, c"algorithm_test.c".ptr, (86 as c_int))
 
     (__local_sum = ((0 as c_long)))
 
@@ -2376,7 +2376,7 @@ fn ctest_algorithm_c_filter_run() {
         }
     }
 
-    assert_compare((1 as c_int), c"==".ptr, (73 as c_long), __local_sum, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (90 as c_int))
+    assert_compare((1 as c_int), c"==".ptr, (73 as c_long), __local_sum, c"algorithm_test.c".ptr, (90 as c_int))
 
     unsafe { IVec_drop(((&raw mut __local_vec as *mut IVec) as *const IVec)) }
 
@@ -2482,23 +2482,23 @@ fn ctest_algorithm_c_union_run() {
 
     unsafe { action((&raw mut __local_act1 as *mut Action), (&raw mut __local_res as *mut cstr)) }
 
-    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to speak or log message: Hello!\n".ptr, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (143 as c_int))
+    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to speak or log message: Hello!\n".ptr, c"algorithm_test.c".ptr, (143 as c_int))
 
     unsafe { action((&raw mut __local_act2 as *mut Action), (&raw mut __local_res as *mut cstr)) }
 
-    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to quit!\n".ptr, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (145 as c_int))
+    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to quit!\n".ptr, c"algorithm_test.c".ptr, (145 as c_int))
 
     unsafe { action((&raw mut __local_act3 as *mut Action), (&raw mut __local_res as *mut cstr)) }
 
-    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"v1: 5, v2: 6, res: 11\n".ptr, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (147 as c_int))
+    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"v1: 5, v2: 6, res: 11\n".ptr, c"algorithm_test.c".ptr, (147 as c_int))
 
     unsafe { action((&raw mut __local_act4 as *mut Action), (&raw mut __local_res as *mut cstr)) }
 
-    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to speak or log message: Alert mode on\n".ptr, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (149 as c_int))
+    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str(((&raw mut __local_res as *mut cstr) as *const cstr)) }, c"Asked to speak or log message: Alert mode on\n".ptr, c"algorithm_test.c".ptr, (149 as c_int))
 
-    assert_bool((1 as c_int), (true as bool), ((((unsafe *(&raw const (*(&raw mut __local_act1 as *mut Action)).ActionSpeak as *const Action_ActionSpeak)).id == 105000)) as bool), c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (151 as c_int))
+    assert_bool((1 as c_int), (true as bool), ((((unsafe *(&raw const (*(&raw mut __local_act1 as *mut Action)).ActionSpeak as *const Action_ActionSpeak)).id == 105000)) as bool), c"algorithm_test.c".ptr, (151 as c_int))
 
-    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str((((&raw const (*(&raw const (*(&raw const __local_act1 as *const Action)).ActionSpeak as *const Action_ActionSpeak)).item as *const cstr) as *mut cstr) as *const cstr)) }, c"Hello!".ptr, c"out/tmp/action-scratch/stc-migrate-tests/source-algorithm_test/algorithm_test.c".ptr, (152 as c_int))
+    assert_str((1 as c_int), c"==".ptr, unsafe { cstr_str((((&raw const (*(&raw const (*(&raw const __local_act1 as *const Action)).ActionSpeak as *const Action_ActionSpeak)).item as *const cstr) as *mut cstr) as *const cstr)) }, c"Hello!".ptr, c"algorithm_test.c".ptr, (152 as c_int))
 
     loop {
         var __local__c_i2: ctest_algorithm_c_union_run__c_i2_anon = ctest_algorithm_c_union_run__c_i2_anon.zeroed()

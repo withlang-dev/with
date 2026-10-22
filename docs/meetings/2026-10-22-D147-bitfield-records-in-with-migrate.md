@@ -83,7 +83,14 @@ parse: Itanium and MSVC agree exactly when no unit holds members of
 differing declared size and every unit is a whole aligned integer, which the
 migrator verifies from clang's layout and otherwise refuses, naming the
 record and the two ABIs; `comptime` assertions of the record's size and
-every unit's offset are emitted beside the record. Unnamed and zero-width
+every unit's offset are emitted beside the record, guarded on the
+migrating target's data model (`sizeof[*const u8]() == 8` for an LP64
+migration): a migrated corpus is compiled once per target (D38), and a
+pointer-sized member before a unit moves the unit on wasm32 legitimately
+while the unit itself sits where C puts a whole integer member on every
+target, so on another data model the recorded numbers would only misfire
+(STC's `cco_task_state`, 40 bytes with its unit at 31 on arm64, was the
+first). Unnamed and zero-width
 members get no accessor; an enum-typed member's getter returns the integer;
 a `volatile` bitfield is refused. `c_import` keeps §16.9's sentence; the
 spec notes the migrator's representation is the intended one for both.

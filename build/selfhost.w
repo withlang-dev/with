@@ -4685,7 +4685,7 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "pub fn c() -> color:", "an enum member's getter returns the integer alias")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, bits_w, "offsetof[two](__bits_2) != 2: comptime_error(", "the layout assertion")
+    rc = bs_file_contains(ctx, bits_w, "if sizeof[*const u8]() == 8 and (sizeof[two]() != 3 or offsetof[two](__bits_0) != 0 or offsetof[two](__bits_1) != 1 or offsetof[two](__bits_2) != 2): comptime_error(", "the layout assertion, on the migrating data model")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "var __local_m: meta = with 0 as __ci_bits_seq_", "a designated init runs the setters")
     if rc != 0: return rc

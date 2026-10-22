@@ -759,8 +759,14 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             return ci_wrap_unsafe("*" ++ base_text) ++ "." ++ field
         if exprs.get_d2(id) == 3:
             // D147: a bitfield accessor on the record place (the setter is a
-            // `mut fn`: a borrowed read-only view of the place cannot take it).
-            return ci_print_wrapped_operand(exprs, types, base, 0, 1) ++ "." ++ field
+            // `mut fn`: a borrowed read-only view of the place cannot take
+            // it). The place supplies its own `unsafe` (a raw index, a
+            // dereference) and is parenthesized unless it is a name or a field.
+            let base_kind = exprs.kind(base)
+            let place = ci_print_expr(exprs, types, base, 0, 1)
+            if base_kind == CiExprKind.CIE_IDENT or base_kind == CiExprKind.CIE_FIELD:
+                return place ++ "." ++ field
+            return "(" ++ place ++ ")." ++ field
         if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
             let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 1)
             return ci_wrap_unsafe(f"*(&raw const {base_text} as *const {ci_print_type(types, base_ty)})") ++ "." ++ field
