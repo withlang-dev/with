@@ -11798,6 +11798,12 @@ impl MirBuilder:
         if pk == NodeKind.NK_PAT_IDENT:
             let sym = self.ast.get_data0(pat_node)
             let bind_ty = self.place_local_type(scrutinee_place)
+            // D144: Sema judged this binding a view of the payload's place
+            // (an observed subject, not plain bits): it is the place, never
+            // a copy of it, so a mutating call through it writes the field.
+            if self.pattern_subject_observed != 0 and self.sema.pattern_place_bindings.contains(pat_node) and not self.copy_is_bits(bind_ty):
+                self.bind_alias_place(sym, scrutinee_place, bind_ty)
+                return out
             let local_id = self.body.new_local(bind_ty, self.pattern_bind_mut, sym, 1)
             self.bind_local(sym, local_id)
             self.body.push_stmt(self.cur_bb, StmtKind.StorageLive, local_id, 0, self.ast.get_start(pat_node))
