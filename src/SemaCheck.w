@@ -7742,8 +7742,6 @@ impl Sema:
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipwithiter or owner == self.syms.flatmapiter:
-            return true
         let arg_start = self.get_type_d1(resolved)
         for ai in 0..self.get_type_d2(resolved):
             if self.iterator_type_holds_callable(self.type_extra[(arg_start + ai)]):
@@ -8458,56 +8456,6 @@ impl Sema:
             if method_name == "push_str": return MirIntrinsic.FIXED_STRING_PUSH_STR
             if method_name == "as_view": return MirIntrinsic.FIXED_STRING_AS_VIEW
             if method_name == "equals": return MirIntrinsic.FIXED_STRING_EQUALS
-            return MirIntrinsic.NONE
-        // #2220 step 2: `ListIter` is std's view iterator (collections.w);
-        // its `next` is a With body and its adapters are std.traits', so it
-        // has no intrinsic rows.
-        if type_name == "MappedIter" or type_name == "FilterIter" or type_name == "FilterMapIter" or type_name == "TakeIter" or type_name == "DropIter" or type_name == "TakeWhileIter" or type_name == "DropWhileIter" or type_name == "ZipIter" or type_name == "EnumerateIter" or type_name == "ChainIter" or type_name == "ZipWithIter" or type_name == "StepByIter" or type_name == "FlatMapIter":
-            if method_name == "next":
-                if type_name == "MappedIter": return MirIntrinsic.MAPITER_NEXT
-                if type_name == "FilterIter": return MirIntrinsic.FILTERITER_NEXT
-                if type_name == "FilterMapIter": return MirIntrinsic.FILTERMAPITER_NEXT
-                if type_name == "TakeIter": return MirIntrinsic.TAKEITER_NEXT
-                if type_name == "DropIter": return MirIntrinsic.DROPITER_NEXT
-                if type_name == "TakeWhileIter": return MirIntrinsic.TAKEWHILEITER_NEXT
-                if type_name == "DropWhileIter": return MirIntrinsic.DROPWHILEITER_NEXT
-                if type_name == "ZipIter": return MirIntrinsic.ZIPITER_NEXT
-                if type_name == "EnumerateIter": return MirIntrinsic.ENUMERATEITER_NEXT
-                if type_name == "ChainIter": return MirIntrinsic.CHAINITER_NEXT
-                if type_name == "ZipWithIter": return MirIntrinsic.ZIPWITHITER_NEXT
-                if type_name == "StepByIter": return MirIntrinsic.STEPBYITER_NEXT
-                if type_name == "FlatMapIter": return MirIntrinsic.FLATMAPITER_NEXT
-            if method_name == "map": return MirIntrinsic.ITER_MAP
-            if method_name == "filter": return MirIntrinsic.ITER_FILTER
-            if method_name == "filter_map": return MirIntrinsic.ITER_FILTER_MAP
-            if method_name == "take": return MirIntrinsic.ITER_TAKE
-            if method_name == "drop": return MirIntrinsic.ITER_DROP
-            if method_name == "take_while": return MirIntrinsic.ITER_TAKE_WHILE
-            if method_name == "drop_while": return MirIntrinsic.ITER_DROP_WHILE
-            if method_name == "zip": return MirIntrinsic.ITER_ZIP
-            if method_name == "enumerate": return MirIntrinsic.ITER_ENUMERATE
-            if method_name == "chain": return MirIntrinsic.ITER_CHAIN
-            if method_name == "zip_with": return MirIntrinsic.ITER_ZIP_WITH
-            if method_name == "step_by": return MirIntrinsic.ITER_STEP_BY
-            if method_name == "flat_map": return MirIntrinsic.ITER_FLAT_MAP
-            if method_name == "fold": return MirIntrinsic.ITER_FOLD
-            if method_name == "reduce": return MirIntrinsic.ITER_REDUCE
-            if method_name == "sum": return MirIntrinsic.ITER_SUM
-            if method_name == "product": return MirIntrinsic.ITER_PRODUCT
-            if method_name == "min": return MirIntrinsic.ITER_MIN
-            if method_name == "max": return MirIntrinsic.ITER_MAX
-            if method_name == "min_by": return MirIntrinsic.ITER_MIN_BY
-            if method_name == "max_by": return MirIntrinsic.ITER_MAX_BY
-            if method_name == "find": return MirIntrinsic.ITER_FIND
-            if method_name == "position": return MirIntrinsic.ITER_POSITION
-            if method_name == "any": return MirIntrinsic.ITER_ANY
-            if method_name == "all": return MirIntrinsic.ITER_ALL
-            if method_name == "none": return MirIntrinsic.ITER_NONE
-            if method_name == "for_each": return MirIntrinsic.ITER_FOR_EACH
-            if method_name == "count": return MirIntrinsic.ITER_COUNT
-            if method_name == "collect": return MirIntrinsic.ITER_COLLECT
-            if method_name == "partition": return MirIntrinsic.ITER_PARTITION
-            if method_name == "unzip": return MirIntrinsic.ITER_UNZIP
             return MirIntrinsic.NONE
         if type_name == "ListSlot":
             if method_name == "get": return MirIntrinsic.VECSLOT_GET
@@ -25321,11 +25269,6 @@ impl Sema:
         if owner_sym == self.syms.listiterplace:
             if field == self.syms.next:
                 return 1
-        if owner_sym == self.syms.mapiter or owner_sym == self.syms.filteriter or owner_sym == self.syms.takeiter or owner_sym == self.syms.zipiter or owner_sym == self.syms.flatmapiter:
-            if field == self.syms.next:
-                return 1
-            if field == self.syms.map or field == self.syms.filter or field == self.syms.take or field == self.syms.zip or field == self.syms.flat_map:
-                return 1
             if field == self.syms.fold or field == self.syms.reduce or field == self.syms.sum or field == self.syms.count or field == self.syms.partition or field == self.syms.collect:
                 return 1
         0
@@ -31691,95 +31634,6 @@ impl Sema:
             return self.ensure_list_type_for(pair_ty)
         0
 
-    fn ensure_mapiter_type_for(iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(in_ty)
-        args.push(out_ty)
-        self.ensure_generic_inst_type(self.syms.mapiter, args, 3) as i32
-
-    fn ensure_filteriter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.filteriter, args, 2) as i32
-
-    fn ensure_filtermapiter_type_for(iter_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(in_ty)
-        args.push(out_ty)
-        self.ensure_generic_inst_type(self.syms.filtermapiter, args, 3) as i32
-
-    fn ensure_takeiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.takeiter, args, 2) as i32
-
-    fn ensure_dropiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.dropiter, args, 2) as i32
-
-    fn ensure_takewhileiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.takewhileiter, args, 2) as i32
-
-    fn ensure_dropwhileiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.dropwhileiter, args, 2) as i32
-
-    fn ensure_zipiter_type_for(left_ty: i32, right_ty: i32, left_elem_ty: i32, right_elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(left_ty)
-        args.push(right_ty)
-        args.push(left_elem_ty)
-        args.push(right_elem_ty)
-        self.ensure_generic_inst_type(self.syms.zipiter, args, 4) as i32
-
-    fn ensure_enumerateiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.enumerateiter, args, 2) as i32
-
-    fn ensure_chainiter_type_for(left_ty: i32, right_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(left_ty)
-        args.push(right_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.chainiter, args, 3) as i32
-
-    fn ensure_zipwithiter_type_for(left_ty: i32, right_ty: i32, left_elem_ty: i32, right_elem_ty: i32, out_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(left_ty)
-        args.push(right_ty)
-        args.push(left_elem_ty)
-        args.push(right_elem_ty)
-        args.push(out_ty)
-        self.ensure_generic_inst_type(self.syms.zipwithiter, args, 5) as i32
-
-    fn ensure_stepbyiter_type_for(iter_ty: i32, elem_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(elem_ty)
-        self.ensure_generic_inst_type(self.syms.stepbyiter, args, 2) as i32
-
-    fn ensure_flatmapiter_type_for(iter_ty: i32, collection_ty: i32, inner_ty: i32, in_ty: i32, out_ty: i32) -> i32:
-        let args: List[i32] = List.new()
-        args.push(iter_ty)
-        args.push(collection_ty)
-        args.push(inner_ty)
-        args.push(in_ty)
-        args.push(out_ty)
-        self.ensure_generic_inst_type(self.syms.flatmapiter, args, 5) as i32
-
     fn iterator_owner_symbol(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -31790,8 +31644,6 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.mapiter or owner == self.syms.filteriter or owner == self.syms.filtermapiter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.zipiter or owner == self.syms.enumerateiter or owner == self.syms.chainiter or owner == self.syms.zipwithiter or owner == self.syms.stepbyiter or owner == self.syms.flatmapiter:
-            return owner
         0
 
     fn is_iterator_type(tid: i32) -> bool:
@@ -31834,28 +31686,6 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
         let owner = self.get_generic_inst_base(resolved as i32)
-        if owner == self.syms.mapiter:
-            return self.get_generic_inst_arg(resolved as i32, 2)
-        if owner == self.syms.filtermapiter:
-            return self.get_generic_inst_arg(resolved as i32, 2)
-        if owner == self.syms.filteriter or owner == self.syms.takeiter or owner == self.syms.dropiter or owner == self.syms.takewhileiter or owner == self.syms.dropwhileiter or owner == self.syms.stepbyiter:
-            return self.get_generic_inst_arg(resolved as i32, 1)
-        if owner == self.syms.chainiter:
-            return self.get_generic_inst_arg(resolved as i32, 2)
-        if owner == self.syms.zipiter:
-            let elems: List[i32] = List.new()
-            elems.push(self.get_generic_inst_arg(resolved as i32, 2))
-            elems.push(self.get_generic_inst_arg(resolved as i32, 3))
-            return self.ensure_tuple_type(elems, 2) as i32
-        if owner == self.syms.enumerateiter:
-            let elems2: List[i32] = List.new()
-            elems2.push(self.ty_isize as i32)
-            elems2.push(self.get_generic_inst_arg(resolved as i32, 1))
-            return self.ensure_tuple_type(elems2, 2) as i32
-        if owner == self.syms.zipwithiter:
-            return self.get_generic_inst_arg(resolved as i32, 4)
-        if owner == self.syms.flatmapiter:
-            return self.get_generic_inst_arg(resolved as i32, 4)
         0
 
     fn ensure_handle_type_for(elem_ty: i32) -> i32:

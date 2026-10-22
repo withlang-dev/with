@@ -200,19 +200,6 @@ type SemaBuiltinSymbols {
     list: i32,
     fixed_string: i32,
     listiter: i32,
-    mapiter: i32,
-    filteriter: i32,
-    filtermapiter: i32,
-    takeiter: i32,
-    dropiter: i32,
-    takewhileiter: i32,
-    dropwhileiter: i32,
-    zipiter: i32,
-    enumerateiter: i32,
-    chainiter: i32,
-    zipwithiter: i32,
-    stepbyiter: i32,
-    flatmapiter: i32,
     listslot: i32,
     listiterplace: i32,
     listrange: i32,
@@ -2972,19 +2959,6 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         list: 0,
         fixed_string: 0,
         listiter: 0,
-        mapiter: 0,
-        filteriter: 0,
-        filtermapiter: 0,
-        takeiter: 0,
-        dropiter: 0,
-        takewhileiter: 0,
-        dropwhileiter: 0,
-        zipiter: 0,
-        enumerateiter: 0,
-        chainiter: 0,
-        zipwithiter: 0,
-        stepbyiter: 0,
-        flatmapiter: 0,
         listslot: 0,
         listiterplace: 0,
         listrange: 0,
@@ -5491,19 +5465,6 @@ impl Sema:
         self.syms.list = self.pool_intern("List")
         self.syms.fixed_string = self.pool_intern("FixedString")
         self.syms.listiter = self.pool_intern("ListIter")
-        self.syms.mapiter = self.pool_intern("MappedIter")
-        self.syms.filteriter = self.pool_intern("FilterIter")
-        self.syms.filtermapiter = self.pool_intern("FilterMapIter")
-        self.syms.takeiter = self.pool_intern("TakeIter")
-        self.syms.dropiter = self.pool_intern("DropIter")
-        self.syms.takewhileiter = self.pool_intern("TakeWhileIter")
-        self.syms.dropwhileiter = self.pool_intern("DropWhileIter")
-        self.syms.zipiter = self.pool_intern("ZipIter")
-        self.syms.enumerateiter = self.pool_intern("EnumerateIter")
-        self.syms.chainiter = self.pool_intern("ChainIter")
-        self.syms.zipwithiter = self.pool_intern("ZipWithIter")
-        self.syms.stepbyiter = self.pool_intern("StepByIter")
-        self.syms.flatmapiter = self.pool_intern("FlatMapIter")
         self.syms.listslot = self.pool_intern("ListSlot")
         self.syms.listiterplace = self.pool_intern("ListIterPlace")
         self.syms.listrange = self.pool_intern("ListRange")
