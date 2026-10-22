@@ -678,7 +678,8 @@ pub unsafe fn csview_from_n(__param_str_: *const i8, __param_n: c_long) -> csvie
 }
 
 pub unsafe fn csview_clear(__param_self_: *mut csview) -> Unit {
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const (csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as c_long) - 1)) } as csview) as *const u8), sizeof[csview]())
+    let __ci_copy_20: csview = (csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as c_long) - 1)) } as csview)
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_20 as *const u8), sizeof[csview]())
 
 }
 

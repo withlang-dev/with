@@ -138,14 +138,14 @@ pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8)
 
 }
 
-pub unsafe fn _pcre2_strlen_8(__param_str: *const u8) -> c_ulong {
-    var __local_str = __param_str
+pub unsafe fn _pcre2_strlen_8(__param_str_: *const u8) -> c_ulong {
+    var __local_str_ = __param_str_
     var __local_c: c_ulong = ((0 as c_ulong))
 
     while true {
-        var __ci_expr_old_0: *const u8 = __local_str
+        var __ci_expr_old_0: *const u8 = __local_str_
 
-        (__local_str = __local_str + 1)
+        (__local_str_ = __local_str_ + 1)
 
         if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
             break

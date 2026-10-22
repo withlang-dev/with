@@ -694,7 +694,8 @@ fn cstr_with_capacity(__param_cap: c_long) -> cstr {
 unsafe fn cstr_move(__param_self_: *mut cstr) -> cstr {
     var __local_tmp: cstr = (*__param_self_)
 
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const (cstr.zeroed() as cstr) as *const u8), sizeof[cstr]())
+    let __ci_copy_7: cstr = (cstr.zeroed() as cstr)
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_7 as *const u8), sizeof[cstr]())
 
     return __local_tmp
 

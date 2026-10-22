@@ -502,7 +502,7 @@ pub unsafe fn gz_error(__param_state: *mut gz_state, __param_err: c_int, __param
     }
 
 
-    snprintf((*__param_state).msg, (((((strlen(((*__param_state).path as *const i8)) as c_ulong) +% (strlen(__param_msg) as c_ulong)) as c_ulong) +% (3 as c_ulong)) as c_ulong), c"%s%s%s".ptr, (*__param_state).path, ": ", __param_msg)
+    snprintf((*__param_state).msg, (((((strlen(((*__param_state).path as *const i8)) as c_ulong) +% (strlen(__param_msg) as c_ulong)) as c_ulong) +% (3 as c_ulong)) as c_ulong), c"%s%s%s".ptr, (*__param_state).path, c": ".ptr, __param_msg)
 
 }
 
