@@ -41,6 +41,7 @@ extern fn rt_libc_free(ptr: *mut u8) -> Unit
 extern fn rt_exit(code: i32) -> Never
 extern fn rt_clock_ns() -> i64
 extern fn rt_wall_clock_sec() -> i64
+extern fn rt_wall_clock_ns() -> i64
 extern fn rt_getenv(name: *const u8) -> *const u8
 extern fn rt_store_args(argc: i32, argv: *const *const u8)
 extern fn rt_args() -> (*const *const u8, i32)
@@ -4847,6 +4848,11 @@ pub fn with_str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
 
 pub fn with_time_now() -> i64:
     rt_wall_clock_sec()
+
+// The wall clock in nanoseconds since the Unix epoch: std.libc's
+// gettimeofday on every target.
+pub fn with_wall_clock_nanos() -> i64:
+    rt_wall_clock_ns()
 
 pub fn with_clock_nanos() -> i64:
     rt_clock_ns()

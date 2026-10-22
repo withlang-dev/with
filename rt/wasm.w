@@ -1204,6 +1204,13 @@ pub fn rt_clock_ns() -> i64:
         return 0
     t
 
+// The realtime clock in nanoseconds (std.libc's gettimeofday).
+pub fn rt_wall_clock_ns() -> i64:
+    var t: i64 = 0
+    if clock_time_get(WASI_CLOCK_REALTIME, 1, &raw mut t) != 0:
+        return 0
+    t
+
 pub fn rt_wall_clock_sec() -> i64:
     var t: i64 = 0
     if clock_time_get(WASI_CLOCK_REALTIME, 1000000000, &raw mut t) != 0:
