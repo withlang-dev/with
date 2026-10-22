@@ -599,12 +599,33 @@ contract before exposing it.
   engines namespace is `std.engines.<library>` (D146). The test lane maps
   each program's staging directory out of the baked `__FILE__` spellings
   (`with migrate --macro-prefix-map`), which keeps one shared `engine/`.
-- Open: the facade half — the generic-over-templates design item (STC's
-  `sort.h` is a quicksort with an `i_less` hook, so a comparator-slot
-  instantiation can serve arbitrary `T` beside direct instantiations for
-  the word-sized shapes), `std.algorithms`, the container facades, #938,
-  the complexity fixtures and drop-audit cells, the benchmark-backed
-  engine selection.
+- The facade half (D148, 2026-10-22, branch `stc-facades`): the
+  generic-over-templates design item is settled by the slot shape —
+  one hand-written C unit in the corpus's build inputs (`facade_shapes.c`,
+  build/stc.w) instantiates STC's templates per shape: `hset`, `sset`,
+  `pqueue`, `deque` over pointers to facade-owned slots whose head holds the
+  C-ABI callbacks that dispatch to the With comparator and hasher
+  (`std.collections.stc_slot`), `deque` of words, `sort` over slot
+  references and over i64/u64/f64, and `cbits`. Two general migrator rules
+  came out of it (a recursive `pub fn` keeps `-> Unit`, D143; a header
+  function no unit owns is published by its sole includer). Facades: `PriorityQueue`, `OrderedSet`,
+  `OrderedMap`, `Deque`, `BitSet`, `List.sort`/`sort_by`/`binary_search`/
+  `lower_bound`/`upper_bound`/`reverse` (#940); the runtime's `remove(0)`
+  advances the buffer's start (D115), so consuming iteration is O(1) per
+  element (#938; the native `BTreeMap`'s descending rebuild became linear
+  with it, its ascending scan and `BTreeSet` stay #937). Each has a behavior fixture, complexity rows
+  (`test/complexity/stdlib.w`) and drop-audit cells. Benchmark
+  (`test/benchmark/stc_engines.w`, n = 100000 i32, ns per operation,
+  insert/lookup/remove): PriorityQueue 18/0/109 against the c-algorithms
+  BinaryHeap 17/0/111; OrderedSet 197/103/237 against the native BTreeSet
+  4371/481/4525 (n = 4000, #937) and the c-algorithms SortedList
+  6175/83/10435 (n = 20000); Deque 11/0/11 against List 2/0/1 (the slot
+  allocation per element: the word shape is the next row when a Copy
+  `T` needs it); `List.sort` 34 ns per i64, 200 ns per pair through
+  references.
+- Open: `HashMap`/`HashSet` over `hset` (the builtin engine swap is a
+  compiler change: a brief of its own); `d[i]` on `Deque` waits on #2560;
+  `stable_sort` evaluated separately; Phase 4.
 
 **Phase 4 — M*LIB `m-bptree.h`, surgical.**
 Only the B+ tree, providing `BTreeMap`/`BTreeSet` and retiring their
@@ -641,3 +662,8 @@ for now").
    grouping. Optional public types (`BinaryHeap`, `SortedVec`, specialized
    indexes/storage) and detailed new API signatures remain facade-PR
    decisions.
+
+
+
+
+

@@ -922,6 +922,10 @@ type CiProjectSymbol {
     resolved_ty: CiTypeId,
     resolved_ty_text: str,
     consumers: str,
+    // The modules that define this `static inline` header function by
+    // including its header, when no unit owns the header: a sole definer
+    // publishes it (resolve_header_definers).
+    header_definers: str,
     owner_rank: i32,
     owner_definition_kind: i32,
     // D107 (#2240), CIPS_FN only: per parameter, the evidence the corpus
@@ -1009,6 +1013,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         resolved_ty: 0 as CiTypeId,
         resolved_ty_text: "",
         consumers: "",
+        header_definers: "",
         owner_rank: -1,
         owner_definition_kind: 0,
         param_fn_ptr: List.new(),
@@ -1049,7 +1054,24 @@ fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
         i = i + 1
     false
 
+// The one id a pipe list holds, or -1 when it holds none or several.
+fn ci_pipe_i32_sole(items: &str) -> i32:
+    if items.len() < 3: return -1
+    var value: i32 = 0
+    var i = 1
+    while i < items.len() - 1:
+        let c = items[i]
+        if c < 48 or c > 57: return -1
+        value = value * 10 + (c - 48) as i32
+        i = i + 1
+    value
+
 impl CiProjectSymbol:
+    mut fn add_header_definer(module_id: i32):
+        if module_id < 0 or ci_pipe_i32_contains(self.header_definers, module_id):
+            return
+        self.header_definers = self.header_definers ++ "|" ++ i64_to_string(module_id as i64) ++ "|"
+
     mut fn add_consumer(module_id: i32):
         if module_id < 0:
             return

@@ -765,7 +765,7 @@ fn ctest_cspan_slice_run() {
 
 }
 
-unsafe fn Stack_move(__param_self_: *mut Stack) -> Stack {
+pub unsafe fn Stack_move(__param_self_: *mut Stack) -> Stack {
     var __local_m: Stack = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -779,12 +779,12 @@ unsafe fn Stack_move(__param_self_: *mut Stack) -> Stack {
 
 }
 
-unsafe fn Stack_capacity(__param_self_: *const Stack) -> c_long {
+pub unsafe fn Stack_capacity(__param_self_: *const Stack) -> c_long {
     return (*__param_self_).capacity
 
 }
 
-unsafe fn Stack_reserve(__param_self_: *mut Stack, __param_cap: c_long) -> bool {
+pub unsafe fn Stack_reserve(__param_self_: *mut Stack, __param_cap: c_long) -> bool {
     var __local_n: c_long = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as c_long))
 
     if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as c_int) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as c_int)) != 0) {
@@ -804,7 +804,7 @@ unsafe fn Stack_reserve(__param_self_: *mut Stack, __param_cap: c_long) -> bool 
 
 }
 
-unsafe fn Stack_clear(__param_self_: *mut Stack) {
+pub unsafe fn Stack_clear(__param_self_: *mut Stack) {
     var __local_i: c_long = (*__param_self_).size
 
     while true {
@@ -822,7 +822,7 @@ unsafe fn Stack_clear(__param_self_: *mut Stack) {
 
 }
 
-unsafe fn Stack_drop(__param_cself: *const Stack) {
+pub unsafe fn Stack_drop(__param_cself: *const Stack) {
     var __local_self_: *mut Stack = ((__param_cself as *mut Stack))
 
     Stack_clear(__local_self_)
@@ -838,28 +838,28 @@ unsafe fn Stack_drop(__param_cself: *const Stack) {
 
 }
 
-unsafe fn Stack_take(__param_self_: *mut Stack, __param_unowned: Stack) -> Unit {
+pub unsafe fn Stack_take(__param_self_: *mut Stack, __param_unowned: Stack) -> Unit {
     Stack_drop((__param_self_ as *const Stack))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Stack]())
 
 }
 
-unsafe fn Stack_size(__param_self_: *const Stack) -> c_long {
+pub unsafe fn Stack_size(__param_self_: *const Stack) -> c_long {
     return (*__param_self_).size
 
 }
 
-unsafe fn Stack_is_empty(__param_self_: *const Stack) -> bool {
+pub unsafe fn Stack_is_empty(__param_self_: *const Stack) -> bool {
     return ((not ((*__param_self_).size != 0)))
 
 }
 
-unsafe fn Stack_value_drop(__param_self_: *const Stack, __param_val: *mut c_int) {
+pub unsafe fn Stack_value_drop(__param_self_: *const Stack, __param_val: *mut c_int) {
     return
 }
 
-unsafe fn Stack_append_uninit(__param_self_: *mut Stack, __param_n: c_long) -> *mut c_int {
+pub unsafe fn Stack_append_uninit(__param_self_: *mut Stack, __param_n: c_long) -> *mut c_int {
     var __local_len: c_long = (*__param_self_).size
 
     if ((if (__local_len + __param_n) >= Stack_capacity((__param_self_ as *const Stack)): 1 else: 0) != 0) {
@@ -874,42 +874,42 @@ unsafe fn Stack_append_uninit(__param_self_: *mut Stack, __param_n: c_long) -> *
 
 }
 
-unsafe fn Stack_shrink_to_fit(__param_self_: *mut Stack) -> Unit {
+pub unsafe fn Stack_shrink_to_fit(__param_self_: *mut Stack) -> Unit {
     Stack_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn Stack_front(__param_self_: *const Stack) -> *const c_int {
+pub unsafe fn Stack_front(__param_self_: *const Stack) -> *const c_int {
     return ((((&raw const ((*__param_self_).data[0]) as *const c_int) as *mut c_int) as *const c_int))
 
 }
 
-unsafe fn Stack_front_mut(__param_self_: *mut Stack) -> *mut c_int {
+pub unsafe fn Stack_front_mut(__param_self_: *mut Stack) -> *mut c_int {
     return (((&raw const ((*__param_self_).data[0]) as *const c_int) as *mut c_int))
 
 }
 
-unsafe fn Stack_back(__param_self_: *const Stack) -> *const c_int {
+pub unsafe fn Stack_back(__param_self_: *const Stack) -> *const c_int {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const c_int) as *mut c_int) as *const c_int))
 
 }
 
-unsafe fn Stack_back_mut(__param_self_: *mut Stack) -> *mut c_int {
+pub unsafe fn Stack_back_mut(__param_self_: *mut Stack) -> *mut c_int {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const c_int) as *mut c_int))
 
 }
 
-unsafe fn Stack_top(__param_self_: *const Stack) -> *const c_int {
+pub unsafe fn Stack_top(__param_self_: *const Stack) -> *const c_int {
     return ((Stack_back(__param_self_) as *const c_int))
 
 }
 
-unsafe fn Stack_top_mut(__param_self_: *mut Stack) -> *mut c_int {
+pub unsafe fn Stack_top_mut(__param_self_: *mut Stack) -> *mut c_int {
     return ((Stack_back_mut(__param_self_) as *mut c_int))
 
 }
 
-unsafe fn Stack_push(__param_self_: *mut Stack, __param_val: c_int) -> *mut c_int {
+pub unsafe fn Stack_push(__param_self_: *mut Stack, __param_val: c_int) -> *mut c_int {
     if ((if (*__param_self_).size == Stack_capacity((__param_self_ as *const Stack)): 1 else: 0) != 0) {
         if ((if not Stack_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 4) as c_long)): 1 else: 0) != 0) {
             return ((null as *mut c_int))
@@ -928,7 +928,7 @@ unsafe fn Stack_push(__param_self_: *mut Stack, __param_val: c_int) -> *mut c_in
 
 }
 
-unsafe fn Stack_pop(__param_self_: *mut Stack) {
+pub unsafe fn Stack_pop(__param_self_: *mut Stack) {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Stack_pop".ptr, c"stack.h".ptr, (149 as c_int), c"self->size".ptr)
     } else {
@@ -943,7 +943,7 @@ unsafe fn Stack_pop(__param_self_: *mut Stack) {
 
 }
 
-unsafe fn Stack_pull(__param_self_: *mut Stack) -> c_int {
+pub unsafe fn Stack_pull(__param_self_: *mut Stack) -> c_int {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Stack_pull".ptr, c"stack.h".ptr, (152 as c_int), c"self->size".ptr)
     } else {
@@ -957,7 +957,7 @@ unsafe fn Stack_pull(__param_self_: *mut Stack) -> c_int {
 
 }
 
-unsafe fn Stack_put_n(__param_self_: *mut Stack, __param_raw: *const c_int, __param_n: c_long) {
+pub unsafe fn Stack_put_n(__param_self_: *mut Stack, __param_raw: *const c_int, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -977,28 +977,28 @@ unsafe fn Stack_put_n(__param_self_: *mut Stack, __param_raw: *const c_int, __pa
 
 }
 
-fn Stack_init() -> Stack {
+pub fn Stack_init() -> Stack {
     var __local_out: Stack = Stack.zeroed()
 
     return __local_out
 
 }
 
-fn Stack_with_capacity(__param_cap: c_long) -> Stack {
+pub fn Stack_with_capacity(__param_cap: c_long) -> Stack {
     var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[c_int]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
-fn Stack_with_size_uninit(__param_size: c_long) -> Stack {
+pub fn Stack_with_size_uninit(__param_size: c_long) -> Stack {
     var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[c_int]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
 }
 
-fn Stack_with_size(__param_size: c_long, __param_default_raw: c_int) -> Stack {
+pub fn Stack_with_size(__param_size: c_long, __param_default_raw: c_int) -> Stack {
     var __local_size = __param_size
     var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[c_int]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut c_int)), size: __local_size, capacity: __local_size }
 
@@ -1013,7 +1013,7 @@ fn Stack_with_size(__param_size: c_long, __param_default_raw: c_int) -> Stack {
 
 }
 
-unsafe fn Stack_from_n(__param_raw: *const c_int, __param_n: c_long) -> Stack {
+pub unsafe fn Stack_from_n(__param_raw: *const c_int, __param_n: c_long) -> Stack {
     var __local_out: Stack = Stack_with_capacity(__param_n)
 
     Stack_put_n((&raw mut __local_out as *mut Stack), __param_raw, __param_n)
@@ -1022,7 +1022,7 @@ unsafe fn Stack_from_n(__param_raw: *const c_int, __param_n: c_long) -> Stack {
 
 }
 
-unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: c_long) -> *const c_int {
+pub unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: c_long) -> *const c_int {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Stack_at".ptr, c"stack.h".ptr, (189 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -1033,7 +1033,7 @@ unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: c_long) -> *const c
 
 }
 
-unsafe fn Stack_at_mut(__param_self_: *mut Stack, __param_idx: c_long) -> *mut c_int {
+pub unsafe fn Stack_at_mut(__param_self_: *mut Stack, __param_idx: c_long) -> *mut c_int {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Stack_at_mut".ptr, c"stack.h".ptr, (192 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -1044,7 +1044,7 @@ unsafe fn Stack_at_mut(__param_self_: *mut Stack, __param_idx: c_long) -> *mut c
 
 }
 
-fn Stack_clone(__param_stk: Stack) -> Stack {
+pub fn Stack_clone(__param_stk: Stack) -> Stack {
     var __local_out: Stack = __param_stk
 
     var __local_self_: *mut Stack = ((&raw mut __local_out as *mut Stack))
@@ -1079,7 +1079,7 @@ fn Stack_clone(__param_stk: Stack) -> Stack {
 
 }
 
-unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack) {
+pub unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack) {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -1108,18 +1108,18 @@ unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack) {
 
 }
 
-unsafe fn Stack_value_clone(__param_self_: *const Stack, __param_val: c_int) -> c_int {
+pub unsafe fn Stack_value_clone(__param_self_: *const Stack, __param_val: c_int) -> c_int {
 
     return __param_val
 
 }
 
-unsafe fn Stack_value_toraw(__param_val: *const c_int) -> c_int {
+pub unsafe fn Stack_value_toraw(__param_val: *const c_int) -> c_int {
     return (*__param_val)
 
 }
 
-unsafe fn Stack_begin(__param_self_: *const Stack) -> Stack_iter {
+pub unsafe fn Stack_begin(__param_self_: *const Stack) -> Stack_iter {
     var __local_it_: Stack_iter = Stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -1132,7 +1132,7 @@ unsafe fn Stack_begin(__param_self_: *const Stack) -> Stack_iter {
 
 }
 
-unsafe fn Stack_rbegin(__param_self_: *const Stack) -> Stack_iter {
+pub unsafe fn Stack_rbegin(__param_self_: *const Stack) -> Stack_iter {
     var __local_it_: Stack_iter = Stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -1148,7 +1148,7 @@ unsafe fn Stack_rbegin(__param_self_: *const Stack) -> Stack_iter {
 
 }
 
-unsafe fn Stack_end(__param_self_: *const Stack) -> Stack_iter {
+pub unsafe fn Stack_end(__param_self_: *const Stack) -> Stack_iter {
 
     var __local_it_: Stack_iter = Stack_iter.zeroed()
 
@@ -1156,7 +1156,7 @@ unsafe fn Stack_end(__param_self_: *const Stack) -> Stack_iter {
 
 }
 
-unsafe fn Stack_rend(__param_self_: *const Stack) -> Stack_iter {
+pub unsafe fn Stack_rend(__param_self_: *const Stack) -> Stack_iter {
 
     var __local_it_: Stack_iter = Stack_iter.zeroed()
 
@@ -1164,7 +1164,7 @@ unsafe fn Stack_rend(__param_self_: *const Stack) -> Stack_iter {
 
 }
 
-unsafe fn Stack_next(__param_it_: *mut Stack_iter) {
+pub unsafe fn Stack_next(__param_it_: *mut Stack_iter) {
     ((*__param_it_).ref = (*__param_it_).ref + 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -1174,7 +1174,7 @@ unsafe fn Stack_next(__param_it_: *mut Stack_iter) {
 
 }
 
-unsafe fn Stack_rnext(__param_it_: *mut Stack_iter) {
+pub unsafe fn Stack_rnext(__param_it_: *mut Stack_iter) {
     ((*__param_it_).ref = (*__param_it_).ref - 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -1184,7 +1184,7 @@ unsafe fn Stack_rnext(__param_it_: *mut Stack_iter) {
 
 }
 
-fn Stack_advance(__param_it_: Stack_iter, __param_n: c_ulong) -> Stack_iter {
+pub fn Stack_advance(__param_it_: Stack_iter, __param_n: c_ulong) -> Stack_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Stack_iter)).ref + (__param_n as usize))
 
     if ((if (unsafe *(&raw const __param_it_ as *const Stack_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Stack_iter)).end: 1 else: 0) != 0) {
@@ -1196,12 +1196,12 @@ fn Stack_advance(__param_it_: Stack_iter, __param_n: c_ulong) -> Stack_iter {
 
 }
 
-unsafe fn Stack_index(__param_self_: *const Stack, __param_it_: Stack_iter) -> c_long {
+pub unsafe fn Stack_index(__param_self_: *const Stack, __param_it_: Stack_iter) -> c_long {
     return (((((*(&raw const __param_it_ as *const Stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as c_long) / (sizeof[c_int]() as c_long))
 
 }
 
-unsafe fn Stack_adjust_end_(__param_self_: *mut Stack, __param_n: c_long) {
+pub unsafe fn Stack_adjust_end_(__param_self_: *mut Stack, __param_n: c_long) {
     ((*__param_self_).size = (*__param_self_).size + __param_n)
 
 }
@@ -1418,7 +1418,7 @@ fn ctest_cspan_equality_run() {
 
 }
 
-unsafe fn Tiles_move(__param_self_: *mut Tiles) -> Tiles {
+pub unsafe fn Tiles_move(__param_self_: *mut Tiles) -> Tiles {
     var __local_m: Tiles = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -1432,12 +1432,12 @@ unsafe fn Tiles_move(__param_self_: *mut Tiles) -> Tiles {
 
 }
 
-unsafe fn Tiles_capacity(__param_self_: *const Tiles) -> c_long {
+pub unsafe fn Tiles_capacity(__param_self_: *const Tiles) -> c_long {
     return (*__param_self_).capacity
 
 }
 
-unsafe fn Tiles_reserve(__param_self_: *mut Tiles, __param_cap: c_long) -> bool {
+pub unsafe fn Tiles_reserve(__param_self_: *mut Tiles, __param_cap: c_long) -> bool {
     var __local_n: c_long = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as c_long))
 
     if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as c_int) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as c_int)) != 0) {
@@ -1457,7 +1457,7 @@ unsafe fn Tiles_reserve(__param_self_: *mut Tiles, __param_cap: c_long) -> bool 
 
 }
 
-unsafe fn Tiles_clear(__param_self_: *mut Tiles) {
+pub unsafe fn Tiles_clear(__param_self_: *mut Tiles) {
     var __local_i: c_long = (*__param_self_).size
 
     while true {
@@ -1475,7 +1475,7 @@ unsafe fn Tiles_clear(__param_self_: *mut Tiles) {
 
 }
 
-unsafe fn Tiles_drop(__param_cself: *const Tiles) {
+pub unsafe fn Tiles_drop(__param_cself: *const Tiles) {
     var __local_self_: *mut Tiles = ((__param_cself as *mut Tiles))
 
     Tiles_clear(__local_self_)
@@ -1491,28 +1491,28 @@ unsafe fn Tiles_drop(__param_cself: *const Tiles) {
 
 }
 
-unsafe fn Tiles_take(__param_self_: *mut Tiles, __param_unowned: Tiles) -> Unit {
+pub unsafe fn Tiles_take(__param_self_: *mut Tiles, __param_unowned: Tiles) -> Unit {
     Tiles_drop((__param_self_ as *const Tiles))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Tiles]())
 
 }
 
-unsafe fn Tiles_size(__param_self_: *const Tiles) -> c_long {
+pub unsafe fn Tiles_size(__param_self_: *const Tiles) -> c_long {
     return (*__param_self_).size
 
 }
 
-unsafe fn Tiles_is_empty(__param_self_: *const Tiles) -> bool {
+pub unsafe fn Tiles_is_empty(__param_self_: *const Tiles) -> bool {
     return ((not ((*__param_self_).size != 0)))
 
 }
 
-unsafe fn Tiles_value_drop(__param_self_: *const Tiles, __param_val: *mut Span3) {
+pub unsafe fn Tiles_value_drop(__param_self_: *const Tiles, __param_val: *mut Span3) {
     return
 }
 
-unsafe fn Tiles_append_uninit(__param_self_: *mut Tiles, __param_n: c_long) -> *mut Span3 {
+pub unsafe fn Tiles_append_uninit(__param_self_: *mut Tiles, __param_n: c_long) -> *mut Span3 {
     var __local_len: c_long = (*__param_self_).size
 
     if ((if (__local_len + __param_n) >= Tiles_capacity((__param_self_ as *const Tiles)): 1 else: 0) != 0) {
@@ -1527,42 +1527,42 @@ unsafe fn Tiles_append_uninit(__param_self_: *mut Tiles, __param_n: c_long) -> *
 
 }
 
-unsafe fn Tiles_shrink_to_fit(__param_self_: *mut Tiles) -> Unit {
+pub unsafe fn Tiles_shrink_to_fit(__param_self_: *mut Tiles) -> Unit {
     Tiles_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn Tiles_front(__param_self_: *const Tiles) -> *const Span3 {
+pub unsafe fn Tiles_front(__param_self_: *const Tiles) -> *const Span3 {
     return ((((&raw const ((*__param_self_).data[0]) as *const Span3) as *mut Span3) as *const Span3))
 
 }
 
-unsafe fn Tiles_front_mut(__param_self_: *mut Tiles) -> *mut Span3 {
+pub unsafe fn Tiles_front_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return (((&raw const ((*__param_self_).data[0]) as *const Span3) as *mut Span3))
 
 }
 
-unsafe fn Tiles_back(__param_self_: *const Tiles) -> *const Span3 {
+pub unsafe fn Tiles_back(__param_self_: *const Tiles) -> *const Span3 {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Span3) as *mut Span3) as *const Span3))
 
 }
 
-unsafe fn Tiles_back_mut(__param_self_: *mut Tiles) -> *mut Span3 {
+pub unsafe fn Tiles_back_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Span3) as *mut Span3))
 
 }
 
-unsafe fn Tiles_top(__param_self_: *const Tiles) -> *const Span3 {
+pub unsafe fn Tiles_top(__param_self_: *const Tiles) -> *const Span3 {
     return ((Tiles_back(__param_self_) as *const Span3))
 
 }
 
-unsafe fn Tiles_top_mut(__param_self_: *mut Tiles) -> *mut Span3 {
+pub unsafe fn Tiles_top_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return ((Tiles_back_mut(__param_self_) as *mut Span3))
 
 }
 
-unsafe fn Tiles_push(__param_self_: *mut Tiles, __param_val: Span3) -> *mut Span3 {
+pub unsafe fn Tiles_push(__param_self_: *mut Tiles, __param_val: Span3) -> *mut Span3 {
     if ((if (*__param_self_).size == Tiles_capacity((__param_self_ as *const Tiles)): 1 else: 0) != 0) {
         if ((if not Tiles_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 4) as c_long)): 1 else: 0) != 0) {
             return ((null as *mut Span3))
@@ -1581,7 +1581,7 @@ unsafe fn Tiles_push(__param_self_: *mut Tiles, __param_val: Span3) -> *mut Span
 
 }
 
-unsafe fn Tiles_pop(__param_self_: *mut Tiles) {
+pub unsafe fn Tiles_pop(__param_self_: *mut Tiles) {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Tiles_pop".ptr, c"stack.h".ptr, (149 as c_int), c"self->size".ptr)
     } else {
@@ -1596,7 +1596,7 @@ unsafe fn Tiles_pop(__param_self_: *mut Tiles) {
 
 }
 
-unsafe fn Tiles_pull(__param_self_: *mut Tiles) -> Span3 {
+pub unsafe fn Tiles_pull(__param_self_: *mut Tiles) -> Span3 {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Tiles_pull".ptr, c"stack.h".ptr, (152 as c_int), c"self->size".ptr)
     } else {
@@ -1610,7 +1610,7 @@ unsafe fn Tiles_pull(__param_self_: *mut Tiles) -> Span3 {
 
 }
 
-unsafe fn Tiles_put_n(__param_self_: *mut Tiles, __param_raw: *const Span3, __param_n: c_long) {
+pub unsafe fn Tiles_put_n(__param_self_: *mut Tiles, __param_raw: *const Span3, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -1630,28 +1630,28 @@ unsafe fn Tiles_put_n(__param_self_: *mut Tiles, __param_raw: *const Span3, __pa
 
 }
 
-fn Tiles_init() -> Tiles {
+pub fn Tiles_init() -> Tiles {
     var __local_out: Tiles = Tiles.zeroed()
 
     return __local_out
 
 }
 
-fn Tiles_with_capacity(__param_cap: c_long) -> Tiles {
+pub fn Tiles_with_capacity(__param_cap: c_long) -> Tiles {
     var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[Span3]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Span3)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
-fn Tiles_with_size_uninit(__param_size: c_long) -> Tiles {
+pub fn Tiles_with_size_uninit(__param_size: c_long) -> Tiles {
     var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[Span3]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Span3)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
 }
 
-fn Tiles_with_size(__param_size: c_long, __param_default_raw: Span3) -> Tiles {
+pub fn Tiles_with_size(__param_size: c_long, __param_default_raw: Span3) -> Tiles {
     var __local_size = __param_size
     var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[Span3]() as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut Span3)), size: __local_size, capacity: __local_size }
 
@@ -1666,7 +1666,7 @@ fn Tiles_with_size(__param_size: c_long, __param_default_raw: Span3) -> Tiles {
 
 }
 
-unsafe fn Tiles_from_n(__param_raw: *const Span3, __param_n: c_long) -> Tiles {
+pub unsafe fn Tiles_from_n(__param_raw: *const Span3, __param_n: c_long) -> Tiles {
     var __local_out: Tiles = Tiles_with_capacity(__param_n)
 
     Tiles_put_n((&raw mut __local_out as *mut Tiles), __param_raw, __param_n)
@@ -1675,7 +1675,7 @@ unsafe fn Tiles_from_n(__param_raw: *const Span3, __param_n: c_long) -> Tiles {
 
 }
 
-unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: c_long) -> *const Span3 {
+pub unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: c_long) -> *const Span3 {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Tiles_at".ptr, c"stack.h".ptr, (189 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -1686,7 +1686,7 @@ unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: c_long) -> *const S
 
 }
 
-unsafe fn Tiles_at_mut(__param_self_: *mut Tiles, __param_idx: c_long) -> *mut Span3 {
+pub unsafe fn Tiles_at_mut(__param_self_: *mut Tiles, __param_idx: c_long) -> *mut Span3 {
     if (((if not ((if ((__param_idx as c_ulong)) < (((*__param_self_).size as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
         __assert_rtn(c"Tiles_at_mut".ptr, c"stack.h".ptr, (192 as c_int), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
@@ -1697,7 +1697,7 @@ unsafe fn Tiles_at_mut(__param_self_: *mut Tiles, __param_idx: c_long) -> *mut S
 
 }
 
-fn Tiles_clone(__param_stk: Tiles) -> Tiles {
+pub fn Tiles_clone(__param_stk: Tiles) -> Tiles {
     var __local_out: Tiles = __param_stk
 
     var __local_self_: *mut Tiles = ((&raw mut __local_out as *mut Tiles))
@@ -1732,7 +1732,7 @@ fn Tiles_clone(__param_stk: Tiles) -> Tiles {
 
 }
 
-unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles) {
+pub unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles) {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -1761,18 +1761,18 @@ unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles) {
 
 }
 
-unsafe fn Tiles_value_clone(__param_self_: *const Tiles, __param_val: Span3) -> Span3 {
+pub unsafe fn Tiles_value_clone(__param_self_: *const Tiles, __param_val: Span3) -> Span3 {
 
     return __param_val
 
 }
 
-unsafe fn Tiles_value_toraw(__param_val: *const Span3) -> Span3 {
+pub unsafe fn Tiles_value_toraw(__param_val: *const Span3) -> Span3 {
     return (*__param_val)
 
 }
 
-unsafe fn Tiles_begin(__param_self_: *const Tiles) -> Tiles_iter {
+pub unsafe fn Tiles_begin(__param_self_: *const Tiles) -> Tiles_iter {
     var __local_it_: Tiles_iter = Tiles_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -1785,7 +1785,7 @@ unsafe fn Tiles_begin(__param_self_: *const Tiles) -> Tiles_iter {
 
 }
 
-unsafe fn Tiles_rbegin(__param_self_: *const Tiles) -> Tiles_iter {
+pub unsafe fn Tiles_rbegin(__param_self_: *const Tiles) -> Tiles_iter {
     var __local_it_: Tiles_iter = Tiles_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
 
     if ((*__param_self_).size != 0) {
@@ -1801,7 +1801,7 @@ unsafe fn Tiles_rbegin(__param_self_: *const Tiles) -> Tiles_iter {
 
 }
 
-unsafe fn Tiles_end(__param_self_: *const Tiles) -> Tiles_iter {
+pub unsafe fn Tiles_end(__param_self_: *const Tiles) -> Tiles_iter {
 
     var __local_it_: Tiles_iter = Tiles_iter.zeroed()
 
@@ -1809,7 +1809,7 @@ unsafe fn Tiles_end(__param_self_: *const Tiles) -> Tiles_iter {
 
 }
 
-unsafe fn Tiles_rend(__param_self_: *const Tiles) -> Tiles_iter {
+pub unsafe fn Tiles_rend(__param_self_: *const Tiles) -> Tiles_iter {
 
     var __local_it_: Tiles_iter = Tiles_iter.zeroed()
 
@@ -1817,7 +1817,7 @@ unsafe fn Tiles_rend(__param_self_: *const Tiles) -> Tiles_iter {
 
 }
 
-unsafe fn Tiles_next(__param_it_: *mut Tiles_iter) {
+pub unsafe fn Tiles_next(__param_it_: *mut Tiles_iter) {
     ((*__param_it_).ref = (*__param_it_).ref + 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -1827,7 +1827,7 @@ unsafe fn Tiles_next(__param_it_: *mut Tiles_iter) {
 
 }
 
-unsafe fn Tiles_rnext(__param_it_: *mut Tiles_iter) {
+pub unsafe fn Tiles_rnext(__param_it_: *mut Tiles_iter) {
     ((*__param_it_).ref = (*__param_it_).ref - 1)
 
     if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
@@ -1837,7 +1837,7 @@ unsafe fn Tiles_rnext(__param_it_: *mut Tiles_iter) {
 
 }
 
-fn Tiles_advance(__param_it_: Tiles_iter, __param_n: c_ulong) -> Tiles_iter {
+pub fn Tiles_advance(__param_it_: Tiles_iter, __param_n: c_ulong) -> Tiles_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref + (__param_n as usize))
 
     if ((if (unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Tiles_iter)).end: 1 else: 0) != 0) {
@@ -1849,12 +1849,12 @@ fn Tiles_advance(__param_it_: Tiles_iter, __param_n: c_ulong) -> Tiles_iter {
 
 }
 
-unsafe fn Tiles_index(__param_self_: *const Tiles, __param_it_: Tiles_iter) -> c_long {
+pub unsafe fn Tiles_index(__param_self_: *const Tiles, __param_it_: Tiles_iter) -> c_long {
     return (((((*(&raw const __param_it_ as *const Tiles_iter)).ref as usize) -% ((*__param_self_).data as usize)) as c_long) / (sizeof[Span3]() as c_long))
 
 }
 
-unsafe fn Tiles_adjust_end_(__param_self_: *mut Tiles, __param_n: c_long) {
+pub unsafe fn Tiles_adjust_end_(__param_self_: *mut Tiles, __param_n: c_long) {
     ((*__param_self_).size = (*__param_self_).size + __param_n)
 
 }

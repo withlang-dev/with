@@ -41,7 +41,7 @@ const STC_HARNESS_DIR = "test/corpora/stc_harness"
 
 // The library units: every `src/` unit but cregex (setjmp).
 fn stc_lib_units() -> List[str]:
-    ["cspan", "cstr_core", "cstr_io", "cstr_misc", "cstr_utf8", "csview", "fmt", "random", "stc_core", "utf8_misc"]
+    ["cspan", "cstr_core", "cstr_io", "cstr_misc", "cstr_utf8", "csview", "facade_shapes", "fmt", "random", "stc_core", "utf8_misc"]
 
 // The test units: every `tests/*_test.c` but cregex_test (cregex) and
 // main.c (CTEST_MAIN: the section walk and setjmp, replaced by the harness).
@@ -86,14 +86,91 @@ fn stc_stage_headers(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
     0
 
 // The library units into `source`: the `src/` units and the staged ucd unit.
+// The facade shapes unit (docs/proposals/stdlib_sourcing_plan.md, Phase 3,
+// the generic-over-templates design item): STC's templates instantiated for
+// the standard library's facades, one C unit staged beside upstream's. An
+// arbitrary With value rides the slot shape (the engine indexes pointers to
+// facade-owned slots whose head holds the With callbacks, the engine_slot
+// pattern); the word-sized shapes get direct instantiations. The shape set
+// is extended here, never in migrated code.
+fn stc_facade_shapes_source() -> str:
+    "// The facade shapes: STC's templates instantiated for the With standard\n" ++
+    "// library's facades (docs/proposals/stdlib_sourcing_plan.md, Phase 3). An\n" ++
+    "// arbitrary With value rides the slot shape — the engine indexes pointers to\n" ++
+    "// facade-owned slots whose head holds the With callbacks — and the\n" ++
+    "// word-sized shapes get direct instantiations.\n" ++
+    "#define STC_IMPLEMENT\n" ++
+    "#include <stdint.h>\n" ++
+    "#include <stddef.h>\n" ++
+    "#include \"../include/stc/common.h\"\n" ++
+    "\n" ++
+    "typedef struct stc_slot_head {\n" ++
+    "    int (*cmp)(const void*, const void*);\n" ++
+    "    size_t (*hash)(const void*);\n" ++
+    "} stc_slot_head;\n" ++
+    "typedef stc_slot_head* stc_slot;\n" ++
+    "\n" ++
+    "#define STC_SLOT_CMP(a, b) ((*(a))->cmp(*(a), *(b)))\n" ++
+    "\n" ++
+    "#define T stc_slot_set, stc_slot, (c_no_clone)\n" ++
+    "#define i_hash(p) ((*(p))->hash(*(p)))\n" ++
+    "#define i_eq(a, b) (STC_SLOT_CMP(a, b) == 0)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/hset.h\"\n" ++
+    "\n" ++
+    "#define T stc_slot_sset, stc_slot, (c_no_clone)\n" ++
+    "#define i_cmp(a, b) STC_SLOT_CMP(a, b)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/sset.h\"\n" ++
+    "\n" ++
+    "#define T stc_slot_pqueue, stc_slot, (c_no_clone)\n" ++
+    "#define i_less(a, b) (STC_SLOT_CMP(a, b) < 0)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/pqueue.h\"\n" ++
+    "\n" ++
+    "#define T stc_slot_deque, stc_slot, (c_no_clone)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/deque.h\"\n" ++
+    "\n" ++
+    "#define T stc_word_deque, uint64_t\n" ++
+    "#include \"../include/stc/deque.h\"\n" ++
+    "\n" ++
+    "// A slot reference for the sort: the C-ABI comparison the engine calls\n" ++
+    "// with the two references, the element's address, and the With comparator\n" ++
+    "// the facade's trampoline dispatches to.\n" ++
+    "typedef struct stc_slotref {\n" ++
+    "    int (*cmp)(const void*, const void*);\n" ++
+    "    const void* ptr;\n" ++
+    "    const void* with_cmp;\n" ++
+    "    const void* with_env;\n" ++
+    "} stc_slotref;\n" ++
+    "\n" ++
+    "#define T stc_slotrefs, stc_slotref\n" ++
+    "#define i_less(a, b) ((a)->cmp(a, b) < 0)\n" ++
+    "#include \"../include/stc/sort.h\"\n" ++
+    "\n" ++
+    "#define T stc_i64s, int64_t\n" ++
+    "#include \"../include/stc/sort.h\"\n" ++
+    "\n" ++
+    "#define T stc_u64s, uint64_t\n" ++
+    "#include \"../include/stc/sort.h\"\n" ++
+    "\n" ++
+    "#define T stc_f64s, double\n" ++
+    "#include \"../include/stc/sort.h\"\n" ++
+    "\n" ++
+    "#include \"../include/stc/cbits.h\"\n"
+
 fn stc_stage_library(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
     for name in stc_lib_units():
+        // The facade shapes unit is written below, not copied from upstream.
+        if name == "facade_shapes": continue
         if corpus_copy(ctx, reference ++ "/src/" ++ name ++ ".c", source ++ "/" ++ name ++ ".c") != 0: return 1
     // The Unicode category tables (`priv/ucd_prv.c`, which cutf8_isalpha and
     // its kin need) are compiled into upstream's cregex unit alone, which is
     // not migrated (setjmp); they are staged as a unit of their own, in the
     // one-line shape of upstream's `src/` units.
     if ctx.fs().write_text(source ++ "/ucd.c", "#include \"../include/stc/common.h\"\n#include \"../include/stc/types.h\"\n#include \"../include/stc/priv/utf8_prv.h\"\n#include \"../include/stc/priv/ucd_prv.c\"\n") != 0: return corpus_fail(ctx, "cannot write the ucd unit")
+    if ctx.fs().write_text(source ++ "/facade_shapes.c", stc_facade_shapes_source()) != 0: return corpus_fail(ctx, "cannot write the facade shapes unit")
     0
 
 // The production corpus: the library units and the drift harness.

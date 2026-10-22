@@ -527,8 +527,8 @@ impl[T] IntoIter[T] for List[T]:
     move fn into_iter() -> ListIntoIter[T]: ListIntoIter { list: self }
 
 impl[T] Iter[T] for ListIntoIter[T]:
-    // remove(0) is D27's proven element transfer; the memmove-per-next
-    // cost stands until a front-cursor variant earns its unsafe.
+    // remove(0) is D27's proven element transfer, and the runtime takes the
+    // head by advancing the buffer's start (D115), O(1) per element (#938).
     mut fn next() -> Option[T]:
         if self.list.len() == 0: return None
         self.list.remove(0)
@@ -1183,4 +1183,5 @@ pub fn iter_unzip_views[A, B, I: Iter[(&A, &B)]](iter: I) -> (List[A], List[B]):
                 firsts.push(pair.0)
                 seconds.push(pair.1)
     (firsts, seconds)
+
 

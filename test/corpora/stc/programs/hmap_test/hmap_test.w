@@ -1460,22 +1460,22 @@ unsafe fn Intmap_bucket_insert_(__param_self_: *const Intmap, __param_rkeyptr: *
 
 }
 
-unsafe fn Intmap_is_empty(__param_map: *const Intmap) -> bool {
+pub unsafe fn Intmap_is_empty(__param_map: *const Intmap) -> bool {
     return ((not ((*__param_map).size != 0)))
 
 }
 
-unsafe fn Intmap_size(__param_map: *const Intmap) -> c_long {
+pub unsafe fn Intmap_size(__param_map: *const Intmap) -> c_long {
     return (*__param_map).size
 
 }
 
-unsafe fn Intmap_bucket_count(__param_map: *mut Intmap) -> c_long {
+pub unsafe fn Intmap_bucket_count(__param_map: *mut Intmap) -> c_long {
     return (*__param_map).bucket_count
 
 }
 
-unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: c_int) -> bool {
+pub unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: c_int) -> bool {
     var __ci_expr_logic_0: c_int = 0
 
     if ((*__param_self_).size != 0) {
@@ -1487,12 +1487,12 @@ unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: c_int) -> 
 
 }
 
-unsafe fn Intmap_shrink_to_fit(__param_self_: *mut Intmap) -> Unit {
+pub unsafe fn Intmap_shrink_to_fit(__param_self_: *mut Intmap) -> Unit {
     Intmap_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn Intmap_insert_entry_(__param_self_: *mut Intmap, __param_rkey: c_int) -> Intmap_result {
+pub unsafe fn Intmap_insert_entry_(__param_self_: *mut Intmap, __param_rkey: c_int) -> Intmap_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as c_long)): 1 else: 0) != 0) {
         if ((if not Intmap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as c_long)): 1 else: 0) != 0) {
             return ((Intmap_result.zeroed() as Intmap_result))
@@ -1525,7 +1525,7 @@ unsafe fn Intmap_insert_or_assign(__param_self_: *mut Intmap, __param__key: c_in
 
 }
 
-unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: c_int) -> *const c_int {
+pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: c_int) -> *const c_int {
     var __local_res: Intmap_result = Intmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut c_int) as *const c_int))
 
     if (((if not ((*(&raw const __local_res as *const Intmap_result)).ref != null): 1 else: 0) as c_long) != 0) {
@@ -1538,12 +1538,12 @@ unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: c_int) -> *const
 
 }
 
-unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut c_int {
+pub unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut c_int {
     return ((Intmap_at((__param_self_ as *const Intmap), __param_rkey) as *mut c_int))
 
 }
 
-unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) -> Unit {
+pub unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -1555,7 +1555,7 @@ unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) 
 
 }
 
-unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
+pub unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
 
     ((*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)) = (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)))
 
@@ -1565,16 +1565,16 @@ unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_
 
 }
 
-unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
+pub unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
     return ((Intmap_raw { first: ((*(&raw const (*__param_val).first as *const c_int))), second: ((*(&raw const (*__param_val).second as *const c_int))) } as Intmap_raw))
 
 }
 
-unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param__val: *mut Intmap_value) {
+pub unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param__val: *mut Intmap_value) {
     return
 }
 
-unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
+pub unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
     var __local_m: Intmap = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -1590,14 +1590,14 @@ unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
 
 }
 
-unsafe fn Intmap_take(__param_self_: *mut Intmap, __param_unowned: Intmap) -> Unit {
+pub unsafe fn Intmap_take(__param_self_: *mut Intmap, __param_unowned: Intmap) -> Unit {
     Intmap_drop((__param_self_ as *const Intmap))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Intmap]())
 
 }
 
-unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param__mapped: c_int) -> Intmap_result {
+pub unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param__mapped: c_int) -> Intmap_result {
     var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut c_int)))
 
     if (*(&raw const __local__res as *const Intmap_result)).inserted {
@@ -1614,7 +1614,7 @@ unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: c_int, __param
 
 }
 
-unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) -> *mut Intmap_value {
+pub unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) -> *mut Intmap_value {
     var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const c_int) as *mut c_int)))
 
     if ((if not (*(&raw const __local__res as *const Intmap_result)).inserted: 1 else: 0) != 0) {
@@ -1627,12 +1627,12 @@ unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) ->
 
 }
 
-unsafe fn Intmap_put(__param_self_: *mut Intmap, __param_rkey: c_int, __param_rmapped: c_int) -> Intmap_result {
+pub unsafe fn Intmap_put(__param_self_: *mut Intmap, __param_rkey: c_int, __param_rmapped: c_int) -> Intmap_result {
     return Intmap_insert_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
-unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_raw, __param_n: c_long) {
+pub unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -1652,14 +1652,14 @@ unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_ra
 
 }
 
-fn Intmap_init() -> Intmap {
+pub fn Intmap_init() -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     return __local_cx
 
 }
 
-unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Intmap {
+pub unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     Intmap_put_n((&raw mut __local_cx as *mut Intmap), __param_raw, __param_n)
@@ -1668,7 +1668,7 @@ unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: c_long) -> In
 
 }
 
-fn Intmap_with_capacity(__param_cap: c_long) -> Intmap {
+pub fn Intmap_with_capacity(__param_cap: c_long) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
     unsafe { Intmap_reserve((&raw mut __local_cx as *mut Intmap), __param_cap) }
@@ -1701,13 +1701,13 @@ unsafe fn Intmap_begin(__param_self_: *const Intmap) -> Intmap_iter {
 
 }
 
-unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
+pub unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
 
     return ((Intmap_iter.zeroed() as Intmap_iter))
 
 }
 
-unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) {
+pub unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) {
     while true {
         ((*__param_it_).ref = (*__param_it_).ref + 1)
 
@@ -1725,7 +1725,7 @@ unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) {
 
 }
 
-fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
+pub fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
     var __local_n = __param_n
     while true {
         var __ci_expr_logic_1: c_int = 0
@@ -1750,7 +1750,7 @@ fn Intmap_advance(__param_it_: Intmap_iter, __param_n: c_ulong) -> Intmap_iter {
 
 }
 
-unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intmap_iter {
+pub unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intmap_iter {
     var __local_ref: *mut Intmap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -1771,17 +1771,17 @@ unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: c_int) -> Intm
 
 }
 
-unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: c_int) -> *const Intmap_value {
+pub unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: c_int) -> *const Intmap_value {
     return (((if (*__param_self_).size != 0: Intmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut c_int) as *const c_int)).ref else: (null as *mut Intmap_value)) as *const Intmap_value))
 
 }
 
-unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut Intmap_value {
+pub unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: c_int) -> *mut Intmap_value {
     return ((Intmap_get((__param_self_ as *const Intmap), __param_rkey) as *mut Intmap_value))
 
 }
 
-unsafe fn Intmap_erase(__param_self_: *mut Intmap, __param_rkey: c_int) -> c_int {
+pub unsafe fn Intmap_erase(__param_self_: *mut Intmap, __param_rkey: c_int) -> c_int {
     var __local_ref: *mut Intmap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -1805,7 +1805,7 @@ unsafe fn Intmap_erase(__param_self_: *mut Intmap, __param_rkey: c_int) -> c_int
 
 }
 
-unsafe fn Intmap_erase_at(__param_self_: *mut Intmap, __param_it_: Intmap_iter) -> Intmap_iter {
+pub unsafe fn Intmap_erase_at(__param_self_: *mut Intmap, __param_it_: Intmap_iter) -> Intmap_iter {
     Intmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Intmap_iter)).ref)
 
     if ((if (*(*(&raw const __param_it_ as *const Intmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
@@ -1816,7 +1816,7 @@ unsafe fn Intmap_erase_at(__param_self_: *mut Intmap, __param_it_: Intmap_iter) 
 
 }
 
-unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
+pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
     if ((if Intmap_size(__param_self_) != Intmap_size(__param_other): 1 else: 0) != 0) {
         return false
     }
@@ -2226,22 +2226,22 @@ unsafe fn SImap_bucket_insert_(__param_self_: *const SImap, __param_rkeyptr: *co
 
 }
 
-unsafe fn SImap_is_empty(__param_map: *const SImap) -> bool {
+pub unsafe fn SImap_is_empty(__param_map: *const SImap) -> bool {
     return ((not ((*__param_map).size != 0)))
 
 }
 
-unsafe fn SImap_size(__param_map: *const SImap) -> c_long {
+pub unsafe fn SImap_size(__param_map: *const SImap) -> c_long {
     return (*__param_map).size
 
 }
 
-unsafe fn SImap_bucket_count(__param_map: *mut SImap) -> c_long {
+pub unsafe fn SImap_bucket_count(__param_map: *mut SImap) -> c_long {
     return (*__param_map).bucket_count
 
 }
 
-unsafe fn SImap_contains(__param_self_: *const SImap, __param_rkey: *const i8) -> bool {
+pub unsafe fn SImap_contains(__param_self_: *const SImap, __param_rkey: *const i8) -> bool {
     var __ci_expr_logic_0: c_int = 0
 
     if ((*__param_self_).size != 0) {
@@ -2253,12 +2253,12 @@ unsafe fn SImap_contains(__param_self_: *const SImap, __param_rkey: *const i8) -
 
 }
 
-unsafe fn SImap_shrink_to_fit(__param_self_: *mut SImap) -> Unit {
+pub unsafe fn SImap_shrink_to_fit(__param_self_: *mut SImap) -> Unit {
     SImap_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn SImap_insert_entry_(__param_self_: *mut SImap, __param_rkey: *const i8) -> SImap_result {
+pub unsafe fn SImap_insert_entry_(__param_self_: *mut SImap, __param_rkey: *const i8) -> SImap_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as c_long)): 1 else: 0) != 0) {
         if ((if not SImap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as c_long)): 1 else: 0) != 0) {
             return ((SImap_result.zeroed() as SImap_result))
@@ -2312,7 +2312,7 @@ unsafe fn SImap_emplace_or_assign(__param_self_: *mut SImap, __param_rkey: *cons
 
 }
 
-unsafe fn SImap_at(__param_self_: *const SImap, __param_rkey: *const i8) -> *const c_int {
+pub unsafe fn SImap_at(__param_self_: *const SImap, __param_rkey: *const i8) -> *const c_int {
     var __local_res: SImap_result = SImap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const i8) as *const *const i8))
 
     if (((if not ((*(&raw const __local_res as *const SImap_result)).ref != null): 1 else: 0) as c_long) != 0) {
@@ -2325,12 +2325,12 @@ unsafe fn SImap_at(__param_self_: *const SImap, __param_rkey: *const i8) -> *con
 
 }
 
-unsafe fn SImap_at_mut(__param_self_: *mut SImap, __param_rkey: *const i8) -> *mut c_int {
+pub unsafe fn SImap_at_mut(__param_self_: *mut SImap, __param_rkey: *const i8) -> *mut c_int {
     return ((SImap_at((__param_self_ as *const SImap), __param_rkey) as *mut c_int))
 
 }
 
-unsafe fn SImap_copy(__param_self_: *mut SImap, __param_other: *const SImap) -> Unit {
+pub unsafe fn SImap_copy(__param_self_: *mut SImap, __param_other: *const SImap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -2342,7 +2342,7 @@ unsafe fn SImap_copy(__param_self_: *mut SImap, __param_other: *const SImap) -> 
 
 }
 
-unsafe fn SImap_value_clone(__param_self_: *const SImap, __param__val: SImap_value) -> SImap_value {
+pub unsafe fn SImap_value_clone(__param_self_: *const SImap, __param__val: SImap_value) -> SImap_value {
 
     let __ci_copy_18: cstr = cstr_clone((*((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr)))
     with_memcpy((&raw mut (*((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __ci_copy_18 as *const u8), sizeof[cstr]())
@@ -2353,7 +2353,7 @@ unsafe fn SImap_value_clone(__param_self_: *const SImap, __param__val: SImap_val
 
 }
 
-unsafe fn SImap_emplace(__param_self_: *mut SImap, __param_rkey: *const i8, __param_rmapped: c_int) -> SImap_result {
+pub unsafe fn SImap_emplace(__param_self_: *mut SImap, __param_rkey: *const i8, __param_rmapped: c_int) -> SImap_result {
     var __local__res: SImap_result = SImap_insert_entry_(__param_self_, __param_rkey)
 
     if (*(&raw const __local__res as *const SImap_result)).inserted {
@@ -2368,19 +2368,19 @@ unsafe fn SImap_emplace(__param_self_: *mut SImap, __param_rkey: *const i8, __pa
 
 }
 
-unsafe fn SImap_value_toraw(__param_val: *const SImap_value) -> SImap_raw {
+pub unsafe fn SImap_value_toraw(__param_val: *const SImap_value) -> SImap_raw {
     return ((SImap_raw { first: cstr_toraw((&raw const (*__param_val).first as *const cstr)), second: ((*(&raw const (*__param_val).second as *const c_int))) } as SImap_raw))
 
 }
 
-unsafe fn SImap_value_drop(__param_self_: *const SImap, __param__val: *mut SImap_value) {
+pub unsafe fn SImap_value_drop(__param_self_: *const SImap, __param__val: *mut SImap_value) {
 
     cstr_drop((((&raw const (*__param__val).first as *const cstr) as *mut cstr) as *const cstr))
 
 
 }
 
-unsafe fn SImap_move(__param_self_: *mut SImap) -> SImap {
+pub unsafe fn SImap_move(__param_self_: *mut SImap) -> SImap {
     var __local_m: SImap = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -2396,14 +2396,14 @@ unsafe fn SImap_move(__param_self_: *mut SImap) -> SImap {
 
 }
 
-unsafe fn SImap_take(__param_self_: *mut SImap, __param_unowned: SImap) -> Unit {
+pub unsafe fn SImap_take(__param_self_: *mut SImap, __param_unowned: SImap) -> Unit {
     SImap_drop((__param_self_ as *const SImap))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[SImap]())
 
 }
 
-unsafe fn SImap_insert(__param_self_: *mut SImap, __param__key: cstr, __param__mapped: c_int) -> SImap_result {
+pub unsafe fn SImap_insert(__param_self_: *mut SImap, __param__key: cstr, __param__mapped: c_int) -> SImap_result {
     var __local__res: SImap_result = SImap_insert_entry_(__param_self_, cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)))
 
     if (*(&raw const __local__res as *const SImap_result)).inserted {
@@ -2421,7 +2421,7 @@ unsafe fn SImap_insert(__param_self_: *mut SImap, __param__key: cstr, __param__m
 
 }
 
-unsafe fn SImap_push(__param_self_: *mut SImap, __param__val: SImap_value) -> *mut SImap_value {
+pub unsafe fn SImap_push(__param_self_: *mut SImap, __param__val: SImap_value) -> *mut SImap_value {
     var __local__res: SImap_result = SImap_insert_entry_(__param_self_, cstr_toraw((((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr) as *const cstr)))
 
     if ((if not (*(&raw const __local__res as *const SImap_result)).inserted: 1 else: 0) != 0) {
@@ -2434,12 +2434,12 @@ unsafe fn SImap_push(__param_self_: *mut SImap, __param__val: SImap_value) -> *m
 
 }
 
-unsafe fn SImap_put(__param_self_: *mut SImap, __param_rkey: *const i8, __param_rmapped: c_int) -> SImap_result {
+pub unsafe fn SImap_put(__param_self_: *mut SImap, __param_rkey: *const i8, __param_rmapped: c_int) -> SImap_result {
     return SImap_emplace_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
-unsafe fn SImap_put_n(__param_self_: *mut SImap, __param_raw: *const SImap_raw, __param_n: c_long) {
+pub unsafe fn SImap_put_n(__param_self_: *mut SImap, __param_raw: *const SImap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -2459,14 +2459,14 @@ unsafe fn SImap_put_n(__param_self_: *mut SImap, __param_raw: *const SImap_raw, 
 
 }
 
-fn SImap_init() -> SImap {
+pub fn SImap_init() -> SImap {
     var __local_cx: SImap = SImap.zeroed()
 
     return __local_cx
 
 }
 
-unsafe fn SImap_from_n(__param_raw: *const SImap_raw, __param_n: c_long) -> SImap {
+pub unsafe fn SImap_from_n(__param_raw: *const SImap_raw, __param_n: c_long) -> SImap {
     var __local_cx: SImap = SImap.zeroed()
 
     SImap_put_n((&raw mut __local_cx as *mut SImap), __param_raw, __param_n)
@@ -2475,7 +2475,7 @@ unsafe fn SImap_from_n(__param_raw: *const SImap_raw, __param_n: c_long) -> SIma
 
 }
 
-fn SImap_with_capacity(__param_cap: c_long) -> SImap {
+pub fn SImap_with_capacity(__param_cap: c_long) -> SImap {
     var __local_cx: SImap = SImap.zeroed()
 
     unsafe { SImap_reserve((&raw mut __local_cx as *mut SImap), __param_cap) }
@@ -2508,13 +2508,13 @@ unsafe fn SImap_begin(__param_self_: *const SImap) -> SImap_iter {
 
 }
 
-unsafe fn SImap_end(__param_self_: *const SImap) -> SImap_iter {
+pub unsafe fn SImap_end(__param_self_: *const SImap) -> SImap_iter {
 
     return ((SImap_iter.zeroed() as SImap_iter))
 
 }
 
-unsafe fn SImap_next(__param_it_: *mut SImap_iter) {
+pub unsafe fn SImap_next(__param_it_: *mut SImap_iter) {
     while true {
         ((*__param_it_).ref = (*__param_it_).ref + 1)
 
@@ -2532,7 +2532,7 @@ unsafe fn SImap_next(__param_it_: *mut SImap_iter) {
 
 }
 
-fn SImap_advance(__param_it_: SImap_iter, __param_n: c_ulong) -> SImap_iter {
+pub fn SImap_advance(__param_it_: SImap_iter, __param_n: c_ulong) -> SImap_iter {
     var __local_n = __param_n
     while true {
         var __ci_expr_logic_1: c_int = 0
@@ -2557,7 +2557,7 @@ fn SImap_advance(__param_it_: SImap_iter, __param_n: c_ulong) -> SImap_iter {
 
 }
 
-unsafe fn SImap_find(__param_self_: *const SImap, __param_rkey: *const i8) -> SImap_iter {
+pub unsafe fn SImap_find(__param_self_: *const SImap, __param_rkey: *const i8) -> SImap_iter {
     var __local_ref: *mut SImap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -2578,17 +2578,17 @@ unsafe fn SImap_find(__param_self_: *const SImap, __param_rkey: *const i8) -> SI
 
 }
 
-unsafe fn SImap_get(__param_self_: *const SImap, __param_rkey: *const i8) -> *const SImap_value {
+pub unsafe fn SImap_get(__param_self_: *const SImap, __param_rkey: *const i8) -> *const SImap_value {
     return (((if (*__param_self_).size != 0: SImap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const i8) as *const *const i8)).ref else: (null as *mut SImap_value)) as *const SImap_value))
 
 }
 
-unsafe fn SImap_get_mut(__param_self_: *mut SImap, __param_rkey: *const i8) -> *mut SImap_value {
+pub unsafe fn SImap_get_mut(__param_self_: *mut SImap, __param_rkey: *const i8) -> *mut SImap_value {
     return ((SImap_get((__param_self_ as *const SImap), __param_rkey) as *mut SImap_value))
 
 }
 
-unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const i8) -> c_int {
+pub unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const i8) -> c_int {
     var __local_ref: *mut SImap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -2612,7 +2612,7 @@ unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const i8) -> c_i
 
 }
 
-unsafe fn SImap_erase_at(__param_self_: *mut SImap, __param_it_: SImap_iter) -> SImap_iter {
+pub unsafe fn SImap_erase_at(__param_self_: *mut SImap, __param_it_: SImap_iter) -> SImap_iter {
     SImap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const SImap_iter)).ref)
 
     if ((if (*(*(&raw const __param_it_ as *const SImap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
@@ -2623,7 +2623,7 @@ unsafe fn SImap_erase_at(__param_self_: *mut SImap, __param_it_: SImap_iter) -> 
 
 }
 
-unsafe fn SImap_eq(__param_self_: *const SImap, __param_other: *const SImap) -> bool {
+pub unsafe fn SImap_eq(__param_self_: *const SImap, __param_other: *const SImap) -> bool {
     if ((if SImap_size(__param_self_) != SImap_size(__param_other): 1 else: 0) != 0) {
         return false
     }
@@ -3039,22 +3039,22 @@ unsafe fn Strmap_bucket_insert_(__param_self_: *const Strmap, __param_rkeyptr: *
 
 }
 
-unsafe fn Strmap_is_empty(__param_map: *const Strmap) -> bool {
+pub unsafe fn Strmap_is_empty(__param_map: *const Strmap) -> bool {
     return ((not ((*__param_map).size != 0)))
 
 }
 
-unsafe fn Strmap_size(__param_map: *const Strmap) -> c_long {
+pub unsafe fn Strmap_size(__param_map: *const Strmap) -> c_long {
     return (*__param_map).size
 
 }
 
-unsafe fn Strmap_bucket_count(__param_map: *mut Strmap) -> c_long {
+pub unsafe fn Strmap_bucket_count(__param_map: *mut Strmap) -> c_long {
     return (*__param_map).bucket_count
 
 }
 
-unsafe fn Strmap_contains(__param_self_: *const Strmap, __param_rkey: *const i8) -> bool {
+pub unsafe fn Strmap_contains(__param_self_: *const Strmap, __param_rkey: *const i8) -> bool {
     var __ci_expr_logic_0: c_int = 0
 
     if ((*__param_self_).size != 0) {
@@ -3066,12 +3066,12 @@ unsafe fn Strmap_contains(__param_self_: *const Strmap, __param_rkey: *const i8)
 
 }
 
-unsafe fn Strmap_shrink_to_fit(__param_self_: *mut Strmap) -> Unit {
+pub unsafe fn Strmap_shrink_to_fit(__param_self_: *mut Strmap) -> Unit {
     Strmap_reserve(__param_self_, (9223372036854775807 as c_long))
 
 }
 
-unsafe fn Strmap_insert_entry_(__param_self_: *mut Strmap, __param_rkey: *const i8) -> Strmap_result {
+pub unsafe fn Strmap_insert_entry_(__param_self_: *mut Strmap, __param_rkey: *const i8) -> Strmap_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as c_long)): 1 else: 0) != 0) {
         if ((if not Strmap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as c_long)): 1 else: 0) != 0) {
             return ((Strmap_result.zeroed() as Strmap_result))
@@ -3128,7 +3128,7 @@ unsafe fn Strmap_emplace_or_assign(__param_self_: *mut Strmap, __param_rkey: *co
 
 }
 
-unsafe fn Strmap_at(__param_self_: *const Strmap, __param_rkey: *const i8) -> *const cstr {
+pub unsafe fn Strmap_at(__param_self_: *const Strmap, __param_rkey: *const i8) -> *const cstr {
     var __local_res: Strmap_result = Strmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const i8) as *const *const i8))
 
     if (((if not ((*(&raw const __local_res as *const Strmap_result)).ref != null): 1 else: 0) as c_long) != 0) {
@@ -3141,12 +3141,12 @@ unsafe fn Strmap_at(__param_self_: *const Strmap, __param_rkey: *const i8) -> *c
 
 }
 
-unsafe fn Strmap_at_mut(__param_self_: *mut Strmap, __param_rkey: *const i8) -> *mut cstr {
+pub unsafe fn Strmap_at_mut(__param_self_: *mut Strmap, __param_rkey: *const i8) -> *mut cstr {
     return ((Strmap_at((__param_self_ as *const Strmap), __param_rkey) as *mut cstr))
 
 }
 
-unsafe fn Strmap_copy(__param_self_: *mut Strmap, __param_other: *const Strmap) -> Unit {
+pub unsafe fn Strmap_copy(__param_self_: *mut Strmap, __param_other: *const Strmap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
     }
@@ -3158,7 +3158,7 @@ unsafe fn Strmap_copy(__param_self_: *mut Strmap, __param_other: *const Strmap) 
 
 }
 
-unsafe fn Strmap_value_clone(__param_self_: *const Strmap, __param__val: Strmap_value) -> Strmap_value {
+pub unsafe fn Strmap_value_clone(__param_self_: *const Strmap, __param__val: Strmap_value) -> Strmap_value {
 
     let __ci_copy_18: cstr = cstr_clone((*((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr)))
     with_memcpy((&raw mut (*((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __ci_copy_18 as *const u8), sizeof[cstr]())
@@ -3170,7 +3170,7 @@ unsafe fn Strmap_value_clone(__param_self_: *const Strmap, __param__val: Strmap_
 
 }
 
-unsafe fn Strmap_emplace(__param_self_: *mut Strmap, __param_rkey: *const i8, __param_rmapped: *const i8) -> Strmap_result {
+pub unsafe fn Strmap_emplace(__param_self_: *mut Strmap, __param_rkey: *const i8, __param_rmapped: *const i8) -> Strmap_result {
     var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, __param_rkey)
 
     if (*(&raw const __local__res as *const Strmap_result)).inserted {
@@ -3186,12 +3186,12 @@ unsafe fn Strmap_emplace(__param_self_: *mut Strmap, __param_rkey: *const i8, __
 
 }
 
-unsafe fn Strmap_value_toraw(__param_val: *const Strmap_value) -> Strmap_raw {
+pub unsafe fn Strmap_value_toraw(__param_val: *const Strmap_value) -> Strmap_raw {
     return ((Strmap_raw { first: cstr_toraw((&raw const (*__param_val).first as *const cstr)), second: cstr_toraw((&raw const (*__param_val).second as *const cstr)) } as Strmap_raw))
 
 }
 
-unsafe fn Strmap_value_drop(__param_self_: *const Strmap, __param__val: *mut Strmap_value) {
+pub unsafe fn Strmap_value_drop(__param_self_: *const Strmap, __param__val: *mut Strmap_value) {
 
     cstr_drop((((&raw const (*__param__val).first as *const cstr) as *mut cstr) as *const cstr))
 
@@ -3199,7 +3199,7 @@ unsafe fn Strmap_value_drop(__param_self_: *const Strmap, __param__val: *mut Str
 
 }
 
-unsafe fn Strmap_move(__param_self_: *mut Strmap) -> Strmap {
+pub unsafe fn Strmap_move(__param_self_: *mut Strmap) -> Strmap {
     var __local_m: Strmap = (*__param_self_)
 
     ((*__param_self_).size = ((0 as c_long)))
@@ -3215,14 +3215,14 @@ unsafe fn Strmap_move(__param_self_: *mut Strmap) -> Strmap {
 
 }
 
-unsafe fn Strmap_take(__param_self_: *mut Strmap, __param_unowned: Strmap) -> Unit {
+pub unsafe fn Strmap_take(__param_self_: *mut Strmap, __param_unowned: Strmap) -> Unit {
     Strmap_drop((__param_self_ as *const Strmap))
 
     with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Strmap]())
 
 }
 
-unsafe fn Strmap_insert(__param_self_: *mut Strmap, __param__key: cstr, __param__mapped: cstr) -> Strmap_result {
+pub unsafe fn Strmap_insert(__param_self_: *mut Strmap, __param__key: cstr, __param__mapped: cstr) -> Strmap_result {
     var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)))
 
     if (*(&raw const __local__res as *const Strmap_result)).inserted {
@@ -3241,7 +3241,7 @@ unsafe fn Strmap_insert(__param_self_: *mut Strmap, __param__key: cstr, __param_
 
 }
 
-unsafe fn Strmap_push(__param_self_: *mut Strmap, __param__val: Strmap_value) -> *mut Strmap_value {
+pub unsafe fn Strmap_push(__param_self_: *mut Strmap, __param__val: Strmap_value) -> *mut Strmap_value {
     var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, cstr_toraw((((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr) as *const cstr)))
 
     if ((if not (*(&raw const __local__res as *const Strmap_result)).inserted: 1 else: 0) != 0) {
@@ -3254,12 +3254,12 @@ unsafe fn Strmap_push(__param_self_: *mut Strmap, __param__val: Strmap_value) ->
 
 }
 
-unsafe fn Strmap_put(__param_self_: *mut Strmap, __param_rkey: *const i8, __param_rmapped: *const i8) -> Strmap_result {
+pub unsafe fn Strmap_put(__param_self_: *mut Strmap, __param_rkey: *const i8, __param_rmapped: *const i8) -> Strmap_result {
     return Strmap_emplace_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
-unsafe fn Strmap_put_n(__param_self_: *mut Strmap, __param_raw: *const Strmap_raw, __param_n: c_long) {
+pub unsafe fn Strmap_put_n(__param_self_: *mut Strmap, __param_raw: *const Strmap_raw, __param_n: c_long) {
     var __local_raw = __param_raw
     var __local_n = __param_n
     while true {
@@ -3279,14 +3279,14 @@ unsafe fn Strmap_put_n(__param_self_: *mut Strmap, __param_raw: *const Strmap_ra
 
 }
 
-fn Strmap_init() -> Strmap {
+pub fn Strmap_init() -> Strmap {
     var __local_cx: Strmap = Strmap.zeroed()
 
     return __local_cx
 
 }
 
-unsafe fn Strmap_from_n(__param_raw: *const Strmap_raw, __param_n: c_long) -> Strmap {
+pub unsafe fn Strmap_from_n(__param_raw: *const Strmap_raw, __param_n: c_long) -> Strmap {
     var __local_cx: Strmap = Strmap.zeroed()
 
     Strmap_put_n((&raw mut __local_cx as *mut Strmap), __param_raw, __param_n)
@@ -3295,7 +3295,7 @@ unsafe fn Strmap_from_n(__param_raw: *const Strmap_raw, __param_n: c_long) -> St
 
 }
 
-fn Strmap_with_capacity(__param_cap: c_long) -> Strmap {
+pub fn Strmap_with_capacity(__param_cap: c_long) -> Strmap {
     var __local_cx: Strmap = Strmap.zeroed()
 
     unsafe { Strmap_reserve((&raw mut __local_cx as *mut Strmap), __param_cap) }
@@ -3328,13 +3328,13 @@ unsafe fn Strmap_begin(__param_self_: *const Strmap) -> Strmap_iter {
 
 }
 
-unsafe fn Strmap_end(__param_self_: *const Strmap) -> Strmap_iter {
+pub unsafe fn Strmap_end(__param_self_: *const Strmap) -> Strmap_iter {
 
     return ((Strmap_iter.zeroed() as Strmap_iter))
 
 }
 
-unsafe fn Strmap_next(__param_it_: *mut Strmap_iter) {
+pub unsafe fn Strmap_next(__param_it_: *mut Strmap_iter) {
     while true {
         ((*__param_it_).ref = (*__param_it_).ref + 1)
 
@@ -3352,7 +3352,7 @@ unsafe fn Strmap_next(__param_it_: *mut Strmap_iter) {
 
 }
 
-fn Strmap_advance(__param_it_: Strmap_iter, __param_n: c_ulong) -> Strmap_iter {
+pub fn Strmap_advance(__param_it_: Strmap_iter, __param_n: c_ulong) -> Strmap_iter {
     var __local_n = __param_n
     while true {
         var __ci_expr_logic_1: c_int = 0
@@ -3377,7 +3377,7 @@ fn Strmap_advance(__param_it_: Strmap_iter, __param_n: c_ulong) -> Strmap_iter {
 
 }
 
-unsafe fn Strmap_find(__param_self_: *const Strmap, __param_rkey: *const i8) -> Strmap_iter {
+pub unsafe fn Strmap_find(__param_self_: *const Strmap, __param_rkey: *const i8) -> Strmap_iter {
     var __local_ref: *mut Strmap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -3398,17 +3398,17 @@ unsafe fn Strmap_find(__param_self_: *const Strmap, __param_rkey: *const i8) -> 
 
 }
 
-unsafe fn Strmap_get(__param_self_: *const Strmap, __param_rkey: *const i8) -> *const Strmap_value {
+pub unsafe fn Strmap_get(__param_self_: *const Strmap, __param_rkey: *const i8) -> *const Strmap_value {
     return (((if (*__param_self_).size != 0: Strmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const i8) as *const *const i8)).ref else: (null as *mut Strmap_value)) as *const Strmap_value))
 
 }
 
-unsafe fn Strmap_get_mut(__param_self_: *mut Strmap, __param_rkey: *const i8) -> *mut Strmap_value {
+pub unsafe fn Strmap_get_mut(__param_self_: *mut Strmap, __param_rkey: *const i8) -> *mut Strmap_value {
     return ((Strmap_get((__param_self_ as *const Strmap), __param_rkey) as *mut Strmap_value))
 
 }
 
-unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const i8) -> c_int {
+pub unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const i8) -> c_int {
     var __local_ref: *mut Strmap_value
 
     var __ci_expr_logic_0: c_int = 0
@@ -3432,7 +3432,7 @@ unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const i8) -> c
 
 }
 
-unsafe fn Strmap_erase_at(__param_self_: *mut Strmap, __param_it_: Strmap_iter) -> Strmap_iter {
+pub unsafe fn Strmap_erase_at(__param_self_: *mut Strmap, __param_it_: Strmap_iter) -> Strmap_iter {
     Strmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Strmap_iter)).ref)
 
     if ((if (*(*(&raw const __param_it_ as *const Strmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
@@ -3443,7 +3443,7 @@ unsafe fn Strmap_erase_at(__param_self_: *mut Strmap, __param_it_: Strmap_iter) 
 
 }
 
-unsafe fn Strmap_eq(__param_self_: *const Strmap, __param_other: *const Strmap) -> bool {
+pub unsafe fn Strmap_eq(__param_self_: *const Strmap, __param_other: *const Strmap) -> bool {
     if ((if Strmap_size(__param_self_) != Strmap_size(__param_other): 1 else: 0) != 0) {
         return false
     }

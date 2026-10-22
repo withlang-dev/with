@@ -2094,7 +2094,7 @@ fn ci_translate_function(session: i64, idx: i32, known_structs: &str, demoted_ty
             if si_raw:
                 ci_record_raw_function_name(name)
             let si_ret_render = ci_unsafe_fn_ptr_type(si_ret)
-            return ci_take_body_hoisted_decls() ++ ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ")" ++ ci_def_ret_suffix(si_ret_render, body_tail_unit), body)
+            return ci_take_body_hoisted_decls() ++ ci_render_generated_fn_body(fn_kw ++ safe_name ++ "(" ++ si_params ++ ")" ++ ci_def_ret_suffix(si_ret_render, body_tail_unit and not ci_migrate_body_calls(body, safe_name)), body)
         // The translator's own reason (va_arg, an unsupported builtin, a
         // record initializer it cannot resolve), not only that it failed.
         let failed_why = if g_ci_bail_message.len() > 0: "inline body translation failed: " ++ g_ci_bail_message else: "inline body translation failed"

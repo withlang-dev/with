@@ -8,6 +8,7 @@ use std.engines.stc.cstr_misc
 use std.engines.stc.cstr_utf8
 use std.engines.stc.csview
 use std.engines.stc.defs
+use std.engines.stc.facade_shapes
 use std.engines.stc.fmt
 use std.engines.stc.random
 use std.engines.stc.stc_core
