@@ -4179,9 +4179,7 @@ fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32) -> bool:
 fn mir_intrinsic_invokes_closure(intrinsic: MirIntrinsic) -> bool:
     if intrinsic == MirIntrinsic.LIST_MAP or intrinsic == MirIntrinsic.LIST_FILTER or intrinsic == MirIntrinsic.LIST_FOLD:
         return true
-    if intrinsic == MirIntrinsic.ITER_FOLD or intrinsic == MirIntrinsic.ITER_REDUCE or intrinsic == MirIntrinsic.ITER_SUM or intrinsic == MirIntrinsic.ITER_PRODUCT or intrinsic == MirIntrinsic.ITER_MIN or intrinsic == MirIntrinsic.ITER_MAX or intrinsic == MirIntrinsic.ITER_MIN_BY or intrinsic == MirIntrinsic.ITER_MAX_BY or intrinsic == MirIntrinsic.ITER_FIND or intrinsic == MirIntrinsic.ITER_POSITION or intrinsic == MirIntrinsic.ITER_ANY or intrinsic == MirIntrinsic.ITER_ALL or intrinsic == MirIntrinsic.ITER_NONE or intrinsic == MirIntrinsic.ITER_FOR_EACH or intrinsic == MirIntrinsic.ITER_COUNT or intrinsic == MirIntrinsic.ITER_COLLECT or intrinsic == MirIntrinsic.ITER_PARTITION or intrinsic == MirIntrinsic.ITER_UNZIP:
-        return true
-    intrinsic == MirIntrinsic.MAPITER_NEXT or intrinsic == MirIntrinsic.FILTERITER_NEXT or intrinsic == MirIntrinsic.FILTERMAPITER_NEXT or intrinsic == MirIntrinsic.TAKEITER_NEXT or intrinsic == MirIntrinsic.DROPITER_NEXT or intrinsic == MirIntrinsic.TAKEWHILEITER_NEXT or intrinsic == MirIntrinsic.DROPWHILEITER_NEXT or intrinsic == MirIntrinsic.ZIPITER_NEXT or intrinsic == MirIntrinsic.ENUMERATEITER_NEXT or intrinsic == MirIntrinsic.CHAINITER_NEXT or intrinsic == MirIntrinsic.ZIPWITHITER_NEXT or intrinsic == MirIntrinsic.STEPBYITER_NEXT or intrinsic == MirIntrinsic.FLATMAPITER_NEXT
+    false
 
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).
