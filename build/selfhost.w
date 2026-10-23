@@ -4683,7 +4683,7 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "pub fn count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int", "a signed member sign-extends")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, bits_w, "pub fn c() -> color:", "an enum member's getter returns the integer alias")
+    rc = bs_file_contains(ctx, bits_w, "pub fn c() -> i32:", "an enum member's getter returns the integer (an enum is one type everywhere)")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "if sizeof[*const u8]() == 8 and (sizeof[two]() != 3 or offsetof[two](__bits_0) != 0 or offsetof[two](__bits_1) != 1 or offsetof[two](__bits_2) != 2): comptime_error(", "the layout assertion, on the migrating data model")
     if rc != 0: return rc
@@ -4978,7 +4978,7 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let BIG: c_uint = 2147483648", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "type color = c_uint", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "type color = c_int", "enum_constants_are_int")
     if rc != 0: return rc
     var run_args: List[str] = List.new()
     run_args |> push("run")
@@ -5547,6 +5547,29 @@ fn bs_check_migrate_compound_literal_anon_record(ctx: &ActionCtx, compiler_path:
 
 // A typedef of a pointer (`typedef struct node_s *node_t`, M*LIB's node_t)
 // is the pointer: a malloc result converts to it and `n->f` dereferences.
+// A demotion comment's location goes through `--macro-prefix-map` as a
+// `__FILE__` does: a promoted corpus names no staging directory.
+fn bs_check_migrate_demotion_comment_mapped(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "fwd.c")
+    let out_w = bs_join(case_dir, "fwd.w")
+    var rc = bs_write_fixture(ctx, src, "struct fwd;\nstruct fwd *keep(struct fwd *p) { return p; }\n", "demotion comment mapped")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--macro-prefix-map")
+    args |> push(bs_abs(root, case_dir) ++ "/=")
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-demotion_comment_mapped", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "// fwd.c:1:8: demoted to opaque", "demotion_comment_mapped")
+    if rc != 0: return rc
+    0
+
 fn bs_check_migrate_pointer_typedef_local(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "pointer_typedef_local.c")
@@ -6055,6 +6078,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_compound_literal_anon_record(ctx, compiler_path, bs_join(output_dir, "compound_literal_anon_record"))
     if rc != 0: return rc
     rc = bs_check_migrate_pointer_typedef_local(ctx, compiler_path, bs_join(output_dir, "pointer_typedef_local"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_demotion_comment_mapped(ctx, compiler_path, bs_join(output_dir, "demotion_comment_mapped"))
     if rc != 0: return rc
     rc = bs_check_migrate_macro_body_string_literal(ctx, compiler_path, bs_join(output_dir, "macro_body_string_literal"))
     if rc != 0: return rc

@@ -230,7 +230,7 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
     var excludes: List[str] = List.new()
     for exclude in corpus.excludes: excludes.push(exclude.clone())
     var forced: List[str] = List.new()
-    for header in corpus.forced_includes: forced.push(header.clone())
+    for header in corpus.forced_includes: forced.push(header)
     MigrateOptions {
         source_path: corpus_owned_text(source), output_path: corpus_owned_text(output),
         include_paths: corpus_include_paths(corpus, source), forced_includes: forced,
@@ -312,9 +312,15 @@ pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOpt
     for path in options.include_paths:
         argv.push("-I")
         argv.push(corpus_abs(ctx, path))
+    // A location the migration writes into a module (a demotion comment)
+    // is spelled from the staging directory, never through it, so the
+    // promoted corpus is the same on every host (D50).
+    let staging = if options.source_path.ends_with(".c") or options.source_path.ends_with(".h"): corpus_dirname(options.source_path) else: corpus_owned_text(options.source_path)
+    argv.push("--macro-prefix-map")
+    argv.push(corpus_abs(ctx, staging) ++ "/=")
     for header in options.forced_includes:
         argv.push("-include")
-        argv.push(header.clone())
+        argv.push(header)
     for define in options.defines:
         argv.push("-D")
         argv.push(define.clone())

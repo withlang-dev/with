@@ -133,6 +133,17 @@ fn migrate_add_include_path(path: &str) -> Unit:
 fn migrate_add_macro_prefix_map(spec: &str):
     g_migrate_macro_prefix_maps.push(spec)
 
+// A location the migration writes into a module (a demotion comment's)
+// goes through the same maps as a `__FILE__`: a promoted corpus names no
+// staging directory, so it is the same on every host.
+fn migrate_map_output_path(text: &str) -> str:
+    for spec in g_migrate_macro_prefix_maps:
+        let eq = spec.find("=")
+        if eq < 0: continue
+        let old = spec[..eq]
+        if text.starts_with(old): return spec[eq + 1..] ++ text[old.len()..]
+    text
+
 fn migrate_add_forced_include(path: &str) -> Unit:
     g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 

@@ -3991,7 +3991,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
     var probes = CiMacroProbes.new()
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
-        g_ci_expr_subject = name.clone()
+        g_ci_expr_subject = name
         let raw_value = with_cimport_macro_value(session, i)
         var value = ci_trim(ci_strip_c_comments(raw_value))
         var fn_like = with_cimport_macro_is_fn_like(session, i)
@@ -14368,7 +14368,7 @@ fn ci_decl_location_index_reset:
 
 fn ci_get_decl_location(session: i64, name: &str) -> str:
     ci_decl_location_index_ensure(session)
-    if g_ci_decl_location_cursor.contains(name): with_ci_cursor_location(session, g_ci_decl_location_cursor.get(name).unwrap()) else: ""
+    if g_ci_decl_location_cursor.contains(name): migrate_map_output_path(with_ci_cursor_location(session, g_ci_decl_location_cursor.get(name).unwrap())) else: ""
 
 fn ci_is_null_like_stmt(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
