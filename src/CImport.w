@@ -9977,6 +9977,13 @@ fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
     let ty = with_ci_cursor_type(session, cursor)
     if ty < 0:
         return false
+    // A `va_list` is `__va_list_tag[1]` on x86_64 Linux (#1104): an array to
+    // clang, the opaque `c_va_list` value to With. It never decays: passing
+    // `args` to a v* function is the value itself, as on the targets where
+    // va_list is a pointer (`&args[0] as *mut __va_list_tag` indexed an
+    // opaque type, c-migrator-basic-tests' build-vacopy on linux-x86_64, #2582).
+    if cimport_type_is_va_list_at(session, ty, false):
+        return false
     ci_type_kind_is_array(with_ci_type_kind(session, with_ci_type_canonical(session, ty)))
 
 fn ci_type_kind_is_array(k: i32) -> bool:
