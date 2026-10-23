@@ -27697,22 +27697,17 @@ impl Sema:
         let saved_module_path = self.current_module_path.clone()
         let saved_scope_name_map = move self.scope_name_map
         self.scope_name_map = HashMap.new()
+        let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
+        for gi in 0..module_scope_len:
+            let sym = self.bind_names[gi]
+            let mapped = saved_scope_name_map.get(sym)
+            if mapped.is_some() and mapped.unwrap() == gi:
+                self.scope_name_map.insert(sym, gi as i32)
+        for si in 0..self.shadowed_global_syms.len():
+            if self.shadowed_global_indices[si] < module_scope_len:
+                self.scope_name_map.insert(self.shadowed_global_syms[si], self.shadowed_global_indices[si])
         if self.fn_decl_nodes.contains(callee_sym):
             self.update_fn_source_context(callee_sym, self.fn_decl_nodes.get(callee_sym).unwrap())
-        // The caller's module-level names are in scope for a default only
-        // when the declaration is in that module: a default resolves in its
-        // declaration's module, so a caller's own `src` never captures
-        // `panic(loc = src())` (#2568).
-        if self.current_module_path == saved_module_path:
-            let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
-            for gi in 0..module_scope_len:
-                let sym = self.bind_names[gi]
-                let mapped = saved_scope_name_map.get(sym)
-                if mapped.is_some() and mapped.unwrap() == gi:
-                    self.scope_name_map.insert(sym, gi as i32)
-            for si in 0..self.shadowed_global_syms.len():
-                if self.shadowed_global_indices[si] < module_scope_len:
-                    self.scope_name_map.insert(self.shadowed_global_syms[si], self.shadowed_global_indices[si])
         let ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
             else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
             else: self.check_expr_value_context(arg_node)
