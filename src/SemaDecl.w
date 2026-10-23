@@ -3223,10 +3223,17 @@ impl Sema:
                 self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
                 return
             self.impl_identity_traits.insert(identity_key, 1)
+            // D29: the name record is per tier (impl_extra_is_std, what
+            // select_trait_impl_tiered reads); a std corpus's `impl Copy`
+            // for a name the program also declares never stands in for the
+            // program's (#2575: the program's record was never added, and
+            // its type read as not Copy).
+            let this_tier = sema_tier_path_is_std_implementation(self.current_module_path)
             if self.impl_lookup.contains(type_name):
                 let idx: i32 = self.impl_lookup.get(type_name).unwrap()
                 for i in 0..self.impl_counts[idx]:
-                    if self.impl_extra[(self.impl_starts[idx] + i)] == trait_sym:
+                    let record_idx = self.impl_starts[idx] + i
+                    if self.impl_extra[record_idx] == trait_sym and self.impl_record_matches_tier(record_idx, this_tier) != 0:
                         name_record_has_trait = true
 
         // Record direct impl
