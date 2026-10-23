@@ -380,6 +380,11 @@ impl Sema:
                     file_last.insert(file, n)
                 continue
             self.note_mentioned_syms(n as NodeId)
+        // Type names an interface's own declarations mention (#2575): a
+        // demanded interface alias that reads `[multimap_s; 1]` needs the
+        // interface's `multimap_s`, whatever the program declares under
+        // that name; the displacement below is for the program's mentions.
+        let interface_type_mentions = sema_new_map_i32_i32()
         var changed = true
         while changed:
             changed = false
@@ -389,7 +394,7 @@ impl Sema:
                 let decl = self.ast.get_decl(di)
                 if not self.interface_decl_is_named(decl):
                     continue
-                if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and source_type_names.contains(self.ast.get_data0(decl)):
+                if self.ast.kind(decl) == NodeKind.NK_TYPE_DECL and source_type_names.contains(self.ast.get_data0(decl)) and not interface_type_mentions.contains(self.ast.get_data0(decl)):
                     continue
                 self.decl_iface_demanded[di] = 1
                 changed = true
@@ -403,6 +408,9 @@ impl Sema:
                 for n in first..(last + 1):
                     if self.ast.get_start(n as NodeId) >= lo and self.ast.get_end(n as NodeId) <= hi:
                         self.note_mentioned_syms(n as NodeId)
+                        let nk = self.ast.kind(n as NodeId)
+                        if nk == NodeKind.NK_TYPE_NAMED or nk == NodeKind.NK_TYPE_GENERIC or nk == NodeKind.NK_IDENT:
+                            interface_type_mentions.insert(self.ast.get_data0(n as NodeId), 1)
 
     // The names a declaration answers to: its own, a method's bare name, an
     // impl's target type.
@@ -3215,10 +3223,17 @@ impl Sema:
                 self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
                 return
             self.impl_identity_traits.insert(identity_key, 1)
+            // D29: the name record is per tier (impl_extra_is_std, what
+            // select_trait_impl_tiered reads); a std corpus's `impl Copy`
+            // for a name the program also declares never stands in for the
+            // program's (#2575: the program's record was never added, and
+            // its type read as not Copy).
+            let this_tier = sema_tier_path_is_std_implementation(self.current_module_path)
             if self.impl_lookup.contains(type_name):
                 let idx: i32 = self.impl_lookup.get(type_name).unwrap()
                 for i in 0..self.impl_counts[idx]:
-                    if self.impl_extra[(self.impl_starts[idx] + i)] == trait_sym:
+                    let record_idx = self.impl_starts[idx] + i
+                    if self.impl_extra[record_idx] == trait_sym and self.impl_record_matches_tier(record_idx, this_tier) != 0:
                         name_record_has_trait = true
 
         // Record direct impl
