@@ -233,9 +233,9 @@ jobs:
             runner: ubuntu-latest
             sdk_host_tag: linux-x86_64
             seed_repo: withlang-dev/with
-            seed_version: nightly-20261020-local-3-763d0e54c82a
+            seed_version: nightly-20261023-local-2-1508cf5cc0d1
             seed_asset: with-linux-x86_64
-            seed_sha256: 6e40ec0d4e037a1f53bac7f8732ae71dca1c44bad089760f7a650e192b66c9d8
+            seed_sha256: 1bc4c6c81b284d69101d4a38ec680571afa0d37a270d0cc16dfb8a1b351e1c64
             sdk_version: nightly-sdk-20261004-c4ddb7ddbef2
             sdk_asset: with-llvm-sdk-22.1.6-linux-x86_64.tar.gz
             sdk_sha256: 89751749724afcd2cd26f4022201797d310dc77c74f4b49689a0d2768db74785
