@@ -6743,6 +6743,12 @@ impl Sema:
         let kind = self.get_type_kind(resolved)
         kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT
 
+    // A `str` value, or a view of one (`&str`).
+    fn type_is_str_value_or_view(tid: i32) -> bool:
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_STR: return true
+        self.get_type_kind(resolved) == TypeKind.TY_REF and self.get_type_kind(self.resolve_alias(self.get_type_d0(resolved) as TypeId)) == TypeKind.TY_STR
+
     fn literal_suffix_type(suffix: i32) -> i32:
         if suffix == LiteralSuffix.I8: return self.ty_i8 as i32
         if suffix == LiteralSuffix.I16: return self.ty_i16 as i32
