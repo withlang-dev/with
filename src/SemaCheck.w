@@ -11841,6 +11841,8 @@ impl Sema:
                     self.check_pattern(binding, elem_ty)
                 else:
                     self.scope_put_at(binding, elem_ty, 0, iterable)
+                // D128 (#2569): the binding's uses type the literal.
+                self.register_literal_clause_binding(binding, self.ast.comprehension_binding_is_pattern(node, binding), iterable)
                 if filter != 0:
                     let filter_ty = self.check_expr(filter)
                     if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
@@ -11858,6 +11860,7 @@ impl Sema:
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
                 self.unregister_iter_literal_bindings(self.ast.get_extra(base), self.ast.comprehension_binding_is_pattern(node, self.ast.get_extra(base)))
+                self.unregister_literal_clause_binding(self.ast.get_extra(base), self.ast.comprehension_binding_is_pattern(node, self.ast.get_extra(base)))
             for _ in 0..pushed_scopes:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count)
@@ -11915,6 +11918,8 @@ impl Sema:
                     self.check_pattern(binding2, elem_ty2)
                 else:
                     self.scope_put_at(binding2, elem_ty2, 0, iterable2)
+                // D128 (#2569): the binding's uses type the literal.
+                self.register_literal_clause_binding(binding2, self.ast.comprehension_binding_is_pattern(node, binding2), iterable2)
                 if filter2 != 0:
                     let filter_ty2 = self.check_expr(filter2)
                     if filter_ty2 != 0 and self.types_compatible(self.ty_bool as i32, filter_ty2 as i32) == 0:
@@ -11942,6 +11947,9 @@ impl Sema:
                 let _ = self.record_contextual_copy_adjustment(val_expr, val_pointee, val_ty as i32)
                 stored_val_ty = val_pointee
             self.record_gen_comprehension_captures(node, comp_start2 + 2, &gen_outer_counts2)
+            for ci2 in 0..clause_count2:
+                let binding2 = self.ast.get_extra(comp_start2 + 2 + ci2 * 3)
+                self.unregister_literal_clause_binding(binding2, self.ast.comprehension_binding_is_pattern(node, binding2))
             for _ in 0..pushed_scopes2:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count2)
@@ -18784,12 +18792,7 @@ impl Sema:
         // D128: a loop variable over a literal range is a literal-typed local;
         // the body's second check types the range at the variable's decision.
         var range_literal = iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_RANGE and self.range_bound_is_literal(self.ast.get_data0(iterable)) and (self.ast.get_data1(iterable) == 0 or self.range_bound_is_literal(self.ast.get_data1(iterable)))
-        var list_literal = false
-        if iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(iterable) == 0:
-            let elems = self.ast.get_data0(iterable)
-            for ei in 0..self.ast.get_data1(iterable):
-                let elem = self.ast.get_extra(elems + ei)
-                if self.expr_is_untyped_literal_arith(elem) or self.literal_binding_lets_in(elem).len() > 0: list_literal = true
+        let list_literal = self.untyped_list_literal_iterable(iterable)
         if list_literal: range_literal = true
         let iter_type = if range_literal and self.int_local_decisions.contains(node):
             let decided_elem = (self.int_local_decisions.get(node).unwrap() / 4294967296) as i32
@@ -18994,10 +18997,46 @@ impl Sema:
         let base = self.get_generic_inst_base(resolved as i32)
         base == self.syms.hashmap or base == self.syms.hashset or base == self.syms.btreemap
 
+    // D128: an element-form list literal iterable with an element an untyped
+    // number (or a literal-typed local) gives: the loop or clause binding's
+    // uses type it.
+    fn untyped_list_literal_iterable(iterable: i32) -> bool:
+        if iterable == 0 or self.ast.kind(iterable) != NodeKind.NK_ARRAY_LIT or self.ast.get_data2(iterable) != 0: return false
+        let elems = self.ast.get_data0(iterable)
+        for ei in 0..self.ast.get_data1(iterable):
+            let elem = self.ast.get_extra(elems + ei)
+            if self.expr_is_untyped_literal_arith(elem) or self.literal_binding_lets_in(elem).len() > 0: return true
+        false
+
+    // D128 (#2569): a comprehension clause's plain name over a list literal
+    // of untyped numbers (a symbol in a `for`, an identifier pattern in a
+    // clause) is keyed to the literal, so the name's uses type it.
+    mut fn register_literal_clause_binding(binding: i32, is_pattern: bool, iterable: i32):
+        if binding == 0 or not self.untyped_list_literal_iterable(iterable): return
+        if is_pattern and self.ast.kind(binding) != NodeKind.NK_PAT_IDENT: return
+        let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+        self.int_local_for_decls.insert(sym, iterable)
+
+    mut fn unregister_literal_clause_binding(binding: i32, is_pattern: bool):
+        if binding == 0: return
+        if is_pattern and self.ast.kind(binding) != NodeKind.NK_PAT_IDENT: return
+        let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+        self.int_local_for_decls.remove(sym)
+
     mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
         let outer_loop_iterable: i32 = self.loop_iterable_node
         self.loop_iterable_node = iterable
-        let iter_ty = self.check_expr(iterable)
+        // The collection demand is the comprehension's, never its iterable's
+        // (#2569: a `BTreeMap` demand reached `[4, 2, 3]` in `for k in`). A
+        // list literal of untyped numbers is typed by the binding's uses
+        // (D128), as a `for` loop's is, at the body's second check.
+        let iter_ty = if self.untyped_list_literal_iterable(iterable) and self.int_local_decisions.contains(iterable):
+            let decided_elem = (self.int_local_decisions.get(iterable).unwrap() / 4294967296) as i32
+            let elem_args: List[i32] = List.new()
+            elem_args.push(decided_elem)
+            self.check_expr_with_expected(iterable, self.ensure_generic_inst_type(self.syms.list, elem_args, 1))
+        else:
+            self.check_expr_value_context(iterable)
         self.loop_iterable_node = outer_loop_iterable
         let gen_elem = self.resolve_gen_for(iterable, iterable, iter_ty as i32)
         if gen_elem != 0:
@@ -28206,6 +28245,11 @@ impl Sema:
         if kind == NodeKind.NK_IDENT:
             let decl = self.unannotated_literal_binding(node)
             if decl != 0:
+                // D128 (#2569): a comprehension clause binding over a list
+                // literal; the demand lands on the literal (keyed by it).
+                if self.ast.kind(decl) == NodeKind.NK_ARRAY_LIT:
+                    out.push(decl)
+                    return out
                 if self.ast.kind(decl) == NodeKind.NK_FOR:
                     // D128: the loop variable's demand lands on the locals its
                     // range's bounds come from (`for i in 0..unique`).
