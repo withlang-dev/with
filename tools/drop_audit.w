@@ -728,6 +728,20 @@ fn sc_btree_map(kind: &str):
         source = source ++ "    let lit: BTreeMap[i32, R] = {20: mk(20, slot), 10: mk(10, slot)}\n    assert(lit.first().unwrap().1.id == 10)\n"
     source
 
+// The slot shape (D148): `str` keys; the i32-keyed cells above take the
+// word shape.
+fn sc_btree_map_str(kind: &str):
+    var source = "use std.collections.BTreeMap\nfn go(slot: *mut i32):\n    var map = BTreeMap[str, R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: map.insert(f\"{9 - i}\", mk(9 - i, slot))\n    assert(map.len() == 8 and map.get(&\"3\").unwrap().id == 3)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 1..5:\n        let removed = map.remove(&f\"{i}\").unwrap()\n        assert(removed.id == i)\n    assert(map.len() == 4)\n"
+    if kind == "replace":
+        source = source ++ "    map.insert(\"3\", mk(30, slot))\n    assert(map.get(&\"3\").unwrap().id == 30)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = map.iter()\n    var seen = 0\n    while let Some((k, v)) = cursor.next():\n        assert(f\"{v.id}\" == *k)\n        seen = seen + 1\n    assert(seen == 8)\n"
+    source
+
 fn sc_btree_set(kind: &str):
     var source = "use std.collections.BTreeSet\nimpl Ord for R:\n    fn cmp(self: &Self, other: &Self) -> i32: self.id - other.id\nfn go(slot: *mut i32):\n    var set = BTreeSet[R].new()\n"
     if kind == "empty": return source
@@ -839,6 +853,11 @@ fn build_cells():
     cells.push(cell("btree_map_replace/facade", sc_btree_map("replace"), 66))
     cells.push(cell("btree_map_cursor/facade", sc_btree_map("cursor"), 36))
     cells.push(cell("btree_map_literal/facade", sc_btree_map("literal"), 66))
+    cells.push(cell("btree_map_str_empty/facade", sc_btree_map_str("empty"), 0))
+    cells.push(cell("btree_map_str_full/facade", sc_btree_map_str("full"), 36))
+    cells.push(cell("btree_map_str_partial/facade", sc_btree_map_str("partial"), 36))
+    cells.push(cell("btree_map_str_replace/facade", sc_btree_map_str("replace"), 66))
+    cells.push(cell("btree_map_str_cursor/facade", sc_btree_map_str("cursor"), 36))
     cells.push(cell("btree_set_empty/facade", sc_btree_set("empty"), 0))
     cells.push(cell("btree_set_full/facade", sc_btree_set("full"), 39))
     cells.push(cell("btree_set_partial/facade", sc_btree_set("partial"), 49))

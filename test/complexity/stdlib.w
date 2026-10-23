@@ -120,6 +120,30 @@ fn btree_map_work(n: i32, descending: bool):
     assert(entries.len() == n / 2)
     n
 
+// The slot shape (D148): a `str` key rides a facade-owned slot and the
+// With comparator; fixed-width keys keep the order numeric.
+fn btree_map_str_work(n: i32, descending: bool):
+    var entries = BTreeMap[str, i32].new()
+    for i in 0..n:
+        let key = if descending: n - i - 1 else: i
+        entries.insert(f"{key:08}", key)
+    for i in 0..n: assert(entries.get(&f"{i:08}").unwrap() == i)
+    for i in 0..n:
+        if i % 2 == 0: assert(entries.remove(&f"{i:08}").unwrap() == i)
+    assert(entries.len() == n / 2)
+    n
+
+fn btree_set_str_work(n: i32, descending: bool):
+    var entries = BTreeSet[str].new()
+    for i in 0..n:
+        let key = if descending: n - i - 1 else: i
+        entries.insert(f"{key:08}")
+    for i in 0..n: assert(entries.contains(&f"{i:08}"))
+    for i in 0..n:
+        if i % 2 == 0: assert(entries.remove(&f"{i:08}"))
+    assert(entries.len() == n / 2)
+    n
+
 fn btree_set_work(n: i32, descending: bool):
     var entries = BTreeSet[i32].new()
     for i in 0..n: entries.insert(if descending: n - i - 1 else: i)
@@ -304,6 +328,10 @@ fn btree_map_ascending(n: i32): btree_map_work(n, false)
 fn btree_map_descending(n: i32): btree_map_work(n, true)
 fn btree_set_ascending(n: i32): btree_set_work(n, false)
 fn btree_set_descending(n: i32): btree_set_work(n, true)
+fn btree_map_str_ascending(n: i32): btree_map_str_work(n, false)
+fn btree_map_str_descending(n: i32): btree_map_str_work(n, true)
+fn btree_set_str_ascending(n: i32): btree_set_str_work(n, false)
+fn btree_set_str_descending(n: i32): btree_set_str_work(n, true)
 
 // #1998: CPU time, not wall time: on a loaded machine (two batteries and six
 // agents, load 36) a wall clock read contention as super-linear growth and
@@ -418,6 +446,10 @@ else:
     measure("btree-map-descending", btree_map_descending, 1000, 0)
     measure("btree-set-ascending", btree_set_ascending, 1000, 0)
     measure("btree-set-descending", btree_set_descending, 1000, 0)
+    measure("btree-map-str-ascending", btree_map_str_ascending, 1000, 0)
+    measure("btree-map-str-descending", btree_map_str_descending, 1000, 0)
+    measure("btree-set-str-ascending", btree_set_str_ascending, 1000, 0)
+    measure("btree-set-str-descending", btree_set_str_descending, 1000, 0)
     measure("sorted-vec", sorted_list_work, 4000, 0)
     measure("binary-heap", binary_heap_work, 4000, 0)
     measure("trie", trie_work, 2000, 0)
