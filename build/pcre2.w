@@ -232,7 +232,11 @@ impl Pcre2Suite:
             let error_tag = tag ++ "-error"
             rc = self.run(ctx, pcre2_args("-q -" ++ self.bits ++ " " ++ opt ++ " -error -80,-62,-2,-1,0,100,101,191,300"), error_tag)
             let fs = ctx.fs()
-            if fs.write_text(outfile, fs.read_text(outfile) ++ fs.read_text(self.out(error_tag ++ ".stdout"))) != 0:
+            // pcre2test writes the file in binary mode and stdout in text mode,
+            // which on Windows ends a line with CRLF; the appended lines take
+            // the file's endings.
+            let error_lines = fs.read_text(self.out(error_tag ++ ".stdout")).replace("\r\n", "\n")
+            if fs.write_text(outfile, fs.read_text(outfile) ++ error_lines) != 0:
                 self.failed("** could not append the -error run to " ++ outfile)
                 return
         self.check(ctx, rc, suffix, opt, outfile)
