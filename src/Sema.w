@@ -6855,17 +6855,20 @@ impl Sema:
         if context == 0:
             return 0
         let expected = self.numeric_operand_type(context as i32)
-        if not self.is_numeric_type(expected):
+        // §4.5 (#2567): a distinct type over a number is the literal's type;
+        // the literal is checked at the underlying type's width.
+        let width_ty = self.distinct_underlying(expected)
+        if not self.is_numeric_type(width_ty):
             return 0
         if self.in_bitwise_literal_context != 0:
-            if not self.int_literal_bit_pattern_fits_type(node, expected):
+            if not self.int_literal_bit_pattern_fits_type(node, width_ty):
                 self.emit_error("integer literal bit pattern does not fit expected type", node)
-        else if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, expected) else: self.int_literal_fits_type(node, expected)):
+        else if not (if self.in_negated_literal_context != 0: self.int_literal_fits_type_negated(node, width_ty) else: self.int_literal_fits_type(node, width_ty)):
             // Enriched like the default-type arm (#767 payoff pattern): name
             // the literal and the resolved expectation — id-confusion and
             // stale-sidecar failures self-identify.
             let nf_digits = self.ast.int_literal_digits(node as NodeId)
-            let nf_res = self.resolve_alias(expected as TypeId)
+            let nf_res = self.resolve_alias(width_ty as TypeId)
             self.emit_error(f"integer literal does not fit expected type (digits='{nf_digits}' raw={self.ast.int_lit_value(node as NodeId)} expected={expected} resolved_kind={self.get_type_kind(nf_res) as i32} d0={self.get_type_d0(nf_res)} d1={self.get_type_d1(nf_res)})", node)
         expected
 
@@ -6888,7 +6891,16 @@ impl Sema:
         let expected = self.resolve_alias(self.expected_expr_type)
         if self.get_type_kind(expected) == TypeKind.TY_FLOAT:
             return expected as i32
+        // §4.5 (#2567): a distinct type over a float is the literal's type.
+        if self.get_type_kind(self.resolve_alias(self.distinct_underlying(expected as i32) as TypeId)) == TypeKind.TY_FLOAT:
+            return expected as i32
         0
+
+    // §4.5: a distinct type whose representation, through every distinct
+    // layer, is an integer or a float (`type Id = distinct i32`).
+    fn distinct_over_numeric(tid: i32) -> bool:
+        let width_ty = self.distinct_underlying(tid)
+        width_ty != tid and self.is_plain_numeric_type(width_ty)
 
 fn sema_node_is_numeric_literal(ast: &AstPool, node: i32) -> bool:
     if node == 0:

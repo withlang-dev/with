@@ -14168,11 +14168,13 @@ impl Sema:
             if expected != 0: ty = expected
         else if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.numeric_operand_type(self.expected_expr_type as i32)
-            if self.is_numeric_type(expected): ty = expected
+            if self.is_numeric_type(expected) or self.distinct_over_numeric(expected): ty = expected
         if ty != declared:
-            let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
+            // §4.5: a distinct type's constant is folded at the underlying width.
+            let width_ty = self.distinct_underlying(ty)
+            let resolved = self.resolve_alias(self.numeric_operand_type(width_ty) as TypeId)
             if self.get_type_kind(resolved) == TypeKind.TY_INT:
-                let folded = self.fold_literal_int_arith_at(init, ty)
+                let folded = self.fold_literal_int_arith_at(init, width_ty)
                 if folded.ok == 0 or folded.overflow != 0:
                     let name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(node)))
                     self.emit_error(f"constant `{name}` does not fit `{self.type_name(ty)}`: an untyped constant is typed as its initializer would be at each use (§4.2.1)", node)
@@ -14247,7 +14249,8 @@ impl Sema:
         let demanded_resolved = self.resolve_alias(demanded)
         if self.get_type_kind(demanded_resolved) == TypeKind.TY_REF and self.is_numeric_type(self.get_type_d0(demanded_resolved)):
             demanded = self.get_type_d0(demanded_resolved) as TypeId
-        if self.is_numeric_type(demanded as i32): demanded else: 0 as TypeId
+        // §4.5: a distinct type over a number is demanded as itself (#2567).
+        if self.is_numeric_type(demanded as i32) or self.distinct_over_numeric(demanded as i32): demanded else: 0 as TypeId
 
     // The integer type an enclosing context demands of an untyped operand of
     // a bitwise operator or a shift, or 0.
