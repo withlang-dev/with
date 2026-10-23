@@ -505,10 +505,12 @@ impl Codegen:
                         let tp_sym: i32 = self.trait_tp_flat_syms[(tp_start + ti)]
                         // #2043: the argument's type as Sema bound it for the
                         // impl's default methods.
-                        let arg_ty = self.sema_type_to_llvm(self.sema.impl_trait_arg_type_ids.get(self.pool.get_extra(arg_start + ti)) ?? 0)
+                        let arg_tid = self.sema.impl_trait_arg_type_ids.get(self.pool.get_extra(arg_start + ti)) ?? 0
+                        let arg_ty = self.sema_type_to_llvm(arg_tid)
                         if arg_ty != 0:
                             self.type_binding_syms.push(tp_sym)
                             self.type_binding_types.push(arg_ty)
+                            self.type_binding_sema.push(arg_tid)
                             self.type_bindings_len = self.type_bindings_len + 1
                         ti = ti + 1
 
@@ -518,6 +520,8 @@ impl Codegen:
             let _ = self.type_binding_syms.pop()
         while self.type_binding_types.len() > saved_list_len:
             let _ = self.type_binding_types.pop()
+        while self.type_binding_sema.len() > saved_list_len:
+            let _ = self.type_binding_sema.pop()
         self.type_bindings_len = saved_len
 
     mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32, impl_node: i32):

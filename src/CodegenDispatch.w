@@ -16253,6 +16253,7 @@ impl Codegen:
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
+        let saved_tb_sema = move self.type_binding_sema
         let saved_tb_len: i32 = self.type_bindings_len
         let saved_body_owner_sym: i32 = self.current_body_owner_sym
         self.current_body_owner_sym = name_sym
@@ -16610,6 +16611,7 @@ impl Codegen:
         self.type_binding_syms = saved_tb_syms
         self.current_body_owner_sym = saved_body_owner_sym
         self.type_binding_types = saved_tb_tys
+        self.type_binding_sema = saved_tb_sema
         self.type_bindings_len = saved_tb_len
 
     // ── gen_function_mir_mono: MIR codegen for monomorphized generic fn ──
@@ -16690,6 +16692,7 @@ impl Codegen:
         self.current_ret_type = wl_get_return_type(fn_type)
         let saved_tb_syms = move self.type_binding_syms
         let saved_tb_tys = move self.type_binding_types
+        let saved_tb_sema = move self.type_binding_sema
         let saved_tb_len: i32 = self.type_bindings_len
         let saved_body_owner_sym: i32 = self.current_body_owner_sym
         self.current_body_owner_sym = mono_sym
@@ -17045,6 +17048,7 @@ impl Codegen:
         self.type_binding_syms = saved_tb_syms
         self.current_body_owner_sym = saved_body_owner_sym
         self.type_binding_types = saved_tb_tys
+        self.type_binding_sema = saved_tb_sema
         self.type_bindings_len = saved_tb_len
         self.restore_loop_state(saved_loops)
         self.mir_local_ptrs = saved_mir_locals
@@ -18913,8 +18917,10 @@ impl Codegen:
     mut fn set_mono_type_bindings(fn_sym: i32):
         let fresh_syms: List[i32] = List.new()
         let fresh_tys: List[i64] = List.new()
+        let fresh_sema: List[i32] = List.new()
         self.type_binding_syms = fresh_syms
         self.type_binding_types = fresh_tys
+        self.type_binding_sema = fresh_sema
         self.type_bindings_len = 0
         let dtm_debug = with_getenv_str("WITH_DEBUG_DTM").len() > 0
         for si in 0..self.sema.concrete_specialization_syms.len():
@@ -18929,6 +18935,7 @@ impl Codegen:
                 if llvm_ty != 0:
                     self.type_binding_syms.push(p_sym)
                     self.type_binding_types.push(llvm_ty)
+                    self.type_binding_sema.push(p_ty)
                     self.type_bindings_len = self.type_bindings_len + 1
             if dtm_debug:
                 with_eprint(f"[mono-bind] fn={self.intern.resolve(fn_sym)} sym={fn_sym} substs={count} bound={self.type_bindings_len}")

@@ -539,6 +539,7 @@ type Codegen {
     // Active type bindings (for monomorphization)
     type_binding_syms: List[i32],
     type_binding_types: List[i64],
+    type_binding_sema: List[i32],
     type_bindings_len: i32,
 
     // Fn param defaults: fn_sym → start/count in flat array
@@ -1308,6 +1309,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         slotmap_cache_map: HashMap.new(),
         type_binding_syms: List.new(),
         type_binding_types: List.new(),
+        type_binding_sema: List.new(),
         type_bindings_len: 0,
         fn_default_starts: HashMap.new(),
         fn_default_counts: HashMap.new(),
@@ -3647,8 +3649,10 @@ impl Codegen:
         let saved_len: i32 = self.type_bindings_len
         let saved_syms = move self.type_binding_syms
         let saved_types = move self.type_binding_types
+        let saved_sema = move self.type_binding_sema
         self.type_binding_syms = List.new()
         self.type_binding_types = List.new()
+        self.type_binding_sema = List.new()
         self.type_bindings_len = 0
         self.sync_decl_context(di)
         let decl = self.pool.get_decl(di)
@@ -3665,6 +3669,7 @@ impl Codegen:
         self.type_bindings_len = saved_len
         self.type_binding_syms = saved_syms
         self.type_binding_types = saved_types
+        self.type_binding_sema = saved_sema
         self.current_decl_source_file = saved_file
         self.sema.current_module_path = saved_module
         self.type_body_state[di] = TYPE_BODY_DEFINED
@@ -3690,6 +3695,12 @@ impl Codegen:
         let kind = self.pool.kind(type_node)
         if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_TYPE_NAMED:
             let sym = self.pool.get_data0(type_node)
+            // A bound type parameter is Sema's substitution (D65), never its
+            // LLVM representation read back: `TotalF64` lowers to a double,
+            // and a double read back is `f64`.
+            for tbi in 0..self.type_bindings_len:
+                if self.type_binding_syms[tbi] == sym and self.type_binding_sema[tbi] > 0:
+                    return self.type_binding_sema[tbi]
             // #1446: a split name is the declaration Sema resolves here.
             if self.nominal_split_names.contains(sym):
                 let split_tid = self.sema.resolve_type_expr_frozen(type_node) as i32
