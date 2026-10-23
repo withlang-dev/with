@@ -109,7 +109,7 @@ impl[K: Key, V] HashIndex[K, V]:
         unsafe { tommy_hashdyn_search(self.map, hash_slot_compare, slot as *const c_void, self.key_hash(key)) } as *mut HashSlot[K, V]
 
     /// Observes the value stored under `key`.
-    pub fn get(key: &K) -> Option[&V]:
+    pub fn get(key: &K) -> Option[&V] from self:
         let slot = unsafe { self.find(key) }
         if slot as i64 == 0: None else: Some(unsafe { &(*slot).value })
 

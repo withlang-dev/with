@@ -72,7 +72,7 @@ impl[K: Ord, V] OrderedMap[K, V]:
     pub fn contains(key: &K) -> bool: unsafe { self.find_entry(key) } as i64 != 0
 
     /// Observes the value under `key`, if any (D22).
-    pub fn get(key: &K) -> Option[&V]:
+    pub fn get(key: &K) -> Option[&V] from self:
         let entry = unsafe { self.find_entry(key) }
         if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
 
@@ -90,13 +90,13 @@ impl[K: Ord, V] OrderedMap[K, V]:
         Some(value)
 
     /// Observes the least key's entry, or `None` when empty.
-    pub fn first() -> Option[(&K, &V)]:
+    pub fn first() -> Option[(&K, &V)] from self:
         if self.len() == 0: return None
         let entry = unsafe { *stc_slot_sset_front(&raw const self.set) } as *const OrderedEntry[K, V]
         Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
 
     /// Observes the greatest key's entry, or `None` when empty.
-    pub fn last() -> Option[(&K, &V)]:
+    pub fn last() -> Option[(&K, &V)] from self:
         if self.len() == 0: return None
         let entry = unsafe { *stc_slot_sset_back(&raw const self.set) } as *const OrderedEntry[K, V]
         Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))

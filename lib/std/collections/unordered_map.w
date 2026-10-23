@@ -79,7 +79,7 @@ impl[K: Key, V] UnorderedMap[K, V]:
     pub fn contains(key: &K) -> bool: unsafe { self.find_entry(key) } as i64 != 0
 
     /// Observes the value under `key`, if any (D22).
-    pub fn get(key: &K) -> Option[&V]:
+    pub fn get(key: &K) -> Option[&V] from self:
         let entry = unsafe { self.find_entry(key) }
         if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
 

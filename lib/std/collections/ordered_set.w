@@ -64,7 +64,7 @@ impl[T: Ord] OrderedSet[T]:
     pub fn contains(value: &T) -> bool: unsafe { self.find_slot(value) } as i64 != 0
 
     /// Observes the stored value equal to `value`, if any.
-    pub fn get(value: &T) -> Option[&T]:
+    pub fn get(value: &T) -> Option[&T] from self:
         let slot = unsafe { self.find_slot(value) }
         if slot as i64 == 0: None else: Some(unsafe { &(*slot).value })
 
@@ -80,13 +80,13 @@ impl[T: Ord] OrderedSet[T]:
         Some(taken)
 
     /// Observes the least value, or `None` when empty.
-    pub fn first() -> Option[&T]:
+    pub fn first() -> Option[&T] from self:
         if self.len() == 0: return None
         let slot = unsafe { *stc_slot_sset_front(&raw const self.set) } as *const StcSlot[T]
         Some(unsafe { &(*slot).value })
 
     /// Observes the greatest value, or `None` when empty.
-    pub fn last() -> Option[&T]:
+    pub fn last() -> Option[&T] from self:
         if self.len() == 0: return None
         let slot = unsafe { *stc_slot_sset_back(&raw const self.set) } as *const StcSlot[T]
         Some(unsafe { &(*slot).value })

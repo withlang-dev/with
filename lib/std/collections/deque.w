@@ -125,16 +125,16 @@ impl[T] Deque[T]:
         comptime if deque_is_word[T](): stc_word_deque_at(&raw const self.words, index as c_long) as *const T
         else: &raw const (*(*stc_slot_deque_at(&raw const self.slots, index as c_long) as *const StcSlot[T])).value
 
-    pub fn front() -> Option[&T]:
+    pub fn front() -> Option[&T] from self:
         if self.len() == 0: return None
         Some(unsafe { &*self.place(0) })
 
-    pub fn back() -> Option[&T]:
+    pub fn back() -> Option[&T] from self:
         if self.len() == 0: return None
         Some(unsafe { &*self.place(self.len() - 1) })
 
     /// Observes the value at `index`; panics out of range (D27).
-    pub fn get(index: isize) -> &T:
+    pub fn get(index: isize) -> &T from self:
         assert(index >= 0 and index < self.len(), "Deque index out of bounds")
         unsafe { &*self.place(index) }
 

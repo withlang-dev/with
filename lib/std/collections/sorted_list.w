@@ -46,7 +46,7 @@ impl[T: Ord] SortedList[T]:
         assert(unsafe { sortedarray_insert(self.array, slot as *mut c_void) } != 0)
 
     /// Observes the value at `index`; panics out of range (D27).
-    pub fn get(index: isize) -> &T:
+    pub fn get(index: isize) -> &T from self:
         unsafe { &(*unsafe { self.slot_at(index) }).value }
 
     /// Transfers the value at `index` out; panics out of range.

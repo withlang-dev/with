@@ -46,7 +46,7 @@ impl[V] Trie[V]:
         Some(old)
 
     /// Observes the value under `key`.
-    pub fn get(key: &str) -> Option[&V]:
+    pub fn get(key: &str) -> Option[&V] from self:
         let slot = unsafe { self.lookup(key) }
         if slot as i64 == 0: return None
         Some(unsafe { &(*slot).value })
