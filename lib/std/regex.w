@@ -68,7 +68,7 @@ fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
 
 // ── The engine (pcre2 through std.engines.pcre2) ────────────────────────────────
 
-fn regex_engine_malloc(size: c_ulong, data: *mut c_void) -> *mut c_void:
+fn regex_engine_malloc(size: u64, data: *mut c_void) -> *mut c_void:
     with_alloc(size as i64) as *mut c_void
 
 fn regex_engine_free(block: *mut c_void, data: *mut c_void):
@@ -123,8 +123,8 @@ unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, er
     let gcontext = regex_general_context("Regex.compile")
     var ccontext = _pcre2_default_compile_context_8
     ccontext.memctl = (*gcontext).memctl
-    ccontext.max_pattern_length = ~(0 as c_ulong)
-    ccontext.max_pattern_compiled_length = ~(0 as c_ulong)
+    ccontext.max_pattern_length = ~(0 as u64)
+    ccontext.max_pattern_compiled_length = ~(0 as u64)
     ccontext.parens_nest_limit = 250
     ccontext.max_varlookbehind = 255
     ccontext.newline_convention = 2
@@ -136,10 +136,10 @@ unsafe fn regex_compile_code(pattern: &str, options: i32, err_code: *mut i32, er
         with_panic("Regex.compile: character table allocation failed", "", 0)
     let c_pattern = regex_cstr(pattern)
     var raw_err_code: c_int = 0
-    var raw_err_offset: c_ulong = 0
+    var raw_err_offset: u64 = 0
     let compiled = pcre2_compile_8(
         c_pattern,
-        pattern.len() as c_ulong,
+        pattern.len() as u64,
         options as c_uint,
         &raw mut raw_err_code,
         &raw mut raw_err_offset,
@@ -188,8 +188,8 @@ unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -
     let rc = unsafe { pcre2_match_8(
         code as *const pcre2_real_code_8,
         regex_str_data(text),
-        text.len() as c_ulong,
-        start_offset as c_ulong,
+        text.len() as u64,
+        start_offset as u64,
         0,
         match_data,
         null
@@ -198,8 +198,8 @@ unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -
         let ovector = unsafe { pcre2_get_ovector_pointer_8(match_data) }
         let count = unsafe { pcre2_get_ovector_count_8(match_data) } as i32
         for i in 0..count:
-            spans.push(unsafe { *((ovector as i64 + i as i64 * 16) as *const c_ulong) } as i32)
-            spans.push(unsafe { *((ovector as i64 + i as i64 * 16 + 8) as *const c_ulong) } as i32)
+            spans.push(unsafe { *((ovector as i64 + i as i64 * 16) as *const u64) } as i32)
+            spans.push(unsafe { *((ovector as i64 + i as i64 * 16 + 8) as *const u64) } as i32)
     unsafe { pcre2_match_data_free_8(match_data) }
     unsafe { pcre2_general_context_free_8(gcontext) }
     spans
@@ -212,17 +212,17 @@ unsafe fn regex_group_index(code: *const i8, name: &str) -> i32:
     with_free(cname as *mut u8)
     if number < 0: -1 else: number
 
-unsafe fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, out_bytes: *mut u8, out_len: *mut c_ulong) -> c_int:
+unsafe fn regex_substitute_into(code: *const i8, text: &str, c_repl: *const u8, repl_len: i64, options: c_uint, match_data: *mut pcre2_real_match_data_8, out_bytes: *mut u8, out_len: *mut u64) -> c_int:
     unsafe { pcre2_substitute_8(
         code as *const pcre2_real_code_8,
         regex_str_data(text),
-        text.len() as c_ulong,
+        text.len() as u64,
         0,
         options,
         match_data,
         null,
         c_repl,
-        repl_len as c_ulong,
+        repl_len as u64,
         out_bytes,
         out_len
     ) }
@@ -236,7 +236,7 @@ fn regex_substitute(code: *const i8, text: &str, repl: &str, replace_all: bool) 
     var options: c_uint = PCRE2_SUBSTITUTE_UNSET_EMPTY | PCRE2_SUBSTITUTE_OVERFLOW_LENGTH
     if replace_all:
         options = options | PCRE2_SUBSTITUTE_GLOBAL
-    var out_len: c_ulong = (text.len() + repl.len() + 64) as c_ulong
+    var out_len: u64 = (text.len() + repl.len() + 64) as u64
     var out_bytes = with_alloc(out_len as i64 + 1)
     var rc = unsafe { regex_substitute_into(code, text, c_repl, repl.len(), options, match_data, out_bytes, &raw mut out_len) }
     if rc == PCRE2_ERROR_NOMEMORY:

@@ -55,7 +55,7 @@ unsafe fn sort_through_refs[T](base: *mut T, n: isize, compare: fn(*const u8, *c
     let compare_cell = &raw const compare
     for i in 0..n:
         refs[i] = SlotRef { cmp: Some(slot_ref_compare), ptr: (base as i64 + i as i64 * size) as *const c_void, compare: compare_cell, env_pad: 0 }
-    stc_slotrefs_sort(refs as *mut stc_slotref, n as c_long)
+    stc_slotrefs_sort(refs as *mut stc_slotref, n as i64)
     let scratch = with_alloc(n as i64 * size)
     for i in 0..n:
         with_memcpy((scratch as i64 + i as i64 * size) as *mut u8, refs[i].ptr as *const u8, size)
@@ -71,11 +71,11 @@ impl[T: Ord] List[T]:
         if n < 2: return
         let base = self.ptr as *mut T
         comptime if T.name() == "i64":
-            unsafe { stc_i64s_sort(base as *mut c_longlong, n as c_long) }
+            unsafe { stc_i64s_sort(base as *mut c_longlong, n as i64) }
         else if T.name() == "u64":
-            unsafe { stc_u64s_sort(base as *mut c_ulonglong, n as c_long) }
+            unsafe { stc_u64s_sort(base as *mut c_ulonglong, n as i64) }
         else if T.name() == "f64":
-            unsafe { stc_f64s_sort(base as *mut f64, n as c_long) }
+            unsafe { stc_f64s_sort(base as *mut f64, n as i64) }
         else:
             unsafe { sort_through_refs(base, n, ord_compare(self.ptr)) }
 

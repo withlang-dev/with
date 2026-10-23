@@ -471,7 +471,7 @@ fn ci_infer_macro_return_type_from_expr(type_session: i64, translated: &str, kno
         if macro_ret.len() > 0:
             return macro_ret
     if ci_is_int_literal(stripped):
-        return "c_int"
+        return "i32"
     with_str_clone_ref(fallback)
 
 fn ci_object_macro_is_function_alias(type_session: i64, value: &str) -> bool:
@@ -534,9 +534,36 @@ fn ci_record_omitted_symbol(name: &str, reason: &str):
 // D155: the aliases are the compiler's builtins (Sema registers them from
 // the target spec); no import or migration emits a concrete value for one.
 fn ci_c_long_double_representable(triple: &str) -> bool:
-    let os = if triple.len() > 0: (if ci_str_contains(triple, "windows"): "Windows" else if ci_str_contains(triple, "linux"): "Linux" else if ci_str_contains(triple, "apple"): "Macos" else if ci_str_contains(triple, "wasi") or ci_str_contains(triple, "wasm"): "Wasi" else: "Macos") else: target_spec_os()
-    let arch = if triple.len() > 0: (if ci_str_contains(triple, "aarch64") or ci_str_contains(triple, "arm64"): "aarch64" else if ci_str_contains(triple, "wasm32"): "wasm32" else if ci_str_contains(triple, "wasm64"): "wasm64" else: "x86_64") else: target_spec_arch()
+    let os = ci_model_os(triple)
+    let arch = ci_model_arch(triple)
     (os == "Macos" and arch == "aarch64") or os == "Windows"
+
+// The parsed C model's OS and architecture: the triple's when the parse
+// names one (`--c-target`), else the active target's.
+fn ci_model_os(triple: &str) -> str:
+    if triple.len() > 0: (if ci_str_contains(triple, "windows"): "Windows" else if ci_str_contains(triple, "linux"): "Linux" else if ci_str_contains(triple, "apple"): "Macos" else if ci_str_contains(triple, "wasi") or ci_str_contains(triple, "wasm"): "Wasi" else: "Macos") else: target_spec_os()
+
+fn ci_model_arch(triple: &str) -> str:
+    if triple.len() > 0: (if ci_str_contains(triple, "aarch64") or ci_str_contains(triple, "arm64"): "aarch64" else if ci_str_contains(triple, "wasm32"): "wasm32" else if ci_str_contains(triple, "wasm64"): "wasm64" else: "x86_64") else: target_spec_arch()
+
+// D156: the model's `long` width, the one fact the data model's name
+// carries (LP64: 64; LLP64 on Windows and ILP32 on wasm32: 32).
+fn ci_model_long_bits(triple: &str) -> i32:
+    if ci_model_os(triple) == "Windows" or ci_model_arch(triple) == "wasm32": 32 else: 64
+
+// D156: the model's `size_t`/`ssize_t` (its pointer width: 32 on wasm32, 64
+// elsewhere), spelled fixed.
+// D156: the model's `long`, spelled fixed.
+fn ci_model_long_type(unsigned: bool) -> str:
+    if ci_model_long_bits(with_cimport_target_triple()) == 32: (if unsigned: "u32" else: "i32") else: (if unsigned: "u64" else: "i64")
+
+fn ci_model_size_type(unsigned: bool) -> str:
+    if ci_model_arch(with_cimport_target_triple()) == "wasm32": (if unsigned: "u32" else: "i32") else: (if unsigned: "u64" else: "i64")
+
+// D156: the model's name for a migration's header line and its constant.
+fn ci_model_name(triple: &str) -> str:
+    let model = if ci_model_os(triple) == "Windows": "LLP64" else if ci_model_arch(triple) == "wasm32": "ILP32" else: "LP64"
+    model ++ " (" ++ (if triple.len() > 0: with_str_clone_ref(triple) else: target_spec_os() ++ "/" ++ target_spec_arch()) ++ ")"
 
 // #2230: every rewrite rule the migrator applies is tagged with the
 // function it rewrote, so `tools/migrate_diff.w` names the rule behind a
@@ -3103,7 +3130,7 @@ fn ci_value_fits_int(value: i64) -> bool: value >= -2147483648 and value <= 2147
 // type, every one of them: clang types `-ESC_B` unsigned in
 // `enum { ESC_B = 2, BIG = 0x80000000u }`, verified by compiling it.
 fn ci_enum_const_type(all_fit_int: bool, int_type: &str) -> str:
-    if all_fit_int: "c_int" else: int_type.clone()
+    if all_fit_int: "i32" else: int_type.clone()
 
 fn ci_translate_enum(session: i64, idx: i32) -> str:
     let const_count = with_cimport_enum_const_count(session, idx)
@@ -4161,8 +4188,8 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                             // int 0 or 1, as an object macro's does; its
                             // With translation is a bool (`fn F() -> i32:
                             // (a > b)` was a return type mismatch).
-                            translated = "((" ++ ci_strip_parens(ci_trim(translated)) ++ ") as c_int)"
-                            inferred_ret = "c_int"
+                            translated = "((" ++ ci_strip_parens(ci_trim(translated)) ++ ") as i32)"
+                            inferred_ret = "i32"
                         else:
                             inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
                         if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
@@ -5662,7 +5689,7 @@ impl CiExprPool:
     fn promote_c_small_int_operand(session: i64, cursor: i32, peeled_cursor: i32, value: CiExprId, types: CiTypePool) -> CiExprId:
         if not ci_operand_needs_c_int_promotion(session, cursor, peeled_cursor, self.val(), types, value):
             return value
-        let c_int_ty = types.named_type_from_text("c_int")
+        let c_int_ty = types.named_type_from_text("i32")
         if c_int_ty == 0:
             return 0
         self.cast(c_int_ty, value)
@@ -5693,7 +5720,7 @@ fn ci_binary_op_allows_uint_literal_cast(op: i32, operand_unsigned: bool) -> boo
     (operand_unsigned and (op == BO_ADD or op == BO_SUB or op == BO_MUL))
 
 fn ci_binary_large_decimal_cast_type(session: i64, cursor: i32, op: i32, is_rhs: bool, types: CiTypePool) -> CiTypeId:
-    let c_uint_ty = types.named_type_from_text("c_uint")
+    let c_uint_ty = types.named_type_from_text("u32")
     if (op == BO_SHL or op == BO_SHR) and is_rhs:
         return c_uint_ty
     if with_ci_type_is_unsigned(session, cursor) != 0:
@@ -5970,9 +5997,9 @@ fn ci_is_comparison_op(op: &str) -> bool:
 fn ci_map_sizeof_type(c_type: &str) -> str:
     let t = ci_trim(c_type)
     if t == "size_t":
-        return "c_ulong"
+        return ci_model_size_type(true)
     if t == "ssize_t":
-        return "c_long"
+        return ci_model_size_type(false)
     // Try builtin typedef first
     let mapped = ci_map_builtin_typedef(t)
     if mapped.len() > 0:
@@ -5988,16 +6015,16 @@ fn ci_map_sizeof_type(c_type: &str) -> str:
         let translated_typedef = ci_lookup_known(t, g_macro_type_aliases)
         if translated_typedef.len() > 0:
             if translated_typedef == "size_t":
-                return "c_ulong"
+                return ci_model_size_type(true)
             if translated_typedef == "ssize_t":
-                return "c_long"
+                return ci_model_size_type(false)
             return ci_normalize_translated_type_name(translated_typedef)
         let macro_value = ci_trim(ci_lookup_macro_value(0, t))
         if macro_value.len() > 0 and ci_is_c_ident(macro_value):
             if macro_value == "size_t":
-                return "c_ulong"
+                return ci_model_size_type(true)
             if macro_value == "ssize_t":
-                return "c_long"
+                return ci_model_size_type(false)
             let normalized_macro_value = ci_normalize_translated_type_name(macro_value)
             if normalized_macro_value != macro_value:
                 return normalized_macro_value
@@ -6809,30 +6836,31 @@ fn ci_map_base_type(name: &str) -> str:
     if translated_typedef.len() > 0: return ci_normalize_translated_type_name(translated_typedef)
     if name == "void": return "Unit"
     if name == "_Bool": return "bool"
+    // D156: the parsed model's fixed widths; only `char` stays symbolic.
     if name == "char": return "c_char"
-    if name == "signed char": return "c_char"
+    if name == "signed char": return "i8"
     if name == "unsigned char": return "u8"
-    if name == "short": return "c_short"
-    if name == "unsigned short": return "c_ushort"
-    if name == "int": return "c_int"
-    if name == "unsigned int": return "c_uint"
-    if name == "long": return "c_long"
-    if name == "unsigned long": return "c_ulong"
-    if name == "long long": return "c_longlong"
-    if name == "unsigned long long": return "c_ulonglong"
+    if name == "short": return "i16"
+    if name == "unsigned short": return "u16"
+    if name == "int": return "i32"
+    if name == "unsigned int": return "u32"
+    if name == "long": return if ci_model_long_bits(with_cimport_target_triple()) == 32: "i32" else: "i64"
+    if name == "unsigned long": return if ci_model_long_bits(with_cimport_target_triple()) == 32: "u32" else: "u64"
+    if name == "long long": return "i64"
+    if name == "unsigned long long": return "u64"
     if name == "__int128": return "i128"
     if name == "unsigned __int128": return "u128"
     if name == "float": return "f32"
     if name == "double": return "f64"
-    if name == "long double": return "c_longdouble"
-    // enum E → c_int (C enums are integers)
+    if name == "long double": return "f64"
+    // enum E → int (C enums are integers)
     if ci_starts_with(name, "enum "):
-        return "c_int"
+        return "i32"
     // User-defined typedefs/records already emitted in the current translation unit.
     if ci_str_contains(g_macro_type_names, "|" ++ name ++ "|"):
         return ci_escape_reserved(name)
     // Unknown type → c_int (best we can do without struct support)
-    "c_int"
+    "i32"
 
 // ── Reserved word escaping ──────────────────────────────────
 
@@ -10080,7 +10108,7 @@ impl CiExprPool:
         var arg_id = self.lower_expr_ir(session, arg_cursor, types, scope)
         if arg_id == 0:
             return 0
-        let c_int_ty = types.named_type_from_text("c_int")
+        let c_int_ty = types.named_type_from_text("i32")
         if c_int_ty != 0:
             arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
         let args: List[i32] = List.new()
@@ -10110,7 +10138,7 @@ impl CiExprPool:
         var arg_id = self.lower_expr_ir(session, arg_cursor, types, scope)
         if arg_id == 0:
             return 0
-        let c_int_ty = types.named_type_from_text("c_int")
+        let c_int_ty = types.named_type_from_text("i32")
         if c_int_ty != 0:
             arg_id = self.cast_if_needed(c_int_ty, arg_id, arg_cursor, session, types)
         let args: List[i32] = List.new()
@@ -10281,7 +10309,7 @@ fn ci_incdec_binop(op: i32, is_unsigned: i32, is_pointer: i32) -> i32:
 
 impl CiExprPool:
     fn cast_shift_count_expr(types: CiTypePool, rhs: CiExprId) -> CiExprId:
-        let c_uint_ty = types.named_type_from_text("c_uint")
+        let c_uint_ty = types.named_type_from_text("u32")
         if c_uint_ty == 0:
             return 0
         self.cast(c_uint_ty, rhs)
@@ -10332,7 +10360,7 @@ impl CiExprPool:
                     // result back (6.3.1.1); With's `|` has no bool operands:
                     // `b = ((b as c_int) | (x as c_int)) != 0`.
                     if with_ci_type_kind(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))) == CXT_Bool:
-                        let int_ty = types.named_type_from_text("c_int")
+                        let int_ty = types.named_type_from_text("i32")
                         let bits = self.binary(base_op, self.cast(int_ty, lhs_id), self.cast(int_ty, rhs_value), int_ty)
                         let truth = self.bool_expr_from_value_ir(session, cursor, bits, types)
                         if truth == 0:
@@ -11656,7 +11684,7 @@ impl CiExprPool:
         let peeled_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, idx_peeled))
         let idx_is_unsigned_small = ci_type_is_unsigned_small_int(idx_ty_str) or ci_type_is_unsigned_small_int(peeled_ty_str) or ci_array_subscript_element_type_is_unsigned_small_int(session, idx_cursor)
         if idx_is_unsigned_small:
-            let c_uint_ty = types.named_type_from_text("c_uint")
+            let c_uint_ty = types.named_type_from_text("u32")
             if c_uint_ty == 0:
                 return 0
             let as_uint = self.cast(c_uint_ty, idx_id)
@@ -11783,21 +11811,21 @@ impl CiExprPool:
             if ci_type_is_integer_shift_anchor(shift_result_ty_str):
                 shift_lhs_anchor_ty_str = shift_result_ty_str
             else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(self.val(), types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(self.val(), types, lhs_id, 0):
-                shift_lhs_anchor_ty_str = "c_int"
+                shift_lhs_anchor_ty_str = "i32"
             if ci_type_is_small_int(shift_lhs_anchor_ty_str):
-                shift_lhs_anchor_ty_str = "c_int"
+                shift_lhs_anchor_ty_str = "i32"
             if shift_lhs_anchor_ty_str.len() > 0:
                 let shift_lhs_anchor_ty = types.named_type_from_text(shift_lhs_anchor_ty_str)
                 if shift_lhs_anchor_ty == 0:
                     return 0
                 lhs_value = self.cast(shift_lhs_anchor_ty, lhs_value)
             else if ci_shift_lhs_needs_integer_promotion(lhs_ty_str, lhs_peeled_ty, lhs_expr_ty_str) or ci_index_expr_element_type_is_small_int(self.val(), types, lhs_id) or ci_array_subscript_element_type_is_small_int(session, lhs_cursor) or ci_expr_tree_contains_small_int(self.val(), types, lhs_id, 0):
-                let c_int_ty = types.named_type_from_text("c_int")
+                let c_int_ty = types.named_type_from_text("i32")
                 if c_int_ty == 0:
                     return 0
                 lhs_value = self.cast(c_int_ty, lhs_value)
         if (op == BO_SHL or op == BO_SHR) and self.kind(lhs_value) != CiExprKind.CIE_CAST and ci_expr_tree_contains_small_int(self.val(), types, rhs_value, 0):
-            let c_int_ty = types.named_type_from_text("c_int")
+            let c_int_ty = types.named_type_from_text("i32")
             if c_int_ty == 0:
                 return 0
             lhs_value = self.cast(c_int_ty, lhs_value)
@@ -12823,7 +12851,7 @@ impl CiStmtPool:
                         return ci_value_ir_invalid()
                 if ci_op == CiBinOp.CIBO_SHL or ci_op == CiBinOp.CIBO_SHR:
                     let lhs_ty_str = with_ci_type_translated(session, with_ci_cursor_type(session, lhs_cursor))
-                    let c_uint_ty = types.named_type_from_text("c_uint")
+                    let c_uint_ty = types.named_type_from_text("u32")
                     if c_uint_ty == 0:
                         return ci_value_ir_invalid()
                     if ci_type_is_small_int(lhs_ty_str) or ci_is_large_decimal(ci_print_expr(exprs, types, lhs.value_expr, 0, 0)):
@@ -12835,7 +12863,7 @@ impl CiStmtPool:
                     // converts the result back; With's `|` has no bool
                     // operands.
                     let lhs_is_bool = with_ci_type_kind(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))) == CXT_Bool
-                    let result_ty = if lhs_is_bool: types.named_type_from_text("c_int") else: types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                    let result_ty = if lhs_is_bool: types.named_type_from_text("i32") else: types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                     if result_ty == 0:
                         return ci_value_ir_invalid()
                     lhs_operand = exprs.cast(result_ty, lhs_operand)
@@ -12872,7 +12900,7 @@ impl CiStmtPool:
                                 return ci_value_ir_invalid()
                             lhs_operand = exprs.cast(computation_ty, lhs_operand)
                         else if lhs_promoted and rhs_bits != 0 and (rhs_bits < 32 or (rhs_bits == 32 and with_ci_type_is_unsigned(session, rhs_cursor) == 0)) and with_ci_type_is_float(session, rhs_cursor) == 0:
-                            computation_ty = types.named_type_from_text("c_int")
+                            computation_ty = types.named_type_from_text("i32")
                             if computation_ty == 0:
                                 return ci_value_ir_invalid()
                         let unpromoted_rhs = rhs_value
@@ -12893,7 +12921,7 @@ impl CiStmtPool:
                             rhs_value = if rhs_value != unpromoted_rhs: exprs.cast(result_ty, unpromoted_rhs) else: exprs.cast_if_needed(result_ty, rhs_value, rhs_cursor, session, types)
                         else if binary_op == BO_AND or binary_op == BO_OR or binary_op == BO_XOR:
                             let lhs_is_bool = with_ci_type_kind(session, with_ci_type_canonical(session, with_ci_cursor_type(session, cursor))) == CXT_Bool
-                            let result_ty = if lhs_is_bool: types.named_type_from_text("c_int") else: types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+                            let result_ty = if lhs_is_bool: types.named_type_from_text("i32") else: types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                             if result_ty == 0:
                                 return ci_value_ir_invalid()
                             lhs_operand = exprs.cast_if_needed(result_ty, lhs_operand, lhs_cursor, session, types)
@@ -15013,7 +15041,7 @@ impl CiStmtPool:
                 // is its constants, each a `let` of the block (C: int
                 // constants in the enclosing scope); its type names nothing
                 // a body can spell.
-                let c_int_ty = types.named_type_from_text("c_int")
+                let c_int_ty = types.named_type_from_text("i32")
                 let ecount = with_ci_num_children(session, child)
                 for ei in 0..ecount:
                     let constant = with_ci_child(session, child, ei)
@@ -15685,8 +15713,8 @@ fn ci_c_binary(lhs: &str, op: &str, rhs: &str) -> str:
     var common = ""
     if lt.len() > 0 and rt.len() > 0:
         // The integer promotions first: a type narrower than int is int.
-        let lp = if ci_c_int_type_width(lt) < 32: "c_int" else: lt
-        let rp = if ci_c_int_type_width(rt) < 32: "c_int" else: rt
+        let lp = if ci_c_int_type_width(lt) < 32: "i32" else: lt
+        let rp = if ci_c_int_type_width(rt) < 32: "i32" else: rt
         let lw = ci_c_int_type_width(lp)
         let rw = ci_c_int_type_width(rp)
         let lu = ci_c_int_type_is_unsigned(lp)
@@ -15730,10 +15758,10 @@ fn ci_int_annotation_for_value(v0: &str) -> str:
         if hn == 8:
             let hb8 = v0[hj]
             if hb8 >= 56 or (hb8 >= 97 and hb8 <= 102) or (hb8 >= 65 and hb8 <= 70):
-                return "c_uint"
-        return "c_int"
+                return "u32"
+        return "i32"
     if v0.len() == 0:
-        return "c_int"
+        return "i32"
     let v = v0
     if v[0] == 45:
         // Negative: c_int unless it underflows i32.
@@ -15741,7 +15769,7 @@ fn ci_int_annotation_for_value(v0: &str) -> str:
             return "c_longlong"
         if v.len() == 11 and v.slice(1, v.len()) > "2147483648":
             return "c_longlong"
-        return "c_int"
+        return "i32"
     if ci_int_literal_exceeds_i64(v):
         return "c_ulonglong"
     var j: i64 = 0
@@ -15752,8 +15780,8 @@ fn ci_int_annotation_for_value(v0: &str) -> str:
     if n > 10 or (n == 10 and mag > "4294967295"):
         return "c_longlong"
     if n == 10 and mag > "2147483647":
-        return "c_uint"
-    "c_int"
+        return "u32"
+    "i32"
 
 // True when a suffix-stripped C integer literal exceeds i64::MAX (so C
 // treats it as unsigned long long). 20-digit decimals may exceed u64::MAX
@@ -15856,12 +15884,12 @@ fn ci_int_type_from_suffix(s: &str) -> str:
         else:
             break
     if has_u:
-        if l_count >= 2: return "c_ulonglong"
-        if l_count == 1: return "c_ulong"
-        return "c_uint"
-    if l_count >= 2: return "c_longlong"
-    if l_count == 1: return "c_long"
-    "c_int"
+        if l_count >= 2: return "u64"
+        if l_count == 1: return ci_model_long_type(true)
+        return "u32"
+    if l_count >= 2: return "i64"
+    if l_count == 1: return ci_model_long_type(false)
+    "i32"
 
 // The With literal suffix a C integer literal's own suffix gives it, or ""
 // when it has none (C11 6.4.4.1: the first type of the suffix's list that
