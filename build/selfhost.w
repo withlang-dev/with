@@ -5570,6 +5570,31 @@ fn bs_check_migrate_demotion_comment_mapped(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     0
 
+// A declaration directly under a case label (no braces) is the arm's
+// local, in scope for the arm's later statements (M*LIB's octal escape
+// parser: `default: int d1 = c - '0'; ...`).
+fn bs_check_migrate_switch_arm_decl(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "switch_arm_decl.c")
+    let out_w = bs_join(case_dir, "switch_arm_decl.w")
+    let c_text = "int digit(int c, int k) {\n  switch (k) {\n  case 1: return c;\n  default:\n    int d1 = c - '0';\n    int d2 = d1 * 8;\n    return d2 + 1;\n  }\n}\nint main(void) { return digit('3', 2) == 25 ? 0 : 1; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "switch arm declaration")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch_arm_decl", args)
+    if result.rc != 0: return result.rc
+    var run_args: List[str] = List.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-switch_arm_decl", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_pointer_typedef_local(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "pointer_typedef_local.c")
@@ -6078,6 +6103,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_compound_literal_anon_record(ctx, compiler_path, bs_join(output_dir, "compound_literal_anon_record"))
     if rc != 0: return rc
     rc = bs_check_migrate_pointer_typedef_local(ctx, compiler_path, bs_join(output_dir, "pointer_typedef_local"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_switch_arm_decl(ctx, compiler_path, bs_join(output_dir, "switch_arm_decl"))
     if rc != 0: return rc
     rc = bs_check_migrate_demotion_comment_mapped(ctx, compiler_path, bs_join(output_dir, "demotion_comment_mapped"))
     if rc != 0: return rc

@@ -13749,12 +13749,14 @@ impl CiStmtPool:
                     if chain < 0:
                         return 0 as CiStmtId
                 var body_ids: List[i32] = List.new()
+                var arm_scope = scope
                 let inner_kind = with_ci_cursor_kind(session, chain)
                 if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, chain):
-                    let inner_id = self.lower_stmt_ir(session, chain, exprs, types, 0, scope)
-                    if (inner_id as i32) == 0:
+                    let inner = self.lower_arm_stmt_ir(session, chain, arm_scope, exprs, types)
+                    if inner.stmt_id == 0:
                         return 0 as CiStmtId
-                    body_ids.push(inner_id as i32)
+                    arm_scope = inner.updated_scope
+                    body_ids.push(inner.stmt_id as i32)
                 var hit_break = ci_stmt_ends_with_terminator(session, chain)
                 var j = i + 1
                 while j < body_nc:
@@ -13767,10 +13769,11 @@ impl CiStmtPool:
                         j = j + 1
                         break
                     if not ci_is_null_like_stmt(session, sib):
-                        let sib_id = self.lower_stmt_ir(session, sib, exprs, types, 0, scope)
-                        if (sib_id as i32) == 0:
+                        let lowered = self.lower_arm_stmt_ir(session, sib, arm_scope, exprs, types)
+                        if lowered.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(sib_id as i32)
+                        arm_scope = lowered.updated_scope
+                        body_ids.push(lowered.stmt_id as i32)
                         if ci_stmt_ends_with_terminator(session, sib):
                             hit_break = true
                             j = j + 1
@@ -13804,14 +13807,16 @@ impl CiStmtPool:
             else if ck == CXK_DEFAULT_STMT:
                 let inner = ci_drill_innermost_case_substmt(session, child)
                 var body_ids: List[i32] = List.new()
+                var arm_scope = scope
                 var hit_break = false
                 if inner >= 0:
                     let inner_kind = with_ci_cursor_kind(session, inner)
                     if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, inner):
-                        let inner_id = self.lower_stmt_ir(session, inner, exprs, types, 0, scope)
-                        if (inner_id as i32) == 0:
+                        let head = self.lower_arm_stmt_ir(session, inner, arm_scope, exprs, types)
+                        if head.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(inner_id as i32)
+                        arm_scope = head.updated_scope
+                        body_ids.push(head.stmt_id as i32)
                     hit_break = ci_stmt_ends_with_terminator(session, inner)
                 var j = i + 1
                 while j < body_nc:
@@ -13824,10 +13829,11 @@ impl CiStmtPool:
                         j = j + 1
                         break
                     if not ci_is_null_like_stmt(session, sib):
-                        let sib_id = self.lower_stmt_ir(session, sib, exprs, types, 0, scope)
-                        if (sib_id as i32) == 0:
+                        let lowered = self.lower_arm_stmt_ir(session, sib, arm_scope, exprs, types)
+                        if lowered.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(sib_id as i32)
+                        arm_scope = lowered.updated_scope
+                        body_ids.push(lowered.stmt_id as i32)
                         if ci_stmt_ends_with_terminator(session, sib):
                             hit_break = true
                             j = j + 1
@@ -14867,6 +14873,20 @@ impl CiStmtPool:
         let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
         let lhs = exprs.ident(exprs.add_string(storage), list_ty)
         self.assign(lhs, source.value_expr)
+
+    // A statement of a switch arm. A declaration directly under the label
+    // (`default: int d = c - '0';`, m-string.h's octal escape parser) is the
+    // arm's local, scoped to the arm as a block's is to the block; the
+    // arm's scope threads through its later statements. Anything else
+    // lowers as a statement.
+    fn lower_arm_stmt_ir(session: i64, cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
+        if with_ci_cursor_kind(session, cursor) == CXK_DECL_STMT:
+            let decl_ir = self.lower_decl_stmt_structural(session, cursor, scope, false, exprs, types)
+            if decl_ir.stmt_id == 0 and g_ci_bail_location.len() == 0:
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                g_ci_bail_kind = CXK_DECL_STMT
+            return decl_ir
+        CiDeclLoweringIR { updated_scope: scope, stmt_id: self.lower_stmt_ir(session, cursor, exprs, types, 0, scope) }
 
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
         let nc = with_ci_num_children(session, cursor)
