@@ -1098,13 +1098,18 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_void\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
-        // char pointer
+        // char pointer: a pointer to C's `char` is a pointer to `c_char`, the
+        // target's alias (§16.1, #2176: i8 where char is signed, u8 on
+        // AArch64/ARM Linux and wasm). Spelled `i8`, the pointee disagreed
+        // with the scalar's `c_char` on an unsigned-char target: a migrated
+        // `*p = *q` narrowed u8 to i8 and `it.ref = null as *const c_char`
+        // refused to assign a `*const i8` field (#2582).
         if can_pointee.kind == CXType_Char_S or can_pointee.kind == CXType_SChar or can_pointee.kind == CXType_Char_U:
             var buf: [64]u8 = [0 as u8; 64]
             var pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, qual)
-            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " i8\0" as *const u8)
+            buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, " c_char\0" as *const u8)
             return session_strdup(s, &buf as *const [64]u8 as *const u8)
         // In a migration session, a pointer to a reserved-spelled record from
         // a system header (`__sFILE`, glibc's `_IO_FILE`, the UCRT's
@@ -4743,10 +4748,9 @@ fn with_ci_type_is_unsigned(session: i64, cursor_idx: i32) -> i32:
         let canonical = clang_getCanonicalType(ty)
         let k = canonical.kind
         // CXType_Char_U is plain `char` on an unsigned-char target (AArch64/ARM
-        // Linux). c_import models C `char` as `c_char` (= i8) on every target,
-        // so it must classify as signed here too — otherwise the translated
-        // arithmetic picks unsigned wrap ops for an i8-typed value.
-        if k == CXType_UChar or k == CXType_UShort or k == CXType_UInt or k == CXType_ULong or k == CXType_ULongLong or k == CXType_UInt128:
+        // Linux), where the `c_char` alias is u8 (§16.1, #2176): its
+        // arithmetic is unsigned there, as C's is.
+        if k == CXType_Char_U or k == CXType_UChar or k == CXType_UShort or k == CXType_UInt or k == CXType_ULong or k == CXType_ULongLong or k == CXType_UInt128:
             return 1
         0
 
@@ -5703,9 +5707,9 @@ unsafe fn is_float_kind(k: i32) -> i32:
     0
 
 unsafe fn is_unsigned_kind(k: i32) -> i32:
-    // Starts at UChar, not Char_U: plain `char` maps to c_char (= i8) on every
-    // target, including the unsigned-char ones (AArch64/ARM Linux).
-    if k >= CXType_UChar and k <= CXType_UInt128: return 1
+    // Char_U is plain `char` where it is unsigned (AArch64/ARM Linux, wasm):
+    // the `c_char` alias is u8 there (§16.1, #2176).
+    if k == CXType_Char_U or (k >= CXType_UChar and k <= CXType_UInt128): return 1
     0
 
 fn with_ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:

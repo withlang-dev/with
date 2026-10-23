@@ -2574,8 +2574,8 @@ fn ci_bit_member_is_signed(session: i64, field_cursor: i32) -> bool:
         if underlying >= 0: ty = with_ci_type_canonical(session, underlying)
     if ty < 0: return false
     let k = with_ci_type_kind(session, ty)
-    // Plain `char` is `c_char` (= i8) on every target (with_ci_type_is_unsigned).
-    not (k == CXT_Bool or k == CXT_UChar or k == CXT_UShort or k == CXT_UInt or k == CXT_ULong or k == CXT_ULongLong or k == CXT_UInt128)
+    // Plain `char` is the target's `c_char` (§16.1): Char_U is unsigned.
+    not (k == CXT_Bool or k == CXT_Char_U or k == CXT_UChar or k == CXT_UShort or k == CXT_UInt or k == CXT_ULong or k == CXT_ULongLong or k == CXT_UInt128)
 
 fn ci_record_has_bitfields(session: i64, idx: i32) -> bool:
     let field_count = with_cimport_struct_field_count(session, idx)
@@ -9976,6 +9976,13 @@ let CXT_DependentSizedArray: i32 = 116
 fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
     let ty = with_ci_cursor_type(session, cursor)
     if ty < 0:
+        return false
+    // A `va_list` is `__va_list_tag[1]` on x86_64 Linux (#1104): an array to
+    // clang, the opaque `c_va_list` value to With. It never decays: passing
+    // `args` to a v* function is the value itself, as on the targets where
+    // va_list is a pointer (`&args[0] as *mut __va_list_tag` indexed an
+    // opaque type, c-migrator-basic-tests' build-vacopy on linux-x86_64, #2582).
+    if cimport_type_is_va_list_at(session, ty, false):
         return false
     ci_type_kind_is_array(with_ci_type_kind(session, with_ci_type_canonical(session, ty)))
 
