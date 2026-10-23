@@ -301,6 +301,43 @@ impl AstPool:
 // A string literal the transform emits holds ALREADY-DECODED bytes; the
 // parser's raw marker (Parser.parse_string_literal) tells every decoder to
 // take them as written (#1246: a `const r#"a\"b"#` was decoded twice).
+// The type parameter names in scope for `decl`'s comptime transform: the
+// enclosing impl's (`impl_node`, 0 for none), then a fn's own. Each list is
+// `[name, bound count, bounds...]` per parameter.
+fn ct_type_params_in_scope(pool: &AstPool, impl_node: i32, decl: i32) -> List[i32]:
+    let out: List[i32] = List.new()
+    if impl_node != 0:
+        let tp_meta = pool.find_impl_type_params(impl_node as NodeId)
+        if tp_meta >= 0:
+            var pos: i32 = pool.state.impl_type_params[(tp_meta + 1)]
+            for _ in 0..pool.state.impl_type_params[(tp_meta + 2)]:
+                out.push(pool.get_extra(pos))
+                pos = pos + 2 + pool.get_extra(pos + 1)
+    if pool.kind(decl) == NodeKind.NK_FN_DECL:
+        let meta = pool.find_fn_meta(decl)
+        if meta >= 0:
+            var pos: i32 = pool.fn_meta_tp_start(meta)
+            for _ in 0..pool.fn_meta_tp_count(meta):
+                out.push(pool.get_extra(pos))
+                pos = pos + 2 + pool.get_extra(pos + 1)
+    out
+
+// Every impl declaration of the module, in declaration order.
+fn ct_impl_decl_nodes(pool: &AstPool) -> List[i32]:
+    let out: List[i32] = List.new()
+    for di in 0..pool.decl_count():
+        let decl = pool.get_decl(di)
+        if pool.kind(decl) == NodeKind.NK_IMPL_DECL: out.push(decl as i32)
+    out
+
+// The impl whose span holds the method `decl` (same file), or 0.
+fn ct_enclosing_impl(pool: &AstPool, impls: &List[i32], decl: i32) -> i32:
+    if pool.kind(decl) != NodeKind.NK_FN_DECL: return 0
+    let start = pool.get_start(decl)
+    for impl_node in impls:
+        if pool.file(impl_node as NodeId) == pool.file(decl) and start >= pool.get_start(impl_node as NodeId) and start < pool.get_end(impl_node as NodeId): return impl_node
+    0
+
 fn ct_raw_literal_text(decoded: &str) -> str:
     if decoded.starts_with("\x01raw\x01"): return decoded.clone()
     "\x01raw\x01" ++ decoded
@@ -3480,6 +3517,11 @@ impl Sema:
             self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
             return out
 
+        // A method's type parameters (its impl's, then its own) are unbound
+        // during the transform (resolve_type_level_arg_expr). The parser
+        // adds an impl node after its methods, so a method's impl is found
+        // by its span, not by declaration order.
+        let impl_decls = ct_impl_decl_nodes(out)
         for di in 0..out.decl_count():
             if transform_sema.decl_is_lazy_skipped(di):
                 continue
@@ -3487,7 +3529,10 @@ impl Sema:
             let decl = out.get_decl(di)
             // Nodes a comptime expansion adds belong to the declaring file.
             out.set_current_file_id(out.file(decl))
+            let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, &impl_decls, decl as i32)
+            transform_sema.ct_type_param_syms = ct_type_params_in_scope(out, owner, decl as i32)
             transform_sema.ct_transform_decl(out, out, intern, decl as i32)
+            transform_sema.ct_type_param_syms = List.new()
         self.diags = move transform_sema.diags
         self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
         out

@@ -2108,6 +2108,11 @@ impl Sema:
             let subst = self.lookup_generic_subst(sym)
             if subst != 0:
                 return subst as i32
+            // A type parameter of the declaration under comptime transform
+            // is unbound there: the condition waits for an instantiation. A
+            // program's own `type T` is not what std's `word[T]()` names.
+            if self.ct_type_param_syms.contains(sym):
+                return 0
             let prim = self.primitive_type_by_sym(sym)
             if prim != 0:
                 return prim as i32
@@ -2411,6 +2416,11 @@ impl Sema:
             let subst = self.lookup_generic_subst(sym)
             if subst != 0:
                 return subst as i32
+            // A type parameter of the declaration under comptime transform
+            // is unbound there: the condition waits for an instantiation. A
+            // program's own `type T` is not what std's `word[T]()` names.
+            if self.ct_type_param_syms.contains(sym):
+                return 0
             let prim = self.primitive_type_by_sym(sym)
             if prim != 0:
                 return prim as i32

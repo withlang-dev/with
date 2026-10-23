@@ -48,7 +48,9 @@ pub fn mlib_corpus() -> Corpus:
 // to the With comparator (std.collections.mlib_slot). A map's value lives
 // in the same slot after the key, so one ordered set of slots serves
 // `BTreeMap` and `BTreeSet`. The node rank follows upstream's guidance for
-// pointer-sized keys. The shape set is extended here, never in migrated code.
+// pointer-sized keys. An integer key takes the word shape: the engine's
+// own int64_t, ordered without a callback. The shape set is extended here,
+// never in migrated code.
 fn mlib_facade_shapes_source() -> str:
     "// The facade shapes: M*LIB's B+tree instantiated for the With standard\n" ++
     "// library's facades (docs/proposals/stdlib_sourcing_plan.md, Phase 4). An\n" ++
@@ -83,7 +85,13 @@ fn mlib_facade_shapes_source() -> str:
     "#define MLIB_SLOT_CLEAR(s) mlib_slot_release(s)\n" ++
     "#define MLIB_SLOT_OPLIST (INIT(M_INIT_DEFAULT), INIT_SET(MLIB_SLOT_INIT_SET), SET(MLIB_SLOT_SET), CLEAR(MLIB_SLOT_CLEAR), EQUAL(M_EQUAL_DEFAULT), SWAP(M_SWAP_DEFAULT), INIT_MOVE(M_SET_DEFAULT), MOVE(M_SET_DEFAULT), CMP(MLIB_SLOT_CMP), TYPE(mlib_slot))\n" ++
     "\n" ++
-    "BPTREE_DEF(mlib_slot_tree, 16, mlib_slot, MLIB_SLOT_OPLIST)\n"
+    "BPTREE_DEF(mlib_slot_tree, 16, mlib_slot, MLIB_SLOT_OPLIST)\n" ++
+    "\n" ++
+    "// The word shape (D148): an integer key is the engine's own int64_t\n" ++
+    "// (an unsigned 64-bit key flips its sign bit, which keeps its order),\n" ++
+    "// no slot, no callback per comparison; the value is the facade's entry\n" ++
+    "// pointer, which the engine neither clones nor frees.\n" ++
+    "BPTREE_DEF2(mlib_word_tree, 16, int64_t, M_BASIC_OPLIST, void*, M_PTR_OPLIST)\n"
 
 // Flat staging: the two headers beside the units.
 fn mlib_stage(ctx: &ActionCtx, corpus: &Corpus, reference: &str, source: &str) -> i32:

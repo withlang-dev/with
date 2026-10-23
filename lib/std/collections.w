@@ -84,25 +84,50 @@ pub type HashSet[T]  {
 /// through the key comparator (std.collections.mlib_slot). Keys are kept in
 /// ascending `Ord` order (D41). O(log n) insert, lookup and remove; in-order
 /// traversal O(n). A copy is `.clone()` (the map is a resource).
-pub type BTreeMap[K, V] { tree: mlib_slot_tree_s }
+/// An integer key takes the word shape (D148): the engine's own int64_t,
+/// ordered without a callback, holding the entry's address; `words` is that
+/// tree and `tree` the slot one, only one of them ever filled.
+pub type BTreeMap[K, V] { tree: mlib_slot_tree_s, words: mlib_word_tree_s }
 
 /// One entry: the slot prefix, the key, the value. A probe for a lookup is a
 /// `MlibSlot[K]` — the same prefix and the key at the same offset — so the
 /// engine compares it like a stored slot.
 pub type BTreeEntry[K, V] { prefix: MlibSlotPrefix, key: K, value: V }
 
+/// The word shape's entry: the key and the value, keyed in the engine by the
+/// key's word.
+pub type BTreeWordEntry[K, V] { key: K, value: V }
+
 /// Ordered set of unique values over the same B+tree: one facade-owned
 /// entry per element, the engine's slots pointing back at it.
-pub type BTreeSet[T] { tree: mlib_slot_tree_s }
+pub type BTreeSet[T] { tree: mlib_slot_tree_s, words: mlib_word_tree_s }
+
+/// The word shape's set element.
+pub type BTreeWordItem[T] { key: T }
 
 pub fn BTreeMap.new[K, V]() -> BTreeMap[K, V]:
-    var map: BTreeMap[K, V] = BTreeMap { tree: mlib_slot_tree_s {} }
-    unsafe { mlib_slot_tree_init(&raw mut map.tree) }
+    var map: BTreeMap[K, V] = BTreeMap { tree: mlib_slot_tree_s {}, words: mlib_word_tree_s {} }
+    unsafe:
+        mlib_slot_tree_init(&raw mut map.tree)
+        mlib_word_tree_init(&raw mut map.words)
     map
 
 // The engine reads through a mutable pointer (C's `const tree_t` decays to
 // the node pointer); a view of the map hands it the same address.
 fn btree_handle(tree: &mlib_slot_tree_s) -> *mut mlib_slot_tree_s: &raw const *tree as *mut mlib_slot_tree_s
+fn word_handle(words: &mlib_word_tree_s) -> *mut mlib_word_tree_s: &raw const *words as *mut mlib_word_tree_s
+
+// D148's word shape: the integer scalars whose key is the engine's own
+// int64_t (`comptime if` instantiates only the branch taken).
+fn btree_is_word[K]() -> bool:
+    comptime if K.name() == "i64" or K.name() == "u64" or K.name() == "i32" or K.name() == "u32" or K.name() == "i16" or K.name() == "u16" or K.name() == "i8" or K.name() == "u8" or K.name() == "isize" or K.name() == "usize": true
+    else: false
+
+// The key's word. An unsigned 64-bit key flips its sign bit, which keeps
+// its order under the engine's signed comparison.
+fn btree_word[K](key: &K) -> i64:
+    comptime if K.name() == "u64" or K.name() == "usize": ((*key as u64) ^ 9223372036854775808) as i64
+    else: *key as i64
 
 impl[K: Ord + Clone, V] BTreeMap[K, V]:
     fn comparator() -> fn(*const u8, *const u8) -> i32:
@@ -135,9 +160,16 @@ impl[K: Ord + Clone, V] BTreeMap[K, V]:
         let drop_fn = self.dropper()
         mlib_slot_prefix(compare, clone_fn, drop_fn, entry)
 
-    pub fn len() -> isize: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
+    pub fn len() -> isize:
+        comptime if btree_is_word[K](): unsafe { mlib_word_tree_size(word_handle(&self.words)) } as isize
+        else: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
 
     pub fn is_empty() -> bool: self.len() == 0
+
+    // The word shape's entry under `key`, or null.
+    unsafe fn word_entry(key: &K) -> *mut BTreeWordEntry[K, V]:
+        let found = mlib_word_tree_get(word_handle(&self.words), btree_word(key))
+        if found as i64 == 0: 0 as *mut BTreeWordEntry[K, V] else: (*found) as *mut BTreeWordEntry[K, V]
 
     unsafe fn probe(key: &K) -> *mut MlibSlot[K]:
         let probe = with_alloc(sizeof[MlibSlot[K]]() as i64) as *mut MlibSlot[K]
@@ -156,89 +188,153 @@ impl[K: Ord + Clone, V] BTreeMap[K, V]:
         let found = self.find_slot(key)
         if found as i64 == 0: 0 as *mut BTreeEntry[K, V] else: (*(*found)).entry as *mut BTreeEntry[K, V]
 
-    pub fn contains(key: &K) -> bool: unsafe { self.find_entry(key) } as i64 != 0
+    pub fn contains(key: &K) -> bool:
+        comptime if btree_is_word[K](): unsafe { self.word_entry(key) } as i64 != 0
+        else: unsafe { self.find_entry(key) } as i64 != 0
 
     /// Observes the value under `key`, if any (D22).
     pub fn get(key: &K) -> Option[&V] from self:
-        let entry = unsafe { self.find_entry(key) }
-        if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
+        comptime if btree_is_word[K]():
+            let entry = unsafe { self.word_entry(key) }
+            if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
+        else:
+            let entry = unsafe { self.find_entry(key) }
+            if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
 
     /// Stores `value` under `key`; an equal stored key's entry is replaced
     /// (the stored key and the old value drop).
     pub mut fn insert(key: K, value: V) -> Unit:
-        let entry = with_alloc(sizeof[BTreeEntry[K, V]]() as i64) as *mut BTreeEntry[K, V]
-        unsafe { *entry = BTreeEntry { prefix: self.prefix(entry as *mut u8), key: key, value: value } }
-        let found = unsafe { mlib_slot_tree_get(&raw mut self.tree, entry as *mut mlib_slot_head) }
-        if found as i64 == 0:
-            unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
-            return
-        // The engine's slot keeps its key clone (equal) and points at the new
-        // entry; the old entry transfers its key and value out to drop.
-        var old = unsafe { (*(*found)).entry } as *mut BTreeEntry[K, V]
-        unsafe { (*(*found)).entry = entry as *mut c_void }
-        let old_key: K = unsafe { move old.key }
-        drop(old_key)
-        let old_value: V = unsafe { move old.value }
-        drop(old_value)
-        with_free(old as *mut u8)
+        comptime if btree_is_word[K]():
+            let word = btree_word(&key)
+            let entry = with_alloc(sizeof[BTreeWordEntry[K, V]]() as i64) as *mut BTreeWordEntry[K, V]
+            unsafe { *entry = BTreeWordEntry { key: key, value: value } }
+            let found = unsafe { mlib_word_tree_get(&raw mut self.words, word) }
+            if found as i64 == 0:
+                unsafe { mlib_word_tree_set_at(&raw mut self.words, word, entry as *mut c_void) }
+                return
+            var old = unsafe { *found } as *mut BTreeWordEntry[K, V]
+            unsafe { *found = entry as *mut c_void }
+            let old_key: K = unsafe { move old.key }
+            drop(old_key)
+            let old_value: V = unsafe { move old.value }
+            drop(old_value)
+            with_free(old as *mut u8)
+        else:
+            let entry = with_alloc(sizeof[BTreeEntry[K, V]]() as i64) as *mut BTreeEntry[K, V]
+            unsafe { *entry = BTreeEntry { prefix: self.prefix(entry as *mut u8), key: key, value: value } }
+            let found = unsafe { mlib_slot_tree_get(&raw mut self.tree, entry as *mut mlib_slot_head) }
+            if found as i64 == 0:
+                unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
+                return
+            // The engine's slot keeps its key clone (equal) and points at the new
+            // entry; the old entry transfers its key and value out to drop.
+            var old = unsafe { (*(*found)).entry } as *mut BTreeEntry[K, V]
+            unsafe { (*(*found)).entry = entry as *mut c_void }
+            let old_key: K = unsafe { move old.key }
+            drop(old_key)
+            let old_value: V = unsafe { move old.value }
+            drop(old_value)
+            with_free(old as *mut u8)
 
     /// Transfers the value under `key` out, if any; the key drops.
     pub mut fn remove(key: &K) -> Option[V]:
-        var entry = unsafe { self.find_entry(key) }
-        if entry as i64 == 0: return None
-        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
-        let stored_key: K = unsafe { move entry.key }
-        drop(stored_key)
-        let value: V = unsafe { move entry.value }
-        with_free(entry as *mut u8)
-        Some(value)
+        comptime if btree_is_word[K]():
+            var entry = unsafe { self.word_entry(key) }
+            if entry as i64 == 0: return None
+            assert(unsafe { mlib_word_tree_erase(&raw mut self.words, btree_word(key)) })
+            let stored_key: K = unsafe { move entry.key }
+            drop(stored_key)
+            let value: V = unsafe { move entry.value }
+            with_free(entry as *mut u8)
+            Some(value)
+        else:
+            var entry = unsafe { self.find_entry(key) }
+            if entry as i64 == 0: return None
+            assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+            let stored_key: K = unsafe { move entry.key }
+            drop(stored_key)
+            let value: V = unsafe { move entry.value }
+            with_free(entry as *mut u8)
+            Some(value)
 
     /// Drops every entry; the map is empty afterwards.
     pub mut fn clear() -> Unit:
         self.drop_entries()
-        unsafe { mlib_slot_tree_reset(&raw mut self.tree) }
+        unsafe:
+            mlib_slot_tree_reset(&raw mut self.tree)
+            mlib_word_tree_reset(&raw mut self.words)
 
     // Every entry dropped and freed; the engine's own slots are its to clear.
     mut fn drop_entries():
-        var cursor = mlib_slot_tree_it_s {}
-        unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
-        while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
-            var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut BTreeEntry[K, V]
-            let key: K = unsafe { move entry.key }
-            drop(key)
-            let value: V = unsafe { move entry.value }
-            drop(value)
-            with_free(entry as *mut u8)
-            unsafe { mlib_slot_tree_next(&raw mut cursor) }
+        comptime if btree_is_word[K]():
+            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
+            while not unsafe { mlib_word_tree_end_p(&raw mut word_cursor) }:
+                var entry = unsafe { *((*mlib_word_tree_ref(&raw mut word_cursor)).value_ptr) } as *mut BTreeWordEntry[K, V]
+                let key: K = unsafe { move entry.key }
+                drop(key)
+                let value: V = unsafe { move entry.value }
+                drop(value)
+                with_free(entry as *mut u8)
+                unsafe { mlib_word_tree_next(&raw mut word_cursor) }
+        else:
+            var cursor = mlib_slot_tree_it_s {}
+            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+            while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
+                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut BTreeEntry[K, V]
+                let key: K = unsafe { move entry.key }
+                drop(key)
+                let value: V = unsafe { move entry.value }
+                drop(value)
+                with_free(entry as *mut u8)
+                unsafe { mlib_slot_tree_next(&raw mut cursor) }
 
     /// Observes the least key's entry, or `None` when empty.
     pub fn first() -> Option[(&K, &V)]:
         if self.len() == 0: return None
-        let entry = unsafe { (*(*mlib_slot_tree_min(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
-        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        comptime if btree_is_word[K]():
+            let entry = unsafe { *mlib_word_tree_min(word_handle(&self.words)) } as *const BTreeWordEntry[K, V]
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        else:
+            let entry = unsafe { (*(*mlib_slot_tree_min(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
 
     /// Observes the greatest key's entry, or `None` when empty.
     pub fn last() -> Option[(&K, &V)]:
         if self.len() == 0: return None
-        let entry = unsafe { (*(*mlib_slot_tree_max(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
-        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        comptime if btree_is_word[K]():
+            let entry = unsafe { *mlib_word_tree_max(word_handle(&self.words)) } as *const BTreeWordEntry[K, V]
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        else:
+            let entry = unsafe { (*(*mlib_slot_tree_max(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
 
     // The greatest entry, transferred out (the consuming traversals).
     mut fn take_last() -> Option[(K, V)]:
         if self.len() == 0: return None
-        var entry = unsafe { (*(*mlib_slot_tree_max(&raw mut self.tree))).entry } as *mut BTreeEntry[K, V]
-        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
-        let key: K = unsafe { move entry.key }
-        let value: V = unsafe { move entry.value }
-        with_free(entry as *mut u8)
-        Some((key, value))
+        comptime if btree_is_word[K]():
+            var entry = unsafe { *mlib_word_tree_max(&raw mut self.words) } as *mut BTreeWordEntry[K, V]
+            assert(unsafe { mlib_word_tree_erase(&raw mut self.words, btree_word(&(*entry).key)) })
+            let key: K = unsafe { move entry.key }
+            let value: V = unsafe { move entry.value }
+            with_free(entry as *mut u8)
+            Some((key, value))
+        else:
+            var entry = unsafe { (*(*mlib_slot_tree_max(&raw mut self.tree))).entry } as *mut BTreeEntry[K, V]
+            assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+            let key: K = unsafe { move entry.key }
+            let value: V = unsafe { move entry.value }
+            with_free(entry as *mut u8)
+            Some((key, value))
 
     // D44: traversal observes. Each yields views into the entries, in key order.
     @[iter_of_self]
     pub fn iter() -> BTreeMapIter[K, V]:
         var cursor = mlib_slot_tree_it_s {}
-        unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
-        BTreeMapIter { cursor: cursor }
+        var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+        comptime if btree_is_word[K](): unsafe { mlib_word_tree_it(&raw mut word_cursor, word_handle(&self.words)) }
+        else: unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
+        BTreeMapIter { cursor: cursor, word_cursor: word_cursor }
 
     @[iter_of_self]
     pub fn keys() -> BTreeMapKeys[K, V]: BTreeMapKeys { entries: self.iter() }
@@ -249,7 +345,9 @@ impl[K: Ord + Clone, V] BTreeMap[K, V]:
 impl[K, V] Drop for BTreeMap[K, V]:
     move fn drop():
         self.drop_entries()
-        unsafe { mlib_slot_tree_clear(&raw mut self.tree) }
+        unsafe:
+            mlib_slot_tree_clear(&raw mut self.tree)
+            mlib_word_tree_clear(&raw mut self.words)
 
 impl[K: Ord + Clone, V: Clone] Clone for BTreeMap[K, V]:
     fn clone() -> BTreeMap[K, V]:
@@ -258,14 +356,20 @@ impl[K: Ord + Clone, V: Clone] Clone for BTreeMap[K, V]:
         out
 
 /// `map.iter()`, and what `for (k, v) in map` walks: each entry as views.
-pub type BTreeMapIter[K, V] ephemeral { cursor: mlib_slot_tree_it_s }
+pub type BTreeMapIter[K, V] ephemeral { cursor: mlib_slot_tree_it_s, word_cursor: mlib_word_tree_it_s }
 
 impl[K, V] Iter[(&K, &V)] for BTreeMapIter[K, V]:
     mut fn next() -> Option[(&K, &V)]:
-        if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
-        let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const BTreeEntry[K, V]
-        unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
-        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        comptime if btree_is_word[K]():
+            if unsafe { mlib_word_tree_end_p(&raw mut self.word_cursor) }: return None
+            let entry = unsafe { *((*mlib_word_tree_ref(&raw mut self.word_cursor)).value_ptr) } as *const BTreeWordEntry[K, V]
+            unsafe { mlib_word_tree_next(&raw mut self.word_cursor) }
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+        else:
+            if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
+            let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const BTreeEntry[K, V]
+            unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
+            Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
 
 /// `map.keys()`: each key as a view, in order.
 pub type BTreeMapKeys[K, V] ephemeral { entries: BTreeMapIter[K, V] }
@@ -360,8 +464,10 @@ fn debug_entry_order(keys: &List[str], values: &List[str]) -> List[i64]:
     order
 
 pub fn BTreeSet.new[T]() -> BTreeSet[T]:
-    var set: BTreeSet[T] = BTreeSet { tree: mlib_slot_tree_s {} }
-    unsafe { mlib_slot_tree_init(&raw mut set.tree) }
+    var set: BTreeSet[T] = BTreeSet { tree: mlib_slot_tree_s {}, words: mlib_word_tree_s {} }
+    unsafe:
+        mlib_slot_tree_init(&raw mut set.tree)
+        mlib_word_tree_init(&raw mut set.words)
     set
 
 impl[T: Ord + Clone] BTreeSet[T]:
@@ -395,9 +501,16 @@ impl[T: Ord + Clone] BTreeSet[T]:
         let drop_fn = self.dropper()
         mlib_slot_prefix(compare, clone_fn, drop_fn, entry)
 
-    pub fn len() -> isize: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
+    pub fn len() -> isize:
+        comptime if btree_is_word[T](): unsafe { mlib_word_tree_size(word_handle(&self.words)) } as isize
+        else: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
 
     pub fn is_empty() -> bool: self.len() == 0
+
+    // The word shape's item holding `value`, or null.
+    unsafe fn word_item(value: &T) -> *mut BTreeWordItem[T]:
+        let found = mlib_word_tree_get(word_handle(&self.words), btree_word(value))
+        if found as i64 == 0: 0 as *mut BTreeWordItem[T] else: (*found) as *mut BTreeWordItem[T]
 
     unsafe fn probe(value: &T) -> *mut MlibSlot[T]:
         let probe = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
@@ -412,42 +525,74 @@ impl[T: Ord + Clone] BTreeSet[T]:
         with_free(probe as *mut u8)
         if found as i64 == 0: 0 as *mut MlibSlot[T] else: (*(*found)).entry as *mut MlibSlot[T]
 
-    pub fn contains(value: &T) -> bool: unsafe { self.find_entry(value) } as i64 != 0
+    pub fn contains(value: &T) -> bool:
+        comptime if btree_is_word[T](): unsafe { self.word_item(value) } as i64 != 0
+        else: unsafe { self.find_entry(value) } as i64 != 0
 
     /// Stores `value`; an equal stored element keeps its place and the new
     /// one drops.
     pub mut fn insert(value: T) -> Unit:
-        if unsafe { self.find_entry(&value) } as i64 != 0:
-            drop(value)
-            return
-        let entry = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
-        unsafe { *entry = MlibSlot { prefix: self.prefix(entry as *mut u8), key: value } }
-        unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
+        comptime if btree_is_word[T]():
+            if unsafe { self.word_item(&value) } as i64 != 0:
+                drop(value)
+                return
+            let word = btree_word(&value)
+            let item = with_alloc(sizeof[BTreeWordItem[T]]() as i64) as *mut BTreeWordItem[T]
+            unsafe { *item = BTreeWordItem { key: value } }
+            unsafe { mlib_word_tree_set_at(&raw mut self.words, word, item as *mut c_void) }
+        else:
+            if unsafe { self.find_entry(&value) } as i64 != 0:
+                drop(value)
+                return
+            let entry = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
+            unsafe { *entry = MlibSlot { prefix: self.prefix(entry as *mut u8), key: value } }
+            unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
 
     /// Removes `value`; true when it was present (the element drops).
     pub mut fn remove(value: &T) -> bool:
-        var entry = unsafe { self.find_entry(value) }
-        if entry as i64 == 0: return false
-        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
-        let stored: T = unsafe { move entry.key }
-        drop(stored)
-        with_free(entry as *mut u8)
-        true
+        comptime if btree_is_word[T]():
+            var item = unsafe { self.word_item(value) }
+            if item as i64 == 0: return false
+            assert(unsafe { mlib_word_tree_erase(&raw mut self.words, btree_word(value)) })
+            let stored: T = unsafe { move item.key }
+            drop(stored)
+            with_free(item as *mut u8)
+            true
+        else:
+            var entry = unsafe { self.find_entry(value) }
+            if entry as i64 == 0: return false
+            assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+            let stored: T = unsafe { move entry.key }
+            drop(stored)
+            with_free(entry as *mut u8)
+            true
 
     /// Drops every element; the set is empty afterwards.
     pub mut fn clear() -> Unit:
         self.drop_entries()
-        unsafe { mlib_slot_tree_reset(&raw mut self.tree) }
+        unsafe:
+            mlib_slot_tree_reset(&raw mut self.tree)
+            mlib_word_tree_reset(&raw mut self.words)
 
     mut fn drop_entries():
-        var cursor = mlib_slot_tree_it_s {}
-        unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
-        while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
-            var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut MlibSlot[T]
-            let stored: T = unsafe { move entry.key }
-            drop(stored)
-            with_free(entry as *mut u8)
-            unsafe { mlib_slot_tree_next(&raw mut cursor) }
+        comptime if btree_is_word[T]():
+            var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+            unsafe { mlib_word_tree_it(&raw mut word_cursor, &raw mut self.words) }
+            while not unsafe { mlib_word_tree_end_p(&raw mut word_cursor) }:
+                var item = unsafe { *((*mlib_word_tree_ref(&raw mut word_cursor)).value_ptr) } as *mut BTreeWordItem[T]
+                let stored: T = unsafe { move item.key }
+                drop(stored)
+                with_free(item as *mut u8)
+                unsafe { mlib_word_tree_next(&raw mut word_cursor) }
+        else:
+            var cursor = mlib_slot_tree_it_s {}
+            unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+            while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
+                var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut MlibSlot[T]
+                let stored: T = unsafe { move entry.key }
+                drop(stored)
+                with_free(entry as *mut u8)
+                unsafe { mlib_slot_tree_next(&raw mut cursor) }
 
     /// The elements, in order, as an owned list of clones.
     pub fn items() -> List[T]:
@@ -480,13 +625,17 @@ impl[T: Ord + Clone] BTreeSet[T]:
     @[iter_of_self]
     pub fn iter() -> BTreeSetIter[T]:
         var cursor = mlib_slot_tree_it_s {}
-        unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
-        BTreeSetIter { cursor: cursor }
+        var word_cursor = mlib_word_tree_it_s { pair: mlib_word_tree_pair_s {} }
+        comptime if btree_is_word[T](): unsafe { mlib_word_tree_it(&raw mut word_cursor, word_handle(&self.words)) }
+        else: unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
+        BTreeSetIter { cursor: cursor, word_cursor: word_cursor }
 
 impl[T] Drop for BTreeSet[T]:
     move fn drop():
         self.drop_entries()
-        unsafe { mlib_slot_tree_clear(&raw mut self.tree) }
+        unsafe:
+            mlib_slot_tree_clear(&raw mut self.tree)
+            mlib_word_tree_clear(&raw mut self.words)
 
 impl[T: Ord + Clone] Clone for BTreeSet[T]:
     fn clone() -> BTreeSet[T]:
@@ -495,14 +644,20 @@ impl[T: Ord + Clone] Clone for BTreeSet[T]:
         out
 
 /// `set.iter()`, and what `for x in set` walks: each element as a view.
-pub type BTreeSetIter[T] ephemeral { cursor: mlib_slot_tree_it_s }
+pub type BTreeSetIter[T] ephemeral { cursor: mlib_slot_tree_it_s, word_cursor: mlib_word_tree_it_s }
 
 impl[T] Iter[&T] for BTreeSetIter[T]:
     mut fn next() -> Option[&T]:
-        if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
-        let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const MlibSlot[T]
-        unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
-        Some(unsafe { &(*entry).key })
+        comptime if btree_is_word[T]():
+            if unsafe { mlib_word_tree_end_p(&raw mut self.word_cursor) }: return None
+            let item = unsafe { *((*mlib_word_tree_ref(&raw mut self.word_cursor)).value_ptr) } as *const BTreeWordItem[T]
+            unsafe { mlib_word_tree_next(&raw mut self.word_cursor) }
+            Some(unsafe { &(*item).key })
+        else:
+            if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
+            let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const MlibSlot[T]
+            unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
+            Some(unsafe { &(*entry).key })
 
 /// Type-safe generational handle into a SlotMap[T].
 /// Handles are Copy and carry their owner element type at compile time, so a

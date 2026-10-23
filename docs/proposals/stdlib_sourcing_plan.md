@@ -687,8 +687,18 @@ Status (2026-10-22, D151):
   conditional callee, and C11 `_Generic` selected by the controlling
   expression's type through the macros that spell it (libclang peeled it
   to its default arm). The library corpus was not re-promoted (D112).
-- Open: a word-key instantiation for integer keys (the D148 condition) when
-  a hot path needs it.
+- The word shape (D148, 2026-10-23): an integer key (`i8`..`i64`, `u8`..`u64`,
+  `isize`, `usize`) is the engine's own int64_t (`BPTREE_DEF2(mlib_word_tree,
+  16, int64_t, M_BASIC_OPLIST, void*, M_PTR_OPLIST)` in the shapes unit; an
+  unsigned 64-bit key flips its sign bit, which keeps its order), holding the
+  facade's entry; `comptime if btree_is_word[K]()` picks it per method, as
+  `Deque` does. Measured (same harness): BTreeSet[i32] 188/36/171 and
+  BTreeMap[i32] 187/36/173 beside OrderedSet (STC sset) 207/118/258 and the
+  slot shape with `str` keys 2343/1043/1288 (BTreeSet) and 2301/1038/1306
+  (BTreeMap). Fixture behav_btree_word_keys (every width, both signs, the
+  extremes, drops); complexity rows `btree-*-str-*` keep the slot shape
+  measured; drop-audit cells `btree_map_str_*` likewise. The corpus was
+  re-promoted under `inputs:` (D112: the shapes unit is the corpus's source).
 
 Order is fixed by risk: 1 validates the whole-corpus pipeline on a
 container library, 2 adds the performance yardstick, 3 is the campaign, 4

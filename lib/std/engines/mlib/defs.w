@@ -378,6 +378,54 @@ pub type mlib_slot_tree_it_t = [mlib_slot_tree_it_s; 1]
 
 pub type mlib_slot_tree_it_ct = [mlib_slot_tree_it_s; 1]
 
+@[repr(C)]
+pub type mlib_word_tree_pair_s { pub key_ptr: *mut c_longlong = null, pub value_ptr: *mut *mut c_void = null }
+impl Copy for mlib_word_tree_pair_s
+
+pub type mlib_word_tree_itref_t = mlib_word_tree_pair_s
+
+@[repr(C)]
+pub type mlib_word_tree_kind_s = union { pub value: [*mut c_void; 17] = [null as *mut c_void; 17], pub node: [*mut mlib_word_tree_node_s; 18] = [null as *mut mlib_word_tree_node_s; 18] }
+impl Copy for mlib_word_tree_kind_s
+
+@[repr(C)]
+pub type mlib_word_tree_node_s { pub num: c_int = 0, pub key: [c_longlong; 17] = [0 as c_longlong; 17], pub next: *mut mlib_word_tree_node_s = null, pub prev: *mut mlib_word_tree_node_s = null, pub kind: mlib_word_tree_kind_s }
+impl Copy for mlib_word_tree_node_s
+
+pub type mlib_word_tree_node_ct = *mut mlib_word_tree_node_s
+
+@[repr(C)]
+pub type mlib_word_tree_s { pub root: *mut mlib_word_tree_node_s = null, pub size: c_ulong = 0 }
+impl Copy for mlib_word_tree_s
+
+pub type mlib_word_tree_t = [mlib_word_tree_s; 1]
+
+pub type mlib_word_tree_ptr = *mut mlib_word_tree_s
+
+pub type mlib_word_tree_srcptr = *const mlib_word_tree_s
+
+pub type mlib_word_tree_subtype_ct = mlib_word_tree_pair_s
+
+pub type mlib_word_tree_key_ct = c_longlong
+
+pub type mlib_word_tree_value_ct = *mut c_void
+
+pub type mlib_word_tree_ct = [mlib_word_tree_s; 1]
+
+@[repr(C)]
+pub type mlib_word_tree_parent_it_s { pub num: c_int = 0, pub parent: [*mut mlib_word_tree_node_s; 65] = [null as *mut mlib_word_tree_node_s; 65] }
+impl Copy for mlib_word_tree_parent_it_s
+
+pub type mlib_word_tree_pit_ct = [mlib_word_tree_parent_it_s; 1]
+
+@[repr(C)]
+pub type mlib_word_tree_it_s { pub pair: mlib_word_tree_pair_s, pub node: *mut mlib_word_tree_node_s = null, pub idx: c_int = 0 }
+impl Copy for mlib_word_tree_it_s
+
+pub type mlib_word_tree_it_t = [mlib_word_tree_it_s; 1]
+
+pub type mlib_word_tree_it_ct = [mlib_word_tree_it_s; 1]
+
 pub let M_USE_STDARG: c_int = 1
 pub let M_USE_SMALL_NAME: c_int = 1
 pub let M_CORE_VERSION_MAJOR: c_int = 0
