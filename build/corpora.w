@@ -188,7 +188,7 @@ pub fn run_corpus_promote_guard_check_action(ctx: ActionCtx) -> i32:
     if corpus_promote_trigger("abc", "abc", "inputs:shapes") != "inputs:shapes": return corpus_fail(ctx, "D112 guard: a build-input change is a trigger")
     var files: List[str] = ["build.w"]
     for path in ctx.fs().list_files("build"):
-        if path.ends_with(".w"): files.push(path.clone())
+        if path.ends_with(".w"): files.push(path)
     for path in files:
         for line in ctx.fs().read_text(path).split("\n"):
             if line.contains(".dep(") and (line.contains("-promote\")") or line.contains("++ \"-promote\"")):

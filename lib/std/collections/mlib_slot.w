@@ -44,4 +44,4 @@ pub unsafe fn mlib_slot_drop_slot(p: *mut c_void):
 /// trampolines, the With functions are the facade's, the entry is the
 /// facade's record (null in a probe).
 pub fn mlib_slot_prefix(compare: fn(*const u8, *const u8) -> i32, clone_fn: fn(*const u8) -> *mut u8, drop_fn: fn(*mut u8) -> Unit, entry: *mut u8) -> MlibSlotPrefix:
-    MlibSlotPrefix { head: mlib_slot_head { cmp: Some(mlib_slot_compare), clone: Some(mlib_slot_clone_slot), drop: Some(mlib_slot_drop_slot), entry: entry as *mut c_void }, compare: compare, clone_fn: clone_fn, drop_fn: drop_fn }
+    MlibSlotPrefix { head: mlib_slot_head { cmp: mlib_slot_compare, clone: mlib_slot_clone_slot, drop: mlib_slot_drop_slot, entry: entry as *mut c_void }, compare: compare, clone_fn: clone_fn, drop_fn: drop_fn }
