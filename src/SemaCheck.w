@@ -1347,7 +1347,12 @@ impl Sema:
             let prior = self.contextual_join_decision(report_node)
             // D128: a body's later check retypes its locals, so a join may
             // settle differently; the latest check decides.
-            if (prior.final_type != final_type or prior.expected_type != expected) and (self.int_local_rechecking != 0 or (prior.expected_type == 0 and self.is_plain_numeric_type(final_type) and self.expr_is_untyped_literal_arith(report_node))):
+            // #2379: a demand that reaches a join decided under none and
+            // agrees with it (a bracket literal argument re-typed as the
+            // array its parameter names, its elements already isize) is
+            // the same decision with its demand named.
+            let demand_agrees = prior.expected_type == 0 and expected != 0 and prior.final_type == final_type
+            if (prior.final_type != final_type or prior.expected_type != expected) and (self.int_local_rechecking != 0 or demand_agrees or (prior.expected_type == 0 and self.is_plain_numeric_type(final_type) and self.expr_is_untyped_literal_arith(report_node))):
                 // §4.2.1: a join of untyped literals (`if c: 1 else: 0`) was
                 // decided at the literal default, then a demand reached it (a
                 // peer, a field, an enclosing join) and typed its literals.
@@ -1576,7 +1581,14 @@ impl Sema:
     // parameter's type once it is, behind an auto-referenced `&` too (`7 in
     // bag` at `value: &T`, T = i32). Returns the argument's type.
     mut fn retype_literal_call_arg(arg_node: i32, expected: i32, actual: i32) -> i32:
-        if arg_node <= 0 or not self.expr_is_untyped_literal_arith(arg_node): return actual
+        if arg_node <= 0: return actual
+        // #2379 (D93, D113): a bracket literal argument is typed by its
+        // parameter once a generic call knows it: `f([7, 8, 9])` at
+        // `xs: [T; 3]` is the array, not the List it was under no demand.
+        if self.ast.kind(arg_node) == NodeKind.NK_ARRAY_LIT and self.get_type_kind(self.resolve_alias(expected as TypeId)) == TypeKind.TY_ARRAY and self.get_type_kind(self.resolve_alias(actual as TypeId)) != TypeKind.TY_ARRAY:
+            let retyped = self.check_expr_with_expected(arg_node, expected as TypeId)
+            return if retyped != 0: retyped as i32 else: actual
+        if not self.expr_is_untyped_literal_arith(arg_node): return actual
         let value_ty = self.comparison_value_peer(expected as TypeId)
         if not self.is_plain_numeric_type(value_ty as i32) or self.resolve_alias(value_ty) == self.resolve_alias(actual as TypeId): return actual
         let retyped = self.check_expr_with_expected(arg_node, value_ty)
@@ -9933,6 +9945,17 @@ impl Sema:
         if arith != 0:
             out.value_type = arith as i32
             return out
+        // D22 §6.2 / D144: a Copy view beside its value joins to the value
+        // (`return x` of `&i32` beside `return -1`, #2325); the view
+        // materializes at the return once the type is inferred.
+        let have_value = self.shared_copy_pointee(out.value_type)
+        let want_value = self.shared_copy_pointee(actual)
+        if have_value != 0 and self.types_compatible(have_value as TypeId, actual as TypeId) != 0:
+            out.value_type = self.preferred_compatible_type(have_value as TypeId, actual as TypeId) as i32
+            return out
+        if want_value != 0 and self.types_compatible(out.value_type as TypeId, want_value as TypeId) != 0:
+            out.value_type = self.preferred_compatible_type(out.value_type as TypeId, want_value as TypeId) as i32
+            return out
         out.mismatch = 1
         out.mismatch_node = node
         out
@@ -10288,10 +10311,53 @@ impl Sema:
     // as a bare `T` (a `None` joined it), those branches convert now, as
     // they would under a written `-> Option[T]` (§4.9a).
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
-        let inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
+        var inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
         if inferred != 0 and self.is_option_type(inferred) and not self.is_bare_none_type(inferred):
             self.convert_body_values_to_option(body, 1, inferred)
+        // D22: an inferred return preserves a view (the acceptance cell
+        // err_d22_inferred_return_preserves_view). When the join of a view
+        // return with an owned return is the owned value (#2325: `return x`
+        // of `&i32` beside `return -1`), every returned view materializes
+        // it, as under a written `-> T`.
+        if inferred != 0 and self.is_plain_value_type_for_return(inferred):
+            self.materialize_body_view_returns(body, 1, inferred)
         inferred
+
+    fn is_plain_value_type_for_return(tid: i32) -> bool:
+        let kind = self.get_type_kind(self.resolve_alias(tid as TypeId))
+        kind != TypeKind.TY_REF and kind != TypeKind.TY_VOID and kind != TypeKind.TY_NEVER
+
+    // Every value the body returns that is a Copy view of `owned` takes the
+    // value (the D22 contextual copy), mirroring convert_body_values_to_option.
+    mut fn materialize_body_view_returns(node: i32, value_path: i32, owned: i32):
+        if node == 0 or owned == 0:
+            return
+        match self.ast.kind(node):
+            NodeKind.NK_CLOSURE | NodeKind.NK_FN_DECL => ()
+            NodeKind.NK_RETURN => self.materialize_body_view_returns(self.ast.get_data0(node), 1, owned)
+            NodeKind.NK_BLOCK =>
+                let extra_start = self.ast.get_data0(node)
+                for si in 0..self.ast.get_data1(node):
+                    self.materialize_body_view_returns(self.ast.get_extra(extra_start + si), 0, owned)
+                self.materialize_body_view_returns(self.ast.get_data2(node), value_path, owned)
+            NodeKind.NK_IF_EXPR =>
+                self.materialize_body_view_returns(self.ast.get_data1(node), value_path, owned)
+                self.materialize_body_view_returns(self.ast.get_data2(node), value_path, owned)
+            NodeKind.NK_MATCH =>
+                let arm_start = self.ast.get_data1(node)
+                for ai in 0..self.ast.get_data2(node):
+                    self.materialize_body_view_returns(self.ast.get_extra(arm_start + ai), value_path, owned)
+            NodeKind.NK_MATCH_ARM => self.materialize_body_view_returns(self.ast.get_data1(node), value_path, owned)
+            NodeKind.NK_LOOP | NodeKind.NK_DO_WHILE => self.materialize_body_view_returns(self.ast.get_data0(node), 0, owned)
+            NodeKind.NK_WHILE => self.materialize_body_view_returns(self.ast.get_data1(node), 0, owned)
+            NodeKind.NK_FOR => self.materialize_body_view_returns(self.ast.get_data2(node), 0, owned)
+            NodeKind.NK_GROUPED | NodeKind.NK_UNSAFE_BLOCK | NodeKind.NK_NO_SUSPEND => self.materialize_body_view_returns(self.ast.get_data0(node), value_path, owned)
+            _ =>
+                if value_path != 0:
+                    let actual = self.recorded_expr_type_or_zero(node)
+                    let pointee = if actual != 0: self.shared_copy_pointee(actual) else: 0
+                    if pointee != 0 and self.types_compatible(owned as TypeId, pointee as TypeId) != 0:
+                        self.record_contextual_copy_adjustment(node, owned, actual)
 
     // "return type mismatch" under an inferred return; in the second pass
     // of a self-calling body (D143) the message names what disagreed.
@@ -13685,7 +13751,10 @@ impl Sema:
         args.push(operand_node)
         by_place.push(self.type_takes_place(expected_operand))
         self.note_call_global_effects(node, candidate.sig, 0, 0, false, args, by_place)
-        self.sig_return_type(candidate.sig)
+        // Sema owns the type (D65, #2443), as for a binary operator method.
+        let unary_ret = self.sig_return_type(candidate.sig)
+        self.typed_expr_types.insert(node, unary_ret)
+        unary_ret
 
     mut fn check_binary_operator_method(node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
         let method_name = sema_operator_method_name(op)
@@ -13763,6 +13832,11 @@ impl Sema:
         by_place.push(self.type_takes_place(expected_lhs))
         by_place.push(self.type_takes_place(expected_rhs))
         self.note_call_global_effects(node, selected.sig, 0, 0, false, args, by_place)
+        // Sema owns the type (D65, #2443): the operator is its method's
+        // call, so its type is the method's return. Unrecorded, a
+        // `(a - 2.0).x` base fell back to arithmetic over V and f64 in MIR
+        // and projected a field out of a Unit.
+        self.typed_expr_types.insert(node, ret)
         ret
 
     // For comparison, a `&str` behaves like the `str` it points at (string value
@@ -14458,10 +14532,17 @@ impl Sema:
             lhs = self.check_expr_value_context(lhs_node)
             if lhs == 0:
                 return 0
-            let unwrapped = self.try_unwrapped_type(lhs as i32)
+            // D22 §21.1: `??` is transparent to a view of the carrier
+            // (`xs[i] ?? 0` on a `List[Option[i32]]`, #2524): the payload
+            // is the viewed carrier's, and a non-Copy payload is a view of it.
+            let lhs_resolved = self.resolve_alias(lhs)
+            let carrier = if self.get_type_kind(lhs_resolved) == TypeKind.TY_REF: self.get_type_d0(lhs_resolved) else: lhs as i32
+            var unwrapped = self.try_unwrapped_type(carrier)
             if unwrapped == 0:
                 self.emit_error("?? operator requires an Option or Result with a single success payload", node)
                 return 0
+            if carrier != lhs as i32 and self.is_copy(unwrapped as TypeId) == 0 and self.get_type_kind(self.resolve_alias(unwrapped as TypeId)) != TypeKind.TY_REF:
+                unwrapped = self.ensure_exact_type(TypeKind.TY_REF, unwrapped, 0, 0) as i32
             let join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, unwrapped)
             // The payload type is not an expectation for the fallback. Only an
             // enclosing expectation is independent of this join; otherwise the
@@ -21290,7 +21371,7 @@ impl Sema:
             // cannot constrain the struct type until concrete sibling fields
             // have supplied that context. Settle it after the instance exists.
             if self.pending_generic_constructor_base(value, value_ty) == 0:
-                self.bind_type_params_from_type_expr(type_node, value_ty, tp_start, tp_count, node)
+                self.bind_type_params_from_type_expr(type_node, value_ty, tp_start, tp_count, node, value)
 
         let args: List[i32] = List.new()
         var complete = true
@@ -21599,9 +21680,22 @@ impl Sema:
                                     if expected_struct_ty != 0:
                                         let info = self.struct_literal_field_expected_by_index(expected_struct_ty as i32, dfi)
                                         default_expected = (info / 4294967296) as i32
+                                    // #2400: a field's default is the declaring
+                                    // module's expression; its names resolve there,
+                                    // not at the literal (`V2 {}` from a module the
+                                    // literal's own never imports).
+                                    let defaults_di = self.find_decl_index(defaults_td_node)
+                                    let saved_default_file_id = self.local_file_id
+                                    let saved_default_module_path = move self.current_module_path
+                                    let saved_default_module_has_ci = self.current_module_has_ci
+                                    if defaults_di >= 0:
+                                        self.update_decl_source_context(defaults_di)
                                     let default_ty = if default_expected != 0: self.check_expr_with_owned_demand(decl_default, default_expected as TypeId) else: self.check_expr(decl_default)
                                     if not self.ephemeral_types.contains(name):
                                         self.check_ephemeral_task_storage(decl_default, "non-ephemeral struct")
+                                    self.local_file_id = saved_default_file_id
+                                    self.current_module_path = saved_default_module_path
+                                    self.current_module_has_ci = saved_default_module_has_ci
                                     let _ = default_ty
                 if named_instance != 0:
                     self.typed_expr_types.insert(node, named_instance as i32)
@@ -24874,7 +24968,7 @@ impl Sema:
         self.suppress_errors = self.suppress_errors + 1
         for pi in 0..arg_count:
             if pi < param_count and pi != arg_index and arg_types[pi] != 0:
-                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
+                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node, 0)
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
         let fp_start = self.ast.get_data0(p_node)
         let fp_count = self.ast.get_data1(p_node)
@@ -28868,7 +28962,7 @@ impl Sema:
         let saved_diag_count = self.diags.items.len()
         self.clear_generic_substitution()
         for pi in 0..arg_count:
-            self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node)
+            self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi), arg_types[pi], tp_start, tp_count, call_node, 0)
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 
@@ -29082,7 +29176,7 @@ impl Sema:
                 continue
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             let arg_ty = arg_types[pi]
-            self.bind_type_params_from_type_expr(p_type_node, arg_ty, tp_start, tp_count, call_node)
+            self.bind_type_params_from_type_expr(p_type_node, arg_ty, tp_start, tp_count, call_node, lit_node)
             // #600 (§5.1): generic calls (incl. static methods like Box.new) never
             // reached the ephemeral arg gates — heap-owning constructors accepted
             // ephemeral values by value. Route through the same gate; arg node
@@ -29373,7 +29467,7 @@ impl Sema:
         let saved_types = sema_clone_i32_list(&self.generic_subst_type_ids)
         let saved_diag_count = self.diags.items.len()
         self.clear_generic_substitution()
-        self.bind_type_params_from_type_expr(ret_node, expected, tp_start, tp_count, call_node)
+        self.bind_type_params_from_type_expr(ret_node, expected, tp_start, tp_count, call_node, 0)
         let clean = self.diags.items.len() == saved_diag_count
         while self.diags.items.len() > saved_diag_count:
             self.diags.items.pop()
@@ -29513,7 +29607,7 @@ impl Sema:
             return 1
         self.impl_target_bare_type_param(impl_node, sym)
 
-    mut fn bind_type_params_from_type_expr(type_node: i32, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32):
+    mut fn bind_type_params_from_type_expr(type_node: i32, arg_tid: i32, tp_start: i32, tp_count: i32, err_node: i32, arg_node: i32):
         if type_node == 0 or arg_tid == 0:
             return
 
@@ -29529,24 +29623,41 @@ impl Sema:
             let inner_node = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
             if self.get_type_kind(resolved) == TypeKind.TY_REF:
-                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
             else:
                 // Auto-ref (§3.8, #737): `peek(x)` is the ordinary spelling
                 // for a `&T` parameter, so a non-ref argument infers the
                 // pointee from the place type itself.
-                self.bind_type_params_from_type_expr(inner_node, arg_tid, tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, arg_tid, tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_PTR:
             let inner_node = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
             if self.get_type_kind(resolved) == TypeKind.TY_PTR:
-                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_ARRAY:
             let inner_node = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
+            // #2379: a bracket literal argument (a List under no demand,
+            // D113) binds the element from its elements' type and a generic
+            // length from its count; the call then checks it under `[T; N]`.
+            if self.get_type_kind(resolved) != TypeKind.TY_ARRAY and arg_node > 0 and self.ast.kind(arg_node) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(arg_node) == 0 and self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(resolved as i32) == self.syms.list and self.get_generic_inst_arg_count(resolved as i32) == 1:
+                let len_node = self.ast.get_data2(type_node)
+                if len_node != 0:
+                    let len_kind = self.ast.kind(len_node)
+                    if (len_kind == NodeKind.NK_TYPE_NAMED or len_kind == NodeKind.NK_IDENT) and self.type_param_exists(tp_start, tp_count, self.ast.get_data0(len_node)) != 0:
+                        let count = self.ast.get_data1(arg_node)
+                        let len_ty = self.const_int_type(count)
+                        let bound_before = self.lookup_generic_subst(self.ast.get_data0(len_node))
+                        if bound_before != 0 and bound_before != len_ty:
+                            self.emit_error(f"cannot infer one length for '{self.pool_resolve(self.ast.get_data0(len_node))}': saw {self.const_int_value(bound_before)} and {count} (§4.3a)", err_node)
+                            return
+                        self.put_generic_subst(self.ast.get_data0(len_node), len_ty, err_node)
+                self.bind_type_params_from_type_expr(inner_node, self.get_generic_inst_arg(resolved as i32, 0), tp_start, tp_count, err_node, 0)
+                return
             if self.get_type_kind(resolved) == TypeKind.TY_ARRAY:
                 // D119 Amendment 1 (#2311): `[T; N]` binds a generic N from
                 // the argument's length, as `Vector[T, N]` binds its lane
@@ -29563,14 +29674,14 @@ impl Sema:
                             self.emit_error(f"cannot infer one length for '{self.pool_resolve(self.ast.get_data0(len_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3a)", err_node)
                             return
                         self.put_generic_subst(self.ast.get_data0(len_node), len_ty, err_node)
-                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_SLICE:
             let inner_node = self.ast.get_data0(type_node)
             let resolved = self.resolve_alias(arg_tid)
             if self.get_type_kind(resolved) == TypeKind.TY_SLICE:
-                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
             return
 
         // A callable parameter `fn(A) -> R` binds from the argument's callable
@@ -29584,8 +29695,8 @@ impl Sema:
             if fn_param_count != self.get_type_d1(resolved):
                 return
             for fpi in 0..fn_param_count:
-                self.bind_type_params_from_type_expr(self.ast.get_extra(fn_param_start + fpi), self.fn_type_param_type(resolved as i32, fpi), tp_start, tp_count, err_node)
-            self.bind_type_params_from_type_expr(self.ast.get_data2(type_node), self.get_type_d2(resolved), tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(self.ast.get_extra(fn_param_start + fpi), self.fn_type_param_type(resolved as i32, fpi), tp_start, tp_count, err_node, 0)
+            self.bind_type_params_from_type_expr(self.ast.get_data2(type_node), self.get_type_d2(resolved), tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_TUPLE:
@@ -29600,7 +29711,7 @@ impl Sema:
             for ei in 0..pair_count:
                 let inner_node = self.ast.get_extra(inner_start + ei)
                 let arg_elem: i32 = self.type_extra[(te_start + ei)]
-                self.bind_type_params_from_type_expr(inner_node, arg_elem, tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(inner_node, arg_elem, tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_GENERIC:
@@ -29619,12 +29730,12 @@ impl Sema:
                             self.emit_error(f"cannot infer one lane count for '{self.pool_resolve(self.ast.get_data0(count_node))}': saw {self.const_int_value(bound_before)} and {self.get_type_d1(resolved)} (§4.3d)", err_node)
                             return
                         self.put_generic_subst(self.ast.get_data0(count_node), count_ty, err_node)
-                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
                 return
             // `Range[T]` binds T from a range argument's element type (§4.7).
             if self.canonical_range_type_constructor_inclusive(base_sym) >= 0:
                 if self.get_type_kind(resolved) == TypeKind.TY_RANGE and self.ast.get_data2(type_node) == 1:
-                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node)
+                    self.bind_type_params_from_type_expr(self.ast.get_extra(self.ast.get_data1(type_node)), self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
                 return
             if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
                 return
@@ -29637,7 +29748,7 @@ impl Sema:
             for gai in 0..bind_count:
                 let param_arg_node = self.ast.get_extra(type_arg_start + gai)
                 let concrete_arg_ty = self.get_generic_inst_arg(resolved as i32, gai)
-                self.bind_type_params_from_type_expr(param_arg_node, concrete_arg_ty, tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(param_arg_node, concrete_arg_ty, tp_start, tp_count, err_node, 0)
             return
 
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ and self.ast.get_data1(type_node) == TYPE_TRAIT_OBJECT_IMPL:
@@ -29660,7 +29771,7 @@ impl Sema:
         // declaration; T is its element type.
         let gen_state = self.resolve_alias(arg_tid as TypeId) as i32
         if self.generator_state_yield_types.contains(gen_state) and self.pool_resolve(trait_sym) == "Gen" and trait_arg_count == 1:
-            self.bind_type_params_from_type_expr(trait_args[0], self.generator_state_yield_types.get(gen_state).unwrap(), tp_start, tp_count, err_node)
+            self.bind_type_params_from_type_expr(trait_args[0], self.generator_state_yield_types.get(gen_state).unwrap(), tp_start, tp_count, err_node, 0)
             return
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
@@ -29680,7 +29791,7 @@ impl Sema:
             for tai in 0..bind_count:
                 let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
                 let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, target_match.subst_names, target_match.subst_types)
-                self.bind_type_params_from_type_expr(trait_args[tai], actual_trait_arg, tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(trait_args[tai], actual_trait_arg, tp_start, tp_count, err_node, 0)
             return
 
     // A type parameter bound to a concrete type by the arguments binds
@@ -30727,11 +30838,11 @@ impl Sema:
             let resolved = self.resolve_alias(arg_tid as TypeId)
             let rkind = self.get_type_kind(resolved)
             if rkind == TypeKind.TY_REF or rkind == TypeKind.TY_PTR:
-                self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
+                self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node, 0)
             else:
                 self.bind_type_params_from_method_receiver_type(inner, arg_tid, tp_start, tp_count, err_node)
             return
-        self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node)
+        self.bind_type_params_from_type_expr(type_node, arg_tid, tp_start, tp_count, err_node, 0)
 
     mut fn check_generic_method_body_concrete(fn_node: i32, method_fn_sym: i32, concrete_owner: i32, owner_tp_start: i32, owner_tp_count: i32, fn_tp_start: i32, fn_tp_count: i32) -> i32:
         let tp_syms: List[i32] = List.new()
@@ -31200,7 +31311,7 @@ impl Sema:
                     break
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
                 let arg_ty = arg_types[ai]
-                self.bind_type_params_from_type_expr(p_type_node, arg_ty, owner_tp_start, owner_tp_count, node)
+                self.bind_type_params_from_type_expr(p_type_node, arg_ty, owner_tp_start, owner_tp_count, node, self.ast.get_extra(extra_start + ai))
         if fn_tp_count > 0:
             if is_static == 0 and param_count > 0:
                 self.bind_type_params_from_method_receiver_type(self.ast.fn_param_type(param_start, 0), owner_type, fn_tp_start, fn_tp_count, node)
@@ -31216,7 +31327,7 @@ impl Sema:
                     literal_params2.push(pi2)
                     literal_arg_types2.push(arg_types[ai2])
                     continue
-                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types[ai2], fn_tp_start, fn_tp_count, node)
+                self.bind_type_params_from_type_expr(self.ast.fn_param_type(param_start, pi2), arg_types[ai2], fn_tp_start, fn_tp_count, node, self.ast.get_extra(extra_start + ai2))
             self.bind_literal_arg_type_params(literal_params2, literal_arg_types2, param_start, fn_tp_start, fn_tp_count, self.ast.fn_meta_ret(meta), node, self.task_fns.contains(method_fn_sym))
             // D66 (#1652): a callback-only pair setter's `U` comes from the
             // callback's own signature (SemaFacade.w).
