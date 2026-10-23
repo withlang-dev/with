@@ -11399,6 +11399,27 @@ impl CiTypePool:
         0 as CiTypeId
 
 impl CiExprPool:
+    // A conditional whose condition is an integer literal (`1 ? a : b`), or
+    // that literal compared with zero, is its chosen arm.
+    fn fold_literal_ternary(id: CiExprId) -> CiExprId:
+        if self.kind(id) != CiExprKind.CIE_TERNARY: return id
+        var cond = self.get_d0(id) as CiExprId
+        if self.kind(cond) == CiExprKind.CIE_BINARY and self.get_d0(cond) == CiBinOp.CIBO_NEQ:
+            let rhs = self.get_d2(cond) as CiExprId
+            if self.kind(rhs) == CiExprKind.CIE_INT_LIT and self.get_string(self.get_d0(rhs)) == "0":
+                cond = self.get_d1(cond) as CiExprId
+        if self.kind(cond) != CiExprKind.CIE_INT_LIT: return id
+        let text = self.get_string(self.get_d0(cond))
+        if text == "0": self.get_d2(id) as CiExprId else: self.get_d1(id) as CiExprId
+
+    // The name a declaration lookup uses for a callee: a conditional
+    // callee's then-arm when that arm is a plain name, else `text`.
+    fn conditional_callee_name(callee: CiExprId, text: &str) -> str:
+        if self.kind(callee) == CiExprKind.CIE_TERNARY:
+            let arm = self.get_d1(callee) as CiExprId
+            if self.kind(arm) == CiExprKind.CIE_IDENT: return with_str_clone_ref(self.get_string(self.get_d0(arm)))
+        with_str_clone_ref(text)
+
     fn build_named_call_expr(name: &str, arg_ids: &List[i32]) -> CiExprId:
         self.build_named_call_expr_typed(name, arg_ids, 0 as CiTypeId)
 
@@ -13012,6 +13033,11 @@ impl CiStmtPool:
                 let _ = ci_va_bail(session, cursor, stdarg_operation ++ " is used as a value; it is translated only as a statement")
                 return ci_value_ir_invalid()
             var callee = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            // `(1 ? f : g)(args)` (M*LIB's M_IF selects a function by a
+            // literal): the callee is the chosen arm, not a conditional over
+            // two function values, which `...` functions cannot be.
+            if ci_value_ir_valid(callee):
+                callee = CiValueExprIR { setup_stmt: callee.setup_stmt, value_expr: exprs.fold_literal_ternary(callee.value_expr) }
             var callee_text = ""
             var setup: CiStmtId = 0 as CiStmtId
             var first_arg = 1
@@ -13054,7 +13080,10 @@ impl CiStmtPool:
                     }
                 return ci_value_ir_invalid()
             var arg_ids: List[i32] = List.new()
-            let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
+            // A conditional callee's arms have compatible types (C requires
+            // it): the then-arm's declaration coerces the arguments both
+            // calls share.
+            let callee_decl_idx = ci_lookup_c_function_decl_idx(session, exprs.conditional_callee_name(callee.value_expr, callee_text))
             // #799: a c_import inline wrapper body must not lower a call to a
             // C function the header-import emitter skips (leading-underscore
             // UCRT helpers, static-non-inline). Bail so the wrapper is
@@ -13155,7 +13184,17 @@ impl CiStmtPool:
                 let unwrap_method = exprs.add(CiExprKind.CIE_FIELD, callee_expr as i32, exprs.add_string("unwrap"), 2, 0 as CiTypeId)
                 callee_type = types.type_from_translated_text(nullable_inner)
                 callee_expr = exprs.add(CiExprKind.CIE_CALL, unwrap_method as i32, exprs.extra_len() as i32, 0, callee_type)
-            var call_id = exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+            // `(c ? f : g)(args)` with a runtime condition: a conditional
+            // over two function values is not callable in With (a `...`
+            // function never is a value), so the call is one call per arm
+            // under the condition; one arm runs, so the arguments are
+            // evaluated once, as in C.
+            var call_id = if exprs.kind(callee_expr) == CiExprKind.CIE_TERNARY:
+                let call_then = exprs.add(CiExprKind.CIE_CALL, exprs.get_d1(callee_expr), args_start, arg_ids.len() as i32, 0 as CiTypeId)
+                let call_else = exprs.add(CiExprKind.CIE_CALL, exprs.get_d2(callee_expr), args_start, arg_ids.len() as i32, 0 as CiTypeId)
+                exprs.add(CiExprKind.CIE_TERNARY, exprs.get_d0(callee_expr), call_then as i32, call_else as i32, 0 as CiTypeId)
+            else:
+                exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
             // A local identifier can denote a function pointer just as a field
             // can. Declaration identity distinguishes direct function references
             // from pointer values; the spelling of the expression cannot.
@@ -13749,12 +13788,14 @@ impl CiStmtPool:
                     if chain < 0:
                         return 0 as CiStmtId
                 var body_ids: List[i32] = List.new()
+                var arm_scope = scope
                 let inner_kind = with_ci_cursor_kind(session, chain)
                 if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, chain):
-                    let inner_id = self.lower_stmt_ir(session, chain, exprs, types, 0, scope)
-                    if (inner_id as i32) == 0:
+                    let inner = self.lower_arm_stmt_ir(session, chain, arm_scope, exprs, types)
+                    if inner.stmt_id == 0:
                         return 0 as CiStmtId
-                    body_ids.push(inner_id as i32)
+                    arm_scope = inner.updated_scope
+                    body_ids.push(inner.stmt_id as i32)
                 var hit_break = ci_stmt_ends_with_terminator(session, chain)
                 var j = i + 1
                 while j < body_nc:
@@ -13767,10 +13808,11 @@ impl CiStmtPool:
                         j = j + 1
                         break
                     if not ci_is_null_like_stmt(session, sib):
-                        let sib_id = self.lower_stmt_ir(session, sib, exprs, types, 0, scope)
-                        if (sib_id as i32) == 0:
+                        let lowered = self.lower_arm_stmt_ir(session, sib, arm_scope, exprs, types)
+                        if lowered.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(sib_id as i32)
+                        arm_scope = lowered.updated_scope
+                        body_ids.push(lowered.stmt_id as i32)
                         if ci_stmt_ends_with_terminator(session, sib):
                             hit_break = true
                             j = j + 1
@@ -13804,14 +13846,16 @@ impl CiStmtPool:
             else if ck == CXK_DEFAULT_STMT:
                 let inner = ci_drill_innermost_case_substmt(session, child)
                 var body_ids: List[i32] = List.new()
+                var arm_scope = scope
                 var hit_break = false
                 if inner >= 0:
                     let inner_kind = with_ci_cursor_kind(session, inner)
                     if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, inner):
-                        let inner_id = self.lower_stmt_ir(session, inner, exprs, types, 0, scope)
-                        if (inner_id as i32) == 0:
+                        let head = self.lower_arm_stmt_ir(session, inner, arm_scope, exprs, types)
+                        if head.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(inner_id as i32)
+                        arm_scope = head.updated_scope
+                        body_ids.push(head.stmt_id as i32)
                     hit_break = ci_stmt_ends_with_terminator(session, inner)
                 var j = i + 1
                 while j < body_nc:
@@ -13824,10 +13868,11 @@ impl CiStmtPool:
                         j = j + 1
                         break
                     if not ci_is_null_like_stmt(session, sib):
-                        let sib_id = self.lower_stmt_ir(session, sib, exprs, types, 0, scope)
-                        if (sib_id as i32) == 0:
+                        let lowered = self.lower_arm_stmt_ir(session, sib, arm_scope, exprs, types)
+                        if lowered.stmt_id == 0:
                             return 0 as CiStmtId
-                        body_ids.push(sib_id as i32)
+                        arm_scope = lowered.updated_scope
+                        body_ids.push(lowered.stmt_id as i32)
                         if ci_stmt_ends_with_terminator(session, sib):
                             hit_break = true
                             j = j + 1
@@ -14867,6 +14912,20 @@ impl CiStmtPool:
         let list_ty = types.type_from_libclang(session, with_ci_cursor_type(session, list))
         let lhs = exprs.ident(exprs.add_string(storage), list_ty)
         self.assign(lhs, source.value_expr)
+
+    // A statement of a switch arm. A declaration directly under the label
+    // (`default: int d = c - '0';`, m-string.h's octal escape parser) is the
+    // arm's local, scoped to the arm as a block's is to the block; the
+    // arm's scope threads through its later statements. Anything else
+    // lowers as a statement.
+    fn lower_arm_stmt_ir(session: i64, cursor: i32, scope: CiScope, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
+        if with_ci_cursor_kind(session, cursor) == CXK_DECL_STMT:
+            let decl_ir = self.lower_decl_stmt_structural(session, cursor, scope, false, exprs, types)
+            if decl_ir.stmt_id == 0 and g_ci_bail_location.len() == 0:
+                g_ci_bail_location = with_ci_cursor_location(session, cursor)
+                g_ci_bail_kind = CXK_DECL_STMT
+            return decl_ir
+        CiDeclLoweringIR { updated_scope: scope, stmt_id: self.lower_stmt_ir(session, cursor, exprs, types, 0, scope) }
 
     fn lower_decl_stmt_structural(session: i64, cursor: i32, scope: CiScope, hoisted: bool, exprs: CiExprPool, types: CiTypePool) -> CiDeclLoweringIR:
         let nc = with_ci_num_children(session, cursor)
@@ -18446,7 +18505,7 @@ fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
 // value passed to one is not retained. Everything else outside the corpus
 // is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
 fn ci_own_is_libc_observer(name: &str) -> bool:
-    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
+    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "fscanf" or name == "ungetc" or name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
 
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -20243,6 +20302,10 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fseek" or name == "ftell" or name == "fseeko" or name == "ftello": return CI_LIBC_KIND_FN
     if name == "fopen64" or name == "fseeko64" or name == "ftello64" or name == "_fseeki64" or name == "_ftelli64": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
+    // C's stdio input family (M*LIB's `_in_str` parsers read with them).
+    if name == "ungetc" or name == "fscanf": return CI_LIBC_KIND_FN
+    // C's string scanning family (M*LIB's m-string.h).
+    if name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "strncat": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "rewind": return CI_LIBC_KIND_FN
     if name == "putchar": return CI_LIBC_KIND_FN

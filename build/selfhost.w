@@ -5570,6 +5570,59 @@ fn bs_check_migrate_demotion_comment_mapped(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     0
 
+// `(1 ? f : g)(args)` (M*LIB's M_IF selecting a function by a literal)
+// calls the chosen arm; a conditional over two variadic function values
+// is refused by With.
+fn bs_check_migrate_ternary_callee(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "ternary_callee.c")
+    let out_w = bs_join(case_dir, "ternary_callee.w")
+    let c_text = "static int one(int x) { return x + 1; }\nstatic int two(int x) { return x + 2; }\nint pick(int x) { return (1 ? one : two)(x) + (0 ? one : two)(x); }\nint main(void) { return pick(10) == 23 ? 0 : 1; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "ternary callee")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ternary_callee", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "one(__param_x) + two(__param_x)", "ternary_callee")
+    if rc != 0: return rc
+    var run_args: List[str] = List.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-ternary_callee", run_args)
+    if run.rc != 0: return run.rc
+    0
+
+// A declaration directly under a case label (no braces) is the arm's
+// local, in scope for the arm's later statements (M*LIB's octal escape
+// parser: `default: int d1 = c - '0'; ...`).
+fn bs_check_migrate_switch_arm_decl(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "switch_arm_decl.c")
+    let out_w = bs_join(case_dir, "switch_arm_decl.w")
+    let c_text = "int digit(int c, int k) {\n  switch (k) {\n  case 1: return c;\n  default:\n    int d1 = c - '0';\n    int d2 = d1 * 8;\n    return d2 + 1;\n  }\n}\nint main(void) { return digit('3', 2) == 25 ? 0 : 1; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "switch arm declaration")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch_arm_decl", args)
+    if result.rc != 0: return result.rc
+    var run_args: List[str] = List.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-switch_arm_decl", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 fn bs_check_migrate_pointer_typedef_local(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "pointer_typedef_local.c")
@@ -5987,9 +6040,10 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     // The stdio globals lower to std.libc's accessor on every host, whatever
     // the headers macro-expand stderr to (Darwin __stderrp, glibc stderr).
     let stderr_sym = "libc_stderr()"
-    rc = bs_assert_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"%s error: %d\\n\".ptr, \"compress\", __param_err)", "macro_body_string_literal")
-    if rc != 0: return rc
-    rc = bs_assert_not_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"compress\".ptr", "macro_body_string_literal")
+    // A string literal in a variadic position is C's `const char*` (#2556):
+    // a With `str` there is read as two words (`%d` after `%s` prints the
+    // str's length), so the macro's argument renders as the C pointer.
+    rc = bs_assert_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"%s error: %d\\n\".ptr, c\"compress\".ptr, __param_err)", "macro_body_string_literal")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -6078,6 +6132,10 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_compound_literal_anon_record(ctx, compiler_path, bs_join(output_dir, "compound_literal_anon_record"))
     if rc != 0: return rc
     rc = bs_check_migrate_pointer_typedef_local(ctx, compiler_path, bs_join(output_dir, "pointer_typedef_local"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_switch_arm_decl(ctx, compiler_path, bs_join(output_dir, "switch_arm_decl"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_ternary_callee(ctx, compiler_path, bs_join(output_dir, "ternary_callee"))
     if rc != 0: return rc
     rc = bs_check_migrate_demotion_comment_mapped(ctx, compiler_path, bs_join(output_dir, "demotion_comment_mapped"))
     if rc != 0: return rc
