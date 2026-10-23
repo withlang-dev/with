@@ -14458,10 +14458,17 @@ impl Sema:
             lhs = self.check_expr_value_context(lhs_node)
             if lhs == 0:
                 return 0
-            let unwrapped = self.try_unwrapped_type(lhs as i32)
+            // D22 §21.1: `??` is transparent to a view of the carrier
+            // (`xs[i] ?? 0` on a `List[Option[i32]]`, #2524): the payload
+            // is the viewed carrier's, and a non-Copy payload is a view of it.
+            let lhs_resolved = self.resolve_alias(lhs)
+            let carrier = if self.get_type_kind(lhs_resolved) == TypeKind.TY_REF: self.get_type_d0(lhs_resolved) else: lhs as i32
+            var unwrapped = self.try_unwrapped_type(carrier)
             if unwrapped == 0:
                 self.emit_error("?? operator requires an Option or Result with a single success payload", node)
                 return 0
+            if carrier != lhs as i32 and self.is_copy(unwrapped as TypeId) == 0 and self.get_type_kind(self.resolve_alias(unwrapped as TypeId)) != TypeKind.TY_REF:
+                unwrapped = self.ensure_exact_type(TypeKind.TY_REF, unwrapped, 0, 0) as i32
             let join_expected = self.default_join_demand(if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0, unwrapped)
             // The payload type is not an expectation for the fallback. Only an
             // enclosing expectation is independent of this join; otherwise the

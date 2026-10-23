@@ -14483,8 +14483,13 @@ impl MirBuilder:
     // marked for owned demand and retain unioned origins for a view result.
     mut fn lower_double_question(expr: i32, default_expr: i32, node: i32) -> i32:
         let value_op = self.lower_expr(expr)
-        let value_ty = self.expr_type(expr)
-        let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(expr))
+        var value_ty = self.expr_type(expr)
+        var value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(expr))
+        // A view of the carrier (#2524): the Option or Result it views.
+        let value_resolved = self.sema.resolve_alias(value_ty as TypeId)
+        if self.sema.get_type_kind(value_resolved) == TypeKind.TY_REF:
+            value_place = self.new_deref_place(value_place)
+            value_ty = self.sema.get_type_d0(value_resolved)
         let carrier_arm = self.contextual_join_arm_index_for_role(node, D22_JOIN_ROLE_CARRIER_PAYLOAD)
         if carrier_arm < 0:
             self.mark_unsupported()
