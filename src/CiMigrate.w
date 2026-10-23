@@ -817,8 +817,12 @@ fn ci_migrate_preamble_text() -> str:
         // semantics).
         p = p ++ "extern fn abort() -> Never\n"
         p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
-    // D155: the C aliases (c_int, c_long, ...) are the compiler's builtins, the
-    // target's; a migrated corpus never contains a concrete value for one.
+    // D156: a migration is compiled against one data model, explicit in the
+    // text: the header names it and a constant carries it for the seam
+    // diagnostic (Sema names the model where a corpus width meets a host
+    // C width); no `type c_*` line (D155), every width is spelled.
+    let model = ci_model_name(with_cimport_target_triple())
+    p = p ++ "\n// data model: " ++ model ++ "\npub let C_DATA_MODEL: str = \"" ++ model ++ "\"\n"
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.

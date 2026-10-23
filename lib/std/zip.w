@@ -50,7 +50,7 @@ pub fn ZipArchive.open(path: &str) -> Result[ZipArchive, ZipError]:
 unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
     var info = unz_file_info64_s { tmu_date: tm_unz_s {} }
     let name_buf = with_alloc(ZIP_NAME_MAX as i64 + 1) as *mut c_char
-    let rc = unsafe { unzGetCurrentFileInfo64(handle, &raw mut info, name_buf, ZIP_NAME_MAX as c_ulong, null, 0, null, 0) }
+    let rc = unsafe { unzGetCurrentFileInfo64(handle, &raw mut info, name_buf, ZIP_NAME_MAX as u64, null, 0, null, 0) }
     if rc != UNZ_OK:
         with_free(name_buf as *mut u8)
         return Err(zip_error(rc, "cannot read an entry header"))

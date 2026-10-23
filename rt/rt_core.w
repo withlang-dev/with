@@ -28,9 +28,9 @@ extern fn rt_isatty(fd: i32) -> i32
 extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
-extern fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
-extern fn rt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
-extern fn rt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
+extern fn rt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
+extern fn rt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64
+extern fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn rt_mkstemp(template_path: *mut u8) -> i32
@@ -4584,7 +4584,7 @@ pub fn with_fs_remove_file(path: &str) -> i32:
     cstr_free(cpath)
     rc
 
-pub fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32:
+pub fn with_libc_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     let r = rt_open(path, flags, mode)
     if r < 0: -1 else: r
 
@@ -4614,7 +4614,7 @@ pub fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
     let r = rt_fcntl(fd, cmd, arg)
     if r < 0: -1 else: r
 
-pub fn with_libc_unlink(path: *const i8) -> i32:
+pub fn with_libc_unlink(path: *const c_char) -> i32:
     let r = rt_unlink(path)
     if r < 0: -1 else: r
 
@@ -4636,21 +4636,21 @@ pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 // std.libc strtold: With's widest float is f64, which is C's `long double`
 // where that is 8 bytes (Darwin arm64, Windows); where C's is wider the parse
 // is strtod's, the correctly rounded double of the same text (#2176).
-pub fn with_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_strtold(nptr, endptr)
+pub fn with_libc_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: rt_strtold(nptr, endptr)
 // std.libc strtol/strtoul: a 64-bit long on every target (D114). Where C's
 // long is 32 bits (the UCRT) the platform binds its 64-bit parse, so a
 // saturating overflow is the 64-bit one the LP64-modeled corpora expect
 // (pcre2test's repeat-count check on Windows, #2592).
-pub fn with_libc_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: rt_strtol(nptr, endptr, base)
-pub fn with_libc_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: rt_strtoul(nptr, endptr, base)
+pub fn with_libc_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64: rt_strtol(nptr, endptr, base)
+pub fn with_libc_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64: rt_strtoul(nptr, endptr, base)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
 // #1998: std.libc cpu_time_ns — CPU time (user + system, ns) of this process
 // and every child it has reaped; -1 when the platform cannot say.
 pub fn with_libc_cpu_time_ns() -> i64: rt_cpu_time_ns()
 pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
-pub fn with_libc_mkstemp(template_path: *mut i8) -> i32: rt_mkstemp(template_path as *mut u8)
-pub fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8:
-    rt_realpath(path as *const u8, resolved_path as *mut u8) as *mut i8
+pub fn with_libc_mkstemp(template_path: *mut c_char) -> i32: rt_mkstemp(template_path as *mut u8)
+pub fn with_libc_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
+    rt_realpath(path as *const u8, resolved_path as *mut u8) as *mut c_char
 
 pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)

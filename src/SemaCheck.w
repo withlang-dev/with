@@ -26557,6 +26557,25 @@ impl Sema:
 
     // §18.1: the current module's self-name — the last segment of its
     // `module` header, else its file's stem made an identifier.
+    // D156: the data model a migrated module was compiled against, from its
+    // `pub let C_DATA_MODEL: str = "LP64 (…)"` (the migrator's defs
+    // prelude); "" for a module that declares none.
+    fn current_module_data_model() -> str:
+        let wanted = self.pool_lookup_symbol("C_DATA_MODEL")
+        if wanted == 0: return ""
+        for di in 0..self.decl_source_paths.len():
+            if self.decl_source_paths[di] != self.current_module_path: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data0(decl) != wanted: continue
+            var value = self.ast.get_data1(decl)
+            if value != 0 and self.ast.kind(value) == NodeKind.NK_COMPTIME: value = self.ast.get_data0(value)
+            if value != 0 and self.ast.kind(value) == NodeKind.NK_STRING_LIT:
+                let text = self.pool_resolve(self.ast.get_data0(value))
+                // A raw literal carries the parser's marker; the text follows it.
+                return if text.starts_with("\x01raw\x01"): text.slice(5, text.len()) else: with_str_clone_ref(text)
+            return ""
+        ""
+
     mut fn module_self_name() -> str:
         if self.self_name_cache_path == self.current_module_path:
             return with_str_clone_ref(self.self_name_cache)
@@ -28429,7 +28448,12 @@ impl Sema:
             self.emit_error(f"a float where an integer is demanded needs an explicit conversion: `x as {want}` truncates, `x.round() as {want}` rounds (§4.2.6)", node)
             return true
         if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId) != 0:
-            let msg = f"implicit integer narrowing or sign change from `{got}` to `{want}`{self.narrowing_target_note}; use an explicit `as` cast (§4.2.6)"
+            // D156: a migrated module carries its data model in C_DATA_MODEL;
+            // a narrowing in it is a seam where the model's width meets the
+            // host's, and the message says which is which.
+            let model = self.current_module_data_model()
+            let seam_note = if model.len() > 0: "; this module was migrated against " ++ model ++ ": the value is the model's width, the destination the host's" else: ""
+            let msg = f"implicit integer narrowing or sign change from `{got}` to `{want}`{self.narrowing_target_note}{seam_note}; use an explicit `as` cast (§4.2.6)"
             // D114: a name whose type its literal chose (`var i = 0` is
             // `isize`) is pointed at, since the use alone does not say why.
             let literal_let = self.unannotated_literal_binding(node)

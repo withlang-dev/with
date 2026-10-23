@@ -4244,6 +4244,9 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     s.register_prim("c_ulong", if c_long_32: s.ty_u32 else: s.ty_u64)
     s.register_prim("c_longlong", s.ty_i64)
     s.register_prim("c_ulonglong", s.ty_u64)
+    // `c_longdouble` is f64 on every target: a corpus never passes one to C,
+    // and c_import omits a declaration that would where C's long double is
+    // wider than a double (x86_64 Linux, AArch64 Linux, wasm).
     s.register_prim("c_longdouble", s.ty_f64)
     // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
     // `*const c_char` on every target.
