@@ -5570,6 +5570,34 @@ fn bs_check_migrate_demotion_comment_mapped(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     0
 
+// C11 `_Generic` selects by the controlling expression's type (M*LIB's
+// m_string_init_set dispatches a C string to the `_cstr` overload); the
+// default arm was taken as the value before.
+fn bs_check_migrate_generic_selection(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "generic_selection.c")
+    let out_w = bs_join(case_dir, "generic_selection.w")
+    let c_text = "#include <stdint.h>\ntypedef struct s_s { int n; } s_t[1];\nstatic void set_s(s_t d, const s_t v) { d->n = v->n; }\nstatic void set_c(s_t d, const char *v) { d->n = (int)v[0]; }\n#define set(a, b) _Generic((b)+0, char*: set_c, const char *: set_c, default: set_s)(a, b)\n#define hv(x) _Generic(((void)0,(x)), int32_t: (x), signed long: (int32_t)(x), default: (int32_t) {0})\n#define as_type(type, x) _Generic(((void)0,(x)), type: (x), default: (type) {0})\nint pick(const char *p) { s_t d; set(d, p); s_t e; set(e, d); return d->n + e->n; }\nint32_t h(int32_t v, long w, double z) { return hv(v) + hv(w) + hv(z) + as_type(int32_t, v) + as_type(int32_t, w) + (int32_t) as_type(long, w); }\nint main(void) { return pick(\"A\") == 130 && h(5, 7, 1.5) == 24 ? 0 : 1; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "generic selection")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-generic_selection", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "set_c((&__local_d[0] as *mut s_s), __param_p)", "generic_selection")
+    if rc != 0: return rc
+    var run_args: List[str] = List.new()
+    run_args |> push("run")
+    run_args |> push(bs_abs(root, out_w))
+    let run = bs_migrate_expect_success(ctx, compiler_path, case_dir, "run-generic_selection", run_args)
+    if run.rc != 0: return run.rc
+    0
+
 // `(1 ? f : g)(args)` (M*LIB's M_IF selecting a function by a literal)
 // calls the chosen arm; a conditional over two variadic function values
 // is refused by With.
@@ -6136,6 +6164,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_switch_arm_decl(ctx, compiler_path, bs_join(output_dir, "switch_arm_decl"))
     if rc != 0: return rc
     rc = bs_check_migrate_ternary_callee(ctx, compiler_path, bs_join(output_dir, "ternary_callee"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_generic_selection(ctx, compiler_path, bs_join(output_dir, "generic_selection"))
     if rc != 0: return rc
     rc = bs_check_migrate_demotion_comment_mapped(ctx, compiler_path, bs_join(output_dir, "demotion_comment_mapped"))
     if rc != 0: return rc

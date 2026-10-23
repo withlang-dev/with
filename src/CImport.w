@@ -159,6 +159,7 @@ let CXK_CONDITIONAL_OP: i32 = 116   // CXCursor_ConditionalOperator (`c ? a : b`
 let CXK_IMPLICIT_CAST: i32 = 124
 let CXK_DECL_REF: i32 = 101
 let CXK_TYPE_REF: i32 = 43
+let CXK_TYPEDEF_DECL: i32 = 20
 let CXK_MEMBER_REF: i32 = 102
 let CXK_CALL_EXPR: i32 = 103
 let CXK_ARRAY_SUBSCRIPT: i32 = 113
@@ -7524,7 +7525,10 @@ fn ci_effect_expr_needs_terminal_stmt(session: i64, cursor: i32) -> bool:
             return ci_effect_expr_needs_terminal_stmt(session, inner)
         return true
 
-    if (kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
+    if kind == CXK_GENERIC_SELECTION:
+        let selected = ci_generic_selection_selected(session, cursor)
+        return selected < 0 or ci_effect_expr_needs_terminal_stmt(session, selected)
+    if (kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
         if nc == 1:
             return ci_effect_expr_needs_terminal_stmt(session, with_ci_child(session, cursor, 0))
         if nc > 0:
@@ -7675,7 +7679,13 @@ impl CiStmtPool:
 
         // An unexposed operator (`a ?: b`, an atomic builtin) is not a
         // wrapper to peel: it lowers as an expression below.
-        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
+        if kind == CXK_GENERIC_SELECTION:
+            let selected = ci_generic_selection_selected(session, cursor)
+            if selected < 0:
+                ci_bail_generic_selection(session, cursor)
+                return 0 as CiStmtId
+            return self.lower_discard_expr_side_effects_ir(session, selected, exprs, types, scope)
+        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
             if nc == 1:
                 return self.lower_discard_expr_side_effects_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             if nc > 0:
@@ -7780,7 +7790,13 @@ impl CiStmtPool:
                 return 0 as CiStmtId
             return self.lower_effect_expr_ir(session, chosen, exprs, types, scope)
 
-        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100 or kind == 122) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
+        if kind == CXK_GENERIC_SELECTION:
+            let selected = ci_generic_selection_selected(session, cursor)
+            if selected < 0:
+                ci_bail_generic_selection(session, cursor)
+                return 0 as CiStmtId
+            return self.lower_effect_expr_ir(session, selected, exprs, types, scope)
+        if (kind == CXK_PAREN_EXPR or kind == CXK_IMPLICIT_CAST or kind == 100) and ci_unexposed_expr_form(session, cursor) == CI_UNEXPOSED_WRAPPER:
             if nc == 1:
                 return self.lower_effect_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
             if nc > 0:
@@ -11271,7 +11287,10 @@ fn ci_rvalue_needs_lowering(session: i64, cursor: i32) -> bool:
     // keeps a in a temporary; the others are refused there).
     if ci_unexposed_expr_form(session, cursor) != CI_UNEXPOSED_WRAPPER:
         return true
-    if kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == CXK_CSTYLE_CAST or kind == 122:
+    if kind == CXK_GENERIC_SELECTION:
+        let selected = ci_generic_selection_selected(session, cursor)
+        return selected < 0 or ci_rvalue_needs_lowering(session, selected)
+    if kind == CXK_PAREN_EXPR or kind == 100 or kind == CXK_IMPLICIT_CAST or kind == CXK_CSTYLE_CAST:
         if nc == 1:
             return ci_rvalue_needs_lowering(session, with_ci_child(session, cursor, 0))
         if nc > 0:
@@ -12659,15 +12678,20 @@ impl CiStmtPool:
                     }
                 let lhs = self.lower_lvalue_expr_ir(session, lhs_cursor, exprs, types, scope)
                 let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
+                // An operand that named its own reason keeps it (a refused
+                // `_Generic` inside the rhs); only an unnamed failure is this
+                // site's to name.
                 if not ci_value_ir_valid(lhs):
-                    g_ci_bail_location = with_ci_cursor_location(session, lhs_cursor)
-                    g_ci_bail_kind = with_ci_cursor_kind(session, lhs_cursor)
-                    g_ci_bail_message = f"unsupported assignment lhs in goto CFG (kind={g_ci_bail_kind})"
+                    if g_ci_bail_message.len() == 0:
+                        g_ci_bail_location = with_ci_cursor_location(session, lhs_cursor)
+                        g_ci_bail_kind = with_ci_cursor_kind(session, lhs_cursor)
+                        g_ci_bail_message = f"unsupported assignment lhs in goto CFG (kind={g_ci_bail_kind})"
                     return ci_value_ir_invalid()
                 if not ci_value_ir_valid(rhs):
-                    g_ci_bail_location = with_ci_cursor_location(session, rhs_cursor)
-                    g_ci_bail_kind = with_ci_cursor_kind(session, rhs_cursor)
-                    g_ci_bail_message = f"unsupported assignment rhs in goto CFG (kind={g_ci_bail_kind})"
+                    if g_ci_bail_message.len() == 0:
+                        g_ci_bail_location = with_ci_cursor_location(session, rhs_cursor)
+                        g_ci_bail_kind = with_ci_cursor_kind(session, rhs_cursor)
+                        g_ci_bail_message = f"unsupported assignment rhs in goto CFG (kind={g_ci_bail_kind})"
                     return ci_value_ir_invalid()
                 if ci_value_ir_valid(lhs) and ci_value_ir_valid(rhs):
                     var rhs_value = rhs.value_expr
@@ -13284,8 +13308,12 @@ impl CiStmtPool:
                 return CiValueExprIR { setup_stmt: hoisted as CiStmtId, value_expr: init_id }
             return ci_value_ir_invalid()
 
-        if kind == 122 and nc > 0:
-            return self.lower_value_expr_ir(session, with_ci_child(session, cursor, nc - 1), exprs, types, scope)
+        if kind == CXK_GENERIC_SELECTION:
+            let selected = ci_generic_selection_selected(session, cursor)
+            if selected < 0:
+                ci_bail_generic_selection(session, cursor)
+                return ci_value_ir_invalid()
+            return self.lower_value_expr_ir(session, selected, exprs, types, scope)
 
         if kind != CXK_INIT_LIST and kind != CXK_COMPOUND_LITERAL:
             let raw_src = with_ci_cursor_source_text(session, cursor)
@@ -16594,16 +16622,19 @@ fn ci_lookup_macro_value(session: i64, name: &str) -> str:
     let macro_session = g_migrate_macro_session
     if macro_session == 0:
         return ""
+    // The last definition of the name is the one in effect (a redefinition).
     let count = with_cimport_macro_count(macro_session)
+    var last = -1
     var i = 0
     while i < count:
-        if with_cimport_macro_is_fn_like(macro_session, i) == 0:
-            if with_cimport_macro_name(macro_session, i) == name:
-                let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, i)))
-                if value.len() > 0 and value != name:
-                    g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
-                return value
+        if with_cimport_macro_is_fn_like(macro_session, i) == 0 and with_cimport_macro_name(macro_session, i) == name:
+            last = i
         i = i + 1
+    if last >= 0:
+        let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(macro_session, last)))
+        if value.len() > 0 and value != name:
+            g_migrate_macro_values.insert(ci_ir_owned_text(name), ci_ir_owned_text(value))
+        return value
     g_migrate_macro_miss_names.insert(ci_ir_owned_text(name), true)
     ""
 
@@ -16672,7 +16703,18 @@ fn ci_expand_macros_in_text_depth(session: i64, text: &str, depth: i32) -> str:
                 while pk < tlen and (text[pk] == 32 or text[pk] == 9):
                     pk = pk + 1
                 if pk < tlen and text[pk] == 40:
-                    return ""
+                    // A function-like invocation: its arguments substituted
+                    // into the macro's body, then expanded (a `_Generic`
+                    // dispatch reaches its association list this way).
+                    let close = ci_matching_paren(text, pk)
+                    if close < 0: return ""
+                    let substituted = ci_substitute_fn_macro(session, ident, text.slice((pk + 1) as i64, close as i64))
+                    if substituted.len() == 0: return ""
+                    let expanded = ci_expand_macros_in_text_depth(session, substituted, depth + 1)
+                    if expanded.len() == 0: return ""
+                    result = result ++ expanded
+                    pos = close + 1
+                    continue
                 result = result ++ ident
                 pos = end
                 continue
@@ -16689,6 +16731,97 @@ fn ci_expand_macros_in_text_depth(session: i64, text: &str, depth: i32) -> str:
             result = result ++ text.slice(pos as i64, (pos + 1) as i64)
             pos = pos + 1
     result
+
+// The index of the closing parenthesis matching the one at `open`, -1 when
+// the text ends first; strings and character literals are skipped whole.
+fn ci_matching_paren(text: &str, open: i32) -> i32:
+    var depth = 0
+    var i = open
+    let n = text.len()
+    while i < n:
+        let c = text[i]
+        if c == 34 or c == 39:
+            var j = i + 1
+            while j < n:
+                if text[j] == 92:
+                    j = j + 2
+                    continue
+                if text[j] == c: break
+                j = j + 1
+            i = j + 1
+            continue
+        if c == 40: depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+            if depth == 0: return i
+        i = i + 1
+    -1
+
+// The body of function-like macro `name` with `args_text`'s arguments (split
+// at the top-level commas) substituted for its parameters; "" when the
+// macro is unknown, the arity differs, or the body pastes or stringifies
+// (`#`), which this textual expansion does not model.
+fn ci_substitute_fn_macro(session: i64, name: &str, args_text: &str) -> str:
+    let msession = if g_migrate_macro_session != 0: g_migrate_macro_session else: session
+    if msession == 0: return ""
+    // A redefinition is the definition in effect (m-core.h's empty
+    // `M_PRINTF_FORMAT_EXTEND()` is redefined by m-string.h): the last wins.
+    let count = with_cimport_macro_count(msession)
+    var idx = -1
+    var i = 0
+    while i < count:
+        if with_cimport_macro_name(msession, i) == name and with_cimport_macro_is_fn_like(msession, i) != 0:
+            idx = i
+        i = i + 1
+    if idx < 0: return ""
+    let body = ci_strip_c_comments(with_cimport_macro_value(msession, idx))
+    if body.contains("#"): return ""
+    let param_count = with_cimport_macro_param_count(msession, idx)
+    // `F()` has no arguments; an empty argument text is not one empty argument.
+    let args = if ci_trim(args_text).len() == 0 and param_count == 0: List.new() else: ci_split_top_level(args_text, 44)
+    if args.len() != param_count: return ""
+    var params: List[str] = List.new()
+    for p in 0..param_count: params.push(with_cimport_macro_param_name(msession, idx, p))
+    var out = ""
+    var pos = 0
+    let blen = body.len()
+    while pos < blen:
+        let b = body[pos]
+        if b == 34 or b == 39:
+            let close = ci_matching_quote(body, pos)
+            out = out ++ body.slice(pos as i64, (close + 1) as i64)
+            pos = close + 1
+            continue
+        if ci_is_ident_start(b):
+            var end = pos + 1
+            while end < blen and ci_is_ident_char(body[end]): end = end + 1
+            let ident = body.slice(pos as i64, end as i64)
+            var replaced = false
+            for p in 0..param_count:
+                if params[p] == ident:
+                    out = out ++ args[p]
+                    replaced = true
+                    break
+            if not replaced: out = out ++ ident
+            pos = end
+            continue
+        out = out ++ body.slice(pos as i64, (pos + 1) as i64)
+        pos = pos + 1
+    out
+
+// The index of the quote closing the string or character literal opening
+// at `open` (the text's end when unterminated).
+fn ci_matching_quote(text: &str, open: i32) -> i32:
+    let q = text[open]
+    var j = open + 1
+    let n = text.len()
+    while j < n:
+        if text[j] == 92:
+            j = j + 2
+            continue
+        if text[j] == q: return j
+        j = j + 1
+    (n - 1) as i32
 
 fn ci_macro_miss_contains(name: &str) -> bool:
     g_migrate_macro_miss_names.contains(name)
@@ -19968,6 +20101,206 @@ fn ci_unexposed_expr_form(session: i64, cursor: i32) -> i32:
         return CI_UNEXPOSED_ELVIS
     CI_UNEXPOSED_UNSUPPORTED
 
+// C11 `_Generic(ctrl, T1: e1, …, default: ed)` (libclang's
+// GenericSelectionExpr, kind 122): the association whose expression type is
+// the selection's result type is the selected one, the controlling
+// expression (the first expression child) never. Two associations of that
+// type with different expressions cannot be told apart from here: -1, and
+// the caller refuses loudly rather than guessing (the default arm was once
+// taken as a wrapper's last child: `m_string_init_set(s, "text")`
+// called the string_t overload with a C string).
+let CXK_GENERIC_SELECTION: i32 = 122
+
+// A C type name as C11 6.5.1.1 compares it: one spelling for the integer
+// synonyms (`signed int` is `int`, `long int` is `long`, `unsigned` is
+// `unsigned int`), no blank around `*`, a top-level qualifier dropped (the
+// controlling expression undergoes lvalue conversion).
+fn ci_generic_type_key(text: &str) -> str:
+    var out = ""
+    var pending_blank = false
+    for i in 0..text.len():
+        let c = text[i]
+        // A macro definition's line continuation is no part of the name.
+        if c == 92: continue
+        if c == 32 or c == 9 or c == 10 or c == 13:
+            pending_blank = out.len() > 0
+            continue
+        if c == 42:
+            out = out ++ "*"
+            pending_blank = false
+            continue
+        if pending_blank: out = out ++ " "
+        pending_blank = false
+        out = out ++ text[i..i + 1]
+    if out.starts_with("const "): out = out[6..]
+    if out.starts_with("volatile "): out = out[9..]
+    if out == "signed" or out == "signed int": return "int"
+    if out == "unsigned": return "unsigned int"
+    if out == "short int" or out == "signed short" or out == "signed short int": return "short"
+    if out == "long int" or out == "signed long" or out == "signed long int": return "long"
+    if out == "long long int" or out == "signed long long" or out == "signed long long int": return "long long"
+    if out == "unsigned short int": return "unsigned short"
+    if out == "unsigned long int": return "unsigned long"
+    if out == "unsigned long long int": return "unsigned long long"
+    out
+
+// The segments of a parenthesized list at depth 0, split at `sep`.
+fn ci_split_top_level(text: &str, sep: u8) -> List[str]:
+    var parts: List[str] = List.new()
+    var depth = 0
+    var start = 0
+    var in_string = false
+    for i in 0..text.len():
+        let c = text[i]
+        if in_string:
+            if c == 92: continue
+            if c == 34: in_string = false
+            continue
+        if c == 34:
+            in_string = true
+            continue
+        if c == 40 or c == 91 or c == 123: depth = depth + 1
+        else if c == 41 or c == 93 or c == 125: depth = depth - 1
+        else if c == sep and depth == 0:
+            parts.push(ci_trim(text[start..i]))
+            start = i + 1
+    parts.push(ci_trim(text[start..]))
+    parts
+
+// The `_Generic(...)` body of `text` (what the parentheses hold), "" when
+// the text spells no `_Generic`.
+fn ci_generic_body(text: &str) -> str:
+    let at = text.find("_Generic")
+    if at < 0: return ""
+    let open = text[at..].find("(")
+    if open < 0: return ""
+    let from = at + open + 1
+    var depth = 1
+    var in_string = false
+    for i in from..text.len():
+        let c = text[i]
+        if in_string:
+            if c == 92: continue
+            if c == 34: in_string = false
+            continue
+        if c == 34: in_string = true
+        else if c == 40: depth = depth + 1
+        else if c == 41:
+            depth = depth - 1
+            if depth == 0: return text[from..i]
+    ""
+
+// The canonical type key of typedef `name` in the session, "" when no
+// typedef declares it (a builtin spelling, a record tag). Cached: a format
+// selection names twenty types at every use.
+var g_ci_typedef_key_cache: HashMap[str, str] = HashMap.new()
+var g_ci_typedef_key_cache_session: i64 = 0
+fn ci_typedef_canonical_key(session: i64, name: &str) -> str:
+    if g_ci_typedef_key_cache_session != session:
+        g_ci_typedef_key_cache = HashMap.new()
+        g_ci_typedef_key_cache_session = session
+    let cached = g_ci_typedef_key_cache.get(name)
+    if cached.is_some(): return with_str_clone_ref(cached.unwrap())
+    var found = ""
+    let count = with_cimport_decl_count(session)
+    for idx in 0..count:
+        if with_cimport_decl_kind(session, idx) != CXK_TYPEDEF_DECL: continue
+        if with_cimport_decl_name(session, idx) != name: continue
+        let cursor = with_cimport_decl_cursor(session, idx)
+        let ty = if cursor >= 0: with_ci_cursor_type(session, cursor) else: -1
+        if ty < 0: break
+        found = ci_generic_type_key(with_ci_type_spelling(session, with_ci_type_canonical(session, ty)))
+        break
+    g_ci_typedef_key_cache.insert(with_str_clone_ref(name), with_str_clone_ref(found))
+    found
+
+// An identifier alone (a typedef or a macro parameter), not a derived or
+// multi-word type name.
+fn ci_generic_key_is_bare_name(key: &str) -> bool:
+    if key.len() == 0: return false
+    for i in 0..key.len():
+        let c = key[i]
+        if not (ci_is_ident_char(c)): return false
+    ci_is_ident_start(key[0])
+
+// C's one-word builtin type names.
+fn ci_generic_key_is_builtin(key: &str) -> bool:
+    key == "int" or key == "char" or key == "short" or key == "long" or key == "float" or key == "double" or key == "void" or key == "_Bool" or key == "bool"
+
+fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
+    // The association list, through the macros that spell it.
+    let raw = with_ci_cursor_source_text(session, cursor)
+    var body = ci_generic_body(ci_preprocessed_text_for_cursor(session, cursor, raw))
+    if body.len() == 0: body = ci_generic_body(raw)
+    if body.len() == 0: return -1
+    let segments = ci_split_top_level(body, 44)
+    if segments.len() < 2: return -1
+    // The expression children: the controlling expression, then one per
+    // association in order.
+    var expr_children: List[i32] = List.new()
+    var type_refs: List[i32] = List.new()
+    let nc = with_ci_num_children(session, cursor)
+    for i in 0..nc:
+        let child = with_ci_child(session, cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck == CXK_TYPE_REF: type_refs.push(child)
+        else if ci_cursor_kind_is_expr(ck): expr_children.push(child)
+    let trace = with_getenv_str("WITH_MIGRATE_TRACE_GENERIC").len() > 0
+    if trace: eprint(f"generic: exprs={expr_children.len()} segments={segments.len()} typerefs={type_refs.len()} body=" ++ body ++ "\ngeneric: expansion=" ++ with_ci_cursor_expansion_text(session, cursor))
+    if expr_children.len() != segments.len(): return -1
+    let controlling_ty = with_ci_cursor_type(session, expr_children[0])
+    if controlling_ty < 0: return -1
+    let wanted = ci_generic_type_key(with_ci_type_spelling(session, with_ci_type_canonical(session, controlling_ty)))
+    let wanted_spelled = ci_generic_type_key(with_ci_type_spelling(session, controlling_ty))
+    if trace: eprint("generic: wanted=" ++ wanted ++ " spelled=" ++ wanted_spelled)
+    var default_at = -1
+    for k in 1..segments.len():
+        let segment: str = segments[k]
+        let colon = segment.find(":")
+        if colon < 0: return -1
+        let type_text = ci_trim(segment[..colon])
+        if ci_generic_type_key(type_text) == "default":
+            default_at = k
+            continue
+        var key = ci_generic_type_key(type_text)
+        // A typedef name (libclang hands no TypeRef child for an association
+        // type): the session's typedef declaration of that name, canonical.
+        let typedef_key = ci_typedef_canonical_key(session, key)
+        if typedef_key.len() > 0: key = typedef_key
+        // A macro parameter as the type name (M*LIB's `M_AS_TYPE(type, x)`:
+        // `type: (x), default: (type) {0}`): the definition's text cannot
+        // say what it is, but an arm whose expression is spelled `(type)…`,
+        // a cast or a compound literal of it, has that type; its expression
+        // child's type names it.
+        if ci_generic_key_is_bare_name(key) and not ci_generic_key_is_builtin(key):
+            for j in 1..segments.len():
+                let other: str = segments[j]
+                let other_colon = other.find(":")
+                if other_colon < 0: continue
+                let other_expr = ci_trim(other[other_colon + 1..])
+                if other_expr.starts_with("(" ++ key ++ ")"):
+                    let other_ty = with_ci_cursor_type(session, expr_children[j])
+                    if other_ty >= 0:
+                        key = ci_generic_type_key(with_ci_type_spelling(session, with_ci_type_canonical(session, other_ty)))
+                        break
+        // A typedef name: the TypeRef child that spells it says what it is.
+        for ti in 0..type_refs.len():
+            let spelled = with_ci_cursor_spelling(session, type_refs[ti])
+            let bare = if spelled.starts_with("typedef "): spelled[8..] else: spelled
+            if ci_generic_type_key(bare) == key:
+                let ref_ty = with_ci_cursor_type(session, type_refs[ti])
+                if ref_ty >= 0: key = ci_generic_type_key(with_ci_type_spelling(session, with_ci_type_canonical(session, ref_ty)))
+        if trace: eprint("generic: arm " ++ type_text ++ " key=" ++ key)
+        if key == wanted or key == wanted_spelled: return expr_children[k]
+    if default_at >= 0: return expr_children[default_at]
+    -1
+
+fn ci_bail_generic_selection(session: i64, cursor: i32):
+    if g_ci_bail_message.len() == 0:
+        g_ci_bail_message = "C `_Generic` selection `" ++ ci_trim(with_ci_cursor_source_text(session, cursor)) ++ "`: no association has the selected type, or two with it differ"
+        g_ci_bail_location = with_ci_cursor_location(session, cursor)
+        g_ci_bail_kind = CXK_GENERIC_SELECTION
+
 // The operand `__builtin_choose_expr(c, a, b)` selects (c is a constant
 // expression), or -1 when clang cannot evaluate c.
 fn ci_choose_expr_selected(session: i64, cursor: i32) -> i32:
@@ -20393,6 +20726,9 @@ fn ci_libc_constant_use(session: i64, cursor: i32, kind: i32) -> str:
         let space = site.find(" ")
         shape = site.slice(0, space)
         name = site.slice(space + 1, site.len())
+    // <stdbool.h>'s `true` and `false` are the language's, not a library's
+    // constants: the literal lowers by its value, as a `1` would.
+    if name == "true" or name == "false": return ""
     // The expression is the macro's whole body: a one-token body's literal,
     // or a parenthesized body's parenthesized expression.
     let whole = (shape == "leaf" and (at_kind == CXK_INT_LITERAL or at_kind == CXK_CHAR_LITERAL)) or (shape == "paren" and at_kind == CXK_PAREN_EXPR)
