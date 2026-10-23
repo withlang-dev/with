@@ -83,7 +83,7 @@ with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe.version=nightly-20261020-local-3-763d0e54c82a
-with-windows-x86_64.exe=da61df5be6c9525bae7465a451aa1249f1dd1b7a392d99fb2e9a1f5c73af5dcb
+with-windows-x86_64.exe.version=nightly-20261023-local-2-3edfcc663d86
+with-windows-x86_64.exe=8ea399cb95c27ec72b1aeb8f84ae8c51e62abe6af49bd24818937d8ef0aa8d4a
 with-windows-aarch64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
