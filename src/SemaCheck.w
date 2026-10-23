@@ -9933,6 +9933,17 @@ impl Sema:
         if arith != 0:
             out.value_type = arith as i32
             return out
+        // D22 §6.2 / D144: a Copy view beside its value joins to the value
+        // (`return x` of `&i32` beside `return -1`, #2325); the view
+        // materializes at the return once the type is inferred.
+        let have_value = self.shared_copy_pointee(out.value_type)
+        let want_value = self.shared_copy_pointee(actual)
+        if have_value != 0 and self.types_compatible(have_value as TypeId, actual as TypeId) != 0:
+            out.value_type = self.preferred_compatible_type(have_value as TypeId, actual as TypeId) as i32
+            return out
+        if want_value != 0 and self.types_compatible(out.value_type as TypeId, want_value as TypeId) != 0:
+            out.value_type = self.preferred_compatible_type(out.value_type as TypeId, want_value as TypeId) as i32
+            return out
         out.mismatch = 1
         out.mismatch_node = node
         out
@@ -10288,10 +10299,53 @@ impl Sema:
     // as a bare `T` (a `None` joined it), those branches convert now, as
     // they would under a written `-> Option[T]` (§4.9a).
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
-        let inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
+        var inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
         if inferred != 0 and self.is_option_type(inferred) and not self.is_bare_none_type(inferred):
             self.convert_body_values_to_option(body, 1, inferred)
+        // D22: an inferred return preserves a view (the acceptance cell
+        // err_d22_inferred_return_preserves_view). When the join of a view
+        // return with an owned return is the owned value (#2325: `return x`
+        // of `&i32` beside `return -1`), every returned view materializes
+        // it, as under a written `-> T`.
+        if inferred != 0 and self.is_plain_value_type_for_return(inferred):
+            self.materialize_body_view_returns(body, 1, inferred)
         inferred
+
+    fn is_plain_value_type_for_return(tid: i32) -> bool:
+        let kind = self.get_type_kind(self.resolve_alias(tid as TypeId))
+        kind != TypeKind.TY_REF and kind != TypeKind.TY_VOID and kind != TypeKind.TY_NEVER
+
+    // Every value the body returns that is a Copy view of `owned` takes the
+    // value (the D22 contextual copy), mirroring convert_body_values_to_option.
+    mut fn materialize_body_view_returns(node: i32, value_path: i32, owned: i32):
+        if node == 0 or owned == 0:
+            return
+        match self.ast.kind(node):
+            NodeKind.NK_CLOSURE | NodeKind.NK_FN_DECL => ()
+            NodeKind.NK_RETURN => self.materialize_body_view_returns(self.ast.get_data0(node), 1, owned)
+            NodeKind.NK_BLOCK =>
+                let extra_start = self.ast.get_data0(node)
+                for si in 0..self.ast.get_data1(node):
+                    self.materialize_body_view_returns(self.ast.get_extra(extra_start + si), 0, owned)
+                self.materialize_body_view_returns(self.ast.get_data2(node), value_path, owned)
+            NodeKind.NK_IF_EXPR =>
+                self.materialize_body_view_returns(self.ast.get_data1(node), value_path, owned)
+                self.materialize_body_view_returns(self.ast.get_data2(node), value_path, owned)
+            NodeKind.NK_MATCH =>
+                let arm_start = self.ast.get_data1(node)
+                for ai in 0..self.ast.get_data2(node):
+                    self.materialize_body_view_returns(self.ast.get_extra(arm_start + ai), value_path, owned)
+            NodeKind.NK_MATCH_ARM => self.materialize_body_view_returns(self.ast.get_data1(node), value_path, owned)
+            NodeKind.NK_LOOP | NodeKind.NK_DO_WHILE => self.materialize_body_view_returns(self.ast.get_data0(node), 0, owned)
+            NodeKind.NK_WHILE => self.materialize_body_view_returns(self.ast.get_data1(node), 0, owned)
+            NodeKind.NK_FOR => self.materialize_body_view_returns(self.ast.get_data2(node), 0, owned)
+            NodeKind.NK_GROUPED | NodeKind.NK_UNSAFE_BLOCK | NodeKind.NK_NO_SUSPEND => self.materialize_body_view_returns(self.ast.get_data0(node), value_path, owned)
+            _ =>
+                if value_path != 0:
+                    let actual = self.recorded_expr_type_or_zero(node)
+                    let pointee = if actual != 0: self.shared_copy_pointee(actual) else: 0
+                    if pointee != 0 and self.types_compatible(owned as TypeId, pointee as TypeId) != 0:
+                        self.record_contextual_copy_adjustment(node, owned, actual)
 
     // "return type mismatch" under an inferred return; in the second pass
     // of a self-calling body (D143) the message names what disagreed.
