@@ -13739,7 +13739,10 @@ impl Sema:
         args.push(operand_node)
         by_place.push(self.type_takes_place(expected_operand))
         self.note_call_global_effects(node, candidate.sig, 0, 0, false, args, by_place)
-        self.sig_return_type(candidate.sig)
+        // Sema owns the type (D65, #2443), as for a binary operator method.
+        let unary_ret = self.sig_return_type(candidate.sig)
+        self.typed_expr_types.insert(node, unary_ret)
+        unary_ret
 
     mut fn check_binary_operator_method(node: i32, op: i32, lhs: i32, rhs: i32) -> i32:
         let method_name = sema_operator_method_name(op)
@@ -13817,6 +13820,11 @@ impl Sema:
         by_place.push(self.type_takes_place(expected_lhs))
         by_place.push(self.type_takes_place(expected_rhs))
         self.note_call_global_effects(node, selected.sig, 0, 0, false, args, by_place)
+        // Sema owns the type (D65, #2443): the operator is its method's
+        // call, so its type is the method's return. Unrecorded, a
+        // `(a - 2.0).x` base fell back to arithmetic over V and f64 in MIR
+        // and projected a field out of a Unit.
+        self.typed_expr_types.insert(node, ret)
         ret
 
     // For comparison, a `&str` behaves like the `str` it points at (string value
