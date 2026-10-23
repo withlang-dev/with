@@ -1363,7 +1363,7 @@ impl Drop for ToolArchiveFile:
     move fn drop():
         if self.handle != null: fclose(self.handle)
 
-fn tool_archive_open(path: &str, mode: *const i8) -> ToolArchiveFile:
+fn tool_archive_open(path: &str, mode: *const c_char) -> ToolArchiveFile:
     let cpath = match path.to_cstring():
         Ok(c) => c
         Err(_) => return ToolArchiveFile { handle: null }
