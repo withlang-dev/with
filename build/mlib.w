@@ -129,8 +129,12 @@ fn mlib_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i3
     let result = ctx.process_runner().run_capture(argv, corpus_abs(ctx, binary ++ ".stdout"), corpus_abs(ctx, binary ++ ".stderr"), 600000)
     if result.rc != 0: return corpus_fail(ctx, f"multimap exited {result.rc}\n" ++ result.stdout ++ result.stderr)
     // Key 7 is set in all three fills (7, 49, 343, newest first), key 6 once.
+    // The program prints through C's stdio, whose text mode on Windows ends
+    // a line with CRLF; the lines are compared without the CR (the Windows
+    // seed leg, #2582).
+    let stdout_lines = result.stdout.replace("\r", "")
     for expected in ["Key=6 Count=1 Value=6 \n", "Key=7 Count=3 Value=343 Value=49 Value=7 \n", "Key=100 Count=0 \n"]:
-        if not result.stdout.contains(expected): return corpus_fail(ctx, "multimap output lacks '" ++ expected ++ "'\n" ++ result.stdout)
+        if not stdout_lines.contains(expected): return corpus_fail(ctx, "multimap output lacks '" ++ expected ++ "'\n" ++ result.stdout)
     if fs.write_text(output ++ "/report.txt", "upstream=" ++ MLIB_REVISION ++ "\nPASS multimap\n") != 0: return 1
     print("multimap passed")
     0
