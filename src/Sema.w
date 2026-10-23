@@ -1102,6 +1102,11 @@ type Sema {
     lang_trait_syms: HashMap[i32, i32],
     local_type_names: HashMap[i32, i32],
     distinct_type_names: HashMap[i32, i32],
+    // The type parameters in scope for the declaration under comptime
+    // transform (an impl's and a method's own): unbound there, never a
+    // module type of the same name (a program's `type T` beside a std
+    // `comptime if word[T]()`).
+    ct_type_param_syms: List[i32],
     // D120 (§4.3): the structs declared `resource type`, by name symbol:
     // never Copy, whatever their fields.
     resource_type_names: HashMap[i32, i32],
@@ -3408,6 +3413,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         lang_trait_syms,
         local_type_names,
         distinct_type_names: sema_new_map_i32_i32(),
+        ct_type_param_syms: List.new(),
         resource_type_names: sema_new_map_i32_i32(),
         cast_modes: sema_new_map_i32_i32(),
         ephemeral_types,
