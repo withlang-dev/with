@@ -817,8 +817,8 @@ fn ci_migrate_preamble_text() -> str:
         // semantics).
         p = p ++ "extern fn abort() -> Never\n"
         p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
-    // #2176: the C model's aliases (`--c-target`), the host's when none is named.
-    p = p ++ "\n" ++ ci_c_type_aliases(with_cimport_target_triple())
+    // D155: the C aliases (c_int, c_long, ...) are the compiler's builtins, the
+    // target's; a migrated corpus never contains a concrete value for one.
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.

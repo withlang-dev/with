@@ -2401,6 +2401,7 @@ type Sema {
     ty_isize: TypeId,
     ty_c_va_list: TypeId,
     ty_const_i8_ptr: TypeId,
+    ty_c_char: TypeId,
     ty_field_info: TypeId,
     ty_variant_info: TypeId,
 
@@ -4036,7 +4037,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_cstr: 0, ty_cstr_view: 0,
-        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
+        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0, ty_c_char: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_list_str(),
         package_keys: HashMap[str, str].new(),
@@ -4228,7 +4229,32 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     s.ty_usize = s.add_type(TypeKind.TY_INT, size_bits, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, size_bits, 1, 1)
     s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
-    s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
+    // §16.1 / D155: the C aliases are the target's, owned here from the
+    // target spec and ambient like `c_void` and `c_va_list`: `char` is
+    // unsigned on AArch64 Linux and on wasm, `long` is 32 bits on Windows
+    // (LLP64) and wasm32, `long double` is a double only on AArch64 Darwin
+    // and Windows (elsewhere With has no float for it and the name does not
+    // exist). No migration or import emits a concrete value for one.
+    let c_os = target_spec_os()
+    let c_arch = target_spec_arch()
+    let c_wasm = c_arch == "wasm32" or c_arch == "wasm64"
+    let c_char_unsigned = (c_os == "Linux" and c_arch == "aarch64") or c_wasm
+    let c_long_32 = c_os == "Windows" or c_arch == "wasm32"
+    s.ty_c_char = if c_char_unsigned: s.ty_u8 else: s.ty_i8
+    s.register_prim("c_char", s.ty_c_char)
+    s.register_prim("c_short", s.ty_i16)
+    s.register_prim("c_ushort", s.ty_u16)
+    s.register_prim("c_int", s.ty_i32)
+    s.register_prim("c_uint", s.ty_u32)
+    s.register_prim("c_long", if c_long_32: s.ty_i32 else: s.ty_i64)
+    s.register_prim("c_ulong", if c_long_32: s.ty_u32 else: s.ty_u64)
+    s.register_prim("c_longlong", s.ty_i64)
+    s.register_prim("c_ulonglong", s.ty_u64)
+    if (c_os == "Macos" and c_arch == "aarch64") or c_os == "Windows":
+        s.register_prim("c_longdouble", s.ty_f64)
+    // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
+    // `*const c_char` on every target.
+    s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_c_char, 0, 0)
     let cstr_field_names: List[str] = List.new()
     cstr_field_names.push("ptr")
     cstr_field_names.push("len")
