@@ -232,7 +232,11 @@ impl Pcre2Suite:
             let error_tag = tag ++ "-error"
             rc = self.run(ctx, pcre2_args("-q -" ++ self.bits ++ " " ++ opt ++ " -error -80,-62,-2,-1,0,100,101,191,300"), error_tag)
             let fs = ctx.fs()
-            if fs.write_text(outfile, fs.read_text(outfile) ++ fs.read_text(self.out(error_tag ++ ".stdout"))) != 0:
+            // pcre2test writes the file in binary mode and stdout in text mode,
+            // which on Windows ends a line with CRLF; the appended lines take
+            // the file's endings.
+            let error_lines = fs.read_text(self.out(error_tag ++ ".stdout")).replace("\r\n", "\n")
+            if fs.write_text(outfile, fs.read_text(outfile) ++ error_lines) != 0:
                 self.failed("** could not append the -error run to " ++ outfile)
                 return
         self.check(ctx, rc, suffix, opt, outfile)
@@ -332,7 +336,14 @@ impl Pcre2Suite:
             if matched:
                 self.say("  OK" ++ mode)
             else:
-                self.failed("** Locale test did not run successfully" ++ mode ++ ": " ++ actual ++ " matches none of upstream's testoutput3, 3A, 3B, 3C; this may be the locale settings rather than a bug in PCRE2")
+                if fs.read_text(actual).contains("\\x83 \\x8a \\x8c \\x8e"):
+                    // Windows: the CRT's French locale is code page 1252, whose
+                    // letters above 0x7f (\x83 to \x9f: ƒ Š Œ Ž š œ ž Ÿ) are not
+                    // ISO 8859-1's; upstream's four alternatives are all Latin-1.
+                    // The library is not what differs (#2592).
+                    self.skip("because the host's French locale is code page 1252, not the ISO 8859-1 of upstream's expected outputs")
+                else:
+                    self.failed("** Locale test did not run successfully" ++ mode ++ ": " ++ actual ++ " matches none of upstream's testoutput3, 3A, 3B, 3C; this may be the locale settings rather than a bug in PCRE2")
 
     mut fn test(ctx: &ActionCtx, n: i32):
         let fs = ctx.fs()
