@@ -187,6 +187,11 @@ impl Drop for Database:
         sqlite3_close(self.handle)
 ```
 
+A generic type's `Drop` impl is its destructor for every instantiation:
+the impl's bounds are the type's own (`type Holder[T: Clone]` with
+`impl[T: Clone] Drop for Holder[T]`), and an impl that demands a bound the
+type does not is refused (D154).
+
 Because `drop` consumes `self`, there is no need to defensively
 null out fields to prevent double-free — the value ceases to exist
 after `drop` returns, and a moved-from or reassigned source was
