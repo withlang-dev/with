@@ -529,27 +529,14 @@ fn ci_record_omitted_symbol(name: &str, reason: &str):
 // `char` is unsigned on AArch64 Linux and on wasm, signed elsewhere; `long
 // double` is 64 bits only on AArch64 Darwin and Windows — on x86_64 Linux it
 // is the 80-bit extended type and on AArch64 Linux and wasm a 128-bit quad,
-// which With has no float for, so no alias is emitted there and a
+// which With has no float for, so the name does not exist there and a
 // declaration that needs it is omitted with that reason (ci_type_is_known).
-fn ci_c_type_aliases(triple: &str) -> str:
+// D155: the aliases are the compiler's builtins (Sema registers them from
+// the target spec); no import or migration emits a concrete value for one.
+fn ci_c_long_double_representable(triple: &str) -> bool:
     let os = if triple.len() > 0: (if ci_str_contains(triple, "windows"): "Windows" else if ci_str_contains(triple, "linux"): "Linux" else if ci_str_contains(triple, "apple"): "Macos" else if ci_str_contains(triple, "wasi") or ci_str_contains(triple, "wasm"): "Wasi" else: "Macos") else: target_spec_os()
     let arch = if triple.len() > 0: (if ci_str_contains(triple, "aarch64") or ci_str_contains(triple, "arm64"): "aarch64" else if ci_str_contains(triple, "wasm32"): "wasm32" else if ci_str_contains(triple, "wasm64"): "wasm64" else: "x86_64") else: target_spec_arch()
-    let wasm = arch == "wasm32" or arch == "wasm64"
-    let long_bits = if os == "Windows" or arch == "wasm32": 32 else: 64
-    let char_unsigned = (os == "Linux" and arch == "aarch64") or wasm
-    let long_double_64 = (os == "Macos" and arch == "aarch64") or os == "Windows"
-    var out = "type c_char = " ++ (if char_unsigned: "u8" else: "i8") ++ "\n"
-    out = out ++ "type c_short = i16\ntype c_ushort = u16\ntype c_int = i32\ntype c_uint = u32\n"
-    out = out ++ "type c_long = " ++ (if long_bits == 32: "i32" else: "i64") ++ "\n"
-    out = out ++ "type c_ulong = " ++ (if long_bits == 32: "u32" else: "u64") ++ "\n"
-    out = out ++ "type c_longlong = i64\ntype c_ulonglong = u64\n"
-    if long_double_64:
-        out = out ++ "type c_longdouble = f64\n"
-    out
-
-// #2176: whether the parsed target's `long double` has a With float.
-fn ci_c_long_double_representable(triple: &str) -> bool:
-    ci_str_contains(ci_c_type_aliases(triple), "c_longdouble")
+    (os == "Macos" and arch == "aarch64") or os == "Windows"
 
 // #2230: every rewrite rule the migrator applies is tagged with the
 // function it rewrote, so `tools/migrate_diff.w` names the rule behind a
@@ -794,10 +781,10 @@ fn process_c_import_with_defines(header_spec: &str, defines: &List[str], cxx: bo
         with_cimport_mark_name_emitted("c_void")
         ci_mark_type_name_emitted("c_void")
 
-    // Emit the C type aliases of the parsed target (matching Zig's c_int,
-    // c_long, etc.; #2176: `long` and `char` differ by target).
+    // The C type aliases (c_int, c_long, ...) are the compiler's builtins,
+    // the target's (D155, #2176); the unit emits none and names them as
+    // emitted so a declaration's reference to one is known.
     if with_cimport_is_name_emitted("c_char") == 0:
-        output.push_str(ci_c_type_aliases(with_cimport_target_triple()))
         with_cimport_mark_name_emitted("c_char")
         with_cimport_mark_name_emitted("c_short")
         with_cimport_mark_name_emitted("c_ushort")
