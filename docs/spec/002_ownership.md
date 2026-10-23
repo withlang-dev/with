@@ -143,11 +143,21 @@ pointer plus a count increment, the last holder frees. At a variable's last
 use the compiler turns the copy into a move, with no count traffic. Text that
 is built or edited goes through a builder type that produces a `str`.
 
-**Collections and structs of values are values (D120).** Identity is
-compositional. A `List`, `HashMap`, `HashSet` or `BTreeMap` whose elements
-(keys and values) are values is a value, and so is a struct whose every
-field is a value, that has no `Drop`, and that is not declared
-`resource type`. A collection holding a resource (`List[File]`) is a
+**Collections and structs of values are values (D120, D152).** Identity is
+compositional. A `List`, `HashMap` or `HashSet` whose elements (keys and
+values) are values is a value, and so is a struct whose every field is a
+value, that has no `Drop`, and that is not declared `resource type`. A
+collection's copy class is part of its interface, stated here, not a
+consequence of its layout: `List`, `HashMap` and `HashSet` copy with a
+count; every engine-backed collection (`BTreeMap`, `BTreeSet`,
+`OrderedMap`, `OrderedSet`, `PriorityQueue`, `Deque`, `UnorderedMap`,
+`UnorderedSet`, `BitSet`) is a resource: `var n = m` moves it, and a copy
+is `m.clone()`. The line is D45's: a list or hash table is a value whose
+copy is a bounded, flat memcpy-and-count, O(1); a tree is a graph of nodes
+that cannot be copied without walking it. Changing a type from one class
+to the other is an interface break and gets its own ruling; a type keeps
+its class on any engine, so an engine facade for `HashMap` supports the
+count-copy. A collection holding a resource (`List[File]`) is a
 resource, as is a struct with a resource field, a `Drop` impl, or a
 `resource type` declaration — a permit, an ID allocator, a one-shot token:
 value fields, but copying one would be a bug. A value collection copies in

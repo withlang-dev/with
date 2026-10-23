@@ -12118,7 +12118,14 @@ impl Sema:
                     self.emit_error_with_help("use of moved value", node, f"`let _ = {name}` dropped `{name}` at line {line}; remove it to keep `{name}`")
                 else:
                     let moved_msg = if self.in_concrete_generic_body != 0 and tid != 0: f"use of moved value (`{self.type_name(tid)}`)" else: "use of moved value"
-                    self.emit_error_with_help(moved_msg, node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
+                    // D152 (§2.3): an engine-backed collection is a resource;
+                    // the first thing a program upgrading from the counted
+                    // BTreeMap hits is this error, so it names the class and
+                    // the clone's cost.
+                    let collection = if tid != 0: self.engine_collection_base_name(tid) else: ""
+                    let moved_name = self.pool_resolve(sym)
+                    let help = if collection.len() > 0: f"`{moved_name}` is a {collection}, an engine-backed collection and a resource (§2.3, D152): the earlier use moved it; a copy is `{moved_name}.clone()`, O(n), every element cloned" else: "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move".to_owned()
+                    self.emit_error_with_help(moved_msg, node, help)
             if sym != self.assign_target_revive_sym:
                 self.note_param_effect(sym, EFF_READ)
                 if is_local:
@@ -38704,6 +38711,17 @@ impl Sema:
     // context. One error shape at the move site; the help offers both
     // intents when the path could take an explicit `move`, and
     // clone/restructure when it cannot.
+    // The engine-backed collections §2.3 (D152) names as resources, by the
+    // base of a type's spelled name (`BTreeMap[str, i32]` is a BTreeMap).
+    fn engine_collection_base_name(tid: i32) -> str:
+        let spelled = self.type_name(tid)
+        let open = spelled.find("[")
+        let base = if open >= 0: spelled[..open] else: spelled
+        let names = ["BTreeMap", "BTreeSet", "OrderedMap", "OrderedSet", "PriorityQueue", "Deque", "UnorderedMap", "UnorderedSet", "BitSet"]
+        for n in names:
+            if base == n: return n
+        ""
+
     mut fn d32_emit_implicit_field_move_error(node: i32):
         if self.field_move_diag_nodes.contains(node):
             return
