@@ -259,7 +259,7 @@ impl Copy for m_core_backoff_s
 
 pub type m_core_backoff_ct = [m_core_backoff_s; 1]
 
-// out/tmp/mlib-boot/source/m-core.h:5610:8: demoted to opaque
+// m-core.h:5610:8: demoted to opaque
 pub type m_string_s = opaque
 
 pub type m_serial_return_code_e = c_int

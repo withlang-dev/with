@@ -56,6 +56,11 @@ fn mlib_facade_shapes_source() -> str:
     "// its internal nodes as separators, so a stored slot is the engine's own\n" ++
     "// (INIT_SET clones through the With callback, CLEAR drops), and every\n" ++
     "// slot points back at the facade's entry.\n" ++
+    "// The instantiation is this unit's exported definitions (M_USE_DECL +\n" ++
+    "// M_USE_DEF: `extern`, not `static inline`), so the facades reach them\n" ++
+    "// through the corpus interface.\n" ++
+    "#define M_USE_DECL\n" ++
+    "#define M_USE_DEF\n" ++
     "#include <stdint.h>\n" ++
     "#include <stddef.h>\n" ++
     "#include \"m-core.h\"\n" ++
@@ -109,8 +114,8 @@ fn mlib_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i3
     let output = ctx.output()
     let binary = output ++ "/multimap"
     var compile_args: List[str] = List.new()
-    compile_args.push(compiler.clone())
-    for arg in build_args: compile_args.push(arg.clone())
+    compile_args.push(compiler)
+    for arg in build_args: compile_args.push(arg)
     compile_args.push("-o")
     compile_args.push(corpus_abs(ctx, binary))
     let compiled = ctx.process_runner().run_capture_cwd(compile_args, corpus_abs(ctx, binary ++ ".compile.stdout"), corpus_abs(ctx, binary ++ ".compile.stderr"), 600000, corpus_abs(ctx, cwd))
@@ -132,8 +137,8 @@ fn mlib_compile_and_run(ctx: &ActionCtx, build_args: List[str], cwd: &str) -> i3
 fn mlib_lanes(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_compiler: &str) -> Build:
     var tests = target_new(.Action, "mlib-test", "").output("out/corpus/mlib-test")
     tests.action = run_mlib_test_action
-    tests = tests.input(release_compiler.clone()).input("lib/std/engines/mlib/multimap.w").dep("build")
+    tests = tests.input(release_compiler).input("lib/std/engines/mlib/multimap.w").dep("build")
     var fresh = target_new(.Action, "mlib-test-fresh", "").output("out/corpus/mlib-test-fresh")
     fresh.action = run_mlib_test_fresh_action
-    fresh = fresh.input(release_compiler.clone()).input("out/mlib_migrated").dep("build").dep("mlib-migrate")
+    fresh = fresh.input(release_compiler).input("out/mlib_migrated").dep("build").dep("mlib-migrate")
     out.add_target(tests).add_target(fresh)
