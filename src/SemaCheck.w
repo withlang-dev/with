@@ -21668,9 +21668,22 @@ impl Sema:
                                     if expected_struct_ty != 0:
                                         let info = self.struct_literal_field_expected_by_index(expected_struct_ty as i32, dfi)
                                         default_expected = (info / 4294967296) as i32
+                                    // #2400: a field's default is the declaring
+                                    // module's expression; its names resolve there,
+                                    // not at the literal (`V2 {}` from a module the
+                                    // literal's own never imports).
+                                    let defaults_di = self.find_decl_index(defaults_td_node)
+                                    let saved_default_file_id = self.local_file_id
+                                    let saved_default_module_path = move self.current_module_path
+                                    let saved_default_module_has_ci = self.current_module_has_ci
+                                    if defaults_di >= 0:
+                                        self.update_decl_source_context(defaults_di)
                                     let default_ty = if default_expected != 0: self.check_expr_with_owned_demand(decl_default, default_expected as TypeId) else: self.check_expr(decl_default)
                                     if not self.ephemeral_types.contains(name):
                                         self.check_ephemeral_task_storage(decl_default, "non-ephemeral struct")
+                                    self.local_file_id = saved_default_file_id
+                                    self.current_module_path = saved_default_module_path
+                                    self.current_module_has_ci = saved_default_module_has_ci
                                     let _ = default_ty
                 if named_instance != 0:
                     self.typed_expr_types.insert(node, named_instance as i32)
