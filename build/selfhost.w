@@ -6012,9 +6012,10 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     // The stdio globals lower to std.libc's accessor on every host, whatever
     // the headers macro-expand stderr to (Darwin __stderrp, glibc stderr).
     let stderr_sym = "libc_stderr()"
-    rc = bs_assert_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"%s error: %d\\n\".ptr, \"compress\", __param_err)", "macro_body_string_literal")
-    if rc != 0: return rc
-    rc = bs_assert_not_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"compress\".ptr", "macro_body_string_literal")
+    // A string literal in a variadic position is C's `const char*` (#2556):
+    // a With `str` there is read as two words (`%d` after `%s` prints the
+    // str's length), so the macro's argument renders as the C pointer.
+    rc = bs_assert_contains(ctx, out_text, "fprintf(" ++ stderr_sym ++ ", c\"%s error: %d\\n\".ptr, c\"compress\".ptr, __param_err)", "macro_body_string_literal")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
