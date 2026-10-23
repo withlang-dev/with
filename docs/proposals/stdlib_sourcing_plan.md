@@ -12,7 +12,7 @@ started**: no `build/stc.w`, no `lib/std/engines/stc/`, no `std.algorithms`; the
 `Vec` engine, `Deque`/`Stack`/`Queue`/`PriorityQueue`/`List`, the default
 `HashMap`/`HashSet`, `OrderedMap`/`OrderedSet`, `BitSet`, spans, `sort` and
 the searches all wait on it, and #937/#938/#939/#940 stay open. **Phase 4
-M\*LIB — not started.** By this document's own "done" bar the plan is
+M\*LIB — done** (D151, D152; status below). By this document's own "done" bar the plan is
 roughly half implemented; the half users feel (sort, the default map) is the
 open half. `docs/spec/stdlib/libstd-spec.md` (refreshed the same day)
 maps its tiers onto these phases.
@@ -676,9 +676,18 @@ Status (2026-10-22, D151):
   key clone per insert and per separator, a probe allocation per lookup and
   three C-ABI callbacks per comparison; the word shape for integer keys
   (D148's condition) is the next row when a hot path needs it.
-- Open: upstream's `tests/test-mbptree.c` under With (it carries
-  `m-string.h` and `test-obj.h`; a mlib test lane like STC's is the next
-  step); a word-key instantiation for integer keys (the D148 condition) when
+- Upstream's `tests/test-mbptree.c` runs under With (2026-10-23): migrated
+  whole with `m-core.h`, `m-string.h`, `m-bptree.h`, `tests/test-obj.h` and
+  `tests/coverage.h` in upstream's test configuration (`M_USE_STDIO=1`),
+  checked in under `test/corpora/mlib/programs/test_mbptree`, compiled with
+  the prelude off and run by `mlib-test-programs` (in the `mlib-test` lane)
+  and `mlib-test-programs-fresh` (the migrator gate); all thirteen tests
+  exit 0. The rules it exposed, each general with a fixture: std.libc's
+  fscanf/ungetc/str* families, a declaration in a switch arm, a
+  conditional callee, and C11 `_Generic` selected by the controlling
+  expression's type through the macros that spell it (libclang peeled it
+  to its default arm). The library corpus was not re-promoted (D112).
+- Open: a word-key instantiation for integer keys (the D148 condition) when
   a hot path needs it.
 
 Order is fixed by risk: 1 validates the whole-corpus pipeline on a
