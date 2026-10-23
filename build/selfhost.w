@@ -5356,7 +5356,13 @@ fn bs_check_migrate_strtoll_family(ctx: &ActionCtx, compiler_path: &str, case_di
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "strtoll_family.c")
     let out_w = bs_join(case_dir, "strtoll_family.w")
-    let c_text = "#include <stdlib.h>\nlong long p1(const char *s) { return strtoll(s, 0, 10); }\nunsigned long long p2(const char *s) { return strtoull(s, 0, 16); }\nfloat p3(const char *s) { return strtof(s, 0); }\nlong double p4(const char *s) { return strtold(s, 0); }\n"
+    // `long double` is a double only on AArch64 Darwin and Windows (§16.1);
+    // on x86_64 Linux it is the 80-bit type and on AArch64 Linux a quad,
+    // which With has no float for, so a function over it is untranslatable
+    // there (loudly, as it must be) and the fixture asks for `strtold` only
+    // where the host has the type.
+    let has_long_double = os() == "Macos" or os() == "Windows"
+    let c_text = "#include <stdlib.h>\nlong long p1(const char *s) { return strtoll(s, 0, 10); }\nunsigned long long p2(const char *s) { return strtoull(s, 0, 16); }\nfloat p3(const char *s) { return strtof(s, 0); }\n" ++ (if has_long_double: "long double p4(const char *s) { return strtold(s, 0); }\n" else: "")
     var rc = bs_write_fixture(ctx, src, c_text, "strtoll family")
     if rc != 0: return rc
     var args: List[str] = List.new()
@@ -5370,8 +5376,9 @@ fn bs_check_migrate_strtoll_family(ctx: &ActionCtx, compiler_path: &str, case_di
     let out_text = ctx.fs().read_text(out_w)
     rc = bs_assert_contains(ctx, out_text, "strtoll(", "strtoll_family")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "strtold(", "strtoll_family")
-    if rc != 0: return rc
+    if has_long_double:
+        rc = bs_assert_contains(ctx, out_text, "strtold(", "strtoll_family")
+        if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
