@@ -2639,6 +2639,20 @@ impl MirBuilder:
         let pointee = if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF: self.sema.get_type_d0(resolved) else: 0
         self.body.new_deref_place(base, pointee)
 
+    // Whether a place holds a reference value (a `&[T]` local, a `&T`
+    // field): what it names is read through it. An element place `xs[i]`
+    // is the element itself even though Sema types the expression as a
+    // view (D27): the place's own type decides, not the expression's
+    // (#2578: a deref of a `str` element place was invalid MIR).
+    mut fn place_holds_reference(place: i32) -> bool:
+        let ty = self.place_local_type(place)
+        ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ty as TypeId)) == TypeKind.TY_REF
+
+    // The place a sequence operation reads: the pointee when the place
+    // holds a reference, else the place itself.
+    mut fn sequence_place_through_reference(place: i32) -> i32:
+        if self.place_holds_reference(place): self.new_deref_place(place) else: place
+
     // An operand's type as MIR recorded it: a place's recorded type
     // (place_sema_types), a constant's own. What codegen reads.
     fn operand_recorded_type(operand_id: i32) -> i32:
@@ -6555,9 +6569,8 @@ impl MirBuilder:
 
         if lowering == MethodLowering.SeqRest:
             // A view of everything after the first element.
-            var base_place = self.lower_expr_place(self_expr)
-            if through_ref:
-                base_place = self.new_deref_place(base_place)
+            let base_held = self.lower_expr_place(self_expr)
+            let base_place = self.sequence_place_through_reference(base_held)
             if base_kind == TypeKind.TY_ARRAY:
                 let n = self.sema.get_type_d1(base_ty)
                 let start_op = self.int_const_operand(if n > 0: 1 else: 0, self.sema.ty_i64)
@@ -6600,9 +6613,8 @@ impl MirBuilder:
                 if n == 0:
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
                     return finish
-                var recv_place = self.lower_expr_place(self_expr)
-                if through_ref:
-                    recv_place = self.new_deref_place(recv_place)
+                let recv_held = self.lower_expr_place(self_expr)
+                let recv_place = self.sequence_place_through_reference(recv_held)
                 let at = if lowering == MethodLowering.SeqFirst: 0 else: n - 1
                 let elem_place = self.body.new_field_place(recv_place, at, elem_ty)
                 let ref_op = self.seq_ref_operand(elem_place, payload_ty, span)
@@ -6622,9 +6634,8 @@ impl MirBuilder:
             return out_op
 
         // A slice: the length is runtime, so first/last branch on it.
-        var slice_place = self.lower_expr_place(self_expr)
-        if through_ref:
-            slice_place = self.new_deref_place(slice_place)
+        let slice_held = self.lower_expr_place(self_expr)
+        let slice_place = self.sequence_place_through_reference(slice_held)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0), span)
@@ -6852,11 +6863,9 @@ impl MirBuilder:
         // A range through a reference slices what it names (§3.7): the base
         // is the pointee, not the pointer local (`a[1..]` on `a: &[4]i32`
         // failed codegen: "slice base has no bounds metadata"; #1587).
-        let base_ty = self.expr_type(base_node)
-        var base_res = if base_ty != 0: self.sema.resolve_alias(base_ty as TypeId) else: 0
-        if base_res != 0 and self.sema.get_type_kind(base_res) == TypeKind.TY_REF:
-            base_place = self.new_deref_place(base_place)
-            base_res = self.sema.resolve_alias(self.sema.get_type_d0(base_res) as TypeId)
+        // The place's own type decides (#2578): an element place is the
+        // element, whatever view type Sema gave the expression.
+        base_place = self.sequence_place_through_reference(base_place)
         let start_op = if start_node != 0:
             self.lower_expr(start_node)
         else:
@@ -9755,7 +9764,6 @@ impl MirBuilder:
 
     mut fn lower_sequence_place(iter_expr: i32) -> i32:
         let written_ty = self.expr_type(iter_expr)
-        let through_ref = self.sema.get_type_kind(self.sema.resolve_alias(written_ty)) == TypeKind.TY_REF
         let iter_ty = self.sequence_iter_type(iter_expr)
         // §13: the implicit form borrows. A place iterable is read through its
         // own place — lowering it as a value MOVED an array of Drop-class
@@ -9774,6 +9782,8 @@ impl MirBuilder:
         // An array is not a view: copying it out would make a second owner of
         // its elements (the copy's drop freed the caller's strings). It is read
         // in place, and its length is its type's.
+        // The place's own type decides whether it is read through (#2578).
+        let through_ref = self.place_holds_reference(held_place)
         let array_in_place = through_ref and self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_ARRAY
         var slice_place = held_place
         if array_in_place:
