@@ -2,6 +2,6 @@
 # produced these modules (a hash of the migrator's sources), a hash of the
 # modules (the integrity check compares it) and the trigger that justified
 # the promotion (the pin moved, a migrator-pin bump, a ruling).
-migrated_by 81dd84144edc2b7d8677190beb4a42ebd380315a7b472871fea8ccf56f6a6c0c
-modules 33265f4fb99f2ce09a1163d90f189987d0eb916772a68b970f813bf117ad907c
-promoted_for inputs:the facade shapes unit exports its definitions (M_USE_DECL/M_USE_DEF) and the pipeline maps the staging directory out of the modules
+migrated_by 1925d1d3fa3f33956e3d4d52d6b7e191063334676c3adbd68d82e3240d2b9d1d
+modules 47ccebef2f9c2e360721870b1d049a098c58e74e2548704c5145451892ea756c
+promoted_for inputs:facade shapes unit gains the word tree (mlib_word_tree, D148)
