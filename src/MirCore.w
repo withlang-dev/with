@@ -209,10 +209,6 @@ type MirBody {
     // Operands
     operand_kinds: List[i32],
     operand_d0: List[i32],
-    // The operands a pushed statement or a set call terminator reads: a
-    // move operand not here has not happened on the path being lowered
-    // (an unwind between a call's argument evaluations, #2570).
-    emitted_operands: HashSet[i32],
 
     // Constants
     const_kinds: List[i32],
@@ -274,6 +270,11 @@ type MirBody {
     // validator and audit:resolution recognize the call by this mark; the
     // unresolved-bare-function branch that produced #1635 never sets it.
     call_machinery_dispatch: List[i32],
+    // #2570 (§14.7): at the return in block `bb`, local `local` was never
+    // written: the call producing it left by a cancellation unwind. Pairs,
+    // stated by MirLower; the ownership validator's leak rule reads them.
+    unwritten_at_return_bbs: List[i32],
+    unwritten_at_return_locals: List[i32],
     // #2019: an intrinsic call that invokes a closure Sema says may suspend
     // (call_site_may_suspend): codegen leaves its loop when an invocation
     // left by a cancellation unwind, and MirLower checks after the call.
@@ -549,7 +550,6 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         rval_d2: List.new(),
         operand_kinds: List.new(),
         operand_d0: List.new(),
-        emitted_operands: HashSet.new(),
         const_kinds: List.new(),
         const_d0: List.new(),
         const_d1: List.new(),
@@ -575,6 +575,8 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         call_sig_indices: List.new(),
         call_mono_syms: List.new(),
         call_contract_required: List.new(),
+        unwritten_at_return_bbs: List.new(),
+        unwritten_at_return_locals: List.new(),
         call_pipeline_receiver_places: List.new(),
         call_machinery_dispatch: List.new(),
         call_may_cancel: List.new(),
@@ -640,8 +642,6 @@ impl MirBody:
         self.stmt_d0.push(d0)
         self.stmt_d1.push(d1)
         self.stmt_spans.push(span)
-        if kind == StmtKind.Assign:
-            for op in mir_rvalue_operands(self, d1): self.emitted_operands.insert(op)
 
         if bb >= 0 and bb < self.bb_stmt_counts.len():
             let old_count: i32 = self.bb_stmt_counts[bb]
@@ -658,10 +658,6 @@ impl MirBody:
         self.bb_term_d2[bb] = d2
         self.bb_term_d3[bb] = d3
         self.bb_term_spans[bb] = span
-        if kind == TermKind.TK_CALL:
-            self.emitted_operands.insert(d0)
-            if d1 >= 0 and d1 < self.call_arg_starts.len():
-                for i in 0..self.call_arg_counts[d1]: self.emitted_operands.insert(self.call_arg_operands[self.call_arg_starts[d1] + i])
 
     mut fn set_term_no_suspend_node(bb: i32, node: i32):
         if bb < 0 or bb >= self.bb_no_suspend_nodes.len():
@@ -924,6 +920,15 @@ impl MirBody:
         self.let_binding_nodes.push(node)
         self.let_binding_aliases.push(if alias_place >= 0: 1 else: 0)
         self.let_binding_places.push(alias_place)
+
+    mut fn note_unwritten_at_return(bb: i32, local: i32):
+        self.unwritten_at_return_bbs.push(bb)
+        self.unwritten_at_return_locals.push(local)
+
+    fn local_unwritten_at_return(bb: i32, local: i32) -> bool:
+        for i in 0..self.unwritten_at_return_bbs.len():
+            if self.unwritten_at_return_bbs[i] == bb and self.unwritten_at_return_locals[i] == local: return true
+        false
 
     mut fn note_index_place(node: i32, place: i32, base: i32):
         if node <= 0: return
@@ -2936,6 +2941,10 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 if state.place(blocks.keys, place_id) != MirDropState.Init:
                     continue
                 if mir_local_partially_vacated(body, blocks.keys, state, place_id):
+                    continue
+                // #2570 (§14.7): the call producing it left by a cancellation
+                // unwind on this path, so the local holds no value.
+                if body.local_unwritten_at_return(bb, local_id):
                     continue
                 return f"fn sym{body.fn_sym} bb{bb}: owned local {mir_place_text(body, place_id)} is still Init at return — no path drops or moves it (a leak)"
         state.transfer_term(blocks.keys, body, bb)
