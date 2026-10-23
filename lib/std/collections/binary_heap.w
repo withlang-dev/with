@@ -61,7 +61,7 @@ impl[T: Ord] BinaryHeap[T]:
         Some(value)
 
     /// Observes the top value, or `None` when empty.
-    pub fn peek() -> Option[&T]:
+    pub fn peek() -> Option[&T] from self:
         if self.len() == 0: return None
         let slot = unsafe { *(*self.heap).values } as *const Slot[T]
         Some(unsafe { &(*slot).value })

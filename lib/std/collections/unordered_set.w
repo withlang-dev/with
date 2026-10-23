@@ -68,7 +68,7 @@ impl[T: Key] UnorderedSet[T]:
     pub fn contains(value: &T) -> bool: unsafe { self.find_slot(value) } as i64 != 0
 
     /// Observes the stored value equal to `value`, if any.
-    pub fn get(value: &T) -> Option[&T]:
+    pub fn get(value: &T) -> Option[&T] from self:
         let slot = unsafe { self.find_slot(value) }
         if slot as i64 == 0: None else: Some(unsafe { &(*slot).value })
 

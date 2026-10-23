@@ -56,7 +56,7 @@ impl[T: Ord] PriorityQueue[T]:
         Some(value)
 
     /// Observes the top value, or `None` when empty.
-    pub fn peek() -> Option[&T]:
+    pub fn peek() -> Option[&T] from self:
         if self.len() == 0: return None
         let slot = unsafe { *stc_slot_pqueue_top(&raw const self.queue) } as *const StcSlot[T]
         Some(unsafe { &(*slot).value })
