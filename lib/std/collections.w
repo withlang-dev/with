@@ -7,6 +7,11 @@
 
 use std.option
 use rt.rt_core
+use std.engines.mlib.defs
+use std.engines.mlib.facade_shapes
+use std.collections.mlib_slot.MlibSlot
+use std.collections.mlib_slot.MlibSlotPrefix
+use std.collections.mlib_slot.mlib_slot_prefix
 
 /// A growable array. Create with `List.new()`, add with `.push()`,
 /// read with `.get()`. Supports iteration via `.iter()`.
@@ -72,114 +77,224 @@ pub type HashSet[T]  {
     ptr: *const i8,
 }
 
-/// Ordered key-value map. This first stdlib implementation uses List-backed
-/// storage but preserves BTree semantics without using HashMap storage.
-pub type BTreeMap[K, V] {
-    entries: List[(K, V)],
-}
+/// Ordered key-value map over the migrated M*LIB B+tree
+/// (docs/proposals/stdlib_sourcing_plan.md, Phase 4; #937). Each entry is
+/// one facade-owned record holding the key and the value; the engine orders
+/// slots it owns (clones of the key, D151) that point back at the entry,
+/// through the key comparator (std.collections.mlib_slot). Keys are kept in
+/// ascending `Ord` order (D41). O(log n) insert, lookup and remove; in-order
+/// traversal O(n). A copy is `.clone()` (the map is a resource).
+pub type BTreeMap[K, V] { tree: mlib_slot_tree_s }
 
-/// Ordered set of unique values. Backed by a sorted List.
-pub type BTreeSet[T] {
-    values: List[T],
-}
+/// One entry: the slot prefix, the key, the value. A probe for a lookup is a
+/// `MlibSlot[K]` — the same prefix and the key at the same offset — so the
+/// engine compares it like a stored slot.
+pub type BTreeEntry[K, V] { prefix: MlibSlotPrefix, key: K, value: V }
+
+/// Ordered set of unique values over the same B+tree: one facade-owned
+/// entry per element, the engine's slots pointing back at it.
+pub type BTreeSet[T] { tree: mlib_slot_tree_s }
 
 pub fn BTreeMap.new[K, V]() -> BTreeMap[K, V]:
-    BTreeMap { entries: List.new() }
+    var map: BTreeMap[K, V] = BTreeMap { tree: mlib_slot_tree_s {} }
+    unsafe { mlib_slot_tree_init(&raw mut map.tree) }
+    map
 
-impl[K: Ord, V] BTreeMap[K, V]:
-    pub fn len() -> isize:
-        self.entries.len()
+// The engine reads through a mutable pointer (C's `const tree_t` decays to
+// the node pointer); a view of the map hands it the same address.
+fn btree_handle(tree: &mlib_slot_tree_s) -> *mut mlib_slot_tree_s: &raw const *tree as *mut mlib_slot_tree_s
 
-impl[K, V] BTreeMap[K, V]:
-    pub fn is_empty() -> bool:
-        self.entries.len() == 0
+impl[K: Ord + Clone, V] BTreeMap[K, V]:
+    fn comparator() -> fn(*const u8, *const u8) -> i32:
+        (a, b) =>
+            let left = unsafe { &(*(a as *const MlibSlot[K])).key }
+            let right = unsafe { &(*(b as *const MlibSlot[K])).key }
+            if left < right: -1 else if left > right: 1 else: 0
 
-    pub mut fn clear() -> Unit:
-        self.entries.clear()
+    // The engine's clone of a key slot (INIT_SET): the same prefix (its
+    // entry pointer with it), the key cloned; CLEAR drops it (dropper).
+    fn cloner() -> fn(*const u8) -> *mut u8:
+        (p) =>
+            let source = unsafe { &(*(p as *const MlibSlot[K])).prefix }
+            let prefix = mlib_slot_prefix(source.compare.clone(), source.clone_fn.clone(), source.drop_fn.clone(), source.head.entry as *mut u8)
+            let cloned: K = unsafe { (*(p as *const MlibSlot[K])).key.clone() }
+            let slot = with_alloc(sizeof[MlibSlot[K]]() as i64) as *mut MlibSlot[K]
+            unsafe { *slot = MlibSlot { prefix: prefix, key: cloned } }
+            slot as *mut u8
 
-impl[K, V] BTreeMap[K, V]:
-    fn key_at(index: i64) -> &K: &self.entries[index].0
+    fn dropper() -> fn(*mut u8) -> Unit:
+        (p) =>
+            var slot = p as *mut MlibSlot[K]
+            let key: K = unsafe { move slot.key }
+            drop(key)
+            with_free(p)
 
-    fn value_at(index: i64) -> &V: &self.entries[index].1
+    fn prefix(entry: *mut u8) -> MlibSlotPrefix:
+        let compare = self.comparator()
+        let clone_fn = self.cloner()
+        let drop_fn = self.dropper()
+        mlib_slot_prefix(compare, clone_fn, drop_fn, entry)
 
-impl[K: Ord, V] BTreeMap[K, V]:
-    // #773: pure read — takes &K; get/contains/remove all observe the key (D110).
-    fn last_index_of(key: &K) -> i64:
-        var found = -1
-        var i = 0
-        while i < self.entries.len():
-            let existing = self.key_at(i)
-            if not (existing < key) and not (existing > key):
-                found = i
-            i = i + 1
+    pub fn len() -> isize: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
+
+    pub fn is_empty() -> bool: self.len() == 0
+
+    unsafe fn probe(key: &K) -> *mut MlibSlot[K]:
+        let probe = with_alloc(sizeof[MlibSlot[K]]() as i64) as *mut MlibSlot[K]
+        (*probe).prefix = self.prefix(null)
+        with_memcpy(&raw mut (*probe).key as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64)
+        probe
+
+    // The engine's slot under `key` (the address of the stored pointer), or null.
+    unsafe fn find_slot(key: &K) -> *mut *mut mlib_slot_head:
+        let probe = self.probe(key)
+        let found = mlib_slot_tree_get(btree_handle(&self.tree), probe as *mut mlib_slot_head)
+        with_free(probe as *mut u8)
         found
 
-    pub fn contains(key: &K) -> bool:
-        var i = 0
-        while i < self.entries.len():
-            let existing = self.key_at(i)
-            if not (existing < key) and not (existing > key):
-                return true
-            i = i + 1
-        false
+    unsafe fn find_entry(key: &K) -> *mut BTreeEntry[K, V]:
+        let found = self.find_slot(key)
+        if found as i64 == 0: 0 as *mut BTreeEntry[K, V] else: (*(*found)).entry as *mut BTreeEntry[K, V]
 
+    pub fn contains(key: &K) -> bool: unsafe { self.find_entry(key) } as i64 != 0
+
+    /// Observes the value under `key`, if any (D22).
     pub fn get(key: &K) -> Option[&V]:
-        let idx = self.last_index_of(key)
-        if idx < 0:
-            return None
-        Some(self.value_at(idx))
+        let entry = unsafe { self.find_entry(key) }
+        if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
 
+    /// Stores `value` under `key`; an equal stored key's entry is replaced
+    /// (the stored key and the old value drop).
     pub mut fn insert(key: K, value: V) -> Unit:
-        var i = 0
-        while i < self.entries.len():
-            let existing = self.key_at(i)
-            if not (existing < key) and not (existing > key):
-                with self.entries.slot(i) as mut slot:
-                    slot.set((key, value))
-                return
-            if existing > key:
-                let reordered: List[(K, V)] = List.new()
-                var old_index = 0
-                while old_index < i:
-                    reordered.push(self.entries.remove(0))
-                    old_index = old_index + 1
-                reordered.push((key, value))
-                while self.entries.len() > 0:
-                    reordered.push(self.entries.remove(0))
-                self.entries = reordered
-                return
-            i = i + 1
-        self.entries.push((key, value))
+        let entry = with_alloc(sizeof[BTreeEntry[K, V]]() as i64) as *mut BTreeEntry[K, V]
+        unsafe { *entry = BTreeEntry { prefix: self.prefix(entry as *mut u8), key: key, value: value } }
+        let found = unsafe { mlib_slot_tree_get(&raw mut self.tree, entry as *mut mlib_slot_head) }
+        if found as i64 == 0:
+            unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
+            return
+        // The engine's slot keeps its key clone (equal) and points at the new
+        // entry; the old entry transfers its key and value out to drop.
+        var old = unsafe { (*(*found)).entry } as *mut BTreeEntry[K, V]
+        unsafe { (*(*found)).entry = entry as *mut c_void }
+        let old_key: K = unsafe { move old.key }
+        drop(old_key)
+        let old_value: V = unsafe { move old.value }
+        drop(old_value)
+        with_free(old as *mut u8)
 
+    /// Transfers the value under `key` out, if any; the key drops.
     pub mut fn remove(key: &K) -> Option[V]:
-        let idx = self.last_index_of(key)
-        if idx < 0:
-            return None
-        let (_, removed_value) = self.entries.remove(idx)
-        Some(removed_value)
+        var entry = unsafe { self.find_entry(key) }
+        if entry as i64 == 0: return None
+        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+        let stored_key: K = unsafe { move entry.key }
+        drop(stored_key)
+        let value: V = unsafe { move entry.value }
+        with_free(entry as *mut u8)
+        Some(value)
 
-    // D44: traversal observes. Each yields views into the entries.
+    /// Drops every entry; the map is empty afterwards.
+    pub mut fn clear() -> Unit:
+        self.drop_entries()
+        unsafe { mlib_slot_tree_reset(&raw mut self.tree) }
+
+    // Every entry dropped and freed; the engine's own slots are its to clear.
+    mut fn drop_entries():
+        var cursor = mlib_slot_tree_it_s {}
+        unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+        while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
+            var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut BTreeEntry[K, V]
+            let key: K = unsafe { move entry.key }
+            drop(key)
+            let value: V = unsafe { move entry.value }
+            drop(value)
+            with_free(entry as *mut u8)
+            unsafe { mlib_slot_tree_next(&raw mut cursor) }
+
+    /// Observes the least key's entry, or `None` when empty.
+    pub fn first() -> Option[(&K, &V)]:
+        if self.len() == 0: return None
+        let entry = unsafe { (*(*mlib_slot_tree_min(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
+        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+
+    /// Observes the greatest key's entry, or `None` when empty.
+    pub fn last() -> Option[(&K, &V)]:
+        if self.len() == 0: return None
+        let entry = unsafe { (*(*mlib_slot_tree_max(btree_handle(&self.tree)))).entry } as *const BTreeEntry[K, V]
+        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+
+    // The greatest entry, transferred out (the consuming traversals).
+    mut fn take_last() -> Option[(K, V)]:
+        if self.len() == 0: return None
+        var entry = unsafe { (*(*mlib_slot_tree_max(&raw mut self.tree))).entry } as *mut BTreeEntry[K, V]
+        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+        let key: K = unsafe { move entry.key }
+        let value: V = unsafe { move entry.value }
+        with_free(entry as *mut u8)
+        Some((key, value))
+
+    // D44: traversal observes. Each yields views into the entries, in key order.
     @[iter_of_self]
-    pub fn iter() -> MapIter[K, V]: MapIter { source: .Tree(self), at: 0 }
+    pub fn iter() -> BTreeMapIter[K, V]:
+        var cursor = mlib_slot_tree_it_s {}
+        unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
+        BTreeMapIter { cursor: cursor }
 
     @[iter_of_self]
-    pub fn keys() -> MapKeys[K, V]: MapKeys { source: .Tree(self), at: 0 }
+    pub fn keys() -> BTreeMapKeys[K, V]: BTreeMapKeys { entries: self.iter() }
 
     @[iter_of_self]
-    pub fn values() -> MapValues[K, V]: MapValues { source: .Tree(self), at: 0 }
+    pub fn values() -> BTreeMapValues[K, V]: BTreeMapValues { entries: self.iter() }
+
+impl[K, V] Drop for BTreeMap[K, V]:
+    move fn drop():
+        self.drop_entries()
+        unsafe { mlib_slot_tree_clear(&raw mut self.tree) }
+
+impl[K: Ord + Clone, V: Clone] Clone for BTreeMap[K, V]:
+    fn clone() -> BTreeMap[K, V]:
+        var out: BTreeMap[K, V] = BTreeMap.new()
+        for (key, value) in self: out.insert(key.clone(), value.clone())
+        out
+
+/// `map.iter()`, and what `for (k, v) in map` walks: each entry as views.
+pub type BTreeMapIter[K, V] ephemeral { cursor: mlib_slot_tree_it_s }
+
+impl[K, V] Iter[(&K, &V)] for BTreeMapIter[K, V]:
+    mut fn next() -> Option[(&K, &V)]:
+        if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
+        let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const BTreeEntry[K, V]
+        unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
+        Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))
+
+/// `map.keys()`: each key as a view, in order.
+pub type BTreeMapKeys[K, V] ephemeral { entries: BTreeMapIter[K, V] }
+
+impl[K, V] Iter[&K] for BTreeMapKeys[K, V]:
+    mut fn next() -> Option[&K]:
+        match self.entries.next():
+            Some((k, _)) => Some(k)
+            None => None
+
+/// `map.values()`: each value as a view, in key order.
+pub type BTreeMapValues[K, V] ephemeral { entries: BTreeMapIter[K, V] }
+
+impl[K, V] Iter[&V] for BTreeMapValues[K, V]:
+    mut fn next() -> Option[&V]:
+        match self.entries.next():
+            Some((_, v)) => Some(v)
+            None => None
 
 // §15.4.7 / D61: the `:?` forms of the maps. The compiler calls these for
 // every map an f-string formats with `:?`, at any depth; `{k:?}` and `{v:?}`
 // are the same recursive formatter, so a map formats the same everywhere.
 
 // `{key: value, key: value}` in key order.
-impl[K: Ord, V] BTreeMap[K, V]:
+impl[K: Ord + Clone, V] BTreeMap[K, V]:
     fn debug_form() -> str:
-        let parts: List[str] = List.with_capacity(self.entries.len())
-        var i: i64 = 0
-        while i < self.entries.len():
-            parts.push(f"{self.key_at(i):?}: {self.value_at(i):?}")
-            i = i + 1
+        let parts: List[str] = List.with_capacity(self.len())
+        for (key, value) in self:
+            parts.push(f"{key:?}: {value:?}")
         "{" ++ parts.join(", ") ++ "}"
 
 // `{key: value, key: value}` ordered by the Debug text of the keys: a key
@@ -245,125 +360,149 @@ fn debug_entry_order(keys: &List[str], values: &List[str]) -> List[i64]:
     order
 
 pub fn BTreeSet.new[T]() -> BTreeSet[T]:
-    BTreeSet { values: List.new() }
+    var set: BTreeSet[T] = BTreeSet { tree: mlib_slot_tree_s {} }
+    unsafe { mlib_slot_tree_init(&raw mut set.tree) }
+    set
 
-impl[T: Ord] BTreeSet[T]:
-    pub fn len() -> isize:
-        self.values.len()
+impl[T: Ord + Clone] BTreeSet[T]:
+    fn comparator() -> fn(*const u8, *const u8) -> i32:
+        (a, b) =>
+            let left = unsafe { &(*(a as *const MlibSlot[T])).key }
+            let right = unsafe { &(*(b as *const MlibSlot[T])).key }
+            if left < right: -1 else if left > right: 1 else: 0
 
-impl[T] BTreeSet[T]:
-    pub fn is_empty() -> bool:
-        self.values.len() == 0
+    // The engine's clone of a key slot (INIT_SET): the same prefix (its
+    // entry pointer with it), the key cloned; CLEAR drops it (dropper).
+    fn cloner() -> fn(*const u8) -> *mut u8:
+        (p) =>
+            let source = unsafe { &(*(p as *const MlibSlot[T])).prefix }
+            let prefix = mlib_slot_prefix(source.compare.clone(), source.clone_fn.clone(), source.drop_fn.clone(), source.head.entry as *mut u8)
+            let cloned: T = unsafe { (*(p as *const MlibSlot[T])).key.clone() }
+            let slot = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
+            unsafe { *slot = MlibSlot { prefix: prefix, key: cloned } }
+            slot as *mut u8
 
-    pub mut fn clear() -> Unit:
-        self.values.clear()
+    fn dropper() -> fn(*mut u8) -> Unit:
+        (p) =>
+            var slot = p as *mut MlibSlot[T]
+            let key: T = unsafe { move slot.key }
+            drop(key)
+            with_free(p)
 
-impl[T: Ord] BTreeSet[T]:
-    fn index_of(value: &T) -> i64:
-        var i = 0
-        while i < self.values.len():
-            let existing = self.values[i]
-            if not (existing < value) and not (existing > value):
-                return i
-            i = i + 1
-        -1
+    fn prefix(entry: *mut u8) -> MlibSlotPrefix:
+        let compare = self.comparator()
+        let clone_fn = self.cloner()
+        let drop_fn = self.dropper()
+        mlib_slot_prefix(compare, clone_fn, drop_fn, entry)
 
-    pub fn contains(value: &T) -> bool:
-        var i = 0
-        while i < self.values.len():
-            let existing = self.values[i]
-            if not (existing < value) and not (existing > value):
-                return true
-            i = i + 1
-        false
+    pub fn len() -> isize: unsafe { mlib_slot_tree_size(btree_handle(&self.tree)) } as isize
 
+    pub fn is_empty() -> bool: self.len() == 0
+
+    unsafe fn probe(value: &T) -> *mut MlibSlot[T]:
+        let probe = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
+        (*probe).prefix = self.prefix(null)
+        with_memcpy(&raw mut (*probe).key as *mut u8, &raw const *value as *const u8, sizeof[T]() as i64)
+        probe
+
+    // The facade's entry holding `value`, or null.
+    unsafe fn find_entry(value: &T) -> *mut MlibSlot[T]:
+        let probe = self.probe(value)
+        let found = mlib_slot_tree_get(btree_handle(&self.tree), probe as *mut mlib_slot_head)
+        with_free(probe as *mut u8)
+        if found as i64 == 0: 0 as *mut MlibSlot[T] else: (*(*found)).entry as *mut MlibSlot[T]
+
+    pub fn contains(value: &T) -> bool: unsafe { self.find_entry(value) } as i64 != 0
+
+    /// Stores `value`; an equal stored element keeps its place and the new
+    /// one drops.
     pub mut fn insert(value: T) -> Unit:
-        var i = 0
-        while i < self.values.len():
-            let existing = self.values[i]
-            if not (existing < value) and not (existing > value):
-                with self.values.slot(i) as mut slot:
-                    slot.set(value)
-                return
-            if existing > value:
-                self.values.push(value)
-                var j = self.values.len() - 1
-                while j > i:
-                    // Typed lets snapshot the elements: a view of slot j-1
-                    // would observe the first set() and duplicate it (the
-                    // §3.2 view-liveness hazard E3 will reject).
-                    let left: T = self.values[j - 1]
-                    let right: T = self.values[j]
-                    with self.values.slot(j - 1) as mut left_slot:
-                        left_slot.set(right)
-                    with self.values.slot(j) as mut right_slot:
-                        right_slot.set(left)
-                    j = j - 1
-                return
-            i = i + 1
-        self.values.push(value)
+        if unsafe { self.find_entry(&value) } as i64 != 0:
+            drop(value)
+            return
+        let entry = with_alloc(sizeof[MlibSlot[T]]() as i64) as *mut MlibSlot[T]
+        unsafe { *entry = MlibSlot { prefix: self.prefix(entry as *mut u8), key: value } }
+        unsafe { mlib_slot_tree_push(&raw mut self.tree, entry as *mut mlib_slot_head) }
 
+    /// Removes `value`; true when it was present (the element drops).
     pub mut fn remove(value: &T) -> bool:
-        let idx = self.index_of(value)
-        if idx < 0:
-            return false
-        var i = 0
-        while i < self.values.len():
-            let existing = self.values[i]
-            if not (existing < value) and not (existing > value):
-                let _ = self.values.remove(i)
-            else:
-                i = i + 1
+        var entry = unsafe { self.find_entry(value) }
+        if entry as i64 == 0: return false
+        assert(unsafe { mlib_slot_tree_erase(&raw mut self.tree, entry as *mut mlib_slot_head) })
+        let stored: T = unsafe { move entry.key }
+        drop(stored)
+        with_free(entry as *mut u8)
         true
 
+    /// Drops every element; the set is empty afterwards.
+    pub mut fn clear() -> Unit:
+        self.drop_entries()
+        unsafe { mlib_slot_tree_reset(&raw mut self.tree) }
+
+    mut fn drop_entries():
+        var cursor = mlib_slot_tree_it_s {}
+        unsafe { mlib_slot_tree_it(&raw mut cursor, &raw mut self.tree) }
+        while not unsafe { mlib_slot_tree_end_p(&raw mut cursor) }:
+            var entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut cursor))).entry } as *mut MlibSlot[T]
+            let stored: T = unsafe { move entry.key }
+            drop(stored)
+            with_free(entry as *mut u8)
+            unsafe { mlib_slot_tree_next(&raw mut cursor) }
+
+    /// The elements, in order, as an owned list of clones.
     pub fn items() -> List[T]:
-        let out: List[T] = List.new()
-        var value_i = 0
-        while value_i < self.values.len():
-            let value = self.values[value_i]
-            out.push(value.clone())
-            value_i = value_i + 1
+        let out: List[T] = List.with_capacity(self.len())
+        for value in self: out.push(value.clone())
         out
 
-impl[T: Ord] BTreeSet[T]:
+    /// Every element of either set, in order.
     pub fn union(other: &BTreeSet[T]) -> BTreeSet[T]:
-        let out: BTreeSet[T] = BTreeSet[T].new()
-        var self_i = 0
-        while self_i < self.values.len():
-            let value: T = self.values[self_i]
-            out.insert(value)
-            self_i = self_i + 1
-        var other_i = 0
-        while other_i < other.values.len():
-            let value2: T = other.values[other_i]
-            out.insert(value2)
-            other_i = other_i + 1
+        var out: BTreeSet[T] = BTreeSet.new()
+        for value in self: out.insert(value.clone())
+        for value in other: out.insert(value.clone())
         out
 
-impl[T: Ord] BTreeSet[T]:
+    /// The elements of both sets, in order.
     pub fn intersection(other: &BTreeSet[T]) -> BTreeSet[T]:
-        let out: BTreeSet[T] = BTreeSet[T].new()
-        var self_i = 0
-        while self_i < self.values.len():
-            let value: T = self.values[self_i]
-            if other.contains(value):
-                out.insert(value)
-            self_i = self_i + 1
+        var out: BTreeSet[T] = BTreeSet.new()
+        for value in self:
+            if other.contains(value): out.insert(value.clone())
         out
 
+    /// The elements of this set `other` lacks, in order.
     pub fn difference(other: &BTreeSet[T]) -> BTreeSet[T]:
-        let out: BTreeSet[T] = BTreeSet[T].new()
-        var self_i = 0
-        while self_i < self.values.len():
-            let value: T = self.values[self_i]
-            if not other.contains(value):
-                out.insert(value)
-            self_i = self_i + 1
+        var out: BTreeSet[T] = BTreeSet.new()
+        for value in self:
+            if not other.contains(value): out.insert(value.clone())
         out
 
-impl[T: Ord] Iterable[T] for BTreeSet[T]:
-    fn iter() -> ListIter[T]:
-        self.values.iter()
+    /// D44: traversal observes. Each element as a view, in order.
+    @[iter_of_self]
+    pub fn iter() -> BTreeSetIter[T]:
+        var cursor = mlib_slot_tree_it_s {}
+        unsafe { mlib_slot_tree_it(&raw mut cursor, btree_handle(&self.tree)) }
+        BTreeSetIter { cursor: cursor }
+
+impl[T] Drop for BTreeSet[T]:
+    move fn drop():
+        self.drop_entries()
+        unsafe { mlib_slot_tree_clear(&raw mut self.tree) }
+
+impl[T: Ord + Clone] Clone for BTreeSet[T]:
+    fn clone() -> BTreeSet[T]:
+        var out: BTreeSet[T] = BTreeSet.new()
+        for value in self: out.insert(value.clone())
+        out
+
+/// `set.iter()`, and what `for x in set` walks: each element as a view.
+pub type BTreeSetIter[T] ephemeral { cursor: mlib_slot_tree_it_s }
+
+impl[T] Iter[&T] for BTreeSetIter[T]:
+    mut fn next() -> Option[&T]:
+        if unsafe { mlib_slot_tree_end_p(&raw mut self.cursor) }: return None
+        let entry = unsafe { (*(*mlib_slot_tree_ref(&raw mut self.cursor))).entry } as *const MlibSlot[T]
+        unsafe { mlib_slot_tree_next(&raw mut self.cursor) }
+        Some(unsafe { &(*entry).key })
 
 /// Type-safe generational handle into a SlotMap[T].
 /// Handles are Copy and carry their owner element type at compile time, so a
@@ -537,12 +676,11 @@ impl[T] Iter[T] for ListIntoIter[T]:
 // The observing traversals of a keyed map: concrete ephemeral structs over a
 // view of the map, whose items are views into its storage. Nothing is copied
 // out (§2.3). A HashMap or HashSet is walked through its entry slots in
-// insertion order (D96), skipping removed entries; a BTreeMap through its
-// key-ordered entries.
+// insertion order (D96), skipping removed entries; a BTreeMap walks its
+// engine's cursor (BTreeMapIter).
 
 enum MapSource[K, V] ephemeral:
     Hash(&HashMap[K, V])
-    Tree(&BTreeMap[K, V])
 
 impl[K, V] MapSource[K, V]:
     // The first live position at or after `at`, or -1 at the end.
@@ -554,17 +692,14 @@ impl[K, V] MapSource[K, V]:
                     if m.slot_live(slot): return slot
                     slot = slot + 1
                 -1
-            .Tree(t) => if at < t.entries.len(): at else: -1
 
     fn key_at(at: i64) -> &K:
         match self:
             .Hash(m) => m.slot_key(at)
-            .Tree(t) => t.key_at(at)
 
     fn value_at(at: i64) -> &V:
         match self:
             .Hash(m) => m.slot_value(at)
-            .Tree(t) => t.value_at(at)
 
 /// `map.iter()`, and what `for (k, v) in map` walks: each entry as views.
 pub type MapIter[K, V] ephemeral { source: MapSource[K, V], at: i64 }
@@ -662,12 +797,12 @@ impl[K, V] HashMap[K, V]:
 
     pub mut fn drain() -> MapDrain[K, V]: MapDrain { entries: self.take_reversed() }
 
-impl[K, V] BTreeMap[K, V]:
+impl[K: Ord + Clone, V] BTreeMap[K, V]:
     // Every entry, moved out, last first; the map is left empty.
     mut fn take_reversed() -> MapIntoIter[K, V]:
-        var reversed: List[(K, V)] = List.with_capacity(self.entries.len())
+        var reversed: List[(K, V)] = List.with_capacity(self.len())
         while true:
-            match self.entries.pop():
+            match self.take_last():
                 Some(entry) => reversed.push(entry)
                 None => break
         MapIntoIter { entries: reversed }

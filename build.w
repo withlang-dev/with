@@ -1061,7 +1061,7 @@ fn gate_fixed_targets() -> List[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: List[str] = List.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check corpus-promote-guard-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -4957,6 +4957,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         out = corpus_pipeline(move out, ctx, corpus, release_compiler_bin("with"))
     out = out.add_target(corpora_drift_group(ctx))
     out = out.add_target(corpora_integrity_group())
+    out = out.add_target(corpora_promote_guard_target())
     out = out.add_target(corpora_migrator_gate_group())
     out = out.add_target(corpora_drift_report_group())
 

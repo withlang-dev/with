@@ -129,6 +129,9 @@ impl Key for TotalF32:
         if v == 0.0: return 0
         unsafe { transmute[u32](v) }
 
+impl Clone for TotalF64:
+    fn clone(self: &Self) -> TotalF64: *self
+
 impl Ord for TotalF64:
     fn cmp(other: &Self) -> i32: total_float_cmp(self.value, other.value)
 

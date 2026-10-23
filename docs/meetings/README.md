@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D151 — `BTreeMap` and `BTreeSet` are facades over the M*LIB B+tree slot shape; the compiler no longer knows their layout (delegated)](2026-10-22-D151-btreemap-and-btreeset-are-facades-over-the-mlib-bptree-slot-shape.md)
 - [D150 — A `static inline` function a header defines that no unit owns is published by its sole includer; several includers keep a private copy each](2026-10-22-D150-a-header-function-no-unit-owns-is-published-by-its-sole-includer.md)
 - [D149 — The hash family's engine is rt_core's insertion-ordered layout; STC `hmap`/`hset` is the comparison engine and backs an unordered map under its own name (amends the 2026-09-12 facade map)](2026-10-22-D149-the-hash-family-engine-is-rt-core-s-insertion-ordered-layout-stc-hmap-is-the-comparison-engine.md)
 - [D148 — A templated engine serves an arbitrary `T` through the slot shape; the shape set is one C unit in the corpus's build inputs (delegated)](2026-10-22-D148-templated-engines-serve-arbitrary-T-through-the-slot-shape.md)

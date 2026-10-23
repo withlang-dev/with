@@ -3090,6 +3090,11 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
     let iname = pool.get_data0(current)
     let displaceable = frontend_fn_decl_is_displaceable(pool, intern, current)
     if frontend_list_contains_i32(higher_names, iname):
+        // An extern declaration is its module's view of a C symbol
+        // (Sema.extern_view_sig): a higher tier's declaration of the name
+        // never drops it. Dropped, a corpus's `extern fn strlen` bound its
+        // callers to another corpus's generation of the declaration.
+        if current_kind == NodeKind.NK_EXTERN_FN: return FRONTEND_FN_KEEP
         return if displaceable: FRONTEND_FN_DISPLACE else: FRONTEND_FN_DROP
 
     // Within-tier precedence:

@@ -897,7 +897,16 @@ type Sema {
     // a module that declares an extern itself is classified by ITS
     // declaration, not by whichever other module (std.fs) declared the
     // same name last.
+    // `<module>\n<name>` -> that module's signature for the extern (-1 for
+    // an interface's declaration): the module's view (get_sig).
     extern_decl_sites: HashMap[str, i32],
+    // a signature index -> the module that declared the extern (get_sig).
+    extern_sig_modules: HashMap[i32, str],
+    // every extern fn's text (imports keep their own symbol pools).
+    extern_fn_texts: HashMap[str, i32],
+    // text -> newest extern signature of that text; signature -> the previous one.
+    extern_chain_head: HashMap[str, i32],
+    extern_chain_prev: HashMap[i32, i32],
     extern_var_texts: HashMap[str, i32],  // every collected extern var by name text (has_extern_var_decl)
     // #602: c_import/extern params that RETAIN a passed C-string pointer past
     // the call (§16.3c). Keyed by fn name sym → bitmask of retained param
@@ -1583,6 +1592,10 @@ type Sema {
     // use resolved_call_*: the anchor expression may itself be a generic call.
     btree_insert_sigs: HashMap[i32, i32],
     btree_insert_mono_syms: HashMap[i32, i32],
+    // The `new()` a BTree literal or comprehension starts from, specialized
+    // for the concrete type (record_btree_new_contract), keyed by the node.
+    btree_new_sigs: HashMap[i32, i32],
+    btree_new_mono_syms: HashMap[i32, i32],
     // Compiler-synthesized Clone calls (currently Option[&T].cloned()).
     // The source node names the builtin eliminator, not the payload's clone
     // method, so resolved_call_* cannot carry both contracts. Sema resolves
@@ -3084,6 +3097,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let sig_lookup = sema_new_map_i32_i32()
     let extern_fn_names = sema_new_map_i32_i32()
     let extern_decl_sites = sema_new_map_str_i32()
+    let extern_sig_modules = sema_new_map_i32_str()
+    let extern_fn_texts = sema_new_map_str_i32()
+    let extern_chain_head = sema_new_map_str_i32()
+    let extern_chain_prev = sema_new_map_i32_i32()
     let extern_var_texts = sema_new_map_str_i32()
     let retained_extern_params = sema_new_map_i32_i32()
     let fn_decl_nodes = sema_new_map_i32_i32()
@@ -3281,6 +3298,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         move_site_node: 0,
         extern_fn_names,
         extern_decl_sites,
+        extern_sig_modules,
+        extern_fn_texts,
+        extern_chain_head,
+        extern_chain_prev,
         extern_var_texts,
         retained_extern_params,
         fn_decl_nodes,
@@ -3640,6 +3661,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         try_from_break_mono_syms: sema_new_map_i32_i32(),
         btree_insert_sigs: sema_new_map_i32_i32(),
         btree_insert_mono_syms: sema_new_map_i32_i32(),
+        btree_new_sigs: sema_new_map_i32_i32(),
+        btree_new_mono_syms: sema_new_map_i32_i32(),
         clone_contract_fns: sema_new_map_i32_i32(),
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),
@@ -4830,6 +4853,21 @@ impl Sema:
                 return ""
             excluded_by = with_str_clone_ref(text)
         excluded_by
+
+    // Whether the current module names `target_path` in one of its own `use`s.
+    fn module_imports_directly(target_path: &str) -> bool:
+        let cur = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
+        let target = self.module_index_by_path.get(target_path)
+        if not cur.is_some() or not target.is_some(): return false
+        let from: i32 = cur.unwrap()
+        let to: i32 = target.unwrap()
+        let start = self.module_import_starts[from]
+        for ei in 0..self.module_import_counts[from]:
+            // By path, not index: a module an interface and a source both
+            // present (a corpus beside its bundle) has two indices.
+            let edge = self.module_import_targets[start + ei]
+            if edge >= 0 and edge < self.module_paths.len() and self.module_paths[edge] == target_path: return true
+        false
 
     fn module_in_prelude_closure(path: &str) -> i32:
         if self.global_visible_module_paths.contains(path): 1 else: 0
@@ -9701,8 +9739,50 @@ impl Sema:
                 continue
 
     fn get_sig(name: i32) -> i32:
+        // An extern declaration is its module's view of a C symbol, as a C
+        // prototype is a translation unit's: a module that declares `strlen`
+        // calls it through its own signature whatever other modules declare
+        // (every migrated corpus carries its generation's declarations, and
+        // D112 keeps them as they were promoted; codegen reuses one LLVM
+        // declaration per symbol and marshals each call by its own FnAbi).
+        let view = self.extern_view_sig(self.pool_resolve(name))
+        if view >= 0: return view
         if self.sig_lookup.contains(name):
             return self.sig_lookup.get(name).unwrap()
+        -1
+
+    // The current module's view of an extern C symbol spelled `text`, or -1
+    // when no module it reaches declares one: its own declaration, else a
+    // module it imports directly (a corpus's `defs`), else one it reaches
+    // through its imports (the walk is cached). Symbols are matched by text:
+    // every imported module's names live in its own pool.
+    fn extern_view_sig(text: &str) -> i32:
+        if text == "strlen" and self.current_module_path.contains("facade_shapes"):
+            var j: i32 = self.sig_text_index.get(with_str_clone_ref(text)) ?? -1
+            while j >= 0:
+                let dm = self.extern_sig_modules.get(j)
+                let dmt = if dm.is_some(): dm.unwrap() else: "<none>"
+                j = self.sig_text_prev[j]
+            let ci = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
+            if ci.is_some():
+                let st = self.module_import_starts[ci.unwrap()]
+                for ei in 0..self.module_import_counts[ci.unwrap()]:
+                    let e = self.module_import_targets[st + ei]
+        if not self.extern_fn_texts.contains(text): return -1
+        let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ text)
+        if own.is_some() and own.unwrap() >= 0: return own.unwrap()
+        // The declarations of this text, newest first (the extern chain is
+        // the view's own: the signature text chain is not every declaration).
+        var i: i32 = self.extern_chain_head.get(with_str_clone_ref(text)) ?? -1
+        while i >= 0:
+            let declaring = self.extern_sig_modules.get(i)
+            if declaring.is_some() and self.module_imports_directly(declaring.unwrap()): return i
+            i = self.extern_chain_prev.get(i) ?? -1
+        i = self.extern_chain_head.get(with_str_clone_ref(text)) ?? -1
+        while i >= 0:
+            let declaring = self.extern_sig_modules.get(i)
+            if declaring.is_some() and self.module_visible_no_prelude(declaring.unwrap()) != 0: return i
+            i = self.extern_chain_prev.get(i) ?? -1
         -1
 
     fn get_visible_sig(name: i32) -> i32:

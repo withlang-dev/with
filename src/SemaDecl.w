@@ -2289,16 +2289,19 @@ impl Sema:
         if is_local != 0:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
         self.record_decl_visibility(name, node, 1)
+        // An interface's declaration of a name a source module owns keeps
+        // the owner (below) but still gets its own signature: the module's
+        // view of the C symbol (Sema.extern_view_sig), which may spell it
+        // differently from the owner's generation.
+        var keeps_owner = false
         // D39: an extern names one C symbol in every tier (D29); a source
         // declaration of it owns the flat name and its source path whatever
         // the declaration order — an interface's (pcre2's `abort` beside
         // LlvmBridge's) would move the symbol into the migrated-C zone and
         // make the source's `unsafe: abort()` a block with no unsafe operation.
         if bundle_interface_text(self.current_module_path).len() > 0 and self.fn_decl_source_paths.contains(name) and bundle_interface_text(self.fn_symbol_source_path(name)).len() == 0:
-            let source_sig = self.get_sig(name)
-            if source_sig >= 0: self.extern_decl_sigs.insert(node, source_sig)
-            return
-        self.fn_decl_source_paths.insert(name, with_str_clone_ref(self.current_module_path))
+            keeps_owner = true
+        if not keeps_owner: self.fn_decl_source_paths.insert(name, with_str_clone_ref(self.current_module_path))
 
         // Error if this extern fn shadows a regular function from the same file or
         // the prelude. An extern fn silently replaces the existing signature with an
@@ -2338,7 +2341,10 @@ impl Sema:
             self.add_sig(name, fn_tid, self.ty_void, 0, 0, is_variadic)
             self.extern_decl_sigs.insert(node, self.get_sig(name))
             self.extern_fn_names.insert(name, 1)
-            self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), 1)
+            self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), self.get_sig(name))
+            self.extern_sig_modules.insert(self.get_sig(name), with_str_clone_ref(self.current_module_path))
+            self.extern_fn_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
+            self.extern_chain_link(self.get_sig(name), self.pool_resolve(name))
             return
 
         let ret_node = self.ast.fn_meta_ret(meta)
@@ -2382,7 +2388,20 @@ impl Sema:
                 if self.sig_param_is_c_va_list_by_place(sig_idx, pi) != 0:
                     self.set_sig_param_value_ref_abi(sig_idx, pi, 1)
         self.extern_fn_names.insert(name, 1)
-        self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), 1)
+        // The module's own view of the symbol (Sema.get_sig).
+        self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), sig_idx)
+        self.extern_sig_modules.insert(sig_idx, with_str_clone_ref(self.current_module_path))
+        self.extern_fn_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
+        self.extern_chain_link(sig_idx, self.pool_resolve(name))
+
+    // Links an extern declaration's signature into the view chain of its text.
+    mut fn extern_chain_link(sig_idx: i32, text: &str):
+        // Once per signature: a declaration collected again (an interface's
+        // beside a source's) must not link the chain to itself.
+        if sig_idx < 0 or self.extern_chain_prev.contains(sig_idx): return
+        let previous = self.extern_chain_head.get(with_str_clone_ref(text)) ?? -1
+        self.extern_chain_prev.insert(sig_idx, previous)
+        self.extern_chain_head.insert(sema_owned_text(text), sig_idx)
 
     mut fn collect_extern_var(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)

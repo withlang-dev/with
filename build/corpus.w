@@ -60,6 +60,10 @@ pub type Corpus ephemeral {
     // functions upstream declares in its own headers but never defines (the
     // migrated extern has no body anywhere; it links only while unreferenced)
     declared_externs: List[str],
+    // headers included before every unit (`-include`), as the library's own
+    // build would: M*LIB's examples take <stdio.h> from m-core.h, which
+    // `M_USE_STDIO=0` leaves out
+    forced_includes: List[str],
     // lane targets a promote waits for (the corpus's own tests)
     promote_after: List[str],
     // the lane `:test` runs ("" = none)
@@ -225,9 +229,11 @@ pub fn corpus_migrate_options(corpus: &Corpus, source: &str, output: &str) -> Mi
     for define in corpus.defines: defines.push(define.clone())
     var excludes: List[str] = List.new()
     for exclude in corpus.excludes: excludes.push(exclude.clone())
+    var forced: List[str] = List.new()
+    for header in corpus.forced_includes: forced.push(header.clone())
     MigrateOptions {
         source_path: corpus_owned_text(source), output_path: corpus_owned_text(output),
-        include_paths: corpus_include_paths(corpus, source), forced_includes: List.new(),
+        include_paths: corpus_include_paths(corpus, source), forced_includes: forced,
         defines: defines, exclude_basenames: excludes, check_mode: false,
         diff_mode: false, stats_mode: false, no_c_export: true,
         c_export_functions: false, convert_goto_to_structured: false,

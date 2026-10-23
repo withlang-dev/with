@@ -7406,6 +7406,23 @@ impl Sema:
         self.btree_insert_mono_syms.insert(anchor_node, self.sig_names[insert_sig])
         1
 
+    // The `new()` a literal or comprehension starts its BTree collection
+    // from: Sema specializes it for the concrete type and records it for
+    // MIR, which calls it instead of building the type's layout (D65).
+    mut fn record_btree_new_contract(owner_sym: i32, owner_type: i32, anchor_node: i32) -> i32:
+        let new_sym = self.pool_lookup_symbol("new")
+        let new_fn = if new_sym != 0: self.lookup_generic_method_fn(owner_sym, new_sym) else: 0
+        if new_fn == 0:
+            self.emit_error("BTree collection constructor is unavailable", anchor_node)
+            return 0
+        let new_sig = self.concrete_owner_method_sig(owner_sym, owner_type, new_fn)
+        if new_sig < 0:
+            self.emit_error("BTree collection constructor could not be specialized for the concrete collection type", anchor_node)
+            return 0
+        self.btree_new_sigs.insert(anchor_node, new_sig)
+        self.btree_new_mono_syms.insert(anchor_node, self.sig_names[new_sig])
+        1
+
     // A compiler-modeled operation that promises an owned clone must carry the
     // same concrete method contract as an ordinary source `value.clone()` call.
     // In particular, blanket impls such as Clone for List[T] are generic methods:
@@ -11808,7 +11825,8 @@ impl Sema:
                     if ord_trait != 0 and result_expected != 0 and self.type_implements_trait(result_expected, ord_trait) == 0:
                         self.emit_error("BTreeSet comprehension element type must implement Ord", node)
                         return 0
-                    let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
+                    if self.record_btree_new_contract(self.syms.btreeset, target_ty, node) == 0:
+                        return 0
                     if self.record_btree_insert_contract(self.syms.btreeset, target_ty, expr) == 0:
                         return 0
             self.typed_expr_types.insert(node, result_ty)
@@ -11898,7 +11916,8 @@ impl Sema:
                 if ord_trait2 != 0 and stored_key_ty != 0 and self.type_implements_trait(stored_key_ty, ord_trait2) == 0:
                     self.emit_error("BTreeMap comprehension key type must implement Ord", node)
                     return 0
-                let _btree_storage_ty = self.ensure_btree_storage_type(map_target_ty)
+                if self.record_btree_new_contract(self.syms.btreemap, map_target_ty, node) == 0:
+                    return 0
                 if self.record_btree_insert_contract(self.syms.btreemap, map_target_ty, key_expr) == 0:
                     return 0
             else:
@@ -20956,7 +20975,8 @@ impl Sema:
             if ord_trait != 0 and elem_type != 0 and self.type_implements_trait(elem_type, ord_trait) == 0:
                 self.emit_error("BTreeSet literal element type must implement Ord", node)
                 return 0
-            let _btree_storage_ty = self.ensure_btree_storage_type(result as i32)
+            if self.record_btree_new_contract(self.syms.btreeset, result as i32, node) == 0:
+                return 0
             for i in 0..elem_count:
                 if self.record_btree_insert_contract(self.syms.btreeset, result as i32, self.ast.get_extra(extra_start + i)) == 0:
                     return 0
@@ -21051,7 +21071,8 @@ impl Sema:
             if ord_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, ord_trait) == 0:
                 self.emit_error("BTreeMap literal key type must implement Ord", node)
                 return 0
-            let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
+            if self.record_btree_new_contract(self.syms.btreemap, target_ty, node) == 0:
+                return 0
             for i in 0..pair_count:
                 if self.record_btree_insert_contract(self.syms.btreemap, target_ty, self.ast.get_extra(extra_start + i * 2)) == 0:
                     return 0
@@ -31733,25 +31754,6 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.listiter, args, 1) as i32
 
-    fn ensure_btree_storage_type(btree_ty: i32) -> i32:
-        let resolved = self.resolve_alias(btree_ty as TypeId)
-        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        let base = self.get_generic_inst_base(resolved as i32)
-        let base_name = self.pool_resolve(base)
-        let argc = self.get_generic_inst_arg_count(resolved as i32)
-        if base_name == "BTreeSet" and argc > 0:
-            return self.ensure_list_type_for(self.get_generic_inst_arg(resolved as i32, 0))
-        if base_name == "BTreeMap" and argc >= 2:
-            let elems: List[i32] = List.new()
-            elems.push(self.get_generic_inst_arg(resolved as i32, 0))
-            elems.push(self.get_generic_inst_arg(resolved as i32, 1))
-            let pair_ty = self.ensure_tuple_type(elems, 2) as i32
-            if pair_ty == 0:
-                return 0
-            return self.ensure_list_type_for(pair_ty)
-        0
-
     fn iterator_owner_symbol(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -34203,8 +34205,6 @@ impl Sema:
         if base != 0 and base == self.syms.list:
             if name == "sequence": return MethodLowering.ListSequence
             if name == "traverse": return MethodLowering.ListTraverse
-        if name == "new" and (self.base_sym_is_btree(self.static_receiver_sema_base(expr)) or self.base_sym_is_btree(base)):
-            return MethodLowering.BTreeNew
         if is_option or is_result:
             if name == "unwrap_or": return MethodLowering.UnwrapOr
             if name == "unwrap_or_else": return MethodLowering.UnwrapOrElse
@@ -34977,7 +34977,6 @@ impl Sema:
                 if self.task_fns.contains(generic_method_fn):
                     self.record_global_concurrency_evidence(node, "async function call")
                 let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, expr, arg_types, extra_start, mc_resolved_arg_count, node)
-                let _btree_storage_ty = self.ensure_btree_storage_type(generic_ret)
                 return generic_ret
 
         if type_name_sym != 0:
@@ -38474,10 +38473,6 @@ impl Sema:
     // pair binds by value. The generic `next()` protocol found no `next` on
     // the map and typed the element `i32`, so the tuple pattern was refused
     // and a generic body's bindings came back undefined (#1561).
-    mut fn btree_traversal_element_type(map_inst: i32) -> i32:
-        let storage = self.ensure_btree_storage_type(map_inst)
-        if storage == 0: 0 else: self.infer_for_element_type(storage)
-
     mut fn infer_for_element_type(iter_type: i32) -> i32:
         if iter_type == 0:
             return 0
@@ -38504,7 +38499,6 @@ impl Sema:
                 let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
                 let ref_is_list = ref_base == "List"
                 let ref_is_hashmap = ref_base == "HashMap"
-                let ref_is_btreemap = ref_base == "BTreeMap"
                 if ref_is_list and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
@@ -38512,8 +38506,6 @@ impl Sema:
                 // like the map itself; returning 0 left k and v unbound.
                 if ref_is_hashmap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
                     return self.map_traversal_element_type(ref_pointee_resolved as i32)
-                if ref_is_btreemap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
-                    return self.btree_traversal_element_type(ref_pointee_resolved as i32)
             // #1197: a `&[T]` / `&[N]T` binding iterates the sequence it views.
             let pointee_kind = self.get_type_kind(ref_pointee_resolved)
             if pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
@@ -38531,8 +38523,6 @@ impl Sema:
                 return list_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
                 return self.map_traversal_element_type(resolved as i32)
-            if base_name == "BTreeMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
-                return self.btree_traversal_element_type(resolved as i32)
             if base_name == "Receiver" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 // D10: `for msg in rx:` receives until the channel is closed
                 // and drained. The loop desugars through recv() -> Option[T];

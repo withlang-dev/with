@@ -590,7 +590,7 @@ pub fn pcre2_corpus() -> Corpus:
         module_floor: 30,
         defines: ["PCRE2_CODE_UNIT_WIDTH=8", "HAVE_CONFIG_H=1"],
         excludes: ["pcre2demo.c", "pcre2grep.c", "pcre2posix_test.c", "pcre2_jit_test.c", "pcre2_dftables.c", "pcre2_fuzzsupport.c"],
-        include_dirs: List.new(), declared_externs: List.new(),
+        include_dirs: List.new(), declared_externs: List.new(), forced_includes: List.new(),
         promote_after: ["pcre2-test"], test_lane: "",
         fresh_test_lanes: ["pcre2-test"], extra_generated_dirs: List.new(),
         prepare_reference: pcre2_prepare, stage: pcre2_stage,

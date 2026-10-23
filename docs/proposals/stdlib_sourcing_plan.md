@@ -650,6 +650,37 @@ comparison engines; `OrderedMap`/`OrderedSet` retain STC's `smap`/`sset`.
 Gate: M*LIB's bptree tests pass under With; facade complexity fixtures and
 drop audit green; comparison measurements recorded; #937 closed.
 
+Status (2026-10-22, D151):
+- The corpus: `build/mlib.w`, `lib/std/engines/mlib` (`m-core.h`, `m-bptree.h`,
+  the facade shapes unit `BPTREE_DEF(mlib_slot_tree, 16, mlib_slot, …)` over
+  slot pointers, D148; upstream's multimap example as the drift harness and
+  the `mlib-test`/`mlib-test-fresh` lanes). M*LIB pinned at
+  93cddfb56c32976d8aeefd45ef9094167f64b285. Migrated with `M_USE_STDIO=0`
+  (the `FILE*` parsers and printers out) and `M_RAISE_FATAL(...)=abort()`;
+  `<stdio.h>` forced for the units (the corpus model's `forced_includes`).
+- Migrator rules it exposed, each general with a fixture (commit "The
+  migrator rules M*LIB's B+tree exposed"): typedef'd arrays and pointers,
+  `case A: default:`, call arguments translated once per level (the 2^depth
+  tower), discarded `sizeof`/compound literals, `(T){0} = v`, an anonymous
+  record a compound literal instantiates, one enum type everywhere, a field
+  of a value read directly, strlen's `size_t`; std.libc's strtoll family.
+- `BTreeMap`/`BTreeSet` are facades over the slot shape (D151); the compiler's
+  knowledge of their List layout is retired (traversal by `iter()` under
+  §13.5, literals and comprehensions from the recorded `new()` contract).
+  Complexity rows `btree-map-*`/`btree-set-*` PASS (XFAIL #937 before);
+  drop-audit cells `btree_map_*`, `btree_set_*`; `behav_btree_engine.w`.
+- Measured (`test/benchmark/stc_engines.w`, n = 100000 i32, ns/op median of
+  3, insert/lookup/remove): BTreeSet 945/444/617 and BTreeMap 936/438/611 over
+  the slot shape, beside OrderedSet (STC sset, AA-tree) 195/107/223 and the
+  retired sorted-List BTreeSet (n = 4000: 4371/481/4525). The B+tree pays a
+  key clone per insert and per separator, a probe allocation per lookup and
+  three C-ABI callbacks per comparison; the word shape for integer keys
+  (D148's condition) is the next row when a hot path needs it.
+- Open: upstream's `tests/test-mbptree.c` under With (it carries
+  `m-string.h` and `test-obj.h`; a mlib test lane like STC's is the next
+  step); a word-key instantiation for integer keys (the D148 condition) when
+  a hot path needs it.
+
 Order is fixed by risk: 1 validates the whole-corpus pipeline on a
 container library, 2 adds the performance yardstick, 3 is the campaign, 4
 is a bounded extra.

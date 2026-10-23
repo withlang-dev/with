@@ -62,6 +62,20 @@ fn ordered_set_round(n: i32) -> Timing:
     assert(hits == n and set.is_empty())
     Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
 
+fn btree_map_round(n: i32) -> Timing:
+    var map = BTreeMap[i32, i32].new()
+    let t0 = now_ns()
+    for i in 0..n: map.insert((i * 7919) % n, i)
+    let t1 = now_ns()
+    var hits = 0
+    for i in 0..n:
+        if map.contains(&i): hits = hits + 1
+    let t2 = now_ns()
+    for i in 0..n: assert(map.remove(&i).is_some())
+    let t3 = now_ns()
+    assert(hits == n and map.is_empty())
+    Timing { insert: t1 - t0, lookup: t2 - t1, remove: t3 - t2 }
+
 fn sorted_list_round(n: i32) -> Timing:
     var sorted = SortedList[i32].new()
     let t0 = now_ns()
@@ -198,7 +212,8 @@ print(f"engine\tinsert_ns\tlookup_ns\tremove_ns\t(n={n}, i32 values, median of 3
 report("PriorityQueue (STC pqueue)", pqueue_round, n)
 report("BinaryHeap (c-algorithms)", heap_round, n)
 report("OrderedSet (STC sset)", ordered_set_round, n)
-report("BTreeSet (native, #937)", btree_set_round, 4000)
+report("BTreeSet (M*LIB bptree, slot shape)", btree_set_round, n)
+report("BTreeMap (M*LIB bptree, slot shape)", btree_map_round, n)
 report("SortedList (c-algorithms, remove(0))", sorted_list_round, 20000)
 report("Deque[i32] (STC deque, word shape)", deque_round, n)
 report("Deque[Pair] (STC deque, slot shape)", deque_slots_round, n)
