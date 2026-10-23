@@ -10648,6 +10648,13 @@ impl CiExprPool:
             return inner_id
         if types.kind(target_ty_id) == CiTypeKind.CT_POINTER and ci_expr_is_zero_int_lit(self.val(), inner_id):
             return self.null_ptr(target_ty_id)
+        // A string literal is a `str`, never the pointer its C type spells:
+        // `(char *)"..."` keeps its cast however the pointee is spelled
+        // (`"..." as *mut c_char`; dropped as a same-type cast once the
+        // pointee was `c_char` on both sides, zlib's `strm->msg = ...` was a
+        // bare `str` assigned to a `*mut c_char`, #2582).
+        if self.kind(inner_id) == CiExprKind.CIE_STRING_LIT and types.kind(target_ty_id) == CiTypeKind.CT_POINTER:
+            return self.cast(target_ty_id, inner_id)
         let target_str = ci_print_type(types, target_ty_id)
         let inner_ty_id = self.get_type(inner_id)
         if inner_ty_id != 0 and ci_print_type(types, inner_ty_id) == target_str:
