@@ -11399,6 +11399,27 @@ impl CiTypePool:
         0 as CiTypeId
 
 impl CiExprPool:
+    // A conditional whose condition is an integer literal (`1 ? a : b`), or
+    // that literal compared with zero, is its chosen arm.
+    fn fold_literal_ternary(id: CiExprId) -> CiExprId:
+        if self.kind(id) != CiExprKind.CIE_TERNARY: return id
+        var cond = self.get_d0(id) as CiExprId
+        if self.kind(cond) == CiExprKind.CIE_BINARY and self.get_d0(cond) == CiBinOp.CIBO_NEQ:
+            let rhs = self.get_d2(cond) as CiExprId
+            if self.kind(rhs) == CiExprKind.CIE_INT_LIT and self.get_string(self.get_d0(rhs)) == "0":
+                cond = self.get_d1(cond) as CiExprId
+        if self.kind(cond) != CiExprKind.CIE_INT_LIT: return id
+        let text = self.get_string(self.get_d0(cond))
+        if text == "0": self.get_d2(id) as CiExprId else: self.get_d1(id) as CiExprId
+
+    // The name a declaration lookup uses for a callee: a conditional
+    // callee's then-arm when that arm is a plain name, else `text`.
+    fn conditional_callee_name(callee: CiExprId, text: &str) -> str:
+        if self.kind(callee) == CiExprKind.CIE_TERNARY:
+            let arm = self.get_d1(callee) as CiExprId
+            if self.kind(arm) == CiExprKind.CIE_IDENT: return with_str_clone_ref(self.get_string(self.get_d0(arm)))
+        with_str_clone_ref(text)
+
     fn build_named_call_expr(name: &str, arg_ids: &List[i32]) -> CiExprId:
         self.build_named_call_expr_typed(name, arg_ids, 0 as CiTypeId)
 
@@ -13012,6 +13033,11 @@ impl CiStmtPool:
                 let _ = ci_va_bail(session, cursor, stdarg_operation ++ " is used as a value; it is translated only as a statement")
                 return ci_value_ir_invalid()
             var callee = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            // `(1 ? f : g)(args)` (M*LIB's M_IF selects a function by a
+            // literal): the callee is the chosen arm, not a conditional over
+            // two function values, which `...` functions cannot be.
+            if ci_value_ir_valid(callee):
+                callee = CiValueExprIR { setup_stmt: callee.setup_stmt, value_expr: exprs.fold_literal_ternary(callee.value_expr) }
             var callee_text = ""
             var setup: CiStmtId = 0 as CiStmtId
             var first_arg = 1
@@ -13054,7 +13080,10 @@ impl CiStmtPool:
                     }
                 return ci_value_ir_invalid()
             var arg_ids: List[i32] = List.new()
-            let callee_decl_idx = ci_lookup_c_function_decl_idx(session, callee_text)
+            // A conditional callee's arms have compatible types (C requires
+            // it): the then-arm's declaration coerces the arguments both
+            // calls share.
+            let callee_decl_idx = ci_lookup_c_function_decl_idx(session, exprs.conditional_callee_name(callee.value_expr, callee_text))
             // #799: a c_import inline wrapper body must not lower a call to a
             // C function the header-import emitter skips (leading-underscore
             // UCRT helpers, static-non-inline). Bail so the wrapper is
@@ -13155,7 +13184,17 @@ impl CiStmtPool:
                 let unwrap_method = exprs.add(CiExprKind.CIE_FIELD, callee_expr as i32, exprs.add_string("unwrap"), 2, 0 as CiTypeId)
                 callee_type = types.type_from_translated_text(nullable_inner)
                 callee_expr = exprs.add(CiExprKind.CIE_CALL, unwrap_method as i32, exprs.extra_len() as i32, 0, callee_type)
-            var call_id = exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
+            // `(c ? f : g)(args)` with a runtime condition: a conditional
+            // over two function values is not callable in With (a `...`
+            // function never is a value), so the call is one call per arm
+            // under the condition; one arm runs, so the arguments are
+            // evaluated once, as in C.
+            var call_id = if exprs.kind(callee_expr) == CiExprKind.CIE_TERNARY:
+                let call_then = exprs.add(CiExprKind.CIE_CALL, exprs.get_d1(callee_expr), args_start, arg_ids.len() as i32, 0 as CiTypeId)
+                let call_else = exprs.add(CiExprKind.CIE_CALL, exprs.get_d2(callee_expr), args_start, arg_ids.len() as i32, 0 as CiTypeId)
+                exprs.add(CiExprKind.CIE_TERNARY, exprs.get_d0(callee_expr), call_then as i32, call_else as i32, 0 as CiTypeId)
+            else:
+                exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0 as CiTypeId)
             // A local identifier can denote a function pointer just as a field
             // can. Declaration identity distinguishes direct function references
             // from pointer values; the spelling of the expression cannot.
