@@ -78,6 +78,13 @@ pub extern fn remove(path: *const i8) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
 pub extern fn fgets(s: *mut i8, size: i32, stream: *mut c_void) -> *mut i8
 pub extern fn fgetc(stream: *mut c_void) -> i32
+pub extern fn ungetc(c: i32, stream: *mut c_void) -> i32
+pub extern fn strcoll(a: *const i8, b: *const i8) -> i32
+pub extern fn strspn(s: *const i8, accept: *const i8) -> u64
+pub extern fn strcspn(s: *const i8, reject: *const i8) -> u64
+pub extern fn strpbrk(s: *const i8, accept: *const i8) -> *mut i8
+pub extern fn strncat(dst: *mut i8, src: *const i8, n: u64) -> *mut i8
+pub extern fn fscanf(stream: *mut c_void, fmt: *const i8, ...) -> i32
 pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
 pub extern fn fputs(s: *const i8, stream: *mut c_void) -> i32
 pub extern fn putc(c: i32, stream: *mut c_void) -> i32

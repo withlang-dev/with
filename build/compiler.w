@@ -1450,7 +1450,7 @@ pub fn run_check_mirlower_no_name_dispatch_action(ctx: ActionCtx) -> i32:
 
 fn comp_libc_standard_externs() -> str:
     "|fprintf|printf|snprintf|sprintf|vsnprintf|vfprintf|vprintf|fopen|fclose|fflush|" ++
-    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|" ++
+    "fgets|fgetc|fputc|fputs|putc|perror|feof|ferror|fread|fwrite|remove|ungetc|fscanf|strcoll|strspn|strcspn|strpbrk|strncat|" ++
     "strcpy|strncpy|strrchr|strstr|strerror|atoi|strtol|strtoul|strtod|setlocale|" ++
     "strtoll|strtoull|strtof|" ++
     "abort|exit|clock|time|rand|srand|qsort|rewind|putchar|strftime|mktime|"

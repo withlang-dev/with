@@ -18446,7 +18446,7 @@ fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
 // value passed to one is not retained. Everything else outside the corpus
 // is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
 fn ci_own_is_libc_observer(name: &str) -> bool:
-    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
+    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "fscanf" or name == "ungetc" or name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
 
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -20243,6 +20243,10 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "fseek" or name == "ftell" or name == "fseeko" or name == "ftello": return CI_LIBC_KIND_FN
     if name == "fopen64" or name == "fseeko64" or name == "ftello64" or name == "_fseeki64" or name == "_ftelli64": return CI_LIBC_KIND_FN
     if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs": return CI_LIBC_KIND_FN
+    // C's stdio input family (M*LIB's `_in_str` parsers read with them).
+    if name == "ungetc" or name == "fscanf": return CI_LIBC_KIND_FN
+    // C's string scanning family (M*LIB's m-string.h).
+    if name == "strcoll" or name == "strspn" or name == "strcspn" or name == "strpbrk" or name == "strncat": return CI_LIBC_KIND_FN
     if name == "putc" or name == "perror" or name == "feof" or name == "ferror" or name == "fread" or name == "fwrite": return CI_LIBC_KIND_FN
     if name == "rewind": return CI_LIBC_KIND_FN
     if name == "putchar": return CI_LIBC_KIND_FN
