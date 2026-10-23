@@ -138,6 +138,11 @@ type MirBuilder = ephemeral {
     stmt_temp_drop_depths: List[i32],
     stmt_temp_starts: List[i32],
     pending_reset_locals: List[i32],
+    // Per entry: the move operand that empties the local (-1: none) and
+    // whether the move cancelled the local's statement-temporary drop
+    // (#2570: a reset is emitted only once the move has happened).
+    pending_reset_operands: List[i32],
+    pending_reset_temp_cancelled: List[i32],
     // #719: per-statement-frame snapshots of the pending-reset stacks.
     stmt_reset_starts: List[i32],
     stmt_reset_field_starts: List[i32],
@@ -321,6 +326,8 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         stmt_temp_drop_depths: List.new(),
         stmt_temp_starts: List.new(),
         pending_reset_locals: List.new(),
+        pending_reset_operands: List.new(),
+        pending_reset_temp_cancelled: List.new(),
         stmt_reset_starts: List.new(),
         stmt_reset_field_starts: List.new(),
         stmt_reset_temp_starts: List.new(),
@@ -449,6 +456,17 @@ impl MirBuilder:
             let releases_result = mir_intrinsic_invokes_closure(self.body.call_intrinsic(d1))
             if releases_result:
                 self.body.set_call_may_cancel(d1)
+            // #2570: on the unwind edge the callee left without writing the
+            // result. The slot is blanked before the call, so the edge's
+            // guarded drop of it (emit_cancelled_return_check) frees nothing
+            // at runtime, and the result is not an owned value left Init at
+            // the return (§2.5.1, the ownership validator's leak rule).
+            let dest_local = if d2 >= 0 and d2 < self.body.place_locals.len() and self.body.place_proj_counts[d2] == 0: self.body.place_locals[d2] else: -1
+            if not releases_result and dest_local >= 0 and self.sema.type_needs_drop_frozen(self.local_type(dest_local)) != 0:
+                let blank_op = self.body.gen_zero_operand(self.local_type(dest_local))
+                let blank = self.body.new_rvalue(RvalueKind.RK_USE, blank_op, 0, 0)
+                self.body.push_stmt(self.cur_bb, StmtKind.Assign, d2, blank, span)
+                self.body.mark_local_ever_moved(dest_local)
             let check_bb = self.new_block()
             self.settle_payload_resets_at_terminator(kind, d2, check_bb)
             self.body.set_terminator(self.cur_bb, kind, d0, d1, d2, check_bb, span)
@@ -1003,13 +1021,15 @@ impl MirBuilder:
             i = i - 1
         -1
 
-    mut fn cancel_stmt_temp_for_local(local_id: i32) -> Unit:
+    // True when the local was a statement temporary whose drop this cancels.
+    mut fn cancel_stmt_temp_for_local(local_id: i32) -> bool:
         var i = self.stmt_temp_locals.len() - 1
         while i >= 0:
             if self.stmt_temp_locals[i] == local_id:
                 self.stmt_temp_locals[i] = -1
-                return
+                return true
             i = i - 1
+        false
 
     // A call reads its callee: `f(1); f(2)` lowers both as `call copy _f`.
     // A carrier eliminator (`map`, `and_then`, `inspect`, …) calls the
@@ -1088,8 +1108,8 @@ impl MirBuilder:
             // statement boundary (flush_stmt_temp_frame) zeroes it so its later
             // drops — drop-before-overwrite, scope-exit — free nothing. The reset
             // is unconditional, so it does not depend on the move analysis below.
-            if self.sema.type_needs_drop_frozen(self.local_type(local_id)) != 0:
-                self.pending_reset_locals.push(local_id)
+            let needs_reset = self.sema.type_needs_drop_frozen(self.local_type(local_id)) != 0
+            if needs_reset:
                 // Stage 4 (§2.5.2): this local is reset-on-move, so its drop must
                 // keep its null guard. Locals never recorded here are never reset,
                 // and codegen elides their guard (unconditional drop).
@@ -1102,7 +1122,11 @@ impl MirBuilder:
             // The old permanent downgrade to DK_STORAGE was load-bearing and leaked
             // the reassigned value. Reset-on-move + the guarded drop prevent any
             // double-free if the moved-skip and an analysis bug ever disagree.
-            self.cancel_stmt_temp_for_local(local_id)
+            let temp_cancelled = self.cancel_stmt_temp_for_local(local_id)
+            if needs_reset:
+                self.pending_reset_locals.push(local_id)
+                self.pending_reset_operands.push(operand_id)
+                self.pending_reset_temp_cancelled.push(if temp_cancelled: 1 else: 0)
             self.clear_moved_fields_for_local(local_id)
             return
         if self.place_field_projection_count(place) > 0:
@@ -1317,6 +1341,8 @@ impl MirBuilder:
             self.pending_move_temp_locals.pop()
         while self.pending_reset_locals.len() > start:
             self.pending_reset_locals.pop()
+            self.pending_reset_operands.pop()
+            self.pending_reset_temp_cancelled.pop()
         while self.pending_reset_field_places.len() > field_start:
             self.pending_reset_field_places.pop()
             self.pending_reset_field_types.pop()
@@ -1335,6 +1361,18 @@ impl MirBuilder:
         var ri = start
         while ri < self.pending_reset_locals.len():
             let rl: i32 = self.pending_reset_locals[ri]
+            let moved_by: i32 = self.pending_reset_operands[ri]
+            if moved_by >= 0 and not self.body.emitted_operands.contains(moved_by):
+                // #2570: the move has not happened on this path (an unwind
+                // between a call's argument evaluations, an early exit among
+                // an aggregate's fields): the local still owns its value. A
+                // statement temporary whose own drop the move cancelled is
+                // dropped here; a local keeps its guarded scope drop.
+                if self.pending_reset_temp_cancelled[ri] != 0:
+                    let rl_place = self.place_for_local(rl)
+                    self.emit_drop_stmt(rl_place, "unwind-before-move", 0)
+                ri = ri + 1
+                continue
             let zop = self.body.gen_zero_operand(self.local_type(rl))
             let rval = self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(rl), rval, 0)
@@ -10700,8 +10738,10 @@ impl MirBuilder:
         let ic_op = self.body.new_operand(OperandKind.OK_COPY, ic_place)
         self.terminate(TermKind.TK_SWITCH_INT, ic_op, sw, unwind_bb, 0)
         self.switch_to(unwind_bb)
-        if release_dest and dest >= 0 and dest < self.body.place_locals.len() and self.sema.type_needs_drop_frozen(self.local_type(self.body.place_locals[dest])) != 0:
-            self.emit_drop_stmt(dest, "cancel-unwind", 0)
+        if dest >= 0 and dest < self.body.place_locals.len() and (release_dest or self.body.place_proj_counts[dest] == 0) and self.sema.type_needs_drop_frozen(self.local_type(self.body.place_locals[dest])) != 0:
+            // A partial result (#2019) is dropped; an unwritten one (#2570)
+            // was blanked before the call, so its guarded drop is a no-op.
+            self.emit_drop_stmt(dest, if release_dest: "cancel-unwind" else: "cancel-unwind-unwritten", 0)
         self.emit_cancelled_return()
 
     // Join a Task purely for cleanup: await completion and free its result buffer,

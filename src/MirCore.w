@@ -209,6 +209,10 @@ type MirBody {
     // Operands
     operand_kinds: List[i32],
     operand_d0: List[i32],
+    // The operands a pushed statement or a set call terminator reads: a
+    // move operand not here has not happened on the path being lowered
+    // (an unwind between a call's argument evaluations, #2570).
+    emitted_operands: HashSet[i32],
 
     // Constants
     const_kinds: List[i32],
@@ -545,6 +549,7 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         rval_d2: List.new(),
         operand_kinds: List.new(),
         operand_d0: List.new(),
+        emitted_operands: HashSet.new(),
         const_kinds: List.new(),
         const_d0: List.new(),
         const_d1: List.new(),
@@ -635,6 +640,8 @@ impl MirBody:
         self.stmt_d0.push(d0)
         self.stmt_d1.push(d1)
         self.stmt_spans.push(span)
+        if kind == StmtKind.Assign:
+            for op in mir_rvalue_operands(self, d1): self.emitted_operands.insert(op)
 
         if bb >= 0 and bb < self.bb_stmt_counts.len():
             let old_count: i32 = self.bb_stmt_counts[bb]
@@ -651,6 +658,10 @@ impl MirBody:
         self.bb_term_d2[bb] = d2
         self.bb_term_d3[bb] = d3
         self.bb_term_spans[bb] = span
+        if kind == TermKind.TK_CALL:
+            self.emitted_operands.insert(d0)
+            if d1 >= 0 and d1 < self.call_arg_starts.len():
+                for i in 0..self.call_arg_counts[d1]: self.emitted_operands.insert(self.call_arg_operands[self.call_arg_starts[d1] + i])
 
     mut fn set_term_no_suspend_node(bb: i32, node: i32):
         if bb < 0 or bb >= self.bb_no_suspend_nodes.len():
