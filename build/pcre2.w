@@ -136,6 +136,314 @@ fn pcre2_heap_comparable(text: &str) -> str:
         out = out ++ (if line.starts_with("free"): "free" else: line) ++ "\n"
     out
 
+// ── upstream's RunTest, in With ──────────────────────────────────────────
+//
+// RunTest is a bash script; the build runs no shell (a Windows host has
+// none, #2592). This is RunTest's logic for the 8-bit library: the
+// capability probes (`pcre2test -C <name>` answers in its exit code), tests
+// 0 to `last` with the same skips, option passes (-jit, -dfa) and output
+// files, and a byte comparison of each output against upstream's testdata.
+// Every pcre2test run's stdout and stderr land in the run directory under
+// the run's tag; the suite's own lines go to stdout.txt there. The heap
+// test stays apart (run_pcre2_test_action, pcre2_heap_comparable), as
+// upstream runs it only on request.
+type Pcre2Suite {
+    pcre2test: str,
+    testdata: str,
+    run_dir: str,
+    bits: str,
+    utf: bool,
+    jit: bool,
+    backslash_c: bool,
+    ebcdic: bool,
+    setstack: bool,
+    link_size: i32,
+    log: str,
+    failures: i32,
+}
+
+// The words of `text` as an argument list.
+fn pcre2_args(text: &str) -> List[str]:
+    var out: List[str] = List.new()
+    for w in text.fields(): out.push(pcre2_owned_text(w))
+    out
+
+impl Pcre2Suite:
+    fn out(path: &str) -> str: pcre2_join(self.run_dir, path)
+
+    mut fn say(line: &str):
+        print(line)
+        self.log = self.log ++ line ++ "\n"
+
+    // pcre2test with `args`, cwd the run directory; stdout and stderr land in
+    // `<tag>.stdout` and `<tag>.stderr` there. The exit code (124: timed out).
+    mut fn run(ctx: &ActionCtx, args: List[str], tag: &str) -> i32:
+        var argv: List[str] = List.new()
+        argv.push(self.pcre2test)
+        for a in args: argv.push(a)
+        let result = ctx.process_runner().run_capture_cwd(argv, self.out(tag ++ ".stdout"), self.out(tag ++ ".stderr"), 600000, self.run_dir)
+        if result.timed_out: return 124
+        result.rc
+
+    // `pcre2test -C <name>`: the answer is the exit code.
+    mut fn capability(ctx: &ActionCtx, name: &str) -> i32:
+        self.run(ctx, pcre2_args("-C " ++ name), "probe-" ++ name)
+
+    fn same(ctx: &ActionCtx, expected: &str, actual: &str) -> bool:
+        let fs = ctx.fs()
+        fs.exists(expected) and fs.exists(actual) and fs.read_text(expected) == fs.read_text(actual)
+
+    // The option passes a test runs under: "" always, "-jit" when JIT is
+    // available and the test takes it, "-dfa" when the test takes it.
+    fn opts(with_jit: bool, with_dfa: bool) -> List[str]:
+        var out: List[str] = List.new()
+        out.push("")
+        if with_jit and self.jit: out.push("-jit")
+        if with_dfa: out.push("-dfa")
+        out
+
+    mut fn failed(line: &str):
+        self.say(line)
+        self.failures += 1
+
+    // RunTest's checkresult: the run succeeded and its output is upstream's.
+    mut fn check(ctx: &ActionCtx, rc: i32, suffix: &str, opt: &str, actual: &str):
+        let mode = if opt == "-jit": " with JIT" else if opt == "-dfa": " with DFA" else: ""
+        if rc != 0:
+            self.failed(f"** pcre2test failed (exit {rc}) - check " ++ actual)
+            return
+        let expected = pcre2_join(self.testdata, "testoutput" ++ suffix)
+        if not self.same(ctx, expected, actual):
+            self.failed("** Test " ++ suffix ++ " failed" ++ mode ++ ": diff " ++ expected ++ " " ++ actual)
+            return
+        self.say("  OK" ++ mode)
+
+    // One numbered test under `opt`: testinput<n> to
+    // testoutput<bits><opt>/testoutput<suffix>, compared to upstream's.
+    mut fn standard(ctx: &ActionCtx, n: i32, suffix: &str, opt: &str):
+        let outfile = self.out("testoutput" ++ self.bits ++ opt ++ "/testoutput" ++ suffix)
+        var args = pcre2_args("-q -" ++ self.bits ++ " " ++ opt)
+        args.push(pcre2_join(self.testdata, f"testinput{n}"))
+        args.push(outfile)
+        let tag = f"test{n}" ++ opt
+        var rc = self.run(ctx, args, tag)
+        if rc == 0 and n == 2:
+            // RunTest appends an `-error` run to test 2's output.
+            let error_tag = tag ++ "-error"
+            rc = self.run(ctx, pcre2_args("-q -" ++ self.bits ++ " " ++ opt ++ " -error -80,-62,-2,-1,0,100,101,191,300"), error_tag)
+            let fs = ctx.fs()
+            if fs.write_text(outfile, fs.read_text(outfile) ++ fs.read_text(self.out(error_tag ++ ".stdout"))) != 0:
+                self.failed("** could not append the -error run to " ++ outfile)
+                return
+        self.check(ctx, rc, suffix, opt, outfile)
+
+    mut fn standard_passes(ctx: &ActionCtx, n: i32, suffix: &str, with_jit: bool, with_dfa: bool):
+        for opt in self.opts(with_jit, with_dfa): self.standard(ctx, n, suffix, opt)
+
+    // RunTest's checkspecial: the exit code alone is checked.
+    mut fn special(ctx: &ActionCtx, words: &str, expect: i32, tag: &str) -> bool:
+        let rc = self.run(ctx, pcre2_args(words), "special-" ++ tag)
+        if rc != expect:
+            self.failed(f"** pcre2test {words} exited {rc}, expected {expect} - check special-" ++ tag ++ ".stdout")
+            return false
+        true
+
+    mut fn skip(reason: &str): self.say("  Skipped " ++ reason)
+
+    // Test 0: pcre2test's own argument handling, output unchecked.
+    mut fn test0(ctx: &ActionCtx):
+        let fs = ctx.fs()
+        let input = self.out("testSinput")
+        if fs.write_text(input, "/abc/jit,memory,framesize\n   abc\n") != 0:
+            self.failed("** could not write " ++ input)
+            return
+        let b = "-" ++ self.bits
+        var ok = self.special(ctx, b ++ " -C", 0, "C")
+        ok = self.special(ctx, "--help", 0, "help") and ok
+        ok = self.special(ctx, b ++ " testSinput", 0, "input") and ok
+        ok = self.special(ctx, b ++ " " ++ pcre2_join(self.testdata, "testinputheap"), 0, "heap") and ok
+        if self.setstack:
+            ok = self.special(ctx, b ++ " -S 1 -t 10 testSinput", 0, "stack") and ok
+        ok = self.special(ctx, b ++ " reallydoesnotexist", 1, "missing-input") and ok
+        ok = self.special(ctx, b ++ " testSinput reallydoesnotexist/outfile", 1, "missing-output") and ok
+        ok = self.special(ctx, b ++ " -pattern debug testSinput", 0, "pattern-debug") and ok
+        ok = self.special(ctx, b ++ " -pattern INVALID testSinput", 1, "pattern-invalid") and ok
+        ok = self.special(ctx, b ++ " -subject notempty testSinput", 0, "subject-notempty") and ok
+        ok = self.special(ctx, b ++ " -subject INVALID testSinput", 1, "subject-invalid") and ok
+        ok = self.special(ctx, "-LM", 0, "LM") and ok
+        ok = self.special(ctx, "-LP", 0, "LP") and ok
+        ok = self.special(ctx, "-LS", 0, "LS") and ok
+        ok = self.special(ctx, b ++ " -unittest", 0, "unittest") and ok
+        if ok: self.say("  OK")
+
+    // Test 3: the first French locale pcre2test can set; the output may
+    // match any of upstream's alternatives (locales differ by version).
+    mut fn test3(ctx: &ActionCtx):
+        let fs = ctx.fs()
+        var locale = ""
+        for loc in ["fr_FR", "french", "fr", "fr_CA"]:
+            let probe_in = self.out("localeprobe.in")
+            let probe_out = self.out("localeprobe.out")
+            if fs.write_text(probe_in, "/a/locale=" ++ loc ++ "\n") != 0: break
+            let tag = "localeprobe-" ++ loc
+            var args = pcre2_args("-q -" ++ self.bits)
+            args.push(probe_in)
+            args.push(probe_out)
+            self.run(ctx, args, tag)
+            let text = fs.read_text(probe_out) ++ fs.read_text(self.out(tag ++ ".stdout")) ++ fs.read_text(self.out(tag ++ ".stderr"))
+            if not text.contains("Failed to set locale"):
+                locale = loc
+                break
+        if locale.len() == 0:
+            self.skip("because none of the 'fr_FR', 'fr_CA', 'fr' or 'french' locales can be set")
+            return
+        self.say("  (using '" ++ locale ++ "' locale)")
+        // fr_FR's files as upstream wrote them; another locale's with its name.
+        var infile = pcre2_join(self.testdata, "testinput3")
+        var expected: List[str] = List.new()
+        for name in ["testoutput3", "testoutput3A", "testoutput3B", "testoutput3C"]:
+            let src = pcre2_join(self.testdata, name)
+            if locale == "fr_FR":
+                expected.push(src)
+            else:
+                let dst = self.out("test3" ++ name)
+                if fs.exists(src) and fs.write_text(dst, fs.read_text(src).replace("fr_FR", locale)) != 0:
+                    self.failed("** could not write " ++ dst)
+                    return
+                expected.push(dst)
+        if locale != "fr_FR":
+            infile = self.out("test3input")
+            if fs.write_text(infile, fs.read_text(pcre2_join(self.testdata, "testinput3")).replace("fr_FR", locale)) != 0:
+                self.failed("** could not write " ++ infile)
+                return
+        for opt in self.opts(true, false):
+            let mode = if opt == "-jit": " with JIT" else: ""
+            let tag = "test3" ++ opt
+            let actual = self.out("testoutput" ++ self.bits ++ "/testoutput3")
+            var args = pcre2_args("-q -" ++ self.bits ++ " " ++ opt)
+            args.push(infile)
+            args.push(actual)
+            let rc = self.run(ctx, args, tag)
+            if rc != 0:
+                self.failed(f"** pcre2test failed (exit {rc}) - check " ++ actual)
+                continue
+            var matched = false
+            for e in expected: if self.same(ctx, e, actual): matched = true
+            if matched:
+                self.say("  OK" ++ mode)
+            else:
+                self.failed("** Locale test did not run successfully" ++ mode ++ ": " ++ actual ++ " matches none of upstream's testoutput3, 3A, 3B, 3C; this may be the locale settings rather than a bug in PCRE2")
+
+    mut fn test(ctx: &ActionCtx, n: i32):
+        let fs = ctx.fs()
+        self.say(pcre2_test_title(n, self.bits))
+        if n == 0: self.test0(ctx)
+        else if n == 1: self.standard_passes(ctx, 1, "1", true, false)
+        else if n == 2:
+            // The test reads testbtables from the current directory.
+            if fs.copy_file(pcre2_join(self.testdata, "testbtables"), self.out("testbtables")) != 0:
+                self.failed("** could not copy testbtables")
+                return
+            self.standard_passes(ctx, 2, "2", true, false)
+        else if n == 3: self.test3(ctx)
+        else if n == 4 or n == 5 or n == 10 or n == 26 or n == 27:
+            if self.utf: self.standard_passes(ctx, n, f"{n}", true, false)
+            else: self.skip("because UTF-" ++ self.bits ++ " support is not available")
+        else if n == 6 or n == 15 or n == 18 or n == 20 or n == 24: self.standard(ctx, n, f"{n}", "")
+        else if n == 7 or n == 19 or n == 25:
+            if self.utf: self.standard(ctx, n, f"{n}", "")
+            else: self.skip("because UTF-" ++ self.bits ++ " support is not available")
+        else if n == 8:
+            if self.utf: self.standard(ctx, 8, f"8-{self.bits}-{self.link_size}", "")
+            else: self.skip("because UTF-" ++ self.bits ++ " support is not available")
+        else if n == 9: self.standard_passes(ctx, 9, "9", true, false)
+        else if n == 11 or n == 12 or n == 13: self.skip("when running 8-bit tests")
+        else if n == 14:
+            if self.utf: self.standard(ctx, 14, "14-" ++ self.bits, "")
+            else: self.skip("because UTF-" ++ self.bits ++ " support is not available")
+        else if n == 16:
+            if self.jit: self.skip("because JIT is available")
+            else: self.standard(ctx, 16, "16", "")
+        else if n == 17:
+            if self.jit: self.standard(ctx, 17, "17", "")
+            else: self.skip("because JIT is not available")
+        else if n == 21:
+            if self.backslash_c: self.standard_passes(ctx, 21, "21", true, true)
+            else: self.skip("because \\C is disabled")
+        else if n == 22:
+            if not self.backslash_c: self.skip("because \\C is disabled")
+            else if not self.utf: self.skip("because UTF-" ++ self.bits ++ " support is not available")
+            else: self.standard_passes(ctx, 22, "22-" ++ self.bits, true, false)
+        else if n == 23:
+            if self.backslash_c: self.skip("because \\C is not disabled")
+            else: self.standard(ctx, 23, "23", "")
+        else if n == 28 or n == 29:
+            if self.ebcdic: self.failed("** EBCDIC tests are not run by this port of RunTest")
+            else: self.skip("when not targetting EBCDIC")
+        else: self.failed(f"** no such test: {n}")
+
+// RunTest's title lines.
+fn pcre2_test_title(n: i32, bits: &str) -> str:
+    if n == 0: return "Test 0: Unchecked pcre2test argument tests (to improve coverage)"
+    if n == 1: return "Test 1: Main non-UTF, non-UCP functionality (compatible with Perl >= 5.10)"
+    if n == 2: return "Test 2: API, errors, internals and non-Perl stuff (excluding UTF-" ++ bits ++ ")"
+    if n == 3: return "Test 3: Locale-specific features"
+    if n == 4: return "Test 4: UTF-" ++ bits ++ " and Unicode property support (compatible with Perl >= 5.10)"
+    if n == 5: return "Test 5: API, internals, and non-Perl stuff for UTF-" ++ bits ++ " and UCP support"
+    if n == 6: return "Test 6: DFA matching main non-UTF, non-UCP functionality"
+    if n == 7: return "Test 7: DFA matching with UTF-" ++ bits ++ " and Unicode property support"
+    if n == 8: return "Test 8: Internal offsets and code size tests"
+    if n == 9: return "Test 9: Specials for the basic 8-bit library"
+    if n == 10: return "Test 10: Specials for the 8-bit library with UTF-8 and UCP support"
+    if n == 11: return "Test 11: Specials for the basic 16-bit and 32-bit libraries"
+    if n == 12: return "Test 12: Specials for the 16-bit and 32-bit libraries UTF and UCP support"
+    if n == 13: return "Test 13: DFA specials for the basic 16-bit and 32-bit libraries"
+    if n == 14: return "Test 14: DFA specials for UTF and UCP support"
+    if n == 15: return "Test 15: Non-JIT limits and other non-JIT tests"
+    if n == 16: return "Test 16: JIT-specific features when JIT is not available"
+    if n == 17: return "Test 17: JIT-specific features when JIT is available"
+    if n == 18: return "Test 18: Tests of the POSIX interface, excluding UTF/UCP"
+    if n == 19: return "Test 19: Tests of the POSIX interface with UTF/UCP"
+    if n == 20: return "Test 20: Serialization and code copy tests"
+    if n == 21: return "Test 21: \\C tests without UTF (supported for DFA matching)"
+    if n == 22: return "Test 22: \\C tests with UTF (not supported for DFA matching)"
+    if n == 23: return "Test 23: \\C disabled test"
+    if n == 24: return "Test 24: Non-UTF pattern conversion tests"
+    if n == 25: return "Test 25: UTF pattern conversion tests"
+    if n == 26: return "Test 26: Unicode property tests (compatible with Perl >= 5.38)"
+    if n == 27: return "Test 27: Auto-generated unicode property tests"
+    if n == 28: return "Test 28: EBCDIC-specific tests"
+    if n == 29: return "Test 29: EBCDIC-specific tests (for NL=0x25)"
+    f"Test {n}"
+
+// Runs upstream's tests 0 to `last` for the 8-bit library with `pcre2test`
+// (an absolute path) against `testdata`, in `run_dir` (absolute, existing).
+// The suite's lines go to `run_dir/stdout.txt`. 0 when every test passed.
+fn pcre2_run_upstream_tests(ctx: &ActionCtx, pcre2test: &str, testdata: &str, run_dir: &str, last: i32) -> i32:
+    let fs = ctx.fs()
+    var suite = Pcre2Suite { pcre2test: pcre2_owned_text(pcre2test), testdata: pcre2_owned_text(testdata), run_dir: pcre2_owned_text(run_dir), bits: "8", utf: false, jit: false, backslash_c: false, ebcdic: false, setstack: false, link_size: 0, log: "", failures: 0 }
+    for dir in ["testoutput8", "testoutput8-jit", "testoutput8-dfa"]:
+        if fs.mkdir_all(suite.out(dir)) != 0: return pcre2_fail(ctx, "could not create " ++ suite.out(dir))
+    if suite.capability(ctx, "pcre2-8") == 0:
+        return pcre2_fail(ctx, "pcre2test has no 8-bit library")
+    suite.utf = suite.capability(ctx, "unicode") != 0
+    suite.jit = suite.capability(ctx, "jit") != 0
+    suite.backslash_c = suite.capability(ctx, "backslash-C") != 0
+    suite.ebcdic = suite.capability(ctx, "ebcdic") != 0
+    let empty = suite.out("empty.in")
+    if fs.write_text(empty, "") != 0: return pcre2_fail(ctx, "could not write " ++ empty)
+    suite.setstack = suite.run(ctx, pcre2_args("-S 32 " ++ empty ++ " " ++ empty), "probe-setstack") == 0
+    suite.link_size = suite.run(ctx, pcre2_args("-8 -C linksize"), "probe-linksize")
+    suite.say("PCRE2 C library tests using test data from " ++ testdata)
+    suite.say("---- Testing 8-bit library ----")
+    for n in 0..(last + 1): suite.test(ctx, n)
+    let verdict = if suite.failures == 0: "All tests passed." else: f"** {suite.failures} test(s) failed."
+    suite.say(verdict)
+    let log_path = suite.out("stdout.txt")
+    if fs.write_text(log_path, suite.log) != 0: return pcre2_fail(ctx, "could not write " ++ log_path)
+    if suite.failures != 0: return pcre2_fail(ctx, verdict ++ " See " ++ log_path)
+    0
+
 fn pcre2_copy_if_missing(ctx: &ActionCtx, src: &str, dst: &str) -> i32:
     let fs = ctx.fs()
     if fs.exists(dst):
@@ -431,21 +739,9 @@ pub fn run_pcre2_test_smoke_action(ctx: ActionCtx) -> i32:
     if not fs.exists(pcre2test_bin):
         return pcre2_fail(ctx, "did not produce pcre2test smoke binary: " ++ pcre2test_bin)
 
-    let run_stdout = pcre2_abs(root, pcre2_join(output_dir, "run.stdout"))
-    let run_stderr = pcre2_abs(root, pcre2_join(output_dir, "run.stderr"))
-    var run_args: List[str] = List.new()
-    run_args |> push("/bin/bash")
-    run_args |> push(pcre2_abs(root, run_test_path))
-    run_args |> push("-8")
-    run_args |> push("0-5")
-    var run_env = process_env()
-    run_env = run_env.set("srcdir", pcre2_abs(root, ref_dir))
-    run_env = run_env.set("pcre2test", pcre2_abs(root, pcre2test_bin))
-    let run_result = ctx.process_runner().run_capture_cwd_with_env(run_args, run_stdout, run_stderr, 120000, pcre2_abs(root, output_dir), run_env)
-    if run_result.rc == 124:
-        return pcre2_fail(ctx, "timed out running pcre2test smoke; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
-    if run_result.rc != 0:
-        return pcre2_fail(ctx, f"pcre2test smoke failed with exit code {run_result.rc}; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
+    // upstream's RunTest -8 0-5, in With (pcre2_run_upstream_tests).
+    if pcre2_run_upstream_tests(ctx, pcre2_abs(root, pcre2test_bin), pcre2_abs(root, pcre2_join(ref_dir, "testdata")), pcre2_abs(root, output_dir), 5) != 0:
+        return 1
     print("PCRE2 TEST SMOKE OK")
     0
 
@@ -537,24 +833,12 @@ pub fn run_pcre2_test_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not remove previous pcre2-test output: " ++ run_dir)
     if fs.mkdir_all(run_dir) != 0:
         return pcre2_fail(ctx, "could not create pcre2-test output directory: " ++ run_dir)
-    let stdout_path = pcre2_abs(root, pcre2_join(run_dir, "stdout.txt"))
-    let stderr_path = pcre2_abs(root, pcre2_join(run_dir, "stderr.txt"))
-    var run_args: List[str] = List.new()
-    run_args |> push("/bin/bash")
-    run_args |> push(pcre2_abs(root, run_test_path))
-    run_args |> push("-8")
-    run_args |> push("0-29")
-    var env = process_env()
-    env = env.set("srcdir", pcre2_abs(root, ref_dir))
-    env = env.set("pcre2test", pcre2_abs(root, pcre2test_path))
-    let result = ctx.process_runner().run_capture_cwd_with_env(run_args, stdout_path, stderr_path, 900000, pcre2_abs(root, run_dir), env)
-    if result.rc == 124:
-        return pcre2_fail(ctx, "timed out; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
-    if result.rc != 0:
-        return pcre2_fail(ctx, f"failed with exit code {result.rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+    // upstream's RunTest -8 0-29, in With (pcre2_run_upstream_tests).
+    let testdata = pcre2_abs(root, pcre2_join(ref_dir, "testdata"))
+    if pcre2_run_upstream_tests(ctx, pcre2_abs(root, pcre2test_path), testdata, pcre2_abs(root, run_dir), 29) != 0:
+        return 1
     // The heap test, as RunTest's `heap` runs it, compared without the
     // sizes frees name (pcre2_heap_comparable).
-    let testdata = pcre2_abs(root, pcre2_join(ref_dir, "testdata"))
     let heap_actual = pcre2_abs(root, pcre2_join(run_dir, "testoutputheap-8"))
     var heap_args: List[str] = List.new()
     heap_args |> push(pcre2_abs(root, pcre2test_path))
