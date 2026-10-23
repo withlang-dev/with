@@ -29,6 +29,8 @@ extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
 extern fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
+extern fn rt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
+extern fn rt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn rt_mkstemp(template_path: *mut u8) -> i32
@@ -4635,6 +4637,12 @@ pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 // where that is 8 bytes (Darwin arm64, Windows); where C's is wider the parse
 // is strtod's, the correctly rounded double of the same text (#2176).
 pub fn with_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_strtold(nptr, endptr)
+// std.libc strtol/strtoul: a 64-bit long on every target (D114). Where C's
+// long is 32 bits (the UCRT) the platform binds its 64-bit parse, so a
+// saturating overflow is the 64-bit one the LP64-modeled corpora expect
+// (pcre2test's repeat-count check on Windows, #2592).
+pub fn with_libc_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: rt_strtol(nptr, endptr, base)
+pub fn with_libc_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: rt_strtoul(nptr, endptr, base)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
 // #1998: std.libc cpu_time_ns — CPU time (user + system, ns) of this process
 // and every child it has reaped; -1 when the platform cannot say.
