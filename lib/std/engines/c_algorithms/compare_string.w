@@ -2,15 +2,15 @@
 use std.engines.c_algorithms.defs
 use std.libc
 
-pub unsafe fn string_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
-    return (if strcmp(((__param_string1 as *mut c_char) as *const i8), ((__param_string2 as *mut c_char) as *const i8)) == 0: 1 else: 0)
+pub unsafe fn string_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> i32 {
+    return (if strcmp(((__param_string1 as *mut c_char) as *const c_char), ((__param_string2 as *mut c_char) as *const c_char)) == 0: 1 else: 0)
 
 }
 
-pub unsafe fn string_compare(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
-    var __local_result: c_int
+pub unsafe fn string_compare(__param_string1: *mut c_void, __param_string2: *mut c_void) -> i32 {
+    var __local_result: i32
 
-    (__local_result = ((strcmp(((__param_string1 as *mut c_char) as *const i8), ((__param_string2 as *mut c_char) as *const i8)) as c_int)))
+    (__local_result = ((strcmp(((__param_string1 as *mut c_char) as *const c_char), ((__param_string2 as *mut c_char) as *const c_char)) as i32)))
 
     if ((if __local_result < 0: 1 else: 0) != 0) {
         return -1
@@ -25,19 +25,19 @@ pub unsafe fn string_compare(__param_string1: *mut c_void, __param_string2: *mut
 
 }
 
-pub unsafe fn string_nocase_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
+pub unsafe fn string_nocase_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> i32 {
     return (if string_nocase_compare(((__param_string1 as *mut c_char) as *mut c_void), ((__param_string2 as *mut c_char) as *mut c_void)) == 0: 1 else: 0)
 
 }
 
-pub unsafe fn string_nocase_compare(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
+pub unsafe fn string_nocase_compare(__param_string1: *mut c_void, __param_string2: *mut c_void) -> i32 {
     var __local_p1: *mut c_char
 
     var __local_p2: *mut c_char
 
-    var __local_c1: c_int
+    var __local_c1: i32
 
-    var __local_c2: c_int
+    var __local_c2: i32
 
 
     (__local_p1 = ((__param_string1 as *mut c_char)))
@@ -45,9 +45,9 @@ pub unsafe fn string_nocase_compare(__param_string1: *mut c_void, __param_string
     (__local_p2 = ((__param_string2 as *mut c_char)))
 
     while true {
-        (__local_c1 = ((tolower(((*__local_p1) as c_int)) as c_int)))
+        (__local_c1 = ((tolower(((*__local_p1) as i32)) as i32)))
 
-        (__local_c2 = ((tolower(((*__local_p2) as c_int)) as c_int)))
+        (__local_c2 = ((tolower(((*__local_p2) as i32)) as i32)))
 
         if ((if __local_c1 != __local_c2: 1 else: 0) != 0) {
             if ((if __local_c1 < __local_c2: 1 else: 0) != 0) {

@@ -29,14 +29,14 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
-pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __param_number_of_codes: c_int, __param_serialized_bytes: *mut *mut u8, __param_serialized_size: *mut c_ulong, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
+pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __param_number_of_codes: i32, __param_serialized_bytes: *mut *mut u8, __param_serialized_size: *mut u64, __param_gcontext: *mut pcre2_real_general_context_8) -> i32 {
     var __local_bytes: *mut u8
 
     var __local_dst_bytes: *mut u8
 
-    var __local_i: c_int
+    var __local_i: i32
 
-    var __local_total_size: c_ulong
+    var __local_total_size: u64
 
     var __local_re: *const pcre2_real_code_8
 
@@ -46,9 +46,9 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     var __local_memctl: *const pcre2_memctl = (((if (if __param_gcontext != null: 1 else: 0) != 0: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
 
-    var __ci_expr_logic_1: c_int
+    var __ci_expr_logic_1: i32
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_codes == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -71,11 +71,11 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
         return -29
     }
 
-    (__local_total_size = ((((sizeof[pcre2_serialized_data]() as c_ulong) +% (1088 as c_ulong)) as c_ulong)))
+    (__local_total_size = ((((sizeof[pcre2_serialized_data]() as u64) +% (1088 as u64)) as u64)))
 
     (__local_tables = ((null as *const u8)))
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
         if ((if (__param_codes[__local_i]) == null: 1 else: 0) != 0) {
@@ -104,44 +104,44 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
     }
 
 
-    (__local_bytes = (((*__local_memctl).malloc.unwrap()((((__local_total_size as c_ulong) +% (sizeof[pcre2_memctl]() as c_ulong)) as c_ulong), (*__local_memctl).memory_data) as *mut u8)))
+    (__local_bytes = (((*__local_memctl).malloc.unwrap()((((__local_total_size as u64) +% (sizeof[pcre2_memctl]() as u64)) as u64), (*__local_memctl).memory_data) as *mut u8)))
 
     if ((if __local_bytes == null: 1 else: 0) != 0) {
         return -48
     }
 
-    with_memcpy(((__local_bytes as *mut c_void) as *mut u8), ((__local_memctl as *const c_void) as *const u8), ((sizeof[pcre2_memctl]() as c_ulong) as i64))
+    with_memcpy(((__local_bytes as *mut c_void) as *mut u8), ((__local_memctl as *const c_void) as *const u8), ((sizeof[pcre2_memctl]() as u64) as i64))
 
     (__local_bytes = __local_bytes + (sizeof[pcre2_memctl]() as usize))
 
     (__local_data = ((__local_bytes as *mut pcre2_serialized_data)))
 
-    ((*__local_data).magic = ((1347564115 as c_uint)))
+    ((*__local_data).magic = ((1347564115 as u32)))
 
-    ((*__local_data).version = ((3080202 as c_uint)))
+    ((*__local_data).version = ((3080202 as u32)))
 
-    ((*__local_data).config = ((526337 as c_uint)))
+    ((*__local_data).config = ((526337 as u32)))
 
     ((*__local_data).number_of_codes = __param_number_of_codes)
 
     (__local_dst_bytes = __local_bytes + (sizeof[pcre2_serialized_data]() as usize))
 
-    with_memcpy(((__local_dst_bytes as *mut c_void) as *mut u8), ((__local_tables as *const c_void) as *const u8), ((1088 as c_ulong) as i64))
+    with_memcpy(((__local_dst_bytes as *mut c_void) as *mut u8), ((__local_tables as *const c_void) as *const u8), ((1088 as u64) as i64))
 
     (__local_dst_bytes = __local_dst_bytes + ((((512 + 320) + 256) as isize) as usize))
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
         (__local_re = (__param_codes[__local_i]))
 
         with_memcpy(((__local_dst_bytes as *mut c_void) as *mut u8), (((__local_re as *const c_char) as *const c_void) as *const u8), ((*__local_re).blocksize as i64))
 
-        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](memctl) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[pcre2_memctl]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](memctl) as usize) as usize)) as *mut c_void) as *mut u8), (0 as i32), ((sizeof[pcre2_memctl]() as u64) as i64))
 
-        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](tables) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](tables) as usize) as usize)) as *mut c_void) as *mut u8), (0 as i32), ((sizeof[usize]() as u64) as i64))
 
-        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](executable_jit) as usize) as usize)) as *mut c_void) as *mut u8), (0 as c_int), ((sizeof[usize]() as c_ulong) as i64))
+        with_memset((((__local_dst_bytes + ((offsetof[pcre2_real_code_8](executable_jit) as usize) as usize)) as *mut c_void) as *mut u8), (0 as i32), ((sizeof[usize]() as u64) as i64))
 
         (__local_dst_bytes = __local_dst_bytes + ((*__local_re).blocksize as usize))
 
@@ -159,7 +159,7 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
 }
 
-pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: c_int, __param_bytes: *const u8, __param_gcontext: *mut pcre2_real_general_context_8) -> c_int {
+pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: i32, __param_bytes: *const u8, __param_gcontext: *mut pcre2_real_general_context_8) -> i32 {
     var __local_number_of_codes = __param_number_of_codes
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
@@ -171,12 +171,12 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     var __local_tables: *mut u8
 
-    var __local_i: c_int
+    var __local_i: i32
 
-    var __local_j: c_int
+    var __local_j: i32
 
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __local_data == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -205,7 +205,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
         return -32
     }
 
-    if ((if (*__local_data).config != ((((sizeof[u8]() as c_ulong) | (((8 as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((sizeof[c_ulong]() as c_ulong) << (16 as c_uint)) as c_ulong)): 1 else: 0) != 0) {
+    if ((if (*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64)): 1 else: 0) != 0) {
         return -32
     }
 
@@ -215,24 +215,24 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     (__local_src_bytes = __param_bytes + (sizeof[pcre2_serialized_data]() as usize))
 
-    (__local_tables = (((*__local_memctl).malloc.unwrap()((((1088 as c_ulong) +% (sizeof[c_ulong]() as c_ulong)) as c_ulong), (*__local_memctl).memory_data) as *mut u8)))
+    (__local_tables = (((*__local_memctl).malloc.unwrap()((((1088 as u64) +% (sizeof[u64]() as u64)) as u64), (*__local_memctl).memory_data) as *mut u8)))
 
     if ((if __local_tables == null: 1 else: 0) != 0) {
         return -48
     }
 
-    with_memcpy(((__local_tables as *mut c_void) as *mut u8), ((__local_src_bytes as *const c_void) as *const u8), ((1088 as c_ulong) as i64))
+    with_memcpy(((__local_tables as *mut c_void) as *mut u8), ((__local_src_bytes as *const c_void) as *const u8), ((1088 as u64) as i64))
 
-    ((*((__local_tables + ((((512 + 320) + 256) as isize) as usize)) as *mut c_ulong)) = ((__local_number_of_codes as c_ulong)))
+    ((*((__local_tables + ((((512 + 320) + 256) as isize) as usize)) as *mut u64)) = ((__local_number_of_codes as u64)))
 
     (__local_src_bytes = __local_src_bytes + ((((512 + 320) + 256) as isize) as usize))
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < __local_number_of_codes: 1 else: 0) != 0) {
-        var __local_blocksize: c_ulong
+        var __local_blocksize: u64
 
-        with_memcpy((((&raw mut __local_blocksize as *mut c_ulong) as *mut c_void) as *mut u8), (((__local_src_bytes + ((offsetof[pcre2_real_code_8](blocksize) as usize) as usize)) as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
+        with_memcpy((((&raw mut __local_blocksize as *mut u64) as *mut c_void) as *mut u8), (((__local_src_bytes + ((offsetof[pcre2_real_code_8](blocksize) as usize) as usize)) as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         if ((if __local_blocksize <= (sizeof[pcre2_real_code_8]() as usize): 1 else: 0) != 0) {
             return -62
@@ -243,7 +243,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
         if ((if __local_dst_re == null: 1 else: 0) != 0) {
             (*__local_memctl).free.unwrap()((__local_tables as *mut c_void), (*__local_memctl).memory_data)
 
-            (__local_j = ((0 as c_int)))
+            (__local_j = ((0 as i32)))
 
             while ((if __local_j < __local_i: 1 else: 0) != 0) {
                 (*__local_memctl).free.unwrap()(((__param_codes[__local_j]) as *mut c_void), (*__local_memctl).memory_data)
@@ -260,11 +260,11 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
         }
 
-        with_memcpy(((((__local_dst_re as *mut u8) + (sizeof[pcre2_memctl]() as usize)) as *mut c_void) as *mut u8), (((__local_src_bytes + (sizeof[pcre2_memctl]() as usize)) as *const c_void) as *const u8), ((((__local_blocksize as c_ulong) -% (sizeof[pcre2_memctl]() as c_ulong)) as c_ulong) as i64))
+        with_memcpy(((((__local_dst_re as *mut u8) + (sizeof[pcre2_memctl]() as usize)) as *mut c_void) as *mut u8), (((__local_src_bytes + (sizeof[pcre2_memctl]() as usize)) as *const c_void) as *const u8), ((((__local_blocksize as u64) -% (sizeof[pcre2_memctl]() as u64)) as u64) as i64))
 
-        var __ci_expr_logic_2: c_int
+        var __ci_expr_logic_2: i32
 
-        var __ci_expr_logic_1: c_int
+        var __ci_expr_logic_1: i32
 
         if ((if (*__local_dst_re).magic_number != 1346589253: 1 else: 0) != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
@@ -290,7 +290,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
         ((*__local_dst_re).executable_jit = null)
 
-        ((*__local_dst_re).flags = ((*__local_dst_re).flags as c_uint) | (262144 as c_uint))
+        ((*__local_dst_re).flags = ((*__local_dst_re).flags as u32) | (262144 as u32))
 
         ((__param_codes[__local_i]) = __local_dst_re)
 
@@ -306,7 +306,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
 }
 
-pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> c_int {
+pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> i32 {
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
     if ((if __local_data == null: 1 else: 0) != 0) {
@@ -321,7 +321,7 @@ pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) ->
         return -32
     }
 
-    if ((if (*__local_data).config != ((((sizeof[u8]() as c_ulong) | (((8 as c_ulong) << (8 as c_uint)) as c_ulong)) as c_ulong) | (((sizeof[c_ulong]() as c_ulong) << (16 as c_uint)) as c_ulong)): 1 else: 0) != 0) {
+    if ((if (*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64)): 1 else: 0) != 0) {
         return -32
     }
 

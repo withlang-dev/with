@@ -2,6 +2,6 @@
 # produced these modules (a hash of the migrator's sources), a hash of the
 # modules (the integrity check compares it) and the trigger that justified
 # the promotion (the pin moved, a migrator-pin bump, a ruling).
-migrated_by 1925d1d3fa3f33956e3d4d52d6b7e191063334676c3adbd68d82e3240d2b9d1d
-modules 47ccebef2f9c2e360721870b1d049a098c58e74e2548704c5145451892ea756c
-promoted_for inputs:facade shapes unit gains the word tree (mlib_word_tree, D148)
+migrated_by 52d215ca7c44822fca4e150f71b3c6f1faa0e00033efb9233baf0c8f598917b7
+modules ae56d736212e8b0a0db6f9222d8cab870b207139514451324533f2b3de1d61b4
+promoted_for ruling:D155

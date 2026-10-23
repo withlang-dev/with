@@ -5,39 +5,39 @@ use std.engines.tommyds.tommylist
 use std.libc
 use std.collections
 
-fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
+fn tommy_ilog2_u32(__param_value: u32) -> u32 {
+    return (((((__param_value as u32).clz() as i32) ^ (31 as i32)) as u32))
 
 }
 
-fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
+fn tommy_ilog2_u64(__param_value: u64) -> u32 {
+    return (((((__param_value as u64).clz() as i32) ^ (63 as i32)) as u32))
 
 }
 
-fn tommy_ctz_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).ctz() as c_uint))
+fn tommy_ctz_u32(__param_value: u32) -> u32 {
+    return (((__param_value as u32).ctz() as u32))
 
 }
 
-fn tommy_ctz_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).ctz() as c_uint))
+fn tommy_ctz_u64(__param_value: u64) -> u32 {
+    return (((__param_value as u64).ctz() as u32))
 
 }
 
-fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
+fn tommy_roundup_pow2_u32(__param_value: u32) -> u32 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (1 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (1 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (2 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (2 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (4 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (4 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (8 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (8 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (16 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (16 as u32)) as u32))
 
     (__local_value = (__local_value +% 1))
 
@@ -45,21 +45,21 @@ fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
 
 }
 
-fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
+fn tommy_roundup_pow2_u64(__param_value: u64) -> u64 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (1 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (1 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (2 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (2 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (4 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (4 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (8 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (8 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (16 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (16 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (32 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (32 as u32)) as u64))
 
     (__local_value = (__local_value +% 1))
 
@@ -67,15 +67,15 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 
 }
 
-fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
+fn tommy_haszero_u32(__param_value: u32) -> i32 {
+    return (if ((((((__param_value as u32) -% (16843009 as u32)) as u32) & ((~__param_value) as u32)) as u32) & (2155905152 as u32)) != 0: 1 else: 0)
 
 }
 
 pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_alloc: *mut tommy_allocator_struct) {
-    var __local_i: c_uint
+    var __local_i: u32
 
-    (__local_i = ((0 as c_uint)))
+    (__local_i = ((0 as u32)))
 
     while ((if __local_i < 32: 1 else: 0) != 0) {
         ((*__param_trie).bucket[__local_i] = null)
@@ -85,19 +85,19 @@ pub unsafe fn tommy_trie_init(__param_trie: *mut tommy_trie_struct, __param_allo
     }
 
 
-    ((*__param_trie).count = ((0 as c_ulonglong)))
+    ((*__param_trie).count = ((0 as u64)))
 
-    ((*__param_trie).node_count = ((0 as c_ulonglong)))
+    ((*__param_trie).node_count = ((0 as u64)))
 
     ((*__param_trie).alloc = __param_alloc)
 
 }
 
-pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_key: c_ulonglong) {
+pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_key: u64) {
     var __local_let_ptr: *mut *mut tommy_node_struct
 
-    if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint)) < 32: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"tommy_trie_insert".ptr, c"tommytrie.c".ptr, (158 as c_int), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
+    if (((if not ((if ((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32)) < 32: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"tommy_trie_insert".ptr, c"tommytrie.c".ptr, (158 as i32), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
     } else {
         0
     }
@@ -106,28 +106,28 @@ pub unsafe fn tommy_trie_insert(__param_trie: *mut tommy_trie_struct, __param_no
 
     ((*__param_node).index = __param_key)
 
-    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
-    trie_bucket_insert(__param_trie, (27 as c_uint), __local_let_ptr, __param_node, __param_key)
+    trie_bucket_insert(__param_trie, (27 as u32), __local_let_ptr, __param_node, __param_key)
 
     ((*__param_trie).count = ((*__param_trie).count +% 1))
 
 }
 
-pub unsafe fn tommy_trie_remove(__param_trie: *mut tommy_trie_struct, __param_key: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_trie_remove(__param_trie: *mut tommy_trie_struct, __param_key: u64) -> *mut c_void {
     var __local_ret: *mut tommy_node_struct
 
     var __local_let_ptr: *mut *mut tommy_node_struct
 
-    if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint)) < 32: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"tommy_trie_remove".ptr, c"tommytrie.c".ptr, (261 as c_int), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
+    if (((if not ((if ((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32)) < 32: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"tommy_trie_remove".ptr, c"tommytrie.c".ptr, (261 as i32), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
     } else {
         0
     }
 
-    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
-    (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as c_uint), __local_let_ptr, null, __param_key))
+    (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as u32), __local_let_ptr, null, __param_key))
 
     if ((if not (__local_ret != null): 1 else: 0) != 0) {
         return ((0 as *mut c_void))
@@ -139,25 +139,25 @@ pub unsafe fn tommy_trie_remove(__param_trie: *mut tommy_trie_struct, __param_ke
 
 }
 
-pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_key: c_ulonglong) -> *mut tommy_node_struct {
+pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_key: u64) -> *mut tommy_node_struct {
     var __local_node__goto_298_19: *mut tommy_node_struct = null
 
     var __local_ptr__goto_299_8: *mut c_void = null
 
-    var __local_type___goto_300_15: c_uint = 0
+    var __local_type___goto_300_15: u32 = 0
 
-    var __local_shift__goto_301_15: c_uint = 0
+    var __local_shift__goto_301_15: u32 = 0
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        if (((if not ((if ((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint)) < 32: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-            __assert_rtn(c"tommy_trie_bucket".ptr, c"tommytrie.c".ptr, (304 as c_int), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
+        if (((if not ((if ((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32)) < 32: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"tommy_trie_bucket".ptr, c"tommytrie.c".ptr, (304 as i32), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
         } else {
             0
         }
-        (__local_ptr__goto_299_8 = (((*__param_trie).bucket[((__param_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint))] as *mut c_void)))
-        (__local_shift__goto_301_15 = ((27 as c_uint)))
+        (__local_ptr__goto_299_8 = (((*__param_trie).bucket[((__param_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32))] as *mut c_void)))
+        (__local_shift__goto_301_15 = ((27 as u32)))
         goto '__ci_bb_1
     }
 
@@ -174,7 +174,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
     }
 
     '__ci_bb_3 {
-        (__local_type___goto_300_15 = ((((__local_ptr__goto_299_8 as c_ulong) & (1 as c_ulong)) as c_uint)))
+        (__local_type___goto_300_15 = ((((__local_ptr__goto_299_8 as u64) & (1 as u64)) as u32)))
         goto '__ci_bb_4
     }
 
@@ -204,7 +204,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
     }
 
     '__ci_bb_9 {
-        (__local_ptr__goto_299_8 = (((*(((__local_ptr__goto_299_8 as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift__goto_301_15 as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *mut c_void)))
+        (__local_ptr__goto_299_8 = (((*(((__local_ptr__goto_299_8 as u64) -% (1 as u64)) as *mut tommy_trie_tree_struct)).map[((((__param_key as u64) >> (__local_shift__goto_301_15 as u32)) as u64) & (7 as u64))] as *mut c_void)))
         (__local_shift__goto_301_15 = (__local_shift__goto_301_15 -% 3))
         goto '__ci_bb_1
     }
@@ -221,7 +221,7 @@ pub unsafe fn tommy_trie_bucket(__param_trie: *mut tommy_trie_struct, __param_ke
 
 }
 
-pub unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_key: c_ulonglong) -> *mut c_void {
+pub unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_key: u64) -> *mut c_void {
     var __local_i: *mut tommy_node_struct = tommy_trie_bucket(__param_trie, __param_key)
 
     if ((if not (__local_i != null): 1 else: 0) != 0) {
@@ -235,22 +235,22 @@ pub unsafe fn tommy_trie_search(__param_trie: *mut tommy_trie_struct, __param_ke
 pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_ret: *mut tommy_node_struct
 
-    var __local_key: c_ulonglong = (*__param_node).index
+    var __local_key: u64 = (*__param_node).index
 
     var __local_let_ptr: *mut *mut tommy_node_struct
 
-    if (((if not ((if ((__local_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint)) < 32: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"tommy_trie_remove_existing".ptr, c"tommytrie.c".ptr, (282 as c_int), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
+    if (((if not ((if ((__local_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32)) < 32: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"tommy_trie_remove_existing".ptr, c"tommytrie.c".ptr, (282 as i32), c"key >> TOMMY_TRIE_BUCKET_SHIFT < TOMMY_TRIE_BUCKET_MAX".ptr)
     } else {
         0
     }
 
-    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__local_key as c_ulonglong) >> ((32 - ((32 % (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int))) + (if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 256: 1 else: 0) != 0: (8 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 128: 1 else: 0) != 0: (7 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 64: 1 else: 0) != 0: (6 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 32: 1 else: 0) != 0: (5 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 16: 1 else: 0) != 0: (4 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 8: 1 else: 0) != 0: (3 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 4: 1 else: 0) != 0: (2 as c_int) else: ((if (if ((64 as c_ulong) / (sizeof[usize]() as c_ulong)) == 2: 1 else: 0) != 0: (1 as c_int) else: (0 as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)) as c_int)))) as c_uint))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+    (__local_let_ptr = (((&raw const (*__param_trie).bucket[((__local_key as u64) >> ((32 - ((32 % (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32))) + (if (if ((64 as u64) / (sizeof[usize]() as u64)) == 256: 1 else: 0) != 0: (8 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 128: 1 else: 0) != 0: (7 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 64: 1 else: 0) != 0: (6 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 32: 1 else: 0) != 0: (5 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 16: 1 else: 0) != 0: (4 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 8: 1 else: 0) != 0: (3 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 4: 1 else: 0) != 0: (2 as i32) else: ((if (if ((64 as u64) / (sizeof[usize]() as u64)) == 2: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)) as i32)))) as u32))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
 
-    (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as c_uint), __local_let_ptr, __param_node, __local_key))
+    (__local_ret = trie_bucket_remove_existing(__param_trie, (27 as u32), __local_let_ptr, __param_node, __local_key))
 
-    if (((if not ((if __local_ret == __param_node: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"tommy_trie_remove_existing".ptr, c"tommytrie.c".ptr, (289 as c_int), c"ret == node".ptr)
+    if (((if not ((if __local_ret == __param_node: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"tommy_trie_remove_existing".ptr, c"tommytrie.c".ptr, (289 as i32), c"ret == node".ptr)
     } else {
         0
     }
@@ -261,17 +261,17 @@ pub unsafe fn tommy_trie_remove_existing(__param_trie: *mut tommy_trie_struct, _
 
 }
 
-pub unsafe fn tommy_trie_count(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
+pub unsafe fn tommy_trie_count(__param_trie: *mut tommy_trie_struct) -> u64 {
     return (*__param_trie).count
 
 }
 
-pub unsafe fn tommy_trie_memory_usage(__param_trie: *mut tommy_trie_struct) -> c_ulonglong {
-    return ((((tommy_trie_count(__param_trie) as c_ulonglong) *% (sizeof[tommy_node_struct]() as c_ulonglong)) as c_ulonglong) +% ((((*__param_trie).node_count as c_ulonglong) *% (((((64 as c_ulong) / (8 as c_ulong)) as c_ulong) *% (8 as c_ulong)) as c_ulonglong)) as c_ulonglong))
+pub unsafe fn tommy_trie_memory_usage(__param_trie: *mut tommy_trie_struct) -> u64 {
+    return ((((tommy_trie_count(__param_trie) as u64) *% (sizeof[tommy_node_struct]() as u64)) as u64) +% ((((*__param_trie).node_count as u64) *% (((((64 as u64) / (8 as u64)) as u64) *% (8 as u64)) as u64)) as u64))
 
 }
 
-unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift: c_uint, __param_let_ptr: *mut *mut tommy_node_struct, __param_insert: *mut tommy_node_struct, __param_key: c_ulonglong) -> Unit {
+unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift: u32, __param_let_ptr: *mut *mut tommy_node_struct, __param_insert: *mut tommy_node_struct, __param_key: u64) -> Unit {
     var __local_shift = __param_shift
     var __local_let_ptr = __param_let_ptr
     var __local_tree__goto_92_19: *mut tommy_trie_tree_struct = null
@@ -280,9 +280,9 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
 
     var __local_ptr__goto_94_8: *mut c_void = null
 
-    var __local_i__goto_95_15: c_uint = 0
+    var __local_i__goto_95_15: u32 = 0
 
-    var __local_j__goto_96_15: c_uint = 0
+    var __local_j__goto_96_15: u32 = 0
 
     goto '__ci_bb_0
 
@@ -305,7 +305,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_3 {
-        if ((if ((__local_ptr__goto_94_8 as c_ulong) & (1 as c_ulong)) == 1: 1 else: 0) != 0) {
+        if ((if ((__local_ptr__goto_94_8 as u64) & (1 as u64)) == 1: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -313,7 +313,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_4 {
-        (__local_let_ptr = (((&raw const (*(((__local_ptr__goto_94_8 as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+        (__local_let_ptr = (((&raw const (*(((__local_ptr__goto_94_8 as u64) -% (1 as u64)) as *mut tommy_trie_tree_struct)).map[((((__param_key as u64) >> (__local_shift as u32)) as u64) & (7 as u64))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
         (__local_shift = (__local_shift -% 3))
         goto '__ci_bb_1
     }
@@ -339,13 +339,13 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     '__ci_bb_8 {
         (__local_tree__goto_92_19 = ((tommy_allocator_alloc((*__param_trie).alloc) as *mut tommy_trie_tree_struct)))
         ((*__param_trie).node_count = ((*__param_trie).node_count +% 1))
-        ((*__local_let_ptr) = (((((__local_tree__goto_92_19 as c_ulong) +% (1 as c_ulong)) as *mut c_void) as *mut tommy_node_struct)))
-        (__local_i__goto_95_15 = ((0 as c_uint)))
+        ((*__local_let_ptr) = (((((__local_tree__goto_92_19 as u64) +% (1 as u64)) as *mut c_void) as *mut tommy_node_struct)))
+        (__local_i__goto_95_15 = ((0 as u32)))
         goto '__ci_bb_9
     }
 
     '__ci_bb_9 {
-        if ((if __local_i__goto_95_15 < ((64 as c_ulong) / (8 as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_95_15 < ((64 as u64) / (8 as u64)): 1 else: 0) != 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_12
@@ -363,8 +363,8 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
     }
 
     '__ci_bb_12 {
-        (__local_i__goto_95_15 = (((((((*__local_node__goto_93_19).index as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong)) as c_uint)))
-        (__local_j__goto_96_15 = ((((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong)) as c_uint)))
+        (__local_i__goto_95_15 = (((((((*__local_node__goto_93_19).index as u64) >> (__local_shift as u32)) as u64) & (7 as u64)) as u32)))
+        (__local_j__goto_96_15 = ((((((__param_key as u64) >> (__local_shift as u32)) as u64) & (7 as u64)) as u32)))
         if ((if __local_i__goto_95_15 != __local_j__goto_96_15: 1 else: 0) != 0) {
             goto '__ci_bb_13
         } else {
@@ -388,7 +388,7 @@ unsafe fn trie_bucket_insert(__param_trie: *mut tommy_trie_struct, __param_shift
 
 }
 
-unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __param_shift: c_uint, __param_let_ptr: *mut *mut tommy_node_struct, __param_remove: *mut tommy_node_struct, __param_key: c_ulonglong) -> *mut tommy_node_struct {
+unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __param_shift: u32, __param_let_ptr: *mut *mut tommy_node_struct, __param_remove: *mut tommy_node_struct, __param_key: u64) -> *mut tommy_node_struct {
     var __local_shift = __param_shift
     var __local_let_ptr = __param_let_ptr
     var __local_remove = __param_remove
@@ -400,22 +400,22 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
 
     var __local_let_back__goto_175_20: List[*mut *mut tommy_node_struct] = [null; 10]
 
-    var __local_level__goto_176_15: c_uint = 0
+    var __local_level__goto_176_15: u32 = 0
 
-    var __local_i__goto_177_15: c_uint = 0
+    var __local_i__goto_177_15: u32 = 0
 
-    var __local_count__goto_178_15: c_uint = 0
+    var __local_count__goto_178_15: u32 = 0
 
-    var __local_last__goto_179_15: c_uint = 0
+    var __local_last__goto_179_15: u32 = 0
 
-    var __ci_expr_old_0: c_uint = 0
+    var __ci_expr_old_0: u32 = 0
 
-    var __ci_expr_logic_1: c_int = 0
+    var __ci_expr_logic_1: i32 = 0
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_level__goto_176_15 = ((0 as c_uint)))
+        (__local_level__goto_176_15 = ((0 as u32)))
         goto '__ci_bb_1
     }
 
@@ -433,7 +433,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_3 {
-        if ((if ((__local_ptr__goto_174_8 as c_ulong) & (1 as c_ulong)) == 1: 1 else: 0) != 0) {
+        if ((if ((__local_ptr__goto_174_8 as u64) & (1 as u64)) == 1: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -441,11 +441,11 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_4 {
-        (__local_tree__goto_173_19 = ((((__local_ptr__goto_174_8 as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)))
+        (__local_tree__goto_173_19 = ((((__local_ptr__goto_174_8 as u64) -% (1 as u64)) as *mut tommy_trie_tree_struct)))
         (__ci_expr_old_0 = __local_level__goto_176_15)
         (__local_level__goto_176_15 = (__local_level__goto_176_15 +% 1))
         (__local_let_back__goto_175_20[__ci_expr_old_0] = __local_let_ptr)
-        (__local_let_ptr = (((&raw const (*__local_tree__goto_173_19).map[((((__param_key as c_ulonglong) >> (__local_shift as c_uint)) as c_ulonglong) & (7 as c_ulonglong))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
+        (__local_let_ptr = (((&raw const (*__local_tree__goto_173_19).map[((((__param_key as u64) >> (__local_shift as u32)) as u64) & (7 as u64))] as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct)))
         (__local_shift = (__local_shift -% 3))
         goto '__ci_bb_1
     }
@@ -501,15 +501,15 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     '__ci_bb_12 {
         (__local_level__goto_176_15 = (__local_level__goto_176_15 -% 1))
         (__local_let_ptr = __local_let_back__goto_175_20[__local_level__goto_176_15])
-        (__local_tree__goto_173_19 = (((((*__local_let_ptr) as c_ulong) -% (1 as c_ulong)) as *mut tommy_trie_tree_struct)))
-        (__local_count__goto_178_15 = ((0 as c_uint)))
-        (__local_last__goto_179_15 = ((0 as c_uint)))
-        (__local_i__goto_177_15 = ((0 as c_uint)))
+        (__local_tree__goto_173_19 = (((((*__local_let_ptr) as u64) -% (1 as u64)) as *mut tommy_trie_tree_struct)))
+        (__local_count__goto_178_15 = ((0 as u32)))
+        (__local_last__goto_179_15 = ((0 as u32)))
+        (__local_i__goto_177_15 = ((0 as u32)))
         goto '__ci_bb_13
     }
 
     '__ci_bb_13 {
-        if ((if __local_i__goto_177_15 < ((64 as c_ulong) / (8 as c_ulong)): 1 else: 0) != 0) {
+        if ((if __local_i__goto_177_15 < ((64 as u64) / (8 as u64)): 1 else: 0) != 0) {
             goto '__ci_bb_14
         } else {
             goto '__ci_bb_16
@@ -530,8 +530,8 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_16 {
-        if (((if not ((if __local_count__goto_178_15 == 1: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-            __assert_rtn(c"trie_bucket_remove_existing".ptr, c"tommytrie.c".ptr, (241 as c_int), c"count == 1".ptr)
+        if (((if not ((if __local_count__goto_178_15 == 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"trie_bucket_remove_existing".ptr, c"tommytrie.c".ptr, (241 as i32), c"count == 1".ptr)
         } else {
             0
         }
@@ -546,7 +546,7 @@ unsafe fn trie_bucket_remove_existing(__param_trie: *mut tommy_trie_struct, __pa
     }
 
     '__ci_bb_17 {
-        if ((if (((*__local_tree__goto_173_19).map[__local_i__goto_177_15] as c_ulong) & (1 as c_ulong)) != 0: 1 else: 0) != 0) {
+        if ((if (((*__local_tree__goto_173_19).map[__local_i__goto_177_15] as u64) & (1 as u64)) != 0: 1 else: 0) != 0) {
             goto '__ci_bb_19
         } else {
             goto '__ci_bb_20

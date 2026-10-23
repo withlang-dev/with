@@ -3,10 +3,10 @@ use std.engines.c_algorithms.defs
 use std.option
 use std.collections
 
-pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> c_uint], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _HashTable {
+pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> u32], __param_equal_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _HashTable {
     var __local_hash_table: *mut _HashTable
 
-    (__local_hash_table = (((with_alloc(((sizeof[_HashTable]() as c_ulong) as i64)) as *mut c_void) as *mut _HashTable)))
+    (__local_hash_table = (((with_alloc(((sizeof[_HashTable]() as u64) as i64)) as *mut c_void) as *mut _HashTable)))
 
     if ((if __local_hash_table == null: 1 else: 0) != 0) {
         return ((null as *mut _HashTable))
@@ -21,9 +21,9 @@ pub fn hash_table_new(__param_hash_func: Option[unsafe extern "C" fn(*mut c_void
 
     ((unsafe *__local_hash_table).value_free_func = null)
 
-    ((unsafe *__local_hash_table).entries = ((0 as c_uint)))
+    ((unsafe *__local_hash_table).entries = ((0 as u32)))
 
-    ((unsafe *__local_hash_table).prime_index = ((0 as c_uint)))
+    ((unsafe *__local_hash_table).prime_index = ((0 as u32)))
 
     if ((if not (unsafe { hash_table_allocate_table(__local_hash_table) } != 0): 1 else: 0) != 0) {
         with_free(((__local_hash_table as *mut c_void) as *mut u8))
@@ -41,9 +41,9 @@ pub unsafe fn hash_table_free(__param_hash_table: *mut _HashTable) {
 
     var __local_next: *mut _HashTableEntry
 
-    var __local_i: c_uint
+    var __local_i: u32
 
-    (__local_i = ((0 as c_uint)))
+    (__local_i = ((0 as u32)))
 
     while ((if __local_i < (*__param_hash_table).table_size: 1 else: 0) != 0) {
         (__local_rover = ((*__param_hash_table).table[__local_i]))
@@ -76,16 +76,16 @@ pub unsafe fn hash_table_register_free_functions(__param_hash_table: *mut _HashT
 
 }
 
-pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key: *mut c_void, __param_value: *mut c_void) -> c_int {
+pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key: *mut c_void, __param_value: *mut c_void) -> i32 {
     var __local_rover: *mut _HashTableEntry
 
     var __local_pair: *mut _HashTablePair
 
     var __local_newentry: *mut _HashTableEntry
 
-    var __local_index: c_uint
+    var __local_index: u32
 
-    if ((if (((((*__param_hash_table).entries as c_uint) *% (3 as c_uint)) as c_uint) / ((*__param_hash_table).table_size as c_uint)) > 0: 1 else: 0) != 0) {
+    if ((if (((((*__param_hash_table).entries as u32) *% (3 as u32)) as u32) / ((*__param_hash_table).table_size as u32)) > 0: 1 else: 0) != 0) {
         if ((if not (hash_table_enlarge(__param_hash_table) != 0): 1 else: 0) != 0) {
             return 0
 
@@ -93,7 +93,7 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     }
 
-    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as u32) % ((*__param_hash_table).table_size as u32)) as u32)))
 
     (__local_rover = ((*__param_hash_table).table[__local_index]))
 
@@ -123,7 +123,7 @@ pub unsafe fn hash_table_insert(__param_hash_table: *mut _HashTable, __param_key
 
     }
 
-    (__local_newentry = (((with_alloc(((sizeof[_HashTableEntry]() as c_ulong) as i64)) as *mut c_void) as *mut _HashTableEntry)))
+    (__local_newentry = (((with_alloc(((sizeof[_HashTableEntry]() as u64) as i64)) as *mut c_void) as *mut _HashTableEntry)))
 
     if ((if __local_newentry == null: 1 else: 0) != 0) {
         return 0
@@ -149,9 +149,9 @@ pub unsafe fn hash_table_lookup(__param_hash_table: *mut _HashTable, __param_key
 
     var __local_pair: *mut _HashTablePair
 
-    var __local_index: c_uint
+    var __local_index: u32
 
-    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as u32) % ((*__param_hash_table).table_size as u32)) as u32)))
 
     (__local_rover = ((*__param_hash_table).table[__local_index]))
 
@@ -171,20 +171,20 @@ pub unsafe fn hash_table_lookup(__param_hash_table: *mut _HashTable, __param_key
 
 }
 
-pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key: *mut c_void) -> c_int {
+pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key: *mut c_void) -> i32 {
     var __local_rover: *mut *mut _HashTableEntry
 
     var __local_entry: *mut _HashTableEntry
 
     var __local_pair: *mut _HashTablePair
 
-    var __local_index: c_uint
+    var __local_index: u32
 
-    var __local_result: c_int
+    var __local_result: i32
 
-    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+    (__local_index = (((((*__param_hash_table).hash_func.unwrap()(__param_key) as u32) % ((*__param_hash_table).table_size as u32)) as u32)))
 
-    (__local_result = ((0 as c_int)))
+    (__local_result = ((0 as i32)))
 
     (__local_rover = (((&raw const ((*__param_hash_table).table[__local_index]) as *const *mut _HashTableEntry) as *mut *mut _HashTableEntry)))
 
@@ -200,7 +200,7 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 
             ((*__param_hash_table).entries = ((*__param_hash_table).entries -% 1))
 
-            (__local_result = ((1 as c_int)))
+            (__local_result = ((1 as i32)))
 
             break
 
@@ -214,19 +214,19 @@ pub unsafe fn hash_table_remove(__param_hash_table: *mut _HashTable, __param_key
 
 }
 
-pub unsafe fn hash_table_num_entries(__param_hash_table: *mut _HashTable) -> c_uint {
+pub unsafe fn hash_table_num_entries(__param_hash_table: *mut _HashTable) -> u32 {
     return (*__param_hash_table).entries
 
 }
 
 pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_iterator: *mut _HashTableIterator) {
-    var __local_chain: c_uint
+    var __local_chain: u32
 
     ((*__param_iterator).hash_table = __param_hash_table)
 
     ((*__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
 
-    (__local_chain = ((0 as c_uint)))
+    (__local_chain = ((0 as u32)))
 
     while ((if __local_chain < (*__param_hash_table).table_size: 1 else: 0) != 0) {
         if ((if ((*__param_hash_table).table[__local_chain]) != null: 1 else: 0) != 0) {
@@ -246,7 +246,7 @@ pub unsafe fn hash_table_iterate(__param_hash_table: *mut _HashTable, __param_it
 
 }
 
-pub unsafe fn hash_table_iter_has_more(__param_iterator: *mut _HashTableIterator) -> c_int {
+pub unsafe fn hash_table_iter_has_more(__param_iterator: *mut _HashTableIterator) -> i32 {
     return (if (*__param_iterator).next_entry != null: 1 else: 0)
 
 }
@@ -258,7 +258,7 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
 
     var __local_pair: _HashTablePair = _HashTablePair { key: (null), value: (null) }
 
-    var __local_chain: c_uint
+    var __local_chain: u32
 
     (__local_hash_table = (*__param_iterator).hash_table)
 
@@ -275,7 +275,7 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
         ((*__param_iterator).next_entry = (*__local_current_entry).next)
 
     } else {
-        (__local_chain = (((((*__param_iterator).next_chain as c_uint) +% (1 as c_uint)) as c_uint)))
+        (__local_chain = (((((*__param_iterator).next_chain as u32) +% (1 as u32)) as u32)))
 
         ((*__param_iterator).next_entry = ((null as *mut _HashTableEntry)))
 
@@ -299,20 +299,20 @@ pub unsafe fn hash_table_iter_next(__param_iterator: *mut _HashTableIterator) ->
 
 }
 
-unsafe fn hash_table_allocate_table(__param_hash_table: *mut _HashTable) -> c_int {
-    var __local_new_table_size: c_uint
+unsafe fn hash_table_allocate_table(__param_hash_table: *mut _HashTable) -> i32 {
+    var __local_new_table_size: u32
 
     if ((if (*__param_hash_table).prime_index < 24: 1 else: 0) != 0) {
-        (__local_new_table_size = ((hash_table_primes[(*__param_hash_table).prime_index] as c_uint)))
+        (__local_new_table_size = ((hash_table_primes[(*__param_hash_table).prime_index] as u32)))
 
     } else {
-        (__local_new_table_size = (((((*__param_hash_table).entries as c_uint) *% (10 as c_uint)) as c_uint)))
+        (__local_new_table_size = (((((*__param_hash_table).entries as u32) *% (10 as u32)) as u32)))
 
     }
 
     ((*__param_hash_table).table_size = __local_new_table_size)
 
-    ((*__param_hash_table).table = (((with_alloc_zeroed((((*__param_hash_table).table_size as c_ulong) as i64), ((sizeof[usize]() as c_ulong) as i64)) as *mut c_void) as *mut *mut _HashTableEntry)))
+    ((*__param_hash_table).table = (((with_alloc_zeroed((((*__param_hash_table).table_size as u64) as i64), ((sizeof[usize]() as u64) as i64)) as *mut c_void) as *mut *mut _HashTableEntry)))
 
     return (if (*__param_hash_table).table != null: 1 else: 0)
 
@@ -337,12 +337,12 @@ unsafe fn hash_table_free_entry(__param_hash_table: *mut _HashTable, __param_ent
 
 }
 
-unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
+unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> i32 {
     var __local_old_table: *mut *mut _HashTableEntry
 
-    var __local_old_table_size: c_uint
+    var __local_old_table_size: u32
 
-    var __local_old_prime_index: c_uint
+    var __local_old_prime_index: u32
 
     var __local_rover: *mut _HashTableEntry
 
@@ -350,9 +350,9 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
     var __local_next: *mut _HashTableEntry
 
-    var __local_index: c_uint
+    var __local_index: u32
 
-    var __local_i: c_uint
+    var __local_i: u32
 
     (__local_old_table = (*__param_hash_table).table)
 
@@ -373,7 +373,7 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
     }
 
-    (__local_i = ((0 as c_uint)))
+    (__local_i = ((0 as u32)))
 
     while ((if __local_i < __local_old_table_size: 1 else: 0) != 0) {
         (__local_rover = (__local_old_table[__local_i]))
@@ -383,7 +383,7 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
             (__local_pair = (((&raw const (*__local_rover).pair as *const _HashTablePair) as *mut _HashTablePair)))
 
-            (__local_index = (((((*__param_hash_table).hash_func.unwrap()((*__local_pair).key) as c_uint) % ((*__param_hash_table).table_size as c_uint)) as c_uint)))
+            (__local_index = (((((*__param_hash_table).hash_func.unwrap()((*__local_pair).key) as u32) % ((*__param_hash_table).table_size as u32)) as u32)))
 
             ((*__local_rover).next = ((*__param_hash_table).table[__local_index]))
 
@@ -405,6 +405,6 @@ unsafe fn hash_table_enlarge(__param_hash_table: *mut _HashTable) -> c_int {
 
 }
 
-let hash_table_primes: List[c_uint] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
-let hash_table_num_primes: c_uint = 24
+let hash_table_primes: List[u32] = [193, 389, 769, 1543, 3079, 6151, 12289, 24593, 49157, 98317, 196613, 393241, 786433, 1572869, 3145739, 6291469, 12582917, 25165843, 50331653, 100663319, 201326611, 402653189, 805306457, 1610612741]
+let hash_table_num_primes: u32 = 24
 let hash_table_null_value: *mut c_void = null

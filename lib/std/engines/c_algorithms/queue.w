@@ -4,7 +4,7 @@ use std.engines.c_algorithms.defs
 pub fn queue_new() -> *mut _Queue {
     var __local_queue: *mut _Queue
 
-    (__local_queue = (((with_alloc(((sizeof[_Queue]() as c_ulong) as i64)) as *mut c_void) as *mut _Queue)))
+    (__local_queue = (((with_alloc(((sizeof[_Queue]() as u64) as i64)) as *mut c_void) as *mut _Queue)))
 
     if ((if __local_queue == null: 1 else: 0) != 0) {
         return ((null as *mut _Queue))
@@ -29,10 +29,10 @@ pub unsafe fn queue_free(__param_queue: *mut _Queue) {
 
 }
 
-pub unsafe fn queue_push_head(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int {
+pub unsafe fn queue_push_head(__param_queue: *mut _Queue, __param_data: *mut c_void) -> i32 {
     var __local_new_entry: *mut _QueueEntry
 
-    (__local_new_entry = (((with_alloc(((sizeof[_QueueEntry]() as c_ulong) as i64)) as *mut c_void) as *mut _QueueEntry)))
+    (__local_new_entry = (((with_alloc(((sizeof[_QueueEntry]() as u64) as i64)) as *mut c_void) as *mut _QueueEntry)))
 
     if ((if __local_new_entry == null: 1 else: 0) != 0) {
         return 0
@@ -101,10 +101,10 @@ pub unsafe fn queue_peek_head(__param_queue: *mut _Queue) -> *mut c_void {
 
 }
 
-pub unsafe fn queue_push_tail(__param_queue: *mut _Queue, __param_data: *mut c_void) -> c_int {
+pub unsafe fn queue_push_tail(__param_queue: *mut _Queue, __param_data: *mut c_void) -> i32 {
     var __local_new_entry: *mut _QueueEntry
 
-    (__local_new_entry = (((with_alloc(((sizeof[_QueueEntry]() as c_ulong) as i64)) as *mut c_void) as *mut _QueueEntry)))
+    (__local_new_entry = (((with_alloc(((sizeof[_QueueEntry]() as u64) as i64)) as *mut c_void) as *mut _QueueEntry)))
 
     if ((if __local_new_entry == null: 1 else: 0) != 0) {
         return 0
@@ -173,7 +173,7 @@ pub unsafe fn queue_peek_tail(__param_queue: *mut _Queue) -> *mut c_void {
 
 }
 
-pub unsafe fn queue_is_empty(__param_queue: *mut _Queue) -> c_int {
+pub unsafe fn queue_is_empty(__param_queue: *mut _Queue) -> i32 {
     return (if (*__param_queue).head == null: 1 else: 0)
 
 }
