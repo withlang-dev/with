@@ -330,7 +330,14 @@ impl Pcre2Suite:
             if matched:
                 self.say("  OK" ++ mode)
             else:
-                self.failed("** Locale test did not run successfully" ++ mode ++ ": " ++ actual ++ " matches none of upstream's testoutput3, 3A, 3B, 3C; this may be the locale settings rather than a bug in PCRE2")
+                if fs.read_text(actual).contains("\\x83 \\x8a \\x8c \\x8e"):
+                    // Windows: the CRT's French locale is code page 1252, whose
+                    // letters above 0x7f (\x83 to \x9f: ƒ Š Œ Ž š œ ž Ÿ) are not
+                    // ISO 8859-1's; upstream's four alternatives are all Latin-1.
+                    // The library is not what differs (#2592).
+                    self.skip("because the host's French locale is code page 1252, not the ISO 8859-1 of upstream's expected outputs")
+                else:
+                    self.failed("** Locale test did not run successfully" ++ mode ++ ": " ++ actual ++ " matches none of upstream's testoutput3, 3A, 3B, 3C; this may be the locale settings rather than a bug in PCRE2")
 
     mut fn test(ctx: &ActionCtx, n: i32) -> Unit:
         let fs = ctx.fs()
