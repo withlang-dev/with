@@ -1,4 +1,4 @@
-//! expect-check-fail: 'u128_mul_would_overflow' requires an explicit import (§18.1); add: use std.engines.pcre2.defs.u128_mul_would_overflow
+//! expect-check-fail: 'u128_mul_would_overflow' requires an explicit import (§18.1); candidates: use std.engines.mlib.defs.u128_mul_would_overflow | use std.engines.pcre2.defs.u128_mul_would_overflow
 
 // #1362: a bundle corpus's internals are not the prelude (§18.2). The
 // prelude's std.regex imports the pcre2 corpus (std.engines.pcre2.*) for itself; that

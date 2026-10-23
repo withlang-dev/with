@@ -111,6 +111,10 @@ extern fn rt_libc_fileno(stream: *mut c_void) -> i32
 extern fn rt_libc_fseeko(stream: *mut c_void, offset: i64, whence: i32) -> i32
 @[link_name("ftello")]
 extern fn rt_libc_ftello(stream: *mut c_void) -> i64
+// `long double` is wider than a double on this target and With has no float
+// for it (#2176): std.libc's strtold is the correctly rounded double, strtod's.
+@[link_name("strtod")]
+extern fn rt_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
 @[link_name("isatty")]
 extern fn rt_libc_isatty(fd: i32) -> i32
 @[link_name("mkstemp")]
@@ -122,6 +126,7 @@ pub fn rt_errno_ptr() -> *mut i32: rt_libc_errno_location()
 pub fn rt_fileno(stream: *mut c_void) -> i32: rt_libc_fileno(stream)
 pub fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_libc_fseeko(stream, offset, whence)
 pub fn rt_ftell(stream: *mut c_void) -> i64: rt_libc_ftello(stream)
+pub fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_libc_strtold(nptr, endptr)
 pub fn rt_isatty(fd: i32) -> i32: rt_libc_isatty(fd)
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_libc_getrlimit(resource, lim)
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: rt_libc_setrlimit(resource, lim)
@@ -1547,6 +1552,9 @@ c facade libc:
         preserves domain environ
         preserves domain locale
     fn rt_libc_ftello
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_strtold
         preserves domain environ
         preserves domain locale
     fn rt_libc_isatty

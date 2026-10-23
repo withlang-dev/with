@@ -922,7 +922,9 @@ impl BundleEmitter:
             else:
                 attrs = attrs ++ "@[callconv(\"" ++ cc ++ "\")]\n"
             cc_row = cc
-        let sig = sema.get_sig(name_sym)
+        // The declaration's own signature: get_sig answers with the module's
+        // view of the symbol, which may be another module's declaration.
+        let sig = sema.extern_decl_sigs.get(node) ?? sema.get_sig(name_sym)
         if sig < 0:
             self.refuse("has no finalized signature")
             return

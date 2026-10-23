@@ -133,6 +133,17 @@ fn migrate_add_include_path(path: &str) -> Unit:
 fn migrate_add_macro_prefix_map(spec: &str):
     g_migrate_macro_prefix_maps.push(spec)
 
+// A location the migration writes into a module (a demotion comment's)
+// goes through the same maps as a `__FILE__`: a promoted corpus names no
+// staging directory, so it is the same on every host.
+fn migrate_map_output_path(text: &str) -> str:
+    for spec in g_migrate_macro_prefix_maps:
+        let eq = spec.find("=")
+        if eq < 0: continue
+        let old = spec[..eq]
+        if text.starts_with(old): return spec[eq + 1..] ++ text[old.len()..]
+    text
+
 fn migrate_add_forced_include(path: &str) -> Unit:
     g_migrate_forced_includes.push(ci_migrate_fs_path(path))
 
@@ -754,7 +765,7 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ ci_migrate_render_preamble_fn("fn to_lower(c: i32) -> i32", "if c >= 65 and c <= 90: c + 32 else: c", "if c >= 65 and c <= 90 { c + 32 } else { c }")
     p = p ++ ci_migrate_render_preamble_fn("fn to_upper(c: i32) -> i32", "if c >= 97 and c <= 122: c - 32 else: c", "if c >= 97 and c <= 122 { c - 32 } else { c }")
     // String functions from libc
-    p = p ++ "extern fn strlen(s: *const i8) -> i64\n"
+    p = p ++ "extern fn strlen(s: *const i8) -> u64\n"
     p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
     p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
     p = p ++ "extern fn strchr(s: *const i8, c: i32) -> *mut i8\n"

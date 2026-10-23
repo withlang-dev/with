@@ -10,7 +10,8 @@
 // bits; a struct holding a str and a List copies by sharing their buffers
 // under a count (the copy glue retains each field), and the first write
 // through one copy leaves the other alone. The same for an instance of a
-// generic struct of values, so a BTreeMap of values is a value. Passing a
+// generic struct of values. A BTreeMap is engine-backed, a resource (D152):
+// a copy is `.clone()`. Passing a
 // value struct copies it, so the caller still has it.
 use std.box.Box
 use std.collections.BTreeMap
@@ -37,7 +38,7 @@ fn main:
     print(f"w.items {w.items.len()} v.items {v.items.len()}")
     var m: BTreeMap[str, i32] = BTreeMap.new()
     m.insert("a", 1)
-    var n = m
+    var n = m.clone()
     n.insert("b", 2)
     print(f"m.len {m.len()} n.len {n.len()}")
     let boxed_drop = Box.new(Named { name: "d" ++ "rop", tags: ["k"] })

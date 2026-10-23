@@ -158,6 +158,7 @@ let CXK_CSTYLE_CAST: i32 = 117
 let CXK_CONDITIONAL_OP: i32 = 116   // CXCursor_ConditionalOperator (`c ? a : b`)
 let CXK_IMPLICIT_CAST: i32 = 124
 let CXK_DECL_REF: i32 = 101
+let CXK_TYPE_REF: i32 = 43
 let CXK_MEMBER_REF: i32 = 102
 let CXK_CALL_EXPR: i32 = 103
 let CXK_ARRAY_SUBSCRIPT: i32 = 113
@@ -3138,22 +3139,25 @@ fn ci_translate_enum(session: i64, idx: i32) -> str:
 
     var output = ""
 
-    // Emit type alias for named enums (skip anonymous enums with synthetic names)
+    var all_fit_int = true
+    for ci in 0..const_count:
+        if not ci_value_fits_int(ci_enum_const_value(with_cimport_enum_const_value(session, idx, ci), int_type)):
+            all_fit_int = false
+    let const_type = ci_enum_const_type(all_fit_int, int_type)
+
+    // Emit type alias for named enums (skip anonymous enums with synthetic
+    // names). The alias is the type every use of the enum renders (the
+    // bridge's enum rule): the constants' `c_int` when they all fit `int`,
+    // else the underlying integer type.
     let enum_name = with_cimport_decl_name(session, idx)
     let is_anonymous = enum_name.len() == 0 or enum_name[0] == 95 or ci_str_contains(enum_name, "(unnamed") or ci_str_contains(enum_name, "(anonymous")
     if not is_anonymous:
         if not ci_type_name_is_emitted(enum_name):
             let safe_enum_name = ci_escape_reserved(enum_name)
             ci_mark_type_name_emitted(enum_name)
-            let type_line = "type " ++ safe_enum_name ++ " = " ++ int_type ++ "\n"
+            let type_line = "type " ++ safe_enum_name ++ " = " ++ const_type ++ "\n"
             if not ci_migrate_shared_decl_add("type", enum_name, type_line):
                 output = output ++ type_line
-
-    var all_fit_int = true
-    for ci in 0..const_count:
-        if not ci_value_fits_int(ci_enum_const_value(with_cimport_enum_const_value(session, idx, ci), int_type)):
-            all_fit_int = false
-    let const_type = ci_enum_const_type(all_fit_int, int_type)
 
     for ci in 0..const_count:
         let cname = with_cimport_enum_const_name(session, idx, ci)
@@ -3987,6 +3991,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
     var probes = CiMacroProbes.new()
     for i in 0..count:
         let name = with_cimport_macro_name(session, i)
+        g_ci_expr_subject = name
         let raw_value = with_cimport_macro_value(session, i)
         var value = ci_trim(ci_strip_c_comments(raw_value))
         var fn_like = with_cimport_macro_is_fn_like(session, i)
@@ -4445,6 +4450,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     ci_record_untranslated_object_macro(name, macro_is_system)
     probes.close()
     g_migrate_macro_session = 0
+    g_ci_expr_subject = ""
     g_macro_type_names = ""
     g_macro_type_aliases = ""
     output
@@ -4476,6 +4482,8 @@ var g_ci_expr_depth = 0
 // C's size_t (#1417).
 var g_ci_sizeof_as_size_t = false
 var g_ci_expr_scanned: i64 = 0
+// The macro whose body is being translated, so a spent budget names it.
+var g_ci_expr_subject = ""
 
 fn ci_expr_budget_spent(s: &str) -> bool:
     g_ci_expr_scanned = g_ci_expr_scanned + s.len()
@@ -4490,7 +4498,8 @@ fn ci_translate_c_expr(s: &str, params: &str, known: &str) -> str:
     let result = if trimmed.len() == 0: "" else: ci_parse_cond_expr(trimmed, params, known)
     g_ci_expr_depth = g_ci_expr_depth - 1
     if top and g_ci_expr_scanned > CI_EXPR_SCAN_BUDGET:
-        ci_warn(f"warning: c_import: a C expression of {s.len()} bytes exceeded the translator's scan budget ({CI_EXPR_SCAN_BUDGET} bytes); left untranslated")
+        let subject = if g_ci_expr_subject.len() > 0: " (macro '" ++ g_ci_expr_subject ++ "')" else: ""
+        ci_warn(f"warning: c_import: a C expression of {s.len()} bytes{subject} exceeded the translator's scan budget ({CI_EXPR_SCAN_BUDGET} bytes); left untranslated")
         return ""
     result
 
@@ -4832,9 +4841,13 @@ fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
             let builtin_result = ci_translate_builtin_call(fn_name, args_str, params, known)
             if builtin_result.len() > 0:
                 return builtin_result
-            let translated_libc_args = ci_translate_call_args(args_str, params, known)
-            if translated_libc_args.len() > 0:
-                let libc_result = ci_map_libc_call(fn_name, translated_libc_args)
+            // The arguments are translated once: a call nested in a call
+            // argument translated twice per level (the libc map, then the
+            // generic call) cost 2^depth, and M*LIB's `M_INC(M_INC(...))`
+            // towers spent the #1387 budget on every macro.
+            let translated_args = ci_translate_call_args(args_str, params, known)
+            if translated_args.len() > 0:
+                let libc_result = ci_map_libc_call(fn_name, translated_args)
                 if libc_result.len() > 0:
                     return libc_result
             // #945: a paste-suffix macro applied to an integer literal IS that
@@ -4845,7 +4858,6 @@ fn ci_parse_postfix_expr(s: &str, params: &str, known: &str) -> str:
             if pasted_literal.len() > 0:
                 return pasted_literal
             if ci_str_contains(params, "|" ++ fn_name ++ "|") or with_cimport_is_name_emitted(fn_name) != 0:
-                let translated_args = ci_translate_call_args(args_str, params, known)
                 if translated_args.len() > 0:
                     let call_text = fn_name ++ "(" ++ translated_args ++ ")"
                     if ci_migrate_call_requires_unsafe_wrapper(fn_name):
@@ -7631,6 +7643,11 @@ fn ci_cursor_value_is_void(session: i64, cursor: i32) -> bool:
 fn ci_discard_operand_is_pure(session: i64, cursor: i32, kind: i32) -> bool:
     if kind == CXK_INT_LITERAL or kind == CXK_FLOAT_LITERAL or kind == CXK_STRING_LITERAL or kind == CXK_CHAR_LITERAL:
         return true
+    // A `sizeof` is a constant: `(void) sizeof(struct { _Static_assert(..); })`
+    // is a compile-time check clang made when it parsed the unit, and the
+    // anonymous type has no With spelling (it rendered `sizeof[c_void]()`).
+    if ci_cursor_is_sizeof(session, cursor):
+        return true
     if kind != CXK_DECL_REF:
         return false
     with_ci_type_is_volatile(session, with_ci_cursor_type(session, cursor)) == 0
@@ -7675,6 +7692,18 @@ impl CiStmtPool:
 
         if ci_discard_operand_is_pure(session, cursor, kind):
             return self.empty_stmt_ir()
+
+        // A discarded compound literal or initializer list is its elements'
+        // effects, in order: `(T){0}` is no statement, `(T){f()}` calls f.
+        if kind == CXK_COMPOUND_LITERAL or kind == CXK_INIT_LIST:
+            var effects = self.empty_stmt_ir()
+            for i in 0..nc:
+                let child = with_ci_child(session, cursor, i)
+                let ck = with_ci_cursor_kind(session, child)
+                if ck == CK_STRUCT or ck == CK_UNION or ck == CXK_TYPE_REF: continue
+                effects = self.merge_both_or_fail_ir(effects, self.lower_discard_expr_side_effects_ir(session, child, exprs, types, scope))
+                if (effects as i32) == 0: return 0 as CiStmtId
+            return effects
 
         // A discarded field or element read is its operands' effects
         // (`(void)f()->x` calls f, `(void)a[i++]` steps i); a volatile one
@@ -8209,6 +8238,12 @@ impl CiTypePool:
         let name = ci_unsafe_fn_ptr_type(ci_normalize_translated_type_name(with_ci_type_translated(session, cxtype)))
         if name.len() == 0:
             return 0 as CiTypeId
+        // A typedef of a pointer (`typedef struct node_s *node_t`) is the
+        // pointer its text spells: a name would hide that from every
+        // dereference, conversion and borrow decision downstream (a malloc
+        // result stayed `*mut c_void`, `n->f` read a field of a pointer).
+        if ci_starts_with(name, "*mut ") or ci_starts_with(name, "*const "):
+            return self.type_from_translated_text(name)
         let name_idx = self.add_string(name)
         self.ty_named(name_idx)
 
@@ -8491,6 +8526,22 @@ fn ci_index_base_is_raw_pointer(session: i64, cursor: i32, base_id: CiExprId, ex
     if ci_cursor_type_is_pointerish(session, peeled):
         return 1
     0
+
+// The base of a member access: the array itself when the base is an array
+// (`arr->f`, the `[1]` idiom `typedef struct s_s s_t[1]`). C decays the
+// array; the lowering indexes its first element instead of wrapping the
+// decay in a deref.
+fn ci_member_base_cursor(session: i64, member_cursor: i32) -> i32:
+    let base = with_ci_child(session, member_cursor, 0)
+    let peeled = ci_peel_transparent(session, base)
+    if ci_cursor_is_array_type(session, peeled): peeled else: base
+
+// `arr->f` on an array is `arr[0].f`.
+fn ci_member_base_first_element(session: i64, base_cursor: i32, base_id: CiExprId, exprs: CiExprPool, types: CiTypePool) -> CiExprId:
+    if not ci_cursor_is_array_type(session, base_cursor): return base_id
+    let elem_ty = types.named_type_from_text(ci_array_elem_type_from_cursor(session, base_cursor))
+    let zero = exprs.int_lit(exprs.add_string("0"), 0 as CiTypeId)
+    exprs.add(CiExprKind.CIE_INDEX, base_id as i32, zero as i32, ci_index_base_is_raw_pointer(session, base_cursor, base_id, exprs, types), elem_ty)
 
 fn ci_expr_is_string_lit(exprs: CiExprPool, id: CiExprId) -> bool:
     if (id as i32) == 0:
@@ -9566,8 +9617,10 @@ impl CiExprPool:
         if kind == CXK_MEMBER_REF:
             let nc = with_ci_num_children(session, cursor)
             if nc > 0:
-                let base_cursor = with_ci_child(session, cursor, 0)
-                let base_id = self.lower_expr_ir(session, base_cursor, types, scope)
+                let base_cursor = ci_member_base_cursor(session, cursor)
+                var base_id = self.lower_expr_ir(session, base_cursor, types, scope)
+                if (base_id as i32) != 0:
+                    base_id = ci_member_base_first_element(session, base_cursor, base_id, self.val(), types)
                 let field = with_ci_member_field_name(session, cursor)
                 if (base_id as i32) != 0 and field.len() > 0:
                     let escaped = ci_escape_reserved(field)
@@ -9626,6 +9679,8 @@ impl CiExprPool:
 
         // Compound literal.
         if kind == CXK_COMPOUND_LITERAL:
+            if not ci_hoist_compound_literal_record(session, cursor):
+                return 0 as CiExprId
             let init_cursor = ci_find_child_of_kind(session, cursor, CXK_INIT_LIST)
             if init_cursor >= 0:
                 return self.lower_init_list_ir(session, init_cursor, types, scope)
@@ -9900,11 +9955,15 @@ let CXT_IncompleteArray: i32 = 114
 let CXT_VariableArray: i32 = 115
 let CXT_DependentSizedArray: i32 = 116
 
+// An array behind a typedef (M*LIB's `typedef struct s_s s_t[1]`) is an
+// array: the canonical type decides, so `s_t t; f(t)` decays as C does.
 fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
     let ty = with_ci_cursor_type(session, cursor)
     if ty < 0:
         return false
-    let k = with_ci_type_kind(session, ty)
+    ci_type_kind_is_array(with_ci_type_kind(session, with_ci_type_canonical(session, ty)))
+
+fn ci_type_kind_is_array(k: i32) -> bool:
     k == CXT_ConstantArray or k == CXT_IncompleteArray or k == CXT_VariableArray or k == CXT_DependentSizedArray
 
 // Return the array element type as a With type string, or ""
@@ -9912,11 +9971,11 @@ fn ci_cursor_is_array_type(session: i64, cursor: i32) -> bool:
 // whose translated string doesn't have a leading `[N]` prefix
 // (e.g. `*const ucd_record` from a decayed `extern ... []` ref).
 fn ci_array_elem_type_from_cursor(session: i64, cursor: i32) -> str:
-    let ty = with_ci_cursor_type(session, cursor)
-    if ty < 0:
+    let declared_ty = with_ci_cursor_type(session, cursor)
+    if declared_ty < 0:
         return ""
-    let k = with_ci_type_kind(session, ty)
-    if k == CXT_ConstantArray or k == CXT_IncompleteArray or k == CXT_VariableArray or k == CXT_DependentSizedArray:
+    let ty = with_ci_type_canonical(session, declared_ty)
+    if ci_type_kind_is_array(with_ci_type_kind(session, ty)):
         let elem_ty = with_ci_type_array_element(session, ty)
         if elem_ty >= 0:
             let translated = with_ci_type_translated(session, elem_ty)
@@ -12337,7 +12396,10 @@ impl CiStmtPool:
             return ci_value_ir_invalid()
 
         if kind == CXK_MEMBER_REF and nc > 0:
-            let base = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            let base_cursor = ci_member_base_cursor(session, cursor)
+            var base = self.lower_value_expr_ir(session, base_cursor, exprs, types, scope)
+            if ci_value_ir_valid(base):
+                base.value_expr = ci_member_base_first_element(session, base_cursor, base.value_expr, exprs, types)
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
                 let field_idx = exprs.add_string(ci_escape_reserved(field))
@@ -12553,6 +12615,27 @@ impl CiStmtPool:
             let op = with_ci_binary_op(session, cursor)
 
             if op == BO_ASSIGN:
+                // `(T){init} = v` (C99 6.5.2.5; M*LIB's M_ASSIGN_CAST): the
+                // temporary is never observed again, so the expression is `v`
+                // converted to T, after the initializer's own effects.
+                let lhs_literal = ci_peel_transparent(session, lhs_cursor)
+                if with_ci_cursor_kind(session, lhs_literal) == CXK_COMPOUND_LITERAL:
+                    let init_effects = self.lower_discard_expr_side_effects_ir(session, lhs_literal, exprs, types, scope)
+                    if (init_effects as i32) == 0:
+                        return ci_value_ir_invalid()
+                    let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
+                    if not ci_value_ir_valid(rhs):
+                        return ci_value_ir_invalid()
+                    let literal_ty = types.type_from_libclang(session, with_ci_cursor_type(session, lhs_literal))
+                    if (literal_ty as i32) == 0:
+                        return ci_value_ir_invalid()
+                    let converted = exprs.coerce_value_expr_for_target(session, literal_ty, rhs_cursor, rhs.value_expr, types)
+                    if (converted as i32) == 0:
+                        return ci_value_ir_invalid()
+                    return CiValueExprIR {
+                        setup_stmt: self.merge_ir( init_effects, rhs.setup_stmt),
+                        value_expr: converted,
+                    }
                 let lhs = self.lower_lvalue_expr_ir(session, lhs_cursor, exprs, types, scope)
                 let rhs = self.lower_value_expr_ir(session, rhs_cursor, exprs, types, scope)
                 if not ci_value_ir_valid(lhs):
@@ -13086,7 +13169,10 @@ impl CiStmtPool:
             }
 
         if kind == CXK_MEMBER_REF and nc > 0:
-            let base = self.lower_value_expr_ir(session, with_ci_child(session, cursor, 0), exprs, types, scope)
+            let base_cursor = ci_member_base_cursor(session, cursor)
+            var base = self.lower_value_expr_ir(session, base_cursor, exprs, types, scope)
+            if ci_value_ir_valid(base):
+                base.value_expr = ci_member_base_first_element(session, base_cursor, base.value_expr, exprs, types)
             let field = with_ci_member_field_name(session, cursor)
             if ci_value_ir_valid(base) and field.len() > 0:
                 let field_idx = exprs.add_string(ci_escape_reserved(field))
@@ -13117,6 +13203,8 @@ impl CiStmtPool:
             return ci_value_ir_invalid()
 
         if kind == CXK_COMPOUND_LITERAL and nc > 0:
+            if not ci_hoist_compound_literal_record(session, cursor):
+                return ci_value_ir_invalid()
             let init_cursor = ci_find_child_of_kind(session, cursor, CXK_INIT_LIST)
             if init_cursor >= 0:
                 let mark = g_ci_expr_substitution_cursors.len()
@@ -13653,6 +13741,13 @@ impl CiStmtPool:
                         return 0 as CiStmtId
                     value_ids.push(val_id as i32)
                     chain = with_ci_child(session, chain, 1)
+                // `case A: default: body` — the run is the default arm (its
+                // values are covered by `_`), so its body lands there.
+                let chain_is_default = with_ci_cursor_kind(session, chain) == CXK_DEFAULT_STMT
+                if chain_is_default:
+                    chain = ci_drill_innermost_case_substmt(session, chain)
+                    if chain < 0:
+                        return 0 as CiStmtId
                 var body_ids: List[i32] = List.new()
                 let inner_kind = with_ci_cursor_kind(session, chain)
                 if inner_kind != CXK_BREAK_STMT and not ci_is_null_like_stmt(session, chain):
@@ -13693,7 +13788,10 @@ impl CiStmtPool:
                 let body_id = self.strip_trailing_break_ir(raw_body)
                 if (body_id as i32) == 0 and body_ids.len() > 0 and not hit_break:
                     return 0 as CiStmtId
-                if (body_id as i32) != 0 or hit_break:
+                if chain_is_default and (body_id != 0 or hit_break):
+                    default_body_id = body_id
+                    has_default_body = true
+                else if (body_id as i32) != 0 or hit_break:
                     arm_records.push(value_ids.len() as i32)
                     var vi: i64 = 0
                     while vi < value_ids.len():
@@ -13838,7 +13936,11 @@ impl CiStmtPool:
                         if (ret_ty_id as i32) != 0 and not ci_type_is_fn_ptr(types, ret_ty_id):
                             let val_ty = exprs.get_type(ret_value)
                             let ret_is_ptr = types.kind(ret_ty_id) == CiTypeKind.CT_POINTER
-                            let mismatch = if (val_ty as i32) != 0: ci_print_type(types, val_ty) != ci_print_type(types, ret_ty_id) else: ret_is_ptr
+                            // A value the IR did not type (an `&` of an enum and a
+                            // constant) is typed by its own C expression, under the
+                            // implicit conversion to the return type.
+                            let val_text = if (val_ty as i32) != 0: ci_print_type(types, val_ty) else: ci_pointer_type_explicit_mut(with_ci_type_translated(session, with_ci_cursor_type(session, ret_peeled)))
+                            let mismatch = if (val_ty as i32) != 0 or (val_text.len() > 0 and not ret_is_ptr): val_text != ci_print_type(types, ret_ty_id) else: ret_is_ptr
                             if mismatch:
                                 ret_value = exprs.cast(ret_ty_id, ret_value)
                 let return_id = self.return_(ret_value)
@@ -14266,7 +14368,7 @@ fn ci_decl_location_index_reset:
 
 fn ci_get_decl_location(session: i64, name: &str) -> str:
     ci_decl_location_index_ensure(session)
-    if g_ci_decl_location_cursor.contains(name): with_ci_cursor_location(session, g_ci_decl_location_cursor.get(name).unwrap()) else: ""
+    if g_ci_decl_location_cursor.contains(name): migrate_map_output_path(with_ci_cursor_location(session, g_ci_decl_location_cursor.get(name).unwrap())) else: ""
 
 fn ci_is_null_like_stmt(session: i64, cursor: i32) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -15078,6 +15180,27 @@ fn ci_expr_substitutions_truncate(len: isize):
     while g_ci_expr_substitution_cursors.len() > len:
         g_ci_expr_substitution_cursors.pop()
         g_ci_expr_substitution_exprs.pop()
+
+// A record with no tag a compound literal instantiates (`(union { .. }){ ..
+// }`) is declared beside the function under the bridge's name for it, as a
+// local's record is (#1878). False when the record has no With layout.
+fn ci_hoist_compound_literal_record(session: i64, literal_cursor: i32) -> bool:
+    let nc = with_ci_num_children(session, literal_cursor)
+    for di in 0..nc:
+        let dc = with_ci_child(session, literal_cursor, di)
+    for i in 0..nc:
+        let child = with_ci_child(session, literal_cursor, i)
+        let ck = with_ci_cursor_kind(session, child)
+        if ck != CK_STRUCT and ck != CK_UNION: continue
+        let synth = with_ci_anon_record_name(session, child)
+        if synth.len() == 0 or ci_type_name_is_emitted(synth): continue
+        let rendered = ci_translate_anon_record_cursor(session, child, synth)
+        if rendered.ends_with("= opaque\n"):
+            ci_va_bail(session, child, "compound literal record '" ++ synth ++ "' has no With layout (§16.9)")
+            return false
+        ci_mark_type_name_emitted(synth)
+        g_ci_body_hoisted_decls = g_ci_body_hoisted_decls ++ rendered
+    true
 
 fn ci_take_body_hoisted_decls() -> str:
     let taken = g_ci_body_hoisted_decls.clone()
@@ -18323,7 +18446,7 @@ fn ci_own_is_libc_free(name: &str) -> bool: name == "free"
 // value passed to one is not retained. Everything else outside the corpus
 // is taken to retain what it is handed (the asymmetry rule, §16.2b.2).
 fn ci_own_is_libc_observer(name: &str) -> bool:
-    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "sscanf" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
+    name == "memset" or name == "memcpy" or name == "memmove" or name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat" or name == "strchr" or name == "strrchr" or name == "strstr" or name == "strcasecmp" or name == "strncasecmp" or name == "printf" or name == "fprintf" or name == "sprintf" or name == "snprintf" or name == "vfprintf" or name == "vsnprintf" or name == "puts" or name == "fputs" or name == "fwrite" or name == "fread" or name == "fopen" or name == "fclose" or name == "fflush" or name == "atoi" or name == "atol" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "sscanf" or name == "__builtin_expect" or name == "__assert_rtn" or name == "__assert_fail" or name == "abort" or name == "exit"
 
 fn ci_body_assigns_to(session: i64, cursor: i32, name: &str) -> bool:
     let kind = with_ci_cursor_kind(session, cursor)
@@ -20124,7 +20247,7 @@ fn ci_libc_symbol_kind_mask(name: &str) -> i32:
     if name == "rewind": return CI_LIBC_KIND_FN
     if name == "putchar": return CI_LIBC_KIND_FN
     if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strrchr" or name == "strerror": return CI_LIBC_KIND_FN
-    if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "setlocale": return CI_LIBC_KIND_FN
+    if name == "atoi" or name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "setlocale": return CI_LIBC_KIND_FN
     if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace": return CI_LIBC_KIND_FN
     if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint": return CI_LIBC_KIND_FN
     if name == "isgraph" or name == "ispunct" or name == "iscntrl": return CI_LIBC_KIND_FN
@@ -20381,7 +20504,7 @@ fn ci_is_mapped_libc_fn(name: &str) -> bool:
     if name == "alloca" or name == "reallocf" or name == "valloc": return true
     if name == "aligned_alloc" or name == "posix_memalign": return true
     if name == "strlcpy" or name == "strlcat" or name == "strnstr": return true
-    if name == "strtol" or name == "strtoul" or name == "strtod" or name == "atoi": return true
+    if name == "strtol" or name == "strtoul" or name == "strtod" or name == "strtoll" or name == "strtoull" or name == "strtof" or name == "strtold" or name == "atoi": return true
     if name == "snprintf" or name == "sprintf" or name == "printf" or name == "fprintf": return true
     if name == "qsort" or name == "bsearch" or name == "abs": return true
     if name == "memchr" or name == "strstr" or name == "strcpy" or name == "strncpy" or name == "strcat" or name == "strncat": return true

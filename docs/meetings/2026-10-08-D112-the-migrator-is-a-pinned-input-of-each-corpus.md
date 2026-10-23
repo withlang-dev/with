@@ -71,3 +71,18 @@ which point amendment 3 takes over."
 **What would reopen it.** A corpus whose old-generation output cannot be kept
 compiling without a ruling, or a migrator regression the re-migration gate
 did not catch.
+
+**Enforcement (2026-10-22).** The rule was broken once: a preamble change
+(`strlen` is `size_t`) collided with the five promoted corpora's own copies
+of the declaration, and all five were re-promoted to agree. Eric: "changing
+the migrator will never require all the corpora to re-migrate … we must
+build EVERYTHING as though there are 20,000 corpora." Since then:
+`run_corpus_promote_action` refuses unless the trigger is stated (the
+promoted `UPSTREAM` differs from the pin, or `WITH_CORPUS_PROMOTE` names
+`migrator-pin:#NNNN` or `ruling:DNNN`) and records it in the stamp
+(`promoted_for`); `corpus-promote-guard-check` in the gate asserts the
+trigger rule and that no target depends on a promote; the integrity check
+fails a corpus whose pin moved without a promotion; and an `extern fn` is
+its module's view of a C symbol (`Sema.extern_view_sig`), so corpora of
+different generations coexist in one program
+(`test/behavior/behav_extern_module_views.w`).

@@ -412,7 +412,6 @@ enum MethodLowering: i32:
     TaskJoinCleanup
     ListSequence
     ListTraverse
-    BTreeNew
     UnwrapOr
     UnwrapOrElse
     // `is_empty()` on a receiver with a `len` intrinsic and no `is_empty`

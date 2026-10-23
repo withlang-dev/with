@@ -670,6 +670,7 @@ WITH_VERSION=v0.14.3 with build :release-uat
 
 Do not list Make compatibility wrapper commands on the release page.
 
+- [ ] Release notes for a release that changes a collection's copy class (D152): v0.16.0 makes `BTreeMap` and `BTreeSet` resources (facades over the M*LIB B+tree, D151): `var n = m` moves the map; a copy is `m.clone()`, O(n); the moved-value diagnostic says so.
 - [ ] Release notes for a release that adds a prelude function or intrinsic: a new prelude function or intrinsic can break bare uses in user types with a same-named field; the fix is `self.` (or `builtins.name`).
 
 ## Post-Publish Checks

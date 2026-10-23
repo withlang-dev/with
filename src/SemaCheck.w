@@ -3140,13 +3140,31 @@ impl Sema:
             out.push(self.declared_from_flat[si])
         out
 
+    // Whether declaration `node`'s `from` clause names parameter `pi` (the
+    // node a body check holds is the template, a specialization's too).
+    fn from_clause_names_param(node: i32, pi: i32) -> bool:
+        self.declared_from_starts.contains(node) and self.declared_view_origin_entries(node).contains(-1 - pi)
+
     // The declaration whose `from` clause states signature `sig`'s origins
     // (a specialization's is its generic declaration's); 0 for none.
     fn sig_from_clause_node(sig: i32) -> i32:
         if sig < 0 or self.declared_from_starts.len() == 0:
             return 0
         let node = self.receiver_decl_node_for_sig(sig)
-        if node != 0 and self.declared_from_starts.contains(node): node else: 0
+        if node != 0 and self.declared_from_starts.contains(node): return node
+        // A specialization's declaration node is its instantiated copy; the
+        // clause is the generic declaration's (the side table is keyed by
+        // the template node).
+        let template = self.sig_specialization_template_node(sig)
+        if template != 0 and self.declared_from_starts.contains(template): template else: 0
+
+    // The generic declaration a specialization's signature was made from; 0
+    // when `sig` is no specialization's.
+    fn sig_specialization_template_node(sig: i32) -> i32:
+        if sig < 0 or sig >= self.sig_names.len(): return 0
+        let specialization = self.concrete_specialization_by_sym.get(self.sig_names[sig])
+        if specialization.is_none(): return 0
+        self.concrete_specialization_nodes[specialization.unwrap()]
 
     // The globals a call of `sig` returns a view of: its `from` clause's,
     // when it states one (checked against the body,
@@ -3254,7 +3272,9 @@ impl Sema:
             let entry = entries[ei]
             let text: str = with_str_clone_ref(self.pool_resolve(if entry < 0: self.ast.fn_param_name(param_start, -1 - entry) else: entry))
             clause = clause ++ (if ei == 0: "from " else: ", ") ++ text
-            let derived = if entry < 0: -1 - entry < param_count and (self.sig_param_effect(sig, -1 - entry) & EFF_ESCAPE_VIEW) != 0 else: derived_globals.contains(entry)
+            // A body that reads through a raw pointer (an engine's entry)
+            // derives what no inference can see; its clause is the statement.
+            let derived = if entry < 0: -1 - entry < param_count and ((self.sig_param_direct_effect(sig, -1 - entry) & EFF_ESCAPE_VIEW) != 0 or self.sig_raw_deref_bodies.contains(sig)) else: derived_globals.contains(entry)
             if not derived:
                 self.emit_error_with_help(f"`{fn_text}` declares its returned view `from {text}`, but its body never returns a view derived from `{text}`: a declared origin the body does not derive the view from is an error, never a silent widening (§21.1 rule 6)", node, f"remove `{text}` from the `from` clause")
         let lead = if clause.len() == 0: "from" else: clause ++ ","
@@ -4820,6 +4840,15 @@ impl Sema:
         let saved_eff_param_syms = sema_clone_i32_list(&self.current_fn_param_syms)
         let saved_eff_param_effs = sema_clone_i32_list(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_list(&self.current_fn_param_direct_effs)
+        let saved_raw_derefs: i32 = self.current_fn_raw_derefs
+        self.current_fn_raw_derefs = 0
+        // §21.1 rule 6: a declaration check_bodies' loop skipped as lazy (a
+        // std generic instantiated on demand) resolves its `from` clause
+        // here, before its merge reads it.
+        let template = self.sig_specialization_template_node(sig_idx)
+        let clause_decl = if self.ast.fn_view_origin_count(node) > 0 or template == 0: node else: template
+        if self.ast.fn_view_origin_count(clause_decl) > 0 and not self.declared_from_starts.contains(clause_decl):
+            self.resolve_declared_view_origins(clause_decl, self.ast.fn_decl_body_is_interface(clause_decl))
         let saved_eff_param_origins = sema_clone_i32_list(&self.current_fn_param_origins)
         let saved_eff_param_storage_origins = sema_clone_i32_list(&self.current_fn_param_storage_origins)
         let saved_eff_param_view_nodes = sema_clone_i32_list(&self.current_fn_param_view_nodes)
@@ -5158,9 +5187,16 @@ impl Sema:
                 if pi == 0 and self.sig_receiver_mode(sig_idx) == ReceiverMode.Move:
                     direct_eff = direct_eff | EFF_CONSUME
                 eff = eff | declared_contract
+                // §21.1 rule 6: a `from` clause naming this parameter states it
+                // as an origin of the returned view to every caller (an
+                // engine facade's view reached through a raw pointer has no
+                // place root the body could show); the judge checks the clause
+                // against what the body derived (the direct effects).
+                let clause_bit = if self.from_clause_names_param(node, pi): sema_param_origin_bit(pi) else: 0
+                if clause_bit != 0: eff = eff | EFF_ESCAPE_VIEW
                 self.set_sig_param_effect(sig_idx, pi, eff)
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
-                let declared_origin = if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0
+                let declared_origin = (if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0) | clause_bit
                 if (eff & EFF_ESCAPE_VIEW) != 0:
                     let body_origins: i32 = self.current_fn_param_origins[pi]
                     let body_storage: i32 = self.current_fn_param_storage_origins[pi]
@@ -5226,6 +5262,8 @@ impl Sema:
             self.declared_from_checks.push(node)
             self.declared_from_checks.push(sig_idx)
             self.declared_from_checks.push(self.local_file_id)
+        if sig_idx >= 0 and self.current_fn_raw_derefs != 0: self.sig_raw_deref_bodies.insert(sig_idx, 1)
+        self.current_fn_raw_derefs = saved_raw_derefs
 
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
@@ -7404,6 +7442,23 @@ impl Sema:
             return 0
         self.btree_insert_sigs.insert(anchor_node, insert_sig)
         self.btree_insert_mono_syms.insert(anchor_node, self.sig_names[insert_sig])
+        1
+
+    // The `new()` a literal or comprehension starts its BTree collection
+    // from: Sema specializes it for the concrete type and records it for
+    // MIR, which calls it instead of building the type's layout (D65).
+    mut fn record_btree_new_contract(owner_sym: i32, owner_type: i32, anchor_node: i32) -> i32:
+        let new_sym = self.pool_lookup_symbol("new")
+        let new_fn = if new_sym != 0: self.lookup_generic_method_fn(owner_sym, new_sym) else: 0
+        if new_fn == 0:
+            self.emit_error("BTree collection constructor is unavailable", anchor_node)
+            return 0
+        let new_sig = self.concrete_owner_method_sig(owner_sym, owner_type, new_fn)
+        if new_sig < 0:
+            self.emit_error("BTree collection constructor could not be specialized for the concrete collection type", anchor_node)
+            return 0
+        self.btree_new_sigs.insert(anchor_node, new_sig)
+        self.btree_new_mono_syms.insert(anchor_node, self.sig_names[new_sig])
         1
 
     // A compiler-modeled operation that promises an owned clone must carry the
@@ -11808,7 +11863,8 @@ impl Sema:
                     if ord_trait != 0 and result_expected != 0 and self.type_implements_trait(result_expected, ord_trait) == 0:
                         self.emit_error("BTreeSet comprehension element type must implement Ord", node)
                         return 0
-                    let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
+                    if self.record_btree_new_contract(self.syms.btreeset, target_ty, node) == 0:
+                        return 0
                     if self.record_btree_insert_contract(self.syms.btreeset, target_ty, expr) == 0:
                         return 0
             self.typed_expr_types.insert(node, result_ty)
@@ -11898,7 +11954,8 @@ impl Sema:
                 if ord_trait2 != 0 and stored_key_ty != 0 and self.type_implements_trait(stored_key_ty, ord_trait2) == 0:
                     self.emit_error("BTreeMap comprehension key type must implement Ord", node)
                     return 0
-                let _btree_storage_ty = self.ensure_btree_storage_type(map_target_ty)
+                if self.record_btree_new_contract(self.syms.btreemap, map_target_ty, node) == 0:
+                    return 0
                 if self.record_btree_insert_contract(self.syms.btreemap, map_target_ty, key_expr) == 0:
                     return 0
             else:
@@ -12099,7 +12156,14 @@ impl Sema:
                     self.emit_error_with_help("use of moved value", node, f"`let _ = {name}` dropped `{name}` at line {line}; remove it to keep `{name}`")
                 else:
                     let moved_msg = if self.in_concrete_generic_body != 0 and tid != 0: f"use of moved value (`{self.type_name(tid)}`)" else: "use of moved value"
-                    self.emit_error_with_help(moved_msg, node, "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move")
+                    // D152 (§2.3): an engine-backed collection is a resource;
+                    // the first thing a program upgrading from the counted
+                    // BTreeMap hits is this error, so it names the class and
+                    // the clone's cost.
+                    let collection = if tid != 0: self.engine_collection_base_name(tid) else: ""
+                    let moved_name = self.pool_resolve(sym)
+                    let help = if collection.len() > 0: f"`{moved_name}` is a {collection}, an engine-backed collection and a resource (§2.3, D152): the earlier use moved it; a copy is `{moved_name}.clone()`, O(n), every element cloned" else: "a moved value cannot be used again; if it is moved on only some control-flow paths, reinitialize it on every path before this use, or clone it before the move".to_owned()
+                    self.emit_error_with_help(moved_msg, node, help)
             if sym != self.assign_target_revive_sym:
                 self.note_param_effect(sym, EFF_READ)
                 if is_local:
@@ -15183,6 +15247,7 @@ impl Sema:
                 self.record_transparent_view_origins(node, operand_node)
                 return pointee
             if tk == TypeKind.TY_PTR:
+                self.current_fn_raw_derefs = 1
                 self.note_raw_pointer_validity_precondition(operand_node)
                 self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
                 return self.get_type_d0(resolved)
@@ -20956,7 +21021,8 @@ impl Sema:
             if ord_trait != 0 and elem_type != 0 and self.type_implements_trait(elem_type, ord_trait) == 0:
                 self.emit_error("BTreeSet literal element type must implement Ord", node)
                 return 0
-            let _btree_storage_ty = self.ensure_btree_storage_type(result as i32)
+            if self.record_btree_new_contract(self.syms.btreeset, result as i32, node) == 0:
+                return 0
             for i in 0..elem_count:
                 if self.record_btree_insert_contract(self.syms.btreeset, result as i32, self.ast.get_extra(extra_start + i)) == 0:
                     return 0
@@ -21051,7 +21117,8 @@ impl Sema:
             if ord_trait != 0 and key_ty != 0 and self.type_implements_trait(key_ty, ord_trait) == 0:
                 self.emit_error("BTreeMap literal key type must implement Ord", node)
                 return 0
-            let _btree_storage_ty = self.ensure_btree_storage_type(target_ty)
+            if self.record_btree_new_contract(self.syms.btreemap, target_ty, node) == 0:
+                return 0
             for i in 0..pair_count:
                 if self.record_btree_insert_contract(self.syms.btreemap, target_ty, self.ast.get_extra(extra_start + i * 2)) == 0:
                     return 0
@@ -31733,25 +31800,6 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.listiter, args, 1) as i32
 
-    fn ensure_btree_storage_type(btree_ty: i32) -> i32:
-        let resolved = self.resolve_alias(btree_ty as TypeId)
-        if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        let base = self.get_generic_inst_base(resolved as i32)
-        let base_name = self.pool_resolve(base)
-        let argc = self.get_generic_inst_arg_count(resolved as i32)
-        if base_name == "BTreeSet" and argc > 0:
-            return self.ensure_list_type_for(self.get_generic_inst_arg(resolved as i32, 0))
-        if base_name == "BTreeMap" and argc >= 2:
-            let elems: List[i32] = List.new()
-            elems.push(self.get_generic_inst_arg(resolved as i32, 0))
-            elems.push(self.get_generic_inst_arg(resolved as i32, 1))
-            let pair_ty = self.ensure_tuple_type(elems, 2) as i32
-            if pair_ty == 0:
-                return 0
-            return self.ensure_list_type_for(pair_ty)
-        0
-
     fn iterator_owner_symbol(tid: i32) -> i32:
         if tid == 0:
             return 0
@@ -34203,8 +34251,6 @@ impl Sema:
         if base != 0 and base == self.syms.list:
             if name == "sequence": return MethodLowering.ListSequence
             if name == "traverse": return MethodLowering.ListTraverse
-        if name == "new" and (self.base_sym_is_btree(self.static_receiver_sema_base(expr)) or self.base_sym_is_btree(base)):
-            return MethodLowering.BTreeNew
         if is_option or is_result:
             if name == "unwrap_or": return MethodLowering.UnwrapOr
             if name == "unwrap_or_else": return MethodLowering.UnwrapOrElse
@@ -34977,7 +35023,6 @@ impl Sema:
                 if self.task_fns.contains(generic_method_fn):
                     self.record_global_concurrency_evidence(node, "async function call")
                 let generic_ret = self.check_generic_method_call(type_name_sym, recv_type as i32, generic_method_fn, is_static_receiver, expr, arg_types, extra_start, mc_resolved_arg_count, node)
-                let _btree_storage_ty = self.ensure_btree_storage_type(generic_ret)
                 return generic_ret
 
         if type_name_sym != 0:
@@ -38474,10 +38519,6 @@ impl Sema:
     // pair binds by value. The generic `next()` protocol found no `next` on
     // the map and typed the element `i32`, so the tuple pattern was refused
     // and a generic body's bindings came back undefined (#1561).
-    mut fn btree_traversal_element_type(map_inst: i32) -> i32:
-        let storage = self.ensure_btree_storage_type(map_inst)
-        if storage == 0: 0 else: self.infer_for_element_type(storage)
-
     mut fn infer_for_element_type(iter_type: i32) -> i32:
         if iter_type == 0:
             return 0
@@ -38504,7 +38545,6 @@ impl Sema:
                 let ref_base = self.pool_resolve(self.get_type_d0(ref_pointee_resolved))
                 let ref_is_list = ref_base == "List"
                 let ref_is_hashmap = ref_base == "HashMap"
-                let ref_is_btreemap = ref_base == "BTreeMap"
                 if ref_is_list and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) > 0:
                     let ref_elem = self.get_generic_inst_arg(ref_pointee_resolved as i32, 0)
                     return self.ensure_exact_type(TypeKind.TY_REF, ref_elem, 0, 0) as i32
@@ -38512,8 +38552,6 @@ impl Sema:
                 // like the map itself; returning 0 left k and v unbound.
                 if ref_is_hashmap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
                     return self.map_traversal_element_type(ref_pointee_resolved as i32)
-                if ref_is_btreemap and self.get_generic_inst_arg_count(ref_pointee_resolved as i32) >= 2:
-                    return self.btree_traversal_element_type(ref_pointee_resolved as i32)
             // #1197: a `&[T]` / `&[N]T` binding iterates the sequence it views.
             let pointee_kind = self.get_type_kind(ref_pointee_resolved)
             if pointee_kind == TypeKind.TY_ARRAY or pointee_kind == TypeKind.TY_SLICE:
@@ -38531,8 +38569,6 @@ impl Sema:
                 return list_elem
             if base_name == "HashMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
                 return self.map_traversal_element_type(resolved as i32)
-            if base_name == "BTreeMap" and self.get_generic_inst_arg_count(resolved as i32) >= 2:
-                return self.btree_traversal_element_type(resolved as i32)
             if base_name == "Receiver" and self.get_generic_inst_arg_count(resolved as i32) > 0:
                 // D10: `for msg in rx:` receives until the channel is closed
                 // and drained. The loop desugars through recv() -> Option[T];
@@ -38714,6 +38750,17 @@ impl Sema:
     // context. One error shape at the move site; the help offers both
     // intents when the path could take an explicit `move`, and
     // clone/restructure when it cannot.
+    // The engine-backed collections §2.3 (D152) names as resources, by the
+    // base of a type's spelled name (`BTreeMap[str, i32]` is a BTreeMap).
+    fn engine_collection_base_name(tid: i32) -> str:
+        let spelled = self.type_name(tid)
+        let open = spelled.find("[")
+        let base = if open >= 0: spelled[..open] else: spelled
+        let names = ["BTreeMap", "BTreeSet", "OrderedMap", "OrderedSet", "PriorityQueue", "Deque", "UnorderedMap", "UnorderedSet", "BitSet"]
+        for n in names:
+            if base == n: return n
+        ""
+
     mut fn d32_emit_implicit_field_move_error(node: i32):
         if self.field_move_diag_nodes.contains(node):
             return

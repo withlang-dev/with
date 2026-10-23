@@ -4683,7 +4683,7 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "pub fn count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int", "a signed member sign-extends")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, bits_w, "pub fn c() -> color:", "an enum member's getter returns the integer alias")
+    rc = bs_file_contains(ctx, bits_w, "pub fn c() -> i32:", "an enum member's getter returns the integer (an enum is one type everywhere)")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "if sizeof[*const u8]() == 8 and (sizeof[two]() != 3 or offsetof[two](__bits_0) != 0 or offsetof[two](__bits_1) != 1 or offsetof[two](__bits_2) != 2): comptime_error(", "the layout assertion, on the migrating data model")
     if rc != 0: return rc
@@ -4978,7 +4978,7 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let BIG: c_uint = 2147483648", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "type color = c_uint", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "type color = c_int", "enum_constants_are_int")
     if rc != 0: return rc
     var run_args: List[str] = List.new()
     run_args |> push("run")
@@ -5286,6 +5286,312 @@ fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: &st
     check_args |> push("check")
     check_args |> push(bs_abs(root, out_w))
     let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-macro-case-values", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_switch_case_then_default(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "switch_case_then_default.c")
+    let out_w = bs_join(case_dir, "switch_case_then_default.w")
+    let c_text = "int tag(int k) {\n  int r = 0;\n  switch (k) {\n    case 1: r = 10; break;\n    case 2: default: r = 99; break;\n  }\n  return r;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "switch case then default")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-switch-case-then-default", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "match __param_k:", "switch_case_then_default")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "        1 =>", "switch_case_then_default")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "        _ =>", "switch_case_then_default")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "        2 =>", "switch_case_then_default")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-switch-case-then-default", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+fn bs_check_migrate_strtoll_family(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "strtoll_family.c")
+    let out_w = bs_join(case_dir, "strtoll_family.w")
+    let c_text = "#include <stdlib.h>\nlong long p1(const char *s) { return strtoll(s, 0, 10); }\nunsigned long long p2(const char *s) { return strtoull(s, 0, 16); }\nfloat p3(const char *s) { return strtof(s, 0); }\nlong double p4(const char *s) { return strtold(s, 0); }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "strtoll family")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-strtoll-family", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "strtoll(", "strtoll_family")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "strtold(", "strtoll_family")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-strtoll-family", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// A call nested in a call argument is translated once per level: twice
+// (the libc map, then the generic call) was 2^depth, and a tower of nested
+// macro calls spent the scan budget on every macro (M*LIB's M_ADDI_n).
+fn bs_check_migrate_nested_call_macro_tower(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "nested_call_tower.c")
+    let out_w = bs_join(case_dir, "nested_call_tower.w")
+    let c_text = "#define M_INC(x) ((x)+1)\n#define M_ADDI(n) M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(M_INC(n))))))))))))))))))))))))\nint f(void) { return M_ADDI(1); }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "nested call macro tower")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-nested-call-macro-tower", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "scan budget", "nested_call_tower")
+    if rc != 0: return rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "M_INC(M_INC(", "nested_call_tower")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-nested-call-macro-tower", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// The `[1]` idiom (M*LIB): a typedef of a one-element array of a record,
+// passed by name, decays to the record pointer the callee takes.
+fn bs_check_migrate_typedef_array_decay(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "typedef_array_decay.c")
+    let out_w = bs_join(case_dir, "typedef_array_decay.w")
+    let c_text = "typedef struct box_s { int v; } box_t[1];\nstatic inline void box_init(box_t b) { b->v = 3; }\nstatic inline int box_get(const box_t b) { return b->v; }\nint f(void) {\n  box_t b;\n  box_init(b);\n  return box_get(b) + b->v;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "typedef array decay")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-typedef-array-decay", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "&__local_b[0] as *mut box_s", "typedef_array_decay")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-typedef-array-decay", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// A discarded sizeof is a constant with no effect: `(void) sizeof(struct {
+// _Static_assert(...); })` (M*LIB's type checks) is no statement.
+fn bs_check_migrate_discarded_sizeof(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "discarded_sizeof.c")
+    let out_w = bs_join(case_dir, "discarded_sizeof.w")
+    let c_text = "int f(int x) {\n  (void) sizeof(struct { int tag; _Static_assert(sizeof(int) == 4, \"int\"); });\n  (void) sizeof(x);\n  return x + 1;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "discarded sizeof")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-discarded-sizeof", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_not_contains(ctx, out_text, "sizeof[", "discarded_sizeof")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-discarded-sizeof", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// `arr->f` on a one-element array typedef (the `[1]` idiom) is `arr[0].f`.
+fn bs_check_migrate_array_arrow_member(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "array_arrow_member.c")
+    let out_w = bs_join(case_dir, "array_arrow_member.w")
+    let c_text = "typedef struct pit_s { int num; int parent[4]; } pit_t[1];\nint h(int k) {\n  pit_t pit;\n  pit->num = 0;\n  pit->parent[pit->num++] = k;\n  return pit->parent[0] + pit->num;\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "array arrow member")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-array_arrow_member", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "__local_pit[0].num", "array_arrow_member")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "as *const [pit_s; 1]", "array_arrow_member")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-array_arrow_member", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// `(T){0} = v` (C99 6.5.2.5) is `v` converted to T: the temporary is
+// never observed again.
+fn bs_check_migrate_compound_literal_assign(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "compound_literal_assign.c")
+    let out_w = bs_join(case_dir, "compound_literal_assign.w")
+    let c_text = "#include <stdint.h>\n#define ASSIGN_CAST(type, n) ((type) { 0 } = (n))\nunsigned first(const void *str) {\n  const uint8_t *p = ASSIGN_CAST(const uint8_t *, str);\n  return p[0];\n}\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "compound literal assign")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-compound_literal_assign", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "(__param_str as *const u8)", "compound_literal_assign")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "null = ", "compound_literal_assign")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-compound_literal_assign", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// An enum is one With type everywhere: `i32` when its enumerators fit
+// `int` (its typedef, its signatures, its locals), so `return a & FLAG`
+// converts to the declared return type instead of narrowing.
+fn bs_check_migrate_enum_one_type(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "enum_one_type.c")
+    let out_w = bs_join(case_dir, "enum_one_type.w")
+    let c_text = "typedef enum { OK = 0, FAIL = 2 } rc_t;\nenum wide { SMALL = 1, BIG = 0x80000000u };\nrc_t combine(rc_t a, int b) { rc_t ret = a; ret |= b; return ret & FAIL; }\nenum wide pick(enum wide w) { return w; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "enum one type")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-enum_one_type", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "pub type rc_t = c_int", "enum_one_type")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-enum_one_type", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// A record with no tag a compound literal instantiates (M*LIB's
+// M_CONST_CAST) is declared beside the function, as a local's record is.
+fn bs_check_migrate_compound_literal_anon_record(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "compound_literal_anon_record.c")
+    let out_w = bs_join(case_dir, "compound_literal_anon_record.w")
+    let c_text = "#define CONST_CAST(type, n) (((union { type *ptr; type const *cptr; }){ .ptr = n }).cptr)\nint *source(void);\nconst int *cc(void) { return CONST_CAST(int, source()); }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "compound literal anon record")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-compound-literal-anon-record", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "cc_literal_anon", "compound_literal_anon_record")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, out_text, "c_void {", "compound_literal_anon_record")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-compound-literal-anon-record", check_args)
+    if check.rc != 0: return check.rc
+    0
+
+// A typedef of a pointer (`typedef struct node_s *node_t`, M*LIB's node_t)
+// is the pointer: a malloc result converts to it and `n->f` dereferences.
+// A demotion comment's location goes through `--macro-prefix-map` as a
+// `__FILE__` does: a promoted corpus names no staging directory.
+fn bs_check_migrate_demotion_comment_mapped(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "fwd.c")
+    let out_w = bs_join(case_dir, "fwd.w")
+    var rc = bs_write_fixture(ctx, src, "struct fwd;\nstruct fwd *keep(struct fwd *p) { return p; }\n", "demotion comment mapped")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--macro-prefix-map")
+    args |> push(bs_abs(root, case_dir) ++ "/=")
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-demotion_comment_mapped", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "// fwd.c:1:8: demoted to opaque", "demotion_comment_mapped")
+    if rc != 0: return rc
+    0
+
+fn bs_check_migrate_pointer_typedef_local(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "pointer_typedef_local.c")
+    let out_w = bs_join(case_dir, "pointer_typedef_local.w")
+    let c_text = "#include <stdlib.h>\ntypedef struct node_s { struct node_s *next; int num; } *node_t;\nstatic node_t new_node(void) { node_t n = malloc(sizeof(struct node_s)); if (n == NULL) abort(); n->next = NULL; n->num = 0; return n; }\nint g(void) { node_t n = new_node(); int r = n->num; free(n); return r; }\n"
+    var rc = bs_write_fixture(ctx, src, c_text, "pointer typedef local")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-pointer-typedef-local", args)
+    if result.rc != 0: return result.rc
+    let out_text = ctx.fs().read_text(out_w)
+    rc = bs_assert_contains(ctx, out_text, "as *mut node_s))", "pointer_typedef_local")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-pointer-typedef-local", check_args)
     if check.rc != 0: return check.rc
     0
 
@@ -5752,6 +6058,28 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_shared_defs_cross_module_test(ctx, compiler_path, bs_join(output_dir, "shared_defs_cross_module_test"))
     if rc != 0: return rc
     rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_switch_case_then_default(ctx, compiler_path, bs_join(output_dir, "switch_case_then_default"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_strtoll_family(ctx, compiler_path, bs_join(output_dir, "strtoll_family"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_nested_call_macro_tower(ctx, compiler_path, bs_join(output_dir, "nested_call_tower"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_typedef_array_decay(ctx, compiler_path, bs_join(output_dir, "typedef_array_decay"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_discarded_sizeof(ctx, compiler_path, bs_join(output_dir, "discarded_sizeof"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_array_arrow_member(ctx, compiler_path, bs_join(output_dir, "array_arrow_member"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_compound_literal_assign(ctx, compiler_path, bs_join(output_dir, "compound_literal_assign"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_enum_one_type(ctx, compiler_path, bs_join(output_dir, "enum_one_type"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_compound_literal_anon_record(ctx, compiler_path, bs_join(output_dir, "compound_literal_anon_record"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_pointer_typedef_local(ctx, compiler_path, bs_join(output_dir, "pointer_typedef_local"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_demotion_comment_mapped(ctx, compiler_path, bs_join(output_dir, "demotion_comment_mapped"))
     if rc != 0: return rc
     rc = bs_check_migrate_macro_body_string_literal(ctx, compiler_path, bs_join(output_dir, "macro_body_string_literal"))
     if rc != 0: return rc

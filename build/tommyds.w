@@ -29,7 +29,7 @@ pub fn tommyds_corpus() -> Corpus:
         // program, never in the bundle root (`check` collides with the
         // prelude name, so the migrator spells the module check_)
         harness: ["check_"], drift_harness: "check_.w", drift_harness_arg: "",
-        module_floor: 14, defines: List.new(), excludes: List.new(), include_dirs: List.new(), declared_externs: List.new(),
+        module_floor: 14, defines: List.new(), excludes: List.new(), include_dirs: List.new(), declared_externs: List.new(), forced_includes: List.new(),
         promote_after: List.new(), test_lane: "tommyds-test",
         fresh_test_lanes: ["tommyds-test-fresh"], extra_generated_dirs: List.new(),
         prepare_reference: corpus_no_prepare, stage: tommy_stage,

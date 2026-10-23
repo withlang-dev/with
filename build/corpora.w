@@ -8,6 +8,7 @@ use build.zlib
 use build.c_algorithms
 use build.tommyds
 use build.stc
+use build.mlib
 use std.crypto.sha256
 
 // The corpus registry (docs/spec/toolchain/wo_bundles.md, docs/proposals/stdlib_sourcing_plan.md):
@@ -18,14 +19,15 @@ use std.crypto.sha256
 // module under build/; nothing else names it. Indexed, not a List: a Corpus
 // is ephemeral (its hooks take references), and the seed's comptime
 // evaluator iterates a List of ephemeral records as strings.
-pub fn corpus_count() -> i32: 5
+pub fn corpus_count() -> i32: 6
 
 pub fn corpus_at(index: i32) -> Corpus:
     if index == 0: return pcre2_corpus()
     if index == 1: return zlib_corpus()
     if index == 2: return c_algorithms_corpus()
     if index == 3: return tommyds_corpus()
-    stc_corpus()
+    if index == 4: return stc_corpus()
+    mlib_corpus()
 
 pub fn corpus_by_name(name: &str) -> Corpus:
     for i in 0..corpus_count():
@@ -125,10 +127,36 @@ pub fn run_corpus_check_generated_action(ctx: ActionCtx) -> i32:
 
 /// Promotion replaces every module under the corpus directory with the
 /// migration's output: the checked-in corpus is generated, never hand-edited.
+// D112: a corpus is re-promoted for exactly three reasons, and the trigger is
+// stated before anything is copied: the upstream pin moved (the promoted
+// UPSTREAM differs from the reference revision), or WITH_CORPUS_PROMOTE
+// names the migrator-pin bump (`migrator-pin:#NNNN`, the issue whose fix
+// this corpus needs), the ruling (`ruling:DNNN`) whose campaign
+// re-promotes it, or a change to the corpus's own build inputs
+// (`inputs:<what>`: a facade shapes unit is the corpus's source as much as
+// the upstream tarball is). A migrator change alone never re-promotes a corpus
+// (20,000 corpora: nothing scales with their number). "" refuses.
+pub fn corpus_promote_trigger(recorded_revision: &str, pinned_revision: &str, stated: &str) -> str:
+    if recorded_revision.len() == 0: return "first promotion"
+    if recorded_revision != pinned_revision: return "pin moved: " ++ recorded_revision ++ " -> " ++ pinned_revision
+    if stated.starts_with("migrator-pin:#") or stated.starts_with("ruling:D") or stated.starts_with("inputs:"): return with_str_clone_ref(stated)
+    ""
+
+pub fn corpus_promote_refusal(corpus: &Corpus) -> str:
+    corpus.name ++ ": not promoted. D112: a corpus is re-promoted only when its upstream pin moves, when its migrator pin is bumped for a fix it needs, or when a ruling breaks its output; a migrator change alone never re-promotes a corpus. The pin is unchanged: state the trigger, WITH_CORPUS_PROMOTE=migrator-pin:#NNNN, ruling:DNNN or inputs:<what changed>, or leave the corpus as it was promoted."
+
+// The revision the promoted corpus records (its UPSTREAM's first line).
+fn corpus_promoted_revision(ctx: &ActionCtx, corpus: &Corpus) -> str:
+    let path = corpus.corpus_dir ++ "/UPSTREAM"
+    if not ctx.fs().exists(path): return ""
+    with_str_clone_ref(ctx.fs().read_text(path).split("\n")[0])
+
 pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let owned = action_corpus(ctx)
     let corpus = &owned
+    let trigger = corpus_promote_trigger(corpus_promoted_revision(&ctx, corpus), corpus.upstream.revision, ctx.env_input("WITH_CORPUS_PROMOTE"))
+    if trigger.len() == 0: return corpus_fail(ctx, corpus_promote_refusal(corpus))
     let generated = ctx.inputs()[0]
     let destination = ctx.output()
     if corpus_check_generated(ctx, corpus, generated, ctx.inputs()[1]) != 0: return 1
@@ -137,11 +165,35 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
         if path.ends_with(".w") and fs.remove_file(path) != 0: return corpus_fail(ctx, "cannot remove " ++ path)
     var copied = 0
     for path in fs.list_files(generated):
-        if not path.ends_with(".w"): continue
-        if corpus_copy(ctx, path, destination ++ "/" ++ corpus_basename(path)) != 0: return 1
-        copied = copied + 1
-    if corpus_write_stamp(&ctx, corpus) != 0: return 1
-    print(f"promoted {copied} generated " ++ corpus.name ++ " modules into " ++ corpus_abs(ctx, destination) ++ " and stamped them (D112)")
+        let base = corpus_basename(path)
+        // The modules, the pin record and the license are the corpus.
+        if not path.ends_with(".w") and base != "UPSTREAM" and base != corpus.license: continue
+        if corpus_copy(ctx, path, destination ++ "/" ++ base) != 0: return 1
+        if path.ends_with(".w"): copied = copied + 1
+    if corpus_write_stamp(&ctx, corpus, trigger) != 0: return 1
+    print(f"promoted {copied} generated " ++ corpus.name ++ " modules into " ++ corpus_abs(ctx, destination) ++ " and stamped them (D112: " ++ trigger ++ ")")
+    0
+
+
+/// `corpus-promote-guard-check`: the D112 trigger rule holds (its four
+/// cases), and no target in build.w or build/*.w depends on a promote: a
+/// promote is run by hand, one corpus at a time, with its trigger stated.
+pub fn run_corpus_promote_guard_check_action(ctx: ActionCtx) -> i32:
+    if corpus_promote_trigger("", "abc", "") != "first promotion": return corpus_fail(ctx, "D112 guard: a first promotion is allowed")
+    if corpus_promote_trigger("abc", "def", "") != "pin moved: abc -> def": return corpus_fail(ctx, "D112 guard: a moved pin is a trigger")
+    if corpus_promote_trigger("abc", "abc", "") != "": return corpus_fail(ctx, "D112 guard: an unchanged pin with no stated trigger must refuse")
+    if corpus_promote_trigger("abc", "abc", "because") != "": return corpus_fail(ctx, "D112 guard: a trigger is a migrator-pin bump or a ruling, not prose")
+    if corpus_promote_trigger("abc", "abc", "migrator-pin:#2567") != "migrator-pin:#2567": return corpus_fail(ctx, "D112 guard: a migrator-pin bump is a trigger")
+    if corpus_promote_trigger("abc", "abc", "ruling:D151") != "ruling:D151": return corpus_fail(ctx, "D112 guard: a ruling is a trigger")
+    if corpus_promote_trigger("abc", "abc", "inputs:shapes") != "inputs:shapes": return corpus_fail(ctx, "D112 guard: a build-input change is a trigger")
+    var files: List[str] = ["build.w"]
+    for path in ctx.fs().list_files("build"):
+        if path.ends_with(".w"): files.push(path)
+    for path in files:
+        for line in ctx.fs().read_text(path).split("\n"):
+            if line.contains(".dep(") and (line.contains("-promote\")") or line.contains("++ \"-promote\"")):
+                return corpus_fail(ctx, path ++ ": a target depends on a promote (" ++ line.trim() ++ "); a promote is never reached through another target (D112)")
+    if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
 
 /// Regenerates the promoted root from the corpus listing (the tool for a
@@ -212,8 +264,8 @@ fn corpus_modules_hash(ctx: &ActionCtx, corpus: &Corpus) -> str:
 
 pub fn corpus_stamp_path(corpus: &Corpus) -> str: corpus.corpus_dir ++ "/corpus.stamp"
 
-fn corpus_write_stamp(ctx: &ActionCtx, corpus: &Corpus) -> i32:
-    let text = "# D112: written by promotion, never by hand. The migrator generation that\n# produced these modules (a hash of the migrator's sources) and a hash of\n# the modules; the integrity check compares the second.\nmigrated_by " ++ corpus_migrator_generation(ctx) ++ "\nmodules " ++ corpus_modules_hash(ctx, corpus) ++ "\n"
+fn corpus_write_stamp(ctx: &ActionCtx, corpus: &Corpus, trigger: &str) -> i32:
+    let text = "# D112: written by promotion, never by hand. The migrator generation that\n# produced these modules (a hash of the migrator's sources), a hash of the\n# modules (the integrity check compares it) and the trigger that justified\n# the promotion (the pin moved, a migrator-pin bump, a ruling).\nmigrated_by " ++ corpus_migrator_generation(ctx) ++ "\nmodules " ++ corpus_modules_hash(ctx, corpus) ++ "\npromoted_for " ++ trigger ++ "\n"
     if ctx.fs().write_text(corpus_stamp_path(corpus), text) != 0: return corpus_fail(ctx, "cannot write " ++ corpus_stamp_path(corpus))
     0
 
@@ -232,6 +284,9 @@ pub fn run_corpus_integrity_action(ctx: ActionCtx) -> i32:
     let actual = corpus_modules_hash(&ctx, corpus)
     if recorded != actual:
         return corpus_fail(ctx, corpus.name ++ ": the corpus is not what promotion wrote (" ++ stamp ++ " records modules " ++ recorded ++ "; the tree hashes to " ++ actual ++ "). A corpus is never edited by hand (D112): restore it, or re-promote it for one of D112's three reasons")
+    let promoted_revision = corpus_promoted_revision(&ctx, corpus)
+    if promoted_revision.len() > 0 and promoted_revision != corpus.upstream.revision:
+        return corpus_fail(ctx, corpus.name ++ ": the pin moved (" ++ corpus.upstream.revision ++ ") but the promoted corpus is " ++ promoted_revision ++ "'s migration; promote it (`:" ++ corpus.stem ++ "-promote`, D112's first trigger)")
     print(corpus.name ++ ": the corpus is what promotion wrote (migrated_by " ++ corpus_stamp_field(ctx.fs().read_text(stamp), "migrated_by") ++ ")")
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
@@ -280,7 +335,7 @@ pub fn run_corpus_stamp_action(ctx: ActionCtx) -> i32:
         var detail = ""
         for line in lines: detail = detail ++ "\n" ++ line
         return corpus_fail(ctx, corpus.name ++ ": not today's migrator output, so it is stamped only by promotion:" ++ detail)
-    if corpus_write_stamp(&ctx, corpus) != 0: return 1
+    if corpus_write_stamp(&ctx, corpus, "stamped as today's migrator output (predates D112)") != 0: return 1
     print("stamped " ++ corpus_stamp_path(corpus))
     if ctx.fs().write_text(ctx.output(), "ok\n") != 0: return corpus_fail(ctx, "cannot write " ++ ctx.output())
     0
@@ -394,6 +449,14 @@ pub fn corpora_drift_group(ctx: &BuildCtx) -> Target:
         group = group.dep(corpus.stem ++ "-bundle-root-check")
         group = group.dep(wo_drift_target_name(&plan))
     group
+
+/// `corpus-promote-guard-check` (the gate): the D112 promote guard holds and
+/// no target reaches a promote (run_corpus_promote_guard_check_action).
+pub fn corpora_promote_guard_target() -> Target:
+    var guard = target_new(.Action, "corpus-promote-guard-check", "").output("out/corpus-integrity/promote-guard.ok")
+    guard.action = run_corpus_promote_guard_check_action
+    guard = guard.input("build.w").input("build/corpora.w")
+    guard
 
 /// `corpus-integrity-check` (the gate): every corpus is what promotion wrote.
 pub fn corpora_integrity_group() -> Target:

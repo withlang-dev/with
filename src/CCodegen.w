@@ -172,6 +172,7 @@ enum CcBuiltin: i32:
     VECRANGE
     FMT_BUF_WRITE_STR_REF
     STR_CLONE_REF
+    CLOSURE_CLONE
     MATH_FN
     VA_START
     VA_ARG
@@ -2505,6 +2506,15 @@ impl CCodegen:
 
     // A type the C output holds by value as a struct, so a struct containing
     // it must follow its definition.
+    // The struct a by-value member needs complete before its record: the
+    // member's own, or a fixed array's element (`tab[265]` of a record); 0
+    // when the member holds no struct by value.
+    fn c_value_member_struct_tid(tid: i32) -> i32:
+        var cur = self.sema.resolve_alias(tid as TypeId) as i32
+        while self.sema.get_type_kind(cur as TypeId) == TypeKind.TY_ARRAY:
+            cur = self.sema.resolve_alias(self.sema.get_type_d0(cur as TypeId) as TypeId) as i32
+        if self.tid_is_c_struct_value(cur): cur else: 0
+
     fn tid_is_c_struct_value(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         let kind = self.sema.get_type_kind(resolved as TypeId)
@@ -6091,6 +6101,8 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.sema.ty_f64 as i32
+        if kind == CcBuiltin.CLOSURE_CLONE:
+            return self.place_local_tid(body, dest_place)
         if kind == CcBuiltin.FMT_TO_STR or kind == CcBuiltin.FMT_DEBUG_STR or kind == CcBuiltin.FMT_DEBUG or kind == CcBuiltin.FMT_SPEC or kind == CcBuiltin.STR_CLONE_REF:
             return self.sema.ty_str as i32
         if kind == CcBuiltin.FMT_BUF_NEW:
@@ -6824,6 +6836,7 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.FMT_BUF_WRITE_STR: return CcBuiltin.FMT_BUF_WRITE_STR
     if intrinsic == MirIntrinsic.FMT_BUF_WRITE_STR_REF: return CcBuiltin.FMT_BUF_WRITE_STR_REF
     if intrinsic == MirIntrinsic.STR_CLONE_REF: return CcBuiltin.STR_CLONE_REF
+    if intrinsic == MirIntrinsic.CLOSURE_CLONE: return CcBuiltin.CLOSURE_CLONE
     if intrinsic == MirIntrinsic.FMT_BUF_WRITE_FMT: return CcBuiltin.FMT_BUF_WRITE_FMT
     if intrinsic == MirIntrinsic.FMT_BUF_FINISH: return CcBuiltin.FMT_BUF_FINISH
     if intrinsic == MirIntrinsic.LIST_SLOT: return CcBuiltin.LIST_SLOT
@@ -8108,6 +8121,22 @@ impl CCodegen:
             let buf = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             let text = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
             var out = "    with_fmt_buf_write_str_ref((uint8_t*)(" ++ buf ++ "), " ++ text ++ ");\n"
+            out = out ++ f"    goto bb{next_bb};"
+            return out
+
+        // D63: `f.clone()` of a callable value. A plain function or an
+        // inline-captured closure is its pair; an owning cell's clone runs
+        // the cell's clone fn, which the C backend does not model, so it
+        // stops there (the LLVM backend panics the same way for a cell with
+        // no clone fn).
+        if kind == CcBuiltin.CLOSURE_CLONE:
+            if argc < 1:
+                self.fail("closure_clone expects one argument")
+                return "    abort();"
+            let text = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+            var out = "    if ((((intptr_t)(" ++ text ++ ").ctx) & 3) == 2) { abort(); } /* emit-c: an owning closure's clone is not modeled */\n"
+            if has_ret != 0:
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = " ++ text ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -9515,6 +9544,19 @@ impl CCodegen:
                 for pi in 0..param_count:
                     let p_tid = self.sema.sig_param_type(sig_idx, pi)
                     acc = self.collect_struct_types_from_tid(move acc, p_tid)
+        // A struct a function type names only through a pointer (an engine's
+        // `fn(*mut m_string_s) -> i32` callback field, the pointee opaque)
+        // needs its forward typedef before the fn typedefs: collected as a
+        // signature's parameters are.
+        let fn_tids = self.collect_used_fn_types()
+        for fi in 0..fn_tids.len():
+            let ftid = self.sema.resolve_alias(fn_tids[fi] as TypeId)
+            let fkind = self.sema.get_type_kind(ftid)
+            if fkind != TypeKind.TY_FN and fkind != TypeKind.TY_EXTERN_FN: continue
+            acc = self.collect_struct_types_from_tid(move acc, self.sema.get_type_d2(ftid))
+            let pstart = self.sema.get_type_d0(ftid)
+            for pi in 0..self.sema.get_type_d1(ftid):
+                acc = self.collect_struct_types_from_tid(move acc, self.sema.type_extra[(pstart + pi)])
 
         var i = 0
         while i < acc.out.len():
@@ -9683,10 +9725,10 @@ impl CCodegen:
                             return ""
                         let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
                         let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
-                        let field_tid = self.sema.resolve_alias(self.effective_field_tid(resolved, field_sym, raw_field_tid) as TypeId)
-                        if not self.tid_is_c_struct_value(field_tid as i32):
+                        let field_tid = self.c_value_member_struct_tid(self.effective_field_tid(resolved, field_sym, raw_field_tid))
+                        if field_tid == 0:
                             continue
-                        if field_tid != resolved and not emitted_names.contains(field_tid as i32):
+                        if field_tid != resolved and not emitted_names.contains(field_tid):
                             ready = 0
                             break
                 if ready == 0:

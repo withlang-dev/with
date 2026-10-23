@@ -522,6 +522,12 @@ fn ci_print_type(types: CiTypePool, id: CiTypeId) -> str:
         return out ++ ") -> " ++ ci_print_type(types, ret)
     "<ci:ty:unimpl>"
 
+// A place expression: a name, a field, an element, a dereference. Anything
+// else is a value and has no address to take.
+fn ci_expr_is_place(exprs: CiExprPool, id: CiExprId) -> bool:
+    let kind = exprs.kind(id)
+    kind == CiExprKind.CIE_IDENT or kind == CiExprKind.CIE_FIELD or kind == CiExprKind.CIE_INDEX or kind == CiExprKind.CIE_DEREF
+
 fn ci_field_base_needs_borrow(types: CiTypePool, ty: CiTypeId) -> bool:
     if (ty as i32) == 0:
         return false
@@ -644,7 +650,7 @@ fn ci_print_memcpy_assignment(indent: &str, exprs: CiExprPool, types: CiTypePool
     // literal, a cast, a conditional) is no address (#2551: it compiled to a
     // read from nowhere), so a value is bound first and copied from there.
     let rhs_kind = exprs.kind(rhs)
-    let rhs_is_place = rhs_kind == CiExprKind.CIE_IDENT or rhs_kind == CiExprKind.CIE_FIELD or rhs_kind == CiExprKind.CIE_INDEX or rhs_kind == CiExprKind.CIE_DEREF
+    let rhs_is_place = ci_expr_is_place(exprs, rhs)
     if not rhs_is_place:
         let copy_name = "__ci_copy_" ++ i32_to_string(rhs as i32)
         let bound = indent ++ "let " ++ copy_name ++ ": " ++ ci_print_type(types, ty) ++ " = " ++ ci_print_expr(exprs, types, rhs, 0, 0) ++ "\n"
@@ -767,7 +773,10 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
             if base_kind == CiExprKind.CIE_IDENT or base_kind == CiExprKind.CIE_FIELD:
                 return place ++ "." ++ field
             return "(" ++ place ++ ")." ++ field
-        if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty):
+        // The borrow needs a place: a field of a value (a record literal, a
+        // call's result, a cast of one) reads directly — `&raw const` of a
+        // value is no address (#2551).
+        if wants_ptr == 0 and ci_field_base_needs_borrow(types, base_ty) and ci_expr_is_place(exprs, base):
             let base_text = ci_print_wrapped_operand(exprs, types, base, 0, 1)
             return ci_wrap_unsafe(f"*(&raw const {base_text} as *const {ci_print_type(types, base_ty)})") ++ "." ++ field
         let base_text = ci_print_expr(exprs, types, base, 0, wants_ptr)

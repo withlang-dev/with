@@ -62,7 +62,7 @@ pub fn stc_corpus() -> Corpus:
         // library proper (no template), never part of the bundle root
         harness: ["replace"], drift_harness: "replace.w", drift_harness_arg: "",
         module_floor: 10, defines: ["STC_HEADER"], excludes: List.new(),
-        include_dirs: ["include"], declared_externs: List.new(),
+        include_dirs: ["include"], declared_externs: List.new(), forced_includes: List.new(),
         promote_after: ["stc-promote-tests"], test_lane: "stc-test",
         fresh_test_lanes: ["stc-test-fresh"], extra_generated_dirs: [STC_TESTS_DIR],
         prepare_reference: corpus_no_prepare, stage: stc_stage,

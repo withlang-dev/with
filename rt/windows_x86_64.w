@@ -742,6 +742,8 @@ extern fn rt_ucrt_fileno(stream: *mut c_void) -> i32
 extern fn rt_ucrt_fseeki64(stream: *mut c_void, offset: i64, whence: i32) -> i32
 @[link_name("_ftelli64")]
 extern fn rt_ucrt_ftelli64(stream: *mut c_void) -> i64
+@[link_name("strtold")]
+extern fn rt_ucrt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
 @[link_name("_isatty")]
 extern fn rt_ucrt_isatty(fd: i32) -> i32
 
@@ -749,6 +751,7 @@ pub fn rt_errno_ptr() -> *mut i32: rt_ucrt_errno()
 pub fn rt_fileno(stream: *mut c_void) -> i32: rt_ucrt_fileno(stream)
 pub fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_ucrt_fseeki64(stream, offset, whence)
 pub fn rt_ftell(stream: *mut c_void) -> i64: rt_ucrt_ftelli64(stream)
+pub fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_ucrt_strtold(nptr, endptr)
 pub fn rt_isatty(fd: i32) -> i32: rt_ucrt_isatty(fd)
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: win_getrlimit(resource, lim)
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: win_setrlimit(resource, lim)
@@ -2096,6 +2099,9 @@ c facade win32:
         preserves domain environ
         preserves domain locale
     fn rt_ucrt_ftelli64
+        preserves domain environ
+        preserves domain locale
+    fn rt_ucrt_strtold
         preserves domain environ
         preserves domain locale
     fn rt_ucrt_isatty

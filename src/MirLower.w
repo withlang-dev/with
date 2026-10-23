@@ -6405,47 +6405,26 @@ impl MirBuilder:
     fn is_btreemap_base_sym(sym: i32) -> i32:
         if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeMap: 1 else: 0
 
-    mut fn btree_storage_list_type(target_ty: i32) -> i32:
-        let resolved = self.sema.resolve_alias(target_ty)
-        if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        let base = self.sema.get_generic_inst_base(resolved as i32)
-        if self.is_btreeset_base_sym(base) != 0:
-            let values_ty = self.struct_field_type(target_ty, self.pool.intern("values"))
-            if values_ty != 0:
-                return values_ty
-            if self.sema.get_generic_inst_arg_count(resolved as i32) <= 0:
-                return 0
-            return self.sema.find_list_type_for(self.sema.get_generic_inst_arg(resolved as i32, 0))
-        if self.is_btreemap_base_sym(base) != 0:
-            let entries_ty = self.struct_field_type(target_ty, self.pool.intern("entries"))
-            if entries_ty != 0:
-                return entries_ty
-            if self.sema.get_generic_inst_arg_count(resolved as i32) < 2:
-                return 0
-            let elems: List[i32] = List.new()
-            elems.push(self.sema.get_generic_inst_arg(resolved as i32, 0))
-            elems.push(self.sema.get_generic_inst_arg(resolved as i32, 1))
-            let pair_ty = self.sema.find_tuple_type(elems, 2) as i32
-            return self.sema.find_list_type_for(pair_ty)
-        0
-
-    mut fn emit_btree_new_into(out_place: i32, target_ty: i32, span: i32):
-        let storage_ty = self.btree_storage_list_type(target_ty)
-        if storage_ty == 0:
+    // The collection a literal or comprehension fills: the type's own
+    // `new()`, specialized by Sema for this node (record_btree_new_contract),
+    // called into `out_place`. MIR never builds the facade's layout (D65).
+    mut fn emit_btree_new_into(out_place: i32, target_ty: i32, node: i32):
+        let base = self.literal_target_base_sym(target_ty)
+        let owner = if self.is_btreeset_base_sym(base) != 0: self.sema.syms.btreeset else: self.sema.syms.btreemap
+        let new_sym = self.sema.pool_lookup_symbol("new")
+        let fn_sym = if new_sym != 0: self.sema.lookup_generic_method_fn(owner, new_sym) else: 0
+        if fn_sym == 0 or not self.sema.btree_new_sigs.contains(node):
             self.mark_unsupported()
             return
-        let storage_local = self.new_temp(storage_ty)
-        let storage_place = self.place_for_local(storage_local)
-        self.emit_list_new_into(storage_place, span)
-        let storage_op = self.body.new_operand(OperandKind.OK_MOVE, storage_place)
-        let fields: List[i32] = List.new()
-        let names: List[i32] = List.new()
-        fields.push(storage_op)
-        names.push(0)
-        let fid = self.body.new_agg_fields(fields, names)
-        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, out_place, rv, span)
+        let args: List[i32] = List.new()
+        let sig_idx: i32 = self.sema.btree_new_sigs.get(node).unwrap()
+        let mono_sym: i32 = self.sema.btree_new_mono_syms.get(node).unwrap()
+        let made = self.lower_resolved_call_with_operand_args_contract(fn_sym, args, target_ty, node, sig_idx, mono_sym)
+        // The result moves into the literal's place: its statement temp
+        // must not drop it again.
+        self.consume_moved_operand(made)
+        let rv = self.body.new_rvalue(RvalueKind.RK_USE, made, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, out_place, rv, self.ast.get_start(node))
 
     mut fn emit_btree_set_insert(set_place: i32, elem_op: i32, node: i32):
         let insert_sym = self.sema.pool_lookup_symbol("insert")
@@ -6478,12 +6457,9 @@ impl MirBuilder:
         let elem_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
-        if self.btree_storage_list_type(target_ty) == 0:
-            self.mark_unsupported()
-            return self.unit_operand()
         let out_local = self.new_temp(target_ty)
         let out_place = self.place_for_local(out_local)
-        self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
+        self.emit_btree_new_into(out_place, target_ty, node)
         let saved_expected = self.expected_type
         for i in 0..elem_count:
             let elem_node = self.ast.get_extra(elem_start + i)
@@ -6500,12 +6476,9 @@ impl MirBuilder:
         let pair_start = self.ast.get_data0(node)
         let pair_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
-        if self.btree_storage_list_type(target_ty) == 0:
-            self.mark_unsupported()
-            return self.unit_operand()
         let out_local = self.new_temp(target_ty)
         let out_place = self.place_for_local(out_local)
-        self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
+        self.emit_btree_new_into(out_place, target_ty, node)
         let saved_expected = self.expected_type
         for i in 0..pair_count:
             let key_node = self.ast.get_extra(pair_start + i * 2)
@@ -6715,32 +6688,6 @@ impl MirBuilder:
         let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 1, self.body.new_agg_fields(fields, names), self.sema.enum_variant_index_for_type(result_ty, self.sema.syms.some))
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
         finish
-
-    mut fn lower_btree_new(node: i32, fallback_ty: i32) -> i32:
-        var target_ty = self.expr_type(node)
-        var storage_ty = self.btree_storage_list_type(target_ty)
-        if storage_ty == 0 and self.expected_type > 0:
-            let expected_storage_ty = self.btree_storage_list_type(self.expected_type)
-            if expected_storage_ty != 0:
-                target_ty = self.expected_type
-                storage_ty = expected_storage_ty
-        if storage_ty == 0 and fallback_ty > 0:
-            let fallback_storage_ty = self.btree_storage_list_type(fallback_ty)
-            if fallback_storage_ty != 0:
-                target_ty = fallback_ty
-                storage_ty = fallback_storage_ty
-        if storage_ty == 0:
-            self.mark_unsupported()
-            return self.unit_operand()
-        let out_local = self.new_temp(target_ty)
-        let out_place = self.place_for_local(out_local)
-        // D65: Sema resolved this `new()` to the type's specialization; MIR
-        // builds the aggregate in its place and states the elision.
-        self.body.note_elided_call_node(node)
-        self.emit_btree_new_into(out_place, target_ty, self.ast.get_start(node))
-        if self.copy_is_bits(target_ty):
-            return self.body.new_operand(OperandKind.OK_COPY, out_place)
-        self.body.new_operand(OperandKind.OK_MOVE, out_place)
 
     mut fn lower_collection_literal_call(node: i32, intrinsic: MirIntrinsic, operands: &List[i32]):
         // Literal elements transfer to their collection just like arguments to
@@ -8445,8 +8392,6 @@ impl MirBuilder:
                 // #1187: `for (k, v) in &m` walks m's table in place.
                 if rin_std == StdGeneric.HashMap:
                     return self.lower_for_hashmap(for_node, pat_or_sym, ref_inner, body_expr)
-                if rin_std == StdGeneric.BTreeMap:
-                    return self.lower_for_btreemap(for_node, pat_or_sym, ref_inner, body_expr)
 
         // Range variable: iter_expr is an ident/expr whose type is TY_RANGE
         let iter_ty = self.expr_type(iter_expr)
@@ -8465,8 +8410,6 @@ impl MirBuilder:
                 // traverses like the map it views.
                 if rp_std == StdGeneric.HashMap:
                     return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
-                if rp_std == StdGeneric.BTreeMap:
-                    return self.lower_for_btreemap(for_node, pat_or_sym, iter_expr, body_expr)
                 // #1197: a `&[T]` or `&[N]T` binding (a borrowed parameter)
                 // iterates the slice it views. No branch took it, and the
                 // function failed to lower with no source diagnostic.
@@ -8497,8 +8440,6 @@ impl MirBuilder:
                         return self.lower_for_list(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.HashMap:
                         return self.lower_for_hashmap(for_node, pat_or_sym, iter_expr, body_expr)
-                    if iter_std == StdGeneric.BTreeMap:
-                        return self.lower_for_btreemap(for_node, pat_or_sym, iter_expr, body_expr)
                     if iter_std == StdGeneric.Receiver:
                         return self.lower_for_receiver(for_node, pat_or_sym, iter_expr, body_expr)
 
@@ -9078,9 +9019,6 @@ impl MirBuilder:
             self.expected_type = saved_expected2
             let target_base = self.literal_target_base_sym(target_ty)
             if self.is_btreemap_base_sym(target_base) != 0:
-                if self.btree_storage_list_type(target_ty) == 0:
-                    self.mark_unsupported()
-                    return
                 self.emit_btree_map_insert(out_place, key_op, val_op, key_expr)
                 return
             self.emit_map_insert(out_place, key_op, val_op, 0, self.ast.get_start(key_expr))
@@ -9096,9 +9034,6 @@ impl MirBuilder:
         let comp_ty = self.expr_type(comp_node)
         let target_base = self.literal_target_base_sym(comp_ty)
         if self.is_btreeset_base_sym(target_base) != 0:
-            if self.btree_storage_list_type(comp_ty) == 0:
-                self.mark_unsupported()
-                return
             self.emit_btree_set_insert(out_place, elem_op, expr)
             return
         if target_base == self.sema.syms.hashset:
@@ -9622,10 +9557,7 @@ impl MirBuilder:
         if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
             self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
         else if self.is_btreeset_base_sym(out_base) != 0 or self.is_btreemap_base_sym(out_base) != 0:
-            if self.btree_storage_list_type(out_ty) == 0:
-                self.mark_unsupported()
-                return self.unit_operand()
-            self.emit_btree_new_into(out_place, out_ty, self.ast.get_start(comp_node))
+            self.emit_btree_new_into(out_place, out_ty, comp_node)
         else:
             self.emit_list_new_into(out_place, self.ast.get_start(comp_node))
         self.lower_comprehension_clause(comp_node, 0, out_place, elem_ty)
@@ -10073,36 +10005,6 @@ impl MirBuilder:
         let binding_place = self.place_for_local(binding_local)
         self.emit_map_slot_call(intrinsic, map_place, slot_place, binding_place)
         self.body.new_operand(OperandKind.OK_COPY, binding_place)
-
-    // D44 (#1561): `for (k, v) in bt` traverses the BTreeMap's `entries`
-    // (`List[(K, V)]`, kept in key order) in place — the List loop over that
-    // field place: a Drop-class pair binds as a `&(K, V)` view, a Copy pair
-    // by value. The map itself is only borrowed; a `&BTreeMap` binding
-    // reads through one deref. Sema typed the element the same way
-    // (btree_traversal_element_type).
-    mut fn lower_for_btreemap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
-        let map_ty = self.expr_type(iter_expr)
-        let mvk = self.ast.kind(iter_expr)
-        var map_place: i32 = 0
-        if mvk == NodeKind.NK_IDENT or mvk == NodeKind.NK_FIELD_ACCESS or mvk == NodeKind.NK_INDEX:
-            map_place = self.lower_expr_place(iter_expr)
-        else:
-            let map_op = self.lower_expr(iter_expr)
-            map_place = self.materialize_operand(map_op, map_ty, self.ast.get_start(iter_expr))
-        var resolved_map = self.sema.resolve_alias(map_ty)
-        if self.sema.get_type_kind(resolved_map) == TypeKind.TY_REF:
-            map_place = self.new_deref_place(map_place)
-            resolved_map = self.sema.resolve_alias(self.sema.get_type_d0(resolved_map))
-        let storage_ty = self.btree_storage_list_type(resolved_map as i32)
-        if storage_ty == 0:
-            self.mark_unsupported()
-            return self.unit_operand()
-        let entries_place = self.named_field_place(map_place, self.pool.intern("entries"), storage_ty, 0)
-        let resolved_storage = self.sema.resolve_alias(storage_ty)
-        let pair_ty = self.sema.get_generic_inst_arg(resolved_storage as i32, 0)
-        if self.sema.type_needs_drop_frozen(pair_ty) != 0:
-            return self.lower_for_iter_ref_place(for_node, pat_or_sym, entries_place, self.ast.get_start(iter_expr), body_expr)
-        self.lower_for_list_place(for_node, pat_or_sym, entries_place, self.loop_element_type(for_node), self.ast.get_start(iter_expr), body_expr)
 
     mut fn lower_for_hashmap(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
         // for (k, v) in map → materialize map.items() then use the normal List loop.
@@ -13585,9 +13487,6 @@ impl MirBuilder:
 
         if lowering == MethodLowering.ListSequence or lowering == MethodLowering.ListTraverse:
             return self.lower_list_sequence_or_traverse_method(self_expr, lowering, arg_start, arg_count, node)
-
-        if lowering == MethodLowering.BTreeNew:
-            return self.lower_btree_new(node, recv_type)
 
         if lowering == MethodLowering.SeqFirst or lowering == MethodLowering.SeqLast or lowering == MethodLowering.SeqRest:
             return self.lower_seq_method(lowering, self_expr, node)
