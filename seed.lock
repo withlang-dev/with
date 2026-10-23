@@ -8,8 +8,8 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261020-local-3-763d0e54c82a
-with-darwin-aarch64=0c6a2afd69b55cbc0d134d00a36796828682df89e2c40bfd7765bfb4bfc46a29
+version=nightly-20261023-local-1-f78d2c24f59d
+with-darwin-aarch64=b9c35a107a1f3e7a8cd5ef4beee13849480482b4c8382781acb3f9659a264cc7
 # All five are cut from main 763d0e54c (2026-10-20): the first seeds built
 # after the D30 step 4 flip (#2500: the runtime bundle is the only link path,
 # no .w-derived runtime objects) and R4c (#2504), with the wasm import
@@ -66,7 +66,12 @@ with-darwin-aarch64=0c6a2afd69b55cbc0d134d00a36796828682df89e2c40bfd7765bfb4bfc4
 # linux-aarch64 is cut from main 3d73b98c (#2305, D118), bootstrapped natively
 # in tools/docker/linux-aarch64 to a stage2 == stage3 fixpoint over all 16
 # units and verified against :no-host-toolchain.
+# The linux and windows legs of nightly-20261023-local-1 wait for their
+# hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
+# on local-3 until the legs are cut (issue below).
+with-linux-x86_64.version=nightly-20261020-local-3-763d0e54c82a
 with-linux-x86_64=6e40ec0d4e037a1f53bac7f8732ae71dca1c44bad089760f7a650e192b66c9d8
+with-linux-aarch64.version=nightly-20261020-local-3-763d0e54c82a
 with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad1aa
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
@@ -78,5 +83,7 @@ with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
+with-windows-x86_64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-x86_64.exe=da61df5be6c9525bae7465a451aa1249f1dd1b7a392d99fb2e9a1f5c73af5dcb
+with-windows-aarch64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
