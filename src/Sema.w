@@ -2049,6 +2049,8 @@ type Sema {
     current_fn_param_syms: List[i32],   // param name symbols for the function being checked
     current_fn_param_effs: List[i32],   // accumulated effect bits per param
     current_fn_param_direct_effs: List[i32], // body-local effects, excluding propagated calls
+    current_fn_raw_derefs: i32,              // the body dereferenced a raw pointer
+    sig_raw_deref_bodies: HashMap[i32, i32], // sig -> 1: its body reads through a raw pointer (§21.1 rule 6)
     current_fn_param_origins: List[i32],// accumulated escape_view origin masks per param
     current_fn_param_storage_origins: List[i32], // the subset of those whose own storage the returned view may point into
     current_fn_param_view_nodes: List[i32], // representative return/view node for escape_view diagnostics
@@ -3878,6 +3880,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         current_fn_param_syms: List.new(),
         current_fn_param_effs: List.new(),
         current_fn_param_direct_effs: List.new(),
+        current_fn_raw_derefs: 0,
+        sig_raw_deref_bodies: sema_new_map_i32_i32(),
         current_fn_param_origins: List.new(),
         current_fn_param_storage_origins: List.new(),
         current_fn_param_view_nodes: List.new(),
@@ -9745,11 +9749,17 @@ impl Sema:
         // (every migrated corpus carries its generation's declarations, and
         // D112 keeps them as they were promoted; codegen reuses one LLVM
         // declaration per symbol and marshals each call by its own FnAbi).
+        // Within a module the latest declaration wins, as it always did (a
+        // program's manual `extern fn` after its c_import's); a name that
+        // resolves to a function with a body is never re-read through the
+        // view (std.libc's `free` beside a module's own `pub fn free`).
+        if not self.sig_lookup.contains(name): return self.extern_view_sig(self.pool_resolve(name))
+        let direct: i32 = self.sig_lookup.get(name).unwrap()
+        let declaring = self.extern_sig_modules.get(direct)
+        if declaring.is_none() or declaring.unwrap() == self.current_module_path: return direct
         let view = self.extern_view_sig(self.pool_resolve(name))
         if view >= 0: return view
-        if self.sig_lookup.contains(name):
-            return self.sig_lookup.get(name).unwrap()
-        -1
+        direct
 
     // The current module's view of an extern C symbol spelled `text`, or -1
     // when no module it reaches declares one: its own declaration, else a
@@ -9757,17 +9767,6 @@ impl Sema:
     // through its imports (the walk is cached). Symbols are matched by text:
     // every imported module's names live in its own pool.
     fn extern_view_sig(text: &str) -> i32:
-        if text == "strlen" and self.current_module_path.contains("facade_shapes"):
-            var j: i32 = self.sig_text_index.get(with_str_clone_ref(text)) ?? -1
-            while j >= 0:
-                let dm = self.extern_sig_modules.get(j)
-                let dmt = if dm.is_some(): dm.unwrap() else: "<none>"
-                j = self.sig_text_prev[j]
-            let ci = self.module_index_by_path.get(with_str_clone_ref(self.current_module_path))
-            if ci.is_some():
-                let st = self.module_import_starts[ci.unwrap()]
-                for ei in 0..self.module_import_counts[ci.unwrap()]:
-                    let e = self.module_import_targets[st + ei]
         if not self.extern_fn_texts.contains(text): return -1
         let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ text)
         if own.is_some() and own.unwrap() >= 0: return own.unwrap()

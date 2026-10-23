@@ -3140,13 +3140,31 @@ impl Sema:
             out.push(self.declared_from_flat[si])
         out
 
+    // Whether declaration `node`'s `from` clause names parameter `pi` (the
+    // node a body check holds is the template, a specialization's too).
+    fn from_clause_names_param(node: i32, pi: i32) -> bool:
+        self.declared_from_starts.contains(node) and self.declared_view_origin_entries(node).contains(-1 - pi)
+
     // The declaration whose `from` clause states signature `sig`'s origins
     // (a specialization's is its generic declaration's); 0 for none.
     fn sig_from_clause_node(sig: i32) -> i32:
         if sig < 0 or self.declared_from_starts.len() == 0:
             return 0
         let node = self.receiver_decl_node_for_sig(sig)
-        if node != 0 and self.declared_from_starts.contains(node): node else: 0
+        if node != 0 and self.declared_from_starts.contains(node): return node
+        // A specialization's declaration node is its instantiated copy; the
+        // clause is the generic declaration's (the side table is keyed by
+        // the template node).
+        let template = self.sig_specialization_template_node(sig)
+        if template != 0 and self.declared_from_starts.contains(template): template else: 0
+
+    // The generic declaration a specialization's signature was made from; 0
+    // when `sig` is no specialization's.
+    fn sig_specialization_template_node(sig: i32) -> i32:
+        if sig < 0 or sig >= self.sig_names.len(): return 0
+        let specialization = self.concrete_specialization_by_sym.get(self.sig_names[sig])
+        if specialization.is_none(): return 0
+        self.concrete_specialization_nodes[specialization.unwrap()]
 
     // The globals a call of `sig` returns a view of: its `from` clause's,
     // when it states one (checked against the body,
@@ -3254,7 +3272,9 @@ impl Sema:
             let entry = entries[ei]
             let text: str = with_str_clone_ref(self.pool_resolve(if entry < 0: self.ast.fn_param_name(param_start, -1 - entry) else: entry))
             clause = clause ++ (if ei == 0: "from " else: ", ") ++ text
-            let derived = if entry < 0: -1 - entry < param_count and (self.sig_param_effect(sig, -1 - entry) & EFF_ESCAPE_VIEW) != 0 else: derived_globals.contains(entry)
+            // A body that reads through a raw pointer (an engine's entry)
+            // derives what no inference can see; its clause is the statement.
+            let derived = if entry < 0: -1 - entry < param_count and ((self.sig_param_direct_effect(sig, -1 - entry) & EFF_ESCAPE_VIEW) != 0 or self.sig_raw_deref_bodies.contains(sig)) else: derived_globals.contains(entry)
             if not derived:
                 self.emit_error_with_help(f"`{fn_text}` declares its returned view `from {text}`, but its body never returns a view derived from `{text}`: a declared origin the body does not derive the view from is an error, never a silent widening (§21.1 rule 6)", node, f"remove `{text}` from the `from` clause")
         let lead = if clause.len() == 0: "from" else: clause ++ ","
@@ -4820,6 +4840,15 @@ impl Sema:
         let saved_eff_param_syms = sema_clone_i32_list(&self.current_fn_param_syms)
         let saved_eff_param_effs = sema_clone_i32_list(&self.current_fn_param_effs)
         let saved_eff_param_direct_effs = sema_clone_i32_list(&self.current_fn_param_direct_effs)
+        let saved_raw_derefs: i32 = self.current_fn_raw_derefs
+        self.current_fn_raw_derefs = 0
+        // §21.1 rule 6: a declaration check_bodies' loop skipped as lazy (a
+        // std generic instantiated on demand) resolves its `from` clause
+        // here, before its merge reads it.
+        let template = self.sig_specialization_template_node(sig_idx)
+        let clause_decl = if self.ast.fn_view_origin_count(node) > 0 or template == 0: node else: template
+        if self.ast.fn_view_origin_count(clause_decl) > 0 and not self.declared_from_starts.contains(clause_decl):
+            self.resolve_declared_view_origins(clause_decl, self.ast.fn_decl_body_is_interface(clause_decl))
         let saved_eff_param_origins = sema_clone_i32_list(&self.current_fn_param_origins)
         let saved_eff_param_storage_origins = sema_clone_i32_list(&self.current_fn_param_storage_origins)
         let saved_eff_param_view_nodes = sema_clone_i32_list(&self.current_fn_param_view_nodes)
@@ -5158,9 +5187,16 @@ impl Sema:
                 if pi == 0 and self.sig_receiver_mode(sig_idx) == ReceiverMode.Move:
                     direct_eff = direct_eff | EFF_CONSUME
                 eff = eff | declared_contract
+                // §21.1 rule 6: a `from` clause naming this parameter states it
+                // as an origin of the returned view to every caller (an
+                // engine facade's view reached through a raw pointer has no
+                // place root the body could show); the judge checks the clause
+                // against what the body derived (the direct effects).
+                let clause_bit = if self.from_clause_names_param(node, pi): sema_param_origin_bit(pi) else: 0
+                if clause_bit != 0: eff = eff | EFF_ESCAPE_VIEW
                 self.set_sig_param_effect(sig_idx, pi, eff)
                 self.set_sig_param_direct_effect(sig_idx, pi, direct_eff)
-                let declared_origin = if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0
+                let declared_origin = (if facade_declared: self.sig_param_view_origin(sig_idx, pi) else: 0) | clause_bit
                 if (eff & EFF_ESCAPE_VIEW) != 0:
                     let body_origins: i32 = self.current_fn_param_origins[pi]
                     let body_storage: i32 = self.current_fn_param_storage_origins[pi]
@@ -5226,6 +5262,8 @@ impl Sema:
             self.declared_from_checks.push(node)
             self.declared_from_checks.push(sig_idx)
             self.declared_from_checks.push(self.local_file_id)
+        if sig_idx >= 0 and self.current_fn_raw_derefs != 0: self.sig_raw_deref_bodies.insert(sig_idx, 1)
+        self.current_fn_raw_derefs = saved_raw_derefs
 
         // Restore state
         self.current_fn_sig_idx = saved_eff_sig_idx
@@ -15209,6 +15247,7 @@ impl Sema:
                 self.record_transparent_view_origins(node, operand_node)
                 return pointee
             if tk == TypeKind.TY_PTR:
+                self.current_fn_raw_derefs = 1
                 self.note_raw_pointer_validity_precondition(operand_node)
                 self.require_unsafe_operation("raw pointer dereference requires unsafe context", node)
                 return self.get_type_d0(resolved)
