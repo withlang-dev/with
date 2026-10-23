@@ -69,8 +69,8 @@ with-darwin-aarch64=b9c35a107a1f3e7a8cd5ef4beee13849480482b4c8382781acb3f9659a26
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64.version=nightly-20261020-local-3-763d0e54c82a
-with-linux-x86_64=6e40ec0d4e037a1f53bac7f8732ae71dca1c44bad089760f7a650e192b66c9d8
+with-linux-x86_64.version=nightly-20261023-local-2-1508cf5cc0d1
+with-linux-x86_64=1bc4c6c81b284d69101d4a38ec680571afa0d37a270d0cc16dfb8a1b351e1c64
 with-linux-aarch64.version=nightly-20261020-local-3-763d0e54c82a
 with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad1aa
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
