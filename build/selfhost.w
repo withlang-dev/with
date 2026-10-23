@@ -4488,6 +4488,38 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
         return bs_fail(ctx, "fetched facade: the written block's drop still renders beside the project's override")
     0
 
+// §16.1 (#2176, #2582): C's `char` is `c_char`, the target's alias, in
+// every position — a pointer to it included. The clang bridge spelled a
+// char pointee `i8` while the scalar was `c_char`; on an unsigned-char
+// target (AArch64 Linux, where the alias is u8) a migrated `*p = *q`
+// narrowed u8 to i8 and a `*const i8` field refused `null as *const
+// c_char`. `unsigned char` stays `u8`.
+fn bs_check_migrate_char_pointer_is_c_char(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "chars.c")
+    let out_w = bs_join(case_dir, "chars.w")
+    var rc = bs_write_fixture(ctx, src, "struct S { const char *r; unsigned char u; signed char s; };\nvoid f(char *p, const char *q, unsigned char *u) { *p = *q; *u = 1; }\nchar g(char c) { return c; }\nint h(void) { char buf[2] = {7, 0}; char *p = buf; f(p, \"a\", (unsigned char *)p + 1); return g(buf[0]) + buf[1]; }\n", "char pointer fixture")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-char-pointer", args)
+    if result.rc != 0: return result.rc
+    rc = bs_file_contains(ctx, out_w, "pub r: *const c_char = null", "char_pointer field")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "__param_p: *mut c_char, __param_q: *const c_char, __param_u: *mut u8", "char_pointer parameters")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "fn g(__param_c: c_char) -> c_char", "char scalar")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-char-pointer", check_args)
+    checked.rc
+
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "zeroed.c")
@@ -6104,6 +6136,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
     if rc != 0: return rc
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_char_pointer_is_c_char(ctx, compiler_path, bs_join(output_dir, "char_pointer_is_c_char"))
     if rc != 0: return rc
     rc = bs_check_migrate_local_and_member_records(ctx, compiler_path, bs_join(output_dir, "local_and_member_records"))
     if rc != 0: return rc
