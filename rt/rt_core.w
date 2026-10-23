@@ -28,6 +28,7 @@ extern fn rt_isatty(fd: i32) -> i32
 extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
+extern fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
 extern fn rt_mkstemp(template_path: *mut u8) -> i32
@@ -4630,6 +4631,10 @@ pub fn with_libc_fileno(stream: *mut c_void) -> i32: rt_fileno(stream)
 pub fn with_libc_isatty(fd: i32) -> i32: rt_isatty(fd)
 pub fn with_libc_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_fseek(stream, offset, whence)
 pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
+// std.libc strtold: With's widest float is f64, which is C's `long double`
+// where that is 8 bytes (Darwin arm64, Windows); where C's is wider the parse
+// is strtod's, the correctly rounded double of the same text (#2176).
+pub fn with_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_strtold(nptr, endptr)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
 // #1998: std.libc cpu_time_ns — CPU time (user + system, ns) of this process
 // and every child it has reaped; -1 when the platform cannot say.

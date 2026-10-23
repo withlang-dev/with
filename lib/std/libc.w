@@ -106,6 +106,12 @@ pub extern fn atoi(nptr: *const i8) -> i32
 pub extern fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
 pub extern fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
 pub extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
+pub extern fn strtoll(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
+pub extern fn strtoull(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
+pub extern fn strtof(nptr: *const i8, endptr: *mut *mut i8) -> f32
+// C's `long double` is With's f64 where it is 8 bytes (Darwin arm64, Windows);
+// elsewhere With has no float for it and the parse is strtod's (#2176).
+pub fn strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: with_libc_strtold(nptr, endptr)
 pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
 
 // errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,

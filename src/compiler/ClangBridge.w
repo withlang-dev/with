@@ -236,6 +236,7 @@ let CXCursor_FieldDecl: i32 = 6
 let CXCursor_EnumConstantDecl: i32 = 7
 let CXCursor_FunctionDecl: i32 = 8
 let CXCursor_VarDecl: i32 = 9
+let CXCursor_CompoundLiteralExpr: i32 = 118
 let CXCursor_ParmDecl: i32 = 10
 let CXCursor_TypedefDecl: i32 = 20
 let CXCursor_CXXMethod: i32 = 21
@@ -1227,8 +1228,19 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         clang_disposeString(spelling)
         return result
 
+    // C11 6.7.2.2p3 (CImport.ci_enum_const_type): an enum whose enumerators
+    // all fit `int` is `i32`, as its constants are; one with a value int
+    // cannot hold is its underlying integer type. The alias the enum's
+    // declaration emits follows the same rule, so a signature, a local and
+    // the alias agree (a `c_uint` alias beside `i32` uses made every
+    // `return a & FLAG` a narrowing).
     if kind == CXType_Enum:
-        return session_strdup(s, "i32\0" as *const u8)
+        let decl = clang_getTypeDeclaration(canonical)
+        var probe = EnumFitProbe { fits: 1 }
+        let _ = clang_visitChildren(decl, probe_enum_const_fits as *const u8, &raw mut probe as *mut EnumFitProbe as *mut u8)
+        if probe.fits != 0:
+            return session_strdup(s, "i32\0" as *const u8)
+        return translate_type_recursive_mode(s, clang_getEnumDeclIntegerType(decl), depth + 1, 0, 0)
 
     if kind == CXType_Complex:
         let elem = clang_getElementType(canonical)
@@ -1856,7 +1868,26 @@ type LocalAnonNamer:
 /// (name_anon_record numbers a taken one).
 @[callconv("c")]
 unsafe fn name_local_anon_record(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
-    if clang_getCursorKind(cursor) != CXCursor_VarDecl: return CXChildVisit_Recurse
+    let kind = clang_getCursorKind(cursor)
+    // A compound literal of a record with no tag (`(union { int *p; const
+    // int *cp; }){ .p = n }.cp`, M*LIB's M_CONST_CAST) instantiates a local
+    // record the way a local declares one: it is named `<fn>_literal_anon`.
+    if kind == CXCursor_CompoundLiteralExpr:
+        let namer = data as *mut LocalAnonNamer
+        let s = (*namer).s
+        let ldecl = clang_getTypeDeclaration(clang_getCanonicalType(clang_getCursorType(cursor)))
+        let lk = clang_getCursorKind(ldecl)
+        if (lk == CXCursor_StructDecl or lk == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(ldecl) != 0 and session_anon_record_name(s, ldecl) as i64 == 0:
+            if session_anon_record_slot(s, ldecl) < 0:
+                let _ = session_anon_record_append(s, ldecl)
+            let base = anon_join((*namer).fn_name, "_literal_anon\0" as *const u8, 0 as *const u8, -1)
+            name_anon_record(s, ldecl, base as *const u8)
+            let synthesized = session_anon_record_name(s, ldecl)
+            if synthesized as i64 != 0:
+                name_member_anon_records(s, ldecl, synthesized, 0)
+            with_free(base)
+        return CXChildVisit_Recurse
+    if kind != CXCursor_VarDecl: return CXChildVisit_Recurse
     let namer = data as *mut LocalAnonNamer
     let s = (*namer).s
     var reached = cursor
@@ -2005,6 +2036,18 @@ unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: isize):
     let _ = clang_visitChildren(decl, collect_field as *const u8, &raw mut fc as *mut FieldCollector as *mut u8)
     (*cache).fields = fc.fields
     (*cache).field_count = fc.count
+
+// Whether every enumerator of an enum fits `int` (translate_type's enum rule).
+type EnumFitProbe { fits: i32 }
+
+@[callconv("c")]
+unsafe fn probe_enum_const_fits(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
+    if clang_getCursorKind(cursor) != CXCursor_EnumConstantDecl:
+        return CXChildVisit_Continue
+    let value = clang_getEnumConstantDeclValue(cursor)
+    if value < -2147483648 or value > 2147483647:
+        (*(data as *mut EnumFitProbe)).fits = 0
+    CXChildVisit_Continue
 
 @[callconv("c")]
 unsafe fn collect_enum_const(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
