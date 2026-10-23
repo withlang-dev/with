@@ -31,9 +31,9 @@ pub type tm {
     pub tm_yday: c_int,
     pub tm_isdst: c_int,
     pub tm_gmtoff: c_long,
-    pub tm_zone: *const i8,
+    pub tm_zone: *const c_char,
 }
-pub extern fn strftime(buf: *mut i8, max: u64, fmt: *const i8, timeptr: *const tm) -> u64
+pub extern fn strftime(buf: *mut c_char, max: u64, fmt: *const c_char, timeptr: *const tm) -> u64
 pub extern fn mktime(timeptr: *mut tm) -> i64
 
 pub type rlimit {
@@ -63,33 +63,33 @@ pub fn libc_iob(index: i32) -> *mut c_void:
     libc_stderr()
 
 // stdio
-pub extern fn fprintf(stream: *mut c_void, fmt: *const i8, ...) -> i32
-pub extern fn printf(fmt: *const i8, ...) -> i32
-pub extern fn snprintf(dst: *mut i8, size: u64, fmt: *const i8, ...) -> i32
-pub extern fn sprintf(dst: *mut i8, fmt: *const i8, ...) -> i32
+pub extern fn fprintf(stream: *mut c_void, fmt: *const c_char, ...) -> i32
+pub extern fn printf(fmt: *const c_char, ...) -> i32
+pub extern fn snprintf(dst: *mut c_char, size: u64, fmt: *const c_char, ...) -> i32
+pub extern fn sprintf(dst: *mut c_char, fmt: *const c_char, ...) -> i32
 // The v* formatters take C's va_list: `c_va_list`, modeled per target by the
-// compiler (#1104) — never `*mut i8`, which is only Darwin's spelling.
-pub extern fn vsnprintf(dst: *mut i8, size: u64, fmt: *const i8, va: c_va_list) -> i32
-pub extern fn vfprintf(stream: *mut c_void, fmt: *const i8, va: c_va_list) -> i32
-pub extern fn vprintf(fmt: *const i8, va: c_va_list) -> i32
-pub extern fn fopen(path: *const i8, mode: *const i8) -> *mut c_void
+// compiler (#1104) — never `*mut c_char`, which is only Darwin's spelling.
+pub extern fn vsnprintf(dst: *mut c_char, size: u64, fmt: *const c_char, va: c_va_list) -> i32
+pub extern fn vfprintf(stream: *mut c_void, fmt: *const c_char, va: c_va_list) -> i32
+pub extern fn vprintf(fmt: *const c_char, va: c_va_list) -> i32
+pub extern fn fopen(path: *const c_char, mode: *const c_char) -> *mut c_void
 pub extern fn fclose(stream: *mut c_void) -> i32
-pub extern fn remove(path: *const i8) -> i32
+pub extern fn remove(path: *const c_char) -> i32
 pub extern fn fflush(stream: *mut c_void) -> i32
-pub extern fn fgets(s: *mut i8, size: i32, stream: *mut c_void) -> *mut i8
+pub extern fn fgets(s: *mut c_char, size: i32, stream: *mut c_void) -> *mut c_char
 pub extern fn fgetc(stream: *mut c_void) -> i32
 pub extern fn ungetc(c: i32, stream: *mut c_void) -> i32
-pub extern fn strcoll(a: *const i8, b: *const i8) -> i32
-pub extern fn strspn(s: *const i8, accept: *const i8) -> u64
-pub extern fn strcspn(s: *const i8, reject: *const i8) -> u64
-pub extern fn strpbrk(s: *const i8, accept: *const i8) -> *mut i8
-pub extern fn strncat(dst: *mut i8, src: *const i8, n: u64) -> *mut i8
-pub extern fn fscanf(stream: *mut c_void, fmt: *const i8, ...) -> i32
+pub extern fn strcoll(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strspn(s: *const c_char, accept: *const c_char) -> u64
+pub extern fn strcspn(s: *const c_char, reject: *const c_char) -> u64
+pub extern fn strpbrk(s: *const c_char, accept: *const c_char) -> *mut c_char
+pub extern fn strncat(dst: *mut c_char, src: *const c_char, n: u64) -> *mut c_char
+pub extern fn fscanf(stream: *mut c_void, fmt: *const c_char, ...) -> i32
 pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
-pub extern fn fputs(s: *const i8, stream: *mut c_void) -> i32
+pub extern fn fputs(s: *const c_char, stream: *mut c_void) -> i32
 pub extern fn putc(c: i32, stream: *mut c_void) -> i32
 pub extern fn putchar(c: i32) -> i32
-pub extern fn perror(s: *const i8) -> Unit
+pub extern fn perror(s: *const c_char) -> Unit
 pub extern fn feof(stream: *mut c_void) -> i32
 pub extern fn ferror(stream: *mut c_void) -> i32
 pub extern fn rewind(stream: *mut c_void)
@@ -104,24 +104,24 @@ pub fn fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: with_libc_fs
 pub fn ftell(stream: *mut c_void) -> i64: with_libc_ftell(stream)
 
 // strings / locale / conversion
-pub extern fn strcpy(dst: *mut i8, src: *const i8) -> *mut i8
-pub extern fn strncpy(dst: *mut i8, src: *const i8, n: u64) -> *mut i8
-pub extern fn strrchr(s: *const i8, c: i32) -> *mut i8
-pub extern fn strstr(haystack: *const i8, needle: *const i8) -> *mut i8
-pub extern fn strerror(errnum: i32) -> *mut i8
-pub extern fn atoi(nptr: *const i8) -> i32
+pub extern fn strcpy(dst: *mut c_char, src: *const c_char) -> *mut c_char
+pub extern fn strncpy(dst: *mut c_char, src: *const c_char, n: u64) -> *mut c_char
+pub extern fn strrchr(s: *const c_char, c: i32) -> *mut c_char
+pub extern fn strstr(haystack: *const c_char, needle: *const c_char) -> *mut c_char
+pub extern fn strerror(errnum: i32) -> *mut c_char
+pub extern fn atoi(nptr: *const c_char) -> i32
 // strtol and strtoul parse a 64-bit long on every target (D114): where C's
 // long is 32 bits (the UCRT) the runtime binds the 64-bit parse (#2592).
-pub fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: with_libc_strtol(nptr, endptr, base)
-pub fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: with_libc_strtoul(nptr, endptr, base)
-pub extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
-pub extern fn strtoll(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
-pub extern fn strtoull(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
-pub extern fn strtof(nptr: *const i8, endptr: *mut *mut i8) -> f32
+pub fn strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64: with_libc_strtol(nptr, endptr, base)
+pub fn strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64: with_libc_strtoul(nptr, endptr, base)
+pub extern fn strtod(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
+pub extern fn strtoll(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64
+pub extern fn strtoull(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64
+pub extern fn strtof(nptr: *const c_char, endptr: *mut *mut c_char) -> f32
 // C's `long double` is With's f64 where it is 8 bytes (Darwin arm64, Windows);
 // elsewhere With has no float for it and the parse is strtod's (#2176).
-pub fn strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: with_libc_strtold(nptr, endptr)
-pub extern fn setlocale(category: i32, locale: *const i8) -> *mut i8
+pub fn strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: with_libc_strtold(nptr, endptr)
+pub extern fn setlocale(category: i32, locale: *const c_char) -> *mut c_char
 
 // errno: C's lvalue macro reaches a per-libc accessor (Darwin `__error()`,
 // glibc `__errno_location()`, UCRT `_errno()`); migrated code derefs this.
@@ -134,14 +134,14 @@ pub extern fn abort() -> Never
 // portably: none of the symbols exists on the other platforms, and a corpus
 // migrated on one host must assert the same way on every target. Same
 // report, then abort.
-pub fn __assert_rtn(function: *const i8, file: *const i8, line: i32, expression: *const i8) -> Never:
+pub fn __assert_rtn(function: *const c_char, file: *const c_char, line: i32, expression: *const c_char) -> Never:
     libc_assert_failed(expression, function, file, line)
-pub fn __assert_fail(expression: *const i8, file: *const i8, line: u32, function: *const i8) -> Never:
+pub fn __assert_fail(expression: *const c_char, file: *const c_char, line: u32, function: *const c_char) -> Never:
     libc_assert_failed(expression, function, file, line as i64)
 // mingw-w64's reporter names no function.
-pub fn _assert(expression: *const i8, file: *const i8, line: u32) -> Never:
+pub fn _assert(expression: *const c_char, file: *const c_char, line: u32) -> Never:
     libc_assert_failed(expression, c"".ptr, file, line as i64)
-fn libc_assert_failed(expression: *const i8, function: *const i8, file: *const i8, line: i64) -> Never:
+fn libc_assert_failed(expression: *const c_char, function: *const c_char, file: *const c_char, line: i64) -> Never:
     let function_name = with_str_from_cstr(function as *const u8)
     let site = if function_name.len() > 0: ", function " ++ function_name else: ""
     let text = f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}){site}, file {with_str_from_cstr(file as *const u8)}, line {line}."
@@ -154,9 +154,9 @@ pub extern fn time(tloc: *mut i64) -> i64
 // POSIX file descriptors, temp files and paths: seams (UCRT spells them
 // `_isatty`, `_open`, ...; Windows has no mkstemp or realpath).
 pub fn isatty(fd: i32) -> i32: with_libc_isatty(fd)
-pub fn mkstemp(template_path: *mut i8) -> i32: with_libc_mkstemp(template_path)
-pub fn realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8: with_libc_realpath(path, resolved_path)
-pub fn open(path: *const i8, flags: i32, mode: i32) -> i32:
+pub fn mkstemp(template_path: *mut c_char) -> i32: with_libc_mkstemp(template_path)
+pub fn realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char: with_libc_realpath(path, resolved_path)
+pub fn open(path: *const c_char, flags: i32, mode: i32) -> i32:
     with_libc_open(path, flags, mode)
 pub fn read(fd: i32, buf: *mut c_void, count: u64) -> i64:
     with_libc_read(fd, buf as *mut u8, count)
@@ -166,7 +166,7 @@ pub fn close(fd: i32) -> i32:
     with_libc_close(fd)
 pub fn lseek(fd: i32, offset: i64, whence: i32) -> i64:
     with_libc_lseek(fd, offset, whence)
-pub fn unlink(path: *const i8) -> i32:
+pub fn unlink(path: *const c_char) -> i32:
     with_libc_unlink(path)
 pub extern fn rand() -> i32
 pub extern fn srand(seed: u32) -> Unit

@@ -5,7 +5,7 @@
 // which are backed by rt_* platform calls.
 
 use rt.rt_core
-extern fn strerror(errnum: i32) -> *mut i8
+extern fn strerror(errnum: i32) -> *mut c_char
 
 /// Check if a file exists at the given path.
 pub fn file_exists(path: &str) -> bool:
