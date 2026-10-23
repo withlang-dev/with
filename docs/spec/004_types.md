@@ -1423,6 +1423,11 @@ type Meters = distinct f64
 Zero-cost wrappers that prevent accidental mixing of semantically
 different values.
 
+An unsuffixed numeric literal where a distinct type over a number is
+demanded (a return type, an annotated binding, a parameter, a field) is a
+value of the distinct type, checked at the underlying type's width: `fn
+none() -> UserId: 0`, `let m: Meters = 2.5` (D153).
+
 Casting an owned value into or out of its distinct type (`s as Name`,
 `n as str`) moves it: the distinct type has its underlying type's
 destructor. A cast whose target is a view (`n as &str`), or any cast through

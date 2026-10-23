@@ -1816,7 +1816,9 @@ impl Codegen:
     mut fn exact_int_const_llvm(node: i32, sema_tid: i32) -> i64:
         if node == 0 or sema_tid == 0:
             return 0
-        let resolved = self.sema.resolve_alias(sema_tid as TypeId)
+        // §4.5: a constant of a distinct type has the underlying type's
+        // representation (`fn none() -> Id: 0`, #2567).
+        let resolved = self.sema.resolve_alias(self.sema.distinct_underlying(sema_tid) as TypeId)
         let tk = self.sema.get_type_kind(resolved)
         if tk != TypeKind.TY_INT and tk != TypeKind.TY_BOOL:
             return 0

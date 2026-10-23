@@ -733,6 +733,12 @@ impl Sema:
             // A Copy view the variadic slot materialized passes its pointee.
             let value_ty = passed_types.get(ai) ?? arg_types[ai]
             var promoted = if value_ty != 0 and (unprototyped or ai >= variadic_from): self.c_default_promoted_type(value_ty) else: 0
+            // §16.3c (#2574): a `str` in a slot with no parameter type is
+            // lent as the NUL-terminated `const char *` a `*const c_char`
+            // parameter would take; passed as its fat value, C read the
+            // length word as the next argument.
+            if promoted == 0 and value_ty != 0 and not unprototyped and ai >= variadic_from and self.type_is_str_value_or_view(value_ty):
+                promoted = self.ensure_exact_type(TypeKind.TY_PTR, self.ty_i8 as i32, 0, 0) as i32
             if not unprototyped and promoted == self.resolve_alias(value_ty as TypeId) as i32:
                 promoted = 0
             if unprototyped and promoted == 0 and value_ty != 0:
@@ -11835,6 +11841,8 @@ impl Sema:
                     self.check_pattern(binding, elem_ty)
                 else:
                     self.scope_put_at(binding, elem_ty, 0, iterable)
+                // D128 (#2569): the binding's uses type the literal.
+                self.register_literal_clause_binding(binding, self.ast.comprehension_binding_is_pattern(node, binding), iterable)
                 if filter != 0:
                     let filter_ty = self.check_expr(filter)
                     if filter_ty != 0 and self.types_compatible(self.ty_bool as i32, filter_ty as i32) == 0:
@@ -11852,6 +11860,7 @@ impl Sema:
             for ci in 0..clause_count:
                 let base = comp_start + ci * 3
                 self.unregister_iter_literal_bindings(self.ast.get_extra(base), self.ast.comprehension_binding_is_pattern(node, self.ast.get_extra(base)))
+                self.unregister_literal_clause_binding(self.ast.get_extra(base), self.ast.comprehension_binding_is_pattern(node, self.ast.get_extra(base)))
             for _ in 0..pushed_scopes:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count)
@@ -11909,6 +11918,8 @@ impl Sema:
                     self.check_pattern(binding2, elem_ty2)
                 else:
                     self.scope_put_at(binding2, elem_ty2, 0, iterable2)
+                // D128 (#2569): the binding's uses type the literal.
+                self.register_literal_clause_binding(binding2, self.ast.comprehension_binding_is_pattern(node, binding2), iterable2)
                 if filter2 != 0:
                     let filter_ty2 = self.check_expr(filter2)
                     if filter_ty2 != 0 and self.types_compatible(self.ty_bool as i32, filter_ty2 as i32) == 0:
@@ -11936,6 +11947,9 @@ impl Sema:
                 let _ = self.record_contextual_copy_adjustment(val_expr, val_pointee, val_ty as i32)
                 stored_val_ty = val_pointee
             self.record_gen_comprehension_captures(node, comp_start2 + 2, &gen_outer_counts2)
+            for ci2 in 0..clause_count2:
+                let binding2 = self.ast.get_extra(comp_start2 + 2 + ci2 * 3)
+                self.unregister_literal_clause_binding(binding2, self.ast.comprehension_binding_is_pattern(node, binding2))
             for _ in 0..pushed_scopes2:
                 self.pop_scope()
             self.truncate_for_view_bindings(comp_view_count2)
@@ -14168,11 +14182,13 @@ impl Sema:
             if expected != 0: ty = expected
         else if self.has_expected_type != 0 and self.expected_expr_type != 0:
             let expected = self.numeric_operand_type(self.expected_expr_type as i32)
-            if self.is_numeric_type(expected): ty = expected
+            if self.is_numeric_type(expected) or self.distinct_over_numeric(expected): ty = expected
         if ty != declared:
-            let resolved = self.resolve_alias(self.numeric_operand_type(ty) as TypeId)
+            // §4.5: a distinct type's constant is folded at the underlying width.
+            let width_ty = self.distinct_underlying(ty)
+            let resolved = self.resolve_alias(self.numeric_operand_type(width_ty) as TypeId)
             if self.get_type_kind(resolved) == TypeKind.TY_INT:
-                let folded = self.fold_literal_int_arith_at(init, ty)
+                let folded = self.fold_literal_int_arith_at(init, width_ty)
                 if folded.ok == 0 or folded.overflow != 0:
                     let name: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(node)))
                     self.emit_error(f"constant `{name}` does not fit `{self.type_name(ty)}`: an untyped constant is typed as its initializer would be at each use (§4.2.1)", node)
@@ -14247,7 +14263,8 @@ impl Sema:
         let demanded_resolved = self.resolve_alias(demanded)
         if self.get_type_kind(demanded_resolved) == TypeKind.TY_REF and self.is_numeric_type(self.get_type_d0(demanded_resolved)):
             demanded = self.get_type_d0(demanded_resolved) as TypeId
-        if self.is_numeric_type(demanded as i32): demanded else: 0 as TypeId
+        // §4.5: a distinct type over a number is demanded as itself (#2567).
+        if self.is_numeric_type(demanded as i32) or self.distinct_over_numeric(demanded as i32): demanded else: 0 as TypeId
 
     // The integer type an enclosing context demands of an untyped operand of
     // a bitwise operator or a shift, or 0.
@@ -18775,12 +18792,7 @@ impl Sema:
         // D128: a loop variable over a literal range is a literal-typed local;
         // the body's second check types the range at the variable's decision.
         var range_literal = iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_RANGE and self.range_bound_is_literal(self.ast.get_data0(iterable)) and (self.ast.get_data1(iterable) == 0 or self.range_bound_is_literal(self.ast.get_data1(iterable)))
-        var list_literal = false
-        if iterable != 0 and self.ast.kind(iterable) == NodeKind.NK_ARRAY_LIT and self.ast.get_data2(iterable) == 0:
-            let elems = self.ast.get_data0(iterable)
-            for ei in 0..self.ast.get_data1(iterable):
-                let elem = self.ast.get_extra(elems + ei)
-                if self.expr_is_untyped_literal_arith(elem) or self.literal_binding_lets_in(elem).len() > 0: list_literal = true
+        let list_literal = self.untyped_list_literal_iterable(iterable)
         if list_literal: range_literal = true
         let iter_type = if range_literal and self.int_local_decisions.contains(node):
             let decided_elem = (self.int_local_decisions.get(node).unwrap() / 4294967296) as i32
@@ -18985,10 +18997,46 @@ impl Sema:
         let base = self.get_generic_inst_base(resolved as i32)
         base == self.syms.hashmap or base == self.syms.hashset or base == self.syms.btreemap
 
+    // D128: an element-form list literal iterable with an element an untyped
+    // number (or a literal-typed local) gives: the loop or clause binding's
+    // uses type it.
+    fn untyped_list_literal_iterable(iterable: i32) -> bool:
+        if iterable == 0 or self.ast.kind(iterable) != NodeKind.NK_ARRAY_LIT or self.ast.get_data2(iterable) != 0: return false
+        let elems = self.ast.get_data0(iterable)
+        for ei in 0..self.ast.get_data1(iterable):
+            let elem = self.ast.get_extra(elems + ei)
+            if self.expr_is_untyped_literal_arith(elem) or self.literal_binding_lets_in(elem).len() > 0: return true
+        false
+
+    // D128 (#2569): a comprehension clause's plain name over a list literal
+    // of untyped numbers (a symbol in a `for`, an identifier pattern in a
+    // clause) is keyed to the literal, so the name's uses type it.
+    mut fn register_literal_clause_binding(binding: i32, is_pattern: bool, iterable: i32):
+        if binding == 0 or not self.untyped_list_literal_iterable(iterable): return
+        if is_pattern and self.ast.kind(binding) != NodeKind.NK_PAT_IDENT: return
+        let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+        self.int_local_for_decls.insert(sym, iterable)
+
+    mut fn unregister_literal_clause_binding(binding: i32, is_pattern: bool):
+        if binding == 0: return
+        if is_pattern and self.ast.kind(binding) != NodeKind.NK_PAT_IDENT: return
+        let sym = if is_pattern: self.ast.get_data0(binding) else: binding
+        self.int_local_for_decls.remove(sym)
+
     mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
         let outer_loop_iterable: i32 = self.loop_iterable_node
         self.loop_iterable_node = iterable
-        let iter_ty = self.check_expr(iterable)
+        // The collection demand is the comprehension's, never its iterable's
+        // (#2569: a `BTreeMap` demand reached `[4, 2, 3]` in `for k in`). A
+        // list literal of untyped numbers is typed by the binding's uses
+        // (D128), as a `for` loop's is, at the body's second check.
+        let iter_ty = if self.untyped_list_literal_iterable(iterable) and self.int_local_decisions.contains(iterable):
+            let decided_elem = (self.int_local_decisions.get(iterable).unwrap() / 4294967296) as i32
+            let elem_args: List[i32] = List.new()
+            elem_args.push(decided_elem)
+            self.check_expr_with_expected(iterable, self.ensure_generic_inst_type(self.syms.list, elem_args, 1))
+        else:
+            self.check_expr_value_context(iterable)
         self.loop_iterable_node = outer_loop_iterable
         let gen_elem = self.resolve_gen_for(iterable, iterable, iter_ty as i32)
         if gen_elem != 0:
@@ -26942,7 +26990,11 @@ impl Sema:
                 self.fn_param_invocations.insert(fn_sym, invocations)
                 if invocations > 1 and not self.fn_param_many_nodes.contains(fn_sym):
                     self.fn_param_many_nodes.insert(fn_sym, node)
-            if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0:
+            // #2568: a name a runtime intrinsic has (`src()`) that another
+            // module's own declaration took is still the intrinsic where that
+            // declaration is not visible (a default argument checked in its
+            // declaration's module).
+            if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0 and self.is_intrinsic_fn_sym(fn_sym) == 0:
                 self.emit_private_symbol_error(fn_sym, callee)
                 return 0
         else:
@@ -26972,7 +27024,11 @@ impl Sema:
         // A concrete signature wins over generic-node bookkeeping. Different
         // symbol pools can reuse integer ids, so a stale/raw generic map hit must
         // not turn an ordinary helper call into a generic instantiation.
-        let sig_idx_raw = self.get_visible_sig(fn_sym)
+        // #2568: a declaration of a runtime intrinsic's name that is not
+        // visible here (a caller's `fn src` seen from a std default) is not
+        // the callee; the intrinsic is.
+        let hidden_intrinsic = local_tid < 0 and self.is_intrinsic_fn_sym(fn_sym) != 0 and self.symbol_visible_from_current(fn_sym) == 0
+        let sig_idx_raw = if hidden_intrinsic: -1 else: self.get_visible_sig(fn_sym)
         // D29: a lexical CALLABLE binding preempts a module-level signature
         // of the same flat name (same-module shadowing is already rejected,
         // so this only decides the cross-module case in favor of the local).
@@ -28184,6 +28240,11 @@ impl Sema:
         if kind == NodeKind.NK_IDENT:
             let decl = self.unannotated_literal_binding(node)
             if decl != 0:
+                // D128 (#2569): a comprehension clause binding over a list
+                // literal; the demand lands on the literal (keyed by it).
+                if self.ast.kind(decl) == NodeKind.NK_ARRAY_LIT:
+                    out.push(decl)
+                    return out
                 if self.ast.kind(decl) == NodeKind.NK_FOR:
                     // D128: the loop variable's demand lands on the locals its
                     // range's bounds come from (`for i in 0..unique`).

@@ -3107,6 +3107,12 @@ impl Sema:
             if drop_conflict != 0:
                 self.emit_error("type '" ++ self.pool_resolve(type_name) ++ "' cannot implement Drop because it implements Copy", node)
                 return
+            // §2.4 (#2571): a destructor runs for every instantiation, so a
+            // `Drop` impl's bounds are the type's own; a stricter bound would
+            // make the destructor conditional and the other instantiations
+            // leak.
+            if self.drop_impl_bounds_exceed_type(node, type_name):
+                return
 
         // Validate associated types: impl must provide all required (no-default) associated types
         if not is_lang_trait and self.trait_lookup.contains(trait_sym):
@@ -3599,6 +3605,48 @@ impl Sema:
             let payload_count = self.ast.get_extra(pos)
             pos = pos + 1 + payload_count
         pos
+
+    // §2.4 (#2571): every bound an `impl[...] Drop for G[...]` places on a
+    // type parameter is one `G`'s declaration places on the parameter at
+    // that position; reports and answers true when one is not.
+    mut fn drop_impl_bounds_exceed_type(impl_node: i32, type_name: i32) -> bool:
+        let tp_meta = self.ast.find_impl_type_params(impl_node)
+        if tp_meta < 0 or not self.type_decl_nodes.contains(type_name):
+            return false
+        let target = self.ast.find_impl_target_type_node(impl_node)
+        if target == 0 or self.ast.kind(target) != NodeKind.NK_TYPE_GENERIC:
+            return false
+        let decl: i32 = self.type_decl_nodes.get(type_name).unwrap()
+        let decl_count = self.type_decl_tp_count(decl)
+        let args_start = self.ast.get_data1(target)
+        let arg_count = self.ast.get_data2(target)
+        let tp_start = self.ast.state.impl_type_params[(tp_meta + 1)]
+        let tp_count = self.ast.state.impl_type_params[(tp_meta + 2)]
+        var pos: i32 = tp_start
+        for _ in 0..tp_count:
+            let param = self.ast.get_extra(pos)
+            let bound_count = self.ast.get_extra(pos + 1)
+            // The declaration's parameter at the position the impl names it.
+            var decl_pos = -1
+            for ai in 0..arg_count:
+                let arg = self.ast.get_extra(args_start + ai)
+                if ai < decl_count and self.ast.kind(arg) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(arg) == param:
+                    decl_pos = self.type_decl_tp_start(decl)
+                    for _ in 0..ai: decl_pos = decl_pos + 2 + self.ast.get_extra(decl_pos + 1)
+            for bi in 0..bound_count:
+                let bound = self.ast.get_extra(pos + 2 + bi)
+                var declared = false
+                if decl_pos >= 0:
+                    for di in 0..self.ast.get_extra(decl_pos + 1):
+                        if self.ast.get_extra(decl_pos + 2 + di) == bound: declared = true
+                if not declared:
+                    let pname: str = with_str_clone_ref(self.pool_resolve(param))
+                    let bname: str = with_str_clone_ref(self.pool_resolve(bound))
+                    let tname: str = with_str_clone_ref(self.pool_resolve(type_name))
+                    self.emit_error(f"a `Drop` impl's bounds are the type's own: `{tname}` does not declare `{pname}: {bname}`, and a destructor runs for every instantiation (§2.4)", impl_node)
+                    return true
+            pos = pos + 2 + bound_count
+        false
 
     fn type_decl_tp_start(node: i32) -> i32:
         let extra_start = self.ast.get_data1(node)

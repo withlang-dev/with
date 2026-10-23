@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D154 — A `Drop` impl's bounds are the type's own; drop glue runs a bounded impl for every instantiation (delegated)](2026-10-23-D154-a-drop-impls-bounds-are-the-types-own.md)
+- [D153 — An unsuffixed numeric literal where a distinct type over a number is demanded takes the distinct type (delegated)](2026-10-23-D153-a-literal-at-a-distinct-numeric-demand-takes-the-distinct-type.md)
 - [D152 — A collection's copy class is part of its interface: `List`, `HashMap`, `HashSet` copy with a count; every engine-backed collection is a resource, by D45](2026-10-23-D152-a-collections-copy-class-is-part-of-its-interface-engine-backed-collections-are-resources.md)
 - [D151 — `BTreeMap` and `BTreeSet` are facades over the M*LIB B+tree slot shape; the compiler no longer knows their layout (delegated)](2026-10-22-D151-btreemap-and-btreeset-are-facades-over-the-mlib-bptree-slot-shape.md)
 - [D150 — A `static inline` function a header defines that no unit owns is published by its sole includer; several includers keep a private copy each](2026-10-22-D150-a-header-function-no-unit-owns-is-published-by-its-sole-includer.md)

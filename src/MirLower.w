@@ -10,6 +10,7 @@ use SemaCheck
 use Overflow
 use MathBuiltins
 use MirCore
+use std.collections.HashSet
 use SemaTypes
 use MirVector
 use MirSuspendCheck
@@ -138,6 +139,26 @@ type MirBuilder = ephemeral {
     stmt_temp_drop_depths: List[i32],
     stmt_temp_starts: List[i32],
     pending_reset_locals: List[i32],
+    // Per entry (#2570: a reset is emitted only once the move has
+    // happened): the move operand that empties the local, whether the move
+    // cancelled the local's statement-temporary drop, and where the body
+    // stood when the operand was consumed (its statement count, block
+    // count and current block), so a flush can tell whether a statement or
+    // call terminator reading the operand has been emitted since.
+    pending_reset_operands: List[i32],
+    pending_reset_temp_cancelled: List[i32],
+    pending_reset_stmt_marks: List[i32],
+    pending_reset_bb_marks: List[i32],
+    pending_reset_cur_bbs: List[i32],
+    // Per statement frame: the body's statement count, block count and
+    // current block when the frame opened (the marks above read the
+    // innermost frame's, since a consume may follow its statement).
+    stmt_frame_stmt_starts: List[i32],
+    stmt_frame_bb_starts: List[i32],
+    stmt_frame_cur_bbs: List[i32],
+    // The drops an unwind emitted for a not-yet-moved local (statement
+    // ids): drops on another path, never the awaited move.
+    unwind_drop_stmt_ids: HashSet[i32],
     // #719: per-statement-frame snapshots of the pending-reset stacks.
     stmt_reset_starts: List[i32],
     stmt_reset_field_starts: List[i32],
@@ -321,6 +342,15 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         stmt_temp_drop_depths: List.new(),
         stmt_temp_starts: List.new(),
         pending_reset_locals: List.new(),
+        pending_reset_operands: List.new(),
+        pending_reset_temp_cancelled: List.new(),
+        pending_reset_stmt_marks: List.new(),
+        pending_reset_bb_marks: List.new(),
+        pending_reset_cur_bbs: List.new(),
+        stmt_frame_stmt_starts: List.new(),
+        stmt_frame_bb_starts: List.new(),
+        stmt_frame_cur_bbs: List.new(),
+        unwind_drop_stmt_ids: HashSet.new(),
         stmt_reset_starts: List.new(),
         stmt_reset_field_starts: List.new(),
         stmt_reset_temp_starts: List.new(),
@@ -934,6 +964,9 @@ impl MirBuilder:
     fn push_stmt_temp_frame() -> i32:
         let depth = self.stmt_temp_starts.len() as i32
         self.stmt_temp_starts.push(self.stmt_temp_locals.len() as i32)
+        self.stmt_frame_stmt_starts.push(self.body.stmt_count())
+        self.stmt_frame_bb_starts.push(self.body.block_count())
+        self.stmt_frame_cur_bbs.push(self.cur_bb)
         // #719: remember what was already pending so this frame flushes only the
         // resets ITS OWN statement queues. Flushing from 0 drained the enclosing
         // expression's pending resets — e.g. a struct literal that already
@@ -1003,13 +1036,15 @@ impl MirBuilder:
             i = i - 1
         -1
 
-    mut fn cancel_stmt_temp_for_local(local_id: i32) -> Unit:
+    // True when the local was a statement temporary whose drop this cancels.
+    mut fn cancel_stmt_temp_for_local(local_id: i32) -> bool:
         var i = self.stmt_temp_locals.len() - 1
         while i >= 0:
             if self.stmt_temp_locals[i] == local_id:
                 self.stmt_temp_locals[i] = -1
-                return
+                return true
             i = i - 1
+        false
 
     // A call reads its callee: `f(1); f(2)` lowers both as `call copy _f`.
     // A carrier eliminator (`map`, `and_then`, `inspect`, …) calls the
@@ -1088,8 +1123,8 @@ impl MirBuilder:
             // statement boundary (flush_stmt_temp_frame) zeroes it so its later
             // drops — drop-before-overwrite, scope-exit — free nothing. The reset
             // is unconditional, so it does not depend on the move analysis below.
-            if self.sema.type_needs_drop_frozen(self.local_type(local_id)) != 0:
-                self.pending_reset_locals.push(local_id)
+            let needs_reset = self.sema.type_needs_drop_frozen(self.local_type(local_id)) != 0
+            if needs_reset:
                 // Stage 4 (§2.5.2): this local is reset-on-move, so its drop must
                 // keep its null guard. Locals never recorded here are never reset,
                 // and codegen elides their guard (unconditional drop).
@@ -1102,7 +1137,15 @@ impl MirBuilder:
             // The old permanent downgrade to DK_STORAGE was load-bearing and leaked
             // the reassigned value. Reset-on-move + the guarded drop prevent any
             // double-free if the moved-skip and an analysis bug ever disagree.
-            self.cancel_stmt_temp_for_local(local_id)
+            let temp_cancelled = self.cancel_stmt_temp_for_local(local_id)
+            if needs_reset:
+                self.pending_reset_locals.push(local_id)
+                self.pending_reset_operands.push(operand_id)
+                self.pending_reset_temp_cancelled.push(if temp_cancelled: 1 else: 0)
+                let frames = self.stmt_frame_stmt_starts.len()
+                self.pending_reset_stmt_marks.push(if frames > 0: self.stmt_frame_stmt_starts[frames - 1] else: 0)
+                self.pending_reset_bb_marks.push(if frames > 0: self.stmt_frame_bb_starts[frames - 1] else: 0)
+                self.pending_reset_cur_bbs.push(if frames > 0: self.stmt_frame_cur_bbs[frames - 1] else: self.cur_bb)
             self.clear_moved_fields_for_local(local_id)
             return
         if self.place_field_projection_count(place) > 0:
@@ -1289,6 +1332,9 @@ impl MirBuilder:
             self.stmt_temp_locals.pop()
             self.stmt_temp_drop_depths.pop()
         self.stmt_temp_starts.pop()
+        self.stmt_frame_stmt_starts.pop()
+        self.stmt_frame_bb_starts.pop()
+        self.stmt_frame_cur_bbs.pop()
         var reset_start: i32 = 0
         var reset_field_start: i32 = 0
         var reset_temp_start: i32 = 0
@@ -1317,9 +1363,58 @@ impl MirBuilder:
             self.pending_move_temp_locals.pop()
         while self.pending_reset_locals.len() > start:
             self.pending_reset_locals.pop()
+            self.pending_reset_operands.pop()
+            self.pending_reset_temp_cancelled.pop()
+            self.pending_reset_stmt_marks.pop()
+            self.pending_reset_bb_marks.pop()
+            self.pending_reset_cur_bbs.pop()
         while self.pending_reset_field_places.len() > field_start:
             self.pending_reset_field_places.pop()
             self.pending_reset_field_types.pop()
+
+    // #2570: whether the move that pending reset `ri` awaits has been
+    // emitted: a statement since the consume reads its operand (an assign,
+    // an aggregate, a cast), drops its local, or a call terminator set on
+    // the block current at the consume or on a block made since passes it.
+    // A statement-end flush always finds it; a mid-statement exit (a cancel
+    // unwind between a call's argument evaluations) may not.
+    // The statements and terminators are matched by the local, whatever
+    // operand reads it: a cast relabels through a `copy` of the consumed
+    // local, and a consume may be recorded after its statement.
+    fn pending_move_emitted(ri: i32) -> bool:
+        if self.pending_reset_operands[ri] < 0: return true
+        let local: i32 = self.pending_reset_locals[ri]
+        for si in self.pending_reset_stmt_marks[ri]..self.body.stmt_count():
+            let kind: i32 = self.body.stmt_kinds[si]
+            if kind == StmtKind.Drop and not self.unwind_drop_stmt_ids.contains(si) and self.place_is_local(self.body.stmt_d0[si], local): return true
+            if kind == StmtKind.Assign:
+                for read in mir_rvalue_operands(&self.body, self.body.stmt_d1[si]):
+                    if self.operand_reads_local(read, local): return true
+        let held: i32 = self.pending_reset_cur_bbs[ri]
+        if self.block_term_reads_local(held, local): return true
+        for bb in self.pending_reset_bb_marks[ri]..self.body.block_count():
+            if bb != held and self.block_term_reads_local(bb, local): return true
+        false
+
+    fn place_is_local(place: i32, local: i32) -> bool:
+        place >= 0 and place < self.body.place_locals.len() and self.body.place_locals[place] == local
+
+    fn operand_reads_local(op: i32, local: i32) -> bool:
+        if op < 0 or op >= self.body.operand_kinds.len(): return false
+        let kind: i32 = self.body.operand_kinds[op]
+        (kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE) and self.place_is_local(self.body.operand_d0[op], local)
+
+    // Whether block `bb` ends in a call passing `local`, or a drop of it.
+    fn block_term_reads_local(bb: i32, local: i32) -> bool:
+        if bb < 0 or bb >= self.body.block_count(): return false
+        let tk = self.body.term_kind(bb)
+        if tk == TermKind.TK_DROP_AND_GOTO: return self.place_is_local(self.body.term_data0(bb), local)
+        if tk != TermKind.TK_CALL: return false
+        let args: i32 = self.body.term_data1(bb)
+        if args < 0 or args >= self.body.call_arg_starts.len(): return false
+        for ai in 0..self.body.call_arg_counts[args]:
+            if self.operand_reads_local(self.body.call_arg_operands[self.body.call_arg_starts[args] + ai], local): return true
+        false
 
     mut fn emit_pending_resets_since(start: i32, field_start: i32, temp_start: i32):
         // D16: drop the move-arg temporaries first (their values die at the end
@@ -1335,6 +1430,20 @@ impl MirBuilder:
         var ri = start
         while ri < self.pending_reset_locals.len():
             let rl: i32 = self.pending_reset_locals[ri]
+            if not self.pending_move_emitted(ri):
+                // #2570: the move has not happened on this path (an unwind
+                // between a call's argument evaluations, an early exit among
+                // an aggregate's fields): the local still owns its value. A
+                // statement temporary whose own drop the move cancelled is
+                // dropped here; a local keeps its guarded scope drop.
+                if self.pending_reset_temp_cancelled[ri] != 0:
+                    let rl_place = self.place_for_local(rl)
+                    self.emit_drop_stmt(rl_place, "unwind-before-move", 0)
+                    // Not a move: a later flush on another path must not
+                    // read this drop as the move it awaits.
+                    self.unwind_drop_stmt_ids.insert(self.body.stmt_count() - 1)
+                ri = ri + 1
+                continue
             let zop = self.body.gen_zero_operand(self.local_type(rl))
             let rval = self.body.new_rvalue(RvalueKind.RK_USE, zop, 0, 0)
             self.body.push_stmt(self.cur_bb, StmtKind.Assign, self.place_for_local(rl), rval, 0)
@@ -2638,6 +2747,20 @@ impl MirBuilder:
         let kind = self.sema.get_type_kind(resolved)
         let pointee = if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF: self.sema.get_type_d0(resolved) else: 0
         self.body.new_deref_place(base, pointee)
+
+    // Whether a place holds a reference value (a `&[T]` local, a `&T`
+    // field): what it names is read through it. An element place `xs[i]`
+    // is the element itself even though Sema types the expression as a
+    // view (D27): the place's own type decides, not the expression's
+    // (#2578: a deref of a `str` element place was invalid MIR).
+    mut fn place_holds_reference(place: i32) -> bool:
+        let ty = self.place_local_type(place)
+        ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ty as TypeId)) == TypeKind.TY_REF
+
+    // The place a sequence operation reads: the pointee when the place
+    // holds a reference, else the place itself.
+    mut fn sequence_place_through_reference(place: i32) -> i32:
+        if self.place_holds_reference(place): self.new_deref_place(place) else: place
 
     // An operand's type as MIR recorded it: a place's recorded type
     // (place_sema_types), a constant's own. What codegen reads.
@@ -6555,9 +6678,8 @@ impl MirBuilder:
 
         if lowering == MethodLowering.SeqRest:
             // A view of everything after the first element.
-            var base_place = self.lower_expr_place(self_expr)
-            if through_ref:
-                base_place = self.new_deref_place(base_place)
+            let base_held = self.lower_expr_place(self_expr)
+            let base_place = self.sequence_place_through_reference(base_held)
             if base_kind == TypeKind.TY_ARRAY:
                 let n = self.sema.get_type_d1(base_ty)
                 let start_op = self.int_const_operand(if n > 0: 1 else: 0, self.sema.ty_i64)
@@ -6600,9 +6722,8 @@ impl MirBuilder:
                 if n == 0:
                     self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, none_rv, span)
                     return finish
-                var recv_place = self.lower_expr_place(self_expr)
-                if through_ref:
-                    recv_place = self.new_deref_place(recv_place)
+                let recv_held = self.lower_expr_place(self_expr)
+                let recv_place = self.sequence_place_through_reference(recv_held)
                 let at = if lowering == MethodLowering.SeqFirst: 0 else: n - 1
                 let elem_place = self.body.new_field_place(recv_place, at, elem_ty)
                 let ref_op = self.seq_ref_operand(elem_place, payload_ty, span)
@@ -6622,9 +6743,8 @@ impl MirBuilder:
             return out_op
 
         // A slice: the length is runtime, so first/last branch on it.
-        var slice_place = self.lower_expr_place(self_expr)
-        if through_ref:
-            slice_place = self.new_deref_place(slice_place)
+        let slice_held = self.lower_expr_place(self_expr)
+        let slice_place = self.sequence_place_through_reference(slice_held)
         let len_local = self.new_temp(self.sema.ty_i64)
         let len_place = self.place_for_local(len_local)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, len_place, self.body.new_rvalue(RvalueKind.RK_LEN, slice_place, 0, 0), span)
@@ -6852,11 +6972,9 @@ impl MirBuilder:
         // A range through a reference slices what it names (§3.7): the base
         // is the pointee, not the pointer local (`a[1..]` on `a: &[4]i32`
         // failed codegen: "slice base has no bounds metadata"; #1587).
-        let base_ty = self.expr_type(base_node)
-        var base_res = if base_ty != 0: self.sema.resolve_alias(base_ty as TypeId) else: 0
-        if base_res != 0 and self.sema.get_type_kind(base_res) == TypeKind.TY_REF:
-            base_place = self.new_deref_place(base_place)
-            base_res = self.sema.resolve_alias(self.sema.get_type_d0(base_res) as TypeId)
+        // The place's own type decides (#2578): an element place is the
+        // element, whatever view type Sema gave the expression.
+        base_place = self.sequence_place_through_reference(base_place)
         let start_op = if start_node != 0:
             self.lower_expr(start_node)
         else:
@@ -9755,7 +9873,6 @@ impl MirBuilder:
 
     mut fn lower_sequence_place(iter_expr: i32) -> i32:
         let written_ty = self.expr_type(iter_expr)
-        let through_ref = self.sema.get_type_kind(self.sema.resolve_alias(written_ty)) == TypeKind.TY_REF
         let iter_ty = self.sequence_iter_type(iter_expr)
         // §13: the implicit form borrows. A place iterable is read through its
         // own place — lowering it as a value MOVED an array of Drop-class
@@ -9774,6 +9891,8 @@ impl MirBuilder:
         // An array is not a view: copying it out would make a second owner of
         // its elements (the copy's drop freed the caller's strings). It is read
         // in place, and its length is its type's.
+        // The place's own type decides whether it is read through (#2578).
+        let through_ref = self.place_holds_reference(held_place)
         let array_in_place = through_ref and self.sema.get_type_kind(self.sema.resolve_alias(iter_ty)) == TypeKind.TY_ARRAY
         var slice_place = held_place
         if array_in_place:
@@ -10632,7 +10751,10 @@ impl MirBuilder:
     // The cancellation unwind (§14.7 step 3): mark the fiber's return as
     // cancelled, then leave the function the way a return does — defers and
     // drops run, the value is never produced.
-    mut fn emit_cancelled_return():
+    mut fn emit_cancelled_return(): self.emit_cancelled_return_unwritten(-1)
+
+    // `unwritten`: the local the unwinding call never wrote (-1: none).
+    mut fn emit_cancelled_return_unwritten(unwritten: i32):
         let scr_args: List[i32] = List.new()
         let scr_args_id = self.body.new_call_args(scr_args)
         self.body.set_call_intrinsic(scr_args_id, MirIntrinsic.FIBER_SET_CANCELLED_RETURN)
@@ -10647,6 +10769,7 @@ impl MirBuilder:
         self.emit_pending_resets_since(0, 0, 0)
         self.emit_defers_for_return()
         self.emit_drops_for_return()
+        if unwritten >= 0: self.body.note_unwritten_at_return(self.cur_bb, unwritten)
         self.terminate_fn_return(GEN_LOOP_CANCEL)
 
     // §14.7: a cancelled fiber unwinds at a runtime wait instead of parking.
@@ -10692,7 +10815,11 @@ impl MirBuilder:
         self.switch_to(unwind_bb)
         if release_dest and dest >= 0 and dest < self.body.place_locals.len() and self.sema.type_needs_drop_frozen(self.local_type(self.body.place_locals[dest])) != 0:
             self.emit_drop_stmt(dest, "cancel-unwind", 0)
-        self.emit_cancelled_return()
+        // #2570: the callee left by its unwind without writing the result,
+        // so the result local holds no value on this return (§14.7); the
+        // ownership validator's leak rule reads the fact from the body.
+        let unwritten = if not release_dest and dest >= 0 and dest < self.body.place_locals.len() and self.body.place_proj_counts[dest] == 0: self.body.place_locals[dest] else: -1
+        self.emit_cancelled_return_unwritten(unwritten)
 
     // Join a Task purely for cleanup: await completion and free its result buffer,
     // but do not propagate child-cancel status into the current fiber.
