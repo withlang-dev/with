@@ -1142,7 +1142,7 @@ impl MirBuilder:
                 self.pending_reset_locals.push(local_id)
                 self.pending_reset_operands.push(operand_id)
                 self.pending_reset_temp_cancelled.push(if temp_cancelled: 1 else: 0)
-                let frames = self.stmt_frame_stmt_starts.len() as i32
+                let frames = self.stmt_frame_stmt_starts.len()
                 self.pending_reset_stmt_marks.push(if frames > 0: self.stmt_frame_stmt_starts[frames - 1] else: 0)
                 self.pending_reset_bb_marks.push(if frames > 0: self.stmt_frame_bb_starts[frames - 1] else: 0)
                 self.pending_reset_cur_bbs.push(if frames > 0: self.stmt_frame_cur_bbs[frames - 1] else: self.cur_bb)
