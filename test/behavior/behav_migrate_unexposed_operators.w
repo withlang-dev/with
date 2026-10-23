@@ -30,6 +30,9 @@ fn main:
     let atomic = migrate_case("migrate_unexposed_atomic", "static int g;\nint load(void) { return __atomic_load_n(&g, 0); }\n")
     p7_assert_failure_contains(atomic, "has no translation", "an atomic builtin is refused by name, not read as its last operand")
 
-    let refused_arm = migrate_case("migrate_refused_arm", "union U { int a; long b; };\nvoid t(int c) { int arr[4] = { 0 }; c ? arr[(union U){ .a = 1, .b = 2 }.a] : 0; }\n")
-    p7_assert_failure_contains(refused_arm, "union initializer sets multiple arms", "a discarded arm whose lowering fails fails the function")
+    // A discarded compound literal is its elements' effects (a union
+    // initializer that sets two arms has none), so the construct that
+    // cannot lower even when discarded is a call with no translation.
+    let refused_arm = migrate_case("migrate_refused_arm", "static int g;\nvoid t(int c) { int arr[4] = { 0 }; c ? arr[__atomic_load_n(&g, 0)] : 0; }\n")
+    p7_assert_failure_contains(refused_arm, "has no translation", "a discarded arm whose lowering fails fails the function")
     print("ok")
