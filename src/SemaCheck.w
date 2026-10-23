@@ -26951,7 +26951,11 @@ impl Sema:
                 self.fn_param_invocations.insert(fn_sym, invocations)
                 if invocations > 1 and not self.fn_param_many_nodes.contains(fn_sym):
                     self.fn_param_many_nodes.insert(fn_sym, node)
-            if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0:
+            // #2568: a name a runtime intrinsic has (`src()`) that another
+            // module's own declaration took is still the intrinsic where that
+            // declaration is not visible (a default argument checked in its
+            // declaration's module).
+            if local_tid < 0 and self.symbol_visible_from_current(fn_sym) == 0 and self.is_intrinsic_fn_sym(fn_sym) == 0:
                 self.emit_private_symbol_error(fn_sym, callee)
                 return 0
         else:
@@ -26981,7 +26985,11 @@ impl Sema:
         // A concrete signature wins over generic-node bookkeeping. Different
         // symbol pools can reuse integer ids, so a stale/raw generic map hit must
         // not turn an ordinary helper call into a generic instantiation.
-        let sig_idx_raw = self.get_visible_sig(fn_sym)
+        // #2568: a declaration of a runtime intrinsic's name that is not
+        // visible here (a caller's `fn src` seen from a std default) is not
+        // the callee; the intrinsic is.
+        let hidden_intrinsic = local_tid < 0 and self.is_intrinsic_fn_sym(fn_sym) != 0 and self.symbol_visible_from_current(fn_sym) == 0
+        let sig_idx_raw = if hidden_intrinsic: -1 else: self.get_visible_sig(fn_sym)
         // D29: a lexical CALLABLE binding preempts a module-level signature
         // of the same flat name (same-module shadowing is already rejected,
         // so this only decides the cross-module case in favor of the local).
@@ -27650,17 +27658,22 @@ impl Sema:
         let saved_module_path = self.current_module_path.clone()
         let saved_scope_name_map = move self.scope_name_map
         self.scope_name_map = HashMap.new()
-        let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
-        for gi in 0..module_scope_len:
-            let sym = self.bind_names[gi]
-            let mapped = saved_scope_name_map.get(sym)
-            if mapped.is_some() and mapped.unwrap() == gi:
-                self.scope_name_map.insert(sym, gi as i32)
-        for si in 0..self.shadowed_global_syms.len():
-            if self.shadowed_global_indices[si] < module_scope_len:
-                self.scope_name_map.insert(self.shadowed_global_syms[si], self.shadowed_global_indices[si])
         if self.fn_decl_nodes.contains(callee_sym):
             self.update_fn_source_context(callee_sym, self.fn_decl_nodes.get(callee_sym).unwrap())
+        // The caller's module-level names are in scope for a default only
+        // when the declaration is in that module: a default resolves in its
+        // declaration's module, so a caller's own `src` never captures
+        // `panic(loc = src())` (#2568).
+        if self.current_module_path == saved_module_path:
+            let module_scope_len = if self.scope_starts.len() > 1: self.scope_starts[1] else: self.bind_names.len()
+            for gi in 0..module_scope_len:
+                let sym = self.bind_names[gi]
+                let mapped = saved_scope_name_map.get(sym)
+                if mapped.is_some() and mapped.unwrap() == gi:
+                    self.scope_name_map.insert(sym, gi as i32)
+            for si in 0..self.shadowed_global_syms.len():
+                if self.shadowed_global_indices[si] < module_scope_len:
+                    self.scope_name_map.insert(self.shadowed_global_syms[si], self.shadowed_global_indices[si])
         let ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
             else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
             else: self.check_expr_value_context(arg_node)
