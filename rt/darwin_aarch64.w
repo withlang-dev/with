@@ -130,6 +130,12 @@ extern fn rt_libc_fseeko(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_libc_ftello(stream: *mut c_void) -> i64
 @[link_name("strtold")]
 extern fn rt_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
+// std.libc strtol/strtoul parse a 64-bit long on every target (D114: With
+// code sees one width); C's long is 64 bits here, so libc's own.
+@[link_name("strtol")]
+extern fn rt_libc_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
+@[link_name("strtoul")]
+extern fn rt_libc_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
 @[link_name("isatty")]
 extern fn rt_libc_isatty(fd: i32) -> i32
 @[link_name("mkstemp")]
@@ -142,6 +148,8 @@ pub fn rt_fileno(stream: *mut c_void) -> i32: rt_libc_fileno(stream)
 pub fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_libc_fseeko(stream, offset, whence)
 pub fn rt_ftell(stream: *mut c_void) -> i64: rt_libc_ftello(stream)
 pub fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_libc_strtold(nptr, endptr)
+pub fn rt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: rt_libc_strtol(nptr, endptr, base)
+pub fn rt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: rt_libc_strtoul(nptr, endptr, base)
 pub fn rt_isatty(fd: i32) -> i32: rt_libc_isatty(fd)
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_libc_getrlimit(resource, lim)
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: rt_libc_setrlimit(resource, lim)
@@ -1669,6 +1677,12 @@ c facade libsystem:
         preserves domain environ
         preserves domain locale
     fn rt_libc_ftello
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_strtol
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_strtoul
         preserves domain environ
         preserves domain locale
     fn rt_libc_strtold

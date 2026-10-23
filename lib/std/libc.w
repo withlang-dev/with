@@ -110,8 +110,10 @@ pub extern fn strrchr(s: *const i8, c: i32) -> *mut i8
 pub extern fn strstr(haystack: *const i8, needle: *const i8) -> *mut i8
 pub extern fn strerror(errnum: i32) -> *mut i8
 pub extern fn atoi(nptr: *const i8) -> i32
-pub extern fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
-pub extern fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
+// strtol and strtoul parse a 64-bit long on every target (D114): where C's
+// long is 32 bits (the UCRT) the runtime binds the 64-bit parse (#2592).
+pub fn strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: with_libc_strtol(nptr, endptr, base)
+pub fn strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: with_libc_strtoul(nptr, endptr, base)
 pub extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
 pub extern fn strtoll(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
 pub extern fn strtoull(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
