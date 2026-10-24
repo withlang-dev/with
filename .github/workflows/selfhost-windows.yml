@@ -40,9 +40,9 @@ jobs:
       # regex literal at comptime. build/:fixpoint never compile a regex, so that
       # poison shipped green -- but it reds this job's battery the moment #798/#825
       # un-skip the regex tests. The regex smoke-test step below is the backstop.
-      WITH_SEED_VERSION: nightly-20261024-local-2-f5443bac4111
+      WITH_SEED_VERSION: nightly-20261024-local-3-4aeea7b21612
       WITH_SEED_ASSET: with-windows-x86_64.exe
-      WITH_SEED_SHA256: ecd176514553ee186ec491fc70276ac194d2f4aec7df32c593e4afe25a5de5c1
+      WITH_SEED_SHA256: e3d558de5b9765ccc37a91ce98dd70e38a2533fd34c36a1f5c9f7247b13f96da
       WITH_SDK_REPO: withlang-dev/with
       # The windows-gnu SDK of sdk.lock (#1915): its own C runtime, so the
       # lane reads no Visual Studio and no Windows SDK.
