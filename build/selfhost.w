@@ -6352,9 +6352,9 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let D156_HIGH_HEX: u32 = 0xBAADF00D", "D156 high hex takes the unsigned 32-bit type")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "d156_unsigned: List[u32] = [0x10u32]", "D156 unsigned literal suffix")
+    rc = bs_assert_contains(ctx, out_text, "let d156_unsigned: List[u32] = [16]", "D156: an unsigned int table is List[u32] with clang's folded literal (D119)")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "d156_signed: List[i64] = [0x20i64]", "D156 signed long literal suffix")
+    rc = bs_assert_contains(ctx, out_text, "let d156_signed: List[i64] = [32]", "D156: a long table is the model's List[i64]")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn parse_decimal", "ulong_max_width")
     if rc != 0: return rc

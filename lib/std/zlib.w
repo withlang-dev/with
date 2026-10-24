@@ -49,11 +49,11 @@ pub fn compress(data: &List[u8]) -> Result[List[u8], ZlibError]:
 pub fn compress_level(data: &List[u8], level: i32) -> Result[List[u8], ZlibError]:
     if level < Z_DEFAULT_COMPRESSION or level > Z_BEST_COMPRESSION:
         return Err(zlib_error(Z_STREAM_ERROR, "zlib compression level must be -1..9"))
-    var out_len = compressBound(data.len() as c_ulong)
+    var out_len = compressBound(data.len() as u64)
     let out_ptr = with_alloc(out_len as i64) as *mut u8
     if out_ptr as i64 == 0:
         return Err(zlib_code_error(Z_MEM_ERROR))
-    let rc = unsafe { compress2(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as c_ulong, level as c_int) }
+    let rc = unsafe { compress2(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as u64, level as c_int) }
     if rc != Z_OK:
         with_free(out_ptr)
         return Err(zlib_code_error(rc))
@@ -73,7 +73,7 @@ pub fn compress_gzip_level(data: &List[u8], level: i32) -> Result[List[u8], Zlib
     let init_rc = unsafe { deflateInit2_(&raw mut stream, level, Z_DEFLATED, MAX_WBITS + 16, 8, Z_DEFAULT_STRATEGY, c"1.3.2".ptr, sizeof[z_stream_s]() as c_int) }
     if init_rc != Z_OK:
         return Err(zlib_code_error(init_rc))
-    let out_len = unsafe { deflateBound(&raw mut stream, data.len() as c_ulong) }
+    let out_len = unsafe { deflateBound(&raw mut stream, data.len() as u64) }
     if (out_len as i64) > (ZLIB_MAX_CHUNK as i64):
         unsafe { deflateEnd(&raw mut stream) }
         return Err(zlib_error(Z_BUF_ERROR, "zlib gzip output is too large"))
@@ -119,11 +119,11 @@ fn decompress_window_bits(data: &List[u8], max_output_len: i64, window_bits: i32
     if cap > max_output_len:
         cap = max_output_len
     while true:
-        var out_len = cap as c_ulong
+        var out_len = cap as u64
         let out_ptr = with_alloc(cap) as *mut u8
         if out_ptr as i64 == 0:
             return Err(zlib_code_error(Z_MEM_ERROR))
-        let rc = unsafe { zlib_inflate_to_buffer(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as c_ulong, window_bits as c_int) }
+        let rc = unsafe { zlib_inflate_to_buffer(out_ptr, &raw mut out_len, zlib_list_data(data), data.len() as u64, window_bits as c_int) }
         if rc == Z_OK:
             let out = zlib_copy_from_raw(out_ptr as *const u8, out_len as i64)
             with_free(out_ptr)
@@ -137,7 +137,7 @@ fn decompress_window_bits(data: &List[u8], max_output_len: i64, window_bits: i32
         if cap > max_output_len:
             cap = max_output_len
 
-unsafe fn zlib_inflate_to_buffer(dest: *mut u8, dest_len: *mut c_ulong, source: *const u8, source_len: c_ulong, window_bits: c_int) -> c_int:
+unsafe fn zlib_inflate_to_buffer(dest: *mut u8, dest_len: *mut u64, source: *const u8, source_len: u64, window_bits: c_int) -> c_int:
     var stream: z_stream_s
     var left = *dest_len
     *dest_len = 0
@@ -153,10 +153,10 @@ unsafe fn zlib_inflate_to_buffer(dest: *mut u8, dest_len: *mut c_ulong, source: 
     while err == Z_OK:
         if stream.avail_out == 0:
             stream.avail_out = if left > ZLIB_MAX_CHUNK: ZLIB_MAX_CHUNK else: left as c_uint
-            left = left - stream.avail_out as c_ulong
+            left = left - stream.avail_out as u64
         if stream.avail_in == 0:
             stream.avail_in = if len > ZLIB_MAX_CHUNK: ZLIB_MAX_CHUNK else: len as c_uint
-            len = len - stream.avail_in as c_ulong
+            len = len - stream.avail_in as u64
         err = inflate(&raw mut stream, Z_NO_FLUSH)
     *dest_len = stream.total_out
     inflateEnd(&raw mut stream)
@@ -164,6 +164,6 @@ unsafe fn zlib_inflate_to_buffer(dest: *mut u8, dest_len: *mut c_ulong, source: 
         return Z_OK
     if err == Z_NEED_DICT:
         return Z_DATA_ERROR
-    if err == Z_BUF_ERROR and left + stream.avail_out as c_ulong != 0:
+    if err == Z_BUF_ERROR and left + stream.avail_out as u64 != 0:
         return Z_DATA_ERROR
     err
