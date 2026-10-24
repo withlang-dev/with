@@ -5211,14 +5211,26 @@ impl Sema:
             return ""
         if modules.len() == 1:
             return "; add: use " ++ modules[0] ++ "." ++ name
+        // Listed in name order: the message does not depend on the order
+        // the modules were loaded in.
         var listed = ""
-        for mi in 0..modules.len():
-            if mi > 0:
+        var taken: List[bool] = List.new()
+        for _ in 0..modules.len(): taken.push(false)
+        for _ in 0..modules.len():
+            var best = -1
+            for mi in 0..modules.len():
+                if taken[mi]: continue
+                if best < 0 or modules[mi] < modules[best]: best = mi
+            taken[best] = true
+            if listed.len() > 0:
                 listed = listed ++ " | "
-            listed = listed ++ "use " ++ modules[mi] ++ "." ++ name
+            listed = listed ++ "use " ++ modules[best] ++ "." ++ name
         "; candidates: " ++ listed
 
     mut fn emit_private_symbol_error(sym: i32, node: i32) -> Unit:
+        // A symbol this unit's own c_import omitted names the import gap,
+        // whatever a std module of the same name would need.
+        if self.emit_ci_omitted_symbol_error(sym, node): return
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         // #1744: a name its module's named imports do not select.
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
