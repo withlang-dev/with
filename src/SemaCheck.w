@@ -26555,18 +26555,17 @@ impl Sema:
         self.emit_error(f"builtins provides no '{member_name}': `builtins.` names the prelude's functions and the compiler's intrinsics (§18.2)", node)
         -1
 
-    // §18.1: the current module's self-name — the last segment of its
-    // `module` header, else its file's stem made an identifier.
     // D156: the data model a migrated module was compiled against, from its
-    // `pub let C_DATA_MODEL: str = "LP64 (…)"` (the migrator's defs
-    // prelude); "" for a module that declares none.
+    // `pub const C_DATA_MODEL: str = "LP64 (…)"` (the migrator's defs
+    // prelude); "" for a module that declares none. Another module's constant
+    // may have displaced this one's flat name (#1703).
     fn current_module_data_model() -> str:
-        let wanted = self.pool_lookup_symbol("C_DATA_MODEL")
-        if wanted == 0: return ""
         for di in 0..self.decl_source_paths.len():
             if self.decl_source_paths[di] != self.current_module_path: continue
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data0(decl) != wanted: continue
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL: continue
+            let name = self.pool_resolve(self.ast.get_data0(decl))
+            if name != "C_DATA_MODEL" and not name.starts_with("C_DATA_MODEL$in$"): continue
             var value = self.ast.get_data1(decl)
             if value != 0 and self.ast.kind(value) == NodeKind.NK_COMPTIME: value = self.ast.get_data0(value)
             if value != 0 and self.ast.kind(value) == NodeKind.NK_STRING_LIT:

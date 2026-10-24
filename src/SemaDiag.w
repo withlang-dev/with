@@ -117,6 +117,18 @@ impl Sema:
                     return 1
         0
 
+    fn integer_pointer_cast_help(expected_ty: i32, actual_ty: i32, expr_text: &str) -> str:
+        let expected = self.resolve_alias(expected_ty as TypeId)
+        let actual = self.resolve_alias(actual_ty as TypeId)
+        if self.get_type_kind(expected) != TypeKind.TY_PTR or self.get_type_kind(actual) != TypeKind.TY_PTR:
+            return ""
+        if not self.numeric_types_differ(self.get_type_d0(expected), self.get_type_d0(actual)):
+            return ""
+        let expression = if expr_text.len() > 0: expr_text else: "p"
+        let pointee = self.resolve_alias(self.get_type_d0(expected) as TypeId)
+        let expected_name = if pointee == self.ty_c_char: (if self.get_type_d1(expected) != 0: "*mut c_char" else: "*const c_char") else: self.type_name(expected_ty)
+        "a pointer to one integer type is not a pointer to another; spell the conversion `" ++ expression ++ " as " ++ expected_name ++ "` (D155)"
+
     mut fn emit_argument_type_mismatch(call_name: &str, fn_sym: i32, arg_index: isize, param_i: isize, expected_ty: i32, actual_ty: i32, arg_node: i32):
         // D93: a parameter demands its collection of a literal's binding.
         self.note_literal_demand(arg_node, expected_ty, arg_node)
@@ -151,8 +163,11 @@ impl Sema:
         diag.add_note("actual type: " ++ actual_name)
 
         let help = self.argument_literal_default_help(arg_node, expr_text, expected_ty, actual_ty)
+        let pointer_help = self.integer_pointer_cast_help(expected_ty, actual_ty, expr_text)
         if help.len() > 0:
             diag.add_help(help)
+        else if pointer_help.len() > 0:
+            diag.add_help(pointer_help)
         else if actual_name == "Regex" and arg_index == 0:
             let re_text = if expr_text.len() > 0: expr_text else: "re"
             if call_name == "str.replace":

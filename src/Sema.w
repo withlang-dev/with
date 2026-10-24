@@ -4226,9 +4226,8 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     // §16.1 / D155: the C aliases are the target's, owned here from the
     // target spec and ambient like `c_void` and `c_va_list`: `char` is
     // unsigned on AArch64 Linux and on wasm, `long` is 32 bits on Windows
-    // (LLP64) and wasm32, `long double` is a double only on AArch64 Darwin
-    // and Windows (elsewhere With has no float for it and the name does not
-    // exist). No migration or import emits a concrete value for one.
+    // (LLP64) and wasm32, and `c_longdouble` is f64. No migration or import
+    // emits a concrete value for one.
     let c_os = target_spec_os()
     let c_arch = target_spec_arch()
     let c_wasm = c_arch == "wasm32" or c_arch == "wasm64"
