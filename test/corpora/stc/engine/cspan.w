@@ -3,35 +3,35 @@ use std.engines.stc_testing.defs
 use std.libc
 use std.collections
 
-unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: c_long) -> *mut c_void {
-    return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as c_ulong) as i64)) else: (null as *mut c_void)) as *mut c_void))
+unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
+    return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
-unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
+unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
 
-    var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+    var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    var __local_block: c_ulong = ((0 as c_ulong))
+    var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[c_ulong]() as c_long)): 1 else: 0) != 0) {
-        with_memcpy((((&raw mut __local_block as *mut c_ulong) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
+    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+        with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
-        (__local_h = (__local_h as c_ulong) ^ (__local_block as c_ulong))
+        (__local_h = (__local_h as u64) ^ (__local_block as u64))
 
         (__local_h = (__local_h *% 1099511628211))
 
-        (__local_msg = __local_msg + ((sizeof[c_ulong]() as c_long) as usize))
+        (__local_msg = __local_msg + ((sizeof[u64]() as i64) as usize))
 
-        (__local_len = __local_len - (sizeof[c_ulong]() as c_long))
+        (__local_len = __local_len - (sizeof[u64]() as i64))
 
     }
 
     while true {
-        var __ci_expr_old_0: c_long = __local_len
+        var __ci_expr_old_0: i64 = __local_len
 
         (__local_len = __local_len - 1)
 
@@ -43,7 +43,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulo
 
         (__local_msg = __local_msg + 1)
 
-        (__local_h = (__local_h as c_ulong) ^ ((*__ci_expr_old_1) as c_ulong))
+        (__local_h = (__local_h as u64) ^ ((*__ci_expr_old_1) as u64))
 
         (__local_h = (__local_h *% 1099511628211))
 
@@ -53,22 +53,22 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulo
 
 }
 
-unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
-    var __local_b8: c_ulonglong
+unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
+    var __local_b8: u64
 
-    var __local_b4: c_uint
+    var __local_b4: u32
 
     match __param_len {
         8 => {
-            with_memcpy((((&raw mut __local_b8 as *mut c_ulonglong) as *mut c_void) as *mut u8), (__param_key as *const u8), ((8 as c_ulong) as i64))
+            with_memcpy((((&raw mut __local_b8 as *mut u64) as *mut c_void) as *mut u8), (__param_key as *const u8), ((8 as u64) as i64))
 
-            return ((((__local_b8 as c_ulonglong) *% (((0 as c_ulonglong) -% 4132994306676758115) as c_ulonglong)) as c_ulong))
+            return ((__local_b8 as u64) *% (((0 as u64) -% 4132994306676758115) as u64))
 
         },
         4 => {
-            with_memcpy((((&raw mut __local_b4 as *mut c_uint) as *mut c_void) as *mut u8), (__param_key as *const u8), ((4 as c_ulong) as i64))
+            with_memcpy((((&raw mut __local_b4 as *mut u32) as *mut c_void) as *mut u8), (__param_key as *const u8), ((4 as u64) as i64))
 
-            return ((__local_b4 as c_ulong) *% (((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+            return ((__local_b4 as u64) *% (((0 as u64) -% 3750763034362895579) as u64))
 
         },
         _ => {
@@ -78,17 +78,17 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
-    var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+    var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
     while ((*__local_msg) != 0) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
 
-        (__local_h = (__local_h as c_ulong) ^ ((*__ci_expr_old_0) as c_ulong))
+        (__local_h = (__local_h as u64) ^ ((*__ci_expr_old_0) as u64))
 
 
         (__local_h = (__local_h *% 1099511628211))
@@ -99,11 +99,11 @@ unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
 
 }
 
-unsafe fn c_hash_mix_n(__param_h: *mut c_ulong, __param_n: c_long) -> c_ulong {
-    var __local_i: c_long = ((1 as c_long))
+unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
+    var __local_i: i64 = ((1 as i64))
 
     while ((if __local_i < __param_n: 1 else: 0) != 0) {
-        ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as c_ulong) ^ ((__param_h[__local_i]) as c_ulong))))
+        ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
 
@@ -114,56 +114,56 @@ unsafe fn c_hash_mix_n(__param_h: *mut c_ulong, __param_n: c_long) -> c_ulong {
 
 }
 
-fn c_next_pow2(__param_n: c_long) -> c_long {
+fn c_next_pow2(__param_n: i64) -> i64 {
     var __local_n = __param_n
     (__local_n = __local_n - 1)
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (1 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (1 as u32)) as i64))
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (2 as c_uint)) as c_long))
-
-
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (4 as c_uint)) as c_long))
-
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (8 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (2 as u32)) as i64))
 
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (16 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (4 as u32)) as i64))
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (32 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (8 as u32)) as i64))
+
+
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (16 as u32)) as i64))
+
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (32 as u32)) as i64))
 
     return (__local_n + 1)
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
 
     loop {
-        var __ci_expr_logic_1: c_int = 0
+        var __ci_expr_logic_1: i32 = 0
 
         if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
         (__local_str = __local_str + 1)
 
-        var __ci_expr_old_0: c_long = __local_slen
+        var __ci_expr_old_0: i64 = __local_slen
 
         (__local_slen = __local_slen - 1)
 
@@ -172,13 +172,13 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
-pub unsafe fn _cspan_size(__param_shape: *mut c_int, __param_rank: c_int) -> c_long {
+pub unsafe fn _cspan_size(__param_shape: *mut i32, __param_rank: i32) -> i64 {
     var __local_rank = __param_rank
-    var __local_size: c_long = (((__param_shape[0]) as c_long))
+    var __local_size: i64 = (((__param_shape[0]) as i64))
 
     while true {
         (__local_rank = __local_rank - 1)
@@ -195,23 +195,23 @@ pub unsafe fn _cspan_size(__param_shape: *mut c_int, __param_rank: c_int) -> c_l
 
 }
 
-pub unsafe fn _cspan_swap_axes(__param_shape: *mut c_int, __param_stride: *mut c_int, __param_rank: c_int, __param_ax1: c_int, __param_ax2: c_int) {
+pub unsafe fn _cspan_swap_axes(__param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32, __param_ax1: i32, __param_ax2: i32) {
 
-    if (((if not ((((if ((__param_ax1 as c_ulong)) < ((__param_rank as c_ulong)): 1 else: 0) as c_int) & ((if ((__param_ax2 as c_ulong)) < ((__param_rank as c_ulong)): 1 else: 0) as c_int)) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"_cspan_swap_axes".ptr, c"cspan.h".ptr, (347 as c_int), c"((size_t)(ax1) < (size_t)(rank)) & ((size_t)(ax2) < (size_t)(rank))".ptr)
+    if (((if not ((((if ((__param_ax1 as u64)) < ((__param_rank as u64)): 1 else: 0) as i32) & ((if ((__param_ax2 as u64)) < ((__param_rank as u64)): 1 else: 0) as i32)) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"_cspan_swap_axes".ptr, c"cspan.h".ptr, (347 as i32), c"((size_t)(ax1) < (size_t)(rank)) & ((size_t)(ax2) < (size_t)(rank))".ptr)
     } else {
         0
     }
 
     loop {
-        var __local__xp: *mut c_int = ((&(__param_shape[0]) as *mut c_int) + ((__param_ax1 as c_long) as usize))
+        var __local__xp: *mut i32 = ((&raw const ((&(__param_shape[0]) as *mut i32) + ((__param_ax1 as i64) as usize))[0] as *mut i32))
 
-        var __local__yp: *mut c_int = ((&(__param_shape[0]) as *mut c_int) + ((__param_ax2 as c_long) as usize))
+        var __local__yp: *mut i32 = ((&raw const ((&(__param_shape[0]) as *mut i32) + ((__param_ax2 as i64) as usize))[0] as *mut i32))
 
 
-        var __local__tv: c_int = (((*__local__xp) as c_int))
+        var __local__tv: i32 = (*__local__xp)
 
-        ((*__local__xp) = (((*__local__yp) as c_int)))
+        ((*__local__xp) = (*__local__yp))
 
         ((*__local__yp) = __local__tv)
 
@@ -221,14 +221,14 @@ pub unsafe fn _cspan_swap_axes(__param_shape: *mut c_int, __param_stride: *mut c
     }
 
     loop {
-        var __local__xp_1: *mut c_int = ((&(__param_stride[0]) as *mut c_int) + ((__param_ax1 as c_long) as usize))
+        var __local__xp_1: *mut i32 = ((&raw const ((&(__param_stride[0]) as *mut i32) + ((__param_ax1 as i64) as usize))[0] as *mut i32))
 
-        var __local__yp_1: *mut c_int = ((&(__param_stride[0]) as *mut c_int) + ((__param_ax2 as c_long) as usize))
+        var __local__yp_1: *mut i32 = ((&raw const ((&(__param_stride[0]) as *mut i32) + ((__param_ax2 as i64) as usize))[0] as *mut i32))
 
 
-        var __local__tv_1: c_int = (((*__local__xp_1) as c_int))
+        var __local__tv_1: i32 = (*__local__xp_1)
 
-        ((*__local__xp_1) = (((*__local__yp_1) as c_int)))
+        ((*__local__xp_1) = (*__local__yp_1))
 
         ((*__local__yp_1) = __local__tv_1)
 
@@ -239,9 +239,9 @@ pub unsafe fn _cspan_swap_axes(__param_shape: *mut c_int, __param_stride: *mut c
 
 }
 
-pub unsafe fn _cspan_transpose(__param_shape: *mut c_int, __param_stride: *mut c_int, __param_rank: c_int) {
+pub unsafe fn _cspan_transpose(__param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32) {
     var __local_rank = __param_rank
-    var __local_i: c_int = ((0 as c_int))
+    var __local_i: i32 = ((0 as i32))
 
     while true {
         (__local_rank = __local_rank - 1)
@@ -251,14 +251,14 @@ pub unsafe fn _cspan_transpose(__param_shape: *mut c_int, __param_stride: *mut c
         }
 
         loop {
-            var __local__xp: *mut c_int = ((&(__param_shape[0]) as *mut c_int) + ((__local_i as c_long) as usize))
+            var __local__xp: *mut i32 = ((&raw const ((&(__param_shape[0]) as *mut i32) + ((__local_i as i64) as usize))[0] as *mut i32))
 
-            var __local__yp: *mut c_int = ((&(__param_shape[0]) as *mut c_int) + ((__local_rank as c_long) as usize))
+            var __local__yp: *mut i32 = ((&raw const ((&(__param_shape[0]) as *mut i32) + ((__local_rank as i64) as usize))[0] as *mut i32))
 
 
-            var __local__tv: c_int = (((*__local__xp) as c_int))
+            var __local__tv: i32 = (*__local__xp)
 
-            ((*__local__xp) = (((*__local__yp) as c_int)))
+            ((*__local__xp) = (*__local__yp))
 
             ((*__local__yp) = __local__tv)
 
@@ -268,14 +268,14 @@ pub unsafe fn _cspan_transpose(__param_shape: *mut c_int, __param_stride: *mut c
         }
 
         loop {
-            var __local__xp_1: *mut c_int = ((&(__param_stride[0]) as *mut c_int) + ((__local_i as c_long) as usize))
+            var __local__xp_1: *mut i32 = ((&raw const ((&(__param_stride[0]) as *mut i32) + ((__local_i as i64) as usize))[0] as *mut i32))
 
-            var __local__yp_1: *mut c_int = ((&(__param_stride[0]) as *mut c_int) + ((__local_rank as c_long) as usize))
+            var __local__yp_1: *mut i32 = ((&raw const ((&(__param_stride[0]) as *mut i32) + ((__local_rank as i64) as usize))[0] as *mut i32))
 
 
-            var __local__tv_1: c_int = (((*__local__xp_1) as c_int))
+            var __local__tv_1: i32 = (*__local__xp_1)
 
-            ((*__local__xp_1) = (((*__local__yp_1) as c_int)))
+            ((*__local__xp_1) = (*__local__yp_1))
 
             ((*__local__yp_1) = __local__tv_1)
 
@@ -291,13 +291,13 @@ pub unsafe fn _cspan_transpose(__param_shape: *mut c_int, __param_stride: *mut c
 
 }
 
-pub unsafe fn _cspan_index(__param_shape: *mut c_int, __param_stride: *mut c_int, __param_args: *mut c_long, __param_rank: c_int) -> c_long {
+pub unsafe fn _cspan_index(__param_shape: *mut i32, __param_stride: *mut i32, __param_args: *mut i64, __param_rank: i32) -> i64 {
     var __local_rank = __param_rank
-    var __local_off: c_long = ((0 as c_long))
+    var __local_off: i64 = ((0 as i64))
 
 
     while true {
-        var __ci_expr_old_0: c_int = __local_rank
+        var __ci_expr_old_0: i32 = __local_rank
 
         (__local_rank = __local_rank - 1)
 
@@ -305,8 +305,8 @@ pub unsafe fn _cspan_index(__param_shape: *mut c_int, __param_stride: *mut c_int
             break
         }
 
-        if (((if not ((if (__param_args[__local_rank]) < (__param_shape[__local_rank]): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-            __assert_rtn(c"_cspan_index".ptr, c"cspan.h".ptr, (364 as c_int), c"args[rank] < shape[rank]".ptr)
+        if (((if not ((if (__param_args[__local_rank]) < (__param_shape[__local_rank]): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"_cspan_index".ptr, c"cspan.h".ptr, (364 as i32), c"args[rank] < shape[rank]".ptr)
         } else {
             0
         }
@@ -319,18 +319,18 @@ pub unsafe fn _cspan_index(__param_shape: *mut c_int, __param_stride: *mut c_int
 
 }
 
-pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c_int, __param_rank: c_int, __param_brackets: *const i8, __param_result: *mut [c_char; 20]) {
-    var __local_n: c_int = ((0 as c_int))
+pub unsafe fn _cspan_print_assist(__param_pos: *mut i32, __param_shape: *mut i32, __param_rank: i32, __param_brackets: *const c_char, __param_result: *mut [c_char; 20]) {
+    var __local_n: i32 = ((0 as i32))
 
-    var __local_j: c_int = ((0 as c_int))
+    var __local_j: i32 = ((0 as i32))
 
-    var __local_r: c_int = (((__param_rank - 1) as c_int))
+    var __local_r: i32 = (((__param_rank - 1) as i32))
 
 
-    with_memset(((&(__param_result[0]) as *mut [c_char; 20]) as *mut u8), (0 as c_int), ((32 as c_ulong) as i64))
+    with_memset(((&(__param_result[0]) as *mut [c_char; 20]) as *mut u8), (0 as i32), ((32 as u64) as i64))
 
     while true {
-        var __ci_expr_logic_0: c_int = 0
+        var __ci_expr_logic_0: i32 = 0
 
         if ((if __local_n <= __local_r: 1 else: 0) != 0) {
             (__ci_expr_logic_0 = (if (if (__param_pos[(__local_r - __local_n)]) == 0: 1 else: 0) != 0: 1 else: 0))
@@ -346,17 +346,17 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c
 
     if (__local_n != 0) {
         while ((if __local_j < __param_rank: 1 else: 0) != 0) {
-            ((__param_result[0])[__local_j] = (((if (if __local_j < (__param_rank - __local_n): 1 else: 0) != 0: (32 as c_int) else: ((__param_brackets[0]) as c_int)) as c_char)))
+            ((__param_result[0])[__local_j] = (((if (if __local_j < (__param_rank - __local_n): 1 else: 0) != 0: (32 as i32) else: ((__param_brackets[0]) as i32)) as c_char)))
 
             (__local_j = __local_j + 1)
 
         }
     }
 
-    (__local_j = ((0 as c_int)))
+    (__local_j = ((0 as i32)))
 
     while true {
-        var __ci_expr_logic_1: c_int = 0
+        var __ci_expr_logic_1: i32 = 0
 
         if ((if __local_r >= 0: 1 else: 0) != 0) {
             (__ci_expr_logic_1 = (if (if ((__param_pos[__local_r]) + 1) == (__param_shape[__local_r]): 1 else: 0) != 0: 1 else: 0))
@@ -375,16 +375,16 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c
     }
 
 
-    (__local_n = ((((if __local_j > 0: 1 else: 0) + (((if __local_j > 1: 1 else: 0) as c_int) & ((if __local_j < __param_rank: 1 else: 0) as c_int))) as c_int)))
+    (__local_n = ((((if __local_j > 0: 1 else: 0) + (((if __local_j > 1: 1 else: 0) as i32) & ((if __local_j < __param_rank: 1 else: 0) as i32))) as i32)))
 
-    var __ci_expr_logic_2: c_int = 0
+    var __ci_expr_logic_2: i32 = 0
 
     if ((__param_brackets[2]) != 0) {
         (__ci_expr_logic_2 = (if (if __local_j < __param_rank: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
-        var __ci_expr_old_3: c_int = __local_j
+        var __ci_expr_old_3: i32 = __local_j
 
         (__local_j = __local_j + 1)
 
@@ -394,7 +394,7 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c
 
 
     while true {
-        var __ci_expr_old_4: c_int = __local_n
+        var __ci_expr_old_4: i32 = __local_n
 
         (__local_n = __local_n - 1)
 
@@ -402,7 +402,7 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c
             break
         }
 
-        var __ci_expr_old_5: c_int = __local_j
+        var __ci_expr_old_5: i32 = __local_j
 
         (__local_j = __local_j + 1)
 
@@ -412,7 +412,7 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut c_int, __param_shape: *mut c
 
 }
 
-pub unsafe fn _cspan_nextN(__param_pos: *mut c_int, __param_shape: *mut c_int, __param_stride: *mut c_int, __param_rank: c_int, __param_off: *mut c_long) -> bool {
+pub unsafe fn _cspan_nextN(__param_pos: *mut i32, __param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32, __param_off: *mut i64) -> bool {
     var __local_rank = __param_rank
     (__local_rank = __local_rank - 1)
 
@@ -420,7 +420,7 @@ pub unsafe fn _cspan_nextN(__param_pos: *mut c_int, __param_shape: *mut c_int, _
 
 
     while true {
-        var __ci_expr_logic_0: c_int = 0
+        var __ci_expr_logic_0: i32 = 0
 
         if (__local_rank != 0) {
             (__ci_expr_logic_0 = (if (if (__param_pos[__local_rank]) == (__param_shape[__local_rank]): 1 else: 0) != 0: 1 else: 0))
@@ -430,29 +430,29 @@ pub unsafe fn _cspan_nextN(__param_pos: *mut c_int, __param_shape: *mut c_int, _
             break
         }
 
-        ((__param_pos[__local_rank]) = ((0 as c_int)))
+        ((__param_pos[__local_rank]) = ((0 as i32)))
 
         ((__param_pos[(__local_rank - 1)]) = (__param_pos[(__local_rank - 1)]) + 1)
 
-        ((*__param_off) = (*__param_off) + ((__param_stride[(__local_rank - 1)]) - (((__param_shape[__local_rank]) as c_long) * (__param_stride[__local_rank]))))
+        ((*__param_off) = (*__param_off) + ((__param_stride[(__local_rank - 1)]) - (((__param_shape[__local_rank]) as i64) * (__param_stride[__local_rank]))))
 
         (__local_rank = __local_rank - 1)
 
     }
 
-    return (((__param_pos[__local_rank]) == (__param_shape[__local_rank])))
+    return (((((__param_pos[__local_rank]) == (__param_shape[__local_rank]))) as bool))
 
 }
 
-pub unsafe fn _cspan_slice(__param_oshape: *mut c_int, __param_ostride: *mut c_int, __param_orank: *mut c_int, __param_shape: *mut c_int, __param_stride: *mut c_int, __param_args: *mut [c_long; 3], __param_rank: c_int) -> c_long {
-    var __local_end: c_long
+pub unsafe fn _cspan_slice(__param_oshape: *mut i32, __param_ostride: *mut i32, __param_orank: *mut i32, __param_shape: *mut i32, __param_stride: *mut i32, __param_args: *mut [i64; 3], __param_rank: i32) -> i64 {
+    var __local_end: i64
 
-    var __local_off: c_long = ((0 as c_long))
+    var __local_off: i64 = ((0 as i64))
 
 
-    var __local_i: c_int = ((0 as c_int))
+    var __local_i: i32 = ((0 as i32))
 
-    var __local_oi: c_int = ((0 as c_int))
+    var __local_oi: i32 = ((0 as i32))
 
 
     while ((if __local_i < __param_rank: 1 else: 0) != 0) {
@@ -463,8 +463,8 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut c_int, __param_ostride: *mut c_i
         while true {
             match (__param_args[__local_i])[1] {
                 0 => {
-                    if (((if not ((if (((__param_args[__local_i])[0] as c_ulong)) < (((__param_shape[__local_i]) as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-                        __assert_rtn(c"_cspan_slice".ptr, c"cspan.h".ptr, (464 as c_int), c"((size_t)(args[i][0]) < (size_t)(shape[i]))".ptr)
+                    if (((if not ((if (((__param_args[__local_i])[0] as u64)) < (((__param_shape[__local_i]) as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                        __assert_rtn(c"_cspan_slice".ptr, c"cspan.h".ptr, (464 as i32), c"((size_t)(args[i][0]) < (size_t)(shape[i]))".ptr)
                     }
 
                     (__ci_expr_switch_continue_0 = 1)
@@ -474,10 +474,10 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut c_int, __param_ostride: *mut c_i
 
                 },
                 2147483647 => {
-                    (__local_end = (((__param_shape[__local_i]) as c_long)))
+                    (__local_end = (((__param_shape[__local_i]) as i64)))
                 },
                 _ => {
-                    (__local_end = (((__param_args[__local_i])[1] as c_long)))
+                    (__local_end = (((__param_args[__local_i])[1] as i64)))
                 },
             }
 
@@ -493,20 +493,20 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut c_int, __param_ostride: *mut c_i
         }
 
 
-        ((__param_oshape[__local_oi]) = (((__local_end - (__param_args[__local_i])[0]) as c_int)))
+        ((__param_oshape[__local_oi]) = (((__local_end - (__param_args[__local_i])[0]) as i32)))
 
-        ((__param_ostride[__local_oi]) = (((__param_stride[__local_i]) as c_int)))
+        ((__param_ostride[__local_oi]) = (((__param_stride[__local_i]) as i32)))
 
-        if (((if not ((((if (__param_oshape[__local_oi]) > 0: 1 else: 0) as c_int) & ((if not ((if (((__param_shape[__local_i]) as c_ulong)) < ((__local_end as c_ulong)): 1 else: 0) != 0): 1 else: 0) as c_int)) != 0): 1 else: 0) as c_long) != 0) {
-            __assert_rtn(c"_cspan_slice".ptr, c"cspan.h".ptr, (470 as c_int), c"(oshape[oi] > 0) & !((size_t)(shape[i]) < (size_t)(end))".ptr)
+        if (((if not ((((if (__param_oshape[__local_oi]) > 0: 1 else: 0) as i32) & ((if not ((if (((__param_shape[__local_i]) as u64)) < ((__local_end as u64)): 1 else: 0) != 0): 1 else: 0) as i32)) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"_cspan_slice".ptr, c"cspan.h".ptr, (470 as i32), c"(oshape[oi] > 0) & !((size_t)(shape[i]) < (size_t)(end))".ptr)
         } else {
             0
         }
 
         if ((if (__param_args[__local_i])[2] > 0: 1 else: 0) != 0) {
-            ((__param_ostride[__local_oi]) = (__param_ostride[__local_oi]) * ((__param_args[__local_i])[2] as c_int))
+            ((__param_ostride[__local_oi]) = (__param_ostride[__local_oi]) * ((__param_args[__local_i])[2] as i32))
 
-            ((__param_oshape[__local_oi]) = ((((((__param_oshape[__local_oi]) - 1) / ((__param_args[__local_i])[2] as c_int)) + 1) as c_int)))
+            ((__param_oshape[__local_oi]) = ((((((__param_oshape[__local_oi]) - 1) / ((__param_args[__local_i])[2] as i32)) + 1) as i32)))
 
         }
 
@@ -523,33 +523,33 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut c_int, __param_ostride: *mut c_i
 
 }
 
-pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut c_int, __param_rank: c_int) -> *mut c_int {
+pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut i32, __param_rank: i32) -> *mut i32 {
     var __local_rank = __param_rank
-    var __local_i: c_int
+    var __local_i: i32
 
-    var __local_inc: c_int
+    var __local_inc: i32
 
 
     if ((if __param_layout == 1: 1 else: 0) != 0) {
-        (__local_i = ((0 as c_int)))
+        (__local_i = ((0 as i32)))
 
-        (__local_inc = ((1 as c_int)))
+        (__local_inc = ((1 as i32)))
 
     } else {
-        (__local_i = (((__local_rank - 1) as c_int)))
+        (__local_i = (((__local_rank - 1) as i32)))
 
-        (__local_inc = ((-1 as c_int)))
+        (__local_inc = ((-1 as i32)))
 
     }
 
-    var __local_k: c_int = ((1 as c_int))
+    var __local_k: i32 = ((1 as i32))
 
-    var __local_s1: c_int = (((__param_shpstri[__local_i]) as c_int))
+    var __local_s1: i32 = (((__param_shpstri[__local_i]) as i32))
 
-    var __local_s2: c_int
+    var __local_s2: i32
 
 
-    ((__param_shpstri[__local_i]) = ((1 as c_int)))
+    ((__param_shpstri[__local_i]) = ((1 as i32)))
 
     while true {
         (__local_rank = __local_rank - 1)
@@ -560,7 +560,7 @@ pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut c_i
 
         (__local_i = __local_i + __local_inc)
 
-        (__local_s2 = (((__param_shpstri[__local_i]) as c_int)))
+        (__local_s2 = (((__param_shpstri[__local_i]) as i32)))
 
         (__local_k = __local_k * __local_s1)
 
@@ -570,17 +570,17 @@ pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut c_i
 
     }
 
-    return (&(__param_shpstri[0]) as *mut c_int)
+    return (&(__param_shpstri[0]) as *mut i32)
 
 }
 
-pub unsafe fn _cspan_is_layout(__param_layout: i32, __param_shape: *mut c_int, __param_strides: *mut c_int, __param_rank: c_int) -> bool {
-    var __local_tmpshape: List[c_int] = [0; 16]
+pub unsafe fn _cspan_is_layout(__param_layout: i32, __param_shape: *mut i32, __param_strides: *mut i32, __param_rank: i32) -> bool {
+    var __local_tmpshape: List[i32] = [0; 16]
 
-    var __local_sz: c_ulong = ((((__param_rank as c_ulong) *% (sizeof[c_int]() as c_ulong)) as c_ulong))
+    var __local_sz: u64 = ((((__param_rank as u64) *% (sizeof[i32]() as u64)) as u64))
 
-    with_memcpy(((&__local_tmpshape[0] as *mut c_int) as *mut u8), ((&(__param_shape[0]) as *mut c_int) as *const u8), (__local_sz as i64))
+    with_memcpy(((&__local_tmpshape[0] as *mut i32) as *mut u8), ((&(__param_shape[0]) as *mut i32) as *const u8), (__local_sz as i64))
 
-    return ((with_memcmp(((&(__param_strides[0]) as *mut c_int) as *const u8), ((_cspan_shape2stride(__param_layout, (&__local_tmpshape[0] as *mut c_int), __param_rank) as *const c_void) as *const u8), (__local_sz as i64)) == 0))
+    return ((((with_memcmp(((&(__param_strides[0]) as *mut i32) as *const u8), ((_cspan_shape2stride(__param_layout, (&__local_tmpshape[0] as *mut i32), __param_rank) as *const c_void) as *const u8), (__local_sz as i64)) == 0)) as bool))
 
 }

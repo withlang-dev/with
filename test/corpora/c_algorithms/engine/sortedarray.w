@@ -3,8 +3,8 @@ use std.engines.c_algorithms_testing.defs
 use std.engines.c_algorithms_testing.alloc_testing
 use std.option
 
-pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: c_uint) -> *mut c_void {
-    var __ci_expr_logic_0: c_int
+pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: u32) -> *mut c_void {
+    var __ci_expr_logic_0: i32
 
     if ((if __param_array == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -22,12 +22,12 @@ pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: c_uin
 
 }
 
-pub unsafe fn sortedarray_length(__param_array: *mut _SortedArray) -> c_uint {
+pub unsafe fn sortedarray_length(__param_array: *mut _SortedArray) -> u32 {
     return (*__param_array).length
 
 }
 
-pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _SortedArray writes allocation_limit {
+pub fn sortedarray_new(__param_length: u32, __param_cmp_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _SortedArray writes allocation_limit {
     var __local_length = __param_length
     var __local_array: *mut *mut c_void
 
@@ -39,18 +39,18 @@ pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: Option[unsafe e
     }
 
     if ((if __local_length == 0: 1 else: 0) != 0) {
-        (__local_length = ((16 as c_uint)))
+        (__local_length = ((16 as u32)))
 
     }
 
-    (__local_array = ((alloc_test_malloc((((sizeof[usize]() as c_ulong) *% (__local_length as c_ulong)) as c_ulong)) as *mut *mut c_void)))
+    (__local_array = ((alloc_test_malloc((((sizeof[usize]() as u64) *% (__local_length as u64)) as u64)) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut _SortedArray))
 
     }
 
-    (__local_sortedarray = ((alloc_test_malloc((sizeof[_SortedArray]() as c_ulong)) as *mut _SortedArray)))
+    (__local_sortedarray = ((alloc_test_malloc((sizeof[_SortedArray]() as u64)) as *mut _SortedArray)))
 
     if ((if __local_sortedarray == null: 1 else: 0) != 0) {
         unsafe { alloc_test_free((__local_array as *mut c_void)) }
@@ -61,7 +61,7 @@ pub fn sortedarray_new(__param_length: c_uint, __param_cmp_func: Option[unsafe e
 
     ((unsafe *__local_sortedarray).data = __local_array)
 
-    ((unsafe *__local_sortedarray).length = ((0 as c_uint)))
+    ((unsafe *__local_sortedarray).length = ((0 as u32)))
 
     ((unsafe *__local_sortedarray)._alloced = __local_length)
 
@@ -81,14 +81,14 @@ pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) {
 
 }
 
-pub unsafe fn sortedarray_remove(__param_sortedarray: *mut _SortedArray, __param_index: c_uint) -> c_int {
-    return sortedarray_remove_range(__param_sortedarray, __param_index, (1 as c_uint))
+pub unsafe fn sortedarray_remove(__param_sortedarray: *mut _SortedArray, __param_index: u32) -> i32 {
+    return sortedarray_remove_range(__param_sortedarray, __param_index, (1 as u32))
 
 }
 
-pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, __param_index: c_uint, __param_length: c_uint) -> c_int {
+pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, __param_index: u32, __param_length: u32) -> i32 {
     var __local_length = __param_length
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_sortedarray == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -102,12 +102,12 @@ pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, _
     }
 
 
-    if ((if ((__param_index as c_uint) +% (__local_length as c_uint)) > (*__param_sortedarray).length: 1 else: 0) != 0) {
-        (__local_length = (((((*__param_sortedarray).length as c_uint) -% (__param_index as c_uint)) as c_uint)))
+    if ((if ((__param_index as u32) +% (__local_length as u32)) > (*__param_sortedarray).length: 1 else: 0) != 0) {
+        (__local_length = (((((*__param_sortedarray).length as u32) -% (__param_index as u32)) as u32)))
 
     }
 
-    with_memmove(((((&raw const ((*__param_sortedarray).data[__param_index]) as *const *mut c_void) as *mut *mut c_void) as *mut c_void) as *mut u8), ((((&raw const ((*__param_sortedarray).data[((__param_index as c_uint) +% (__local_length as c_uint))]) as *const *mut c_void) as *mut *mut c_void) as *const c_void) as *const u8), (((((((*__param_sortedarray).length as c_uint) -% (((__param_index as c_uint) +% (__local_length as c_uint)) as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+    with_memmove(((((&raw const ((*__param_sortedarray).data[__param_index]) as *const *mut c_void) as *mut *mut c_void) as *mut c_void) as *mut u8), ((((&raw const ((*__param_sortedarray).data[((__param_index as u32) +% (__local_length as u32))]) as *const *mut c_void) as *mut *mut c_void) as *const c_void) as *const u8), (((((((*__param_sortedarray).length as u32) -% (((__param_index as u32) +% (__local_length as u32)) as u32)) as u64) *% (sizeof[usize]() as u64)) as u64) as i64))
 
     ((*__param_sortedarray).length = ((*__param_sortedarray).length -% __local_length))
 
@@ -115,41 +115,41 @@ pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, _
 
 }
 
-pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> c_int writes allocation_limit {
+pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> i32 writes allocation_limit {
     var __local_data = __param_data
-    var __local_left: c_uint
+    var __local_left: u32
 
-    var __local_right: c_uint
+    var __local_right: u32
 
-    var __local_index: c_uint
+    var __local_index: u32
 
 
-    var __local_order: c_int
+    var __local_order: i32
 
     if ((if __param_sortedarray == null: 1 else: 0) != 0) {
         return 0
 
     }
 
-    (__local_left = ((0 as c_uint)))
+    (__local_left = ((0 as u32)))
 
     (__local_right = (*__param_sortedarray).length)
 
-    (__local_index = ((0 as c_uint)))
+    (__local_index = ((0 as u32)))
 
-    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as c_uint)) as c_uint)))
+    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as u32)) as u32)))
 
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
-        (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
+        (__local_index = ((((((__local_left as u32) +% (__local_right as u32)) as u32) / (2 as u32)) as u32)))
 
-        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
+        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) as i32)))
 
         if ((if __local_order < 0: 1 else: 0) != 0) {
             (__local_right = __local_index)
 
         } else {
             if ((if __local_order > 0: 1 else: 0) != 0) {
-                (__local_left = ((((__local_index as c_uint) +% (1 as c_uint)) as c_uint)))
+                (__local_left = ((((__local_index as u32) +% (1 as u32)) as u32)))
 
             } else {
                 break
@@ -159,7 +159,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     }
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
     if ((if (*__param_sortedarray).length > 0: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
@@ -171,14 +171,14 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
     }
 
 
-    if ((if (((*__param_sortedarray).length as c_uint) +% (1 as c_uint)) > (*__param_sortedarray)._alloced: 1 else: 0) != 0) {
-        var __local_newsize: c_uint
+    if ((if (((*__param_sortedarray).length as u32) +% (1 as u32)) > (*__param_sortedarray)._alloced: 1 else: 0) != 0) {
+        var __local_newsize: u32
 
         var __local_data_1: *mut *mut c_void
 
-        (__local_newsize = (((((*__param_sortedarray)._alloced as c_uint) *% (2 as c_uint)) as c_uint)))
+        (__local_newsize = (((((*__param_sortedarray)._alloced as u32) *% (2 as u32)) as u32)))
 
-        (__local_data_1 = ((alloc_test_realloc(((*__param_sortedarray).data as *mut c_void), (((sizeof[usize]() as c_ulong) *% (__local_newsize as c_ulong)) as c_ulong)) as *mut *mut c_void)))
+        (__local_data_1 = ((alloc_test_realloc(((*__param_sortedarray).data as *mut c_void), (((sizeof[usize]() as u64) *% (__local_newsize as u64)) as u64)) as *mut *mut c_void)))
 
         if ((if __local_data_1 == null: 1 else: 0) != 0) {
             return 0
@@ -191,7 +191,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     }
 
-    with_memmove(((((&raw const ((*__param_sortedarray).data[((__local_index as c_uint) +% (1 as c_uint))]) as *const *mut c_void) as *mut *mut c_void) as *mut c_void) as *mut u8), ((((&raw const ((*__param_sortedarray).data[__local_index]) as *const *mut c_void) as *mut *mut c_void) as *const c_void) as *const u8), (((((((*__param_sortedarray).length as c_uint) -% (__local_index as c_uint)) as c_ulong) *% (sizeof[usize]() as c_ulong)) as c_ulong) as i64))
+    with_memmove(((((&raw const ((*__param_sortedarray).data[((__local_index as u32) +% (1 as u32))]) as *const *mut c_void) as *mut *mut c_void) as *mut c_void) as *mut u8), ((((&raw const ((*__param_sortedarray).data[__local_index]) as *const *mut c_void) as *mut *mut c_void) as *const c_void) as *const u8), (((((((*__param_sortedarray).length as u32) -% (__local_index as u32)) as u64) *% (sizeof[usize]() as u64)) as u64) as i64))
 
     (((*__param_sortedarray).data[__local_index]) = __local_data)
 
@@ -201,43 +201,43 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
 }
 
-pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> c_int {
-    var __local_left: c_uint
+pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> i32 {
+    var __local_left: u32
 
-    var __local_right: c_uint
+    var __local_right: u32
 
-    var __local_index: c_uint
+    var __local_index: u32
 
 
-    var __local_order: c_int
+    var __local_order: i32
 
     if ((if __param_sortedarray == null: 1 else: 0) != 0) {
         return -1
 
     }
 
-    (__local_left = ((0 as c_uint)))
+    (__local_left = ((0 as u32)))
 
     (__local_right = (*__param_sortedarray).length)
 
-    (__local_index = ((0 as c_uint)))
+    (__local_index = ((0 as u32)))
 
-    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as c_uint)) as c_uint)))
+    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as u32)) as u32)))
 
     while ((if __local_left != __local_right: 1 else: 0) != 0) {
-        (__local_index = ((((((__local_left as c_uint) +% (__local_right as c_uint)) as c_uint) / (2 as c_uint)) as c_uint)))
+        (__local_index = ((((((__local_left as u32) +% (__local_right as u32)) as u32) / (2 as u32)) as u32)))
 
-        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__param_data, ((*__param_sortedarray).data[__local_index])) as c_int)))
+        (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__param_data, ((*__param_sortedarray).data[__local_index])) as i32)))
 
         if ((if __local_order < 0: 1 else: 0) != 0) {
             (__local_right = __local_index)
 
         } else {
             if ((if __local_order > 0: 1 else: 0) != 0) {
-                (__local_left = ((((__local_index as c_uint) +% (1 as c_uint)) as c_uint)))
+                (__local_left = ((((__local_index as u32) +% (1 as u32)) as u32)))
 
             } else {
-                return ((__local_index as c_int))
+                return ((__local_index as i32))
 
             }
         }
@@ -249,7 +249,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 }
 
 pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) {
-    ((*__param_sortedarray).length = ((0 as c_uint)))
+    ((*__param_sortedarray).length = ((0 as u32)))
 
 }
 

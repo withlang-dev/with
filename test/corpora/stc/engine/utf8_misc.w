@@ -1,35 +1,35 @@
 // Migrated from C
 use std.engines.stc_testing.defs
 
-unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: c_long) -> *mut c_void {
-    return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as c_ulong) as i64)) else: (null as *mut c_void)) as *mut c_void))
+unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
+    return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
-unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
+unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
 
-    var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+    var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    var __local_block: c_ulong = ((0 as c_ulong))
+    var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[c_ulong]() as c_long)): 1 else: 0) != 0) {
-        with_memcpy((((&raw mut __local_block as *mut c_ulong) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[c_ulong]() as c_ulong) as i64))
+    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+        with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
-        (__local_h = (__local_h as c_ulong) ^ (__local_block as c_ulong))
+        (__local_h = (__local_h as u64) ^ (__local_block as u64))
 
         (__local_h = (__local_h *% 1099511628211))
 
-        (__local_msg = __local_msg + ((sizeof[c_ulong]() as c_long) as usize))
+        (__local_msg = __local_msg + ((sizeof[u64]() as i64) as usize))
 
-        (__local_len = __local_len - (sizeof[c_ulong]() as c_long))
+        (__local_len = __local_len - (sizeof[u64]() as i64))
 
     }
 
     while true {
-        var __ci_expr_old_0: c_long = __local_len
+        var __ci_expr_old_0: i64 = __local_len
 
         (__local_len = __local_len - 1)
 
@@ -41,7 +41,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulo
 
         (__local_msg = __local_msg + 1)
 
-        (__local_h = (__local_h as c_ulong) ^ ((*__ci_expr_old_1) as c_ulong))
+        (__local_h = (__local_h as u64) ^ ((*__ci_expr_old_1) as u64))
 
         (__local_h = (__local_h *% 1099511628211))
 
@@ -51,22 +51,22 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulo
 
 }
 
-unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
-    var __local_b8: c_ulonglong
+unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
+    var __local_b8: u64
 
-    var __local_b4: c_uint
+    var __local_b4: u32
 
     match __param_len {
         8 => {
-            with_memcpy((((&raw mut __local_b8 as *mut c_ulonglong) as *mut c_void) as *mut u8), (__param_key as *const u8), ((8 as c_ulong) as i64))
+            with_memcpy((((&raw mut __local_b8 as *mut u64) as *mut c_void) as *mut u8), (__param_key as *const u8), ((8 as u64) as i64))
 
-            return ((((__local_b8 as c_ulonglong) *% (((0 as c_ulonglong) -% 4132994306676758115) as c_ulonglong)) as c_ulong))
+            return ((__local_b8 as u64) *% (((0 as u64) -% 4132994306676758115) as u64))
 
         },
         4 => {
-            with_memcpy((((&raw mut __local_b4 as *mut c_uint) as *mut c_void) as *mut u8), (__param_key as *const u8), ((4 as c_ulong) as i64))
+            with_memcpy((((&raw mut __local_b4 as *mut u32) as *mut c_void) as *mut u8), (__param_key as *const u8), ((4 as u64) as i64))
 
-            return ((__local_b4 as c_ulong) *% (((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+            return ((__local_b4 as u64) *% (((0 as u64) -% 3750763034362895579) as u64))
 
         },
         _ => {
@@ -76,17 +76,17 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
-    var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
+    var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
     while ((*__local_msg) != 0) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
 
-        (__local_h = (__local_h as c_ulong) ^ ((*__ci_expr_old_0) as c_ulong))
+        (__local_h = (__local_h as u64) ^ ((*__ci_expr_old_0) as u64))
 
 
         (__local_h = (__local_h *% 1099511628211))
@@ -97,11 +97,11 @@ unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
 
 }
 
-unsafe fn c_hash_mix_n(__param_h: *mut c_ulong, __param_n: c_long) -> c_ulong {
-    var __local_i: c_long = ((1 as c_long))
+unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
+    var __local_i: i64 = ((1 as i64))
 
     while ((if __local_i < __param_n: 1 else: 0) != 0) {
-        ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as c_ulong) ^ ((__param_h[__local_i]) as c_ulong))))
+        ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
 
@@ -112,56 +112,56 @@ unsafe fn c_hash_mix_n(__param_h: *mut c_ulong, __param_n: c_long) -> c_ulong {
 
 }
 
-fn c_next_pow2(__param_n: c_long) -> c_long {
+fn c_next_pow2(__param_n: i64) -> i64 {
     var __local_n = __param_n
     (__local_n = __local_n - 1)
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (1 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (1 as u32)) as i64))
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (2 as c_uint)) as c_long))
-
-
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (4 as c_uint)) as c_long))
-
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (8 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (2 as u32)) as i64))
 
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (16 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (4 as u32)) as i64))
 
-    (__local_n = (__local_n as c_long) | (((__local_n as c_long) >> (32 as c_uint)) as c_long))
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (8 as u32)) as i64))
+
+
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (16 as u32)) as i64))
+
+    (__local_n = (__local_n as i64) | (((__local_n as i64) >> (32 as u32)) as i64))
 
     return (__local_n + 1)
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
 
     loop {
-        var __ci_expr_logic_1: c_int = 0
+        var __ci_expr_logic_1: i32 = 0
 
         if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as c_long)) as c_ulong) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
         (__local_str = __local_str + 1)
 
-        var __ci_expr_old_0: c_long = __local_slen
+        var __ci_expr_old_0: i64 = __local_slen
 
         (__local_slen = __local_slen - 1)
 
@@ -170,31 +170,31 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
-pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: *const i8, __param_end: *const i8) -> c_int {
+pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: *const c_char, __param_end: *const c_char) -> i32 {
     var __local_s = __param_s
     var __local_start__goto_29_17: *const c_char = null
 
-    var __local_len__goto_38_9: c_int = 0
+    var __local_len__goto_38_9: i32 = 0
 
-    var __ci_expr_old_0: *const i8 = null
+    var __ci_expr_old_0: *const c_char = null
 
-    var __ci_expr_switch_1: c_uint = 0
+    var __ci_expr_switch_1: u32 = 0
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_start__goto_29_17 = ((__local_s as *const c_char)))
+        (__local_start__goto_29_17 = __local_s)
         goto '__ci_bb_1
     }
 
     '__ci_bb_1 {
         (__ci_expr_old_0 = __local_s)
         (__local_s = __local_s + 1)
-        (__ci_expr_switch_1 = cutf8_decode(__param_d, (((*__ci_expr_old_0) as u8) as c_uint)))
+        (__ci_expr_switch_1 = cutf8_decode(__param_d, (((*__ci_expr_old_0) as u8) as u32)))
         goto '__ci_bb_4
     }
 
@@ -223,7 +223,7 @@ pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: 
     }
 
     '__ci_bb_6 {
-        return ((((((__local_s as usize) -% (__local_start__goto_29_17 as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_int))
+        return ((((((__local_s as usize) -% (__local_start__goto_29_17 as usize)) as i64) / (sizeof[c_char]() as i64)) as i32))
     }
 
     '__ci_bb_7 {
@@ -231,10 +231,10 @@ pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: 
     }
 
     '__ci_bb_8 {
-        ((*__param_d).state = ((0 as c_uint)))
-        ((*__param_d).codep = ((65533 as c_uint)))
-        (__local_len__goto_38_9 = ((((((__local_s as usize) -% (__local_start__goto_29_17 as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_int)))
-        return (if (if __local_len__goto_38_9 <= 2: 1 else: 0) != 0: (1 as c_int) else: ((__local_len__goto_38_9 - 1) as c_int))
+        ((*__param_d).state = ((0 as u32)))
+        ((*__param_d).codep = ((65533 as u32)))
+        (__local_len__goto_38_9 = ((((((__local_s as usize) -% (__local_start__goto_29_17 as usize)) as i64) / (sizeof[c_char]() as i64)) as i32)))
+        return (if (if __local_len__goto_38_9 <= 2: 1 else: 0) != 0: (1 as i32) else: ((__local_len__goto_38_9 - 1) as i32))
     }
 
     '__ci_bb_9 {
@@ -249,16 +249,16 @@ pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: 
 
 }
 
-pub unsafe fn cutf8_peek(__param_s: *const i8) -> c_uint {
+pub unsafe fn cutf8_peek(__param_s: *const c_char) -> u32 {
     var __local_s = __param_s
     var __local_d: cutf8_decode_t = cutf8_decode_t.zeroed()
 
     loop {
-        var __ci_expr_old_0: *const i8 = __local_s
+        var __ci_expr_old_0: *const c_char = __local_s
 
         (__local_s = __local_s + 1)
 
-        cutf8_decode((&raw mut __local_d as *mut cutf8_decode_t), (((*__ci_expr_old_0) as u8) as c_uint))
+        cutf8_decode((&raw mut __local_d as *mut cutf8_decode_t), (((*__ci_expr_old_0) as u8) as u32))
 
 
         if not (((if (*(&raw const __local_d as *const cutf8_decode_t)).state > 12: 1 else: 0) != 0)) {
@@ -266,18 +266,18 @@ pub unsafe fn cutf8_peek(__param_s: *const i8) -> c_uint {
         }
     }
 
-    return (if (if (*(&raw const __local_d as *const cutf8_decode_t)).state == 0: 1 else: 0) != 0: (*(&raw const __local_d as *const cutf8_decode_t)).codep else: (65533 as c_uint))
+    return (if (if (*(&raw const __local_d as *const cutf8_decode_t)).state == 0: 1 else: 0) != 0: (*(&raw const __local_d as *const cutf8_decode_t)).codep else: (65533 as u32))
 
 }
 
-unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: c_uint) -> c_uint {
+unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32 {
     var __local_cutf8_dtab: []u8
 
-    var __local_type_: c_uint = ((__local_cutf8_dtab[__param_byte] as c_uint))
+    var __local_type_: u32 = ((__local_cutf8_dtab[__param_byte] as u32))
 
-    ((*__param_d).codep = (((if (*__param_d).state != 0: (((((__param_byte as c_uint) & (63 as c_uint)) as c_uint) | ((((*__param_d).codep as c_uint) << (6 as c_uint)) as c_uint)) as c_uint) else: (((((255 as c_uint) >> (__local_type_ as c_uint)) as c_uint) & (__param_byte as c_uint)) as c_uint)) as c_uint)))
+    ((*__param_d).codep = (((if (*__param_d).state != 0: (((((__param_byte as u32) & (63 as u32)) as u32) | ((((*__param_d).codep as u32) << (6 as u32)) as u32)) as u32) else: (((((255 as u32) >> (__local_type_ as u32)) as u32) & (__param_byte as u32)) as u32)) as u32)))
 
-    ((*__param_d).state = ((__local_cutf8_dtab[((((256 as c_uint) +% ((*__param_d).state as c_uint)) as c_uint) +% (__local_type_ as c_uint))] as c_uint)))
+    ((*__param_d).state = ((__local_cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
 
     return (*__param_d).state
 

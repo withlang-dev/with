@@ -33,10 +33,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> i64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -73,16 +73,8 @@ pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
 
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
+// data model: LP64 (arm64-apple-macosx11.0)
+pub const C_DATA_MODEL: str = "LP64 (arm64-apple-macosx11.0)"
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -254,79 +246,79 @@ pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, _
     u128_mul_would_overflow(__with_a, __with_b)
 }
 
-pub type isize_t = c_long
+pub type isize_t = i64
 
-pub type isize_ = c_long
+pub type isize_ = i64
 
-pub type _istride = c_int
+pub type _istride = i32
 
-pub type _ituple3 = [c_int; 3]
+pub type _ituple3 = [i32; 3]
 
 @[repr(C)]
-pub type cspan_tuple1 { pub d: [c_int; 1] = [0 as c_int; 1] }
+pub type cspan_tuple1 { pub d: [i32; 1] = [0 as i32; 1] }
 impl Copy for cspan_tuple1
 
 @[repr(C)]
-pub type cspan_tuple2 { pub d: [c_int; 2] = [0 as c_int; 2] }
+pub type cspan_tuple2 { pub d: [i32; 2] = [0 as i32; 2] }
 impl Copy for cspan_tuple2
 
 @[repr(C)]
-pub type cspan_tuple3 { pub d: [c_int; 3] = [0 as c_int; 3] }
+pub type cspan_tuple3 { pub d: [i32; 3] = [0 as i32; 3] }
 impl Copy for cspan_tuple3
 
 @[repr(C)]
-pub type cspan_tuple4 { pub d: [c_int; 4] = [0 as c_int; 4] }
+pub type cspan_tuple4 { pub d: [i32; 4] = [0 as i32; 4] }
 impl Copy for cspan_tuple4
 
 @[repr(C)]
-pub type cspan_tuple5 { pub d: [c_int; 5] = [0 as c_int; 5] }
+pub type cspan_tuple5 { pub d: [i32; 5] = [0 as i32; 5] }
 impl Copy for cspan_tuple5
 
 @[repr(C)]
-pub type cspan_tuple6 { pub d: [c_int; 6] = [0 as c_int; 6] }
+pub type cspan_tuple6 { pub d: [i32; 6] = [0 as i32; 6] }
 impl Copy for cspan_tuple6
 
 @[repr(C)]
-pub type cspan_tuple7 { pub d: [c_int; 7] = [0 as c_int; 7] }
+pub type cspan_tuple7 { pub d: [i32; 7] = [0 as i32; 7] }
 impl Copy for cspan_tuple7
 
 @[repr(C)]
-pub type cspan_tuple8 { pub d: [c_int; 8] = [0 as c_int; 8] }
+pub type cspan_tuple8 { pub d: [i32; 8] = [0 as i32; 8] }
 impl Copy for cspan_tuple8
 
-pub type cspan_layout = c_uint
+pub type cspan_layout = i32
 
-pub let c_ROWMAJOR: c_int = 0
-pub let c_COLMAJOR: c_int = 1
-pub let c_STRIDED: c_int = 2
-pub let ISIZE_MIN: c_long = (0 - 9223372036854775807 - 1)
-pub let ISIZE_MAX: c_long = 9223372036854775807
+pub let c_ROWMAJOR: i32 = 0
+pub let c_COLMAJOR: i32 = 1
+pub let c_STRIDED: i32 = 2
+pub let ISIZE_MIN: i64 = (0 - 9223372036854775807 - 1)
+pub let ISIZE_MAX: i64 = 9223372036854775807
 pub let c_ZI: [c_char; 3] = [108, 105, 0]
 pub let c_ZU: [c_char; 3] = [108, 117, 0]
-pub let c_NPOS: c_long = 9223372036854775807
+pub let c_NPOS: i64 = 9223372036854775807
 pub fn c_literal[T](p_T: T) -> T {
     p_T
 }
-pub fn c_countof[T](a: T) -> c_long {
-    (sizeof[T]() as c_long)
+pub fn c_countof[T](a: T) -> i64 {
+    (sizeof[T]() as i64)
 }
-pub fn c_strlen[T](s: T) -> c_long {
-    (strlen(s) as c_long)
+pub fn c_strlen[T](s: T) -> i64 {
+    (strlen(s) as i64)
 }
-pub fn c_u2i_cast[T](u: T) -> c_long {
-    ((if 1 != 0: u else: (1 as usize)) as c_long)
+pub fn c_u2i_cast[T](u: T) -> i64 {
+    ((if 1 != 0: u else: (1 as usize)) as i64)
 }
 pub fn c_i2u_cast[T](i: T) -> usize {
     ((if 1 != 0: i else: -1) as usize)
 }
-pub fn c_uless[T](a: T, b: T) -> c_int {
-    (((a as usize) < (b as usize)) as c_int)
+pub fn c_uless[T](a: T, b: T) -> i32 {
+    (((a as usize) < (b as usize)) as i32)
 }
-pub fn c_default_eq[T](x: T, y: T) -> c_int {
-    (((unsafe *x) == (unsafe *y)) as c_int)
+pub fn c_default_eq[T](x: T, y: T) -> i32 {
+    (((unsafe *x) == (unsafe *y)) as i32)
 }
-pub fn c_default_less[T](x: T, y: T) -> c_int {
-    (((unsafe *x) < (unsafe *y)) as c_int)
+pub fn c_default_less[T](x: T, y: T) -> i32 {
+    (((unsafe *x) < (unsafe *y)) as i32)
 }
 pub fn c_default_cmp[T](x: T, y: T) -> T {
     (c_default_less(y, x) - c_default_less(x, y))
@@ -340,53 +332,53 @@ pub fn c_default_toraw[T](vp: T) -> T {
 pub fn c_default_drop[T](vp: T) -> T {
     vp
 }
-pub fn c_arraylen[T](a: T) -> c_long {
+pub fn c_arraylen[T](a: T) -> i64 {
     c_countof(a)
 }
-pub let FNV_BASIS: c_ulonglong = 0xcbf29ce484222325
-pub let FNV_PRIME: c_longlong = 0x00000100000001b3
-pub let c_END: c_int = 2147483647
+pub let FNV_BASIS: u64 = 0xcbf29ce484222325
+pub let FNV_PRIME: i64 = 0x00000100000001b3
+pub let c_END: i32 = 2147483647
 @[repr(C)]
-pub type cutf8_decode_t { pub state: c_uint = 0, pub codep: c_uint = 0 }
+pub type cutf8_decode_t { pub state: u32 = 0, pub codep: u32 = 0 }
 impl Copy for cutf8_decode_t
 
 pub type csview_value = c_char
 
 @[repr(C)]
-pub type csview { pub buf: *mut i8 = null, pub size: c_long = 0 }
+pub type csview { pub buf: *mut c_char = null, pub size: i64 = 0 }
 impl Copy for csview
 
 @[repr(C)]
-pub type csview_iter_u8 { chr: csview, end: *mut i8 = null, dec: cutf8_decode_t }
+pub type csview_iter_u8 { chr: csview, end: *mut c_char = null, dec: cutf8_decode_t }
 impl Copy for csview_iter_u8
 @[repr(C)]
-pub type csview_iter = union { pub u8: csview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type csview_iter = union { pub u8: csview_iter_u8, pub chr: csview, pub ref: *mut c_char = null }
 impl Copy for csview_iter
 
 pub type zsview_value = c_char
 
 @[repr(C)]
-pub type zsview { pub str: *mut i8 = null, pub size: c_long = 0 }
+pub type zsview { pub str: *mut c_char = null, pub size: i64 = 0 }
 impl Copy for zsview
 
 @[repr(C)]
 pub type zsview_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for zsview_iter_u8
 @[repr(C)]
-pub type zsview_iter = union { pub u8: zsview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type zsview_iter = union { pub u8: zsview_iter_u8, pub chr: csview, pub ref: *mut c_char = null }
 impl Copy for zsview_iter
 
 pub type cstr_value = c_char
 
 @[repr(C)]
-pub type cstr_buf { pub data: *mut i8 = null, pub size: c_long = 0, pub cap: c_long = 0 }
+pub type cstr_buf { pub data: *mut c_char = null, pub size: i64 = 0, pub cap: i64 = 0 }
 impl Copy for cstr_buf
 
 @[repr(C)]
 pub type cstr_sml { data: [c_char; 23] = [0 as c_char; 23], size: u8 = 0 }
 impl Copy for cstr_sml
 @[repr(C)]
-pub type cstr_lon { data: *mut i8 = null, size: c_ulong = 0, ncap: c_ulong = 0 }
+pub type cstr_lon { data: *mut c_char = null, size: u64 = 0, ncap: u64 = 0 }
 impl Copy for cstr_lon
 @[repr(C)]
 pub type cstr = union { pub sml: cstr_sml, pub lon: cstr_lon }
@@ -396,69 +388,69 @@ impl Copy for cstr
 pub type cstr_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for cstr_iter_u8
 @[repr(C)]
-pub type cstr_iter = union { pub u8: cstr_iter_u8, pub chr: csview, pub ref: *const i8 = null }
+pub type cstr_iter = union { pub u8: cstr_iter_u8, pub chr: csview, pub ref: *const c_char = null }
 impl Copy for cstr_iter
 
-pub type cstr_raw = *const i8
+pub type cstr_raw = *const c_char
 
-pub let cutf8_ACCEPT: c_int = 0
-pub let cutf8_REJECT: c_int = 12
-pub type cutf8_group = c_uint
+pub let cutf8_ACCEPT: i32 = 0
+pub let cutf8_REJECT: i32 = 12
+pub type cutf8_group = i32
 
-pub let U8G_Cc: c_int = 0
-pub let U8G_L: c_int = 1
-pub let U8G_Lm: c_int = 2
-pub let U8G_Lt: c_int = 3
-pub let U8G_Nd: c_int = 4
-pub let U8G_Nl: c_int = 5
-pub let U8G_No: c_int = 6
-pub let U8G_P: c_int = 7
-pub let U8G_Pc: c_int = 8
-pub let U8G_Pd: c_int = 9
-pub let U8G_Pe: c_int = 10
-pub let U8G_Pf: c_int = 11
-pub let U8G_Pi: c_int = 12
-pub let U8G_Ps: c_int = 13
-pub let U8G_Sc: c_int = 14
-pub let U8G_Sk: c_int = 15
-pub let U8G_Sm: c_int = 16
-pub let U8G_Zl: c_int = 17
-pub let U8G_Zp: c_int = 18
-pub let U8G_Zs: c_int = 19
-pub let U8G_Arabic: c_int = 20
-pub let U8G_Bengali: c_int = 21
-pub let U8G_Cyrillic: c_int = 22
-pub let U8G_Devanagari: c_int = 23
-pub let U8G_Georgian: c_int = 24
-pub let U8G_Greek: c_int = 25
-pub let U8G_Han: c_int = 26
-pub let U8G_Hiragana: c_int = 27
-pub let U8G_Katakana: c_int = 28
-pub let U8G_Latin: c_int = 29
-pub let U8G_Thai: c_int = 30
-pub let U8G_SIZE: c_int = 31
-pub let cstr_s_cap: c_int = 22
+pub let U8G_Cc: i32 = 0
+pub let U8G_L: i32 = 1
+pub let U8G_Lm: i32 = 2
+pub let U8G_Lt: i32 = 3
+pub let U8G_Nd: i32 = 4
+pub let U8G_Nl: i32 = 5
+pub let U8G_No: i32 = 6
+pub let U8G_P: i32 = 7
+pub let U8G_Pc: i32 = 8
+pub let U8G_Pd: i32 = 9
+pub let U8G_Pe: i32 = 10
+pub let U8G_Pf: i32 = 11
+pub let U8G_Pi: i32 = 12
+pub let U8G_Ps: i32 = 13
+pub let U8G_Sc: i32 = 14
+pub let U8G_Sk: i32 = 15
+pub let U8G_Sm: i32 = 16
+pub let U8G_Zl: i32 = 17
+pub let U8G_Zp: i32 = 18
+pub let U8G_Zs: i32 = 19
+pub let U8G_Arabic: i32 = 20
+pub let U8G_Bengali: i32 = 21
+pub let U8G_Cyrillic: i32 = 22
+pub let U8G_Devanagari: i32 = 23
+pub let U8G_Georgian: i32 = 24
+pub let U8G_Greek: i32 = 25
+pub let U8G_Han: i32 = 26
+pub let U8G_Hiragana: i32 = 27
+pub let U8G_Katakana: i32 = 28
+pub let U8G_Latin: i32 = 29
+pub let U8G_Thai: i32 = 30
+pub let U8G_SIZE: i32 = 31
+pub let cstr_s_cap: i32 = 22
 pub let c_svfmt = "%.*s"
-pub fn cstr_raw_cmp[T](x: T, y: T) -> c_int {
+pub fn cstr_raw_cmp[T](x: T, y: T) -> i32 {
     strcmp((unsafe *x), (unsafe *y))
 }
-pub fn cstr_raw_eq[T](x: T, y: T) -> c_int {
-    ((cstr_raw_cmp(x, y) == 0) as c_int)
+pub fn cstr_raw_eq[T](x: T, y: T) -> i32 {
+    ((cstr_raw_cmp(x, y) == 0) as i32)
 }
 pub fn cstr_raw_hash[T](vp: T) -> T {
     unsafe { c_hash_str((unsafe *vp)) }
 }
 @[repr(C)]
-pub type CaseMapping { pub c1: c_ushort = 0, pub c2: c_ushort = 0, pub m2: c_ushort = 0 }
+pub type CaseMapping { pub c1: u16 = 0, pub c2: u16 = 0, pub m2: u16 = 0 }
 impl Copy for CaseMapping
 
-pub let casefold_len: c_int = 192
+pub let casefold_len: i32 = 192
 @[repr(C)]
-pub type fn_tocase_anon { pub conv_asc: Option[extern "C" fn(c_int) -> c_int] = null, pub conv_utf: Option[extern "C" fn(c_uint) -> c_uint] = null }
+pub type fn_tocase_anon { pub conv_asc: Option[extern "C" fn(i32) -> i32] = null, pub conv_utf: Option[extern "C" fn(u32) -> u32] = null }
 impl Copy for fn_tocase_anon
 
 @[repr(C)]
-pub type stc_slot_head { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub hash: Option[unsafe extern "C" fn(*const c_void) -> c_ulong] = null }
+pub type stc_slot_head { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32] = null, pub hash: Option[unsafe extern "C" fn(*const c_void) -> u64] = null }
 impl Copy for stc_slot_head
 
 pub type stc_slot = *mut stc_slot_head
@@ -467,10 +459,10 @@ pub type stc_slot = *mut stc_slot_head
 pub type hmap_meta { pub __bits_0: u16 = 0 }
 impl Copy for hmap_meta
 impl hmap_meta:
-    pub fn hashx() -> c_ushort: ((self.__bits_0 >> 0) & 63) as c_ushort
-    pub mut fn set_hashx(v: c_ushort): self.__bits_0 = (self.__bits_0 & ~((63 as u16) << 0)) | (((v as u16) & 63) << 0)
-    pub fn dist() -> c_ushort: ((self.__bits_0 >> 6) & 1023) as c_ushort
-    pub mut fn set_dist(v: c_ushort): self.__bits_0 = (self.__bits_0 & ~((1023 as u16) << 6)) | (((v as u16) & 1023) << 6)
+    pub fn hashx() -> u16: ((self.__bits_0 >> 0) & 63) as u16
+    pub mut fn set_hashx(v: u16): self.__bits_0 = (self.__bits_0 & ~((63 as u16) << 0)) | (((v as u16) & 63) << 0)
+    pub fn dist() -> u16: ((self.__bits_0 >> 6) & 1023) as u16
+    pub mut fn set_dist(v: u16): self.__bits_0 = (self.__bits_0 & ~((1023 as u16) << 6)) | (((v as u16) & 1023) << 6)
 comptime fn __ci_layout_hmap_meta() -> Unit:
     if sizeof[*const u8]() == 8 and (sizeof[hmap_meta]() != 2 or offsetof[hmap_meta](__bits_0) != 0): comptime_error("hmap_meta: the bitfield layout this migration recorded (D147) differs on this target")
 const __ci_layout_hmap_meta_check: Unit = __ci_layout_hmap_meta()
@@ -484,7 +476,7 @@ pub type stc_slot_set_value = *mut stc_slot_head
 pub type stc_slot_set_entry = *mut stc_slot_head
 
 @[repr(C)]
-pub type stc_slot_set_result { pub ref: *mut *mut stc_slot_head = null, pub idx: c_ulong = 0, pub inserted: bool = false, pub hashx: u8 = 0, pub dist: c_ushort = 0 }
+pub type stc_slot_set_result { pub ref: *mut *mut stc_slot_head = null, pub idx: u64 = 0, pub inserted: bool = false, pub hashx: u8 = 0, pub dist: u16 = 0 }
 impl Copy for stc_slot_set_result
 
 @[repr(C)]
@@ -492,7 +484,7 @@ pub type stc_slot_set_iter { pub ref: *mut *mut stc_slot_head = null, pub _end: 
 impl Copy for stc_slot_set_iter
 
 @[repr(C)]
-pub type stc_slot_set { pub table: *mut *mut stc_slot_head = null, pub meta: *mut hmap_meta = null, pub size: c_long = 0, pub bucket_count: c_long = 0 }
+pub type stc_slot_set { pub table: *mut *mut stc_slot_head = null, pub meta: *mut hmap_meta = null, pub size: i64 = 0, pub bucket_count: i64 = 0 }
 impl Copy for stc_slot_set
 
 pub type stc_slot_set_keyraw = *mut stc_slot_head
@@ -514,15 +506,15 @@ pub type stc_slot_sset_result { pub ref: *mut *mut stc_slot_head = null, pub ins
 impl Copy for stc_slot_sset_result
 
 @[repr(C)]
-pub type stc_slot_sset_iter { pub ref: *mut *mut stc_slot_head = null, pub _d: *mut stc_slot_sset_node = null, pub _top: c_int = 0, pub _tn: c_int = 0, pub _st: [c_int; 36] = [0 as c_int; 36] }
+pub type stc_slot_sset_iter { pub ref: *mut *mut stc_slot_head = null, pub _d: *mut stc_slot_sset_node = null, pub _top: i32 = 0, pub _tn: i32 = 0, pub _st: [i32; 36] = [0 as i32; 36] }
 impl Copy for stc_slot_sset_iter
 
 @[repr(C)]
-pub type stc_slot_sset { pub nodes: *mut stc_slot_sset_node = null, pub root: c_int = 0, pub disp: c_int = 0, pub head: c_int = 0, pub size: c_int = 0, pub capacity: c_int = 0 }
+pub type stc_slot_sset { pub nodes: *mut stc_slot_sset_node = null, pub root: i32 = 0, pub disp: i32 = 0, pub head: i32 = 0, pub size: i32 = 0, pub capacity: i32 = 0 }
 impl Copy for stc_slot_sset
 
 @[repr(C)]
-pub type stc_slot_sset_node { pub link: [c_int; 2] = [0 as c_int; 2], pub level: c_char = 0, pub value: *mut stc_slot_head = null }
+pub type stc_slot_sset_node { pub link: [i32; 2] = [0 as i32; 2], pub level: i8 = 0, pub value: *mut stc_slot_head = null }
 impl Copy for stc_slot_sset_node
 
 pub type stc_slot_sset_keyraw = *mut stc_slot_head
@@ -538,7 +530,7 @@ pub type stc_slot_pqueue_iter { pub ref: *mut *mut stc_slot_head = null, pub end
 impl Copy for stc_slot_pqueue_iter
 
 @[repr(C)]
-pub type stc_slot_pqueue { pub data: *mut *mut stc_slot_head = null, pub size: c_long = 0, pub capacity: c_long = 0 }
+pub type stc_slot_pqueue { pub data: *mut *mut stc_slot_head = null, pub size: i64 = 0, pub capacity: i64 = 0 }
 impl Copy for stc_slot_pqueue
 
 pub type stc_slot_pqueue_raw = *mut stc_slot_head
@@ -546,29 +538,29 @@ pub type stc_slot_pqueue_raw = *mut stc_slot_head
 pub type stc_slot_deque_value = *mut stc_slot_head
 
 @[repr(C)]
-pub type stc_slot_deque { pub cbuf: *mut *mut stc_slot_head = null, pub start: c_long = 0, pub end: c_long = 0, pub capmask: c_long = 0 }
+pub type stc_slot_deque { pub cbuf: *mut *mut stc_slot_head = null, pub start: i64 = 0, pub end: i64 = 0, pub capmask: i64 = 0 }
 impl Copy for stc_slot_deque
 
 @[repr(C)]
-pub type stc_slot_deque_iter { pub ref: *mut *mut stc_slot_head = null, pub pos: c_long = 0, pub _s: *const stc_slot_deque = null }
+pub type stc_slot_deque_iter { pub ref: *mut *mut stc_slot_head = null, pub pos: i64 = 0, pub _s: *const stc_slot_deque = null }
 impl Copy for stc_slot_deque_iter
 
 pub type stc_slot_deque_raw = *mut stc_slot_head
 
-pub type stc_word_deque_value = c_ulonglong
+pub type stc_word_deque_value = u64
 
 @[repr(C)]
-pub type stc_word_deque { pub cbuf: *mut c_ulonglong = null, pub start: c_long = 0, pub end: c_long = 0, pub capmask: c_long = 0 }
+pub type stc_word_deque { pub cbuf: *mut u64 = null, pub start: i64 = 0, pub end: i64 = 0, pub capmask: i64 = 0 }
 impl Copy for stc_word_deque
 
 @[repr(C)]
-pub type stc_word_deque_iter { pub ref: *mut c_ulonglong = null, pub pos: c_long = 0, pub _s: *const stc_word_deque = null }
+pub type stc_word_deque_iter { pub ref: *mut u64 = null, pub pos: i64 = 0, pub _s: *const stc_word_deque = null }
 impl Copy for stc_word_deque_iter
 
-pub type stc_word_deque_raw = c_ulonglong
+pub type stc_word_deque_raw = u64
 
 @[repr(C)]
-pub type stc_slotref { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub ptr: *const c_void = null, pub with_cmp: *const c_void = null, pub with_env: *const c_void = null }
+pub type stc_slotref { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32] = null, pub ptr: *const c_void = null, pub with_cmp: *const c_void = null, pub with_env: *const c_void = null }
 impl Copy for stc_slotref
 
 pub type stc_slotrefs = stc_slotref
@@ -577,17 +569,17 @@ pub type stc_slotrefs_value = stc_slotref
 
 pub type stc_slotrefs_raw = stc_slotref
 
-pub type stc_i64s = c_longlong
+pub type stc_i64s = i64
 
-pub type stc_i64s_value = c_longlong
+pub type stc_i64s_value = i64
 
-pub type stc_i64s_raw = c_longlong
+pub type stc_i64s_raw = i64
 
-pub type stc_u64s = c_ulonglong
+pub type stc_u64s = u64
 
-pub type stc_u64s_value = c_ulonglong
+pub type stc_u64s_value = u64
 
-pub type stc_u64s_raw = c_ulonglong
+pub type stc_u64s_raw = u64
 
 pub type stc_f64s = f64
 
@@ -596,27 +588,27 @@ pub type stc_f64s_value = f64
 pub type stc_f64s_raw = f64
 
 @[repr(C)]
-pub type cbits { pub buffer: *mut c_ulong = null, pub _size: c_long = 0 }
+pub type cbits { pub buffer: *mut u64 = null, pub _size: i64 = 0 }
 impl Copy for cbits
 
-pub fn i_keydrop[T](p: T) -> c_int {
+pub fn i_keydrop[T](p: T) -> i32 {
     0
 }
-pub let c_declared: c_int = 1
-pub let c_no_atomic: c_int = 2
-pub let c_use_arc2: c_int = 4
-pub let c_use_rc2: c_int = 4
-pub let c_no_clone: c_int = 8
-pub let c_use_eq: c_int = 16
-pub let c_use_cmp: c_int = 32
-pub let c_use_compare: c_int = 48
-pub let c_compare_key: c_int = 64
-pub let c_class_key: c_int = 128
-pub let c_class_val: c_int = 256
-pub let c_pro_key: c_int = 512
-pub let c_pro_val: c_int = 1024
-pub fn i_less[T](x: T, y: T) -> c_int {
-    (((unsafe *x) < (unsafe *y)) as c_int)
+pub let c_declared: i32 = 1
+pub let c_no_atomic: i32 = 2
+pub let c_use_arc2: i32 = 4
+pub let c_use_rc2: i32 = 4
+pub let c_no_clone: i32 = 8
+pub let c_use_eq: i32 = 16
+pub let c_use_cmp: i32 = 32
+pub let c_use_compare: i32 = 48
+pub let c_compare_key: i32 = 64
+pub let c_class_key: i32 = 128
+pub let c_class_val: i32 = 256
+pub let c_pro_key: i32 = 512
+pub let c_pro_val: i32 = 1024
+pub fn i_less[T](x: T, y: T) -> i32 {
+    (((unsafe *x) < (unsafe *y)) as i32)
 }
 pub fn i_cmp[T](x: T, y: T) -> T {
     (i_less(y, x) - i_less(x, y))
@@ -631,12 +623,12 @@ pub fn i_keyclone[T](v: T) -> T {
     v
 }
 pub let i_max_load_factor: f32 = 0.80
-pub fn i_eq[T](x: T, y: T) -> c_int {
-    (((unsafe *x) == (unsafe *y)) as c_int)
+pub fn i_eq[T](x: T, y: T) -> i32 {
+    (((unsafe *x) == (unsafe *y)) as i32)
 }
 pub type Self = cbits
 @[repr(C)]
-pub type fmt_stream { pub data: *mut i8 = null, pub cap: c_long = 0, pub len: c_long = 0, pub overwrite: bool = false }
+pub type fmt_stream { pub data: *mut c_char = null, pub cap: i64 = 0, pub len: i64 = 0, pub overwrite: bool = false }
 impl Copy for fmt_stream
 
 pub let fmt_sv = "{:.*s}"
@@ -653,13 +645,13 @@ pub type ctest_run_func_union = union { pub nullary: Option[extern "C" fn() -> U
 impl Copy for ctest_run_func_union
 
 @[repr(C)]
-pub type ctest { pub magic0: c_uint = 0, pub padding: c_uint = 0, pub ssname: *const i8 = null, pub ttname: *const i8 = null, pub run: ctest_run_func_union, pub data: *mut c_void = null, pub setup: *mut Option[extern "C" fn(*mut c_void) -> Unit] = null, pub teardown: *mut Option[extern "C" fn(*mut c_void) -> Unit] = null, pub skip: c_int = 0, pub magic1: c_uint = 0 }
+pub type ctest { pub magic0: u32 = 0, pub padding: u32 = 0, pub ssname: *const c_char = null, pub ttname: *const c_char = null, pub run: ctest_run_func_union, pub data: *mut c_void = null, pub setup: *mut Option[extern "C" fn(*mut c_void) -> Unit] = null, pub teardown: *mut Option[extern "C" fn(*mut c_void) -> Unit] = null, pub skip: i32 = 0, pub magic1: u32 = 0 }
 impl Copy for ctest
 
-pub type IList_value = c_int
+pub type IList_value = i32
 
 @[repr(C)]
-pub type IList_iter { pub ref: *mut c_int = null, pub _last: *const *mut IList_node = null, pub prev: *mut IList_node = null }
+pub type IList_iter { pub ref: *mut i32 = null, pub _last: *const *mut IList_node = null, pub prev: *mut IList_node = null }
 impl Copy for IList_iter
 
 @[repr(C)]
@@ -667,74 +659,74 @@ pub type IList { pub last: *mut IList_node = null }
 impl Copy for IList
 
 @[repr(C)]
-pub type IList_node { pub value: c_int = 0, pub next: *mut IList_node = null }
+pub type IList_node { pub value: i32 = 0, pub next: *mut IList_node = null }
 impl Copy for IList_node
 
-pub type IList_raw = c_int
+pub type IList_raw = i32
 
 pub let CTEST_FLT_EPSILON: f64 = 1e-5
 pub let CTEST_DBL_EPSILON: f64 = 1e-12
 @[repr(C)]
-pub type crand64 { pub data: [c_ulonglong; 4] = [0 as c_ulonglong; 4] }
+pub type crand64 { pub data: [u64; 4] = [0 as u64; 4] }
 impl Copy for crand64
 
 @[repr(C)]
-pub type crand64_normal_dist { pub mean: f64 = 0.0, pub stddev: f64 = 0.0, pub _next: f64 = 0.0, pub _has_next: c_int = 0 }
+pub type crand64_normal_dist { pub mean: f64 = 0.0, pub stddev: f64 = 0.0, pub _next: f64 = 0.0, pub _has_next: i32 = 0 }
 impl Copy for crand64_normal_dist
 
 @[repr(C)]
-pub type crand64_uniform_dist { pub low: c_longlong = 0, pub range: c_ulonglong = 0, pub threshold: c_ulonglong = 0 }
+pub type crand64_uniform_dist { pub low: i64 = 0, pub range: u64 = 0, pub threshold: u64 = 0 }
 impl Copy for crand64_uniform_dist
 
 @[repr(C)]
-pub type crand32 { pub data: [c_uint; 4] = [0 as c_uint; 4] }
+pub type crand32 { pub data: [u32; 4] = [0 as u32; 4] }
 impl Copy for crand32
 
 @[repr(C)]
-pub type crand32_uniform_dist { pub low: c_int = 0, pub range: c_uint = 0, pub threshold: c_uint = 0 }
+pub type crand32_uniform_dist { pub low: i32 = 0, pub range: u32 = 0, pub threshold: u32 = 0 }
 impl Copy for crand32_uniform_dist
 
 pub type crandWS = crand64
-pub type cco_position = c_int
+pub type cco_position = i32
 
-pub let cco_POS_INIT: c_int = 0
-pub let cco_POS_DONE: c_int = -1
-pub let cco_POS_FINAL: c_int = -2
-pub type cco_status_bits = c_uint
+pub let cco_POS_INIT: i32 = 0
+pub let cco_POS_DONE: i32 = -1
+pub let cco_POS_FINAL: i32 = -2
+pub type cco_status_bits = i32
 
-pub let cco_DONE: c_int = 0
-pub let cco_AWAIT: c_int = 1073741824
-pub let cco_SUSPEND: c_int = 536870912
-pub let cco_YIELD: c_int = 268435456
-pub let cco_RECEIVE: c_int = 134217728
+pub let cco_DONE: i32 = 0
+pub let cco_AWAIT: i32 = 1073741824
+pub let cco_SUSPEND: i32 = 536870912
+pub let cco_YIELD: i32 = 268435456
+pub let cco_RECEIVE: i32 = 134217728
 @[repr(C)]
-pub type cco_group { pub await_count: c_int = 0, pub __bits_0: u32 = 0 }
+pub type cco_group { pub await_count: i32 = 0, pub __bits_0: u32 = 0 }
 impl Copy for cco_group
 impl cco_group:
-    pub fn spawn_count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int
-    pub mut fn set_spawn_count(v: c_int): self.__bits_0 = (self.__bits_0 & ~((16777215 as u32) << 0)) | (((v as u32) & 16777215) << 0)
-    pub fn on_error() -> c_uint: ((self.__bits_0 >> 24) & 127) as c_uint
-    pub mut fn set_on_error(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((127 as u32) << 24)) | (((v as u32) & 127) << 24)
-    pub fn cancelled() -> c_uint: ((self.__bits_0 >> 31) & 1) as c_uint
-    pub mut fn set_cancelled(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 31)) | (((v as u32) & 1) << 31)
+    pub fn spawn_count() -> i32: (((self.__bits_0 << 8) as i32) >> 8) as i32
+    pub mut fn set_spawn_count(v: i32): self.__bits_0 = (self.__bits_0 & ~((16777215 as u32) << 0)) | (((v as u32) & 16777215) << 0)
+    pub fn on_error() -> u32: ((self.__bits_0 >> 24) & 127) as u32
+    pub mut fn set_on_error(v: u32): self.__bits_0 = (self.__bits_0 & ~((127 as u32) << 24)) | (((v as u32) & 127) << 24)
+    pub fn cancelled() -> u32: ((self.__bits_0 >> 31) & 1) as u32
+    pub mut fn set_cancelled(v: u32): self.__bits_0 = (self.__bits_0 & ~((1 as u32) << 31)) | (((v as u32) & 1) << 31)
 comptime fn __ci_layout_cco_group() -> Unit:
     if sizeof[*const u8]() == 8 and (sizeof[cco_group]() != 8 or offsetof[cco_group](__bits_0) != 4): comptime_error("cco_group: the bitfield layout this migration recorded (D147) differs on this target")
 const __ci_layout_cco_group_check: Unit = __ci_layout_cco_group()
 
 @[repr(C)]
-pub type cco_info = union { pub num: c_long = 0, pub str: *const i8 = null, pub ptr: *mut c_void = null }
+pub type cco_info = union { pub num: i64 = 0, pub str: *const c_char = null, pub ptr: *mut c_void = null }
 impl Copy for cco_info
 
 @[repr(C)]
-pub type cco_err_t { pub code: c_int = 0, pub line: c_int = 0, pub file: *const i8 = null, pub info: cco_info }
+pub type cco_err_t { pub code: i32 = 0, pub line: i32 = 0, pub file: *const c_char = null, pub info: cco_info }
 impl Copy for cco_err_t
 
 @[repr(C)]
-pub type cco_task_state { pub fib: *mut cco_task_fiber = null, pub parent_grp: *mut cco_group = null, pub tmp_grp: *mut cco_group = null, pub pos: c_int = 0, pub finalizing: bool = false, pub scope_idx: c_char = 0, pub curr_scope: c_char = 0, pub __bits_0: u8 = 0, pub group: [cco_group; 1] }
+pub type cco_task_state { pub fib: *mut cco_task_fiber = null, pub parent_grp: *mut cco_group = null, pub tmp_grp: *mut cco_group = null, pub pos: i32 = 0, pub finalizing: bool = false, pub scope_idx: i8 = 0, pub curr_scope: i8 = 0, pub __bits_0: u8 = 0, pub group: [cco_group; 1] }
 impl Copy for cco_task_state
 impl cco_task_state:
-    pub fn n_scopes() -> c_char: (((self.__bits_0 << 1) as i8) >> 1) as c_char
-    pub mut fn set_n_scopes(v: c_char): self.__bits_0 = (self.__bits_0 & ~((127 as u8) << 0)) | (((v as u8) & 127) << 0)
+    pub fn n_scopes() -> i8: (((self.__bits_0 << 1) as i8) >> 1) as i8
+    pub mut fn set_n_scopes(v: i8): self.__bits_0 = (self.__bits_0 & ~((127 as u8) << 0)) | (((v as u8) & 127) << 0)
     pub fn scoped() -> u8: ((self.__bits_0 >> 7) & 1) as u8
     pub mut fn set_scoped(v: u8): self.__bits_0 = (self.__bits_0 & ~((1 as u8) << 7)) | (((v as u8) & 1) << 7)
 comptime fn __ci_layout_cco_task_state() -> Unit:
@@ -747,16 +739,16 @@ pub type cco_base_state = cco_task_state
 pub type cco_base { pub state: cco_task_state }
 impl Copy for cco_base
 
-pub type cco_task_data_ptr_check = [c_int; 4]
+pub type cco_task_data_ptr_check = [i32; 4]
 
 pub type cco_task_data_ptr = *mut c_void
 
 @[repr(C)]
-pub type cco_task_fiber { pub task: *mut cco_task = null, pub data: *mut c_void = null, pub failed_grp: *mut cco_group = null, pub cur_awaiter: *mut cco_task = null, pub next: *mut cco_task_fiber = null, pub parent: *mut cco_task_fiber = null, pub recover_state: cco_task_state, pub error_: cco_err_t, pub cur_awaitbits: c_int = 0, pub status: c_int = 0 }
+pub type cco_task_fiber { pub task: *mut cco_task = null, pub data: *mut c_void = null, pub failed_grp: *mut cco_group = null, pub cur_awaiter: *mut cco_task = null, pub next: *mut cco_task_fiber = null, pub parent: *mut cco_task_fiber = null, pub recover_state: cco_task_state, pub error_: cco_err_t, pub cur_awaitbits: i32 = 0, pub status: i32 = 0 }
 impl Copy for cco_task_fiber
 
 @[repr(C)]
-pub type cco_task_base { pub func: Option[unsafe extern "C" fn(*mut cco_task) -> c_int] = null, pub awaiter: *mut cco_task = null, pub awaitbits: c_int = 0, pub state: cco_task_state }
+pub type cco_task_base { pub func: Option[unsafe extern "C" fn(*mut cco_task) -> i32] = null, pub awaiter: *mut cco_task = null, pub awaitbits: i32 = 0, pub state: cco_task_state }
 impl Copy for cco_task_base
 
 @[repr(C)]
@@ -765,33 +757,33 @@ impl Copy for cco_task
 
 pub type cco_fiber = cco_task_fiber
 
-pub type cco_err_policy = c_uint
+pub type cco_err_policy = i32
 
-pub let cco_POLICY_SHUTDOWN: c_int = 0
-pub let cco_POLICY_NOTIFY: c_int = 1
-pub let cco_POLICY_IGNORE: c_int = 2
+pub let cco_POLICY_SHUTDOWN: i32 = 0
+pub let cco_POLICY_NOTIFY: i32 = 1
+pub let cco_POLICY_IGNORE: i32 = 2
 @[repr(C)]
-pub type cco_semaphore { pub acq_count: c_long = 0 }
+pub type cco_semaphore { pub acq_count: i64 = 0 }
 impl Copy for cco_semaphore
 
 @[repr(C)]
-pub type cco_timer { pub duration: f64 = 0.0, pub start_time: c_longlong = 0 }
+pub type cco_timer { pub duration: f64 = 0.0, pub start_time: i64 = 0 }
 impl Copy for cco_timer
 
-pub let cco_OK: c_int = 0
-pub let cco_CANCEL: c_uint = 1073741824
-pub let cco_SHUTDOWN: c_uint = 536870912
-pub let cco_SUBTASK_FAIL: c_uint = 536870913
-pub let cco_NONE: c_int = 0
+pub let cco_OK: i32 = 0
+pub let cco_CANCEL: u32 = 1073741824
+pub let cco_SHUTDOWN: u32 = 536870912
+pub let cco_SUBTASK_FAIL: u32 = 536870913
+pub let cco_NONE: i32 = 0
 pub fn cco_timer_freq() -> i64 {
     1000000i64
 }
 @[repr(C)]
-pub type URange16 { pub lo: c_ushort = 0, pub hi: c_ushort = 0 }
+pub type URange16 { pub lo: u16 = 0, pub hi: u16 = 0 }
 impl Copy for URange16
 
 @[repr(C)]
-pub type UGroup { pub r16: *const URange16 = null, pub nr16: c_int = 0 }
+pub type UGroup { pub r16: *const URange16 = null, pub nr16: i32 = 0 }
 impl Copy for UGroup
 
 pub let cutf8_dtab: List[u8] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 9, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 8, 8, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 10, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 3, 3, 11, 6, 6, 6, 5, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 8, 0, 12, 24, 36, 60, 96, 84, 12, 12, 12, 48, 72, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 0, 12, 12, 12, 12, 12, 0, 12, 0, 12, 12, 12, 24, 12, 12, 12, 12, 12, 24, 12, 24, 12, 12, 12, 12, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, 12, 12, 12, 24, 12, 12, 12, 12, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, 12, 36, 12, 12, 12, 12, 12, 36, 12, 36, 12, 12, 12, 36, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
