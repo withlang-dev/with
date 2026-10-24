@@ -14,19 +14,13 @@ use std.collections.engine_slot.Slot
 use std.collections.engine_slot.slot_compare
 use rt.rt_core
 
-
-// The engine's BINARY_HEAP_TYPE_MIN / BINARY_HEAP_TYPE_MAX (std.engines.c_algorithms.defs),
-// spelled here until #1136 lets a nested module import a corpus global.
-const HEAP_TYPE_MIN: c_uint = 0
-const HEAP_TYPE_MAX: c_uint = 1
-
 /// A max-heap by default (`pop` yields the greatest value); `new_min()`
 /// builds the min-heap. `T: Ord` orders through `cmp` (D41). `peek`
 /// observes, `pop` transfers (D27).
 pub type BinaryHeap[T] { heap: *mut _BinaryHeap }
 
 fn binary_heap_engine(max: bool) -> *mut _BinaryHeap:
-    let heap_type = if max: HEAP_TYPE_MAX else: HEAP_TYPE_MIN
+    let heap_type = if max: BINARY_HEAP_TYPE_MAX else: BINARY_HEAP_TYPE_MIN
     let heap = binary_heap_new(heap_type as i32, Some(slot_compare))
     assert(heap as i64 != 0)
     heap
