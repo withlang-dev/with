@@ -132,11 +132,10 @@ impl[T: Ord] LinkedList[T]:
         else if stc_is_word[T]():
             unsafe { stc_word_list_sort(&raw mut self.words) }
         else:
-            let compare = self.comparator()
             var cursor = unsafe { stc_slot_list_begin(&raw const self.slots) }
             while cursor.ref as i64 != 0:
                 let prefix = unsafe { *cursor.ref } as *mut StcSlotPrefix
-                unsafe { (*prefix).compare = compare.clone() }
+                unsafe { (*prefix).compare = self.comparator() }
                 unsafe { stc_slot_list_next(&raw mut cursor) }
             unsafe { stc_slot_list_sort(&raw mut self.slots) }
 

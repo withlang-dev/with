@@ -7183,7 +7183,7 @@ impl MirBuilder:
                 ip_args.push(ip_recv_op)
                 ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
                 ip_args.push(ip_val_op)
-                let _ = self.lower_resolved_call_with_operand_args_contract(ip_fn_sym, ip_args, self.sema.ty_void as i32, place_expr, ip_set_sig, ip_set_mono)
+                self.lower_resolved_call_with_operand_args_contract(ip_fn_sym, ip_args, self.sema.ty_void as i32, place_expr, ip_set_sig, ip_set_mono)
                 if read_back == 0:
                     return -1
                 // The place of a user IndexPlace is its `get`: read it back
