@@ -27,7 +27,7 @@ use std.collections.stc_word.stc_to_word
 use std.collections.stc_word.stc_from_word
 use rt.rt_core
 
-/// `peek` and `get(i)` observe, `pop` transfers (D27); index 0 is the
+/// `peek` and `s[i]` observe, `pop` transfers (D27); index 0 is the
 /// bottom and an out-of-range index panics (§15.11).
 pub type Stack[T] { slots: stc_slot_stack, words: stc_word_stack }
 
@@ -69,11 +69,6 @@ impl[T] Stack[T]:
         if self.len() == 0: return None
         Some(unsafe { &*self.place(self.len() - 1) })
 
-    /// Observes the value at `index` from the bottom; panics out of range.
-    pub fn get(index: isize) -> &T from self:
-        assert(index >= 0 and index < self.len(), "Stack index out of bounds")
-        unsafe { &*self.place(index) }
-
     /// Drops every value and empties the stack.
     pub mut fn clear():
         while self.len() > 0:
@@ -83,6 +78,13 @@ impl[T] Stack[T]:
     /// Views of the values, bottom to top (D44: traversal observes).
     pub fn iter() -> StackIter[T]:
         StackIter { stack: (&raw const *self) as i64, index: 0, len: self.len() }
+
+/// `s[i]` observes the value at `index` from the bottom (D27's element
+/// view, #2560); panics out of range. `s.get(i)` is the same method by name.
+impl[T] IndexGet[isize, &T] for Stack[T]:
+    fn get(self: &Self, index: isize) -> &T from self:
+        assert(index >= 0 and index < self.len(), "Stack index out of bounds")
+        unsafe { &*self.place(index) }
 
 impl[T] Drop for Stack[T]:
     move fn drop():

@@ -21,6 +21,8 @@ fn strings():
     s.push("c")
     assert(s.len() == 3 and *s.peek().unwrap() == "c")
     assert(*s.get(0) == "a" and *s.get(2) == "c")
+    // `s[i]` is the element's view (IndexGet, #2560).
+    assert(*s[0] == "a" and *s[1] == "b" and *s[2] == "c")
     var cursor = s.iter()
     var seen: List[str] = []
     while let Some(v) = cursor.next(): seen.push(*v)

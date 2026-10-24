@@ -29,10 +29,10 @@ use std.collections.stc_word.stc_to_word
 use std.collections.stc_word.stc_from_word
 use rt.rt_core
 
-/// `front`/`back`/`get(i)` observe, `pop_front`/`pop_back` transfer (D27);
+/// `front`/`back`/`d[i]` observe, `pop_front`/`pop_back` transfer (D27);
 /// an out-of-range index panics (§15.11: absence is a bug, not a value).
-/// `d[i]` is the spelling once a generic type can implement IndexPlace
-/// (#2560).
+/// `d[i]` is the element's view (`IndexGet`, #2560): `d[i] = v` is not a
+/// store a deque offers.
 pub type Deque[T] { slots: stc_slot_deque, words: stc_word_deque }
 
 pub fn Deque.new[T]() -> Deque[T]:
@@ -94,11 +94,6 @@ impl[T] Deque[T]:
         if self.len() == 0: return None
         Some(unsafe { &*self.place(self.len() - 1) })
 
-    /// Observes the value at `index`; panics out of range (D27).
-    pub fn get(index: isize) -> &T from self:
-        assert(index >= 0 and index < self.len(), "Deque index out of bounds")
-        unsafe { &*self.place(index) }
-
     /// Drops every value and empties the deque.
     pub mut fn clear():
         while self.len() > 0:
@@ -108,6 +103,13 @@ impl[T] Deque[T]:
     /// Views of the values, front to back (D44: traversal observes).
     pub fn iter() -> DequeIter[T]:
         DequeIter { deque: (&raw const *self) as i64, index: 0, len: self.len() }
+
+/// `d[i]` observes the value at `index` (D27's element view, #2560); panics
+/// out of range. `d.get(i)` is the same method by name.
+impl[T] IndexGet[isize, &T] for Deque[T]:
+    fn get(self: &Self, index: isize) -> &T from self:
+        assert(index >= 0 and index < self.len(), "Deque index out of bounds")
+        unsafe { &*self.place(index) }
 
 impl[T] Drop for Deque[T]:
     move fn drop():
