@@ -344,7 +344,7 @@ impl Sema:
         if self.get_type_d1(resolved) != 0:
             return 0
         let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId) as i32
-        if pointee == self.ty_i8 as i32:
+        if pointee == self.ty_c_char as i32:
             return 1
         0
 
@@ -738,7 +738,7 @@ impl Sema:
             // parameter would take; passed as its fat value, C read the
             // length word as the next argument.
             if promoted == 0 and value_ty != 0 and not unprototyped and ai >= variadic_from and self.type_is_str_value_or_view(value_ty):
-                promoted = self.ensure_exact_type(TypeKind.TY_PTR, self.ty_i8 as i32, 0, 0) as i32
+                promoted = self.ensure_exact_type(TypeKind.TY_PTR, self.ty_c_char as i32, 0, 0) as i32
             if not unprototyped and promoted == self.resolve_alias(value_ty as TypeId) as i32:
                 promoted = 0
             if unprototyped and promoted == 0 and value_ty != 0:

@@ -4543,7 +4543,7 @@ impl Sema:
         if ptid == 0: return false
         let resolved = self.resolve_alias(ptid as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_PTR or self.get_type_d1(resolved) != 0: return false
-        self.resolve_alias(self.get_type_d0(resolved) as TypeId) == self.ty_i8
+        self.resolve_alias(self.get_type_d0(resolved) as TypeId) == self.ty_c_char
 
     // D102: parameter `pi` of signature `sig` is a C function pointer.
     fn facade_param_is_fn_pointer(sig: i32, pi: i32) -> bool:

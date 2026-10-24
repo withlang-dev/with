@@ -948,7 +948,7 @@ impl Sema:
         if self.get_type_d1(resolved) != 0:
             return 0
         let pointee = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
-        if pointee == self.ty_i8:
+        if pointee == self.ty_c_char:
             return 1
         0
 
