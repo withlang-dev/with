@@ -47,3 +47,81 @@ pub fn stc_slot_unordered(a: *const u8, b: *const u8) -> i32: 0
 /// the two trampolines, the With functions are the facade's.
 pub fn stc_slot_prefix(compare: fn(*const u8, *const u8) -> i32, hash: fn(*const u8) -> u64) -> StcSlotPrefix:
     StcSlotPrefix { head: stc_slot_head { cmp: Some(stc_slot_compare), hash: Some(stc_slot_hash) }, compare: compare, hash: hash }
+
+// The slot's lifetime, in three safe steps the facades share: `stc_slot_new`
+// moves a value into a fresh slot (the engine is then handed the slot's
+// address, the one `unsafe` left in a facade is that engine call);
+// `stc_slot_view` observes the value in a slot the engine still indexes
+// (D22: the view is of the value where it sits); `stc_slot_take` transfers
+// the value back out of a slot the engine no longer indexes and frees the
+// slot (D27: never a second live value).
+
+/// A fresh slot holding `value`, its prefix dispatching to `compare` and
+/// `hash`; the engine indexes it by this address.
+pub fn stc_slot_new[T](value: T, compare: fn(*const u8, *const u8) -> i32, hash: fn(*const u8) -> u64) -> *mut stc_slot_head:
+    let slot = with_alloc(sizeof[StcSlot[T]]() as i64) as *mut StcSlot[T]
+    unsafe { *slot = StcSlot { prefix: stc_slot_prefix(compare, hash), value: value } }
+    slot as *mut stc_slot_head
+
+/// The value in a slot the engine indexes (the engine's `stc_slot_head*`
+/// cast to the facade's slot type: the cast carries `T`, which a call site
+/// never spells).
+pub unsafe fn stc_slot_view[T](slot: *const StcSlot[T]) -> &T:
+    unsafe { &(*slot).value }
+
+/// Transfers the value out of a slot the engine has released and frees
+/// the slot.
+pub unsafe fn stc_slot_take[T](slot: *mut StcSlot[T]) -> T:
+    var owned = slot
+    let value: T = unsafe { move owned.value }
+    with_free(slot as *mut u8)
+    value
+
+/// Drops the value in a slot the engine has released and frees the slot.
+pub unsafe fn stc_slot_release[T](slot: *mut StcSlot[T]):
+    let value: T = stc_slot_take(slot)
+    drop(value)
+
+/// A probe for a lookup: the engine compares and hashes it through its
+/// own callbacks like a stored slot, so it carries the prefix and a byte
+/// image of `value` that is never read back as owned. Freed with
+/// `stc_slot_discard_probe`, never taken.
+pub fn stc_slot_probe[T](value: &T, compare: fn(*const u8, *const u8) -> i32, hash: fn(*const u8) -> u64) -> *mut stc_slot_head:
+    let probe = with_alloc(sizeof[StcSlot[T]]() as i64) as *mut StcSlot[T]
+    unsafe { (*probe).prefix = stc_slot_prefix(compare, hash) }
+    with_memcpy(unsafe { &raw mut (*probe).value } as *mut u8, &raw const *value as *const u8, sizeof[T]() as i64)
+    probe as *mut stc_slot_head
+
+pub fn stc_slot_discard_probe(probe: *mut stc_slot_head): with_free(probe as *mut u8)
+
+/// A map's entry: the slot prefix, the key, the value. A `StcSlot[K]` probe
+/// has the same prefix and the key at the same offset, so the engine
+/// compares it like a stored entry without a value. The same three steps
+/// as a slot's: `stc_entry_new`, the key and value views, `stc_entry_take`.
+pub type StcEntry[K, V] { prefix: StcSlotPrefix, key: K, value: V }
+
+pub fn stc_entry_new[K, V](key: K, value: V, compare: fn(*const u8, *const u8) -> i32, hash: fn(*const u8) -> u64) -> *mut stc_slot_head:
+    let entry = with_alloc(sizeof[StcEntry[K, V]]() as i64) as *mut StcEntry[K, V]
+    unsafe { *entry = StcEntry { prefix: stc_slot_prefix(compare, hash), key: key, value: value } }
+    entry as *mut stc_slot_head
+
+pub unsafe fn stc_entry_key[K, V](entry: *const StcEntry[K, V]) -> &K:
+    unsafe { &(*entry).key }
+
+pub unsafe fn stc_entry_value[K, V](entry: *const StcEntry[K, V]) -> &V:
+    unsafe { &(*entry).value }
+
+/// Transfers the value out of an entry the engine has released; the key
+/// drops and the entry is freed.
+pub unsafe fn stc_entry_take[K, V](entry: *mut StcEntry[K, V]) -> V:
+    var owned = entry
+    let key: K = unsafe { move owned.key }
+    drop(key)
+    let value: V = unsafe { move owned.value }
+    with_free(entry as *mut u8)
+    value
+
+/// Drops both halves of an entry the engine has released and frees it.
+pub unsafe fn stc_entry_release[K, V](entry: *mut StcEntry[K, V]):
+    let value: V = stc_entry_take(entry)
+    drop(value)

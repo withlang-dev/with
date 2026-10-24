@@ -18,9 +18,15 @@ use std.traits
 use std.engines.stc.defs
 use std.engines.stc.facade_shapes
 use std.collections.stc_slot.StcSlot
-use std.collections.stc_slot.stc_slot_prefix
+use std.collections.stc_slot.stc_slot_new
+use std.collections.stc_slot.stc_slot_view
+use std.collections.stc_slot.stc_slot_take
+use std.collections.stc_slot.stc_slot_release
 use std.collections.stc_slot.stc_slot_unhashed
 use std.collections.stc_slot.stc_slot_unordered
+use std.collections.stc_word.stc_is_word
+use std.collections.stc_word.stc_to_word
+use std.collections.stc_word.stc_from_word
 use rt.rt_core
 
 /// `front`/`back`/`get(i)` observe, `pop_front`/`pop_back` transfer (D27);
@@ -32,98 +38,53 @@ pub type Deque[T] { slots: stc_slot_deque, words: stc_word_deque }
 pub fn Deque.new[T]() -> Deque[T]:
     Deque { slots: stc_slot_deque_init(), words: stc_word_deque_init() }
 
-// The integer scalars the word shape stores inline, by the element type's
-// name (`comptime if` instantiates only the branch taken).
-fn deque_is_word[T]() -> bool:
-    comptime if T.name() == "i64" or T.name() == "u64" or T.name() == "i32" or T.name() == "u32" or T.name() == "i16" or T.name() == "u16" or T.name() == "i8" or T.name() == "u8" or T.name() == "isize" or T.name() == "usize": true
-    else: false
-
-fn deque_to_word[T](value: T) -> u64:
-    comptime if T.name() == "i64": value as u64
-    else if T.name() == "u64": value
-    else if T.name() == "i32": (value as i64) as u64
-    else if T.name() == "u32": value as u64
-    else if T.name() == "i16": (value as i64) as u64
-    else if T.name() == "u16": value as u64
-    else if T.name() == "i8": (value as i64) as u64
-    else if T.name() == "u8": value as u64
-    else if T.name() == "isize": (value as i64) as u64
-    else if T.name() == "usize": value as u64
-    else: 0
-
-fn deque_from_word[T](word: u64) -> T:
-    comptime if T.name() == "i64": word as i64
-    else if T.name() == "u64": word
-    else if T.name() == "i32": (word as i64) as i32
-    else if T.name() == "u32": word as u32
-    else if T.name() == "i16": (word as i64) as i16
-    else if T.name() == "u16": word as u16
-    else if T.name() == "i8": (word as i64) as i8
-    else if T.name() == "u8": word as u8
-    else if T.name() == "isize": (word as i64) as isize
-    else if T.name() == "usize": word as usize
-    else: panic("Deque: not a word element")
-
 impl[T] Deque[T]:
     pub fn len() -> isize:
-        comptime if deque_is_word[T](): unsafe { stc_word_deque_size(&raw const self.words) } as isize
+        comptime if stc_is_word[T](): unsafe { stc_word_deque_size(&raw const self.words) } as isize
         else: unsafe { stc_slot_deque_size(&raw const self.slots) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
-    unsafe fn new_slot(value: T) -> *mut StcSlot[T]:
-        let slot = with_alloc(sizeof[StcSlot[T]]() as i64) as *mut StcSlot[T]
-        *slot = StcSlot { prefix: stc_slot_prefix(stc_slot_unordered, stc_slot_unhashed), value: value }
-        slot
-
     pub mut fn push_back(value: T):
-        comptime if deque_is_word[T]():
-            unsafe { stc_word_deque_push_back(&raw mut self.words, deque_to_word(value) as c_ulonglong) }
+        comptime if stc_is_word[T]():
+            unsafe { stc_word_deque_push_back(&raw mut self.words, stc_to_word(value)) }
         else:
-            let slot = unsafe { self.new_slot(value) }
-            unsafe { stc_slot_deque_push_back(&raw mut self.slots, slot as *mut stc_slot_head) }
+            unsafe { stc_slot_deque_push_back(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
     pub mut fn push_front(value: T):
-        comptime if deque_is_word[T]():
-            unsafe { stc_word_deque_push_front(&raw mut self.words, deque_to_word(value) as c_ulonglong) }
+        comptime if stc_is_word[T]():
+            unsafe { stc_word_deque_push_front(&raw mut self.words, stc_to_word(value)) }
         else:
-            let slot = unsafe { self.new_slot(value) }
-            unsafe { stc_slot_deque_push_front(&raw mut self.slots, slot as *mut stc_slot_head) }
-
-    unsafe fn take(slot: *mut StcSlot[T]) -> T:
-        var owned = slot
-        let value: T = move owned.value
-        with_free(slot as *mut u8)
-        value
+            unsafe { stc_slot_deque_push_front(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
     /// Transfers the last value out, or `None` when empty.
     pub mut fn pop_back() -> Option[T]:
         if self.len() == 0: return None
-        comptime if deque_is_word[T]():
-            let word = unsafe { *stc_word_deque_back(&raw const self.words) } as u64
+        comptime if stc_is_word[T]():
+            let word = unsafe { *stc_word_deque_back(&raw const self.words) }
             unsafe { stc_word_deque_pop_back(&raw mut self.words) }
-            Some(deque_from_word(word))
+            Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_deque_back(&raw const self.slots) } as *mut StcSlot[T]
             unsafe { stc_slot_deque_pop_back(&raw mut self.slots) }
-            Some(unsafe { self.take(slot) })
+            Some(unsafe { stc_slot_take(slot) })
 
     /// Transfers the first value out, or `None` when empty.
     pub mut fn pop_front() -> Option[T]:
         if self.len() == 0: return None
-        comptime if deque_is_word[T]():
-            let word = unsafe { *stc_word_deque_front(&raw const self.words) } as u64
+        comptime if stc_is_word[T]():
+            let word = unsafe { *stc_word_deque_front(&raw const self.words) }
             unsafe { stc_word_deque_pop_front(&raw mut self.words) }
-            Some(deque_from_word(word))
+            Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_deque_front(&raw const self.slots) } as *mut StcSlot[T]
             unsafe { stc_slot_deque_pop_front(&raw mut self.slots) }
-            Some(unsafe { self.take(slot) })
+            Some(unsafe { stc_slot_take(slot) })
 
     // The element's place in whichever ring holds it (D22: a word element
     // is read where it sits, the engine's own storage).
     unsafe fn place(index: isize) -> *const T:
-        comptime if deque_is_word[T](): stc_word_deque_at(&raw const self.words, index as c_long) as *const T
-        else: &raw const (*(*stc_slot_deque_at(&raw const self.slots, index as c_long) as *const StcSlot[T])).value
+        comptime if stc_is_word[T](): stc_word_deque_at(&raw const self.words, index as i64) as *const T
+        else: &raw const *unsafe { stc_slot_view(*stc_slot_deque_at(&raw const self.slots, index as i64) as *const StcSlot[T]) }
 
     pub fn front() -> Option[&T] from self:
         if self.len() == 0: return None
@@ -150,17 +111,13 @@ impl[T] Deque[T]:
 
 impl[T] Drop for Deque[T]:
     move fn drop():
-        comptime if deque_is_word[T]():
+        comptime if stc_is_word[T]():
             unsafe { stc_word_deque_drop(&raw const self.words) }
             unsafe { stc_slot_deque_drop(&raw const self.slots) }
         else:
             let count = self.len()
             for index in 0..count:
-                let slot = unsafe { *stc_slot_deque_at(&raw const self.slots, index as c_long) } as *mut StcSlot[T]
-                var owned = slot
-                let value: T = unsafe { move owned.value }
-                drop(value)
-                with_free(slot as *mut u8)
+                unsafe { stc_slot_release(unsafe { *stc_slot_deque_at(&raw const self.slots, index as i64) } as *mut StcSlot[T]) }
             unsafe { stc_slot_deque_drop(&raw const self.slots) }
             unsafe { stc_word_deque_drop(&raw const self.words) }
 
