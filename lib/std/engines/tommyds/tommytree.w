@@ -3,39 +3,39 @@ use std.engines.tommyds.defs
 use std.libc
 use std.option
 
-fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
+fn tommy_ilog2_u32(__param_value: u32) -> u32 {
+    return (((((__param_value as u32).clz() as i32) ^ (31 as i32)) as u32))
 
 }
 
-fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
+fn tommy_ilog2_u64(__param_value: u64) -> u32 {
+    return (((((__param_value as u64).clz() as i32) ^ (63 as i32)) as u32))
 
 }
 
-fn tommy_ctz_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).ctz() as c_uint))
+fn tommy_ctz_u32(__param_value: u32) -> u32 {
+    return (((__param_value as u32).ctz() as u32))
 
 }
 
-fn tommy_ctz_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).ctz() as c_uint))
+fn tommy_ctz_u64(__param_value: u64) -> u32 {
+    return (((__param_value as u64).ctz() as u32))
 
 }
 
-fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
+fn tommy_roundup_pow2_u32(__param_value: u32) -> u32 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (1 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (1 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (2 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (2 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (4 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (4 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (8 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (8 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (16 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (16 as u32)) as u32))
 
     (__local_value = (__local_value +% 1))
 
@@ -43,21 +43,21 @@ fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
 
 }
 
-fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
+fn tommy_roundup_pow2_u64(__param_value: u64) -> u64 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (1 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (1 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (2 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (2 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (4 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (4 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (8 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (8 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (16 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (16 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (32 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (32 as u32)) as u64))
 
     (__local_value = (__local_value +% 1))
 
@@ -65,15 +65,15 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 
 }
 
-fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
+fn tommy_haszero_u32(__param_value: u32) -> i32 {
+    return (if ((((((__param_value as u32) -% (16843009 as u32)) as u32) & ((~__param_value) as u32)) as u32) & (2155905152 as u32)) != 0: 1 else: 0)
 
 }
 
-pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int]) {
+pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32]) {
     ((*__param_tree).root = null)
 
-    ((*__param_tree).count = ((0 as c_ulonglong)))
+    ((*__param_tree).count = ((0 as u64)))
 
     ((*__param_tree).cmp = __param_cmp)
 
@@ -88,7 +88,7 @@ pub unsafe fn tommy_tree_insert(__param_tree: *mut tommy_tree_struct, __param_no
 
     ((*__local_insert).next = null)
 
-    ((*__local_insert).index = ((0 as c_ulonglong)))
+    ((*__local_insert).index = ((0 as u64)))
 
     ((*__param_tree).root = tommy_tree_insert_node((*__param_tree).cmp, (*__param_tree).root, (&raw mut __local_insert as *mut *mut tommy_node_struct)))
 
@@ -126,7 +126,7 @@ pub unsafe fn tommy_tree_search(__param_tree: *mut tommy_tree_struct, __param_da
 
 }
 
-pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int, __param_cmp_arg: *mut c_void) -> *mut c_void {
+pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *mut c_void) -> *mut c_void {
     var __local_node: *mut tommy_node_struct = tommy_tree_search_node(Some(__param_cmp), (*__param_tree).root, __param_cmp_arg)
 
     if ((if not (__local_node != null): 1 else: 0) != 0) {
@@ -140,8 +140,8 @@ pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __
 pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_data: *mut c_void = tommy_tree_remove(__param_tree, (*__param_node).data)
 
-    if (((if not ((if __local_data != 0: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"tommy_tree_remove_existing".ptr, c"tommytree.c".ptr, (239 as c_int), c"data != 0".ptr)
+    if (((if not ((if __local_data != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"tommy_tree_remove_existing".ptr, c"tommytree.c".ptr, (239 as i32), c"data != 0".ptr)
     } else {
         0
     }
@@ -160,27 +160,27 @@ pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __par
 
 }
 
-pub unsafe fn tommy_tree_count(__param_tree: *mut tommy_tree_struct) -> c_ulonglong {
+pub unsafe fn tommy_tree_count(__param_tree: *mut tommy_tree_struct) -> u64 {
     return (*__param_tree).count
 
 }
 
-pub unsafe fn tommy_tree_memory_usage(__param_tree: *mut tommy_tree_struct) -> c_ulonglong {
-    return ((tommy_tree_count(__param_tree) as c_ulonglong) *% (32 as c_ulonglong))
+pub unsafe fn tommy_tree_memory_usage(__param_tree: *mut tommy_tree_struct) -> u64 {
+    return ((tommy_tree_count(__param_tree) as u64) *% (32 as u64))
 
 }
 
-unsafe fn tommy_tree_delta(__param_root: *mut tommy_node_struct) -> c_longlong {
-    var __local_left_height: c_longlong = (((if (*__param_root).prev != null: (*(*__param_root).prev).index else: (0 as c_ulonglong)) as c_longlong))
+unsafe fn tommy_tree_delta(__param_root: *mut tommy_node_struct) -> i64 {
+    var __local_left_height: i64 = (((if (*__param_root).prev != null: (*(*__param_root).prev).index else: (0 as u64)) as i64))
 
-    var __local_right_height: c_longlong = (((if (*__param_root).next != null: (*(*__param_root).next).index else: (0 as c_ulonglong)) as c_longlong))
+    var __local_right_height: i64 = (((if (*__param_root).next != null: (*(*__param_root).next).index else: (0 as u64)) as i64))
 
     return (__local_left_height - __local_right_height)
 
 }
 
 unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy_node_struct {
-    var __local_delta: c_longlong = ((tommy_tree_delta(__param_root) as c_longlong))
+    var __local_delta: i64 = ((tommy_tree_delta(__param_root) as i64))
 
     if ((if __local_delta < -1: 1 else: 0) != 0) {
         if ((if tommy_tree_delta((*__param_root).next) > 0: 1 else: 0) != 0) {
@@ -200,9 +200,9 @@ unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy
 
     }
 
-    ((*__param_root).index = ((0 as c_ulonglong)))
+    ((*__param_root).index = ((0 as u64)))
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
     if ((*__param_root).prev != null) {
         (__ci_expr_logic_0 = (if (if (*(*__param_root).prev).index > (*__param_root).index: 1 else: 0) != 0: 1 else: 0))
@@ -213,7 +213,7 @@ unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy
     }
 
 
-    var __ci_expr_logic_1: c_int = 0
+    var __ci_expr_logic_1: i32 = 0
 
     if ((*__param_root).next != null) {
         (__ci_expr_logic_1 = (if (if (*(*__param_root).next).index > (*__param_root).index: 1 else: 0) != 0: 1 else: 0))
@@ -263,14 +263,14 @@ unsafe fn tommy_tree_move_right(__param_root: *mut tommy_node_struct, __param_no
 
 }
 
-unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
-    var __local_c: c_int
+unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
+    var __local_c: i32
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return (*__param_let_)
     }
 
-    (__local_c = ((__param_cmp.unwrap()(((*(*__param_let_)).data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()(((*(*__param_let_)).data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         ((*__param_root).prev = tommy_tree_insert_node(__param_cmp, (*__param_root).prev, __param_let_))
@@ -292,14 +292,14 @@ unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
-unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_data: *mut c_void, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
-    var __local_c: c_int
+unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_data: *mut c_void, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
+    var __local_c: i32
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return ((0 as *mut tommy_node_struct))
     }
 
-    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         ((*__param_root).prev = tommy_tree_remove_node(__param_cmp, (*__param_root).prev, __param_data, __param_let_))
@@ -321,14 +321,14 @@ unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
-unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int], __param_root: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut tommy_node_struct {
-    var __local_c: c_int
+unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut tommy_node_struct {
+    var __local_c: i32
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
         return ((0 as *mut tommy_node_struct))
     }
 
-    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as c_int)))
+    (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
     if ((if __local_c < 0: 1 else: 0) != 0) {
         return ((tommy_tree_search_node(__param_cmp, (*__param_root).prev, __param_data) as *mut tommy_node_struct))

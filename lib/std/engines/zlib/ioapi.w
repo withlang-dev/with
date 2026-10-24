@@ -53,7 +53,7 @@ pub unsafe fn fill_fopen_filefunc(__param_pzlib_filefunc_def: *mut zlib_filefunc
 
 }
 
-pub unsafe fn call_zopen64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filename: *const c_void, __param_mode: c_int) -> *mut c_void {
+pub unsafe fn call_zopen64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filename: *const c_void, __param_mode: i32) -> *mut c_void {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zopen64_file != null: 1 else: 0) != 0) {
         return (((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zopen64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filename, __param_mode) as *mut c_void))
     }
@@ -62,28 +62,28 @@ pub unsafe fn call_zopen64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, _
 
 }
 
-pub unsafe fn call_zseek64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_offset: c_ulong, __param_origin: c_int) -> c_long {
+pub unsafe fn call_zseek64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void, __param_offset: u64, __param_origin: i32) -> i64 {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file != null: 1 else: 0) != 0) {
         return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __param_offset, __param_origin)
     }
-    var __local_offsetTruncated: c_ulong = __param_offset
+    var __local_offsetTruncated: u64 = __param_offset
 
     if ((if __local_offsetTruncated != __param_offset: 1 else: 0) != 0) {
-        return ((-1 as c_long))
+        return ((-1 as i64))
     }
     return (*__param_pfilefunc).zseek32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __local_offsetTruncated, __param_origin)
 
 
 }
 
-pub unsafe fn call_ztell64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void) -> c_ulong {
+pub unsafe fn call_ztell64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, __param_filestream: *mut c_void) -> u64 {
     if ((if (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).zseek64_file != null: 1 else: 0) != 0) {
         return (*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).ztell64_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream)
     }
-    var __local_tell_uLong: c_ulong = (((*__param_pfilefunc).ztell32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) as c_ulong))
+    var __local_tell_uLong: u64 = (((*__param_pfilefunc).ztell32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream) as u64))
 
     if ((if __local_tell_uLong == 4294967295: 1 else: 0) != 0) {
-        return ((-1 as c_ulong))
+        return ((-1 as u64))
     }
     return __local_tell_uLong
 
@@ -115,25 +115,25 @@ pub unsafe fn fill_zlib_filefunc64_32_def_from_filefunc32(__param_p_filefunc64_3
 
 }
 
-unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const c_char, __param_mode: c_int) -> *mut c_void {
+unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const c_char, __param_mode: i32) -> *mut c_void {
     var __local_file: *mut c_void = null
 
     var __local_mode_fopen: *const c_char = ((null as *const c_char))
 
 
-    if ((if ((__param_mode as c_int) & (3 as c_int)) == 1: 1 else: 0) != 0) {
+    if ((if ((__param_mode as i32) & (3 as i32)) == 1: 1 else: 0) != 0) {
         (__local_mode_fopen = c"rb".ptr)
     } else {
-        if (((__param_mode as c_int) & (4 as c_int)) != 0) {
+        if (((__param_mode as i32) & (4 as i32)) != 0) {
             (__local_mode_fopen = c"r+b".ptr)
         } else {
-            if (((__param_mode as c_int) & (8 as c_int)) != 0) {
+            if (((__param_mode as i32) & (8 as i32)) != 0) {
                 (__local_mode_fopen = c"wb".ptr)
             }
         }
     }
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
     if ((if __param_filename != null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if __local_mode_fopen != null: 1 else: 0) != 0: 1 else: 0))
@@ -148,25 +148,25 @@ unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const
 
 }
 
-unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *const c_void, __param_mode: c_int) -> *mut c_void {
+unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *const c_void, __param_mode: i32) -> *mut c_void {
     var __local_file: *mut c_void = null
 
     var __local_mode_fopen: *const c_char = ((null as *const c_char))
 
 
-    if ((if ((__param_mode as c_int) & (3 as c_int)) == 1: 1 else: 0) != 0) {
+    if ((if ((__param_mode as i32) & (3 as i32)) == 1: 1 else: 0) != 0) {
         (__local_mode_fopen = c"rb".ptr)
     } else {
-        if (((__param_mode as c_int) & (4 as c_int)) != 0) {
+        if (((__param_mode as i32) & (4 as i32)) != 0) {
             (__local_mode_fopen = c"r+b".ptr)
         } else {
-            if (((__param_mode as c_int) & (8 as c_int)) != 0) {
+            if (((__param_mode as i32) & (8 as i32)) != 0) {
                 (__local_mode_fopen = c"wb".ptr)
             }
         }
     }
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
     if ((if __param_filename != null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if __local_mode_fopen != null: 1 else: 0) != 0: 1 else: 0))
@@ -181,65 +181,65 @@ unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *con
 
 }
 
-unsafe fn fread_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *mut c_void, __param_size: c_ulong) -> c_ulong {
-    var __local_ret: c_ulong
+unsafe fn fread_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *mut c_void, __param_size: u64) -> u64 {
+    var __local_ret: u64
 
 
-    (__local_ret = ((fread(__param_buf, (1 as c_ulong), __param_size, __param_stream) as c_ulong)))
-
-    return __local_ret
-
-}
-
-unsafe fn fwrite_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *const c_void, __param_size: c_ulong) -> c_ulong {
-    var __local_ret: c_ulong
-
-
-    (__local_ret = ((fwrite(__param_buf, (1 as c_ulong), __param_size, __param_stream) as c_ulong)))
+    (__local_ret = ((fread(__param_buf, (1 as u64), __param_size, __param_stream) as u64)))
 
     return __local_ret
 
 }
 
-unsafe fn ftell_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_long {
-    var __local_ret: c_long
+unsafe fn fwrite_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_buf: *const c_void, __param_size: u64) -> u64 {
+    var __local_ret: u64
 
 
-    (__local_ret = ((ftell(__param_stream) as c_long)))
-
-    return __local_ret
-
-}
-
-unsafe fn ftell64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_ulong {
-    var __local_ret: c_ulong
-
-
-    (__local_ret = ((ftell(__param_stream) as c_ulong)))
+    (__local_ret = ((fwrite(__param_buf, (1 as u64), __param_size, __param_stream) as u64)))
 
     return __local_ret
 
 }
 
-unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_offset: c_ulong, __param_origin: c_int) -> c_long {
-    var __local_fseek_origin: c_int = ((0 as c_int))
+unsafe fn ftell_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> i64 {
+    var __local_ret: i64
 
-    var __local_ret: c_long
+
+    (__local_ret = ((ftell(__param_stream) as i64)))
+
+    return __local_ret
+
+}
+
+unsafe fn ftell64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> u64 {
+    var __local_ret: u64
+
+
+    (__local_ret = ((ftell(__param_stream) as u64)))
+
+    return __local_ret
+
+}
+
+unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_offset: u64, __param_origin: i32) -> i64 {
+    var __local_fseek_origin: i32 = ((0 as i32))
+
+    var __local_ret: i64
 
 
     while true {
         match __param_origin {
             1 => {
-                (__local_fseek_origin = ((libc.SEEK_CUR as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_CUR as i32)))
             },
             2 => {
-                (__local_fseek_origin = ((libc.SEEK_END as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_END as i32)))
             },
             0 => {
-                (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_SET as i32)))
             },
             _ => {
-                return ((-1 as c_long))
+                return ((-1 as i64))
             },
         }
 
@@ -247,35 +247,35 @@ unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
 
     }
 
-    (__local_ret = ((0 as c_long)))
+    (__local_ret = ((0 as i64)))
 
-    if ((if fseek(__param_stream, (__param_offset as c_long), __local_fseek_origin) != 0: 1 else: 0) != 0) {
-        (__local_ret = ((-1 as c_long)))
+    if ((if fseek(__param_stream, (__param_offset as i64), __local_fseek_origin) != 0: 1 else: 0) != 0) {
+        (__local_ret = ((-1 as i64)))
     }
 
     return __local_ret
 
 }
 
-unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_offset: c_ulong, __param_origin: c_int) -> c_long {
-    var __local_fseek_origin: c_int = ((0 as c_int))
+unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void, __param_offset: u64, __param_origin: i32) -> i64 {
+    var __local_fseek_origin: i32 = ((0 as i32))
 
-    var __local_ret: c_long
+    var __local_ret: i64
 
 
     while true {
         match __param_origin {
             1 => {
-                (__local_fseek_origin = ((libc.SEEK_CUR as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_CUR as i32)))
             },
             2 => {
-                (__local_fseek_origin = ((libc.SEEK_END as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_END as i32)))
             },
             0 => {
-                (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
+                (__local_fseek_origin = ((libc.SEEK_SET as i32)))
             },
             _ => {
-                return ((-1 as c_long))
+                return ((-1 as i64))
             },
         }
 
@@ -283,31 +283,31 @@ unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c
 
     }
 
-    (__local_ret = ((0 as c_long)))
+    (__local_ret = ((0 as i64)))
 
-    if ((if fseek(__param_stream, ((__param_offset as c_longlong) as c_long), __local_fseek_origin) != 0: 1 else: 0) != 0) {
-        (__local_ret = ((-1 as c_long)))
+    if ((if fseek(__param_stream, (__param_offset as i64), __local_fseek_origin) != 0: 1 else: 0) != 0) {
+        (__local_ret = ((-1 as i64)))
     }
 
     return __local_ret
 
 }
 
-unsafe fn fclose_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_int {
-    var __local_ret: c_int
+unsafe fn fclose_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> i32 {
+    var __local_ret: i32
 
 
-    (__local_ret = ((fclose(__param_stream) as c_int)))
+    (__local_ret = ((fclose(__param_stream) as i32)))
 
     return __local_ret
 
 }
 
-unsafe fn ferror_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> c_int {
-    var __local_ret: c_int
+unsafe fn ferror_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_void) -> i32 {
+    var __local_ret: i32
 
 
-    (__local_ret = ((ferror(__param_stream) as c_int)))
+    (__local_ret = ((ferror(__param_stream) as i32)))
 
     return __local_ret
 

@@ -30,14 +30,14 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.collections
 
-pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: *mut u8, __param_size: c_ulong) -> c_int {
+pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *mut u8, __param_size: u64) -> i32 {
     var __local_message: *const u8
 
-    var __local_i: c_ulong
+    var __local_i: u64
 
-    var __local_n: c_int
+    var __local_n: i32
 
-    var __local_rc: c_int = ((0 as c_int))
+    var __local_rc: i32 = ((0 as i32))
 
 
     if ((if __param_size == 0: 1 else: 0) != 0) {
@@ -47,18 +47,18 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
     if ((if __param_enumber >= 100: 1 else: 0) != 0) {
         (__local_message = (&compile_error_texts[0] as *const u8))
 
-        (__local_n = (((__param_enumber - 100) as c_int)))
+        (__local_n = (((__param_enumber - 100) as i32)))
 
     } else {
         if ((if __param_enumber < 0: 1 else: 0) != 0) {
             (__local_message = (&match_error_texts[0] as *const u8))
 
-            (__local_n = (((0 - __param_enumber) as c_int)))
+            (__local_n = (((0 - __param_enumber) as i32)))
 
         } else {
             (__local_message = (("\0" as *const u8)))
 
-            (__local_n = ((1 as c_int)))
+            (__local_n = ((1 as i32)))
 
         }
     }
@@ -84,11 +84,11 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
     }
 
-    (__local_i = ((0 as c_ulong)))
+    (__local_i = ((0 as u64)))
 
     while ((if (*__local_message) != 0: 1 else: 0) != 0) {
-        if ((if __local_i >= ((__param_size as c_ulong) -% (1 as c_ulong)): 1 else: 0) != 0) {
-            (__local_rc = ((-48 as c_int)))
+        if ((if __local_i >= ((__param_size as u64) -% (1 as u64)): 1 else: 0) != 0) {
+            (__local_rc = ((-48 as i32)))
 
             break
 
@@ -109,7 +109,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: c_int, __param_buffer: 
 
     ((__param_buffer[__local_i]) = ((0 as u8)))
 
-    return (if __local_rc != 0: __local_rc else: (__local_i as c_int))
+    return (if __local_rc != 0: __local_rc else: (__local_i as i32))
 
 }
 

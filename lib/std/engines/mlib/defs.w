@@ -71,6 +71,9 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
+
+// data model: LP64 (arm64-apple-macosx11.0)
+pub const C_DATA_MODEL: str = "LP64 (arm64-apple-macosx11.0)"
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -243,7 +246,7 @@ pub unsafe fn __with_builtin_mul_overflow_u128(__with_a: u128, __with_b: u128, _
 }
 
 @[repr(C)]
-pub type m_core_backoff_s { pub count: c_uint = 0, pub seed: c_uint = 0 }
+pub type m_core_backoff_s { pub count: u32 = 0, pub seed: u32 = 0 }
 impl Copy for m_core_backoff_s
 
 pub type m_core_backoff_ct = [m_core_backoff_s; 1]
@@ -251,16 +254,16 @@ pub type m_core_backoff_ct = [m_core_backoff_s; 1]
 // m-core.h:5610:8: demoted to opaque
 pub type m_string_s = opaque
 
-pub type m_serial_return_code_e = c_int
+pub type m_serial_return_code_e = i32
 
-pub let M_SERIAL_OK_DONE: c_int = 0
-pub let M_SERIAL_OK_CONTINUE: c_int = 1
-pub let M_SERIAL_FAIL: c_int = 2
-pub let M_SERIAL_FAIL_RETRY: c_int = 4
+pub let M_SERIAL_OK_DONE: i32 = 0
+pub let M_SERIAL_OK_CONTINUE: i32 = 1
+pub let M_SERIAL_FAIL: i32 = 2
+pub let M_SERIAL_FAIL_RETRY: i32 = 4
 pub type m_serial_return_code_t = i32
 
 @[repr(C)]
-pub type m_serial_ll_u = union { pub b: bool = false, pub c: c_char = 0, pub i: c_int = 0, pub l: c_long = 0, pub ll: c_longlong = 0, pub f: f32 = 0.0, pub d: f64 = 0.0, pub e: c_longdouble = 0.0, pub s: c_ulong = 0, pub u: c_ulong = 0, pub p: *mut c_void = null, pub cstr: *const c_char = null, pub r: i32 = 0 }
+pub type m_serial_ll_u = union { pub b: bool = false, pub c: c_char = 0, pub i: i32 = 0, pub l: i64 = 0, pub ll: i64 = 0, pub f: f32 = 0.0, pub d: f64 = 0.0, pub e: f64 = 0.0, pub s: u64 = 0, pub u: u64 = 0, pub p: *mut c_void = null, pub cstr: *const c_char = null, pub r: i32 = 0 }
 impl Copy for m_serial_ll_u
 
 pub type m_serial_ll_ct = m_serial_ll_u
@@ -278,7 +281,7 @@ impl Copy for m_serial_read_s
 pub type m_serial_read_t = [m_serial_read_s; 1]
 
 @[repr(C)]
-pub type m_serial_read_interface_s { pub read_boolean: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut bool) -> i32] = null, pub read_integer: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longlong, c_ulong) -> i32] = null, pub read_float: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longdouble, c_ulong) -> i32] = null, pub read_string: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut m_string_s) -> i32] = null, pub read_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, c_int, *mut c_int) -> i32] = null, pub read_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, c_int, *mut c_int) -> i32] = null, pub read_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null }
+pub type m_serial_read_interface_s { pub read_boolean: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut bool) -> i32] = null, pub read_integer: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut i64, u64) -> i32] = null, pub read_float: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut f64, u64) -> i32] = null, pub read_string: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut m_string_s) -> i32] = null, pub read_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut u64) -> i32] = null, pub read_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut u64) -> i32] = null, pub read_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, i32, *mut i32) -> i32] = null, pub read_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, i32, *mut i32) -> i32] = null, pub read_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null }
 impl Copy for m_serial_read_interface_s
 
 pub type m_serial_read_interface_t = m_serial_read_interface_s
@@ -290,35 +293,35 @@ impl Copy for m_serial_write_s
 pub type m_serial_write_t = [m_serial_write_s; 1]
 
 @[repr(C)]
-pub type m_serial_write_interface_s { pub write_boolean: Option[unsafe extern "C" fn(*mut m_serial_write_s, bool) -> i32] = null, pub write_integer: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longlong, c_ulong) -> i32] = null, pub write_float: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longdouble, c_ulong) -> i32] = null, pub write_string: Option[unsafe extern "C" fn(*mut m_serial_write_s, *c_char, c_ulong) -> i32] = null, pub write_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_array_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, c_int, c_int) -> i32] = null, pub write_tuple_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, c_int, c_int) -> i32] = null, pub write_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null }
+pub type m_serial_write_interface_s { pub write_boolean: Option[unsafe extern "C" fn(*mut m_serial_write_s, bool) -> i32] = null, pub write_integer: Option[unsafe extern "C" fn(*mut m_serial_write_s, i64, u64) -> i32] = null, pub write_float: Option[unsafe extern "C" fn(*mut m_serial_write_s, f64, u64) -> i32] = null, pub write_string: Option[unsafe extern "C" fn(*mut m_serial_write_s, *c_char, u64) -> i32] = null, pub write_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, u64) -> i32] = null, pub write_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_array_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, u64) -> i32] = null, pub write_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, i32, i32) -> i32] = null, pub write_tuple_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, i32, i32) -> i32] = null, pub write_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null }
 impl Copy for m_serial_write_interface_s
 
 pub type m_serial_write_interface_t = m_serial_write_interface_s
 
-pub type m_bptr33_transaction_kind_t = c_int
+pub type m_bptr33_transaction_kind_t = i32
 
-pub let M_BPTR33_NONE: c_int = 0
-pub let M_BPTR33_NEW_NODE: c_int = 1
-pub let M_BPTR33_INIT_KEY: c_int = 2
-pub let M_BPTR33_MOVE_KEY: c_int = 3
-pub let M_BPTR33_INIT_VALUE: c_int = 4
-pub let M_BPTR33_SPLIT_LEAF: c_int = 5
-pub let M_BPTR33_SPLIT_NODE: c_int = 6
-pub let M_BPTR33_SHIFT_LEAF: c_int = 7
-pub let M_BPTR33_SHIFT_NODE: c_int = 8
-pub let M_BPTR33_INC_SIZE: c_int = 9
+pub let M_BPTR33_NONE: i32 = 0
+pub let M_BPTR33_NEW_NODE: i32 = 1
+pub let M_BPTR33_INIT_KEY: i32 = 2
+pub let M_BPTR33_MOVE_KEY: i32 = 3
+pub let M_BPTR33_INIT_VALUE: i32 = 4
+pub let M_BPTR33_SPLIT_LEAF: i32 = 5
+pub let M_BPTR33_SPLIT_NODE: i32 = 6
+pub let M_BPTR33_SHIFT_LEAF: i32 = 7
+pub let M_BPTR33_SHIFT_NODE: i32 = 8
+pub let M_BPTR33_INC_SIZE: i32 = 9
 @[repr(C)]
 pub type m_bptr33_transaction_record_t { pub type_: i32 = 0, pub data_dst: *mut c_void = null, pub data_src: *mut c_void = null }
 impl Copy for m_bptr33_transaction_record_t
 
 @[repr(C)]
-pub type m_bptr33_transaction_t_anon { pub size: c_int = 0, pub tab: [m_bptr33_transaction_record_t; 265] }
+pub type m_bptr33_transaction_t_anon { pub size: i32 = 0, pub tab: [m_bptr33_transaction_record_t; 265] }
 impl Copy for m_bptr33_transaction_t_anon
 
 pub type m_bptr33_transaction_t = [m_bptr33_transaction_t_anon; 1]
 
 @[repr(C)]
-pub type mlib_slot_head { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> c_int] = null, pub clone: Option[unsafe extern "C" fn(*const c_void) -> *mut c_void] = null, pub drop: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null, pub entry: *mut c_void = null }
+pub type mlib_slot_head { pub cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32] = null, pub clone: Option[unsafe extern "C" fn(*const c_void) -> *mut c_void] = null, pub drop: Option[unsafe extern "C" fn(*mut c_void) -> Unit] = null, pub entry: *mut c_void = null }
 impl Copy for mlib_slot_head
 
 pub type mlib_slot = *mut mlib_slot_head
@@ -330,13 +333,13 @@ pub type mlib_slot_tree_kind_s = union { pub node: [*mut mlib_slot_tree_node_s; 
 impl Copy for mlib_slot_tree_kind_s
 
 @[repr(C)]
-pub type mlib_slot_tree_node_s { pub num: c_int = 0, pub key: [*mut mlib_slot_head; 17] = [null as *mut mlib_slot_head; 17], pub next: *mut mlib_slot_tree_node_s = null, pub prev: *mut mlib_slot_tree_node_s = null, pub kind: mlib_slot_tree_kind_s }
+pub type mlib_slot_tree_node_s { pub num: i32 = 0, pub key: [*mut mlib_slot_head; 17] = [null as *mut mlib_slot_head; 17], pub next: *mut mlib_slot_tree_node_s = null, pub prev: *mut mlib_slot_tree_node_s = null, pub kind: mlib_slot_tree_kind_s }
 impl Copy for mlib_slot_tree_node_s
 
 pub type mlib_slot_tree_node_ct = *mut mlib_slot_tree_node_s
 
 @[repr(C)]
-pub type mlib_slot_tree_s { pub root: *mut mlib_slot_tree_node_s = null, pub size: c_ulong = 0 }
+pub type mlib_slot_tree_s { pub root: *mut mlib_slot_tree_node_s = null, pub size: u64 = 0 }
 impl Copy for mlib_slot_tree_s
 
 pub type mlib_slot_tree_t = [mlib_slot_tree_s; 1]
@@ -354,38 +357,38 @@ pub type mlib_slot_tree_value_ct = *mut mlib_slot_head
 pub type mlib_slot_tree_ct = [mlib_slot_tree_s; 1]
 
 @[repr(C)]
-pub type mlib_slot_tree_parent_it_s { pub num: c_int = 0, pub parent: [*mut mlib_slot_tree_node_s; 65] = [null as *mut mlib_slot_tree_node_s; 65] }
+pub type mlib_slot_tree_parent_it_s { pub num: i32 = 0, pub parent: [*mut mlib_slot_tree_node_s; 65] = [null as *mut mlib_slot_tree_node_s; 65] }
 impl Copy for mlib_slot_tree_parent_it_s
 
 pub type mlib_slot_tree_pit_ct = [mlib_slot_tree_parent_it_s; 1]
 
 @[repr(C)]
-pub type mlib_slot_tree_it_s { pub node: *mut mlib_slot_tree_node_s = null, pub idx: c_int = 0 }
+pub type mlib_slot_tree_it_s { pub node: *mut mlib_slot_tree_node_s = null, pub idx: i32 = 0 }
 impl Copy for mlib_slot_tree_it_s
 
 pub type mlib_slot_tree_it_t = [mlib_slot_tree_it_s; 1]
 
 pub type mlib_slot_tree_it_ct = [mlib_slot_tree_it_s; 1]
 
-pub let M_USE_STDARG: c_int = 1
-pub let M_USE_SMALL_NAME: c_int = 1
-pub let M_CORE_VERSION_MAJOR: c_int = 0
-pub let M_CORE_VERSION_MINOR: c_int = 8
-pub let M_CORE_VERSION_PATCHLEVEL: c_int = 2
+pub let M_USE_STDARG: i32 = 1
+pub let M_USE_SMALL_NAME: i32 = 1
+pub let M_CORE_VERSION_MAJOR: i32 = 0
+pub let M_CORE_VERSION_MINOR: i32 = 8
+pub let M_CORE_VERSION_PATCHLEVEL: i32 = 2
 pub fn M_LIKELY[T](cond: T) -> T {
     (if (if cond != 0: 0 else: 1) != 0: 0 else: 1)
 }
 pub fn M_UNLIKELY[T](cond: T) -> T {
     (if (if cond != 0: 0 else: 1) != 0: 0 else: 1)
 }
-pub let M_ALIGN_FOR_CACHELINE_EXCLUSION: c_int = 64
+pub let M_ALIGN_FOR_CACHELINE_EXCLUSION: i32 = 64
 pub fn M_MEMORY_DEL[T](ctx: T, ptr: T) {
     with_free((ptr) as *mut u8)
 }
 pub fn M_MEMORY_FREE[T](ctx: T, type_: T, ptr: T, o: T) {
     with_free((ptr) as *mut u8)
 }
-pub let M_USE_GLOBAL_CONTEXT: c_int = 0
+pub let M_USE_GLOBAL_CONTEXT: i32 = 0
 pub fn M_UNUSED_CONTEXT() {
     return
 }
@@ -398,191 +401,191 @@ pub fn M_ASSERT_SLOW[T](n: T) -> T {
 pub fn M_UNLIKELY_NOMEM[T](cond: T) -> T {
     M_UNLIKELY(cond)
 }
-pub let M_MAX_NB_ARGUMENT: c_int = 52
-pub let M_INVI_0: c_int = 1
-pub let M_INVI_1: c_int = 0
-pub let M_ANDI_00: c_int = 0
-pub let M_ANDI_01: c_int = 0
-pub let M_ANDI_10: c_int = 0
-pub let M_ANDI_11: c_int = 1
-pub let M_ANDI_000: c_int = 0
-pub let M_ANDI_001: c_int = 0
-pub let M_ANDI_010: c_int = 0
-pub let M_ANDI_011: c_int = 0
-pub let M_ANDI_100: c_int = 0
-pub let M_ANDI_101: c_int = 0
-pub let M_ANDI_110: c_int = 0
-pub let M_ANDI_111: c_int = 1
-pub let M_ORI_00: c_int = 0
-pub let M_ORI_01: c_int = 1
-pub let M_ORI_10: c_int = 1
-pub let M_ORI_11: c_int = 1
-pub let M_ORI_000: c_int = 0
-pub let M_ORI_001: c_int = 1
-pub let M_ORI_010: c_int = 1
-pub let M_ORI_011: c_int = 1
-pub let M_ORI_100: c_int = 1
-pub let M_ORI_101: c_int = 1
-pub let M_ORI_110: c_int = 1
-pub let M_ORI_111: c_int = 1
-pub let M_INC_0: c_int = 1
-pub let M_INC_1: c_int = 2
-pub let M_INC_2: c_int = 3
-pub let M_INC_3: c_int = 4
-pub let M_INC_4: c_int = 5
-pub let M_INC_5: c_int = 6
-pub let M_INC_6: c_int = 7
-pub let M_INC_7: c_int = 8
-pub let M_INC_8: c_int = 9
-pub let M_INC_9: c_int = 10
-pub let M_INC_10: c_int = 11
-pub let M_INC_11: c_int = 12
-pub let M_INC_12: c_int = 13
-pub let M_INC_13: c_int = 14
-pub let M_INC_14: c_int = 15
-pub let M_INC_15: c_int = 16
-pub let M_INC_17: c_int = 18
-pub let M_INC_18: c_int = 19
-pub let M_INC_19: c_int = 20
-pub let M_INC_20: c_int = 21
-pub let M_INC_21: c_int = 22
-pub let M_INC_22: c_int = 23
-pub let M_INC_23: c_int = 24
-pub let M_INC_24: c_int = 25
-pub let M_INC_25: c_int = 26
-pub let M_INC_26: c_int = 27
-pub let M_INC_27: c_int = 28
-pub let M_INC_28: c_int = 29
-pub let M_INC_29: c_int = 30
-pub let M_INC_30: c_int = 31
-pub let M_INC_31: c_int = 32
-pub let M_INC_33: c_int = 34
-pub let M_INC_34: c_int = 35
-pub let M_INC_35: c_int = 36
-pub let M_INC_36: c_int = 37
-pub let M_INC_37: c_int = 38
-pub let M_INC_38: c_int = 39
-pub let M_INC_39: c_int = 40
-pub let M_INC_40: c_int = 41
-pub let M_INC_41: c_int = 42
-pub let M_INC_42: c_int = 43
-pub let M_INC_43: c_int = 44
-pub let M_INC_44: c_int = 45
-pub let M_INC_45: c_int = 46
-pub let M_INC_46: c_int = 47
-pub let M_INC_47: c_int = 48
-pub let M_INC_48: c_int = 49
-pub let M_INC_49: c_int = 50
-pub let M_INC_50: c_int = 51
-pub let M_INC_51: c_int = 52
-pub let M_INC_52: c_int = 53
-pub let M_DEC_1: c_int = 0
-pub let M_DEC_2: c_int = 1
-pub let M_DEC_3: c_int = 2
-pub let M_DEC_4: c_int = 3
-pub let M_DEC_5: c_int = 4
-pub let M_DEC_6: c_int = 5
-pub let M_DEC_7: c_int = 6
-pub let M_DEC_8: c_int = 7
-pub let M_DEC_9: c_int = 8
-pub let M_DEC_10: c_int = 9
-pub let M_DEC_11: c_int = 10
-pub let M_DEC_12: c_int = 11
-pub let M_DEC_13: c_int = 12
-pub let M_DEC_14: c_int = 13
-pub let M_DEC_15: c_int = 14
-pub let M_DEC_17: c_int = 16
-pub let M_DEC_18: c_int = 17
-pub let M_DEC_19: c_int = 18
-pub let M_DEC_20: c_int = 19
-pub let M_DEC_21: c_int = 20
-pub let M_DEC_22: c_int = 21
-pub let M_DEC_23: c_int = 22
-pub let M_DEC_24: c_int = 23
-pub let M_DEC_25: c_int = 24
-pub let M_DEC_26: c_int = 25
-pub let M_DEC_27: c_int = 26
-pub let M_DEC_28: c_int = 27
-pub let M_DEC_29: c_int = 28
-pub let M_DEC_30: c_int = 29
-pub let M_DEC_31: c_int = 30
-pub let M_DEC_33: c_int = 32
-pub let M_DEC_34: c_int = 33
-pub let M_DEC_35: c_int = 34
-pub let M_DEC_36: c_int = 35
-pub let M_DEC_37: c_int = 36
-pub let M_DEC_38: c_int = 37
-pub let M_DEC_39: c_int = 38
-pub let M_DEC_40: c_int = 39
-pub let M_DEC_41: c_int = 40
-pub let M_DEC_42: c_int = 41
-pub let M_DEC_43: c_int = 42
-pub let M_DEC_44: c_int = 43
-pub let M_DEC_45: c_int = 44
-pub let M_DEC_46: c_int = 45
-pub let M_DEC_47: c_int = 46
-pub let M_DEC_48: c_int = 47
-pub let M_DEC_49: c_int = 48
-pub let M_DEC_50: c_int = 49
-pub let M_DEC_51: c_int = 50
-pub let M_DEC_52: c_int = 51
+pub let M_MAX_NB_ARGUMENT: i32 = 52
+pub let M_INVI_0: i32 = 1
+pub let M_INVI_1: i32 = 0
+pub let M_ANDI_00: i32 = 0
+pub let M_ANDI_01: i32 = 0
+pub let M_ANDI_10: i32 = 0
+pub let M_ANDI_11: i32 = 1
+pub let M_ANDI_000: i32 = 0
+pub let M_ANDI_001: i32 = 0
+pub let M_ANDI_010: i32 = 0
+pub let M_ANDI_011: i32 = 0
+pub let M_ANDI_100: i32 = 0
+pub let M_ANDI_101: i32 = 0
+pub let M_ANDI_110: i32 = 0
+pub let M_ANDI_111: i32 = 1
+pub let M_ORI_00: i32 = 0
+pub let M_ORI_01: i32 = 1
+pub let M_ORI_10: i32 = 1
+pub let M_ORI_11: i32 = 1
+pub let M_ORI_000: i32 = 0
+pub let M_ORI_001: i32 = 1
+pub let M_ORI_010: i32 = 1
+pub let M_ORI_011: i32 = 1
+pub let M_ORI_100: i32 = 1
+pub let M_ORI_101: i32 = 1
+pub let M_ORI_110: i32 = 1
+pub let M_ORI_111: i32 = 1
+pub let M_INC_0: i32 = 1
+pub let M_INC_1: i32 = 2
+pub let M_INC_2: i32 = 3
+pub let M_INC_3: i32 = 4
+pub let M_INC_4: i32 = 5
+pub let M_INC_5: i32 = 6
+pub let M_INC_6: i32 = 7
+pub let M_INC_7: i32 = 8
+pub let M_INC_8: i32 = 9
+pub let M_INC_9: i32 = 10
+pub let M_INC_10: i32 = 11
+pub let M_INC_11: i32 = 12
+pub let M_INC_12: i32 = 13
+pub let M_INC_13: i32 = 14
+pub let M_INC_14: i32 = 15
+pub let M_INC_15: i32 = 16
+pub let M_INC_17: i32 = 18
+pub let M_INC_18: i32 = 19
+pub let M_INC_19: i32 = 20
+pub let M_INC_20: i32 = 21
+pub let M_INC_21: i32 = 22
+pub let M_INC_22: i32 = 23
+pub let M_INC_23: i32 = 24
+pub let M_INC_24: i32 = 25
+pub let M_INC_25: i32 = 26
+pub let M_INC_26: i32 = 27
+pub let M_INC_27: i32 = 28
+pub let M_INC_28: i32 = 29
+pub let M_INC_29: i32 = 30
+pub let M_INC_30: i32 = 31
+pub let M_INC_31: i32 = 32
+pub let M_INC_33: i32 = 34
+pub let M_INC_34: i32 = 35
+pub let M_INC_35: i32 = 36
+pub let M_INC_36: i32 = 37
+pub let M_INC_37: i32 = 38
+pub let M_INC_38: i32 = 39
+pub let M_INC_39: i32 = 40
+pub let M_INC_40: i32 = 41
+pub let M_INC_41: i32 = 42
+pub let M_INC_42: i32 = 43
+pub let M_INC_43: i32 = 44
+pub let M_INC_44: i32 = 45
+pub let M_INC_45: i32 = 46
+pub let M_INC_46: i32 = 47
+pub let M_INC_47: i32 = 48
+pub let M_INC_48: i32 = 49
+pub let M_INC_49: i32 = 50
+pub let M_INC_50: i32 = 51
+pub let M_INC_51: i32 = 52
+pub let M_INC_52: i32 = 53
+pub let M_DEC_1: i32 = 0
+pub let M_DEC_2: i32 = 1
+pub let M_DEC_3: i32 = 2
+pub let M_DEC_4: i32 = 3
+pub let M_DEC_5: i32 = 4
+pub let M_DEC_6: i32 = 5
+pub let M_DEC_7: i32 = 6
+pub let M_DEC_8: i32 = 7
+pub let M_DEC_9: i32 = 8
+pub let M_DEC_10: i32 = 9
+pub let M_DEC_11: i32 = 10
+pub let M_DEC_12: i32 = 11
+pub let M_DEC_13: i32 = 12
+pub let M_DEC_14: i32 = 13
+pub let M_DEC_15: i32 = 14
+pub let M_DEC_17: i32 = 16
+pub let M_DEC_18: i32 = 17
+pub let M_DEC_19: i32 = 18
+pub let M_DEC_20: i32 = 19
+pub let M_DEC_21: i32 = 20
+pub let M_DEC_22: i32 = 21
+pub let M_DEC_23: i32 = 22
+pub let M_DEC_24: i32 = 23
+pub let M_DEC_25: i32 = 24
+pub let M_DEC_26: i32 = 25
+pub let M_DEC_27: i32 = 26
+pub let M_DEC_28: i32 = 27
+pub let M_DEC_29: i32 = 28
+pub let M_DEC_30: i32 = 29
+pub let M_DEC_31: i32 = 30
+pub let M_DEC_33: i32 = 32
+pub let M_DEC_34: i32 = 33
+pub let M_DEC_35: i32 = 34
+pub let M_DEC_36: i32 = 35
+pub let M_DEC_37: i32 = 36
+pub let M_DEC_38: i32 = 37
+pub let M_DEC_39: i32 = 38
+pub let M_DEC_40: i32 = 39
+pub let M_DEC_41: i32 = 40
+pub let M_DEC_42: i32 = 41
+pub let M_DEC_43: i32 = 42
+pub let M_DEC_44: i32 = 43
+pub let M_DEC_45: i32 = 44
+pub let M_DEC_46: i32 = 45
+pub let M_DEC_47: i32 = 46
+pub let M_DEC_48: i32 = 47
+pub let M_DEC_49: i32 = 48
+pub let M_DEC_50: i32 = 49
+pub let M_DEC_51: i32 = 50
+pub let M_DEC_52: i32 = 51
 pub fn M_ADDI_0[T](n: T) -> T {
     n
 }
 pub fn M_SUBI_0[T](n: T) -> T {
     n
 }
-pub let M_NOTEQUAL_0_0: c_int = 0
-pub let M_NOTEQUAL_1_1: c_int = 0
-pub let M_NOTEQUAL_2_2: c_int = 0
-pub let M_NOTEQUAL_3_3: c_int = 0
-pub let M_NOTEQUAL_4_4: c_int = 0
-pub let M_NOTEQUAL_5_5: c_int = 0
-pub let M_NOTEQUAL_6_6: c_int = 0
-pub let M_NOTEQUAL_7_7: c_int = 0
-pub let M_NOTEQUAL_8_8: c_int = 0
-pub let M_NOTEQUAL_9_9: c_int = 0
-pub let M_NOTEQUAL_10_10: c_int = 0
-pub let M_NOTEQUAL_11_11: c_int = 0
-pub let M_NOTEQUAL_12_12: c_int = 0
-pub let M_NOTEQUAL_13_13: c_int = 0
-pub let M_NOTEQUAL_14_14: c_int = 0
-pub let M_NOTEQUAL_15_15: c_int = 0
-pub let M_NOTEQUAL_17_17: c_int = 0
-pub let M_NOTEQUAL_18_18: c_int = 0
-pub let M_NOTEQUAL_19_19: c_int = 0
-pub let M_NOTEQUAL_20_20: c_int = 0
-pub let M_NOTEQUAL_21_21: c_int = 0
-pub let M_NOTEQUAL_22_22: c_int = 0
-pub let M_NOTEQUAL_23_23: c_int = 0
-pub let M_NOTEQUAL_24_24: c_int = 0
-pub let M_NOTEQUAL_25_25: c_int = 0
-pub let M_NOTEQUAL_26_26: c_int = 0
-pub let M_NOTEQUAL_27_27: c_int = 0
-pub let M_NOTEQUAL_28_28: c_int = 0
-pub let M_NOTEQUAL_29_29: c_int = 0
-pub let M_NOTEQUAL_30_30: c_int = 0
-pub let M_NOTEQUAL_31_31: c_int = 0
-pub let M_NOTEQUAL_33_33: c_int = 0
-pub let M_NOTEQUAL_34_34: c_int = 0
-pub let M_NOTEQUAL_35_35: c_int = 0
-pub let M_NOTEQUAL_36_36: c_int = 0
-pub let M_NOTEQUAL_37_37: c_int = 0
-pub let M_NOTEQUAL_38_38: c_int = 0
-pub let M_NOTEQUAL_39_39: c_int = 0
-pub let M_NOTEQUAL_40_40: c_int = 0
-pub let M_NOTEQUAL_41_41: c_int = 0
-pub let M_NOTEQUAL_42_42: c_int = 0
-pub let M_NOTEQUAL_43_43: c_int = 0
-pub let M_NOTEQUAL_44_44: c_int = 0
-pub let M_NOTEQUAL_45_45: c_int = 0
-pub let M_NOTEQUAL_46_46: c_int = 0
-pub let M_NOTEQUAL_47_47: c_int = 0
-pub let M_NOTEQUAL_48_48: c_int = 0
-pub let M_NOTEQUAL_49_49: c_int = 0
-pub let M_NOTEQUAL_50_50: c_int = 0
-pub let M_NOTEQUAL_51_51: c_int = 0
-pub let M_NOTEQUAL_52_52: c_int = 0
+pub let M_NOTEQUAL_0_0: i32 = 0
+pub let M_NOTEQUAL_1_1: i32 = 0
+pub let M_NOTEQUAL_2_2: i32 = 0
+pub let M_NOTEQUAL_3_3: i32 = 0
+pub let M_NOTEQUAL_4_4: i32 = 0
+pub let M_NOTEQUAL_5_5: i32 = 0
+pub let M_NOTEQUAL_6_6: i32 = 0
+pub let M_NOTEQUAL_7_7: i32 = 0
+pub let M_NOTEQUAL_8_8: i32 = 0
+pub let M_NOTEQUAL_9_9: i32 = 0
+pub let M_NOTEQUAL_10_10: i32 = 0
+pub let M_NOTEQUAL_11_11: i32 = 0
+pub let M_NOTEQUAL_12_12: i32 = 0
+pub let M_NOTEQUAL_13_13: i32 = 0
+pub let M_NOTEQUAL_14_14: i32 = 0
+pub let M_NOTEQUAL_15_15: i32 = 0
+pub let M_NOTEQUAL_17_17: i32 = 0
+pub let M_NOTEQUAL_18_18: i32 = 0
+pub let M_NOTEQUAL_19_19: i32 = 0
+pub let M_NOTEQUAL_20_20: i32 = 0
+pub let M_NOTEQUAL_21_21: i32 = 0
+pub let M_NOTEQUAL_22_22: i32 = 0
+pub let M_NOTEQUAL_23_23: i32 = 0
+pub let M_NOTEQUAL_24_24: i32 = 0
+pub let M_NOTEQUAL_25_25: i32 = 0
+pub let M_NOTEQUAL_26_26: i32 = 0
+pub let M_NOTEQUAL_27_27: i32 = 0
+pub let M_NOTEQUAL_28_28: i32 = 0
+pub let M_NOTEQUAL_29_29: i32 = 0
+pub let M_NOTEQUAL_30_30: i32 = 0
+pub let M_NOTEQUAL_31_31: i32 = 0
+pub let M_NOTEQUAL_33_33: i32 = 0
+pub let M_NOTEQUAL_34_34: i32 = 0
+pub let M_NOTEQUAL_35_35: i32 = 0
+pub let M_NOTEQUAL_36_36: i32 = 0
+pub let M_NOTEQUAL_37_37: i32 = 0
+pub let M_NOTEQUAL_38_38: i32 = 0
+pub let M_NOTEQUAL_39_39: i32 = 0
+pub let M_NOTEQUAL_40_40: i32 = 0
+pub let M_NOTEQUAL_41_41: i32 = 0
+pub let M_NOTEQUAL_42_42: i32 = 0
+pub let M_NOTEQUAL_43_43: i32 = 0
+pub let M_NOTEQUAL_44_44: i32 = 0
+pub let M_NOTEQUAL_45_45: i32 = 0
+pub let M_NOTEQUAL_46_46: i32 = 0
+pub let M_NOTEQUAL_47_47: i32 = 0
+pub let M_NOTEQUAL_48_48: i32 = 0
+pub let M_NOTEQUAL_49_49: i32 = 0
+pub let M_NOTEQUAL_50_50: i32 = 0
+pub let M_NOTEQUAL_51_51: i32 = 0
+pub let M_NOTEQUAL_52_52: i32 = 0
 pub fn M_PAIR_1[T](a: T, b: T) -> T {
     a
 }
@@ -1234,14 +1237,14 @@ pub fn M_REDUCEI3_52[T](f: T, g: T, d: T, _1: T, _2: T, _3: T, _4: T, _5: T, _6:
 pub fn M_CROSSI_MAP2_F_C[T](f: T, d: T, a1: T, b1: T) -> T {
     f(d, a1, b1)
 }
-pub let M_NDEBUG_TEST: c_int = 0
+pub let M_NDEBUG_TEST: i32 = 0
 pub fn M_AS_STRI(x: str) -> str {
     x
 }
 pub fn M_OPL_AS_STR(x: i32) {
     return
 }
-pub let M_USE_IDENTIFIER_ALLOC: c_int = 128
+pub let M_USE_IDENTIFIER_ALLOC: i32 = 128
 pub fn M_PRINTF_FORMAT_EXTEND() {
     return
 }
@@ -1260,17 +1263,17 @@ pub fn M_ADD_SIZE[T](a: T, b: T) -> T {
 pub fn M_VLA[T](n: T) -> T {
     n
 }
-pub let M_USE_HASH_SEED: c_ulong = 0
-pub let M_HASH_INIT: c_ulong = 0
+pub let M_USE_HASH_SEED: u64 = 0
+pub let M_HASH_INIT: u64 = 0
 pub fn M_HASH_CALC[T](h1: T, h2: T) -> T {
     ((h1 * 0x811C9DC5u64) ^ h2)
 }
 pub fn M_HASH_FINAL[T](hash: T) -> T {
-    ((hash >> (((sizeof[c_ulong]() * 8) / 2) as u32)) ^ hash)
+    ((hash >> (((sizeof[u64]() * 8) / 2) as u32)) ^ hash)
 }
-pub let M_USE_UNDEF_OPLIST_TERMS: c_int = 0
-pub fn M_EQUAL_DEFAULT[T](a: T, b: T) -> c_int {
-    ((a == b) as c_int)
+pub let M_USE_UNDEF_OPLIST_TERMS: i32 = 0
+pub fn M_EQUAL_DEFAULT[T](a: T, b: T) -> i32 {
+    ((a == b) as i32)
 }
 pub fn M_CMP_DEFAULT[T](a: T, b: T) -> T {
     (if (a < b): -1 else: (a > b))
@@ -1284,8 +1287,8 @@ pub fn M_INC_ALLOC_DEFAULT[T](n: T) -> T {
 pub fn M_RESET_POD[T](a: T) -> i64 {
     with_memset(&a as *mut u8, 0, sizeof[T]() as i64)
 }
-pub fn M_CSTR_EQUAL[T](a: T, b: T) -> c_int {
-    ((strcmp(a, b) == 0) as c_int)
+pub fn M_CSTR_EQUAL[T](a: T, b: T) -> i32 {
+    ((strcmp(a, b) == 0) as i32)
 }
 pub fn M_GLOBALI_OPLIST_ID[T](a: T) -> T {
     a
@@ -1308,31 +1311,31 @@ pub fn M_INIT_KEY_VAI_ID[T](a: T) -> T {
 pub fn M_EMPLACE_ASS_ARRAY_DEF_EXPAND_BOTH_EMP_TYPE_LIST[T](val_emp: T) -> T {
     val_emp
 }
-pub let M_USE_BACKOFF_MAX_COUNT: c_int = 8
-pub let M_USE_SERIAL_MAX_DATA_SIZE: c_int = 4
-pub let M_BPTR33_MAX_STACK: c_int = 65
-pub let M_BPTR33_TRANSACTION_MAX: c_int = 265
+pub let M_USE_BACKOFF_MAX_COUNT: i32 = 8
+pub let M_USE_SERIAL_MAX_DATA_SIZE: i32 = 4
+pub let M_BPTR33_MAX_STACK: i32 = 65
+pub let M_BPTR33_TRANSACTION_MAX: i32 = 265
 pub fn MLIB_SLOT_CLEAR[T](s: T) -> T {
     unsafe { mlib_slot_release(s) }
 }
 @[repr(C)]
-pub type multimap_pair_s { pub key_ptr: *mut c_int = null, pub value_ptr: *mut c_int = null }
+pub type multimap_pair_s { pub key_ptr: *mut i32 = null, pub value_ptr: *mut i32 = null }
 impl Copy for multimap_pair_s
 
 pub type multimap_itref_t = multimap_pair_s
 
 @[repr(C)]
-pub type multimap_kind_s = union { pub value: [c_int; 6] = [0 as c_int; 6], pub node: [*mut multimap_node_s; 7] = [null as *mut multimap_node_s; 7] }
+pub type multimap_kind_s = union { pub value: [i32; 6] = [0 as i32; 6], pub node: [*mut multimap_node_s; 7] = [null as *mut multimap_node_s; 7] }
 impl Copy for multimap_kind_s
 
 @[repr(C)]
-pub type multimap_node_s { pub num: c_int = 0, pub key: [c_int; 6] = [0 as c_int; 6], pub next: *mut multimap_node_s = null, pub prev: *mut multimap_node_s = null, pub kind: multimap_kind_s }
+pub type multimap_node_s { pub num: i32 = 0, pub key: [i32; 6] = [0 as i32; 6], pub next: *mut multimap_node_s = null, pub prev: *mut multimap_node_s = null, pub kind: multimap_kind_s }
 impl Copy for multimap_node_s
 
 pub type multimap_node_ct = *mut multimap_node_s
 
 @[repr(C)]
-pub type multimap_s { pub root: *mut multimap_node_s = null, pub size: c_ulong = 0 }
+pub type multimap_s { pub root: *mut multimap_node_s = null, pub size: u64 = 0 }
 impl Copy for multimap_s
 
 pub type multimap_t = [multimap_s; 1]
@@ -1343,20 +1346,20 @@ pub type multimap_srcptr = *const multimap_s
 
 pub type multimap_subtype_ct = multimap_pair_s
 
-pub type multimap_key_ct = c_int
+pub type multimap_key_ct = i32
 
-pub type multimap_value_ct = c_int
+pub type multimap_value_ct = i32
 
 pub type multimap_ct = [multimap_s; 1]
 
 @[repr(C)]
-pub type multimap_parent_it_s { pub num: c_int = 0, pub parent: [*mut multimap_node_s; 65] = [null as *mut multimap_node_s; 65] }
+pub type multimap_parent_it_s { pub num: i32 = 0, pub parent: [*mut multimap_node_s; 65] = [null as *mut multimap_node_s; 65] }
 impl Copy for multimap_parent_it_s
 
 pub type multimap_pit_ct = [multimap_parent_it_s; 1]
 
 @[repr(C)]
-pub type multimap_it_s { pub pair: multimap_pair_s, pub node: *mut multimap_node_s = null, pub idx: c_int = 0 }
+pub type multimap_it_s { pub pair: multimap_pair_s, pub node: *mut multimap_node_s = null, pub idx: i32 = 0 }
 impl Copy for multimap_it_s
 
 pub type multimap_it_t = [multimap_it_s; 1]

@@ -23,27 +23,27 @@ use std.option
 use std.collections
 
 fn test_compare_int() -> Unit {
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
 
-    (__local_a = ((1 as c_int)))
+    (__local_a = ((1 as i32)))
 
-    (__local_b = ((2 as c_int)))
+    (__local_b = ((2 as i32)))
 
-    if (((if not ((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (53 as c_int), c"!int_equal(&a, &b)".ptr)
+    if (((if not ((if not (unsafe { int_equal(((&raw mut __local_a as *mut i32) as *mut c_void), ((&raw mut __local_b as *mut i32) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (53 as i32), c"!int_equal(&a, &b)".ptr)
     } else {
         0
     }
 
-    (__local_a = ((2 as c_int)))
+    (__local_a = ((2 as i32)))
 
-    (__local_b = ((2 as c_int)))
+    (__local_b = ((2 as i32)))
 
-    if (((if not (unsafe { int_equal(((&raw mut __local_a as *mut c_int) as *mut c_void), ((&raw mut __local_b as *mut c_int) as *mut c_void)) } != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (55 as c_int), c"int_equal(&a, &b)".ptr)
+    if (((if not (unsafe { int_equal(((&raw mut __local_a as *mut i32) as *mut c_void), ((&raw mut __local_b as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_int".ptr, c"test-cpp.c".ptr, (55 as i32), c"int_equal(&a, &b)".ptr)
     } else {
         0
     }
@@ -51,9 +51,9 @@ fn test_compare_int() -> Unit {
 }
 
 fn test_compare_pointer() -> Unit {
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
 
     var __local_p1: *mut c_void
@@ -61,22 +61,22 @@ fn test_compare_pointer() -> Unit {
     var __local_p2: *mut c_void
 
 
-    (__local_p1 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p1 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    (__local_p2 = (((&raw mut __local_b as *mut c_int) as *mut c_void)))
+    (__local_p2 = (((&raw mut __local_b as *mut i32) as *mut c_void)))
 
-    if (((if not ((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (64 as c_int), c"!pointer_equal(p1, p2)".ptr)
+    if (((if not ((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (64 as i32), c"!pointer_equal(p1, p2)".ptr)
     } else {
         0
     }
 
-    (__local_p1 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p1 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    (__local_p2 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p2 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    if (((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (66 as c_int), c"pointer_equal(p1, p2)".ptr)
+    if (((if not (unsafe { pointer_equal(__local_p1, __local_p2) } != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_pointer".ptr, c"test-cpp.c".ptr, (66 as i32), c"pointer_equal(p1, p2)".ptr)
     } else {
         0
     }
@@ -90,14 +90,14 @@ fn test_compare_string() -> Unit {
 
     var __local_s3: List[c_char] = [119, 111, 114, 108, 100, 0]
 
-    if (((if not ((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s3[0] as *mut c_char)) } != 0): 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (75 as c_int), c"!string_equal(s1, s3)".ptr)
+    if (((if not ((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s3[0] as *mut c_char)) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (75 as i32), c"!string_equal(s1, s3)".ptr)
     } else {
         0
     }
 
-    if (((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s2[0] as *mut c_char)) } != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (76 as c_int), c"string_equal(s1, s2)".ptr)
+    if (((if not (unsafe { string_equal((&__local_s1[0] as *mut c_char), (&__local_s2[0] as *mut c_char)) } != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_compare_string".ptr, c"test-cpp.c".ptr, (76 as i32), c"string_equal(s1, s2)".ptr)
     } else {
         0
     }
@@ -105,27 +105,27 @@ fn test_compare_string() -> Unit {
 }
 
 fn test_hash_int() -> Unit {
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
 
-    (__local_a = ((1 as c_int)))
+    (__local_a = ((1 as i32)))
 
-    (__local_b = ((2 as c_int)))
+    (__local_b = ((2 as i32)))
 
-    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } != unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (84 as c_int), c"int_hash(&a) != int_hash(&b)".ptr)
+    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut i32) as *mut c_void)) } != unsafe { int_hash(((&raw mut __local_b as *mut i32) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (84 as i32), c"int_hash(&a) != int_hash(&b)".ptr)
     } else {
         0
     }
 
-    (__local_a = ((2 as c_int)))
+    (__local_a = ((2 as i32)))
 
-    (__local_b = ((2 as c_int)))
+    (__local_b = ((2 as i32)))
 
-    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut c_int) as *mut c_void)) } == unsafe { int_hash(((&raw mut __local_b as *mut c_int) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (86 as c_int), c"int_hash(&a) == int_hash(&b)".ptr)
+    if (((if not ((if unsafe { int_hash(((&raw mut __local_a as *mut i32) as *mut c_void)) } == unsafe { int_hash(((&raw mut __local_b as *mut i32) as *mut c_void)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_int".ptr, c"test-cpp.c".ptr, (86 as i32), c"int_hash(&a) == int_hash(&b)".ptr)
     } else {
         0
     }
@@ -133,9 +133,9 @@ fn test_hash_int() -> Unit {
 }
 
 fn test_hash_pointer() -> Unit {
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
 
     var __local_p1: *mut c_void
@@ -143,22 +143,22 @@ fn test_hash_pointer() -> Unit {
     var __local_p2: *mut c_void
 
 
-    (__local_p1 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p1 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    (__local_p2 = (((&raw mut __local_b as *mut c_int) as *mut c_void)))
+    (__local_p2 = (((&raw mut __local_b as *mut i32) as *mut c_void)))
 
-    if (((if not ((if unsafe { pointer_hash(__local_p1) } != unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (95 as c_int), c"pointer_hash(p1) != pointer_hash(p2)".ptr)
+    if (((if not ((if unsafe { pointer_hash(__local_p1) } != unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (95 as i32), c"pointer_hash(p1) != pointer_hash(p2)".ptr)
     } else {
         0
     }
 
-    (__local_p1 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p1 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    (__local_p2 = (((&raw mut __local_a as *mut c_int) as *mut c_void)))
+    (__local_p2 = (((&raw mut __local_a as *mut i32) as *mut c_void)))
 
-    if (((if not ((if unsafe { pointer_hash(__local_p1) } == unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (97 as c_int), c"pointer_hash(p1) == pointer_hash(p2)".ptr)
+    if (((if not ((if unsafe { pointer_hash(__local_p1) } == unsafe { pointer_hash(__local_p2) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_pointer".ptr, c"test-cpp.c".ptr, (97 as i32), c"pointer_hash(p1) == pointer_hash(p2)".ptr)
     } else {
         0
     }
@@ -172,14 +172,14 @@ fn test_hash_string() -> Unit {
 
     var __local_s3: List[c_char] = [119, 111, 114, 108, 100, 0]
 
-    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } != unsafe { string_hash((&__local_s3[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (106 as c_int), c"string_hash(s1) != string_hash(s3)".ptr)
+    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } != unsafe { string_hash((&__local_s3[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (106 as i32), c"string_hash(s1) != string_hash(s3)".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } == unsafe { string_hash((&__local_s2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as c_long) != 0) {
-        __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (107 as c_int), c"string_hash(s1) == string_hash(s2)".ptr)
+    if (((if not ((if unsafe { string_hash((&__local_s1[0] as *mut c_char)) } == unsafe { string_hash((&__local_s2[0] as *mut c_char)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"test_hash_string".ptr, c"test-cpp.c".ptr, (107 as i32), c"string_hash(s1) == string_hash(s2)".ptr)
     } else {
         0
     }
@@ -189,7 +189,7 @@ fn test_hash_string() -> Unit {
 fn test_arraylist() {
     var __local_arraylist: *mut _ArrayList
 
-    (__local_arraylist = arraylist_new((0 as c_uint)))
+    (__local_arraylist = arraylist_new((0 as u32)))
 
     unsafe { arraylist_free(__local_arraylist) }
 
@@ -225,7 +225,7 @@ fn test_binomial_heap() {
 fn test_bloom_filter() {
     var __local_filter: *mut _BloomFilter
 
-    (__local_filter = bloom_filter_new((16 as c_uint), Some(string_hash), (10 as c_uint)))
+    (__local_filter = bloom_filter_new((16 as u32), Some(string_hash), (10 as u32)))
 
     unsafe { bloom_filter_free(__local_filter) }
 
@@ -243,18 +243,18 @@ fn test_hash_table() {
 fn test_list() {
     var __local_list: *mut _ListEntry = ((null as *mut _ListEntry))
 
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
-    var __local_c: c_int
+    var __local_c: i32
 
 
-    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_a as *mut c_int) as *mut c_void)) }
+    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_a as *mut i32) as *mut c_void)) }
 
-    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_b as *mut c_int) as *mut c_void)) }
+    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_b as *mut i32) as *mut c_void)) }
 
-    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_c as *mut c_int) as *mut c_void)) }
+    unsafe { list_prepend((&raw mut __local_list as *mut *mut _ListEntry), ((&raw mut __local_c as *mut i32) as *mut c_void)) }
 
     unsafe { list_free(__local_list) }
 
@@ -281,18 +281,18 @@ fn test_set() {
 fn test_slist() {
     var __local_list: *mut _SListEntry = ((null as *mut _SListEntry))
 
-    var __local_a: c_int
+    var __local_a: i32
 
-    var __local_b: c_int
+    var __local_b: i32
 
-    var __local_c: c_int
+    var __local_c: i32
 
 
-    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_a as *mut c_int) as *mut c_void)) }
+    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_a as *mut i32) as *mut c_void)) }
 
-    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_b as *mut c_int) as *mut c_void)) }
+    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_b as *mut i32) as *mut c_void)) }
 
-    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_c as *mut c_int) as *mut c_void)) }
+    unsafe { slist_prepend((&raw mut __local_list as *mut *mut _SListEntry), ((&raw mut __local_c as *mut i32) as *mut c_void)) }
 
     unsafe { slist_free(__local_list) }
 
@@ -307,7 +307,7 @@ fn test_trie() {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut c_char) -> c_int writes allocation_limit {
+pub unsafe fn main(__param_argc: i32, __param_argv: *mut *mut c_char) -> i32 writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
 }

@@ -2,39 +2,39 @@
 use std.engines.tommyds.defs
 use std.collections
 
-fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
+fn tommy_ilog2_u32(__param_value: u32) -> u32 {
+    return (((((__param_value as u32).clz() as i32) ^ (31 as i32)) as u32))
 
 }
 
-fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
+fn tommy_ilog2_u64(__param_value: u64) -> u32 {
+    return (((((__param_value as u64).clz() as i32) ^ (63 as i32)) as u32))
 
 }
 
-fn tommy_ctz_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).ctz() as c_uint))
+fn tommy_ctz_u32(__param_value: u32) -> u32 {
+    return (((__param_value as u32).ctz() as u32))
 
 }
 
-fn tommy_ctz_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).ctz() as c_uint))
+fn tommy_ctz_u64(__param_value: u64) -> u32 {
+    return (((__param_value as u64).ctz() as u32))
 
 }
 
-fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
+fn tommy_roundup_pow2_u32(__param_value: u32) -> u32 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (1 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (1 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (2 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (2 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (4 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (4 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (8 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (8 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (16 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (16 as u32)) as u32))
 
     (__local_value = (__local_value +% 1))
 
@@ -42,21 +42,21 @@ fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
 
 }
 
-fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
+fn tommy_roundup_pow2_u64(__param_value: u64) -> u64 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (1 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (1 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (2 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (2 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (4 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (4 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (8 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (8 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (16 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (16 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (32 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (32 as u32)) as u64))
 
     (__local_value = (__local_value +% 1))
 
@@ -64,23 +64,23 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 
 }
 
-fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
+fn tommy_haszero_u32(__param_value: u32) -> i32 {
+    return (if ((((((__param_value as u32) -% (16843009 as u32)) as u32) & ((~__param_value) as u32)) as u32) & (2155905152 as u32)) != 0: 1 else: 0)
 
 }
 
-pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const c_void, __param_key_len: c_ulonglong) -> c_uint {
+pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_void, __param_key_len: u64) -> u32 {
     var __local_key_len = __param_key_len
     var __local_key: *const u8 = ((__param_void_key as *const u8))
 
-    var __local_a: c_uint
+    var __local_a: u32
 
-    var __local_b: c_uint
+    var __local_b: u32
 
-    var __local_c: c_uint
+    var __local_c: u32
 
 
-    (__local_c = ((((((3735928559 as c_uint) +% (__local_key_len as c_uint)) as c_uint) +% (__param_init_val as c_uint)) as c_uint)))
+    (__local_c = ((((((3735928559 as u32) +% (__local_key_len as u32)) as u32) +% (__param_init_val as u32)) as u32)))
 
     (__local_b = __local_c)
 
@@ -97,37 +97,37 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
         loop {
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (6 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 6) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (6 as u32)) as u32) | (((__local_a as u32) >> ((32 - 6) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (8 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 8) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (8 as u32)) as u32) | (((__local_b as u32) >> ((32 - 8) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (16 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 16) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (16 as u32)) as u32) | (((__local_c as u32) >> ((32 - 16) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (19 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 19) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (19 as u32)) as u32) | (((__local_a as u32) >> ((32 - 19) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (4 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (4 as u32)) as u32) | (((__local_b as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
@@ -156,11 +156,11 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             11 => {
-                (__local_c = (__local_c +% (((__local_key[10]) as c_uint) << (16 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[10]) as u32) << (16 as u32))))
 
-                (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[9]) as u32) << (8 as u32))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -171,9 +171,9 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             10 => {
-                (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[9]) as u32) << (8 as u32))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -183,7 +183,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             9 => {
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -198,11 +198,11 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             7 => {
-                (__local_b = (__local_b +% (((__local_key[6]) as c_uint) << (16 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[6]) as u32) << (16 as u32))))
 
-                (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[5]) as u32) << (8 as u32))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -210,16 +210,16 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
             },
             6 => {
-                (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[5]) as u32) << (8 as u32))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
 
             },
             5 => {
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -228,22 +228,22 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
             },
             3 => {
-                (__local_a = (__local_a +% (((__local_key[2]) as c_uint) << (16 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[2]) as u32) << (16 as u32))))
 
-                (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[1]) as u32) << (8 as u32))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
 
 
             },
             2 => {
-                (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[1]) as u32) << (8 as u32))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
 
             },
             1 => {
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
             },
         }
 
@@ -252,33 +252,33 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
     }
 
     loop {
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (14 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (14 as u32)) as u32) | (((__local_b as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (11 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 11) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (11 as u32)) as u32) | (((__local_c as u32) >> ((32 - 11) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (25 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 25) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (25 as u32)) as u32) | (((__local_a as u32) >> ((32 - 25) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (16 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 16) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (16 as u32)) as u32) | (((__local_b as u32) >> ((32 - 16) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (14 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (14 as u32)) as u32) | (((__local_a as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (24 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 24) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
         if not ((0 != 0)) {
             break
@@ -289,25 +289,25 @@ pub unsafe fn tommy_hash_u32(__param_init_val: c_uint, __param_void_key: *const 
 
 }
 
-pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *const c_void, __param_key_len: c_ulonglong) -> c_ulonglong {
+pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_void, __param_key_len: u64) -> u64 {
     var __local_key_len = __param_key_len
     var __local_key: *const u8 = ((__param_void_key as *const u8))
 
-    var __local_a: c_uint
+    var __local_a: u32
 
-    var __local_b: c_uint
+    var __local_b: u32
 
-    var __local_c: c_uint
+    var __local_c: u32
 
 
-    (__local_c = ((((((3735928559 as c_uint) +% (__local_key_len as c_uint)) as c_ulonglong) +% (((__param_init_val as c_ulonglong) & (4294967295 as c_ulonglong)) as c_ulonglong)) as c_uint)))
+    (__local_c = ((((((3735928559 as u32) +% (__local_key_len as u32)) as u64) +% (((__param_init_val as u64) & (4294967295 as u64)) as u64)) as u32)))
 
     (__local_b = __local_c)
 
     (__local_a = __local_b)
 
 
-    (__local_c = (((__local_c +% (((__param_init_val as c_ulonglong) >> (32 as c_uint)) as c_uint)) as c_uint)))
+    (__local_c = (((__local_c +% (((__param_init_val as u64) >> (32 as u32)) as u32)) as u32)))
 
     while ((if __local_key_len > 12: 1 else: 0) != 0) {
         (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
@@ -319,37 +319,37 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
         loop {
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (6 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 6) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (6 as u32)) as u32) | (((__local_a as u32) >> ((32 - 6) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (8 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 8) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (8 as u32)) as u32) | (((__local_b as u32) >> ((32 - 8) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (16 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 16) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (16 as u32)) as u32) | (((__local_c as u32) >> ((32 - 16) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (19 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 19) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (19 as u32)) as u32) | (((__local_a as u32) >> ((32 - 19) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (4 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (4 as u32)) as u32) | (((__local_b as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
@@ -367,7 +367,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
     while true {
         match __local_key_len {
             0 => {
-                return ((__local_c as c_ulonglong) +% (((__local_b as c_ulonglong) << (32 as c_uint)) as c_ulonglong))
+                return ((__local_c as u64) +% (((__local_b as u64) << (32 as u32)) as u64))
             },
             12 => {
                 (__local_c = (__local_c +% tommy_le_uint32_read(((__local_key + ((8 as isize) as usize)) as *const c_void))))
@@ -378,11 +378,11 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             11 => {
-                (__local_c = (__local_c +% (((__local_key[10]) as c_uint) << (16 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[10]) as u32) << (16 as u32))))
 
-                (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[9]) as u32) << (8 as u32))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -393,9 +393,9 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             10 => {
-                (__local_c = (__local_c +% (((__local_key[9]) as c_uint) << (8 as c_uint))))
+                (__local_c = (__local_c +% (((__local_key[9]) as u32) << (8 as u32))))
 
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -405,7 +405,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             9 => {
-                (__local_c = (__local_c +% ((__local_key[8]) as c_uint)))
+                (__local_c = (__local_c +% ((__local_key[8]) as u32)))
 
                 (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
 
@@ -420,11 +420,11 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             7 => {
-                (__local_b = (__local_b +% (((__local_key[6]) as c_uint) << (16 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[6]) as u32) << (16 as u32))))
 
-                (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[5]) as u32) << (8 as u32))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -432,16 +432,16 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
 
             },
             6 => {
-                (__local_b = (__local_b +% (((__local_key[5]) as c_uint) << (8 as c_uint))))
+                (__local_b = (__local_b +% (((__local_key[5]) as u32) << (8 as u32))))
 
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
 
             },
             5 => {
-                (__local_b = (__local_b +% ((__local_key[4]) as c_uint)))
+                (__local_b = (__local_b +% ((__local_key[4]) as u32)))
 
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
@@ -450,22 +450,22 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
                 (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
             },
             3 => {
-                (__local_a = (__local_a +% (((__local_key[2]) as c_uint) << (16 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[2]) as u32) << (16 as u32))))
 
-                (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[1]) as u32) << (8 as u32))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
 
 
             },
             2 => {
-                (__local_a = (__local_a +% (((__local_key[1]) as c_uint) << (8 as c_uint))))
+                (__local_a = (__local_a +% (((__local_key[1]) as u32) << (8 as u32))))
 
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
 
             },
             1 => {
-                (__local_a = (__local_a +% ((__local_key[0]) as c_uint)))
+                (__local_a = (__local_a +% ((__local_key[0]) as u32)))
             },
         }
 
@@ -474,56 +474,56 @@ pub unsafe fn tommy_hash_u64(__param_init_val: c_ulonglong, __param_void_key: *c
     }
 
     loop {
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (14 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (14 as u32)) as u32) | (((__local_b as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (11 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 11) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (11 as u32)) as u32) | (((__local_c as u32) >> ((32 - 11) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (25 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 25) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (25 as u32)) as u32) | (((__local_a as u32) >> ((32 - 25) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (16 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 16) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (16 as u32)) as u32) | (((__local_b as u32) >> ((32 - 16) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (14 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (14 as u32)) as u32) | (((__local_a as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (24 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 24) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
         if not ((0 != 0)) {
             break
         }
     }
 
-    return ((__local_c as c_ulonglong) +% (((__local_b as c_ulonglong) << (32 as c_uint)) as c_ulonglong))
+    return ((__local_c as u64) +% (((__local_b as u64) << (32 as u32)) as u64))
 
 }
 
-pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *const c_void) -> c_uint {
+pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const c_void) -> u32 {
     var __local_key: *const u8 = ((__param_void_key as *const u8))
 
-    var __local_a: c_uint
+    var __local_a: u32
 
-    var __local_b: c_uint
+    var __local_b: u32
 
-    var __local_c: c_uint
+    var __local_c: u32
 
 
-    var __local_m: List[c_uint] = [255, 65280, 16711680]
+    var __local_m: List[u32] = [255, 65280, 16711680]
 
-    (__local_c = ((((3735928559 as c_uint) +% (__param_init_val as c_uint)) as c_uint)))
+    (__local_c = ((((3735928559 as u32) +% (__param_init_val as u32)) as u32)))
 
     (__local_b = __local_c)
 
@@ -531,17 +531,17 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
 
 
     while (1 != 0) {
-        var __local_v: c_uint = ((tommy_le_uint32_read((__local_key as *const c_void)) as c_uint))
+        var __local_v: u32 = ((tommy_le_uint32_read((__local_key as *const c_void)) as u32))
 
         if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as c_uint) & (__local_m[0] as c_uint)) != 0) {
-                (__local_a = (__local_a +% ((__local_v as c_uint) & (__local_m[0] as c_uint))))
+            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+                (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as c_uint) & (__local_m[1] as c_uint)) != 0) {
-                    (__local_a = (__local_a +% ((__local_v as c_uint) & (__local_m[1] as c_uint))))
+                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                    (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as c_uint) & (__local_m[2] as c_uint)) != 0) {
-                        (__local_a = (__local_a +% ((__local_v as c_uint) & (__local_m[2] as c_uint))))
+                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                        (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
                 }
@@ -554,17 +554,17 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
 
         (__local_a = (__local_a +% __local_v))
 
-        (__local_v = ((tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void)) as c_uint)))
+        (__local_v = ((tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void)) as u32)))
 
         if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as c_uint) & (__local_m[0] as c_uint)) != 0) {
-                (__local_b = (__local_b +% ((__local_v as c_uint) & (__local_m[0] as c_uint))))
+            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+                (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as c_uint) & (__local_m[1] as c_uint)) != 0) {
-                    (__local_b = (__local_b +% ((__local_v as c_uint) & (__local_m[1] as c_uint))))
+                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                    (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as c_uint) & (__local_m[2] as c_uint)) != 0) {
-                        (__local_b = (__local_b +% ((__local_v as c_uint) & (__local_m[2] as c_uint))))
+                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                        (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
                 }
@@ -577,17 +577,17 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
 
         (__local_b = (__local_b +% __local_v))
 
-        (__local_v = ((tommy_le_uint32_read(((__local_key + ((8 as isize) as usize)) as *const c_void)) as c_uint)))
+        (__local_v = ((tommy_le_uint32_read(((__local_key + ((8 as isize) as usize)) as *const c_void)) as u32)))
 
         if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as c_uint) & (__local_m[0] as c_uint)) != 0) {
-                (__local_c = (__local_c +% ((__local_v as c_uint) & (__local_m[0] as c_uint))))
+            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+                (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as c_uint) & (__local_m[1] as c_uint)) != 0) {
-                    (__local_c = (__local_c +% ((__local_v as c_uint) & (__local_m[1] as c_uint))))
+                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                    (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as c_uint) & (__local_m[2] as c_uint)) != 0) {
-                        (__local_c = (__local_c +% ((__local_v as c_uint) & (__local_m[2] as c_uint))))
+                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                        (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
                 }
@@ -603,37 +603,37 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
         loop {
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (6 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 6) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (6 as u32)) as u32) | (((__local_a as u32) >> ((32 - 6) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (8 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 8) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (8 as u32)) as u32) | (((__local_b as u32) >> ((32 - 8) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
             (__local_a = (__local_a -% __local_c))
 
-            (__local_a = (__local_a as c_uint) ^ (((((__local_c as c_uint) << (16 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 16) as c_uint)) as c_uint)) as c_uint))
+            (__local_a = (__local_a as u32) ^ (((((__local_c as u32) << (16 as u32)) as u32) | (((__local_c as u32) >> ((32 - 16) as u32)) as u32)) as u32))
 
             (__local_c = (__local_c +% __local_b))
 
             (__local_b = (__local_b -% __local_a))
 
-            (__local_b = (__local_b as c_uint) ^ (((((__local_a as c_uint) << (19 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 19) as c_uint)) as c_uint)) as c_uint))
+            (__local_b = (__local_b as u32) ^ (((((__local_a as u32) << (19 as u32)) as u32) | (((__local_a as u32) >> ((32 - 19) as u32)) as u32)) as u32))
 
             (__local_a = (__local_a +% __local_c))
 
             (__local_c = (__local_c -% __local_b))
 
-            (__local_c = (__local_c as c_uint) ^ (((((__local_b as c_uint) << (4 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 4) as c_uint)) as c_uint)) as c_uint))
+            (__local_c = (__local_c as u32) ^ (((((__local_b as u32) << (4 as u32)) as u32) | (((__local_b as u32) >> ((32 - 4) as u32)) as u32)) as u32))
 
             (__local_b = (__local_b +% __local_a))
 
@@ -647,33 +647,33 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
     }
 
     loop {
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (14 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (14 as u32)) as u32) | (((__local_b as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (11 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 11) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (11 as u32)) as u32) | (((__local_c as u32) >> ((32 - 11) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (25 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 25) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (25 as u32)) as u32) | (((__local_a as u32) >> ((32 - 25) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (16 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 16) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (16 as u32)) as u32) | (((__local_b as u32) >> ((32 - 16) as u32)) as u32))))
 
-        (__local_a = (__local_a as c_uint) ^ (__local_c as c_uint))
+        (__local_a = (__local_a as u32) ^ (__local_c as u32))
 
-        (__local_a = (__local_a -% ((((__local_c as c_uint) << (4 as c_uint)) as c_uint) | (((__local_c as c_uint) >> ((32 - 4) as c_uint)) as c_uint))))
+        (__local_a = (__local_a -% ((((__local_c as u32) << (4 as u32)) as u32) | (((__local_c as u32) >> ((32 - 4) as u32)) as u32))))
 
-        (__local_b = (__local_b as c_uint) ^ (__local_a as c_uint))
+        (__local_b = (__local_b as u32) ^ (__local_a as u32))
 
-        (__local_b = (__local_b -% ((((__local_a as c_uint) << (14 as c_uint)) as c_uint) | (((__local_a as c_uint) >> ((32 - 14) as c_uint)) as c_uint))))
+        (__local_b = (__local_b -% ((((__local_a as u32) << (14 as u32)) as u32) | (((__local_a as u32) >> ((32 - 14) as u32)) as u32))))
 
-        (__local_c = (__local_c as c_uint) ^ (__local_b as c_uint))
+        (__local_c = (__local_c as u32) ^ (__local_b as u32))
 
-        (__local_c = (__local_c -% ((((__local_b as c_uint) << (24 as c_uint)) as c_uint) | (((__local_b as c_uint) >> ((32 - 24) as c_uint)) as c_uint))))
+        (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
         if not ((0 != 0)) {
             break
@@ -684,50 +684,50 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: c_uint, __param_void_key: *con
 
 }
 
-pub fn tommy_inthash_u32(__param_key: c_uint) -> c_uint {
+pub fn tommy_inthash_u32(__param_key: u32) -> u32 {
     var __local_key = __param_key
-    (__local_key = (__local_key -% ((__local_key as c_uint) << (6 as c_uint))))
+    (__local_key = (__local_key -% ((__local_key as u32) << (6 as u32))))
 
-    (__local_key = (__local_key as c_uint) ^ (((__local_key as c_uint) >> (17 as c_uint)) as c_uint))
+    (__local_key = (__local_key as u32) ^ (((__local_key as u32) >> (17 as u32)) as u32))
 
-    (__local_key = (__local_key -% ((__local_key as c_uint) << (9 as c_uint))))
+    (__local_key = (__local_key -% ((__local_key as u32) << (9 as u32))))
 
-    (__local_key = (__local_key as c_uint) ^ (((__local_key as c_uint) << (4 as c_uint)) as c_uint))
+    (__local_key = (__local_key as u32) ^ (((__local_key as u32) << (4 as u32)) as u32))
 
-    (__local_key = (__local_key -% ((__local_key as c_uint) << (3 as c_uint))))
+    (__local_key = (__local_key -% ((__local_key as u32) << (3 as u32))))
 
-    (__local_key = (__local_key as c_uint) ^ (((__local_key as c_uint) << (10 as c_uint)) as c_uint))
+    (__local_key = (__local_key as u32) ^ (((__local_key as u32) << (10 as u32)) as u32))
 
-    (__local_key = (__local_key as c_uint) ^ (((__local_key as c_uint) >> (15 as c_uint)) as c_uint))
+    (__local_key = (__local_key as u32) ^ (((__local_key as u32) >> (15 as u32)) as u32))
 
     return __local_key
 
 }
 
-pub fn tommy_inthash_u64(__param_key: c_ulonglong) -> c_ulonglong {
+pub fn tommy_inthash_u64(__param_key: u64) -> u64 {
     var __local_key = __param_key
-    (__local_key = (((((~__local_key) as c_ulonglong) +% (((__local_key as c_ulonglong) << (21 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = (((((~__local_key) as u64) +% (((__local_key as u64) << (21 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((__local_key as c_ulonglong) ^ (((__local_key as c_ulonglong) >> (24 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((__local_key as u64) ^ (((__local_key as u64) >> (24 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((((__local_key as c_ulonglong) +% (((__local_key as c_ulonglong) << (3 as c_uint)) as c_ulonglong)) as c_ulonglong) +% (((__local_key as c_ulonglong) << (8 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((((__local_key as u64) +% (((__local_key as u64) << (3 as u32)) as u64)) as u64) +% (((__local_key as u64) << (8 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((__local_key as c_ulonglong) ^ (((__local_key as c_ulonglong) >> (14 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((__local_key as u64) ^ (((__local_key as u64) >> (14 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((((__local_key as c_ulonglong) +% (((__local_key as c_ulonglong) << (2 as c_uint)) as c_ulonglong)) as c_ulonglong) +% (((__local_key as c_ulonglong) << (4 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((((__local_key as u64) +% (((__local_key as u64) << (2 as u32)) as u64)) as u64) +% (((__local_key as u64) << (4 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((__local_key as c_ulonglong) ^ (((__local_key as c_ulonglong) >> (28 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((__local_key as u64) ^ (((__local_key as u64) >> (28 as u32)) as u64)) as u64)))
 
-    (__local_key = ((((__local_key as c_ulonglong) +% (((__local_key as c_ulonglong) << (31 as c_uint)) as c_ulonglong)) as c_ulonglong)))
+    (__local_key = ((((__local_key as u64) +% (((__local_key as u64) << (31 as u32)) as u64)) as u64)))
 
     return __local_key
 
 }
 
-unsafe fn tommy_le_uint32_read(__param_ptr: *const c_void) -> c_uint {
-    var __local_v: c_uint
+unsafe fn tommy_le_uint32_read(__param_ptr: *const c_void) -> u32 {
+    var __local_v: u32
 
-    with_memcpy((((&raw mut __local_v as *mut c_uint) as *mut c_void) as *mut u8), (__param_ptr as *const u8), ((sizeof[c_uint]() as c_ulong) as i64))
+    with_memcpy((((&raw mut __local_v as *mut u32) as *mut c_void) as *mut u8), (__param_ptr as *const u8), ((sizeof[u32]() as u64) as i64))
 
     return __local_v
 

@@ -2,8 +2,8 @@
 use std.engines.stc.defs
 use std.libc
 
-pub unsafe fn _fmt_time(__param_fmt: *const c_char, __param_tm: *const tm, __param_buf: *mut c_char, __param_bufsize: c_int) -> *const c_char {
-    strftime(__param_buf, (__param_bufsize as c_ulong), __param_fmt, __param_tm)
+pub unsafe fn _fmt_time(__param_fmt: *const c_char, __param_tm: *const tm, __param_buf: *mut c_char, __param_bufsize: i32) -> *const c_char {
+    strftime(__param_buf, (__param_bufsize as u64), __param_fmt, __param_tm)
 
     return ((__param_buf as *const c_char))
 
@@ -14,7 +14,7 @@ pub unsafe fn fmt_close(__param_ss: *mut fmt_stream) {
 
 }
 
-pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_fmt: *const c_char, ...) -> c_int {
+pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt: *const c_char, ...) -> i32 {
     var __local_p = __param_p
     var __local_fmt = __param_fmt
     var __local_arg__goto_250_11: *mut c_char = null
@@ -23,17 +23,17 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
 
     var __local_ch__goto_250_21: c_char = 0
 
-    var __local_n__goto_251_9: c_int = 0
+    var __local_n__goto_251_9: i32 = 0
 
-    var __local_empty__goto_251_16: c_int = 0
+    var __local_empty__goto_251_16: i32 = 0
 
     var __local_args__goto_252_13: c_va_list = va_start()
 
-    var __ci_expr_switch_0: c_int = 0
+    var __ci_expr_switch_0: i32 = 0
 
     var __ci_expr_old_1: *mut c_char = null
 
-    var __ci_expr_logic_2: c_int = 0
+    var __ci_expr_logic_2: i32 = 0
 
     var __ci_expr_old_3: *mut c_char = null
 
@@ -47,7 +47,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
 
     var __ci_expr_old_8: *mut c_char = null
 
-    var __ci_expr_logic_10: c_int = 0
+    var __ci_expr_logic_10: i32 = 0
 
     var __ci_expr_old_11: *mut c_char = null
 
@@ -58,7 +58,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_n__goto_251_9 = ((0 as c_int)))
+        (__local_n__goto_251_9 = ((0 as i32)))
         goto '__ci_bb_1
     }
 
@@ -118,7 +118,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_9 {
-        (__local_n__goto_251_9 = ((99 as c_int)))
+        (__local_n__goto_251_9 = ((99 as i32)))
         goto '__ci_bb_2
     }
 
@@ -161,13 +161,13 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_15 {
-        (__local_n__goto_251_9 = ((99 as c_int)))
+        (__local_n__goto_251_9 = ((99 as i32)))
         goto '__ci_bb_16
     }
 
     '__ci_bb_16 {
         (__local_fmt = __local_fmt + (((if (*__local_fmt) == 58: 1 else: 0) as isize) as usize))
-        (__local_empty__goto_251_16 = (((if (*__local_fmt) == 125: 1 else: 0) as c_int)))
+        (__local_empty__goto_251_16 = (((if (*__local_fmt) == 125: 1 else: 0) as i32)))
         (__local_arg__goto_250_11 = ((__local_args__goto_252_13.arg[*mut c_char]() as *mut c_char)))
         (__ci_expr_old_3 = __local_p)
         (__local_p = __local_p + 1)
@@ -205,7 +205,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_22 {
-        (__local_n__goto_251_9 = ((99 as c_int)))
+        (__local_n__goto_251_9 = ((99 as i32)))
         goto '__ci_bb_23
     }
 
@@ -311,7 +311,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_38 {
-        if ((if strchr(c"csdioxXufFeEaAgGnp".ptr, ((__local_fmt[-1]) as c_int)) == null: 1 else: 0) != 0) {
+        if ((if strchr(c"csdioxXufFeEaAgGnp".ptr, ((__local_fmt[-1]) as i32)) == null: 1 else: 0) != 0) {
             goto '__ci_bb_46
         } else {
             goto '__ci_bb_47
@@ -327,7 +327,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_40 {
-        with_memcpy(((__local_p as *mut c_void) as *mut u8), ((".8" as *const c_void) as *const u8), ((2 as c_ulong) as i64))
+        with_memcpy(((__local_p as *mut c_void) as *mut u8), ((".8" as *const c_void) as *const u8), ((2 as u64) as i64))
         (__local_p = __local_p + ((2 as isize) as usize))
         goto '__ci_bb_41
     }
@@ -346,7 +346,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     }
 
     '__ci_bb_43 {
-        with_memcpy(((__local_p as *mut c_void) as *mut u8), ((".16" as *const c_void) as *const u8), ((3 as c_ulong) as i64))
+        with_memcpy(((__local_p as *mut c_void) as *mut u8), ((".16" as *const c_void) as *const u8), ((3 as u64) as i64))
         (__local_p = __local_p + ((3 as isize) as usize))
         goto '__ci_bb_44
     }
@@ -370,7 +370,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     '__ci_bb_47 {
         (__ci_expr_logic_10 = 0)
         if (__local_p0__goto_250_17 != null) {
-            var __ci_expr_logic_9: c_int
+            var __ci_expr_logic_9: i32
 
             if ((if (__local_p[-1]) == 115: 1 else: 0) != 0) {
                 (__ci_expr_logic_9 = (if true: 1 else: 0))
@@ -412,7 +412,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_f
     '__ci_bb_51 {
         (__ci_expr_old_11 = __local_p)
         (__local_p = __local_p + 1)
-        with_memmove((((__local_p0__goto_250_17 + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((__local_p0__goto_250_17 as *const c_void) as *const u8), ((((((__ci_expr_old_11 as usize) -% (__local_p0__goto_250_17 as usize)) as c_long) / (sizeof[c_char]() as c_long)) as c_ulong) as i64))
+        with_memmove((((__local_p0__goto_250_17 + ((1 as isize) as usize)) as *mut c_void) as *mut u8), ((__local_p0__goto_250_17 as *const c_void) as *const u8), ((((((__ci_expr_old_11 as usize) -% (__local_p0__goto_250_17 as usize)) as i64) / (sizeof[c_char]() as i64)) as u64) as i64))
         ((*__local_p0__goto_250_17) = ((45 as c_char)))
         goto '__ci_bb_52
     }
@@ -447,9 +447,9 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
 
     var __local_args2__goto_229_19: c_va_list
 
-    var __local_n__goto_236_15: c_int = 0
+    var __local_n__goto_236_15: i32 = 0
 
-    var __local_pos__goto_238_21: c_long = 0
+    var __local_pos__goto_238_21: i64 = 0
 
     goto '__ci_bb_0
 
@@ -463,13 +463,13 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
 
     '__ci_bb_1 {
         vprintf(__param_fmt, __local_args__goto_229_13)
-        putchar((10 as c_int))
+        putchar((10 as i32))
         goto '__ci_bb_3
     }
 
     '__ci_bb_2 {
         (__local_args2__goto_229_19 = __local_args__goto_229_13)
-        (__local_n__goto_236_15 = ((vsnprintf((null as *mut c_char), (0 as c_ulong), __param_fmt, __local_args__goto_229_13) as c_int)))
+        (__local_n__goto_236_15 = ((vsnprintf((null as *mut c_char), (0 as u64), __param_fmt, __local_args__goto_229_13) as i32)))
         if ((if __local_n__goto_236_15 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {
@@ -486,8 +486,8 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
     }
 
     '__ci_bb_5 {
-        (__local_pos__goto_238_21 = (((if (*__param_ss).overwrite != 0: (0 as c_long) else: (*__param_ss).len) as c_long)))
-        ((*__param_ss).len = (((__local_pos__goto_238_21 + __local_n__goto_236_15) as c_long)))
+        (__local_pos__goto_238_21 = (((if (*__param_ss).overwrite != 0: (0 as i64) else: (*__param_ss).len) as i64)))
+        ((*__param_ss).len = (((__local_pos__goto_238_21 + __local_n__goto_236_15) as i64)))
         if ((if (*__param_ss).len > (*__param_ss).cap: 1 else: 0) != 0) {
             goto '__ci_bb_7
         } else {
@@ -500,13 +500,13 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
     }
 
     '__ci_bb_7 {
-        ((*__param_ss).cap = ((((*__param_ss).len + ((*__param_ss).cap / 2)) as c_long)))
-        ((*__param_ss).data = (((with_realloc((((*__param_ss).data as *mut c_void) as *mut u8), (0 as i64), (((((*__param_ss).cap as c_ulong) +% (1 as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut c_char)))
+        ((*__param_ss).cap = ((((*__param_ss).len + ((*__param_ss).cap / 2)) as i64)))
+        ((*__param_ss).data = (((with_realloc((((*__param_ss).data as *mut c_void) as *mut u8), (0 as i64), (((((*__param_ss).cap as u64) +% (1 as u64)) as u64) as i64)) as *mut c_void) as *mut c_char)))
         goto '__ci_bb_8
     }
 
     '__ci_bb_8 {
-        vsnprintf(((*__param_ss).data + ((__local_pos__goto_238_21 as isize) as usize)), (((__local_n__goto_236_15 as c_ulong) +% (1 as c_ulong)) as c_ulong), __param_fmt, __local_args2__goto_229_19)
+        vsnprintf(((*__param_ss).data + ((__local_pos__goto_238_21 as isize) as usize)), (((__local_n__goto_236_15 as u64) +% (1 as u64)) as u64), __param_fmt, __local_args2__goto_229_19)
         goto '__ci_bb_6
     }
 
