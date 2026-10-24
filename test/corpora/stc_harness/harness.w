@@ -34,12 +34,12 @@ fn ctest_cmp_holds(cmp: str, c3: i64) -> bool:
     c3 >= 0
 
 @[c_export("assert_compare")]
-pub unsafe fn ctest_assert_compare(diag: c_int, cmp: *const c_char, exp: c_long, real: c_long, caller: *const c_char, line: c_int):
+pub unsafe fn ctest_assert_compare(diag: c_int, cmp: *const c_char, exp: i64, real: i64, caller: *const c_char, line: c_int):
     let c = if exp < real: -1 else if exp > real: 1 else: 0
     if not ctest_cmp_holds(ctest_text(cmp), c): ctest_fail(caller, line, f"expected {exp} {ctest_text(cmp)} {real}")
 
 @[c_export("assert_interval")]
-pub unsafe fn ctest_assert_interval(diag: c_int, low: c_long, high: c_long, real: c_long, caller: *const c_char, line: c_int):
+pub unsafe fn ctest_assert_interval(diag: c_int, low: i64, high: i64, real: i64, caller: *const c_char, line: c_int):
     if real < low or real > high: ctest_fail(caller, line, f"{real} not in [{low}, {high}]")
 
 @[c_export("assert_pointers")]
