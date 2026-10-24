@@ -41,18 +41,24 @@ pub fn next_i32 -> i32:
     let v = xorshift64()
     (v >> 16) as i32
 
+// A non-negative draw: the sign bit masked off, never negated (#1058: the
+// minimum value negated overflows).
+fn positive_i32() -> i32: next_i32() & 2147483647
+fn positive_i64() -> i64: xorshift64() & 9223372036854775807
+
 /// Generate a random i32 in the range [lo, hi).
 pub fn range_i32(lo: i32, hi: i32) -> i32:
     if hi <= lo: return lo
-    let range = hi - lo
-    let v = next_i32()
-    let positive = if v < 0: 0 - v else: v
-    lo + (positive % range)
+    lo + (positive_i32() % (hi - lo))
+
+/// Generate a random index in the range [lo, hi) (D108: lengths and
+/// indices are `isize`).
+pub fn range_isize(lo: isize, hi: isize) -> isize:
+    if hi <= lo: return lo
+    lo + (positive_i64() % ((hi - lo) as i64)) as isize
 
 /// Return true with the given probability (-100 percent).
 pub fn chance(percent: i32) -> bool:
     if percent <= 0: return false
     if percent >= 100: return true
-    let v = next_i32()
-    let positive = if v < 0: 0 - v else: v
-    (positive % 100) < percent
+    (positive_i32() % 100) < percent
