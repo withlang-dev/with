@@ -106,11 +106,11 @@ pub unsafe fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_mem
 
 pub unsafe fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> c_ulong {
 
-    return 0
+    return ((0 as c_ulong))
 
 }
 
-pub fn _pcre2_jit_get_target_8() -> *const i8 {
+pub fn _pcre2_jit_get_target_8() -> *const c_char {
     return (&"JIT is not supported"[0] as *mut c_char)
 
 }

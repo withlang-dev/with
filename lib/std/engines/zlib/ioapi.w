@@ -69,7 +69,7 @@ pub unsafe fn call_zseek64(__param_pfilefunc: *const zlib_filefunc64_32_def_s, _
     var __local_offsetTruncated: c_ulong = __param_offset
 
     if ((if __local_offsetTruncated != __param_offset: 1 else: 0) != 0) {
-        return -1
+        return ((-1 as c_long))
     }
     return (*__param_pfilefunc).zseek32_file.unwrap()((*(&raw const (*__param_pfilefunc).zfile_func64 as *const zlib_filefunc64_def_s)).opaque_, __param_filestream, __local_offsetTruncated, __param_origin)
 
@@ -115,7 +115,7 @@ pub unsafe fn fill_zlib_filefunc64_32_def_from_filefunc32(__param_p_filefunc64_3
 
 }
 
-unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const i8, __param_mode: c_int) -> *mut c_void {
+unsafe fn fopen_file_func(__param_opaque_: *mut c_void, __param_filename: *const c_char, __param_mode: c_int) -> *mut c_void {
     var __local_file: *mut c_void = null
 
     var __local_mode_fopen: *const c_char = ((null as *const c_char))
@@ -173,7 +173,7 @@ unsafe fn fopen64_file_func(__param_opaque_: *mut c_void, __param_filename: *con
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (__local_file = fopen(((__param_filename as *const c_char) as *const i8), __local_mode_fopen))
+        (__local_file = fopen((__param_filename as *const c_char), __local_mode_fopen))
     }
 
 
@@ -239,7 +239,7 @@ unsafe fn fseek_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c_v
                 (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
             },
             _ => {
-                return -1
+                return ((-1 as c_long))
             },
         }
 
@@ -275,7 +275,7 @@ unsafe fn fseek64_file_func(__param_opaque_: *mut c_void, __param_stream: *mut c
                 (__local_fseek_origin = ((libc.SEEK_SET as c_int)))
             },
             _ => {
-                return -1
+                return ((-1 as c_long))
             },
         }
 

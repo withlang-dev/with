@@ -21,6 +21,6 @@ pub unsafe fn gzclose(__param_file: *mut gzFile_s) -> c_int {
 
     (__local_state = ((__param_file as *mut gz_state)))
 
-    return (if (if __local_state.mode == 7247: 1 else: 0) != 0: (gzclose_r(__param_file) as c_int) else: (gzclose_w(__param_file) as c_int))
+    return (if (if (*__local_state).mode == 7247: 1 else: 0) != 0: (gzclose_r(__param_file) as c_int) else: (gzclose_w(__param_file) as c_int))
 
 }

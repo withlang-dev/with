@@ -76,7 +76,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> c_ulong {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
@@ -134,15 +134,15 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: c_long, __param_needle: *const c_char, __param_nlen: c_long) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
@@ -155,7 +155,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
@@ -170,24 +170,24 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
-pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: *const i8, __param_end: *const i8) -> c_int {
+pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: *const c_char, __param_end: *const c_char) -> c_int {
     var __local_s = __param_s
     var __local_start__goto_29_17: *const c_char = null
 
     var __local_len__goto_38_9: c_int = 0
 
-    var __ci_expr_old_0: *const i8 = null
+    var __ci_expr_old_0: *const c_char = null
 
     var __ci_expr_switch_1: c_uint = 0
 
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        (__local_start__goto_29_17 = ((__local_s as *const c_char)))
+        (__local_start__goto_29_17 = __local_s)
         goto '__ci_bb_1
     }
 
@@ -249,12 +249,12 @@ pub unsafe fn cutf8_decode_codepoint(__param_d: *mut cutf8_decode_t, __param_s: 
 
 }
 
-pub unsafe fn cutf8_peek(__param_s: *const i8) -> c_uint {
+pub unsafe fn cutf8_peek(__param_s: *const c_char) -> c_uint {
     var __local_s = __param_s
     var __local_d: cutf8_decode_t = cutf8_decode_t.zeroed()
 
     loop {
-        var __ci_expr_old_0: *const i8 = __local_s
+        var __ci_expr_old_0: *const c_char = __local_s
 
         (__local_s = __local_s + 1)
 

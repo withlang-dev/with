@@ -17,7 +17,7 @@ use std.engines.zlib.unzip
 use std.libc
 use std.collections
 
-pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __param_fileOutTmp: *const i8, __param_nRecovered: *mut c_ulong, __param_bytesRecovered: *mut c_ulong) -> c_int {
+pub unsafe fn unzRepair(__param_file: *const c_char, __param_fileOut: *const c_char, __param_fileOutTmp: *const c_char, __param_nRecovered: *mut c_ulong, __param_bytesRecovered: *mut c_ulong) -> c_int {
     var __local_err: c_int = ((0 as c_int))
 
     var __local_fpZip: *mut c_void = fopen(__param_file, c"rb".ptr)
@@ -203,7 +203,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
                 var __local_comment: *mut c_char = (("" as *mut c_char))
 
-                var __local_comsize: c_int = ((strlen((__local_comment as *const i8)) as c_int))
+                var __local_comsize: c_int = ((strlen((__local_comment as *const c_char)) as c_int))
 
                 loop {
                     loop {
@@ -817,7 +817,7 @@ pub unsafe fn unzRepair(__param_file: *const i8, __param_fileOut: *const i8, __p
 
         var __local_comment_1: *mut c_char = (("" as *mut c_char))
 
-        var __local_comsize_1: c_int = ((strlen((__local_comment_1 as *const i8)) as c_int))
+        var __local_comsize_1: c_int = ((strlen((__local_comment_1 as *const c_char)) as c_int))
 
         if ((if __local_entriesZip > 65535: 1 else: 0) != 0) {
             (__local_entriesZip = ((65535 as c_int)))

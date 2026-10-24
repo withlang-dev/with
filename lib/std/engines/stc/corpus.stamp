@@ -1,5 +1,7 @@
 # D112: written by promotion, never by hand. The migrator generation that
-# produced these modules (a hash of the migrator's sources) and a hash of
-# the modules; the integrity check compares the second.
-migrated_by b4f08cd7bbd65f38e35daf4b3cbb2df9e07cbef6772461c2033b8de183b26e3e
-modules 42149e58d666518efb9abca70b1433894d9a3913e99263e1dd64b0ec9df8c5d7
+# produced these modules (a hash of the migrator's sources), a hash of the
+# modules (the integrity check compares it) and the trigger that justified
+# the promotion (the pin moved, a migrator-pin bump, a ruling).
+migrated_by 08626739411a0e7e7d9c6a89bf363cac4746294620263be09333f73c16a9edf9
+modules 5d6616d33ffbe313d6c0ba7e78d8f54c8838167e06b1d6ff21a86dd3338c2cf3
+promoted_for ruling:D155

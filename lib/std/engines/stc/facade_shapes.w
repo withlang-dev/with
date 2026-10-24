@@ -78,7 +78,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> c_ulong {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
@@ -136,15 +136,15 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: c_long, __param_needle: *const c_char, __param_nlen: c_long) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
@@ -157,7 +157,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
@@ -172,7 +172,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
@@ -185,15 +185,9 @@ pub unsafe fn stc_slot_set_drop(__param_cself: *const stc_slot_set) {
 
     stc_slot_set_wipe_(__local_self_)
 
-    (sizeof[hmap_meta]() as usize)
-
     with_free((((*__local_self_).meta as *mut c_void) as *mut u8))
 
-
-    (sizeof[usize]() as usize)
-
     with_free((((*__local_self_).table as *mut c_void) as *mut u8))
-
 
 }
 
@@ -226,7 +220,7 @@ pub unsafe fn stc_slot_set_reserve(__param__self: *mut stc_slot_set, __param__ca
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return true
+        return ((true as bool))
     }
 
 
@@ -283,9 +277,9 @@ pub unsafe fn stc_slot_set_reserve(__param__self: *mut stc_slot_set, __param__ca
 
             var __local__tv: stc_slot_set = (*__local__xp)
 
-            ((*__local__xp) = (*__local__yp))
+            with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[stc_slot_set]())
 
-            ((*__local__yp) = __local__tv)
+            with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_slot_set]())
 
             if not ((0 != 0)) {
                 break
@@ -294,15 +288,9 @@ pub unsafe fn stc_slot_set_reserve(__param__self: *mut stc_slot_set, __param__ca
 
     }
 
-    (sizeof[hmap_meta]() as usize)
-
     with_free((((*(&raw const __local_map as *const stc_slot_set)).meta as *mut c_void) as *mut u8))
 
-
-    (sizeof[usize]() as usize)
-
     with_free((((*(&raw const __local_map as *const stc_slot_set)).table as *mut c_void) as *mut u8))
-
 
     return __local_ok
 
@@ -367,7 +355,7 @@ pub unsafe fn stc_slot_set_bucket_lookup_(__param_self_: *const stc_slot_set, __
         if ((if (((*__param_self_).meta[(*(&raw const __local__res as *const stc_slot_set_result)).idx])).hashx() == (*(&raw const __local__res as *const stc_slot_set_result)).hashx: 1 else: 0) != 0) {
             var __local__raw: *mut stc_slot_head = (*((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const stc_slot_set_result)).idx]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
-            if ((if (*(&raw const __local__raw as *const *mut stc_slot_head)).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*__param_rkeyptr) as *const c_void)) == 0: 1 else: 0) != 0) {
+            if ((if (*(*(&raw const __local__raw as *const *mut stc_slot_head))).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*__param_rkeyptr) as *const c_void)) == 0: 1 else: 0) != 0) {
                 (__local__res.ref = (((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const stc_slot_set_result)).idx]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
 
                 break
@@ -426,9 +414,9 @@ pub unsafe fn stc_slot_set_bucket_insert_(__param_self_: *const stc_slot_set, __
 
                     var __local__tv: hmap_meta = (*__local__xp)
 
-                    ((*__local__xp) = (*__local__yp))
+                    with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[hmap_meta]())
 
-                    ((*__local__yp) = __local__tv)
+                    with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[hmap_meta]())
 
                     if not ((0 != 0)) {
                         break
@@ -467,7 +455,7 @@ pub unsafe fn stc_slot_set_bucket_insert_(__param_self_: *const stc_slot_set, __
 }
 
 pub unsafe fn stc_slot_set_is_empty(__param_map: *const stc_slot_set) -> bool {
-    return ((not ((*__param_map).size != 0)))
+    return ((((not ((*__param_map).size != 0))) as bool))
 
 }
 
@@ -488,7 +476,7 @@ pub unsafe fn stc_slot_set_contains(__param_self_: *const stc_slot_set, __param_
         (__ci_expr_logic_0 = (if stc_slot_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *mut stc_slot_head) as *const *mut stc_slot_head)).ref != null: 1 else: 0))
     }
 
-    return (__ci_expr_logic_0 != 0)
+    return (((__ci_expr_logic_0 != 0) as bool))
 
 
 }
@@ -758,7 +746,7 @@ pub unsafe fn stc_slot_set_erase_at(__param_self_: *mut stc_slot_set, __param_it
 
 pub unsafe fn stc_slot_set_eq(__param_self_: *const stc_slot_set, __param_other: *const stc_slot_set) -> bool {
     if ((if stc_slot_set_size(__param_self_) != stc_slot_set_size(__param_other): 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     var __local_i: stc_slot_set_iter = stc_slot_set_begin(__param_self_)
@@ -767,7 +755,7 @@ pub unsafe fn stc_slot_set_eq(__param_self_: *const stc_slot_set, __param_other:
         var __local__raw: *mut stc_slot_head = (*((*(&raw const __local_i as *const stc_slot_set_iter)).ref))
 
         if ((if not stc_slot_set_contains(__param_other, __local__raw): 1 else: 0) != 0) {
-            return false
+            return ((false as bool))
         }
 
 
@@ -776,7 +764,7 @@ pub unsafe fn stc_slot_set_eq(__param_self_: *const stc_slot_set, __param_other:
     }
 
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -815,22 +803,19 @@ pub unsafe fn stc_slot_sset_drop(__param_cself: *const stc_slot_sset) {
 
     stc_slot_sset_drop_r_(__local_self_, (*__local_self_).root)
 
-    (sizeof[stc_slot_sset_node]() as usize)
-
     with_free((((*__local_self_).nodes as *mut c_void) as *mut u8))
-
 
 }
 
 pub unsafe fn stc_slot_sset_reserve(__param_self_: *mut stc_slot_sset, __param_cap: c_long) -> bool {
     if ((if __param_cap <= (*__param_self_).capacity: 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     var __local_nodes: *mut stc_slot_sset_node = (((with_realloc((((*__param_self_).nodes as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: (((__param_cap + 1) * (sizeof[stc_slot_sset_node]() as c_long)) as c_long) else: ((((*__param_self_).capacity + 1) * (sizeof[stc_slot_sset_node]() as c_long)) as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut stc_slot_sset_node))
 
     if ((if __local_nodes == null: 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     ((__local_nodes[0]) = ((stc_slot_sset_node.zeroed() as stc_slot_sset_node)))
@@ -839,7 +824,7 @@ pub unsafe fn stc_slot_sset_reserve(__param_self_: *mut stc_slot_sset, __param_c
 
     ((*__param_self_).capacity = ((__param_cap as c_int)))
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -858,7 +843,7 @@ pub unsafe fn stc_slot_sset_find_it(__param_self_: *const stc_slot_sset, __param
 
         var __local__raw: *mut stc_slot_head = (*((&raw const (__local_d[__local_tn]).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
-        (__local_c = (((*(&raw const __local__raw as *const *mut stc_slot_head)).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*(&raw mut __param_rkey as *mut *mut stc_slot_head)) as *const c_void)) as c_int)))
+        (__local_c = (((*(*(&raw const __local__raw as *const *mut stc_slot_head))).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*(&raw mut __param_rkey as *mut *mut stc_slot_head)) as *const c_void)) as c_int)))
 
         if ((if __local_c < 0: 1 else: 0) != 0) {
             (__local_tn = (((__local_d[__local_tn]).link[1] as c_int)))
@@ -1084,7 +1069,7 @@ pub unsafe fn stc_slot_sset_next(__param_it_: *mut stc_slot_sset_iter) -> Unit {
 }
 
 pub unsafe fn stc_slot_sset_is_empty(__param_self_: *const stc_slot_sset) -> bool {
-    return (((*__param_self_).size == 0))
+    return (((((*__param_self_).size == 0)) as bool))
 
 }
 
@@ -1110,7 +1095,7 @@ pub unsafe fn stc_slot_sset_find(__param_self_: *const stc_slot_sset, __param_rk
 pub unsafe fn stc_slot_sset_contains(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head) -> bool {
     var __local_it_: stc_slot_sset_iter
 
-    return ((stc_slot_sset_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut stc_slot_sset_iter)) != null))
+    return ((((stc_slot_sset_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut stc_slot_sset_iter)) != null)) as bool))
 
 }
 
@@ -1399,7 +1384,7 @@ pub unsafe fn stc_slot_sset_insert_entry_i_(__param_self_: *mut stc_slot_sset, _
 
         var __local__raw: *mut stc_slot_head = (*((&raw const (__local_d[__local_tx]).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
-        (__local_c = (((*(&raw const __local__raw as *const *mut stc_slot_head)).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*__param_rkey) as *const c_void)) as c_int)))
+        (__local_c = (((*(*(&raw const __local__raw as *const *mut stc_slot_head))).cmp.unwrap()(((*(&raw const __local__raw as *const *mut stc_slot_head)) as *const c_void), ((*__param_rkey) as *const c_void)) as c_int)))
 
         if ((if __local_c == 0: 1 else: 0) != 0) {
             ((*__param__res).ref = (((&raw const (__local_d[__local_tx]).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
@@ -1473,7 +1458,7 @@ pub unsafe fn stc_slot_sset_erase_r_(__param_self_: *mut stc_slot_sset, __param_
 
     var __local_tx: c_int
 
-    var __local_c: c_int = (((*(&raw mut __local_raw as *mut *mut stc_slot_head)).cmp.unwrap()(((*(&raw mut __local_raw as *mut *mut stc_slot_head)) as *const c_void), ((*__param_rkey) as *const c_void)) as c_int))
+    var __local_c: c_int = (((*(*(&raw mut __local_raw as *mut *mut stc_slot_head))).cmp.unwrap()(((*(&raw mut __local_raw as *mut *mut stc_slot_head)) as *const c_void), ((*__param_rkey) as *const c_void)) as c_int))
 
     if ((if __local_c != 0: 1 else: 0) != 0) {
         ((__local_d[__local_tn]).link[(if __local_c < 0: 1 else: 0)] = ((stc_slot_sset_erase_r_(__param_self_, ((__local_d[__local_tn]).link[(if __local_c < 0: 1 else: 0)] as c_int), __param_rkey, __param_erased) as c_int)))
@@ -1616,7 +1601,7 @@ pub unsafe fn stc_slot_pqueue_push(__param_self_: *mut stc_slot_pqueue, __param_
         var __ci_expr_logic_0: c_int = 0
 
         if ((if __local_c > 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (*((&raw const (__local_arr[(__local_c / 2)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)).cmp.unwrap()(((*((&raw const (__local_arr[(__local_c / 2)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*(&raw mut __param_value as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (if (*(*((&raw const (__local_arr[(__local_c / 2)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[(__local_c / 2)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*(&raw mut __param_value as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (not (__ci_expr_logic_0 != 0)) {
@@ -1647,9 +1632,9 @@ pub unsafe fn stc_slot_pqueue_sift_down_(__param_self_: *mut stc_slot_pqueue, __
 
 
     while ((if __local_c <= __param_n: 1 else: 0) != 0) {
-        (__local_c = __local_c + (if (*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)).cmp.unwrap()(((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0))
+        (__local_c = __local_c + (if (*(*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0))
 
-        if ((if not ((if (*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)).cmp.unwrap()(((*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+        if ((if not ((if (*(*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0): 1 else: 0) != 0) {
             return
         }
 
@@ -1697,7 +1682,7 @@ pub unsafe fn stc_slot_pqueue_reserve(__param_self_: *mut stc_slot_pqueue, __par
         var __local_d: *mut *mut stc_slot_head = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[usize]() as c_long)) as c_long) else: (((*__param_self_).capacity * (sizeof[usize]() as c_long)) as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
         if ((if __local_d == null: 1 else: 0) != 0) {
-            return false
+            return ((false as bool))
         }
 
         ((*__param_self_).data = __local_d)
@@ -1706,7 +1691,7 @@ pub unsafe fn stc_slot_pqueue_reserve(__param_self_: *mut stc_slot_pqueue, __par
 
     }
 
-    return (((*__param_self_).data != null))
+    return (((((*__param_self_).data != null)) as bool))
 
 }
 
@@ -1765,10 +1750,7 @@ pub unsafe fn stc_slot_pqueue_drop(__param_cself: *const stc_slot_pqueue) {
 
     stc_slot_pqueue_clear(__local_self_)
 
-    (sizeof[usize]() as usize)
-
     with_free((((*__local_self_).data as *mut c_void) as *mut u8))
-
 
 }
 
@@ -1799,7 +1781,7 @@ pub unsafe fn stc_slot_pqueue_size(__param_q: *const stc_slot_pqueue) -> c_long 
 }
 
 pub unsafe fn stc_slot_pqueue_is_empty(__param_q: *const stc_slot_pqueue) -> bool {
-    return ((not ((*__param_q).size != 0)))
+    return ((((not ((*__param_q).size != 0))) as bool))
 
 }
 
@@ -1849,7 +1831,7 @@ pub unsafe fn stc_slot_pqueue_pushpull(__param_self_: *mut stc_slot_pqueue, __pa
     var __ci_expr_logic_0: c_int = 0
 
     if ((*__param_self_).size != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw mut __param_val as *mut *mut stc_slot_head)).cmp.unwrap()(((*(&raw mut __param_val as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (if (*(*(&raw mut __param_val as *mut *mut stc_slot_head))).cmp.unwrap()(((*(&raw mut __param_val as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -1915,13 +1897,13 @@ pub unsafe fn stc_slot_deque_reserve(__param_self_: *mut stc_slot_deque, __param
     var __local_newpow2: c_long = ((c_next_pow2(((__param_cap + 1) as c_long)) as c_long))
 
     if ((if __local_newpow2 <= __local_oldpow2: 1 else: 0) != 0) {
-        return (((*__param_self_).cbuf != null))
+        return (((((*__param_self_).cbuf != null)) as bool))
     }
 
     var __local_d: *mut *mut stc_slot_head = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[usize]() as c_long)) as c_long) else: ((__local_oldpow2 * (sizeof[usize]() as c_long)) as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
 
     if ((if __local_d == null: 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     var __local_head: c_long = (((__local_oldpow2 - (*__param_self_).start) as c_long))
@@ -1944,7 +1926,7 @@ pub unsafe fn stc_slot_deque_reserve(__param_self_: *mut stc_slot_deque, __param
 
     ((*__param_self_).cbuf = __local_d)
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -1975,10 +1957,7 @@ pub unsafe fn stc_slot_deque_drop(__param_cself: *const stc_slot_deque) {
 
     stc_slot_deque_clear(__local_self_)
 
-    (sizeof[usize]() as usize)
-
     with_free((((*__local_self_).cbuf as *mut c_void) as *mut u8))
-
 
 }
 
@@ -2142,7 +2121,7 @@ pub unsafe fn stc_slot_deque_capacity(__param_self_: *const stc_slot_deque) -> c
 }
 
 pub unsafe fn stc_slot_deque_is_empty(__param_self_: *const stc_slot_deque) -> bool {
-    return (((*__param_self_).start == (*__param_self_).end))
+    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
 
 }
 
@@ -2502,13 +2481,13 @@ pub unsafe fn stc_word_deque_reserve(__param_self_: *mut stc_word_deque, __param
     var __local_newpow2: c_long = ((c_next_pow2(((__param_cap + 1) as c_long)) as c_long))
 
     if ((if __local_newpow2 <= __local_oldpow2: 1 else: 0) != 0) {
-        return (((*__param_self_).cbuf != null))
+        return (((((*__param_self_).cbuf != null)) as bool))
     }
 
     var __local_d: *mut c_ulonglong = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[c_ulonglong]() as c_long)) as c_long) else: ((__local_oldpow2 * (sizeof[c_ulonglong]() as c_long)) as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut c_ulonglong))
 
     if ((if __local_d == null: 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     var __local_head: c_long = (((__local_oldpow2 - (*__param_self_).start) as c_long))
@@ -2531,7 +2510,7 @@ pub unsafe fn stc_word_deque_reserve(__param_self_: *mut stc_word_deque, __param
 
     ((*__param_self_).cbuf = __local_d)
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -2562,10 +2541,7 @@ pub unsafe fn stc_word_deque_drop(__param_cself: *const stc_word_deque) {
 
     stc_word_deque_clear(__local_self_)
 
-    (sizeof[c_ulonglong]() as usize)
-
     with_free((((*__local_self_).cbuf as *mut c_void) as *mut u8))
-
 
 }
 
@@ -2785,7 +2761,7 @@ pub unsafe fn stc_word_deque_capacity(__param_self_: *const stc_word_deque) -> c
 }
 
 pub unsafe fn stc_word_deque_is_empty(__param_self_: *const stc_word_deque) -> bool {
-    return (((*__param_self_).start == (*__param_self_).end))
+    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
 
 }
 
@@ -3202,9 +3178,9 @@ pub unsafe fn stc_slotrefs_sort_lowhigh(__param_self_: *mut stc_slotref, __param
 
                 var __local__tv: stc_slotref = (*__local__xp)
 
-                ((*__local__xp) = (*__local__yp))
+                with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[stc_slotref]())
 
-                ((*__local__yp) = __local__tv)
+                with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_slotref]())
 
                 if not ((0 != 0)) {
                     break
@@ -3227,9 +3203,9 @@ pub unsafe fn stc_slotrefs_sort_lowhigh(__param_self_: *mut stc_slotref, __param
                 var __local__yp_1: *mut c_long = ((&raw mut __local_i as *mut c_long))
 
 
-                var __local__tv_1: c_long = (((*__local__xp_1) as c_long))
+                var __local__tv_1: c_long = (*__local__xp_1)
 
-                ((*__local__xp_1) = (((*__local__yp_1) as c_long)))
+                ((*__local__xp_1) = (*__local__yp_1))
 
                 ((*__local__yp_1) = __local__tv_1)
 
@@ -3244,9 +3220,9 @@ pub unsafe fn stc_slotrefs_sort_lowhigh(__param_self_: *mut stc_slotref, __param
                 var __local__yp_2: *mut c_long = ((&raw mut __local_j as *mut c_long))
 
 
-                var __local__tv_2: c_long = (((*__local__xp_2) as c_long))
+                var __local__tv_2: c_long = (*__local__xp_2)
 
-                ((*__local__xp_2) = (((*__local__yp_2) as c_long)))
+                ((*__local__xp_2) = (*__local__yp_2))
 
                 ((*__local__yp_2) = __local__tv_2)
 
@@ -3429,9 +3405,9 @@ pub unsafe fn stc_i64s_sort_lowhigh(__param_self_: *mut c_longlong, __param_lo: 
                 var __local__yp: *mut c_longlong = (((&raw const (__param_self_[__local_j]) as *const c_longlong) as *mut c_longlong))
 
 
-                var __local__tv: c_longlong = (((*__local__xp) as c_longlong))
+                var __local__tv: c_longlong = (*__local__xp)
 
-                ((*__local__xp) = (((*__local__yp) as c_longlong)))
+                ((*__local__xp) = (*__local__yp))
 
                 ((*__local__yp) = __local__tv)
 
@@ -3456,9 +3432,9 @@ pub unsafe fn stc_i64s_sort_lowhigh(__param_self_: *mut c_longlong, __param_lo: 
                 var __local__yp_1: *mut c_long = ((&raw mut __local_i as *mut c_long))
 
 
-                var __local__tv_1: c_long = (((*__local__xp_1) as c_long))
+                var __local__tv_1: c_long = (*__local__xp_1)
 
-                ((*__local__xp_1) = (((*__local__yp_1) as c_long)))
+                ((*__local__xp_1) = (*__local__yp_1))
 
                 ((*__local__yp_1) = __local__tv_1)
 
@@ -3473,9 +3449,9 @@ pub unsafe fn stc_i64s_sort_lowhigh(__param_self_: *mut c_longlong, __param_lo: 
                 var __local__yp_2: *mut c_long = ((&raw mut __local_j as *mut c_long))
 
 
-                var __local__tv_2: c_long = (((*__local__xp_2) as c_long))
+                var __local__tv_2: c_long = (*__local__xp_2)
 
-                ((*__local__xp_2) = (((*__local__yp_2) as c_long)))
+                ((*__local__xp_2) = (*__local__yp_2))
 
                 ((*__local__yp_2) = __local__tv_2)
 
@@ -3658,9 +3634,9 @@ pub unsafe fn stc_u64s_sort_lowhigh(__param_self_: *mut c_ulonglong, __param_lo:
                 var __local__yp: *mut c_ulonglong = (((&raw const (__param_self_[__local_j]) as *const c_ulonglong) as *mut c_ulonglong))
 
 
-                var __local__tv: c_ulonglong = (((*__local__xp) as c_ulonglong))
+                var __local__tv: c_ulonglong = (*__local__xp)
 
-                ((*__local__xp) = (((*__local__yp) as c_ulonglong)))
+                ((*__local__xp) = (*__local__yp))
 
                 ((*__local__yp) = __local__tv)
 
@@ -3685,9 +3661,9 @@ pub unsafe fn stc_u64s_sort_lowhigh(__param_self_: *mut c_ulonglong, __param_lo:
                 var __local__yp_1: *mut c_long = ((&raw mut __local_i as *mut c_long))
 
 
-                var __local__tv_1: c_long = (((*__local__xp_1) as c_long))
+                var __local__tv_1: c_long = (*__local__xp_1)
 
-                ((*__local__xp_1) = (((*__local__yp_1) as c_long)))
+                ((*__local__xp_1) = (*__local__yp_1))
 
                 ((*__local__yp_1) = __local__tv_1)
 
@@ -3702,9 +3678,9 @@ pub unsafe fn stc_u64s_sort_lowhigh(__param_self_: *mut c_ulonglong, __param_lo:
                 var __local__yp_2: *mut c_long = ((&raw mut __local_j as *mut c_long))
 
 
-                var __local__tv_2: c_long = (((*__local__xp_2) as c_long))
+                var __local__tv_2: c_long = (*__local__xp_2)
 
-                ((*__local__xp_2) = (((*__local__yp_2) as c_long)))
+                ((*__local__xp_2) = (*__local__yp_2))
 
                 ((*__local__yp_2) = __local__tv_2)
 
@@ -3887,9 +3863,9 @@ pub unsafe fn stc_f64s_sort_lowhigh(__param_self_: *mut f64, __param_lo: c_long,
                 var __local__yp: *mut f64 = (((&raw const (__param_self_[__local_j]) as *const f64) as *mut f64))
 
 
-                var __local__tv: f64 = (((*__local__xp) as f64))
+                var __local__tv: f64 = (*__local__xp)
 
-                ((*__local__xp) = (((*__local__yp) as f64)))
+                ((*__local__xp) = (*__local__yp))
 
                 ((*__local__yp) = __local__tv)
 
@@ -3914,9 +3890,9 @@ pub unsafe fn stc_f64s_sort_lowhigh(__param_self_: *mut f64, __param_lo: c_long,
                 var __local__yp_1: *mut c_long = ((&raw mut __local_i as *mut c_long))
 
 
-                var __local__tv_1: c_long = (((*__local__xp_1) as c_long))
+                var __local__tv_1: c_long = (*__local__xp_1)
 
-                ((*__local__xp_1) = (((*__local__yp_1) as c_long)))
+                ((*__local__xp_1) = (*__local__yp_1))
 
                 ((*__local__yp_1) = __local__tv_1)
 
@@ -3931,9 +3907,9 @@ pub unsafe fn stc_f64s_sort_lowhigh(__param_self_: *mut f64, __param_lo: c_long,
                 var __local__yp_2: *mut c_long = ((&raw mut __local_j as *mut c_long))
 
 
-                var __local__tv_2: c_long = (((*__local__xp_2) as c_long))
+                var __local__tv_2: c_long = (*__local__xp_2)
 
-                ((*__local__xp_2) = (((*__local__yp_2) as c_long)))
+                ((*__local__xp_2) = (*__local__yp_2))
 
                 ((*__local__yp_2) = __local__tv_2)
 
@@ -4084,7 +4060,7 @@ pub unsafe fn _cbits_count(__param_set: *const c_ulong, __param_sz: c_long) -> c
 
 }
 
-pub unsafe fn _cbits_to_str(__param_set: *const c_ulong, __param_sz: c_long, __param_out: *mut i8, __param_start: c_long, __param_stop: c_long) -> *mut i8 {
+pub unsafe fn _cbits_to_str(__param_set: *const c_ulong, __param_sz: c_long, __param_out: *mut c_char, __param_start: c_long, __param_stop: c_long) -> *mut c_char {
     var __local_stop = __param_stop
     if ((if __local_stop > __param_sz: 1 else: 0) != 0) {
         (__local_stop = __param_sz)
@@ -4123,7 +4099,7 @@ pub unsafe fn _cbits_subset_of(__param_set: *const c_ulong, __param_other: *cons
 
     while ((if __local_i < __local_n: 1 else: 0) != 0) {
         if ((if (((__param_set[__local_i]) as c_ulong) | ((__param_other[__local_i]) as c_ulong)) != (__param_set[__local_i]): 1 else: 0) != 0) {
-            return false
+            return ((false as bool))
         }
 
         (__local_i = __local_i + 1)
@@ -4132,7 +4108,7 @@ pub unsafe fn _cbits_subset_of(__param_set: *const c_ulong, __param_other: *cons
 
 
     if ((if ((__param_sz as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) == 0: 1 else: 0) != 0) {
-        return true
+        return ((true as bool))
     }
 
     var __local_i_1: c_ulong = ((__local_n as c_ulong))
@@ -4140,7 +4116,7 @@ pub unsafe fn _cbits_subset_of(__param_set: *const c_ulong, __param_other: *cons
     var __local_m: c_ulong = ((((((1 as c_ulong) << (((__param_sz as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) as c_uint)) as c_ulong) -% (1 as c_ulong)) as c_ulong))
 
 
-    return (((((((__param_set[__local_i_1]) as c_ulong) | ((__param_other[__local_i_1]) as c_ulong)) as c_ulong) & (__local_m as c_ulong)) == (((__param_set[__local_i_1]) as c_ulong) & (__local_m as c_ulong))))
+    return (((((((((__param_set[__local_i_1]) as c_ulong) | ((__param_other[__local_i_1]) as c_ulong)) as c_ulong) & (__local_m as c_ulong)) == (((__param_set[__local_i_1]) as c_ulong) & (__local_m as c_ulong)))) as bool))
 
 }
 
@@ -4151,7 +4127,7 @@ pub unsafe fn _cbits_disjoint(__param_set: *const c_ulong, __param_other: *const
 
     while ((if __local_i < __local_n: 1 else: 0) != 0) {
         if ((if (((__param_set[__local_i]) as c_ulong) & ((__param_other[__local_i]) as c_ulong)) != 0: 1 else: 0) != 0) {
-            return false
+            return ((false as bool))
         }
 
         (__local_i = __local_i + 1)
@@ -4160,7 +4136,7 @@ pub unsafe fn _cbits_disjoint(__param_set: *const c_ulong, __param_other: *const
 
 
     if ((if ((__param_sz as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) == 0: 1 else: 0) != 0) {
-        return true
+        return ((true as bool))
     }
 
     var __local_i_1: c_ulong = ((__local_n as c_ulong))
@@ -4168,19 +4144,12 @@ pub unsafe fn _cbits_disjoint(__param_set: *const c_ulong, __param_other: *const
     var __local_m: c_ulong = ((((((1 as c_ulong) << (((__param_sz as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) as c_uint)) as c_ulong) -% (1 as c_ulong)) as c_ulong))
 
 
-    return (((((((__param_set[__local_i_1]) as c_ulong) & ((__param_other[__local_i_1]) as c_ulong)) as c_ulong) & (__local_m as c_ulong)) == ((0 as c_ulong) & (__local_m as c_ulong))))
+    return (((((((((__param_set[__local_i_1]) as c_ulong) & ((__param_other[__local_i_1]) as c_ulong)) as c_ulong) & (__local_m as c_ulong)) == ((0 as c_ulong) & (__local_m as c_ulong)))) as bool))
 
 }
 
 pub unsafe fn cbits_drop(__param_self_: *mut cbits) {
-    (sizeof[c_ulong]() as usize)
-
-    (sizeof[c_ulong]() as usize)
-
-    (sizeof[c_ulong]() as usize)
-
     with_free((((*__param_self_).buffer as *mut c_void) as *mut u8))
-
 
 }
 
@@ -4238,7 +4207,7 @@ pub unsafe fn cbits_resize(__param_self_: *mut cbits, __param_size: c_long, __pa
     var __local_b: *mut c_ulong = (((with_realloc((((*__param_self_).buffer as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_new_w * (sizeof[c_ulong]() as c_long)) as c_long) else: ((__local_old_w * (sizeof[c_ulong]() as c_long)) as c_long)) as c_long) else: (-1 as c_long)) as c_ulong) as i64)) as *mut c_void) as *mut c_ulong))
 
     if ((if __local_b == null: 1 else: 0) != 0) {
-        return false
+        return ((false as bool))
     }
 
     ((*__param_self_).buffer = __local_b)
@@ -4261,7 +4230,7 @@ pub unsafe fn cbits_resize(__param_self_: *mut cbits, __param_size: c_long, __pa
 
     }
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -4319,7 +4288,7 @@ pub fn cbits_with_pattern(__param_size: c_long, __param_pattern: c_ulong) -> cbi
 }
 
 pub unsafe fn cbits_test(__param_self_: *const cbits, __param_i: c_long) -> bool {
-    return ((((((*__param_self_).buffer[(__param_i / (8 * (sizeof[c_ulong]() as c_long)))]) as c_ulong) & (((1 as c_ulong) << (((__param_i as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) as c_uint)) as c_ulong)) != 0))
+    return ((((((((*__param_self_).buffer[(__param_i / (8 * (sizeof[c_ulong]() as c_long)))]) as c_ulong) & (((1 as c_ulong) << (((__param_i as c_long) & (((8 * (sizeof[c_ulong]() as c_long)) - 1) as c_long)) as c_uint)) as c_ulong)) != 0)) as bool))
 
 }
 
@@ -4372,7 +4341,7 @@ pub unsafe fn cbits_flip_all(__param_self_: *mut cbits) {
 
 }
 
-pub unsafe fn cbits_from(__param_str: *const i8) -> cbits {
+pub unsafe fn cbits_from(__param_str: *const c_char) -> cbits {
     var __local_n: c_long = ((strlen(__param_str) as c_long))
 
     var __local_set: cbits = cbits_with_size(__local_n, (false as bool))
@@ -4473,8 +4442,8 @@ pub unsafe fn cbits_count(__param_self_: *const cbits) -> c_long {
 
 }
 
-pub unsafe fn cbits_to_str(__param_self_: *const cbits, __param_out: *mut i8, __param_start: c_long, __param_stop: c_long) -> *mut i8 {
-    return ((_cbits_to_str(((*__param_self_).buffer as *const c_ulong), (cbits_size(__param_self_) as c_long), __param_out, __param_start, __param_stop) as *mut i8))
+pub unsafe fn cbits_to_str(__param_self_: *const cbits, __param_out: *mut c_char, __param_start: c_long, __param_stop: c_long) -> *mut c_char {
+    return ((_cbits_to_str(((*__param_self_).buffer as *const c_ulong), (cbits_size(__param_self_) as c_long), __param_out, __param_start, __param_stop) as *mut c_char))
 
 }
 

@@ -18,7 +18,7 @@ use std.engines.pcre2.pcre2_maketables
 use std.libc
 use std.collections
 
-pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const i8, __param_cflags: c_int) -> c_int writes _pcre2_default_compile_context_8 {
+pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const c_char, __param_cflags: c_int) -> c_int writes _pcre2_default_compile_context_8 {
     var __local_erroffset: c_ulong
 
     var __local_patlen: c_ulong
@@ -119,7 +119,7 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
 }
 
-pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const i8, __param_nmatch: c_ulong, __param_pmatch: *mut regmatch_t, __param_eflags: c_int) -> c_int writes _pcre2_default_match_context_8 {
+pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const c_char, __param_nmatch: c_ulong, __param_pmatch: *mut regmatch_t, __param_eflags: c_int) -> c_int writes _pcre2_default_match_context_8 {
     var __local_nmatch = __param_nmatch
     var __local_rc: c_int
 
@@ -261,7 +261,7 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 
 }
 
-pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_errbuf: *mut i8, __param_errbuf_size: c_ulong) -> c_ulong {
+pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_t, __param_errbuf: *mut c_char, __param_errbuf_size: c_ulong) -> c_ulong {
     var __local_message: *const c_char
 
     var __local_offset_buf: List[c_char] = [0; 23]
@@ -286,10 +286,10 @@ pub unsafe fn pcre2_regerror(__param_errcode: c_int, __param_preg: *const regex_
     if (__ci_expr_logic_0 != 0) {
         (__ci_expr_ternary_1 = c"unknown error code".ptr)
     } else {
-        (__ci_expr_ternary_1 = ((pstring[__param_errcode] as *const c_char)))
+        (__ci_expr_ternary_1 = pstring[__param_errcode])
     }
 
-    (__local_message = ((__ci_expr_ternary_1 as *const c_char)))
+    (__local_message = __ci_expr_ternary_1)
 
 
     var __ci_expr_logic_4: c_int = 0
@@ -373,4 +373,4 @@ pub unsafe fn pcre2_regfree(__param_preg: *mut regex_t) {
 
 let eint1: List[c_int] = [0, REG_EESCAPE, REG_EESCAPE, REG_EESCAPE, REG_BADBR, REG_BADBR, REG_EBRACK, REG_ECTYPE, REG_ERANGE, REG_BADRPT, REG_ASSERT, REG_BADPAT, REG_BADPAT, REG_BADPAT, REG_EPAREN, REG_ESUBREG, REG_INVARG, REG_INVARG, REG_EPAREN, REG_ESIZE, REG_ESIZE, REG_ESPACE, REG_EPAREN, REG_ASSERT]
 let eint2: List[c_int] = [30, REG_ECTYPE, 32, REG_INVARG, 37, REG_EESCAPE, 56, REG_INVARG, 92, REG_INVARG, 98, REG_EESCAPE, 99, REG_EESCAPE, 102, REG_EESCAPE]
-let pstring: List[*const i8] = [(("" as *mut c_char) as *const c_char), (("internal error" as *mut c_char) as *const c_char), (("invalid repeat counts in {}" as *mut c_char) as *const c_char), (("pattern error" as *mut c_char) as *const c_char), (("? * + invalid" as *mut c_char) as *const c_char), (("unbalanced {}" as *mut c_char) as *const c_char), (("unbalanced []" as *mut c_char) as *const c_char), (("collation error - not relevant" as *mut c_char) as *const c_char), (("bad class" as *mut c_char) as *const c_char), (("bad escape sequence" as *mut c_char) as *const c_char), (("empty expression" as *mut c_char) as *const c_char), (("unbalanced ()" as *mut c_char) as *const c_char), (("bad range inside []" as *mut c_char) as *const c_char), (("expression too big" as *mut c_char) as *const c_char), (("failed to get memory" as *mut c_char) as *const c_char), (("bad back reference" as *mut c_char) as *const c_char), (("bad argument" as *mut c_char) as *const c_char), (("match failed" as *mut c_char) as *const c_char)]
+let pstring: List[*const c_char] = [(("" as *mut c_char) as *const c_char), (("internal error" as *mut c_char) as *const c_char), (("invalid repeat counts in {}" as *mut c_char) as *const c_char), (("pattern error" as *mut c_char) as *const c_char), (("? * + invalid" as *mut c_char) as *const c_char), (("unbalanced {}" as *mut c_char) as *const c_char), (("unbalanced []" as *mut c_char) as *const c_char), (("collation error - not relevant" as *mut c_char) as *const c_char), (("bad class" as *mut c_char) as *const c_char), (("bad escape sequence" as *mut c_char) as *const c_char), (("empty expression" as *mut c_char) as *const c_char), (("unbalanced ()" as *mut c_char) as *const c_char), (("bad range inside []" as *mut c_char) as *const c_char), (("expression too big" as *mut c_char) as *const c_char), (("failed to get memory" as *mut c_char) as *const c_char), (("bad back reference" as *mut c_char) as *const c_char), (("bad argument" as *mut c_char) as *const c_char), (("match failed" as *mut c_char) as *const c_char)]

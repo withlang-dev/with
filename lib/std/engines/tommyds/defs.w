@@ -33,10 +33,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> i64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -72,17 +72,6 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
-
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -403,15 +392,15 @@ pub type object_trie_inplace { pub value: c_int = 0, pub node: tommy_trie_inplac
 impl Copy for object_trie_inplace
 
 @[repr(C)]
-pub type hash32_test { pub data: *mut i8 = null, pub len: c_uint = 0, pub hash: c_uint = 0 }
+pub type hash32_test { pub data: *mut c_char = null, pub len: c_uint = 0, pub hash: c_uint = 0 }
 impl Copy for hash32_test
 
 @[repr(C)]
-pub type strhash32_test { pub data: *mut i8 = null, pub hash: c_uint = 0 }
+pub type strhash32_test { pub data: *mut c_char = null, pub hash: c_uint = 0 }
 impl Copy for strhash32_test
 
 @[repr(C)]
-pub type hash64_test { pub data: *mut i8 = null, pub len: c_uint = 0, pub hash: c_ulonglong = 0 }
+pub type hash64_test { pub data: *mut c_char = null, pub len: c_uint = 0, pub hash: c_ulonglong = 0 }
 impl Copy for hash64_test
 
 @[repr(C)]

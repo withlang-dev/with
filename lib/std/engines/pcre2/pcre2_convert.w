@@ -1100,7 +1100,7 @@ unsafe fn convert_posix(__param_pattype: c_uint, __param_pattern: *const u8, __p
         (__local_p__goto_155_14 = __local_p__goto_155_14 + 1)
         (__ci_expr_old_16 = __local_posix__goto_154_12)
         (__local_posix__goto_154_12 = __local_posix__goto_154_12 + 1)
-        ((*__ci_expr_old_15) = (((*__ci_expr_old_16) as u8)))
+        ((*__ci_expr_old_15) = (*__ci_expr_old_16))
         (__local_lastspecial__goto_162_10 = (((*__ci_expr_old_15) as c_uint)))
         (__local_plength = (__local_plength -% 1))
         goto '__ci_bb_104
@@ -1533,7 +1533,7 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
         (__local_pattern = __local_pattern + 1)
 
-        (__local_c = (((*__ci_expr_old_0) as u8)))
+        (__local_c = (*__ci_expr_old_0))
 
 
         var __ci_expr_logic_1: c_int
@@ -1572,7 +1572,7 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
     }
 
 
-    (__local_class_ptr = ((posix_classes as *const c_char)))
+    (__local_class_ptr = posix_classes)
 
     (__local_class_index = ((1 as c_int)))
 
@@ -1594,7 +1594,7 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
                     (__local_start = __local_start + 1)
 
-                    convert_glob_write(__param_out, ((*__ci_expr_old_4) as u8))
+                    convert_glob_write(__param_out, (*__ci_expr_old_4))
 
                     if not (((if __local_start < __local_pattern: 1 else: 0) != 0)) {
                         break
@@ -1745,7 +1745,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
     var __local_pattern: *const u8 = (*__param_from)
 
-    var __local_char_start: *const u8 = null
+    var __local_char_start: *const u8 = ((null as *const u8))
 
     var __local_c: c_uint
 
@@ -2258,7 +2258,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
             (__local_char_start = __local_char_start + 1)
 
-            convert_glob_write(__param_out, ((*__ci_expr_old_26) as u8))
+            convert_glob_write(__param_out, (*__ci_expr_old_26))
 
             if not (((if __local_char_start < __local_pattern: 1 else: 0) != 0)) {
                 break
@@ -2768,6 +2768,6 @@ unsafe fn convert_glob(__param_options: c_uint, __param_pattern: *const u8, __pa
 
 }
 
-var pcre2_escaped_literals: *const i8 = c"\x5c\x3f\x2a\x2b\x7c\x2e\x5e\x24\x7b\x7d\x5b\x5d\x28\x29".ptr as *const i8
-var posix_meta_escapes: *const i8 = c"\x28\x29\x7b\x7d\x31\x32\x33\x34\x35\x36\x37\x38\x39".ptr as *const i8
-var posix_classes: *const i8 = c"\x61\x6c\x70\x68\x61\x3a\x6c\x6f\x77\x65\x72\x3a\x75\x70\x70\x65\x72\x3a\x61\x6c\x6e\x75\x6d\x3a\x61\x73\x63\x69\x69\x3a\x62\x6c\x61\x6e\x6b\x3a\x63\x6e\x74\x72\x6c\x3a\x64\x69\x67\x69\x74\x3a\x67\x72\x61\x70\x68\x3a\x70\x72\x69\x6e\x74\x3a\x70\x75\x6e\x63\x74\x3a\x73\x70\x61\x63\x65\x3a\x77\x6f\x72\x64\x3a\x78\x64\x69\x67\x69\x74\x3a".ptr as *const i8
+var pcre2_escaped_literals: *const c_char = c"\x5c\x3f\x2a\x2b\x7c\x2e\x5e\x24\x7b\x7d\x5b\x5d\x28\x29".ptr as *const c_char
+var posix_meta_escapes: *const c_char = c"\x28\x29\x7b\x7d\x31\x32\x33\x34\x35\x36\x37\x38\x39".ptr as *const c_char
+var posix_classes: *const c_char = c"\x61\x6c\x70\x68\x61\x3a\x6c\x6f\x77\x65\x72\x3a\x75\x70\x70\x65\x72\x3a\x61\x6c\x6e\x75\x6d\x3a\x61\x73\x63\x69\x69\x3a\x62\x6c\x61\x6e\x6b\x3a\x63\x6e\x74\x72\x6c\x3a\x64\x69\x67\x69\x74\x3a\x67\x72\x61\x70\x68\x3a\x70\x72\x69\x6e\x74\x3a\x70\x75\x6e\x63\x74\x3a\x73\x70\x61\x63\x65\x3a\x77\x6f\x72\x64\x3a\x78\x64\x69\x67\x69\x74\x3a".ptr as *const c_char

@@ -120,19 +120,19 @@ pub fn alloc_test_calloc(__param_nmemb: c_ulong, __param_bytes: c_ulong) -> *mut
 
 }
 
-pub unsafe fn alloc_test_strdup(__param_string: *const i8) -> *mut i8 writes allocation_limit {
+pub unsafe fn alloc_test_strdup(__param_string: *const c_char) -> *mut c_char writes allocation_limit {
     var __local_result: *mut c_char
 
     (__local_result = ((alloc_test_malloc((((strlen(__param_string) as c_ulong) +% (1 as c_ulong)) as c_ulong)) as *mut c_char)))
 
     if ((if __local_result == null: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
 
     }
 
     strcpy(__local_result, __param_string)
 
-    return ((__local_result as *mut i8))
+    return __local_result
 
 }
 

@@ -267,7 +267,7 @@ pub unsafe fn avl_tree_num_entries(__param_tree: *mut _AVLTree) -> c_uint {
 
 }
 
-unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
+unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
     if ((if __param_node == null: 1 else: 0) != 0) {
         return
 
@@ -311,10 +311,10 @@ unsafe fn avl_tree_update_height(__param_node: *mut _AVLTreeNode) -> Unit {
 
 unsafe fn avl_tree_node_parent_side(__param_node: *mut _AVLTreeNode) -> i32 {
     if ((if (*(*__param_node).parent).children[AVL_TREE_NODE_LEFT] == __param_node: 1 else: 0) != 0) {
-        return 0
+        return ((0 as i32))
 
     }
-    return 1
+    return ((1 as i32))
 
 
 }
@@ -488,7 +488,7 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
 }
 
-unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut c_int) {
+unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut c_int) -> Unit {
     if ((if __param_subtree == null: 1 else: 0) != 0) {
         return
 

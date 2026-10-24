@@ -33,10 +33,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> i64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -72,17 +72,6 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
-
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -289,7 +278,7 @@ pub type internal_state { pub strm: *mut z_stream_s = null, pub status: c_int = 
 impl Copy for internal_state
 
 @[repr(C)]
-pub type z_stream_s { pub next_in: *mut u8 = null, pub avail_in: c_uint = 0, pub total_in: c_ulong = 0, pub next_out: *mut u8 = null, pub avail_out: c_uint = 0, pub total_out: c_ulong = 0, pub msg: *mut i8 = null, pub state: *mut internal_state = null, pub zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = null, pub zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = null, pub opaque_: *mut c_void = null, pub data_type: c_int = 0, pub adler: c_ulong = 0, pub reserved: c_ulong = 0 }
+pub type z_stream_s { pub next_in: *mut u8 = null, pub avail_in: c_uint = 0, pub total_in: c_ulong = 0, pub next_out: *mut u8 = null, pub avail_out: c_uint = 0, pub total_out: c_ulong = 0, pub msg: *mut c_char = null, pub state: *mut internal_state = null, pub zalloc: Option[unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void] = null, pub zfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit] = null, pub opaque_: *mut c_void = null, pub data_type: c_int = 0, pub adler: c_ulong = 0, pub reserved: c_ulong = 0 }
 impl Copy for z_stream_s
 
 pub type z_stream = z_stream_s
@@ -438,7 +427,7 @@ pub type IPos = c_uint
 
 pub type deflate_state = internal_state
 
-pub type block_state = c_uint
+pub type block_state = c_int
 
 pub let need_more: c_int = 0
 pub let block_done: c_int = 1
@@ -489,7 +478,7 @@ pub fn MIN[T](a: T, b: T) -> T {
     (if (a > b): b else: a)
 }
 @[repr(C)]
-pub type gz_state { pub x: gzFile_s, pub mode: c_int = 0, pub fd: c_int = 0, pub path: *mut i8 = null, pub size: c_uint = 0, pub want: c_uint = 0, pub in_: *mut u8 = null, pub out: *mut u8 = null, pub direct: c_int = 0, pub junk: c_int = 0, pub how: c_int = 0, pub again: c_int = 0, pub start: c_longlong = 0, pub eof: c_int = 0, pub past: c_int = 0, pub level: c_int = 0, pub strategy: c_int = 0, pub reset: c_int = 0, pub skip: c_longlong = 0, pub err: c_int = 0, pub msg: *mut i8 = null, pub strm: z_stream_s }
+pub type gz_state { pub x: gzFile_s, pub mode: c_int = 0, pub fd: c_int = 0, pub path: *mut c_char = null, pub size: c_uint = 0, pub want: c_uint = 0, pub in_: *mut u8 = null, pub out: *mut u8 = null, pub direct: c_int = 0, pub junk: c_int = 0, pub how: c_int = 0, pub again: c_int = 0, pub start: c_longlong = 0, pub eof: c_int = 0, pub past: c_int = 0, pub level: c_int = 0, pub strategy: c_int = 0, pub reset: c_int = 0, pub skip: c_longlong = 0, pub err: c_int = 0, pub msg: *mut c_char = null, pub strm: z_stream_s }
 impl Copy for gz_state
 
 pub type gz_statep = *mut gz_state
@@ -509,12 +498,12 @@ pub fn GT_OFF[T](x: T) -> T {
 pub type code { pub op: u8 = 0, pub bits: u8 = 0, pub val: c_ushort = 0 }
 impl Copy for code
 
-pub type codetype = c_uint
+pub type codetype = c_int
 
 pub let CODES: c_int = 0
 pub let LENS: c_int = 1
 pub let DISTS: c_int = 2
-pub type inflate_mode = c_uint
+pub type inflate_mode = c_int
 
 pub let HEAD: c_int = 16180
 pub let FLAGS: c_int = 16181
@@ -575,7 +564,7 @@ pub type ui64_t = c_ulong
 
 pub type ZPOS64_T = c_ulong
 
-pub type open_file_func = unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void
+pub type open_file_func = unsafe extern "C" fn(*mut c_void, *const c_char, c_int) -> *mut c_void
 
 pub type read_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong
 
@@ -590,7 +579,7 @@ pub type tell_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_lo
 pub type seek_file_func = unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long
 
 @[repr(C)]
-pub type zlib_filefunc_def_s { pub zopen_file: Option[unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void] = null, pub zread_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong] = null, pub zwrite_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong] = null, pub ztell_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null, pub zclose_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub zerror_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub opaque_: *mut c_void = null }
+pub type zlib_filefunc_def_s { pub zopen_file: Option[unsafe extern "C" fn(*mut c_void, *const c_char, c_int) -> *mut c_void] = null, pub zread_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *mut c_void, c_ulong) -> c_ulong] = null, pub zwrite_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, *const c_void, c_ulong) -> c_ulong] = null, pub ztell_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null, pub zclose_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub zerror_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int] = null, pub opaque_: *mut c_void = null }
 impl Copy for zlib_filefunc_def_s
 
 pub type zlib_filefunc_def = zlib_filefunc_def_s
@@ -608,7 +597,7 @@ impl Copy for zlib_filefunc64_def_s
 pub type zlib_filefunc64_def = zlib_filefunc64_def_s
 
 @[repr(C)]
-pub type zlib_filefunc64_32_def_s { pub zfile_func64: zlib_filefunc64_def_s, pub zopen32_file: Option[unsafe extern "C" fn(*mut c_void, *const i8, c_int) -> *mut c_void] = null, pub ztell32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null }
+pub type zlib_filefunc64_32_def_s { pub zfile_func64: zlib_filefunc64_def_s, pub zopen32_file: Option[unsafe extern "C" fn(*mut c_void, *const c_char, c_int) -> *mut c_void] = null, pub ztell32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_long] = null, pub zseek32_file: Option[unsafe extern "C" fn(*mut c_void, *mut c_void, c_ulong, c_int) -> c_long] = null }
 impl Copy for zlib_filefunc64_32_def_s
 
 pub type zlib_filefunc64_32_def = zlib_filefunc64_32_def_s
@@ -712,7 +701,7 @@ impl Copy for unz_file_info64_internal_s
 pub type unz_file_info64_internal = unz_file_info64_internal_s
 
 @[repr(C)]
-pub type file_in_zip64_read_info_s { pub read_buffer: *mut i8 = null, pub stream: z_stream_s, pub pos_in_zipfile: c_ulong = 0, pub stream_initialised: c_ulong = 0, pub offset_local_extrafield: c_ulong = 0, pub size_local_extrafield: c_uint = 0, pub pos_local_extrafield: c_ulong = 0, pub total_out_64: c_ulong = 0, pub crc32: c_ulong = 0, pub crc32_wait: c_ulong = 0, pub rest_read_compressed: c_ulong = 0, pub rest_read_uncompressed: c_ulong = 0, pub z_filefunc: zlib_filefunc64_32_def_s, pub filestream: *mut c_void = null, pub compression_method: c_ulong = 0, pub byte_before_the_zipfile: c_ulong = 0, pub raw: c_int = 0 }
+pub type file_in_zip64_read_info_s { pub read_buffer: *mut c_char = null, pub stream: z_stream_s, pub pos_in_zipfile: c_ulong = 0, pub stream_initialised: c_ulong = 0, pub offset_local_extrafield: c_ulong = 0, pub size_local_extrafield: c_uint = 0, pub pos_local_extrafield: c_ulong = 0, pub total_out_64: c_ulong = 0, pub crc32: c_ulong = 0, pub crc32_wait: c_ulong = 0, pub rest_read_compressed: c_ulong = 0, pub rest_read_uncompressed: c_ulong = 0, pub z_filefunc: zlib_filefunc64_32_def_s, pub filestream: *mut c_void = null, pub compression_method: c_ulong = 0, pub byte_before_the_zipfile: c_ulong = 0, pub raw: c_int = 0 }
 impl Copy for file_in_zip64_read_info_s
 
 @[repr(C)]
@@ -731,4 +720,4 @@ pub let SIZEZIPLOCALHEADER: c_int = 0x1e
 pub let CASESENSITIVITYDEFAULTVALUE: c_int = 2
 pub let BUFREADCOMMENT: c_int = 0x400
 pub let CENTRALDIRINVALID: c_ulong = ((0 as c_ulong) -% 1)
-pub let z_errmsg: List[*mut i8] = [("need dictionary" as *mut c_char), ("stream end" as *mut c_char), ("" as *mut c_char), ("file error" as *mut c_char), ("stream error" as *mut c_char), ("data error" as *mut c_char), ("insufficient memory" as *mut c_char), ("buffer error" as *mut c_char), ("incompatible version" as *mut c_char), ("" as *mut c_char)]
+pub let z_errmsg: List[*mut c_char] = [("need dictionary" as *mut c_char), ("stream end" as *mut c_char), ("" as *mut c_char), ("file error" as *mut c_char), ("stream error" as *mut c_char), ("data error" as *mut c_char), ("insufficient memory" as *mut c_char), ("buffer error" as *mut c_char), ("incompatible version" as *mut c_char), ("" as *mut c_char)]

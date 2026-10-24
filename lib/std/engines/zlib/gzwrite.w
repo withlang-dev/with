@@ -25,19 +25,19 @@ pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __p
 
     (__local_state = ((__param_file as *mut gz_state)))
 
-    (__local_strm = (((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s)))
+    (__local_strm = (((&raw const (*__local_state).strm as *const z_stream_s) as *mut z_stream_s)))
 
     var __ci_expr_logic_2: c_int
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -47,7 +47,7 @@ pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __p
     if (__ci_expr_logic_1 != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if __local_state.direct != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (*__local_state).direct != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
@@ -55,12 +55,12 @@ pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __p
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     var __ci_expr_logic_3: c_int = 0
 
-    if ((if __param_level == __local_state.level: 1 else: 0) != 0) {
-        (__ci_expr_logic_3 = (if (if __param_strategy == __local_state.strategy: 1 else: 0) != 0: 1 else: 0))
+    if ((if __param_level == (*__local_state).level: 1 else: 0) != 0) {
+        (__ci_expr_logic_3 = (if (if __param_strategy == (*__local_state).strategy: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_3 != 0) {
@@ -70,24 +70,24 @@ pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __p
 
     var __ci_expr_logic_4: c_int = 0
 
-    if (__local_state.skip != 0) {
+    if ((*__local_state).skip != 0) {
         (__ci_expr_logic_4 = (if (if gz_zero(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_4 != 0) {
-        return __local_state.err
+        return (*__local_state).err
     }
 
 
-    if (__local_state.size != 0) {
+    if ((*__local_state).size != 0) {
         var __ci_expr_logic_5: c_int = 0
 
-        if (__local_strm.avail_in != 0) {
+        if ((*__local_strm).avail_in != 0) {
             (__ci_expr_logic_5 = (if (if gz_comp(__local_state, (5 as c_int)) == -1: 1 else: 0) != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_5 != 0) {
-            return __local_state.err
+            return (*__local_state).err
         }
 
 
@@ -95,9 +95,9 @@ pub unsafe fn gzsetparams(__param_file: *mut gzFile_s, __param_level: c_int, __p
 
     }
 
-    (__local_state.level = __param_level)
+    ((*__local_state).level = __param_level)
 
-    (__local_state.strategy = __param_strategy)
+    ((*__local_state).strategy = __param_strategy)
 
     return 0
 
@@ -114,13 +114,13 @@ pub unsafe fn gzwrite(__param_file: *mut gzFile_s, __param_buf: *const c_void, _
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -132,7 +132,7 @@ pub unsafe fn gzwrite(__param_file: *mut gzFile_s, __param_buf: *const c_void, _
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     if ((if ((__param_len as c_int)) < 0: 1 else: 0) != 0) {
         gz_error(__local_state, (-3 as c_int), c"requested length does not fit in int".ptr)
@@ -151,20 +151,20 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
     var __local_state: *mut gz_state
 
     if ((if __param_file == null: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     (__local_state = ((__param_file as *mut gz_state)))
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -172,11 +172,11 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
     }
 
     if (__ci_expr_logic_1 != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     (__local_len = ((((__param_nitems as c_ulong) *% (__param_size as c_ulong)) as c_ulong)))
 
@@ -189,7 +189,7 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
     if (__ci_expr_logic_2 != 0) {
         gz_error(__local_state, (-2 as c_int), c"request does not fit in a size_t".ptr)
 
-        return 0
+        return ((0 as c_ulong))
 
     }
 
@@ -198,7 +198,7 @@ pub unsafe fn gzfwrite(__param_buf: *const c_void, __param_size: c_ulong, __para
 
 }
 
-pub unsafe fn gzprintf(__param_file: *mut gzFile_s, __param_format: *const i8, ...) -> c_int {
+pub unsafe fn gzprintf(__param_file: *mut gzFile_s, __param_format: *const c_char, ...) -> c_int {
 
     var __local_ret: c_int
 
@@ -211,7 +211,7 @@ pub unsafe fn gzprintf(__param_file: *mut gzFile_s, __param_format: *const i8, .
 
 }
 
-pub unsafe fn gzputs(__param_file: *mut gzFile_s, __param_s: *const i8) -> c_int {
+pub unsafe fn gzputs(__param_file: *mut gzFile_s, __param_s: *const c_char) -> c_int {
     var __local_len: c_ulong
 
     var __local_put: c_ulong
@@ -227,13 +227,13 @@ pub unsafe fn gzputs(__param_file: *mut gzFile_s, __param_s: *const i8) -> c_int
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -245,7 +245,7 @@ pub unsafe fn gzputs(__param_file: *mut gzFile_s, __param_s: *const i8) -> c_int
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     (__local_len = ((strlen(__param_s) as c_ulong)))
 
@@ -301,17 +301,17 @@ pub unsafe fn gzputc(__param_file: *mut gzFile_s, __param_c: c_int) -> c_int {
 
     (__local_state = ((__param_file as *mut gz_state)))
 
-    (__local_strm = (((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s)))
+    (__local_strm = (((&raw const (*__local_state).strm as *const z_stream_s) as *mut z_stream_s)))
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -323,11 +323,11 @@ pub unsafe fn gzputc(__param_file: *mut gzFile_s, __param_c: c_int) -> c_int {
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     var __ci_expr_logic_2: c_int = 0
 
-    if (__local_state.skip != 0) {
+    if ((*__local_state).skip != 0) {
         (__ci_expr_logic_2 = (if (if gz_zero(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
@@ -336,19 +336,19 @@ pub unsafe fn gzputc(__param_file: *mut gzFile_s, __param_c: c_int) -> c_int {
     }
 
 
-    if (__local_state.size != 0) {
-        if ((if __local_strm.avail_in == 0: 1 else: 0) != 0) {
-            (__local_strm.next_in = __local_state.in_)
+    if ((*__local_state).size != 0) {
+        if ((if (*__local_strm).avail_in == 0: 1 else: 0) != 0) {
+            ((*__local_strm).next_in = (*__local_state).in_)
         }
 
-        (__local_have = (((((((__local_strm.next_in + (__local_strm.avail_in as usize)) as usize) -% (__local_state.in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
+        (__local_have = ((((((((*__local_strm).next_in + ((*__local_strm).avail_in as usize)) as usize) -% ((*__local_state).in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)))
 
-        if ((if __local_have < __local_state.size: 1 else: 0) != 0) {
-            ((__local_state.in_[__local_have]) = ((__param_c as u8)))
+        if ((if __local_have < (*__local_state).size: 1 else: 0) != 0) {
+            (((*__local_state).in_[__local_have]) = ((__param_c as u8)))
 
-            (__local_strm.avail_in = (__local_strm.avail_in +% 1))
+            ((*__local_strm).avail_in = ((*__local_strm).avail_in +% 1))
 
-            (__local_state.x.pos = (*(&raw const __local_state.x as *const gzFile_s)).pos + 1)
+            ((*__local_state).x.pos = (*(&raw const (*__local_state).x as *const gzFile_s)).pos + 1)
 
             return ((__param_c as c_int) & (255 as c_int))
 
@@ -377,13 +377,13 @@ pub unsafe fn gzflush(__param_file: *mut gzFile_s, __param_flush: c_int) -> c_in
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -395,7 +395,7 @@ pub unsafe fn gzflush(__param_file: *mut gzFile_s, __param_flush: c_int) -> c_in
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     var __ci_expr_logic_2: c_int
 
@@ -412,18 +412,18 @@ pub unsafe fn gzflush(__param_file: *mut gzFile_s, __param_flush: c_int) -> c_in
 
     var __ci_expr_logic_3: c_int = 0
 
-    if (__local_state.skip != 0) {
+    if ((*__local_state).skip != 0) {
         (__ci_expr_logic_3 = (if (if gz_zero(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_3 != 0) {
-        return __local_state.err
+        return (*__local_state).err
     }
 
 
     gz_comp(__local_state, __param_flush)
 
-    return __local_state.err
+    return (*__local_state).err
 
 }
 
@@ -438,42 +438,42 @@ pub unsafe fn gzclose_w(__param_file: *mut gzFile_s) -> c_int {
 
     (__local_state = ((__param_file as *mut gz_state)))
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         return -2
     }
 
     var __ci_expr_logic_0: c_int = 0
 
-    if (__local_state.skip != 0) {
+    if ((*__local_state).skip != 0) {
         (__ci_expr_logic_0 = (if (if gz_zero(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (__local_ret = __local_state.err)
+        (__local_ret = (*__local_state).err)
     }
 
 
     if ((if gz_comp(__local_state, (4 as c_int)) == -1: 1 else: 0) != 0) {
-        (__local_ret = __local_state.err)
+        (__local_ret = (*__local_state).err)
     }
 
-    if (__local_state.size != 0) {
-        if ((if not (__local_state.direct != 0): 1 else: 0) != 0) {
-            deflateEnd(((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s))
+    if ((*__local_state).size != 0) {
+        if ((if not ((*__local_state).direct != 0): 1 else: 0) != 0) {
+            deflateEnd(((&raw const (*__local_state).strm as *const z_stream_s) as *mut z_stream_s))
 
-            with_free(((__local_state.out as *mut c_void) as *mut u8))
+            with_free((((*__local_state).out as *mut c_void) as *mut u8))
 
         }
 
-        with_free(((__local_state.in_ as *mut c_void) as *mut u8))
+        with_free((((*__local_state).in_ as *mut c_void) as *mut u8))
 
     }
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
-    with_free(((__local_state.path as *mut c_void) as *mut u8))
+    with_free((((*__local_state).path as *mut c_void) as *mut u8))
 
-    if ((if close(__local_state.fd) == -1: 1 else: 0) != 0) {
+    if ((if close((*__local_state).fd) == -1: 1 else: 0) != 0) {
         (__local_ret = ((-1 as c_int)))
     }
 
@@ -483,7 +483,7 @@ pub unsafe fn gzclose_w(__param_file: *mut gzFile_s) -> c_int {
 
 }
 
-pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, __param_va: c_va_list) -> c_int {
+pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const c_char, __param_va: c_va_list) -> c_int {
     var __local_len: c_int
 
     var __local_ret: c_int
@@ -501,17 +501,17 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
 
     (__local_state = ((__param_file as *mut gz_state)))
 
-    (__local_strm = (((&raw const __local_state.strm as *const z_stream_s) as *mut z_stream_s)))
+    (__local_strm = (((&raw const (*__local_state).strm as *const z_stream_s) as *mut z_stream_s)))
 
     var __ci_expr_logic_1: c_int
 
-    if ((if __local_state.mode != 31153: 1 else: 0) != 0) {
+    if ((if (*__local_state).mode != 31153: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_0: c_int = 0
 
-        if ((if __local_state.err != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((if (*__local_state).err != 0: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
         }
 
         (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
@@ -523,37 +523,37 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
     }
 
 
-    gz_error(__local_state, (0 as c_int), (null as *const i8))
+    gz_error(__local_state, (0 as c_int), (null as *const c_char))
 
     var __ci_expr_logic_2: c_int = 0
 
-    if ((if __local_state.size == 0: 1 else: 0) != 0) {
+    if ((if (*__local_state).size == 0: 1 else: 0) != 0) {
         (__ci_expr_logic_2 = (if (if gz_init(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_2 != 0) {
-        return __local_state.err
+        return (*__local_state).err
     }
 
 
     var __ci_expr_logic_3: c_int = 0
 
-    if (__local_state.skip != 0) {
+    if ((*__local_state).skip != 0) {
         (__ci_expr_logic_3 = (if (if gz_zero(__local_state) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_3 != 0) {
-        return __local_state.err
+        return (*__local_state).err
     }
 
 
     (__local_ret = ((gz_vacate(__local_state) as c_int)))
 
-    if (__local_state.err != 0) {
+    if ((*__local_state).err != 0) {
         var __ci_expr_logic_4: c_int = 0
 
         if (__local_ret != 0) {
-            (__ci_expr_logic_4 = (if __local_state.again != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if (*__local_state).again != 0: 1 else: 0))
         }
 
         if (__ci_expr_logic_4 != 0) {
@@ -562,21 +562,21 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
         }
 
 
-        if ((if not (__local_state.again != 0): 1 else: 0) != 0) {
-            return __local_state.err
+        if ((if not ((*__local_state).again != 0): 1 else: 0) != 0) {
+            return (*__local_state).err
         }
 
     }
 
-    if ((if __local_strm.avail_in == 0: 1 else: 0) != 0) {
-        (__local_strm.next_in = __local_state.in_)
+    if ((if (*__local_strm).avail_in == 0: 1 else: 0) != 0) {
+        ((*__local_strm).next_in = (*__local_state).in_)
     }
 
-    (__local_next = ((((__local_state.in_ + ((((((__local_strm.next_in as usize) -% (__local_state.in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as isize) as usize)) + (__local_strm.avail_in as usize)) as *mut c_char)))
+    (__local_next = (((((*__local_state).in_ + (((((((*__local_strm).next_in as usize) -% ((*__local_state).in_ as usize)) as c_long) / (sizeof[u8]() as c_long)) as isize) as usize)) + ((*__local_strm).avail_in as usize)) as *mut c_char)))
 
-    ((__local_next[((__local_state.size as c_uint) -% (1 as c_uint))]) = ((0 as c_char)))
+    ((__local_next[(((*__local_state).size as c_uint) -% (1 as c_uint))]) = ((0 as c_char)))
 
-    (__local_len = ((vsnprintf(__local_next, (__local_state.size as c_ulong), __param_format, __param_va) as c_int)))
+    (__local_len = ((vsnprintf(__local_next, ((*__local_state).size as c_ulong), __param_format, __param_va) as c_int)))
 
     var __ci_expr_logic_6: c_int
 
@@ -585,13 +585,13 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
     if ((if __local_len == 0: 1 else: 0) != 0) {
         (__ci_expr_logic_5 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_5 = (if (if ((__local_len as c_uint)) >= __local_state.size: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_5 = (if (if ((__local_len as c_uint)) >= (*__local_state).size: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_5 != 0) {
         (__ci_expr_logic_6 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_6 = (if (if (__local_next[((__local_state.size as c_uint) -% (1 as c_uint))]) != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_6 = (if (if (__local_next[(((*__local_state).size as c_uint) -% (1 as c_uint))]) != 0: 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_6 != 0) {
@@ -599,20 +599,20 @@ pub unsafe fn gzvprintf(__param_file: *mut gzFile_s, __param_format: *const i8, 
     }
 
 
-    (__local_strm.avail_in = (__local_strm.avail_in +% (__local_len as c_uint)))
+    ((*__local_strm).avail_in = ((*__local_strm).avail_in +% (__local_len as c_uint)))
 
-    (__local_state.x.pos = (*(&raw const __local_state.x as *const gzFile_s)).pos + __local_len)
+    ((*__local_state).x.pos = (*(&raw const (*__local_state).x as *const gzFile_s)).pos + __local_len)
 
     (__local_ret = ((gz_vacate(__local_state) as c_int)))
 
     var __ci_expr_logic_7: c_int = 0
 
-    if (__local_state.err != 0) {
-        (__ci_expr_logic_7 = (if (if not (__local_state.again != 0): 1 else: 0) != 0: 1 else: 0))
+    if ((*__local_state).err != 0) {
+        (__ci_expr_logic_7 = (if (if not ((*__local_state).again != 0): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_7 != 0) {
-        return __local_state.err
+        return (*__local_state).err
     }
 
 
@@ -646,11 +646,11 @@ unsafe fn gz_init(__param_state: *mut gz_state) -> c_int {
 
         }
 
-        (__local_strm.zalloc = null)
+        ((*__local_strm).zalloc = null)
 
-        (__local_strm.zfree = null)
+        ((*__local_strm).zfree = null)
 
-        (__local_strm.opaque_ = null)
+        ((*__local_strm).opaque_ = null)
 
         (__local_ret = ((deflateInit2_(__local_strm, (*__param_state).level, (8 as c_int), ((15 + 16) as c_int), (8 as c_int), (*__param_state).strategy, c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 
@@ -665,18 +665,18 @@ unsafe fn gz_init(__param_state: *mut gz_state) -> c_int {
 
         }
 
-        (__local_strm.next_in = ((null as *mut u8)))
+        ((*__local_strm).next_in = ((null as *mut u8)))
 
     }
 
     ((*__param_state).size = (*__param_state).want)
 
     if ((if not ((*__param_state).direct != 0): 1 else: 0) != 0) {
-        (__local_strm.avail_out = (*__param_state).size)
+        ((*__local_strm).avail_out = (*__param_state).size)
 
-        (__local_strm.next_out = (*__param_state).out)
+        ((*__local_strm).next_out = (*__param_state).out)
 
-        ((*__param_state).x.next = __local_strm.next_out)
+        ((*__param_state).x.next = (*__local_strm).next_out)
 
     }
 
@@ -711,14 +711,14 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
 
     if ((*__param_state).direct != 0) {
-        while (__local_strm.avail_in != 0) {
+        while ((*__local_strm).avail_in != 0) {
             ((*(errno_ptr())) = ((0 as c_int)))
 
             ((*__param_state).again = ((0 as c_int)))
 
-            (__local_put = (((if (if __local_strm.avail_in > __local_max: 1 else: 0) != 0: __local_max else: __local_strm.avail_in) as c_uint)))
+            (__local_put = (((if (if (*__local_strm).avail_in > __local_max: 1 else: 0) != 0: __local_max else: (*__local_strm).avail_in) as c_uint)))
 
-            (__local_writ = ((write((*__param_state).fd, (__local_strm.next_in as *const c_void), (__local_put as c_ulong)) as c_int)))
+            (__local_writ = ((write((*__param_state).fd, ((*__local_strm).next_in as *const c_void), (__local_put as c_ulong)) as c_int)))
 
             if ((if __local_writ < 0: 1 else: 0) != 0) {
                 var __ci_expr_logic_1: c_int
@@ -734,15 +734,15 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                 }
 
 
-                gz_error(__param_state, (-1 as c_int), (strerror((*(errno_ptr()))) as *const i8))
+                gz_error(__param_state, (-1 as c_int), (strerror((*(errno_ptr()))) as *const c_char))
 
                 return -1
 
             }
 
-            (__local_strm.avail_in = (__local_strm.avail_in -% (__local_writ as c_uint)))
+            ((*__local_strm).avail_in = ((*__local_strm).avail_in -% (__local_writ as c_uint)))
 
-            (__local_strm.next_in = __local_strm.next_in + ((__local_writ as isize) as usize))
+            ((*__local_strm).next_in = (*__local_strm).next_in + ((__local_writ as isize) as usize))
 
         }
 
@@ -753,7 +753,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
     if ((*__param_state).reset != 0) {
         var __ci_expr_logic_2: c_int = 0
 
-        if ((if __local_strm.avail_in == 0: 1 else: 0) != 0) {
+        if ((if (*__local_strm).avail_in == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_2 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
         }
 
@@ -773,7 +773,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
     loop {
         var __ci_expr_logic_5: c_int
 
-        if ((if __local_strm.avail_out == 0: 1 else: 0) != 0) {
+        if ((if (*__local_strm).avail_out == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_4: c_int = 0
@@ -796,12 +796,12 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
         }
 
         if (__ci_expr_logic_5 != 0) {
-            while ((if __local_strm.next_out > (*(&raw const (*__param_state).x as *const gzFile_s)).next: 1 else: 0) != 0) {
+            while ((if (*__local_strm).next_out > (*(&raw const (*__param_state).x as *const gzFile_s)).next: 1 else: 0) != 0) {
                 ((*(errno_ptr())) = ((0 as c_int)))
 
                 ((*__param_state).again = ((0 as c_int)))
 
-                (__local_put = (((if (if ((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) > ((__local_max as c_int)): 1 else: 0) != 0: __local_max else: (((((__local_strm.next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)) as c_uint)))
+                (__local_put = (((if (if (((((*__local_strm).next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) > ((__local_max as c_int)): 1 else: 0) != 0: __local_max else: ((((((*__local_strm).next_out as usize) -% ((*(&raw const (*__param_state).x as *const gzFile_s)).next as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_uint)) as c_uint)))
 
                 (__local_writ = ((write((*__param_state).fd, ((*(&raw const (*__param_state).x as *const gzFile_s)).next as *const c_void), (__local_put as c_ulong)) as c_int)))
 
@@ -819,7 +819,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
                     }
 
 
-                    gz_error(__param_state, (-1 as c_int), (strerror((*(errno_ptr()))) as *const i8))
+                    gz_error(__param_state, (-1 as c_int), (strerror((*(errno_ptr()))) as *const c_char))
 
                     return -1
 
@@ -829,10 +829,10 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
             }
 
-            if ((if __local_strm.avail_out == 0: 1 else: 0) != 0) {
-                (__local_strm.avail_out = (*__param_state).size)
+            if ((if (*__local_strm).avail_out == 0: 1 else: 0) != 0) {
+                ((*__local_strm).avail_out = (*__param_state).size)
 
-                (__local_strm.next_out = (*__param_state).out)
+                ((*__local_strm).next_out = (*__param_state).out)
 
                 ((*__param_state).x.next = (*__param_state).out)
 
@@ -841,7 +841,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
         }
 
 
-        (__local_have = __local_strm.avail_out)
+        (__local_have = (*__local_strm).avail_out)
 
         (__local_ret = ((deflate(__local_strm, __param_flush) as c_int)))
 
@@ -852,7 +852,7 @@ unsafe fn gz_comp(__param_state: *mut gz_state, __param_flush: c_int) -> c_int {
 
         }
 
-        (__local_have = (__local_have -% __local_strm.avail_out))
+        (__local_have = (__local_have -% (*__local_strm).avail_out))
 
         if not ((__local_have != 0)) {
             break
@@ -879,7 +879,7 @@ unsafe fn gz_zero(__param_state: *mut gz_state) -> c_int {
 
     var __ci_expr_logic_0: c_int = 0
 
-    if (__local_strm.avail_in != 0) {
+    if ((*__local_strm).avail_in != 0) {
         (__ci_expr_logic_0 = (if (if gz_comp(__param_state, (0 as c_int)) == -1: 1 else: 0) != 0: 1 else: 0))
     }
 
@@ -923,13 +923,13 @@ unsafe fn gz_zero(__param_state: *mut gz_state) -> c_int {
 
         }
 
-        (__local_strm.avail_in = __local_n)
+        ((*__local_strm).avail_in = __local_n)
 
-        (__local_strm.next_in = (*__param_state).in_)
+        ((*__local_strm).next_in = (*__param_state).in_)
 
         (__local_ret = ((gz_comp(__param_state, (0 as c_int)) as c_int)))
 
-        (__local_n = (__local_n -% __local_strm.avail_in))
+        (__local_n = (__local_n -% (*__local_strm).avail_in))
 
         ((*__param_state).x.pos = (*(&raw const (*__param_state).x as *const gzFile_s)).pos + __local_n)
 
@@ -956,7 +956,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
     var __local_ret: c_int
 
     if ((if __local_len == 0: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     var __ci_expr_logic_0: c_int = 0
@@ -966,7 +966,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
 
@@ -977,7 +977,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
     }
 
     if (__ci_expr_logic_1 != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
 
@@ -1028,7 +1028,7 @@ unsafe fn gz_write(__param_state: *mut gz_state, __param_buf: *const c_void, __p
         }
 
         if (__ci_expr_logic_2 != 0) {
-            return 0
+            return ((0 as c_ulong))
         }
 
 
@@ -1071,23 +1071,23 @@ unsafe fn gz_vacate(__param_state: *mut gz_state) -> c_int {
 
     (__local_strm = (((&raw const (*__param_state).strm as *const z_stream_s) as *mut z_stream_s)))
 
-    if ((if (__local_strm.next_in + (__local_strm.avail_in as usize)) <= ((*__param_state).in_ + ((*__param_state).size as usize)): 1 else: 0) != 0) {
+    if ((if ((*__local_strm).next_in + ((*__local_strm).avail_in as usize)) <= ((*__param_state).in_ + ((*__param_state).size as usize)): 1 else: 0) != 0) {
         return 0
     }
 
     gz_comp(__param_state, (0 as c_int))
 
-    if ((if __local_strm.avail_in == 0: 1 else: 0) != 0) {
-        (__local_strm.next_in = (*__param_state).in_)
+    if ((if (*__local_strm).avail_in == 0: 1 else: 0) != 0) {
+        ((*__local_strm).next_in = (*__param_state).in_)
 
         return 0
 
     }
 
-    with_memmove((((*__param_state).in_ as *mut c_void) as *mut u8), ((__local_strm.next_in as *const c_void) as *const u8), ((__local_strm.avail_in as c_ulong) as i64))
+    with_memmove((((*__param_state).in_ as *mut c_void) as *mut u8), (((*__local_strm).next_in as *const c_void) as *const u8), (((*__local_strm).avail_in as c_ulong) as i64))
 
-    (__local_strm.next_in = (*__param_state).in_)
+    ((*__local_strm).next_in = (*__param_state).in_)
 
-    return (if __local_strm.avail_in > (*__param_state).size: 1 else: 0)
+    return (if (*__local_strm).avail_in > (*__param_state).size: 1 else: 0)
 
 }

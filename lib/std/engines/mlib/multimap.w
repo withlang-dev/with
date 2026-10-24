@@ -8930,7 +8930,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> c_ulong {
         var __local_ref1: *const multimap_pair_s = multimap_cref((&__local_it1[0] as *mut multimap_it_s))
 
         loop {
-            (__local_hash = ((((((__local_hash as c_ulong) *% (2166136261 as c_ulong)) as c_ulong) ^ (m_core_hash((((&raw const (*((*__local_ref1).key_ptr)) as *const c_int) as *mut c_int) as *const c_void), (sizeof[c_int]() as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_hash = ((((((__local_hash as c_ulong) *% (2166136261 as c_ulong)) as c_ulong) ^ ((((((*((*__local_ref1).key_ptr)) as c_uint) ^ ((((*((*__local_ref1).key_ptr)) as c_uint) << (11 as c_uint)) as c_uint)) as c_ulong) ^ (0 as c_ulong)) as c_ulong)) as c_ulong)))
 
             if not ((0 != 0)) {
                 break
@@ -8938,7 +8938,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> c_ulong {
         }
 
         loop {
-            (__local_hash = ((((((__local_hash as c_ulong) *% (2166136261 as c_ulong)) as c_ulong) ^ (m_core_hash((((&raw const (*((*__local_ref1).value_ptr)) as *const c_int) as *mut c_int) as *const c_void), (sizeof[c_int]() as c_ulong)) as c_ulong)) as c_ulong)))
+            (__local_hash = ((((((__local_hash as c_ulong) *% (2166136261 as c_ulong)) as c_ulong) ^ ((((((*((*__local_ref1).value_ptr)) as c_uint) ^ ((((*((*__local_ref1).value_ptr)) as c_uint) << (11 as c_uint)) as c_uint)) as c_ulong) ^ (0 as c_ulong)) as c_ulong)) as c_ulong)))
 
             if not ((0 != 0)) {
                 break
@@ -8953,7 +8953,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> c_ulong {
 
 }
 
-unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_char, __param_endp: *mut *const i8) -> bool {
+unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_char, __param_endp: *mut *const c_char) -> bool {
     var __local_str = __param_str
     var __local_num2__goto_5_1: c_int = 0
 
@@ -9402,8 +9402,8 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_51 {
-        (__local_b__goto_5_1 = false)
-        (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const i8)) as c_int)))
+        (__local_b__goto_5_1 = m_core_parse_sint((&raw mut __local_key__goto_5_1 as *mut c_int), (&(__local_str[0]) as *mut c_char), ((&raw mut __local_str as *mut []c_char) as *mut *const c_char)))
+        (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const c_char)) as c_int)))
         if ((if __local_b__goto_5_1 == 0: 1 else: 0) != 0) {
             goto '__ci_bb_54
         } else {
@@ -9442,8 +9442,8 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_57 {
-        (__local_b__goto_5_1 = false)
-        (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const i8)) as c_int)))
+        (__local_b__goto_5_1 = m_core_parse_sint((&raw mut __local_value__goto_5_1 as *mut c_int), (&(__local_str[0]) as *mut c_char), ((&raw mut __local_str as *mut []c_char) as *mut *const c_char)))
+        (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const c_char)) as c_int)))
         if ((if __local_b__goto_5_1 == 0: 1 else: 0) != 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
@@ -9873,11 +9873,11 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
             (__local_ret = (__local_ret as i32) | ((*(*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface).write_map_next.unwrap()((&__local_local[0] as *mut m_serial_local_s), (&(__param_f[0]) as *mut m_serial_write_s)) as i32))
         }
 
-        (__local_ret = (__local_ret as i32) | (M_SERIAL_FAIL as i32))
+        (__local_ret = (__local_ret as i32) | ((*(*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface).write_integer.unwrap()((&(__param_f[0]) as *mut m_serial_write_s), ((*((*__local_item).key_ptr)) as c_longlong), (sizeof[c_int]() as c_ulong)) as i32))
 
         (__local_ret = (__local_ret as i32) | ((*(*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface).write_map_value.unwrap()((&__local_local[0] as *mut m_serial_local_s), (&(__param_f[0]) as *mut m_serial_write_s)) as i32))
 
-        (__local_ret = (__local_ret as i32) | (M_SERIAL_FAIL as i32))
+        (__local_ret = (__local_ret as i32) | ((*(*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface).write_integer.unwrap()((&(__param_f[0]) as *mut m_serial_write_s), ((*((*__local_item).value_ptr)) as c_longlong), (sizeof[c_int]() as c_ulong)) as i32))
 
         (__local_first_done = true)
 
@@ -10114,7 +10114,7 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
                             }
 
                             loop {
-                                (__local_ret = ((M_SERIAL_FAIL as i32)))
+                                (__local_ret = ((m_core_in_serial_sint((&(__param_f[0]) as *mut m_serial_read_s), (&raw mut __local_key as *mut c_int)) as i32)))
 
                                 if ((if __local_ret != 0: 1 else: 0) != 0) {
                                     break
@@ -10126,7 +10126,7 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
                                     break
                                 }
 
-                                (__local_ret = ((M_SERIAL_FAIL as i32)))
+                                (__local_ret = ((m_core_in_serial_sint((&(__param_f[0]) as *mut m_serial_read_s), (&raw mut __local_value as *mut c_int)) as i32)))
 
                                 if ((if __local_ret != 0: 1 else: 0) != 0) {
                                     break

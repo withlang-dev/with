@@ -24,7 +24,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
     var __local_buf = __param_buf
     var __local_len = __param_len
     if ((if __local_buf == 0: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     (__local_crc = (((((~__local_crc) as c_ulong) & (4294967295 as c_ulong)) as c_ulong)))
@@ -345,7 +345,7 @@ pub unsafe fn crc32_z(__param_crc: c_ulong, __param_buf: *const u8, __param_len:
 
 pub fn crc32_combine_op(__param_crc1: c_ulong, __param_crc2: c_ulong, __param_op: c_ulong) -> c_ulong {
     if ((if __param_op == 0: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     return ((multmodp(__param_op, (((__param_crc1 as c_ulong) & (4294967295 as c_ulong)) as c_ulong)) as c_ulong) ^ (((__param_crc2 as c_ulong) & (4294967295 as c_ulong)) as c_ulong))
@@ -374,7 +374,7 @@ pub fn crc32_combine64(__param_crc1: c_ulong, __param_crc2: c_ulong, __param_len
 
 pub fn crc32_combine_gen64(__param_len2: c_longlong) -> c_ulong {
     if ((if __param_len2 < 0: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     return x2nmodp(__param_len2, (3 as c_uint))

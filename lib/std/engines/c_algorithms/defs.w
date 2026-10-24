@@ -32,10 +32,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> i64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -71,17 +71,6 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
-
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -284,7 +273,7 @@ pub type AVLTreeValue = *mut c_void
 
 pub type AVLTreeNode = _AVLTreeNode
 
-pub type AVLTreeNodeSide = c_uint
+pub type AVLTreeNodeSide = c_int
 
 pub let AVL_TREE_NODE_LEFT: c_int = 0
 pub let AVL_TREE_NODE_RIGHT: c_int = 1
@@ -299,7 +288,7 @@ pub type _AVLTree { pub root_node: *mut _AVLTreeNode = null, pub compare_func: O
 impl Copy for _AVLTree
 
 pub let AVL_TREE_NULL: *mut c_void = null
-pub type BinaryHeapType = c_uint
+pub type BinaryHeapType = c_int
 
 pub let BINARY_HEAP_TYPE_MIN: c_int = 0
 pub let BINARY_HEAP_TYPE_MAX: c_int = 1
@@ -314,7 +303,7 @@ pub type _BinaryHeap { pub heap_type: i32 = 0, pub values: *mut *mut c_void = nu
 impl Copy for _BinaryHeap
 
 pub let BINARY_HEAP_NULL: *mut c_void = null
-pub type BinomialHeapType = c_uint
+pub type BinomialHeapType = c_int
 
 pub let BINOMIAL_HEAP_TYPE_MIN: c_int = 0
 pub let BINOMIAL_HEAP_TYPE_MAX: c_int = 1
@@ -429,11 +418,11 @@ pub type RBTreeNode = _RBTreeNode
 
 pub type RBTreeCompareFunc = unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int
 
-pub type RBTreeNodeColor = c_uint
+pub type RBTreeNodeColor = c_int
 
 pub let RB_TREE_NODE_RED: c_int = 0
 pub let RB_TREE_NODE_BLACK: c_int = 1
-pub type RBTreeNodeSide = c_uint
+pub type RBTreeNodeSide = c_int
 
 pub let RB_TREE_NODE_LEFT: c_int = 0
 pub let RB_TREE_NODE_RIGHT: c_int = 1

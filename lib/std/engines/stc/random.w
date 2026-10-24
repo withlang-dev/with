@@ -76,7 +76,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> c_ulong {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
@@ -134,15 +134,15 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: c_long, __param_needle: *const c_char, __param_nlen: c_long) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
@@ -155,7 +155,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
@@ -170,7 +170,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
@@ -440,6 +440,6 @@ pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: c_uin
 }
 
 pub unsafe fn crand32_uniform(__param_d: *mut crand32_uniform_dist) -> c_longlong {
-    return crand32_uniform_r(_stc32(), (1 as c_uint), __param_d)
+    return ((crand32_uniform_r(_stc32(), (1 as c_uint), __param_d) as c_longlong))
 
 }

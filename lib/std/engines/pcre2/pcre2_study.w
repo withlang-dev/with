@@ -766,7 +766,7 @@ unsafe fn find_minlength(__param_re: *const pcre2_real_code_8, __param_code: *co
     }
 
     '__ci_bb_12 {
-        (__local_op__goto_138_15 = (((*__local_cc__goto_116_12) as u8)))
+        (__local_op__goto_138_15 = (*__local_cc__goto_116_12))
         goto '__ci_bb_13
     }
 
@@ -4946,7 +4946,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     '__ci_bb_180 {
         (__ci_expr_old_10 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (((*__ci_expr_old_10) as u8)))
+        (__local_b__goto_1749_21 = (*__ci_expr_old_10))
         goto '__ci_bb_181
     }
 
@@ -4971,7 +4971,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     '__ci_bb_184 {
         (__ci_expr_old_11 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_b__goto_1749_21 = (((*__ci_expr_old_11) as u8)))
+        (__local_b__goto_1749_21 = (*__ci_expr_old_11))
         goto '__ci_bb_185
     }
 
@@ -4991,7 +4991,7 @@ unsafe fn set_start_bits(__param_re: *mut pcre2_real_code_8, __param_code: *cons
     '__ci_bb_187 {
         (__ci_expr_old_12 = __local_p__goto_1750_20)
         (__local_p__goto_1750_20 = __local_p__goto_1750_20 + 1)
-        (__local_e__goto_1749_24 = (((*__ci_expr_old_12) as u8)))
+        (__local_e__goto_1749_24 = (*__ci_expr_old_12))
         goto '__ci_bb_188
     }
 

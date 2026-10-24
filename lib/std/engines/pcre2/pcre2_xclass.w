@@ -1182,7 +1182,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: c_uint, __param_data_start: *const u8, 
 
     (__local_ptr = __local_ptr + 1)
 
-    (__local_flags = (((*__ci_expr_old_0) as u8)))
+    (__local_flags = (*__ci_expr_old_0))
 
 
     loop {

@@ -13,7 +13,7 @@ use std.engines.zlib.adler32
 use std.engines.zlib.crc32
 use std.engines.zlib.inftrees
 
-pub fn zlibVersion() -> *const i8 {
+pub fn zlibVersion() -> *const c_char {
     return (&"1.3.2"[0] as *mut c_char)
 
 }
@@ -107,7 +107,7 @@ pub fn zlibCompileFlags() -> c_ulong {
 
 }
 
-pub fn zError(__param_err: c_int) -> *const i8 {
+pub fn zError(__param_err: c_int) -> *const c_char {
     var __ci_expr_ternary_1: c_int = 0
 
     var __ci_expr_logic_0: c_int
@@ -124,7 +124,7 @@ pub fn zError(__param_err: c_int) -> *const i8 {
         (__ci_expr_ternary_1 = (((2 - __param_err) as c_int)))
     }
 
-    return ((z_errmsg[__ci_expr_ternary_1] as *const i8))
+    return ((z_errmsg[__ci_expr_ternary_1] as *const c_char))
 
 
 }

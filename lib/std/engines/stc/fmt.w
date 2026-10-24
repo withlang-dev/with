@@ -2,10 +2,10 @@
 use std.engines.stc.defs
 use std.libc
 
-pub unsafe fn _fmt_time(__param_fmt: *const i8, __param_tm: *const tm, __param_buf: *mut i8, __param_bufsize: c_int) -> *const i8 {
+pub unsafe fn _fmt_time(__param_fmt: *const c_char, __param_tm: *const tm, __param_buf: *mut c_char, __param_bufsize: c_int) -> *const c_char {
     strftime(__param_buf, (__param_bufsize as c_ulong), __param_fmt, __param_tm)
 
-    return ((__param_buf as *const i8))
+    return ((__param_buf as *const c_char))
 
 }
 
@@ -14,7 +14,7 @@ pub unsafe fn fmt_close(__param_ss: *mut fmt_stream) {
 
 }
 
-pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: *const i8, ...) -> c_int {
+pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: c_int, __param_fmt: *const c_char, ...) -> c_int {
     var __local_p = __param_p
     var __local_fmt = __param_fmt
     var __local_arg__goto_250_11: *mut c_char = null
@@ -31,29 +31,29 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
 
     var __ci_expr_switch_0: c_int = 0
 
-    var __ci_expr_old_1: *mut i8 = null
+    var __ci_expr_old_1: *mut c_char = null
 
     var __ci_expr_logic_2: c_int = 0
 
-    var __ci_expr_old_3: *mut i8 = null
+    var __ci_expr_old_3: *mut c_char = null
 
-    var __ci_expr_old_4: *mut i8 = null
+    var __ci_expr_old_4: *mut c_char = null
 
-    var __ci_expr_old_5: *mut i8 = null
+    var __ci_expr_old_5: *mut c_char = null
 
-    var __ci_expr_old_6: *const i8 = null
+    var __ci_expr_old_6: *const c_char = null
 
-    var __ci_expr_old_7: *mut i8 = null
+    var __ci_expr_old_7: *mut c_char = null
 
     var __ci_expr_old_8: *mut c_char = null
 
     var __ci_expr_logic_10: c_int = 0
 
-    var __ci_expr_old_11: *mut i8 = null
+    var __ci_expr_old_11: *mut c_char = null
 
-    var __ci_expr_old_12: *mut i8 = null
+    var __ci_expr_old_12: *mut c_char = null
 
-    var __ci_expr_old_13: *const i8 = null
+    var __ci_expr_old_13: *const c_char = null
 
     goto '__ci_bb_0
 
@@ -63,7 +63,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
     }
 
     '__ci_bb_1 {
-        (__local_ch__goto_250_21 = (((*__local_fmt) as c_char)))
+        (__local_ch__goto_250_21 = (*__local_fmt))
         (__ci_expr_switch_0 = __local_ch__goto_250_21)
         goto '__ci_bb_4
     }
@@ -93,7 +93,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
         (__local_p = __local_p + 1)
         (__ci_expr_old_13 = __local_fmt)
         (__local_fmt = __local_fmt + 1)
-        ((*__ci_expr_old_12) = (((*__ci_expr_old_13) as c_char)))
+        ((*__ci_expr_old_12) = (*__ci_expr_old_13))
         goto '__ci_bb_2
     }
 
@@ -172,7 +172,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
         (__ci_expr_old_3 = __local_p)
         (__local_p = __local_p + 1)
         ((*__ci_expr_old_3) = ((37 as c_char)))
-        (__local_p0__goto_250_17 = ((__local_p as *mut c_char)))
+        (__local_p0__goto_250_17 = __local_p)
         goto '__ci_bb_17
     }
 
@@ -258,7 +258,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
         (__local_p = __local_p + 1)
         (__ci_expr_old_6 = __local_fmt)
         (__local_fmt = __local_fmt + 1)
-        ((*__ci_expr_old_5) = (((*__ci_expr_old_6) as c_char)))
+        ((*__ci_expr_old_5) = (*__ci_expr_old_6))
         goto '__ci_bb_21
     }
 
@@ -442,7 +442,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut i8, __param_nargs: c_int, __param_fmt: 
 
 }
 
-pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const i8, ...) -> Unit {
+pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_char, ...) -> Unit {
     var __local_args__goto_229_13: c_va_list = va_start()
 
     var __local_args2__goto_229_19: c_va_list
@@ -469,7 +469,7 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const i8, .
 
     '__ci_bb_2 {
         (__local_args2__goto_229_19 = __local_args__goto_229_13)
-        (__local_n__goto_236_15 = ((vsnprintf((null as *mut i8), (0 as c_ulong), __param_fmt, __local_args__goto_229_13) as c_int)))
+        (__local_n__goto_236_15 = ((vsnprintf((null as *mut c_char), (0 as c_ulong), __param_fmt, __local_args__goto_229_13) as c_int)))
         if ((if __local_n__goto_236_15 < 0: 1 else: 0) != 0) {
             goto '__ci_bb_4
         } else {

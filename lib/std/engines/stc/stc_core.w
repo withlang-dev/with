@@ -77,7 +77,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: c_long) -> c_ulong {
 
 }
 
-unsafe fn c_hash_str(__param_str: *const i8) -> c_ulong {
+unsafe fn c_hash_str(__param_str: *const c_char) -> c_ulong {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
     var __local_h: c_ulong = ((((0 as c_ulong) -% 3750763034362895579) as c_ulong))
@@ -135,15 +135,15 @@ fn c_next_pow2(__param_n: c_long) -> c_long {
 
 }
 
-unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needle: *const i8, __param_nlen: c_long) -> *mut i8 {
+unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: c_long, __param_needle: *const c_char, __param_nlen: c_long) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
     if ((if __param_nlen == 0: 1 else: 0) != 0) {
-        return (((__local_str as *mut c_char) as *mut i8))
+        return ((__local_str as *mut c_char))
     }
 
     if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
-        return ((null as *mut i8))
+        return ((null as *mut c_char))
     }
 
     (__local_slen = __local_slen - __param_nlen)
@@ -156,7 +156,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
 
         if (__ci_expr_logic_1 != 0) {
-            return (((__local_str as *mut c_char) as *mut i8))
+            return ((__local_str as *mut c_char))
         }
 
 
@@ -171,7 +171,7 @@ unsafe fn c_strnstrn(__param_str: *const i8, __param_slen: c_long, __param_needl
         }
     }
 
-    return ((null as *mut i8))
+    return ((null as *mut c_char))
 
 }
 
@@ -187,7 +187,6 @@ pub unsafe fn cco_execute(__param_fib: *mut cco_task_fiber) -> c_int {
     '__ci_bb_0 {
         ((*__param_fib).cur_awaiter = (*(&raw const (*(*__param_fib).task).base as *const cco_task_base)).awaiter)
         ((*__param_fib).cur_awaitbits = (*(&raw const (*(*__param_fib).task).base as *const cco_task_base)).awaitbits)
-        (sizeof[c_int]() as usize)
         ((*__param_fib).status = ((_cco_resume_task((*__param_fib).task) as c_int)))
         if ((*(&raw const (*__param_fib).error_ as *const cco_err_t)).code != 0) {
             goto '__ci_bb_1
@@ -335,7 +334,7 @@ pub unsafe fn cco_execute(__param_fib: *mut cco_task_fiber) -> c_int {
     }
 
     '__ci_bb_22 {
-        fprintf(libc_stderr(), c"/Users/eric/.local/with-staging/stc-facades/out/tmp/action-scratch/stc-migrate/source/../include/stc/coroutine.h: error: unhandled coroutine error '%d'\n%s:%d: cco_throw(%d ...);\n".ptr, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).code, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).file, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).line, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).code)
+        fprintf(libc_stderr(), c"../include/stc/coroutine.h: error: unhandled coroutine error '%d'\n%s:%d: cco_throw(%d ...);\n".ptr, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).code, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).file, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).line, (*(&raw const (*__param_fib).error_ as *const cco_err_t)).code)
         exit((-128 as c_int))
     }
 
@@ -366,10 +365,7 @@ pub unsafe fn cco_execute_next(__param_fib: *mut cco_task_fiber) -> *mut cco_tas
 
         ((*__param_fib).next = __local__next)
 
-        (sizeof[cco_task_fiber]() as usize)
-
         with_free(((__local_unlinked as *mut c_void) as *mut u8))
-
 
     }
 
@@ -423,7 +419,7 @@ pub unsafe fn _cco_spawn(__param_task: *mut cco_task, __param_grp: *mut cco_grou
 
 }
 
-pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cco_group, __param_file: *const i8, __param_line: c_int) -> bool {
+pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cco_group, __param_file: *const c_char, __param_line: c_int) -> bool {
     var __ci_expr_logic_0: c_int = 0
 
     if (__param_grp != null) {
@@ -431,7 +427,7 @@ pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cc
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return false
+        return ((false as bool))
     }
 
 
@@ -450,8 +446,8 @@ pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cc
             }
 
             if (__ci_expr_logic_1 != 0) {
-                let __ci_copy_89: cco_err_t = (cco_err_t { code: 1073741824, line: __param_line, file: __param_file, info: (*(&raw const (*__param_fib).error_ as *const cco_err_t)).info } as cco_err_t)
-                with_memcpy((&raw mut (*__local_fit).error_ as *mut u8), (&raw const __ci_copy_89 as *const u8), sizeof[cco_err_t]())
+                let __ci_copy_90: cco_err_t = (cco_err_t { code: 1073741824, line: __param_line, file: __param_file, info: (*(&raw const (*__param_fib).error_ as *const cco_err_t)).info } as cco_err_t)
+                with_memcpy((&raw mut (*__local_fit).error_ as *mut u8), (&raw const __ci_copy_90 as *const u8), sizeof[cco_err_t]())
 
                 loop {
                     var __local__st: *mut cco_task_state = (((&raw const (*(&raw const (*(*__local_fit).task).base as *const cco_task_base)).state as *const cco_task_state) as *mut cco_task_state))
@@ -486,7 +482,7 @@ pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cc
     }
 
 
-    return true
+    return ((true as bool))
 
 }
 
@@ -579,7 +575,7 @@ pub unsafe fn cco_timer_elapsed(__param_tm: *mut cco_timer) -> f64 {
 }
 
 pub unsafe fn cco_timer_expired(__param_tm: *mut cco_timer) -> bool {
-    return ((cco_timer_elapsed(__param_tm) >= (*__param_tm).duration))
+    return ((((cco_timer_elapsed(__param_tm) >= (*__param_tm).duration)) as bool))
 
 }
 

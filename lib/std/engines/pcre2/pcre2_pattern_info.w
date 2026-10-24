@@ -36,85 +36,85 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
     if ((if __param_where_ == null: 1 else: 0) != 0) {
         match __param_what {
             0 => {
-                return 4
+                return ((4 as c_int))
             },
             1 => {
-                return 4
+                return ((4 as c_int))
             },
             2 => {
-                return 4
+                return ((4 as c_int))
             },
             3 => {
-                return 4
+                return ((4 as c_int))
             },
             4 => {
-                return 4
+                return ((4 as c_int))
             },
             21 => {
-                return 4
+                return ((4 as c_int))
             },
             26 => {
-                return 4
+                return ((4 as c_int))
             },
             6 => {
-                return 4
+                return ((4 as c_int))
             },
             5 => {
-                return 4
+                return ((4 as c_int))
             },
             23 => {
-                return 4
+                return ((4 as c_int))
             },
             8 => {
-                return 4
+                return ((4 as c_int))
             },
             25 => {
-                return 4
+                return ((4 as c_int))
             },
             9 => {
-                return 4
+                return ((4 as c_int))
             },
             12 => {
-                return 4
+                return ((4 as c_int))
             },
             11 => {
-                return 4
+                return ((4 as c_int))
             },
             13 => {
-                return 4
+                return ((4 as c_int))
             },
             14 => {
-                return 4
+                return ((4 as c_int))
             },
             15 => {
-                return 4
+                return ((4 as c_int))
             },
             16 => {
-                return 4
+                return ((4 as c_int))
             },
             18 => {
-                return 4
+                return ((4 as c_int))
             },
             17 => {
-                return 4
+                return ((4 as c_int))
             },
             20 => {
-                return 4
+                return ((4 as c_int))
             },
             7 => {
-                return 8
+                return ((8 as c_int))
             },
             10 => {
-                return 8
+                return ((8 as c_int))
             },
             22 => {
-                return 8
+                return ((8 as c_int))
             },
             24 => {
-                return 8
+                return ((8 as c_int))
             },
             19 => {
-                return 8
+                return ((8 as c_int))
             },
         }
 

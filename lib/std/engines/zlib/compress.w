@@ -87,7 +87,7 @@ pub unsafe fn compress2_z(__param_dest: *mut u8, __param_destLen: *mut c_ulong, 
 
     (__local_stream.zfree = null)
 
-    (__local_stream.opaque_ = ((0 as *mut c_void)))
+    (__local_stream.opaque_ = null)
 
     (__local_err = ((deflateInit_((&raw mut __local_stream as *mut z_stream_s), __param_level, c"1.3.2".ptr, (sizeof[z_stream_s]() as c_int)) as c_int)))
 

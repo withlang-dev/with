@@ -2872,7 +2872,7 @@ pub unsafe fn inflateBackEnd(__param_strm: *mut z_stream_s) -> c_int {
 
 }
 
-pub unsafe fn inflateBackInit_(__param_strm: *mut z_stream_s, __param_windowBits: c_int, __param_window: *mut u8, __param_version: *const i8, __param_stream_size: c_int) -> c_int {
+pub unsafe fn inflateBackInit_(__param_strm: *mut z_stream_s, __param_windowBits: c_int, __param_window: *mut u8, __param_version: *const c_char, __param_stream_size: c_int) -> c_int {
     var __local_state: *mut inflate_state
 
     var __ci_expr_logic_1: c_int
@@ -2930,7 +2930,7 @@ pub unsafe fn inflateBackInit_(__param_strm: *mut z_stream_s, __param_windowBits
     if ((if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)): 1 else: 0) != 0) {
         ((*__param_strm).zalloc = Some(zcalloc))
 
-        ((*__param_strm).opaque_ = ((0 as *mut c_void)))
+        ((*__param_strm).opaque_ = null)
 
     }
 

@@ -3,14 +3,14 @@ use std.engines.c_algorithms.defs
 use std.libc
 
 pub unsafe fn string_equal(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
-    return (if strcmp(((__param_string1 as *mut c_char) as *const i8), ((__param_string2 as *mut c_char) as *const i8)) == 0: 1 else: 0)
+    return (if strcmp(((__param_string1 as *mut c_char) as *const c_char), ((__param_string2 as *mut c_char) as *const c_char)) == 0: 1 else: 0)
 
 }
 
 pub unsafe fn string_compare(__param_string1: *mut c_void, __param_string2: *mut c_void) -> c_int {
     var __local_result: c_int
 
-    (__local_result = ((strcmp(((__param_string1 as *mut c_char) as *const i8), ((__param_string2 as *mut c_char) as *const i8)) as c_int)))
+    (__local_result = ((strcmp(((__param_string1 as *mut c_char) as *const c_char), ((__param_string2 as *mut c_char) as *const c_char)) as c_int)))
 
     if ((if __local_result < 0: 1 else: 0) != 0) {
         return -1

@@ -16,7 +16,7 @@ use std.engines.zlib.ioapi
 use std.libc
 use std.collections
 
-pub unsafe fn unzStringFileNameCompare(__param_fileName1: *const i8, __param_fileName2: *const i8, __param_iCaseSensitivity: c_int) -> c_int {
+pub unsafe fn unzStringFileNameCompare(__param_fileName1: *const c_char, __param_fileName2: *const c_char, __param_iCaseSensitivity: c_int) -> c_int {
     var __local_iCaseSensitivity = __param_iCaseSensitivity
     if ((if __local_iCaseSensitivity == 0: 1 else: 0) != 0) {
         (__local_iCaseSensitivity = ((2 as c_int)))
@@ -30,7 +30,7 @@ pub unsafe fn unzStringFileNameCompare(__param_fileName1: *const i8, __param_fil
 
 }
 
-pub unsafe fn unzOpen(__param_path: *const i8) -> *mut c_void {
+pub unsafe fn unzOpen(__param_path: *const c_char) -> *mut c_void {
     return ((unzOpenInternal((__param_path as *const c_void), (null as *mut zlib_filefunc64_32_def_s), (0 as c_int)) as *mut c_void))
 
 }
@@ -40,7 +40,7 @@ pub unsafe fn unzOpen64(__param_path: *const c_void) -> *mut c_void {
 
 }
 
-pub unsafe fn unzOpen2(__param_path: *const i8, __param_pzlib_filefunc32_def: *mut zlib_filefunc_def_s) -> *mut c_void {
+pub unsafe fn unzOpen2(__param_path: *const c_char, __param_pzlib_filefunc32_def: *mut zlib_filefunc_def_s) -> *mut c_void {
     if ((if __param_pzlib_filefunc32_def != null: 1 else: 0) != 0) {
         var __local_zlib_filefunc64_32_def_fill: zlib_filefunc64_32_def_s
 
@@ -125,7 +125,7 @@ pub unsafe fn unzGetGlobalInfo64(__param_file: *mut c_void, __param_pglobal_info
 
 }
 
-pub unsafe fn unzGetGlobalComment(__param_file: *mut c_void, __param_szComment: *mut i8, __param_uSizeBuf: c_ulong) -> c_int {
+pub unsafe fn unzGetGlobalComment(__param_file: *mut c_void, __param_szComment: *mut c_char, __param_uSizeBuf: c_ulong) -> c_int {
     var __local_s: *mut unz64_s
 
     var __local_uReadThis: c_ulong
@@ -185,7 +185,7 @@ pub unsafe fn unzGoToFirstFile(__param_file: *mut c_void) -> c_int {
 
     ((*__local_s).num_file = ((0 as c_ulong)))
 
-    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut i8), (0 as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut c_char), (0 as c_ulong), null, (0 as c_ulong), (null as *mut c_char), (0 as c_ulong)) as c_int)))
 
     ((*__local_s).current_file_ok = (((if __local_err == 0: 1 else: 0) as c_ulong)))
 
@@ -218,7 +218,7 @@ pub unsafe fn unzGoToNextFile(__param_file: *mut c_void) -> c_int {
 
     ((*__local_s).num_file = ((*__local_s).num_file +% 1))
 
-    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut i8), (0 as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut c_char), (0 as c_ulong), null, (0 as c_ulong), (null as *mut c_char), (0 as c_ulong)) as c_int)))
 
     ((*__local_s).current_file_ok = (((if __local_err == 0: 1 else: 0) as c_ulong)))
 
@@ -226,7 +226,7 @@ pub unsafe fn unzGoToNextFile(__param_file: *mut c_void) -> c_int {
 
 }
 
-pub unsafe fn unzLocateFile(__param_file: *mut c_void, __param_szFileName: *const i8, __param_iCaseSensitivity: c_int) -> c_int {
+pub unsafe fn unzLocateFile(__param_file: *mut c_void, __param_szFileName: *const c_char, __param_iCaseSensitivity: c_int) -> c_int {
     var __local_s: *mut unz64_s
 
     var __local_err: c_int
@@ -266,7 +266,7 @@ pub unsafe fn unzLocateFile(__param_file: *mut c_void, __param_szFileName: *cons
     while ((if __local_err == 0: 1 else: 0) != 0) {
         var __local_szCurrentFileName: List[c_char] = [0; 257]
 
-        (__local_err = ((unzGetCurrentFileInfo64(__param_file, (null as *mut unz_file_info64_s), (&__local_szCurrentFileName[0] as *mut c_char), ((((257 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)) as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+        (__local_err = ((unzGetCurrentFileInfo64(__param_file, (null as *mut unz_file_info64_s), (&__local_szCurrentFileName[0] as *mut c_char), ((((257 * (sizeof[c_char]() as usize)) as c_ulong) -% (1 as c_ulong)) as c_ulong), null, (0 as c_ulong), (null as *mut c_char), (0 as c_ulong)) as c_int)))
 
         if ((if __local_err == 0: 1 else: 0) != 0) {
             if ((if unzStringFileNameCompare((&__local_szCurrentFileName[0] as *mut c_char), __param_szFileName, __param_iCaseSensitivity) == 0: 1 else: 0) != 0) {
@@ -376,7 +376,7 @@ pub unsafe fn unzGoToFilePos64(__param_file: *mut c_void, __param_file_pos: *con
 
     ((*__local_s).num_file = (*__param_file_pos).num_of_file)
 
-    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut i8), (0 as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut c_char), (0 as c_ulong), null, (0 as c_ulong), (null as *mut c_char), (0 as c_ulong)) as c_int)))
 
     ((*__local_s).current_file_ok = (((if __local_err == 0: 1 else: 0) as c_ulong)))
 
@@ -384,12 +384,12 @@ pub unsafe fn unzGoToFilePos64(__param_file: *mut c_void, __param_file_pos: *con
 
 }
 
-pub unsafe fn unzGetCurrentFileInfo64(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info64_s, __param_szFileName: *mut i8, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut i8, __param_commentBufferSize: c_ulong) -> c_int {
+pub unsafe fn unzGetCurrentFileInfo64(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info64_s, __param_szFileName: *mut c_char, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut c_char, __param_commentBufferSize: c_ulong) -> c_int {
     return unz64local_GetCurrentFileInfoInternal(__param_file, __param_pfile_info, (null as *mut unz_file_info64_internal_s), __param_szFileName, __param_fileNameBufferSize, __param_extraField, __param_extraFieldBufferSize, __param_szComment, __param_commentBufferSize)
 
 }
 
-pub unsafe fn unzGetCurrentFileInfo(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info_s, __param_szFileName: *mut i8, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut i8, __param_commentBufferSize: c_ulong) -> c_int {
+pub unsafe fn unzGetCurrentFileInfo(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info_s, __param_szFileName: *mut c_char, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut c_char, __param_commentBufferSize: c_ulong) -> c_int {
     var __local_err: c_int
 
     var __local_file_info64: unz_file_info64_s
@@ -448,13 +448,13 @@ pub unsafe fn unzGetCurrentFileZStreamPos64(__param_file: *mut c_void) -> c_ulon
     (__local_s = ((__param_file as *mut unz64_s)))
 
     if ((if __param_file == null: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     (__local_pfile_in_zip_read_info = (*__local_s).pfile_in_zip_read)
 
     if ((if __local_pfile_in_zip_read_info == null: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     return (((*__local_pfile_in_zip_read_info).pos_in_zipfile as c_ulong) +% ((*__local_pfile_in_zip_read_info).byte_before_the_zipfile as c_ulong))
@@ -462,21 +462,21 @@ pub unsafe fn unzGetCurrentFileZStreamPos64(__param_file: *mut c_void) -> c_ulon
 }
 
 pub unsafe fn unzOpenCurrentFile(__param_file: *mut c_void) -> c_int {
-    return unzOpenCurrentFile3(__param_file, (null as *mut c_int), (null as *mut c_int), (0 as c_int), (null as *const i8))
+    return unzOpenCurrentFile3(__param_file, (null as *mut c_int), (null as *mut c_int), (0 as c_int), (null as *const c_char))
 
 }
 
-pub unsafe fn unzOpenCurrentFilePassword(__param_file: *mut c_void, __param_password: *const i8) -> c_int {
+pub unsafe fn unzOpenCurrentFilePassword(__param_file: *mut c_void, __param_password: *const c_char) -> c_int {
     return unzOpenCurrentFile3(__param_file, (null as *mut c_int), (null as *mut c_int), (0 as c_int), __param_password)
 
 }
 
 pub unsafe fn unzOpenCurrentFile2(__param_file: *mut c_void, __param_method: *mut c_int, __param_level: *mut c_int, __param_raw: c_int) -> c_int {
-    return unzOpenCurrentFile3(__param_file, __param_method, __param_level, __param_raw, (null as *const i8))
+    return unzOpenCurrentFile3(__param_file, __param_method, __param_level, __param_raw, (null as *const c_char))
 
 }
 
-pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mut c_int, __param_level: *mut c_int, __param_raw: c_int, __param_password: *const i8) -> c_int {
+pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mut c_int, __param_level: *mut c_int, __param_raw: c_int, __param_password: *const c_char) -> c_int {
     var __local_err: c_int = ((0 as c_int))
 
     var __local_iSizeVar: c_uint
@@ -614,7 +614,7 @@ pub unsafe fn unzOpenCurrentFile3(__param_file: *mut c_void, __param_method: *mu
 
             ((*__local_pfile_in_zip_read_info).stream.zfree = null)
 
-            ((*__local_pfile_in_zip_read_info).stream.opaque_ = ((0 as *mut c_void)))
+            ((*__local_pfile_in_zip_read_info).stream.opaque_ = null)
 
             ((*__local_pfile_in_zip_read_info).stream.next_in = null)
 
@@ -982,7 +982,7 @@ pub unsafe fn unztell(__param_file: *mut c_void) -> c_longlong {
     var __local_pfile_in_zip_read_info: *mut file_in_zip64_read_info_s
 
     if ((if __param_file == null: 1 else: 0) != 0) {
-        return -102
+        return ((-102 as c_longlong))
     }
 
     (__local_s = ((__param_file as *mut unz64_s)))
@@ -990,7 +990,7 @@ pub unsafe fn unztell(__param_file: *mut c_void) -> c_longlong {
     (__local_pfile_in_zip_read_info = (*__local_s).pfile_in_zip_read)
 
     if ((if __local_pfile_in_zip_read_info == null: 1 else: 0) != 0) {
-        return -102
+        return ((-102 as c_longlong))
     }
 
     return (((*(&raw const (*__local_pfile_in_zip_read_info).stream as *const z_stream_s)).total_out as c_longlong))
@@ -1095,13 +1095,13 @@ pub unsafe fn unzGetOffset64(__param_file: *mut c_void) -> c_ulong {
     var __local_s: *mut unz64_s
 
     if ((if __param_file == null: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     (__local_s = ((__param_file as *mut unz64_s)))
 
     if ((if not ((*__local_s).current_file_ok != 0): 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     var __ci_expr_logic_0: c_int = 0
@@ -1112,7 +1112,7 @@ pub unsafe fn unzGetOffset64(__param_file: *mut c_void) -> c_ulong {
 
     if (__ci_expr_logic_0 != 0) {
         if ((if (*__local_s).num_file == (*(&raw const (*__local_s).gi as *const unz_global_info64_s)).number_entry: 1 else: 0) != 0) {
-            return 0
+            return ((0 as c_ulong))
         }
     }
 
@@ -1125,7 +1125,7 @@ pub unsafe fn unzGetOffset(__param_file: *mut c_void) -> c_ulong {
     var __local_offset64: c_ulong
 
     if ((if __param_file == null: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     (__local_offset64 = ((unzGetOffset64(__param_file) as c_ulong)))
@@ -1149,7 +1149,7 @@ pub unsafe fn unzSetOffset64(__param_file: *mut c_void, __param_pos: c_ulong) ->
 
     ((*__local_s).num_file = (*(&raw const (*__local_s).gi as *const unz_global_info64_s)).number_entry)
 
-    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut i8), (0 as c_ulong), null, (0 as c_ulong), (null as *mut i8), (0 as c_ulong)) as c_int)))
+    (__local_err = ((unz64local_GetCurrentFileInfoInternal(__param_file, ((&raw const (*__local_s).cur_file_info as *const unz_file_info64_s) as *mut unz_file_info64_s), ((&raw const (*__local_s).cur_file_info_internal as *const unz_file_info64_internal_s) as *mut unz_file_info64_internal_s), (null as *mut c_char), (0 as c_ulong), null, (0 as c_ulong), (null as *mut c_char), (0 as c_ulong)) as c_int)))
 
     ((*__local_s).current_file_ok = (((if __local_err == 0: 1 else: 0) as c_ulong)))
 
@@ -1188,7 +1188,7 @@ unsafe fn update_keys(__param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c
 
 }
 
-unsafe fn init_keys(__param_passwd: *const i8, __param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint) {
+unsafe fn init_keys(__param_passwd: *const c_char, __param_pkeys: *mut c_ulong, __param_pcrc_32_tab: *const c_uint) {
     var __local_passwd = __param_passwd
     ((*(__param_pkeys + ((0 as isize) as usize))) = ((305419896 as c_ulong)))
 
@@ -1268,20 +1268,20 @@ unsafe fn unz64local_getLong64(__param_pzlib_filefunc_def: *const zlib_filefunc6
 
 }
 
-unsafe fn strcmpcasenosensitive_internal(__param_fileName1: *const i8, __param_fileName2: *const i8) -> c_int {
+unsafe fn strcmpcasenosensitive_internal(__param_fileName1: *const c_char, __param_fileName2: *const c_char) -> c_int {
     var __local_fileName1 = __param_fileName1
     var __local_fileName2 = __param_fileName2
     while true {
         var __local_c1: c_char = with 0 as __ci_expr_seq_7 {
-            var __ci_expr_old_0: *const i8 = __local_fileName1
+            var __ci_expr_old_0: *const c_char = __local_fileName1
             (__local_fileName1 = __local_fileName1 + 1)
-            ((*__ci_expr_old_0) as c_char)
+            (*__ci_expr_old_0)
         }
 
         var __local_c2: c_char = with 0 as __ci_expr_seq_14 {
-            var __ci_expr_old_1: *const i8 = __local_fileName2
+            var __ci_expr_old_1: *const c_char = __local_fileName2
             (__local_fileName2 = __local_fileName2 + 1)
-            ((*__ci_expr_old_1) as c_char)
+            (*__ci_expr_old_1)
         }
 
         var __ci_expr_logic_2: c_int = 0
@@ -1833,7 +1833,7 @@ unsafe fn unz64local_DosDateToTmuDate(__param_ulDosDate: c_ulong, __param_ptm: *
 
 }
 
-unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info64_s, __param_pfile_info_internal: *mut unz_file_info64_internal_s, __param_szFileName: *mut i8, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut i8, __param_commentBufferSize: c_ulong) -> c_int {
+unsafe fn unz64local_GetCurrentFileInfoInternal(__param_file: *mut c_void, __param_pfile_info: *mut unz_file_info64_s, __param_pfile_info_internal: *mut unz_file_info64_internal_s, __param_szFileName: *mut c_char, __param_fileNameBufferSize: c_ulong, __param_extraField: *mut c_void, __param_extraFieldBufferSize: c_ulong, __param_szComment: *mut c_char, __param_commentBufferSize: c_ulong) -> c_int {
     var __local_s: *mut unz64_s
 
     var __local_file_info: unz_file_info64_s

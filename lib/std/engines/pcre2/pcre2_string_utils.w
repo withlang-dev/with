@@ -72,7 +72,7 @@ pub unsafe fn _pcre2_strcmp_8(__param_str1: *const u8, __param_str2: *const u8) 
 
 }
 
-pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i8) -> c_int {
+pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const c_char) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_c1: u8
@@ -99,7 +99,7 @@ pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i
 
         (__local_c1 = (*__ci_expr_old_1))
 
-        var __ci_expr_old_2: *const i8 = __local_str2
+        var __ci_expr_old_2: *const c_char = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 
@@ -115,7 +115,7 @@ pub unsafe fn _pcre2_strcmp_c8_8(__param_str1: *const u8, __param_str2: *const i
 
 }
 
-pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8) -> c_ulong {
+pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const c_char) -> c_ulong {
     var __local_str2 = __param_str2
     var __local_t: *mut u8 = __param_str1
 
@@ -124,7 +124,7 @@ pub unsafe fn _pcre2_strcpy_c8_8(__param_str1: *mut u8, __param_str2: *const i8)
 
         (__local_t = __local_t + 1)
 
-        var __ci_expr_old_1: *const i8 = __local_str2
+        var __ci_expr_old_1: *const c_char = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 
@@ -196,7 +196,7 @@ pub unsafe fn _pcre2_strncmp_8(__param_str1: *const u8, __param_str2: *const u8,
 
 }
 
-pub unsafe fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const i8, __param_len: c_ulong) -> c_int {
+pub unsafe fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const c_char, __param_len: c_ulong) -> c_int {
     var __local_str1 = __param_str1
     var __local_str2 = __param_str2
     var __local_len = __param_len
@@ -213,7 +213,7 @@ pub unsafe fn _pcre2_strncmp_c8_8(__param_str1: *const u8, __param_str2: *const 
         (__local_c1 = (*__ci_expr_old_0))
 
 
-        var __ci_expr_old_1: *const i8 = __local_str2
+        var __ci_expr_old_1: *const c_char = __local_str2
 
         (__local_str2 = __local_str2 + 1)
 

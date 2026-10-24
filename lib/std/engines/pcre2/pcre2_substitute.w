@@ -334,7 +334,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
         (__local_utf__goto_753_6 = (((if (((*__param_code).overall_options as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_null_str__goto_755_13 = [205])
         (__local_original_subject__goto_756_12 = __local_subject)
-        (__local_repend__goto_758_12 = null)
+        (__local_repend__goto_758_12 = ((null as *const u8)))
         (__local_extra_needed__goto_759_12 = ((0 as c_ulong)))
         (__local_ovecsave__goto_762_12 = [0, 0])
         (__local_substitute_case_callout__goto_765_14 = null)
@@ -590,8 +590,8 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_33 {
-        let __ci_copy_570: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
-        with_memcpy((&raw mut __local_gcontext__goto_876_25.memctl as *mut u8), (&raw const __ci_copy_570 as *const u8), sizeof[pcre2_memctl]())
+        let __ci_copy_571: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
+        with_memcpy((&raw mut __local_gcontext__goto_876_25.memctl as *mut u8), (&raw const __ci_copy_571 as *const u8), sizeof[pcre2_memctl]())
         (__local_internal_match_data__goto_748_19 = pcre2_match_data_create_from_pattern_8(__param_code, (&raw mut __local_gcontext__goto_876_25 as *mut pcre2_real_general_context_8)))
         (__local_match_data = __local_internal_match_data__goto_748_19)
         if ((if __local_internal_match_data__goto_748_19 == null: 1 else: 0) != 0) {
@@ -626,8 +626,8 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_38 {
-        let __ci_copy_609: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
-        with_memcpy((&raw mut __local_gcontext__goto_888_25.memctl as *mut u8), (&raw const __ci_copy_609 as *const u8), sizeof[pcre2_memctl]())
+        let __ci_copy_610: pcre2_memctl = (if (if __param_mcontext == null: 1 else: 0) != 0: (*(__param_code as *mut pcre2_real_code_8)).memctl else: (*__param_mcontext).memctl)
+        with_memcpy((&raw mut __local_gcontext__goto_888_25.memctl as *mut u8), (&raw const __ci_copy_610 as *const u8), sizeof[pcre2_memctl]())
         (__local_pairs__goto_887_7 = (((if (if (((*__param_code).top_bracket as c_int) + 1) < (*__local_match_data).oveccount: 1 else: 0) != 0: ((((*__param_code).top_bracket as c_int) + 1) as c_int) else: ((*__local_match_data).oveccount as c_int)) as c_int)))
         (__local_internal_match_data__goto_748_19 = pcre2_match_data_create_8(((*__local_match_data).oveccount as c_uint), (&raw mut __local_gcontext__goto_888_25 as *mut pcre2_real_general_context_8)))
         if ((if __local_internal_match_data__goto_748_19 == null: 1 else: 0) != 0) {
@@ -1211,10 +1211,10 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_124 {
-        (__local_text1_start__goto_1057_16 = null)
-        (__local_text1_end__goto_1058_16 = null)
-        (__local_text2_start__goto_1059_16 = null)
-        (__local_text2_end__goto_1060_16 = null)
+        (__local_text1_start__goto_1057_16 = ((null as *const u8)))
+        (__local_text1_end__goto_1058_16 = ((null as *const u8)))
+        (__local_text2_start__goto_1059_16 = ((null as *const u8)))
+        (__local_text2_end__goto_1060_16 = ((null as *const u8)))
         if ((if __local_ptr__goto_757_12 >= __local_repend__goto_758_12: 1 else: 0) != 0) {
             goto '__ci_bb_127
         } else {
@@ -1338,7 +1338,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_140 {
-        (__local_next__goto_1094_19 = (((*__local_ptr__goto_757_12) as u8)))
+        (__local_next__goto_1094_19 = (*__local_ptr__goto_757_12))
         if ((if __local_next__goto_1094_19 == 36: 1 else: 0) != 0) {
             goto '__ci_bb_142
         } else {
@@ -1643,7 +1643,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_182 {
-        (__local_next__goto_1094_19 = (((*__local_ptr__goto_757_12) as u8)))
+        (__local_next__goto_1094_19 = (*__local_ptr__goto_757_12))
         (__local_inparens__goto_1090_12 = ((1 as c_int)))
         goto '__ci_bb_180
     }
@@ -1666,7 +1666,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_186 {
-        (__local_next__goto_1094_19 = (((*__local_ptr__goto_757_12) as u8)))
+        (__local_next__goto_1094_19 = (*__local_ptr__goto_757_12))
         (__local_inangle__goto_1091_12 = ((1 as c_int)))
         goto '__ci_bb_184
     }
@@ -1705,7 +1705,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_190 {
-        (__local_next__goto_1094_19 = (((*__local_ptr__goto_757_12) as u8)))
+        (__local_next__goto_1094_19 = (*__local_ptr__goto_757_12))
         (__local_star__goto_1092_12 = ((1 as c_int)))
         goto '__ci_bb_188
     }
@@ -1743,7 +1743,7 @@ pub unsafe fn pcre2_substitute_8(__param_code: *const pcre2_real_code_8, __param
     }
 
     '__ci_bb_195 {
-        (__local_next__goto_1094_19 = (((*__local_ptr__goto_757_12) as u8)))
+        (__local_next__goto_1094_19 = (*__local_ptr__goto_757_12))
         if ((if __local_next__goto_1094_19 < 48: 1 else: 0) != 0) {
             (__ci_expr_logic_21 = (if true: 1 else: 0))
         } else {
@@ -4781,7 +4781,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
     (__local_ucp = (((if (((*__param_code).overall_options as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) as c_int)))
 
     if ((if __param_input_len == 0: 1 else: 0) != 0) {
-        return 0
+        return ((0 as c_ulong))
     }
 
     while true {
@@ -4822,7 +4822,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
                     }
                 }
 
-                return 0
+                return ((0 as c_ulong))
 
             },
         }
@@ -5001,7 +5001,7 @@ unsafe fn default_substitute_case_callout(__param_input: *const u8, __param_inpu
 }
 
 unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong, __param_output_cap: c_ulong, __param_state: *mut case_state, __param_utf: c_int, __param_substitute_case_callout: unsafe extern "C" fn(*const u8, c_ulong, *mut u8, c_ulong, c_int, *mut c_void) -> c_ulong, __param_substitute_case_callout_data: *mut c_void) -> c_ulong {
-    var __local_input: *const u8 = __param_input_output
+    var __local_input: *const u8 = ((__param_input_output as *const u8))
 
     var __local_output: *mut u8 = __param_input_output
 
@@ -5099,7 +5099,7 @@ unsafe fn do_case_copy(__param_input_output: *mut u8, __param_input_len: c_ulong
                     }
                 }
 
-                return 0
+                return ((0 as c_ulong))
 
             },
         }

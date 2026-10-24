@@ -34,46 +34,46 @@ pub unsafe fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) 
         while true {
             match __param_what {
                 0 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 14 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 7 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 16 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 12 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 1 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 3 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 4 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 13 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 5 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 6 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 8 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 15 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 9 => {
-                    return 4
+                    return ((4 as c_int))
                 },
                 2 => {
                     0
@@ -140,7 +140,7 @@ pub unsafe fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) 
                 ((*(__param_where_ as *mut c_uint)) = ((1088 as c_uint)))
             },
             10 => {
-                var __local_v: *const c_char = ((_pcre2_unicode_version_8 as *const c_char))
+                var __local_v: *const c_char = _pcre2_unicode_version_8
 
                 return ((((1 as c_ulong) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v) as c_ulong) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as c_ulong)) as c_ulong)) as c_int))
 

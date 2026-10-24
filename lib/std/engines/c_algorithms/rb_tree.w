@@ -204,10 +204,10 @@ pub unsafe fn rb_tree_num_entries(__param_tree: *mut _RBTree) -> c_int {
 
 unsafe fn rb_tree_node_side(__param_node: *mut _RBTreeNode) -> i32 {
     if ((if (*(*__param_node).parent).children[RB_TREE_NODE_LEFT] == __param_node: 1 else: 0) != 0) {
-        return 0
+        return ((0 as i32))
 
     }
-    return 1
+    return ((1 as i32))
 
 
 }
@@ -268,7 +268,7 @@ unsafe fn rb_tree_rotate(__param_tree: *mut _RBTree, __param_node: *mut _RBTreeN
 
 }
 
-unsafe fn rb_tree_free_subtree(__param_node: *mut _RBTreeNode) {
+unsafe fn rb_tree_free_subtree(__param_node: *mut _RBTreeNode) -> Unit {
     if ((if __param_node != null: 1 else: 0) != 0) {
         rb_tree_free_subtree((*__param_node).children[RB_TREE_NODE_LEFT])
 

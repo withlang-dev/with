@@ -270,7 +270,7 @@ pub unsafe fn tommy_list_foreach_arg(__param_list: *mut *mut tommy_node_struct, 
 
 }
 
-unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __param_first_after: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct, __param_second_tail: *mut tommy_node_struct) {
+pub unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __param_first_after: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct, __param_second_tail: *mut tommy_node_struct) {
     ((*__param_first_after).prev = __param_second_tail)
 
     ((*__param_second_head).prev = __param_first_before)
@@ -281,14 +281,14 @@ unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __par
 
 }
 
-unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct) {
+pub unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct) {
     ((*__param_second_head).prev = __param_first_tail)
 
     ((*__param_first_tail).next = __param_second_head)
 
 }
 
-unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
     var __local_first_i: *mut tommy_node_struct = (*__param_first).head
 
     var __local_second_i: *mut tommy_node_struct = (*__param_second).head
@@ -331,7 +331,7 @@ unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_seco
 
 }
 
-unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
     if ((if __param_cmp(((*(*__param_first).tail).data as *const c_void), ((*(*__param_second).head).data as *const c_void)) <= 0: 1 else: 0) != 0) {
         tommy_chain_concat((*__param_first).tail, (*__param_second).head)
 
@@ -354,7 +354,7 @@ unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, 
 
 }
 
-unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) -> Unit {
+pub unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) -> Unit {
     var __local_bit: List[tommy_chain_struct] = [tommy_chain_struct.zeroed(); 65]
 
     var __local_counter: c_ulonglong

@@ -227,7 +227,7 @@ pub fn cache_clear() {
     (__local_i = ((0 as c_uint)))
 
     while ((if __local_i < (16777216 * (sizeof[u8]() as usize)): 1 else: 0) != 0) {
-        (the_cache[__local_i] = ((((the_cache[__local_i] as c_int) +% (1 as u8)) as u8)))
+        (the_cache[__local_i] = ((((the_cache[__local_i] as c_int) +% 1) as u8)))
 
         (__local_i = (__local_i +% 32))
 
@@ -236,12 +236,12 @@ pub fn cache_clear() {
 
 }
 
-pub unsafe fn start(__param_str: *const i8) writes compare_counter {
+pub unsafe fn start(__param_str: *const c_char) writes compare_counter {
     cache_clear()
 
     (compare_counter = ((0 as c_uint)))
 
-    (the_str = ((__param_str as *const c_char)))
+    (the_str = __param_str)
 
     (the_start = ((nano() as c_ulonglong)))
 
@@ -2162,6 +2162,6 @@ pub fn main() -> c_int writes SEED, compare_counter {
 }
 
 let the_cache: List[u8] = [0; 16777216]
-var the_str: *const i8 = null
+var the_str: *const c_char = null
 var the_start: c_ulonglong = 0
 var the_count: c_uint = 0

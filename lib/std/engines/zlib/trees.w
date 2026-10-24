@@ -82,7 +82,7 @@ pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: c_uint, __
 
 }
 
-pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) {
+pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut c_char, __param_stored_len: c_ulong, __param_last: c_int) {
     var __local_opt_lenb: c_ulong
 
     var __local_static_lenb: c_ulong
@@ -91,8 +91,8 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
     var __local_max_blindex: c_int = ((0 as c_int))
 
     if ((if (*__param_s).level > 0: 1 else: 0) != 0) {
-        if ((if (*__param_s).strm.data_type == 2: 1 else: 0) != 0) {
-            ((*__param_s).strm.data_type = ((detect_data_type(__param_s) as c_int)))
+        if ((if (*(*__param_s).strm).data_type == 2: 1 else: 0) != 0) {
+            ((*(*__param_s).strm).data_type = ((detect_data_type(__param_s) as c_int)))
         }
 
         build_tree(__param_s, ((&raw const (*__param_s).l_desc as *const tree_desc_s) as *mut tree_desc_s))
@@ -333,7 +333,7 @@ pub unsafe fn _tr_align(__param_s: *mut internal_state) {
 
 }
 
-pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut i8, __param_stored_len: c_ulong, __param_last: c_int) {
+pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut c_char, __param_stored_len: c_ulong, __param_last: c_int) {
     var __local_len: c_int = ((3 as c_int))
 
     if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
@@ -806,7 +806,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         ((*__param_s).bl_count[__local_bits] = ((*__param_s).bl_count[__local_bits] -% 1))
 
-        ((*__param_s).bl_count[(__local_bits + 1)] = (((((*__param_s).bl_count[(__local_bits + 1)] as c_int) +% (2 as c_ushort)) as c_ushort)))
+        ((*__param_s).bl_count[(__local_bits + 1)] = (((((*__param_s).bl_count[(__local_bits + 1)] as c_int) +% 2) as c_ushort)))
 
         ((*__param_s).bl_count[__local_max_length] = ((*__param_s).bl_count[__local_max_length] -% 1))
 
@@ -1049,7 +1049,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         }
         if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
-            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq as c_int) +% (__local_count as c_ushort)) as c_ushort)))
+            ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq as c_int) +% ((__local_count as c_ushort) as c_int)) as c_ushort)))
 
         } else {
             if ((if __local_curlen != 0: 1 else: 0) != 0) {

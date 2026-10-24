@@ -1635,7 +1635,7 @@ pub unsafe fn pcre2_compile_8(__param_pattern: *const u8, __param_patlen: c_ulon
     }
 
     '__ci_bb_192 {
-        (__local_search_from__goto_11022_18 = __local_codestart__goto_10286_14)
+        (__local_search_from__goto_11022_18 = ((__local_codestart__goto_10286_14 as *const u8)))
         (__local_rgroup__goto_11008_14 = ((null as *const u8)))
         (__local_i__goto_10310_10 = ((0 as c_uint)))
         (__local_p__goto_11017_9 = __local_start__goto_11010_7)
@@ -10474,8 +10474,8 @@ unsafe fn parse_regex(__param_ptr: *const u8, __param_options: c_uint, __param_x
         (__local_auto_callout__goto_3143_6 = (((if ((__local_options as c_uint) & (4 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_okquantifier__goto_3146_6 = ((0 as c_int)))
         (__local_ptrend__goto_3149_12 = (*__param_cb).end_pattern)
-        (__local_verbnamestart__goto_3150_12 = null)
-        (__local_class_range_forbid_ptr__goto_3151_12 = null)
+        (__local_verbnamestart__goto_3150_12 = ((null as *const u8)))
+        (__local_class_range_forbid_ptr__goto_3151_12 = ((null as *const u8)))
         goto '__ci_bb_1
     }
 
@@ -20128,12 +20128,12 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
 
     '__ci_bb_134 {
         (__local_bravalue__goto_6074_5 = OP_ASSERT_SCS)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
     '__ci_bb_135 {
-        ((*__param_cb).parens_depth = (((((*__param_cb).parens_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).parens_depth = (((((*__param_cb).parens_depth as c_int) +% 1) as c_ushort)))
         ((*__local_code__goto_6093_14) = ((__local_bravalue__goto_6074_5 as u8)))
         (__local_pptr__goto_6084_11 = __local_pptr__goto_6084_11 + 1)
         (__local_tempcode__goto_6096_14 = __local_code__goto_6093_14)
@@ -20518,13 +20518,13 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
 
     '__ci_bb_184 {
         (__local_bravalue__goto_6074_5 = OP_ASSERT)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
     '__ci_bb_185 {
         (__local_bravalue__goto_6074_5 = OP_ASSERT_NA)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
@@ -20559,7 +20559,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
 
     '__ci_bb_188 {
         (__local_bravalue__goto_6074_5 = OP_ASSERT_NOT)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
@@ -20569,19 +20569,19 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
 
     '__ci_bb_190 {
         (__local_bravalue__goto_6074_5 = OP_ASSERTBACK)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
     '__ci_bb_191 {
         (__local_bravalue__goto_6074_5 = OP_ASSERTBACK_NOT)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
     '__ci_bb_192 {
         (__local_bravalue__goto_6074_5 = OP_ASSERTBACK_NA)
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) +% 1) as c_ushort)))
         goto '__ci_bb_135
     }
 
@@ -20605,7 +20605,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
     }
 
     '__ci_bb_197 {
-        ((*__param_cb).parens_depth = (((((*__param_cb).parens_depth as c_int) -% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).parens_depth = (((((*__param_cb).parens_depth as c_int) -% 1) as c_ushort)))
         (__ci_expr_logic_54 = 0)
         (__ci_expr_logic_53 = 0)
         if (__local_note_group_empty__goto_6146_8 != 0) {
@@ -20639,7 +20639,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
     }
 
     '__ci_bb_200 {
-        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) -% (1 as c_ushort)) as c_ushort)))
+        ((*__param_cb).assert_depth = (((((*__param_cb).assert_depth as c_int) -% 1) as c_ushort)))
         goto '__ci_bb_201
     }
 
@@ -21124,7 +21124,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
         (__local_callout_string__goto_7235_20 = __local_callout_string__goto_7235_20 + 1)
         (__ci_expr_old_67 = __local_pp__goto_7232_18)
         (__local_pp__goto_7232_18 = __local_pp__goto_7232_18 + 1)
-        ((*__ci_expr_old_66) = (((*__ci_expr_old_67) as u8)))
+        ((*__ci_expr_old_66) = (*__ci_expr_old_67))
         (__local_delimiter__goto_7233_16 = (((*__ci_expr_old_66) as c_uint)))
         if ((if __local_delimiter__goto_7233_16 == 123: 1 else: 0) != 0) {
             goto '__ci_bb_262
@@ -21193,7 +21193,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
         (__local_callout_string__goto_7235_20 = __local_callout_string__goto_7235_20 + 1)
         (__ci_expr_old_71 = __local_pp__goto_7232_18)
         (__local_pp__goto_7232_18 = __local_pp__goto_7232_18 + 1)
-        ((*__ci_expr_old_70) = (((*__ci_expr_old_71) as u8)))
+        ((*__ci_expr_old_70) = (*__ci_expr_old_71))
         goto '__ci_bb_269
     }
 
@@ -22226,7 +22226,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
     }
 
     '__ci_bb_405 {
-        ((*__local_bracode__goto_7775_24) = (((((*__local_bracode__goto_7775_24) as c_int) +% ((OP_SBRA - OP_BRA) as u8)) as u8)))
+        ((*__local_bracode__goto_7775_24) = (((((*__local_bracode__goto_7775_24) as c_int) +% (OP_SBRA - OP_BRA)) as u8)))
         goto '__ci_bb_406
     }
 
@@ -22291,7 +22291,7 @@ unsafe fn compile_branch(__param_optionsptr: *mut c_uint, __param_xoptionsptr: *
     }
 
     '__ci_bb_413 {
-        ((*__local_bracode__goto_7775_24) = (((((*__local_bracode__goto_7775_24) as c_int) +% (1 as u8)) as u8)))
+        ((*__local_bracode__goto_7775_24) = (((((*__local_bracode__goto_7775_24) as c_int) +% 1) as u8)))
         ((*__local_ketcode__goto_7774_24) = ((125 as u8)))
         goto '__ci_bb_414
     }
@@ -25380,7 +25380,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
         var __local_scode: *const u8 = first_significant_code((((__local_code + ((1 as isize) as usize)) + ((2 as isize) as usize)) + ((__local_xl as isize) as usize)), (1 as c_int))
 
-        var __local_op: u8 = (((*__local_scode) as u8))
+        var __local_op: u8 = (*__local_scode)
 
         while true {
             match __local_op {
@@ -25405,7 +25405,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25423,7 +25423,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25450,7 +25450,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25468,7 +25468,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25495,7 +25495,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25513,7 +25513,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25540,7 +25540,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25558,7 +25558,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25585,7 +25585,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25603,7 +25603,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25630,7 +25630,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25648,7 +25648,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25675,7 +25675,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25693,7 +25693,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25720,7 +25720,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25738,7 +25738,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25765,7 +25765,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25783,7 +25783,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25810,7 +25810,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
 
                     if ((if __local_dflags >= 4294967294: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25828,7 +25828,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                         }
 
                         if (__ci_expr_logic_6 != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
 
                     }
@@ -25838,7 +25838,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                     (__local_scode = __local_scode + ((2 as isize) as usize))
 
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25848,7 +25848,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
@@ -25856,7 +25856,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                 },
                 29 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25866,14 +25866,14 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 35 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25883,14 +25883,14 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 36 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25900,14 +25900,14 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 43 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25917,7 +25917,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
@@ -25926,11 +25926,11 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                     (__local_scode = __local_scode + ((2 as isize) as usize))
 
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if (__local_scode[1]) >= 128: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25940,7 +25940,7 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
@@ -25948,11 +25948,11 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
                 },
                 30 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if (__local_scode[1]) >= 128: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25962,18 +25962,18 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 48 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if (__local_scode[1]) >= 128: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -25983,18 +25983,18 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 49 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if (__local_scode[1]) >= 128: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -26004,18 +26004,18 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 56 => {
                     if ((if __param_inassert == 0: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if (__local_scode[1]) >= 128: 1 else: 0) != 0) {
-                        return 0
+                        return ((0 as c_uint))
                     }
 
                     if ((if __local_cflags >= 4294967294: 1 else: 0) != 0) {
@@ -26025,13 +26025,13 @@ unsafe fn find_firstassertedcu(__param_code: *const u8, __param_flags: *mut c_ui
 
                     } else {
                         if ((if __local_c != (__local_scode[1]): 1 else: 0) != 0) {
-                            return 0
+                            return ((0 as c_uint))
                         }
                     }
 
                 },
                 _ => {
-                    return 0
+                    return ((0 as c_uint))
                 },
             }
 
@@ -26428,5 +26428,5 @@ let chartypeoffset: List[c_uint] = [0, 13, 26, 39]
 let posix_names: List[c_char] = [97, 108, 112, 104, 97, 0, 108, 111, 119, 101, 114, 0, 117, 112, 112, 101, 114, 0, 97, 108, 110, 117, 109, 0, 97, 115, 99, 105, 105, 0, 98, 108, 97, 110, 107, 0, 99, 110, 116, 114, 108, 0, 100, 105, 103, 105, 116, 0, 103, 114, 97, 112, 104, 0, 112, 114, 105, 110, 116, 0, 112, 117, 110, 99, 116, 0, 115, 112, 97, 99, 101, 0, 119, 111, 114, 100, 0, 120, 100, 105, 103, 105, 116, 0]
 let posix_name_lengths: List[u8] = [5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5, 4, 6, 0]
 let posix_substitutes: List[c_int] = [1, ucp_L, 2, ucp_Ll, 2, ucp_Lu, 5, 0, -1, 0, -1, 1, 2, ucp_Cc, 2, ucp_Nd, 14, 0, 15, 0, 16, 0, 7, 0, 8, 0, 17, 0]
-let pso_list: List[pso] = [pso { name: c"\x55\x54\x46\x38\x29".ptr as *const i8, length: 5, type_: (PSO_OPT as c_ushort), value: 0x00080000u32 }, pso { name: c"\x55\x54\x46\x29".ptr as *const i8, length: 4, type_: (PSO_OPT as c_ushort), value: 0x00080000u32 }, pso { name: c"\x55\x43\x50\x29".ptr as *const i8, length: 4, type_: (PSO_OPT as c_ushort), value: 0x00020000u32 }, pso { name: c"\x4e\x4f\x54\x45\x4d\x50\x54\x59\x29".ptr as *const i8, length: 9, type_: (PSO_FLG as c_ushort), value: 0x00010000u32 }, pso { name: c"\x4e\x4f\x54\x45\x4d\x50\x54\x59\x5f\x41\x54\x53\x54\x41\x52\x54\x29".ptr as *const i8, length: 17, type_: (PSO_FLG as c_ushort), value: 0x00020000u32 }, pso { name: c"\x4e\x4f\x5f\x41\x55\x54\x4f\x5f\x50\x4f\x53\x53\x45\x53\x53\x29".ptr as *const i8, length: 16, type_: (PSO_OPTMZ as c_ushort), value: 0x00000001u32 }, pso { name: c"\x4e\x4f\x5f\x44\x4f\x54\x53\x54\x41\x52\x5f\x41\x4e\x43\x48\x4f\x52\x29".ptr as *const i8, length: 18, type_: (PSO_OPTMZ as c_ushort), value: 0x00000002u32 }, pso { name: c"\x4e\x4f\x5f\x4a\x49\x54\x29".ptr as *const i8, length: 7, type_: (PSO_FLG as c_ushort), value: 0x00080000u32 }, pso { name: c"\x4e\x4f\x5f\x53\x54\x41\x52\x54\x5f\x4f\x50\x54\x29".ptr as *const i8, length: 13, type_: (PSO_OPTMZ as c_ushort), value: 0x00000004u32 }, pso { name: c"\x43\x41\x53\x45\x4c\x45\x53\x53\x5f\x52\x45\x53\x54\x52\x49\x43\x54\x29".ptr as *const i8, length: 18, type_: (PSO_XOPT as c_ushort), value: 0x00000080u32 }, pso { name: c"\x54\x55\x52\x4b\x49\x53\x48\x5f\x43\x41\x53\x49\x4e\x47\x29".ptr as *const i8, length: 15, type_: (PSO_XOPT as c_ushort), value: 0x00010000u32 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x48\x45\x41\x50\x3d".ptr as *const i8, length: 11, type_: (PSO_LIMH as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x4d\x41\x54\x43\x48\x3d".ptr as *const i8, length: 12, type_: (PSO_LIMM as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x44\x45\x50\x54\x48\x3d".ptr as *const i8, length: 12, type_: (PSO_LIMD as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x52\x45\x43\x55\x52\x53\x49\x4f\x4e\x3d".ptr as *const i8, length: 16, type_: (PSO_LIMD as c_ushort), value: 0 }, pso { name: c"\x43\x52\x29".ptr as *const i8, length: 3, type_: (PSO_NL as c_ushort), value: 1 }, pso { name: c"\x4c\x46\x29".ptr as *const i8, length: 3, type_: (PSO_NL as c_ushort), value: 2 }, pso { name: c"\x43\x52\x4c\x46\x29".ptr as *const i8, length: 5, type_: (PSO_NL as c_ushort), value: 3 }, pso { name: c"\x41\x4e\x59\x29".ptr as *const i8, length: 4, type_: (PSO_NL as c_ushort), value: 4 }, pso { name: c"\x4e\x55\x4c\x29".ptr as *const i8, length: 4, type_: (PSO_NL as c_ushort), value: 6 }, pso { name: c"\x41\x4e\x59\x43\x52\x4c\x46\x29".ptr as *const i8, length: 8, type_: (PSO_NL as c_ushort), value: 5 }, pso { name: c"\x42\x53\x52\x5f\x41\x4e\x59\x43\x52\x4c\x46\x29".ptr as *const i8, length: 12, type_: (PSO_BSR as c_ushort), value: 2 }, pso { name: c"\x42\x53\x52\x5f\x55\x4e\x49\x43\x4f\x44\x45\x29".ptr as *const i8, length: 12, type_: (PSO_BSR as c_ushort), value: 1 }]
+let pso_list: List[pso] = [pso { name: c"\x55\x54\x46\x38\x29".ptr as *const c_char, length: 5, type_: (PSO_OPT as c_ushort), value: 0x00080000u32 }, pso { name: c"\x55\x54\x46\x29".ptr as *const c_char, length: 4, type_: (PSO_OPT as c_ushort), value: 0x00080000u32 }, pso { name: c"\x55\x43\x50\x29".ptr as *const c_char, length: 4, type_: (PSO_OPT as c_ushort), value: 0x00020000u32 }, pso { name: c"\x4e\x4f\x54\x45\x4d\x50\x54\x59\x29".ptr as *const c_char, length: 9, type_: (PSO_FLG as c_ushort), value: 0x00010000u32 }, pso { name: c"\x4e\x4f\x54\x45\x4d\x50\x54\x59\x5f\x41\x54\x53\x54\x41\x52\x54\x29".ptr as *const c_char, length: 17, type_: (PSO_FLG as c_ushort), value: 0x00020000u32 }, pso { name: c"\x4e\x4f\x5f\x41\x55\x54\x4f\x5f\x50\x4f\x53\x53\x45\x53\x53\x29".ptr as *const c_char, length: 16, type_: (PSO_OPTMZ as c_ushort), value: 0x00000001u32 }, pso { name: c"\x4e\x4f\x5f\x44\x4f\x54\x53\x54\x41\x52\x5f\x41\x4e\x43\x48\x4f\x52\x29".ptr as *const c_char, length: 18, type_: (PSO_OPTMZ as c_ushort), value: 0x00000002u32 }, pso { name: c"\x4e\x4f\x5f\x4a\x49\x54\x29".ptr as *const c_char, length: 7, type_: (PSO_FLG as c_ushort), value: 0x00080000u32 }, pso { name: c"\x4e\x4f\x5f\x53\x54\x41\x52\x54\x5f\x4f\x50\x54\x29".ptr as *const c_char, length: 13, type_: (PSO_OPTMZ as c_ushort), value: 0x00000004u32 }, pso { name: c"\x43\x41\x53\x45\x4c\x45\x53\x53\x5f\x52\x45\x53\x54\x52\x49\x43\x54\x29".ptr as *const c_char, length: 18, type_: (PSO_XOPT as c_ushort), value: 0x00000080u32 }, pso { name: c"\x54\x55\x52\x4b\x49\x53\x48\x5f\x43\x41\x53\x49\x4e\x47\x29".ptr as *const c_char, length: 15, type_: (PSO_XOPT as c_ushort), value: 0x00010000u32 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x48\x45\x41\x50\x3d".ptr as *const c_char, length: 11, type_: (PSO_LIMH as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x4d\x41\x54\x43\x48\x3d".ptr as *const c_char, length: 12, type_: (PSO_LIMM as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x44\x45\x50\x54\x48\x3d".ptr as *const c_char, length: 12, type_: (PSO_LIMD as c_ushort), value: 0 }, pso { name: c"\x4c\x49\x4d\x49\x54\x5f\x52\x45\x43\x55\x52\x53\x49\x4f\x4e\x3d".ptr as *const c_char, length: 16, type_: (PSO_LIMD as c_ushort), value: 0 }, pso { name: c"\x43\x52\x29".ptr as *const c_char, length: 3, type_: (PSO_NL as c_ushort), value: 1 }, pso { name: c"\x4c\x46\x29".ptr as *const c_char, length: 3, type_: (PSO_NL as c_ushort), value: 2 }, pso { name: c"\x43\x52\x4c\x46\x29".ptr as *const c_char, length: 5, type_: (PSO_NL as c_ushort), value: 3 }, pso { name: c"\x41\x4e\x59\x29".ptr as *const c_char, length: 4, type_: (PSO_NL as c_ushort), value: 4 }, pso { name: c"\x4e\x55\x4c\x29".ptr as *const c_char, length: 4, type_: (PSO_NL as c_ushort), value: 6 }, pso { name: c"\x41\x4e\x59\x43\x52\x4c\x46\x29".ptr as *const c_char, length: 8, type_: (PSO_NL as c_ushort), value: 5 }, pso { name: c"\x42\x53\x52\x5f\x41\x4e\x59\x43\x52\x4c\x46\x29".ptr as *const c_char, length: 12, type_: (PSO_BSR as c_ushort), value: 2 }, pso { name: c"\x42\x53\x52\x5f\x55\x4e\x49\x43\x4f\x44\x45\x29".ptr as *const c_char, length: 12, type_: (PSO_BSR as c_ushort), value: 1 }]
 let opcode_possessify: List[u8] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 42, 0, 43, 0, 44, 0, 45, 0, 0, 0, 0, 0, 0, 55, 0, 56, 0, 57, 0, 58, 0, 0, 0, 0, 0, 0, 68, 0, 69, 0, 70, 0, 71, 0, 0, 0, 0, 0, 0, 81, 0, 82, 0, 83, 0, 84, 0, 0, 0, 0, 0, 0, 94, 0, 95, 0, 96, 0, 97, 0, 0, 0, 0, 0, 0, 106, 0, 107, 0, 108, 0, 109, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]

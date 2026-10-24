@@ -451,7 +451,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_39 {
-        ((*__local_state__goto_475_31).head.done = ((-1 as c_int)))
+        ((*(*__local_state__goto_475_31).head).done = ((-1 as c_int)))
         goto '__ci_bb_40
     }
 
@@ -669,7 +669,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_71 {
-        ((*__local_state__goto_475_31).head.text = ((((((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_ulong) & (1 as c_ulong)) as c_int)))
+        ((*(*__local_state__goto_475_31).head).text = ((((((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_ulong) & (1 as c_ulong)) as c_int)))
         goto '__ci_bb_72
     }
 
@@ -805,7 +805,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_93 {
-        ((*__local_state__goto_475_31).head.time = __local_hold__goto_479_19)
+        ((*(*__local_state__goto_475_31).head).time = __local_hold__goto_479_19)
         goto '__ci_bb_94
     }
 
@@ -943,8 +943,8 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_115 {
-        ((*__local_state__goto_475_31).head.xflags = ((((__local_hold__goto_479_19 as c_ulong) & (255 as c_ulong)) as c_int)))
-        ((*__local_state__goto_475_31).head.os = ((((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_int)))
+        ((*(*__local_state__goto_475_31).head).xflags = ((((__local_hold__goto_479_19 as c_ulong) & (255 as c_ulong)) as c_int)))
+        ((*(*__local_state__goto_475_31).head).os = ((((__local_hold__goto_479_19 as c_ulong) >> (8 as c_uint)) as c_int)))
         goto '__ci_bb_116
     }
 
@@ -1102,7 +1102,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_140 {
-        ((*__local_state__goto_475_31).head.extra_len = ((__local_hold__goto_479_19 as c_uint)))
+        ((*(*__local_state__goto_475_31).head).extra_len = ((__local_hold__goto_479_19 as c_uint)))
         goto '__ci_bb_141
     }
 
@@ -1164,7 +1164,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_150 {
-        ((*__local_state__goto_475_31).head.extra = null)
+        ((*(*__local_state__goto_475_31).head).extra = null)
         goto '__ci_bb_151
     }
 
@@ -1212,12 +1212,12 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__ci_expr_logic_16 = 0)
         (__ci_expr_logic_15 = 0)
         if ((if (*__local_state__goto_475_31).head != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if (*__local_state__goto_475_31).head.extra != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if (if (*(*__local_state__goto_475_31).head).extra != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_15 != 0) {
-            (__local_len__goto_486_14 = (((((*__local_state__goto_475_31).head.extra_len as c_uint) -% ((*__local_state__goto_475_31).length as c_uint)) as c_uint)))
+            (__local_len__goto_486_14 = (((((*(*__local_state__goto_475_31).head).extra_len as c_uint) -% ((*__local_state__goto_475_31).length as c_uint)) as c_uint)))
 
-            (__ci_expr_logic_16 = (if (if __local_len__goto_486_14 < (*__local_state__goto_475_31).head.extra_max: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_16 = (if (if __local_len__goto_486_14 < (*(*__local_state__goto_475_31).head).extra_max: 1 else: 0) != 0: 1 else: 0))
 
         }
         if (__ci_expr_logic_16 != 0) {
@@ -1236,7 +1236,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_159 {
-        with_memcpy(((((*__local_state__goto_475_31).head.extra + (__local_len__goto_486_14 as usize)) as *mut c_void) as *mut u8), ((__local_next__goto_476_32 as *const c_void) as *const u8), (((if (if ((__local_len__goto_486_14 as c_uint) +% (__local_copy___goto_482_14 as c_uint)) > (*__local_state__goto_475_31).head.extra_max: 1 else: 0) != 0: ((((*__local_state__goto_475_31).head.extra_max as c_uint) -% (__local_len__goto_486_14 as c_uint)) as c_uint) else: __local_copy___goto_482_14) as c_ulong) as i64))
+        with_memcpy(((((*(*__local_state__goto_475_31).head).extra + (__local_len__goto_486_14 as usize)) as *mut c_void) as *mut u8), ((__local_next__goto_476_32 as *const c_void) as *const u8), (((if (if ((__local_len__goto_486_14 as c_uint) +% (__local_copy___goto_482_14 as c_uint)) > (*(*__local_state__goto_475_31).head).extra_max: 1 else: 0) != 0: ((((*(*__local_state__goto_475_31).head).extra_max as c_uint) -% (__local_len__goto_486_14 as c_uint)) as c_uint) else: __local_copy___goto_482_14) as c_ulong) as i64))
         goto '__ci_bb_160
     }
 
@@ -1318,10 +1318,10 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__ci_expr_logic_20 = 0)
         (__ci_expr_logic_19 = 0)
         if ((if (*__local_state__goto_475_31).head != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_19 = (if (if (*__local_state__goto_475_31).head.name != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_19 = (if (if (*(*__local_state__goto_475_31).head).name != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_19 != 0) {
-            (__ci_expr_logic_20 = (if (if (*__local_state__goto_475_31).length < (*__local_state__goto_475_31).head.name_max: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if (if (*__local_state__goto_475_31).length < (*(*__local_state__goto_475_31).head).name_max: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_20 != 0) {
             goto '__ci_bb_174
@@ -1357,7 +1357,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     '__ci_bb_174 {
         (__ci_expr_old_21 = (*__local_state__goto_475_31).length)
         ((*__local_state__goto_475_31).length = ((*__local_state__goto_475_31).length +% 1))
-        (((*__local_state__goto_475_31).head.name[__ci_expr_old_21]) = ((__local_len__goto_486_14 as u8)))
+        (((*(*__local_state__goto_475_31).head).name[__ci_expr_old_21]) = ((__local_len__goto_486_14 as u8)))
         goto '__ci_bb_175
     }
 
@@ -1389,7 +1389,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_180 {
-        ((*__local_state__goto_475_31).head.name = null)
+        ((*(*__local_state__goto_475_31).head).name = null)
         goto '__ci_bb_181
     }
 
@@ -1442,10 +1442,10 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
         (__ci_expr_logic_26 = 0)
         (__ci_expr_logic_25 = 0)
         if ((if (*__local_state__goto_475_31).head != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_25 = (if (if (*__local_state__goto_475_31).head.comment != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if (if (*(*__local_state__goto_475_31).head).comment != 0: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_25 != 0) {
-            (__ci_expr_logic_26 = (if (if (*__local_state__goto_475_31).length < (*__local_state__goto_475_31).head.comm_max: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_26 = (if (if (*__local_state__goto_475_31).length < (*(*__local_state__goto_475_31).head).comm_max: 1 else: 0) != 0: 1 else: 0))
         }
         if (__ci_expr_logic_26 != 0) {
             goto '__ci_bb_191
@@ -1481,7 +1481,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     '__ci_bb_191 {
         (__ci_expr_old_27 = (*__local_state__goto_475_31).length)
         ((*__local_state__goto_475_31).length = ((*__local_state__goto_475_31).length +% 1))
-        (((*__local_state__goto_475_31).head.comment[__ci_expr_old_27]) = ((__local_len__goto_486_14 as u8)))
+        (((*(*__local_state__goto_475_31).head).comment[__ci_expr_old_27]) = ((__local_len__goto_486_14 as u8)))
         goto '__ci_bb_192
     }
 
@@ -1513,7 +1513,7 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_197 {
-        ((*__local_state__goto_475_31).head.comment = null)
+        ((*(*__local_state__goto_475_31).head).comment = null)
         goto '__ci_bb_198
     }
 
@@ -1643,8 +1643,8 @@ pub unsafe fn inflate(__param_strm: *mut z_stream_s, __param_flush: c_int) -> c_
     }
 
     '__ci_bb_218 {
-        ((*__local_state__goto_475_31).head.hcrc = (((((((*__local_state__goto_475_31).flags as c_int) >> (9 as c_uint)) as c_int) & (1 as c_int)) as c_int)))
-        ((*__local_state__goto_475_31).head.done = ((1 as c_int)))
+        ((*(*__local_state__goto_475_31).head).hcrc = (((((((*__local_state__goto_475_31).flags as c_int) >> (9 as c_uint)) as c_int) & (1 as c_int)) as c_int)))
+        ((*(*__local_state__goto_475_31).head).done = ((1 as c_int)))
         goto '__ci_bb_219
     }
 
@@ -5091,12 +5091,12 @@ pub unsafe fn inflateGetHeader(__param_strm: *mut z_stream_s, __param_head: *mut
 
 }
 
-pub unsafe fn inflateInit_(__param_strm: *mut z_stream_s, __param_version: *const i8, __param_stream_size: c_int) -> c_int {
+pub unsafe fn inflateInit_(__param_strm: *mut z_stream_s, __param_version: *const c_char, __param_stream_size: c_int) -> c_int {
     return inflateInit2_(__param_strm, (15 as c_int), __param_version, __param_stream_size)
 
 }
 
-pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c_int, __param_version: *const i8, __param_stream_size: c_int) -> c_int {
+pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c_int, __param_version: *const c_char, __param_stream_size: c_int) -> c_int {
     var __local_ret: c_int
 
     var __local_state: *mut inflate_state
@@ -5131,7 +5131,7 @@ pub unsafe fn inflateInit2_(__param_strm: *mut z_stream_s, __param_windowBits: c
     if ((if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, c_uint, c_uint) -> *mut c_void)): 1 else: 0) != 0) {
         ((*__param_strm).zalloc = Some(zcalloc))
 
-        ((*__param_strm).opaque_ = ((0 as *mut c_void)))
+        ((*__param_strm).opaque_ = null)
 
     }
 

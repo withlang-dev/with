@@ -297,7 +297,7 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return 0
+        return ((0 as c_uint))
 
     }
 

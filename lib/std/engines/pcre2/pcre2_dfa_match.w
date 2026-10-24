@@ -223,8 +223,8 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
         (__local_original_subject__goto_3350_12 = __local_subject)
         (__local_has_first_cu__goto_3357_6 = ((0 as c_int)))
         (__local_has_req_cu__goto_3358_6 = ((0 as c_int)))
-        (__local_memchr_found_first_cu__goto_3361_12 = null)
-        (__local_memchr_found_first_cu2__goto_3362_12 = null)
+        (__local_memchr_found_first_cu__goto_3361_12 = ((null as *const u8)))
+        (__local_memchr_found_first_cu2__goto_3362_12 = ((null as *const u8)))
         (__local_first_cu__goto_3365_13 = ((0 as u8)))
         (__local_first_cu2__goto_3366_13 = ((0 as u8)))
         (__local_req_cu__goto_3367_13 = ((0 as u8)))
@@ -1179,7 +1179,7 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_115 {
-        (__local_c__goto_3748_23 = (((*__local_start_match__goto_3351_12) as u8)))
+        (__local_c__goto_3748_23 = (*__local_start_match__goto_3351_12))
         (__ci_expr_logic_34 = 0)
         if (__local_has_first_cu__goto_3357_6 != 0) {
             var __ci_expr_logic_33: c_int
@@ -1251,8 +1251,8 @@ pub unsafe fn pcre2_dfa_match_8(__param_code: *const pcre2_real_code_8, __param_
     }
 
     '__ci_bb_124 {
-        (__local_pp1__goto_3787_22 = null)
-        (__local_pp2__goto_3788_22 = null)
+        (__local_pp1__goto_3787_22 = ((null as *const u8)))
+        (__local_pp2__goto_3788_22 = ((null as *const u8)))
         (__local_searchlength__goto_3789_22 = ((((((__local_end_subject__goto_3352_12 as usize) -% (__local_start_match__goto_3351_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_memchr_found_first_cu__goto_3361_12 == null: 1 else: 0) != 0) {
             (__ci_expr_logic_36 = (if true: 1 else: 0))

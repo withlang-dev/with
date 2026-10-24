@@ -1295,7 +1295,7 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_129 {
-        (__local_c__goto_7652_23 = (((*__local_start_match__goto_6993_12) as u8)))
+        (__local_c__goto_7652_23 = (*__local_start_match__goto_6993_12))
         (__ci_expr_logic_35 = 0)
         if (__local_has_first_cu__goto_6974_6 != 0) {
             var __ci_expr_logic_34: c_int
@@ -1368,8 +1368,8 @@ pub unsafe fn pcre2_match_8(__param_code: *const pcre2_real_code_8, __param_subj
     }
 
     '__ci_bb_138 {
-        (__local_pp1__goto_7695_22 = null)
-        (__local_pp2__goto_7696_22 = null)
+        (__local_pp1__goto_7695_22 = ((null as *const u8)))
+        (__local_pp2__goto_7696_22 = ((null as *const u8)))
         (__local_searchlength__goto_7697_22 = ((((((__local_end_subject__goto_6991_12 as usize) -% (__local_start_match__goto_6993_12 as usize)) as c_long) / (sizeof[u8]() as c_long)) as c_ulong)))
         if ((if __local_memchr_found_first_cu__goto_6979_12 == null: 1 else: 0) != 0) {
             (__ci_expr_logic_37 = (if true: 1 else: 0))
@@ -4509,7 +4509,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
         (__local_N__goto_693_12 = ((null as *mut heapframe)))
         (__local_P__goto_694_12 = ((null as *mut heapframe)))
         (__local_assert_accept_frame__goto_697_12 = ((null as *mut heapframe)))
-        (__local_branch_end__goto_702_12 = null)
+        (__local_branch_end__goto_702_12 = ((null as *const u8)))
         (__local_reptype__goto_716_10 = ((0 as c_uint)))
         (__local_utf__goto_726_6 = (((if (((*__param_mb).poptions as c_uint) & (524288 as c_uint)) != 0: 1 else: 0) as c_int)))
         (__local_ucp__goto_727_6 = (((if (((*__param_mb).poptions as c_uint) & (131072 as c_uint)) != 0: 1 else: 0) as c_int)))
@@ -4721,7 +4721,7 @@ unsafe fn match_(__param_start_eptr: *const u8, __param_start_ecode: *const u8, 
     }
 
     '__ci_bb_30 {
-        ((*__local_F__goto_692_12).op = (((*((*__local_F__goto_692_12).ecode)) as u8)))
+        ((*__local_F__goto_692_12).op = (*((*__local_F__goto_692_12).ecode)))
         goto '__ci_bb_33
     }
 

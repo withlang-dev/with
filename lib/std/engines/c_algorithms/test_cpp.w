@@ -307,7 +307,7 @@ fn test_trie() {
 
 }
 
-pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut i8) -> c_int writes allocation_limit {
+pub unsafe fn main(__param_argc: c_int, __param_argv: *mut *mut c_char) -> c_int writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 
 }

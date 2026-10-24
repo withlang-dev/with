@@ -68,7 +68,7 @@ pub unsafe fn _pcre2_auto_possessify_8(__param_code: *mut u8, __param_cb: *const
         }
 
         if (__ci_expr_logic_0 != 0) {
-            (__local_c = ((((__local_c as c_int) -% (((get_repeat_base(__local_c) as c_int) - OP_STAR) as u8)) as u8)))
+            (__local_c = ((((__local_c as c_int) -% ((get_repeat_base(__local_c) as c_int) - OP_STAR)) as u8)))
 
             (__local_end = (if (if __local_c <= OP_MINUPTO: 1 else: 0) != 0: get_chr_property_list((__local_code as *const u8), __local_utf, __local_ucp, (*__param_cb).fcc, (&__local_list[0] as *mut c_uint)) else: (null as *const u8)))
 
@@ -109,28 +109,28 @@ pub unsafe fn _pcre2_auto_possessify_8(__param_code: *mut u8, __param_cb: *const
                 while true {
                     match __local_c {
                         33 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSSTAR - OP_STAR) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSSTAR - OP_STAR)) as u8)))
                         },
                         34 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSSTAR - OP_MINSTAR) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSSTAR - OP_MINSTAR)) as u8)))
                         },
                         35 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSPLUS - OP_PLUS) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSPLUS - OP_PLUS)) as u8)))
                         },
                         36 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSPLUS - OP_MINPLUS) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSPLUS - OP_MINPLUS)) as u8)))
                         },
                         37 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSQUERY - OP_QUERY) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSQUERY - OP_QUERY)) as u8)))
                         },
                         38 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSQUERY - OP_MINQUERY) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSQUERY - OP_MINQUERY)) as u8)))
                         },
                         39 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSUPTO - OP_UPTO) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSUPTO - OP_UPTO)) as u8)))
                         },
                         40 => {
-                            ((*__local_code) = (((((*__local_code) as c_int) +% ((OP_POSUPTO - OP_MINUPTO) as u8)) as u8)))
+                            ((*__local_code) = (((((*__local_code) as c_int) +% (OP_POSUPTO - OP_MINUPTO)) as u8)))
                         },
                     }
 
@@ -1108,7 +1108,7 @@ unsafe fn get_chr_property_list(__param_code: *const u8, __param_utf: c_int, __p
     if (__ci_expr_logic_0 != 0) {
         (__local_base = ((get_repeat_base(__local_c) as u8)))
 
-        (__local_c = ((((__local_c as c_int) -% (((__local_base as c_int) - OP_STAR) as u8)) as u8)))
+        (__local_c = ((((__local_c as c_int) -% ((__local_base as c_int) - OP_STAR)) as u8)))
 
         var __ci_expr_logic_3: c_int
 

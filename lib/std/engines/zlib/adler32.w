@@ -48,7 +48,7 @@ pub unsafe fn adler32_z(__param_adler: c_ulong, __param_buf: *const u8, __param_
     }
 
     if ((if __local_buf == 0: 1 else: 0) != 0) {
-        return 1
+        return ((1 as c_ulong))
     }
 
     if ((if __local_len < 16: 1 else: 0) != 0) {

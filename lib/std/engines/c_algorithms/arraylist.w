@@ -158,7 +158,7 @@ unsafe fn arraylist_enlarge(__param_arraylist: *mut _ArrayList) -> c_int {
 
 }
 
-unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) {
+unsafe fn arraylist_sort_internal(__param_list_data: *mut *mut c_void, __param_list_length: c_uint, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> Unit {
     var __local_pivot: *mut c_void
 
     var __local_tmp: *mut c_void

@@ -762,7 +762,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
 
                         ((*__param_cb).erroroffset = __local_offset)
 
-                        return 0
+                        return ((0 as c_ulong))
 
                     }
 
@@ -820,7 +820,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut c_uint, __param
 
                         ((*__param_cb).erroroffset = __local_offset)
 
-                        return 0
+                        return ((0 as c_ulong))
 
                     }
 

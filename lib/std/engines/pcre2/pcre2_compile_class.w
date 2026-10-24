@@ -2867,7 +2867,7 @@ unsafe fn append_char_list(__param_p: *const c_uint, __param_buffer: *mut c_uint
 
 fn get_highest_char(__param_options: c_uint) -> c_uint {
 
-    return 1114111
+    return ((1114111 as c_uint))
 
 }
 

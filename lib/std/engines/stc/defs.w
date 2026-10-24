@@ -33,10 +33,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> i64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -72,17 +72,6 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
-
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -294,7 +283,7 @@ impl Copy for cspan_tuple7
 pub type cspan_tuple8 { pub d: [c_int; 8] = [0 as c_int; 8] }
 impl Copy for cspan_tuple8
 
-pub type cspan_layout = c_uint
+pub type cspan_layout = c_int
 
 pub let c_ROWMAJOR: c_int = 0
 pub let c_COLMAJOR: c_int = 1
@@ -353,40 +342,40 @@ impl Copy for cutf8_decode_t
 pub type csview_value = c_char
 
 @[repr(C)]
-pub type csview { pub buf: *mut i8 = null, pub size: c_long = 0 }
+pub type csview { pub buf: *mut c_char = null, pub size: c_long = 0 }
 impl Copy for csview
 
 @[repr(C)]
-pub type csview_iter_u8 { chr: csview, end: *mut i8 = null, dec: cutf8_decode_t }
+pub type csview_iter_u8 { chr: csview, end: *mut c_char = null, dec: cutf8_decode_t }
 impl Copy for csview_iter_u8
 @[repr(C)]
-pub type csview_iter = union { pub u8: csview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type csview_iter = union { pub u8: csview_iter_u8, pub chr: csview, pub ref: *mut c_char = null }
 impl Copy for csview_iter
 
 pub type zsview_value = c_char
 
 @[repr(C)]
-pub type zsview { pub str: *mut i8 = null, pub size: c_long = 0 }
+pub type zsview { pub str: *mut c_char = null, pub size: c_long = 0 }
 impl Copy for zsview
 
 @[repr(C)]
 pub type zsview_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for zsview_iter_u8
 @[repr(C)]
-pub type zsview_iter = union { pub u8: zsview_iter_u8, pub chr: csview, pub ref: *mut i8 = null }
+pub type zsview_iter = union { pub u8: zsview_iter_u8, pub chr: csview, pub ref: *mut c_char = null }
 impl Copy for zsview_iter
 
 pub type cstr_value = c_char
 
 @[repr(C)]
-pub type cstr_buf { pub data: *mut i8 = null, pub size: c_long = 0, pub cap: c_long = 0 }
+pub type cstr_buf { pub data: *mut c_char = null, pub size: c_long = 0, pub cap: c_long = 0 }
 impl Copy for cstr_buf
 
 @[repr(C)]
 pub type cstr_sml { data: [c_char; 23] = [0 as c_char; 23], size: u8 = 0 }
 impl Copy for cstr_sml
 @[repr(C)]
-pub type cstr_lon { data: *mut i8 = null, size: c_ulong = 0, ncap: c_ulong = 0 }
+pub type cstr_lon { data: *mut c_char = null, size: c_ulong = 0, ncap: c_ulong = 0 }
 impl Copy for cstr_lon
 @[repr(C)]
 pub type cstr = union { pub sml: cstr_sml, pub lon: cstr_lon }
@@ -396,14 +385,14 @@ impl Copy for cstr
 pub type cstr_iter_u8 { chr: csview, dec: cutf8_decode_t }
 impl Copy for cstr_iter_u8
 @[repr(C)]
-pub type cstr_iter = union { pub u8: cstr_iter_u8, pub chr: csview, pub ref: *const i8 = null }
+pub type cstr_iter = union { pub u8: cstr_iter_u8, pub chr: csview, pub ref: *const c_char = null }
 impl Copy for cstr_iter
 
-pub type cstr_raw = *const i8
+pub type cstr_raw = *const c_char
 
 pub let cutf8_ACCEPT: c_int = 0
 pub let cutf8_REJECT: c_int = 12
-pub type cutf8_group = c_uint
+pub type cutf8_group = c_int
 
 pub let U8G_Cc: c_int = 0
 pub let U8G_L: c_int = 1
@@ -636,7 +625,7 @@ pub fn i_eq[T](x: T, y: T) -> c_int {
 }
 pub type Self = cbits
 @[repr(C)]
-pub type fmt_stream { pub data: *mut i8 = null, pub cap: c_long = 0, pub len: c_long = 0, pub overwrite: bool = false }
+pub type fmt_stream { pub data: *mut c_char = null, pub cap: c_long = 0, pub len: c_long = 0, pub overwrite: bool = false }
 impl Copy for fmt_stream
 
 pub let fmt_sv = "{:.*s}"
@@ -666,7 +655,7 @@ pub type cco_position = c_int
 pub let cco_POS_INIT: c_int = 0
 pub let cco_POS_DONE: c_int = -1
 pub let cco_POS_FINAL: c_int = -2
-pub type cco_status_bits = c_uint
+pub type cco_status_bits = c_int
 
 pub let cco_DONE: c_int = 0
 pub let cco_AWAIT: c_int = 1073741824
@@ -688,11 +677,11 @@ comptime fn __ci_layout_cco_group() -> Unit:
 const __ci_layout_cco_group_check: Unit = __ci_layout_cco_group()
 
 @[repr(C)]
-pub type cco_info = union { pub num: c_long = 0, pub str: *const i8 = null, pub ptr: *mut c_void = null }
+pub type cco_info = union { pub num: c_long = 0, pub str: *const c_char = null, pub ptr: *mut c_void = null }
 impl Copy for cco_info
 
 @[repr(C)]
-pub type cco_err_t { pub code: c_int = 0, pub line: c_int = 0, pub file: *const i8 = null, pub info: cco_info }
+pub type cco_err_t { pub code: c_int = 0, pub line: c_int = 0, pub file: *const c_char = null, pub info: cco_info }
 impl Copy for cco_err_t
 
 @[repr(C)]
@@ -731,7 +720,7 @@ impl Copy for cco_task
 
 pub type cco_fiber = cco_task_fiber
 
-pub type cco_err_policy = c_uint
+pub type cco_err_policy = c_int
 
 pub let cco_POLICY_SHUTDOWN: c_int = 0
 pub let cco_POLICY_NOTIFY: c_int = 1

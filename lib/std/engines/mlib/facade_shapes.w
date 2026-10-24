@@ -2,15 +2,15 @@
 use std.engines.mlib.defs
 use std.libc
 
-pub unsafe fn m_core_str_nospace(__param_str: *mut *const i8) -> c_char {
+pub unsafe fn m_core_str_nospace(__param_str: *mut *const c_char) -> c_char {
     var __local_c: c_char
 
     loop {
-        var __ci_expr_old_0: *const i8 = (*__param_str)
+        var __ci_expr_old_0: *const c_char = (*__param_str)
 
         ((*__param_str) = (*__param_str) + 1)
 
-        (__local_c = (((*__ci_expr_old_0) as c_char)))
+        (__local_c = (*__ci_expr_old_0))
 
 
         if not ((isspace(((__local_c as u8) as c_int)) != 0)) {
@@ -22,7 +22,7 @@ pub unsafe fn m_core_str_nospace(__param_str: *mut *const i8) -> c_char {
 
 }
 
-pub unsafe fn m_core_parse_char(__param_ptr: *mut i8, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_char(__param_ptr: *mut c_char, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_str = __param_str
     var __ci_expr_old_0: *mut c_char = __local_str
 
@@ -40,7 +40,7 @@ pub unsafe fn m_core_parse_char(__param_ptr: *mut i8, __param_str: *mut c_char, 
 
 }
 
-pub unsafe fn m_core_parse_bool(__param_ptr: *mut bool, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_bool(__param_ptr: *mut bool, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_str = __param_str
     var __local_c: c_char = with 0 as __ci_expr_seq_7 {
         var __ci_expr_old_0: *mut c_char = __local_str
@@ -68,10 +68,10 @@ pub unsafe fn m_core_parse_bool(__param_ptr: *mut bool, __param_str: *mut c_char
 
 }
 
-pub unsafe fn m_core_parse_schar(__param_ptr: *mut i8, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_schar(__param_ptr: *mut c_char, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_char)))
+    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_char)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -82,10 +82,10 @@ pub unsafe fn m_core_parse_schar(__param_ptr: *mut i8, __param_str: *mut c_char,
 
 }
 
-pub unsafe fn m_core_parse_uchar(__param_ptr: *mut u8, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_uchar(__param_ptr: *mut u8, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as u8)))
+    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as u8)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -96,10 +96,10 @@ pub unsafe fn m_core_parse_uchar(__param_ptr: *mut u8, __param_str: *mut c_char,
 
 }
 
-pub unsafe fn m_core_parse_sshort(__param_ptr: *mut c_short, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_sshort(__param_ptr: *mut c_short, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_short)))
+    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_short)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -110,10 +110,10 @@ pub unsafe fn m_core_parse_sshort(__param_ptr: *mut c_short, __param_str: *mut c
 
 }
 
-pub unsafe fn m_core_parse_ushort(__param_ptr: *mut c_ushort, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_ushort(__param_ptr: *mut c_ushort, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_ushort)))
+    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_ushort)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -124,10 +124,10 @@ pub unsafe fn m_core_parse_ushort(__param_ptr: *mut c_ushort, __param_str: *mut 
 
 }
 
-pub unsafe fn m_core_parse_sint(__param_ptr: *mut c_int, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_sint(__param_ptr: *mut c_int, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_int)))
+    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_int)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -138,10 +138,10 @@ pub unsafe fn m_core_parse_sint(__param_ptr: *mut c_int, __param_str: *mut c_cha
 
 }
 
-pub unsafe fn m_core_parse_uint(__param_ptr: *mut c_uint, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_uint(__param_ptr: *mut c_uint, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_uint)))
+    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_uint)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -152,10 +152,10 @@ pub unsafe fn m_core_parse_uint(__param_ptr: *mut c_uint, __param_str: *mut c_ch
 
 }
 
-pub unsafe fn m_core_parse_slong(__param_ptr: *mut c_long, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_slong(__param_ptr: *mut c_long, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_long)))
+    ((*__param_ptr) = ((strtol((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_long)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -166,10 +166,10 @@ pub unsafe fn m_core_parse_slong(__param_ptr: *mut c_long, __param_str: *mut c_c
 
 }
 
-pub unsafe fn m_core_parse_ulong(__param_ptr: *mut c_ulong, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_ulong(__param_ptr: *mut c_ulong, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_ulong)))
+    ((*__param_ptr) = ((strtoul((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_ulong)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -180,10 +180,10 @@ pub unsafe fn m_core_parse_ulong(__param_ptr: *mut c_ulong, __param_str: *mut c_
 
 }
 
-pub unsafe fn m_core_parse_sllong(__param_ptr: *mut c_longlong, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_sllong(__param_ptr: *mut c_longlong, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoll((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_longlong)))
+    ((*__param_ptr) = ((strtoll((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_longlong)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -194,10 +194,10 @@ pub unsafe fn m_core_parse_sllong(__param_ptr: *mut c_longlong, __param_str: *mu
 
 }
 
-pub unsafe fn m_core_parse_ullong(__param_ptr: *mut c_ulonglong, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_ullong(__param_ptr: *mut c_ulonglong, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtoull((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int)) as c_ulonglong)))
+    ((*__param_ptr) = ((strtoull((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int)) as c_ulonglong)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -208,10 +208,10 @@ pub unsafe fn m_core_parse_ullong(__param_ptr: *mut c_ulonglong, __param_str: *m
 
 }
 
-pub unsafe fn m_core_parse_float(__param_ptr: *mut f32, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_float(__param_ptr: *mut f32, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtof((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8)) as f32)))
+    ((*__param_ptr) = ((strtof((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char)) as f32)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -222,10 +222,10 @@ pub unsafe fn m_core_parse_float(__param_ptr: *mut f32, __param_str: *mut c_char
 
 }
 
-pub unsafe fn m_core_parse_double(__param_ptr: *mut f64, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_double(__param_ptr: *mut f64, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtod((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8)) as f64)))
+    ((*__param_ptr) = ((strtod((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char)) as f64)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -236,10 +236,10 @@ pub unsafe fn m_core_parse_double(__param_ptr: *mut f64, __param_str: *mut c_cha
 
 }
 
-pub unsafe fn m_core_parse_ldouble(__param_ptr: *mut c_longdouble, __param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse_ldouble(__param_ptr: *mut c_longdouble, __param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    ((*__param_ptr) = ((strtold((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8)) as c_longdouble)))
+    ((*__param_ptr) = ((strtold((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char)) as c_longdouble)))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -471,14 +471,14 @@ pub unsafe fn m_core_cstr_hash(__param_str: *mut c_char) -> c_ulong {
 }
 
 pub unsafe fn m_core_parse1_enum(__param_str: *mut c_char) -> c_longlong {
-    return strtoll((&(__param_str[0]) as *mut c_char), (null as *mut *mut i8), (10 as c_int))
+    return strtoll((&(__param_str[0]) as *mut c_char), (null as *mut *mut c_char), (10 as c_int))
 
 }
 
-pub unsafe fn m_core_parse2_enum(__param_str: *mut c_char, __param_endptr: *mut *const i8) -> bool {
+pub unsafe fn m_core_parse2_enum(__param_str: *mut c_char, __param_endptr: *mut *const c_char) -> bool {
     var __local_end: *mut c_char
 
-    strtoll((&(__param_str[0]) as *mut c_char), ((&raw mut __local_end as *mut *mut c_char) as *mut *mut i8), (10 as c_int))
+    strtoll((&(__param_str[0]) as *mut c_char), (&raw mut __local_end as *mut *mut c_char), (10 as c_int))
 
     if ((if __param_endptr != null: 1 else: 0) != 0) {
         ((*__param_endptr) = ((__local_end as *const c_char)))
@@ -540,7 +540,7 @@ pub unsafe fn m_core_backoff_clear(__param_backoff: *mut m_core_backoff_s) {
     return
 }
 
-pub unsafe fn m_core_in_serial_char(__param_serial: *mut m_serial_read_s, __param_ptr: *mut i8) -> i32 {
+pub unsafe fn m_core_in_serial_char(__param_serial: *mut m_serial_read_s, __param_ptr: *mut c_char) -> i32 {
     var __local_i: c_longlong
 
     var __local_r: i32
@@ -553,7 +553,7 @@ pub unsafe fn m_core_in_serial_char(__param_serial: *mut m_serial_read_s, __para
 
 }
 
-pub unsafe fn m_core_in_serial_schar(__param_serial: *mut m_serial_read_s, __param_ptr: *mut i8) -> i32 {
+pub unsafe fn m_core_in_serial_schar(__param_serial: *mut m_serial_read_s, __param_ptr: *mut c_char) -> i32 {
     var __local_i: c_longlong
 
     var __local_r: i32

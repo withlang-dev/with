@@ -187,7 +187,7 @@ unsafe fn binomial_tree_ref(__param_tree: *mut _BinomialTree) {
 
 }
 
-unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) {
+unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) -> Unit {
     var __local_i: c_int
 
     if ((if __param_tree == null: 1 else: 0) != 0) {

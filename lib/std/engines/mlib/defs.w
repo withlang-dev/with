@@ -32,10 +32,10 @@ pub fn to_lower(__with_c: i32) -> i32 {
 pub fn to_upper(__with_c: i32) -> i32 {
     if __with_c >= 97 and __with_c <= 122 { __with_c - 32 } else { __with_c }
 }
-pub extern fn strlen(s: *const i8) -> u64
-pub extern fn strcmp(a: *const i8, b: *const i8) -> i32
-pub extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32
-pub extern fn strchr(s: *const i8, c: i32) -> *mut i8
+pub extern fn strlen(s: *const c_char) -> u64
+pub extern fn strcmp(a: *const c_char, b: *const c_char) -> i32
+pub extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32
+pub extern fn strchr(s: *const c_char, c: i32) -> *mut c_char
 pub extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void
 pub extern fn isalpha(c: i32) -> i32
 pub extern fn isdigit(c: i32) -> i32
@@ -71,17 +71,6 @@ pub extern fn atan2(y: f64, x: f64) -> f64
 pub type c_void = opaque
 pub extern fn abort() -> Never
 pub fn __ci_unreachable() -> Never: abort()
-
-pub type c_char = i8
-pub type c_short = i16
-pub type c_ushort = u16
-pub type c_int = i32
-pub type c_uint = u32
-pub type c_long = i64
-pub type c_ulong = u64
-pub type c_longlong = i64
-pub type c_ulonglong = u64
-pub type c_longdouble = f64
 pub unsafe fn __with_builtin_add_overflow_i8(__with_a: i8, __with_b: i8, __with_out: *mut i8) -> bool {
     let __with_result = __with_a +% __with_b
     unsafe { (*__with_out = __with_result) }
@@ -271,7 +260,7 @@ pub let M_SERIAL_FAIL_RETRY: c_int = 4
 pub type m_serial_return_code_t = i32
 
 @[repr(C)]
-pub type m_serial_ll_u = union { pub b: bool = false, pub c: c_char = 0, pub i: c_int = 0, pub l: c_long = 0, pub ll: c_longlong = 0, pub f: f32 = 0.0, pub d: f64 = 0.0, pub e: c_longdouble = 0.0, pub s: c_ulong = 0, pub u: c_ulong = 0, pub p: *mut c_void = null, pub cstr: *const i8 = null, pub r: i32 = 0 }
+pub type m_serial_ll_u = union { pub b: bool = false, pub c: c_char = 0, pub i: c_int = 0, pub l: c_long = 0, pub ll: c_longlong = 0, pub f: f32 = 0.0, pub d: f64 = 0.0, pub e: c_longdouble = 0.0, pub s: c_ulong = 0, pub u: c_ulong = 0, pub p: *mut c_void = null, pub cstr: *const c_char = null, pub r: i32 = 0 }
 impl Copy for m_serial_ll_u
 
 pub type m_serial_ll_ct = m_serial_ll_u
@@ -289,7 +278,7 @@ impl Copy for m_serial_read_s
 pub type m_serial_read_t = [m_serial_read_s; 1]
 
 @[repr(C)]
-pub type m_serial_read_interface_s { pub read_boolean: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut bool) -> i32] = null, pub read_integer: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longlong, c_ulong) -> i32] = null, pub read_float: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longdouble, c_ulong) -> i32] = null, pub read_string: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut m_string_s) -> i32] = null, pub read_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const i8, c_int, *mut c_int) -> i32] = null, pub read_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const i8, c_int, *mut c_int) -> i32] = null, pub read_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null }
+pub type m_serial_read_interface_s { pub read_boolean: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut bool) -> i32] = null, pub read_integer: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longlong, c_ulong) -> i32] = null, pub read_float: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut c_longdouble, c_ulong) -> i32] = null, pub read_string: Option[unsafe extern "C" fn(*mut m_serial_read_s, *mut m_string_s) -> i32] = null, pub read_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, *mut c_ulong) -> i32] = null, pub read_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null, pub read_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, c_int, *mut c_int) -> i32] = null, pub read_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s, **const c_char, c_int, *mut c_int) -> i32] = null, pub read_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_read_s) -> i32] = null }
 impl Copy for m_serial_read_interface_s
 
 pub type m_serial_read_interface_t = m_serial_read_interface_s
@@ -301,7 +290,7 @@ impl Copy for m_serial_write_s
 pub type m_serial_write_t = [m_serial_write_s; 1]
 
 @[repr(C)]
-pub type m_serial_write_interface_s { pub write_boolean: Option[unsafe extern "C" fn(*mut m_serial_write_s, bool) -> i32] = null, pub write_integer: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longlong, c_ulong) -> i32] = null, pub write_float: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longdouble, c_ulong) -> i32] = null, pub write_string: Option[unsafe extern "C" fn(*mut m_serial_write_s, *c_char, c_ulong) -> i32] = null, pub write_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_array_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const i8, c_int, c_int) -> i32] = null, pub write_tuple_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const i8, c_int, c_int) -> i32] = null, pub write_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null }
+pub type m_serial_write_interface_s { pub write_boolean: Option[unsafe extern "C" fn(*mut m_serial_write_s, bool) -> i32] = null, pub write_integer: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longlong, c_ulong) -> i32] = null, pub write_float: Option[unsafe extern "C" fn(*mut m_serial_write_s, c_longdouble, c_ulong) -> i32] = null, pub write_string: Option[unsafe extern "C" fn(*mut m_serial_write_s, *c_char, c_ulong) -> i32] = null, pub write_array_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_array_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_array_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, c_ulong) -> i32] = null, pub write_map_value: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_next: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_map_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_tuple_id: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, c_int, c_int) -> i32] = null, pub write_tuple_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null, pub write_variant_start: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s, **const c_char, c_int, c_int) -> i32] = null, pub write_variant_end: Option[unsafe extern "C" fn(*mut m_serial_local_s, *mut m_serial_write_s) -> i32] = null }
 impl Copy for m_serial_write_interface_s
 
 pub type m_serial_write_interface_t = m_serial_write_interface_s

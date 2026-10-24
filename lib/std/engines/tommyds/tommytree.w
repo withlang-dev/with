@@ -342,7 +342,7 @@ unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
-unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) {
+unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) -> Unit {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
@@ -359,7 +359,7 @@ unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_
 
 }
 
-unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) {
+unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) -> Unit {
     var __local_next: *mut tommy_node_struct
 
     if ((if not (__param_root != null): 1 else: 0) != 0) {
