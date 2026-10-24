@@ -3,10 +3,10 @@
 // Phase 3; D149: `HashMap` keeps rt_core's insertion-ordered layout, this
 // is the unordered one for hot paths that need no order, the way Zig
 // ships both). Each entry is one facade-owned slot holding the key and
-// the value; the engine (Robin Hood hashing) holds slot pointers and
-// hashes and compares keys through the facade's callbacks
-// (std.collections.stc_slot). Keys hash through `std.hash.hash_of` and
-// compare through `==` (D96).
+// the value (std.collections.stc_slot's `StcEntry`); the engine (Robin
+// Hood hashing) holds entry pointers and hashes and compares keys through
+// the facade's callbacks. Keys hash through `std.hash.hash_of` and compare
+// through `==` (D96).
 //
 // Complexity contract: O(1) expected insert, lookup and remove; a removal
 // allocates nothing.
@@ -17,14 +17,15 @@ use std.traits
 use std.engines.stc.defs
 use std.engines.stc.facade_shapes
 use std.collections.stc_slot.StcSlot
-use std.collections.stc_slot.StcSlotPrefix
-use std.collections.stc_slot.stc_slot_prefix
+use std.collections.stc_slot.StcEntry
+use std.collections.stc_slot.stc_entry_new
+use std.collections.stc_slot.stc_entry_key
+use std.collections.stc_slot.stc_entry_value
+use std.collections.stc_slot.stc_entry_take
+use std.collections.stc_slot.stc_entry_release
+use std.collections.stc_slot.stc_slot_probe
+use std.collections.stc_slot.stc_slot_discard_probe
 use rt.rt_core
-
-/// One entry: the slot prefix, the key, the value. A probe for a lookup is a
-/// `StcSlot[K]` — the same prefix and the key at the same offset — so the
-/// engine hashes and compares it like a stored entry without a value.
-pub type UnorderedEntry[K, V] { prefix: StcSlotPrefix, key: K, value: V }
 
 /// `get` observes, `insert` owns its inputs and returns the value it
 /// replaced, `remove` transfers (D27). Traversal observes, in no order.
@@ -46,55 +47,40 @@ impl[K: Key, V] UnorderedMap[K, V]:
     pub fn len() -> isize: unsafe { stc_slot_set_size(&raw const self.set) } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
-    unsafe fn probe(key: &K) -> *mut StcSlot[K]:
-        let probe = with_alloc(sizeof[StcSlot[K]]() as i64) as *mut StcSlot[K]
-        (*probe).prefix = stc_slot_prefix(self.comparator(), self.hasher())
-        with_memcpy(&raw mut (*probe).value as *mut u8, &raw const *key as *const u8, sizeof[K]() as i64)
-        probe
-
-    unsafe fn find_entry(key: &K) -> *mut UnorderedEntry[K, V]:
-        let probe = self.probe(key)
-        let found = stc_slot_set_get(&raw const self.set, probe as *mut stc_slot_head)
-        with_free(probe as *mut u8)
-        if found as i64 == 0: 0 as *mut UnorderedEntry[K, V] else: (*found) as *mut UnorderedEntry[K, V]
+    fn find_entry(key: &K) -> *mut StcEntry[K, V]:
+        let probe = stc_slot_probe(key, self.comparator(), self.hasher())
+        let found = unsafe { stc_slot_set_get(&raw const self.set, probe) }
+        stc_slot_discard_probe(probe)
+        if found as i64 == 0: null else: unsafe { *found } as *mut StcEntry[K, V]
 
     /// Stores `value` under `key`; returns the previous value, if any (the
     /// stored key is kept, the new one dropped).
     pub mut fn insert(key: K, value: V) -> Option[V]:
-        let entry = with_alloc(sizeof[UnorderedEntry[K, V]]() as i64) as *mut UnorderedEntry[K, V]
-        unsafe { *entry = UnorderedEntry { prefix: stc_slot_prefix(self.comparator(), self.hasher()), key: key, value: value } }
-        let result = unsafe { stc_slot_set_insert(&raw mut self.set, entry as *mut stc_slot_head) }
+        let entry = stc_entry_new(key, value, self.comparator(), self.hasher())
+        let result = unsafe { stc_slot_set_insert(&raw mut self.set, entry) }
         if result.inserted: return None
         // An equal key is stored: the table's pointer is repointed at the new
         // entry (same key, same hash) and the old entry transfers its value
         // out and drops its key.
-        var old = unsafe { *result.ref } as *mut UnorderedEntry[K, V]
-        unsafe { *result.ref = entry as *mut stc_slot_head }
-        let stored_key: K = unsafe { move old.key }
-        drop(stored_key)
-        let previous: V = unsafe { move old.value }
-        with_free(old as *mut u8)
-        Some(previous)
+        let old = unsafe { *result.ref } as *mut StcEntry[K, V]
+        unsafe { *result.ref = entry }
+        Some(unsafe { stc_entry_take(old) })
 
-    pub fn contains(key: &K) -> bool: unsafe { self.find_entry(key) } as i64 != 0
+    pub fn contains(key: &K) -> bool: self.find_entry(key) as i64 != 0
 
     /// Observes the value under `key`, if any (D22).
     pub fn get(key: &K) -> Option[&V] from self:
-        let entry = unsafe { self.find_entry(key) }
+        let entry = self.find_entry(key)
         if entry as i64 == 0: None else: Some(unsafe { &(*entry).value })
 
     /// Transfers the value under `key` out, if any; the key drops.
     pub mut fn remove(key: &K) -> Option[V]:
-        var entry = unsafe { self.find_entry(key) }
+        let entry = self.find_entry(key)
         if entry as i64 == 0: return None
-        let probe = unsafe { self.probe(key) }
-        assert(unsafe { stc_slot_set_erase(&raw mut self.set, probe as *mut stc_slot_head) } != 0)
-        with_free(probe as *mut u8)
-        let stored_key: K = unsafe { move entry.key }
-        drop(stored_key)
-        let value: V = unsafe { move entry.value }
-        with_free(entry as *mut u8)
-        Some(value)
+        let probe = stc_slot_probe(key, self.comparator(), self.hasher())
+        assert(unsafe { stc_slot_set_erase(&raw mut self.set, probe) } != 0)
+        stc_slot_discard_probe(probe)
+        Some(unsafe { stc_entry_take(entry) })
 
     /// Views of the entries, in no stated order (D44: traversal observes).
     pub fn iter() -> UnorderedMapIter[K, V]:
@@ -104,12 +90,7 @@ impl[K, V] Drop for UnorderedMap[K, V]:
     move fn drop():
         var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
         while cursor.ref as i64 != 0:
-            var entry = unsafe { *cursor.ref } as *mut UnorderedEntry[K, V]
-            let key: K = unsafe { move entry.key }
-            drop(key)
-            let value: V = unsafe { move entry.value }
-            drop(value)
-            with_free(entry as *mut u8)
+            unsafe { stc_entry_release(unsafe { *cursor.ref } as *mut StcEntry[K, V]) }
             unsafe { stc_slot_set_next(&raw mut cursor) }
         unsafe { stc_slot_set_drop(&raw const self.set) }
 
@@ -118,6 +99,6 @@ pub type UnorderedMapIter[K, V] ephemeral { cursor: stc_slot_set_iter }
 impl[K, V] UnorderedMapIter[K, V]:
     pub mut fn next() -> Option[(&K, &V)]:
         if self.cursor.ref as i64 == 0: return None
-        let entry = unsafe { *self.cursor.ref } as *const UnorderedEntry[K, V]
+        let entry = unsafe { *self.cursor.ref } as *const StcEntry[K, V]
         unsafe { stc_slot_set_next(&raw mut self.cursor) }
         Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))

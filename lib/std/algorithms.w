@@ -9,13 +9,23 @@
 // once, D27: no second live value, no drop).
 //
 // Complexity contract: O(n log n) sort (quicksort; not stable — `sort_by`
-// promises no order among equal elements), O(log n) binary search and
-// bounds, O(n) reverse.
+// promises no order among equal elements), O(n log n) stable sort, O(log n)
+// binary search and bounds, O(n) reverse and shuffle.
+//
+// `stable_sort` was evaluated against upstream separately (the facade map's
+// row): STC's sort is a quicksort with an insertion-sort tail and promises
+// no order among equal elements, so the stable sort is a merge sort over
+// the same reference layout, written here (the sourcing rule: a small,
+// stable primitive is owned). `shuffle` is a Fisher–Yates over std.random
+// (the With RNG, not the engine's `c_shuffle_array` macro and its own
+// generator). `find`, `position`, `index_of` and `contains` are the
+// language's iterator adapters, not facades.
 
 use std.option
 use std.traits
 use std.engines.stc.defs
 use std.engines.stc.facade_shapes
+use std.random.range_isize
 use rt.rt_core
 
 /// The slot reference the engine orders, laid out as the shapes unit's
@@ -63,7 +73,67 @@ unsafe fn sort_through_refs[T](base: *mut T, n: isize, compare: fn(*const u8, *c
     with_free(scratch)
     with_free(refs as *mut u8)
 
+/// Lays the `n` elements at `base` out in the order of `order` (element
+/// addresses) by one pass of byte moves through a scratch buffer.
+unsafe fn permute_by_addresses(base: *mut u8, n: isize, size: i64, order: *const i64):
+    let scratch = with_alloc(n as i64 * size)
+    for i in 0..n:
+        with_memcpy((scratch as i64 + i as i64 * size) as *mut u8, order[i] as *const u8, size)
+    with_memcpy(base, scratch as *const u8, n as i64 * size)
+    with_free(scratch)
+
+/// Stable: a bottom-up merge sort of the element addresses through
+/// `compare` (equal elements keep their input order), then one permutation
+/// of the elements by bits.
+unsafe fn stable_sort_through_refs[T](base: *mut T, n: isize, compare: fn(*const u8, *const u8) -> i32):
+    if n < 2: return
+    let size = sizeof[T]() as i64
+    var source = with_alloc(n as i64 * 8) as *mut i64
+    var target = with_alloc(n as i64 * 8) as *mut i64
+    for i in 0..n: source[i] = base as i64 + i as i64 * size
+    var width: isize = 1
+    while width < n:
+        var lo: isize = 0
+        while lo < n:
+            let mid = if lo + width < n: lo + width else: n
+            let hi = if lo + width * 2 < n: lo + width * 2 else: n
+            var i = lo
+            var j = mid
+            var k = lo
+            while i < mid and j < hi:
+                // The right run's element goes first only when strictly less.
+                if compare(source[j] as *const u8, source[i] as *const u8) < 0:
+                    target[k] = source[j]
+                    j = j + 1
+                else:
+                    target[k] = source[i]
+                    i = i + 1
+                k = k + 1
+            while i < mid:
+                target[k] = source[i]
+                i = i + 1
+                k = k + 1
+            while j < hi:
+                target[k] = source[j]
+                j = j + 1
+                k = k + 1
+            lo = hi
+        let swapped = source
+        source = target
+        target = swapped
+        width = width * 2
+    permute_by_addresses(base as *mut u8, n, size, source)
+    with_free(source as *mut u8)
+    with_free(target as *mut u8)
+
 impl[T: Ord] List[T]:
+    /// Sorts ascending by `Ord`, keeping equal elements in their input
+    /// order (merge sort; see the module note).
+    pub mut fn stable_sort():
+        let n = self.len()
+        if n < 2: return
+        unsafe { stable_sort_through_refs(self.ptr as *mut T, n, ord_compare(self.ptr)) }
+
     /// Sorts ascending by `Ord` (D41). The word shapes sort in place through
     /// the engine's own instantiation; everything else through references.
     pub mut fn sort():
@@ -117,6 +187,33 @@ impl[T] List[T]:
         if n < 2: return
         let base = self.ptr as *mut T
         unsafe { sort_through_refs(base, n, by_compare(cmp)) }
+
+    /// Sorts by `cmp`, keeping elements `cmp` calls equal in their input
+    /// order.
+    pub mut fn stable_sort_by(cmp: fn(&T, &T) -> i32):
+        let n = self.len()
+        if n < 2: return
+        unsafe { stable_sort_through_refs(self.ptr as *mut T, n, by_compare(cmp)) }
+
+    /// Shuffles the elements in place, uniformly, drawing from std.random
+    /// (seed it for a reproducible order); every element moves by bits.
+    pub mut fn shuffle():
+        let n = self.len()
+        if n < 2: return
+        let size = sizeof[T]() as i64
+        let base = self.ptr as i64
+        let tmp = with_alloc(size)
+        var i = n - 1
+        while i > 0:
+            let j = range_isize(0, i + 1)
+            if j != i:
+                let a = (base + i as i64 * size) as *mut u8
+                let b = (base + j as i64 * size) as *mut u8
+                with_memcpy(tmp, a as *const u8, size)
+                with_memcpy(a, b as *const u8, size)
+                with_memcpy(b, tmp as *const u8, size)
+            i = i - 1
+        with_free(tmp)
 
     /// Reverses the elements in place (every element moves once, by bits).
     pub mut fn reverse():

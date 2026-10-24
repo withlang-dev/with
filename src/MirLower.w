@@ -2373,7 +2373,10 @@ impl MirBuilder:
             return 0
         let resolved = self.sema.resolve_alias(base_ty) as i32
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        // The compiler's own positional kinds (arrays, slices, SIMD vectors
+        // and masks) have their own lowering; a user IndexPlace is a struct
+        // or generic instance with the impl.
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema.get_generic_inst_base(resolved)
@@ -2581,13 +2584,12 @@ impl MirBuilder:
             var ip_base_ty = base_ty
             while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
                 ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
-            if self.is_user_index_place(ip_base_ty) != 0:
-                let ip_get_fn = self.sema.lookup_method_fn(self.sema.get_type_name(ip_base_ty), self.sema.pool_lookup_symbol("get"))
-                let ip_get_sig = if ip_get_fn != 0: self.sema.get_sig(ip_get_fn) else: -1
-                if ip_get_sig >= 0:
-                    let ip_value_ty = self.sema.sig_return_type(ip_get_sig)
-                    if ip_value_ty != 0 and ip_value_ty != self.sema.ty_void as i32:
-                        return self.concrete_type(ip_value_ty)
+            if self.is_user_index_place(ip_base_ty) != 0 and self.sema.index_place_get_sigs.contains(node):
+                // Sema's specialized `get` for this subscript (#2560).
+                let ip_get_sig: i32 = self.sema.index_place_get_sigs.get(node).unwrap()
+                let ip_value_ty = self.sema.sig_return_type(ip_get_sig)
+                if ip_value_ty != 0 and ip_value_ty != self.sema.ty_void as i32:
+                    return self.concrete_type(ip_value_ty)
         if kind == NodeKind.NK_BINARY:
             let op = self.ast.get_data0(node)
             // D22: a &T operand is a view; value arithmetic auto-derefs it to T
@@ -5500,6 +5502,21 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, self.body.operand_d0[op])
         op
 
+    // A user IndexPlace subscript's receiver for its `get(self: &Self, ..)`:
+    // a borrow of the receiver place (the contract's first parameter is a
+    // reference), unless the receiver already is a reference, whose value
+    // is passed as it is. `set(mut self, ..)` takes the place itself.
+    mut fn index_place_borrowed_receiver(recv_place: i32, base_ty: i32, get_sig: i32, span: i32) -> i32:
+        let param0 = self.sema.sig_param_type(get_sig, 0)
+        let base_is_ref = base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(base_ty)) == TypeKind.TY_REF
+        if base_is_ref or param0 == 0 or self.sema.get_type_kind(self.sema.resolve_alias(param0)) != TypeKind.TY_REF:
+            return self.body.new_operand(OperandKind.OK_COPY, recv_place)
+        let rv = self.body.new_rvalue(RvalueKind.RK_REF, BorrowKind.SHARED, recv_place, 0)
+        let temp = self.new_temp(param0)
+        let temp_place = self.place_for_local(temp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, temp_place, rv, span)
+        self.body.new_operand(OperandKind.OK_COPY, temp_place)
+
     mut fn lower_str_contains_char(op: i32, lhs_expr: i32, rhs_expr: i32, node: i32) -> i32:
         let fn_op = self.const_operand(ConstKind.CK_FN, 0, self.sema.ty_void)
         let call_args: List[i32] = List.new()
@@ -7132,72 +7149,54 @@ impl MirBuilder:
                 let ip_list_place = self.lower_expr_place(ip_base_expr)
                 self.make_unique_before_mutation(ip_list_place)
             if self.is_user_index_place(ip_base_ty) != 0:
-                let ip_set_sym = self.sema.pool_lookup_symbol("set")
-                let ip_type_sym = self.sema.get_type_name(ip_base_ty)
-                let ip_fn_sym = self.sema.lookup_method_fn(ip_type_sym, ip_set_sym)
-                if ip_fn_sym != 0:
-                    let ip_recv_raw = self.lower_expr(self.ast.get_data0(place_expr))
-                    let ip_recv_op = self.borrowed_receiver_operand(ip_recv_raw)
-                    let ip_idx_op = self.lower_expr(self.ast.get_data1(place_expr))
-                    let ip_idx_ty = self.expr_type(self.ast.get_data1(place_expr))
-                    let ip_idx_tmp = self.new_temp(ip_idx_ty)
-                    let ip_idx_place = self.place_for_local(ip_idx_tmp)
-                    self.assign_operand_to_place(ip_idx_place, ip_idx_op, self.ast.get_start(place_expr))
-                    var ip_val_op: i32 = 0
-                    let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
-                    if ip_is_compound:
-                        let ip_get_sym = self.sema.pool_lookup_symbol("get")
-                        let ip_get_fn = self.sema.lookup_method_fn(ip_type_sym, ip_get_sym)
-                        let ip_get_ty = self.expr_type(place_expr)
-                        let ip_get_fn_op = self.const_operand(ConstKind.CK_FN, ip_get_fn, ip_get_ty)
-                        let ip_get_args: List[i32] = List.new()
-                        ip_get_args.push(ip_recv_op)
-                        ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
-                        let ip_get_args_id = self.body.new_call_args(ip_get_args)
-                        let ip_cur_ty = self.expr_type(place_expr)
-                        let ip_cur_tmp = self.new_temp(ip_cur_ty)
-                        let ip_cur_place = self.place_for_local(ip_cur_tmp)
-                        let ip_get_next = self.new_block()
-                        self.terminate(TermKind.TK_CALL, ip_get_fn_op, ip_get_args_id, ip_cur_place, ip_get_next)
-                        self.switch_to(ip_get_next)
-                        let ip_cur_val = self.body.new_operand(OperandKind.OK_COPY, ip_cur_place)
-                        let ip_ca_op = self.ast.get_data0(rhs_expr)
-                        let ip_inc_val = self.lower_expr(self.ast.get_data2(rhs_expr))
-                        ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
-                    else:
-                        ip_val_op = self.lower_expr(rhs_expr)
-                    let ip_fn_op = self.const_operand(ConstKind.CK_FN, ip_fn_sym, self.sema.ty_void)
-                    let ip_args: List[i32] = List.new()
-                    ip_args.push(ip_recv_op)
-                    ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
-                    ip_args.push(ip_val_op)
-                    let ip_args_id = self.body.new_call_args(ip_args)
-                    let ip_next_bb = self.new_block()
-                    let ret_place = self.place_for_local(0)
-                    self.terminate(TermKind.TK_CALL, ip_fn_op, ip_args_id, ret_place, ip_next_bb)
-                    self.switch_to(ip_next_bb)
-                    if read_back == 0:
-                        return -1
-                    // The place of a user IndexPlace is its `get`: read it back
-                    // with the receiver and index this store evaluated once.
-                    let ip_recv_kind: i32 = self.body.operand_kinds[ip_recv_op]
-                    let ip_recv_place: i32 = self.body.operand_d0[ip_recv_op]
-                    if ip_recv_kind != OperandKind.OK_COPY and ip_recv_kind != OperandKind.OK_MOVE:
-                        sema_phase_bug(f"BUG: a tail read of an IndexPlace store has no receiver place: node={place_expr}")
-                    let ip_rb_sym = self.sema.pool_lookup_symbol("get")
-                    let ip_rb_fn = self.sema.lookup_method_fn(ip_type_sym, ip_rb_sym)
-                    let ip_rb_ty = self.assignment_place_value_type(place_expr)
-                    let ip_rb_args: List[i32] = List.new()
-                    ip_rb_args.push(self.body.new_operand(ip_recv_kind, ip_recv_place))
-                    ip_rb_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
-                    let ip_rb_args_id = self.body.new_call_args(ip_rb_args)
-                    let ip_rb_tmp = self.new_temp(ip_rb_ty)
-                    let ip_rb_place = self.place_for_local(ip_rb_tmp)
-                    let ip_rb_next = self.new_block()
-                    let ip_rb_fn_op = self.const_operand(ConstKind.CK_FN, ip_rb_fn, ip_rb_ty)
-                    self.terminate(TermKind.TK_CALL, ip_rb_fn_op, ip_rb_args_id, ip_rb_place, ip_rb_next)
-                    self.switch_to(ip_rb_next)
-                    return self.read_assigned_place(place_expr, ip_rb_place, read_back)
+                // The store is the `set` Sema specialized for this subscript,
+                // a compound store reads through its `get` first (#2560, D65).
+                if not self.sema.index_place_set_fns.contains(place_expr):
+                    sema_phase_bug(f"BUG: a user IndexPlace store has no recorded set contract: node={place_expr}")
+                let ip_fn_sym: i32 = self.sema.index_place_set_fns.get(place_expr).unwrap()
+                let ip_set_sig: i32 = self.sema.index_place_set_sigs.get(place_expr).unwrap()
+                let ip_set_mono: i32 = self.sema.index_place_set_mono_syms.get(place_expr).unwrap()
+                let ip_get_fn: i32 = self.sema.index_place_get_fns.get(place_expr).unwrap()
+                let ip_get_sig: i32 = self.sema.index_place_get_sigs.get(place_expr).unwrap()
+                let ip_get_mono: i32 = self.sema.index_place_get_mono_syms.get(place_expr).unwrap()
+                // The receiver place, evaluated once: `set` takes the place,
+                // each `get` a borrow of it.
+                let ip_recv_place = self.lower_expr_place(self.ast.get_data0(place_expr))
+                let ip_recv_expr_ty = self.expr_type(self.ast.get_data0(place_expr))
+                let ip_recv_op = self.body.new_operand(OperandKind.OK_COPY, ip_recv_place)
+                let ip_idx_op = self.lower_expr(self.ast.get_data1(place_expr))
+                let ip_idx_ty = self.expr_type(self.ast.get_data1(place_expr))
+                let ip_idx_tmp = self.new_temp(ip_idx_ty)
+                let ip_idx_place = self.place_for_local(ip_idx_tmp)
+                self.assign_operand_to_place(ip_idx_place, ip_idx_op, self.ast.get_start(place_expr))
+                var ip_val_op: i32 = 0
+                let ip_is_compound = self.ast.kind(rhs_expr) == NodeKind.NK_BINARY and self.ast.get_data1(rhs_expr) == place_expr
+                if ip_is_compound:
+                    let ip_cur_ty = self.expr_type(place_expr)
+                    let ip_get_args: List[i32] = List.new()
+                    ip_get_args.push(self.index_place_borrowed_receiver(ip_recv_place, ip_recv_expr_ty, ip_get_sig, self.ast.get_start(place_expr)))
+                    ip_get_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
+                    let ip_cur_val = self.lower_resolved_call_with_operand_args_contract(ip_get_fn, ip_get_args, ip_cur_ty, place_expr, ip_get_sig, ip_get_mono)
+                    let ip_ca_op = self.ast.get_data0(rhs_expr)
+                    let ip_inc_val = self.lower_expr(self.ast.get_data2(rhs_expr))
+                    ip_val_op = self.lower_bin_op_operand(ip_ca_op, ip_cur_val, ip_inc_val, ip_cur_ty, self.ast.get_start(place_expr))
+                else:
+                    ip_val_op = self.lower_expr(rhs_expr)
+                let ip_args: List[i32] = List.new()
+                ip_args.push(ip_recv_op)
+                ip_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
+                ip_args.push(ip_val_op)
+                self.lower_resolved_call_with_operand_args_contract(ip_fn_sym, ip_args, self.sema.ty_void as i32, place_expr, ip_set_sig, ip_set_mono)
+                if read_back == 0:
+                    return -1
+                // The place of a user IndexPlace is its `get`: read it back
+                // with the receiver and index this store evaluated once.
+                let ip_rb_ty = self.assignment_place_value_type(place_expr)
+                let ip_rb_args: List[i32] = List.new()
+                ip_rb_args.push(self.index_place_borrowed_receiver(ip_recv_place, ip_recv_expr_ty, ip_get_sig, self.ast.get_start(place_expr)))
+                ip_rb_args.push(self.body.new_operand(OperandKind.OK_COPY, ip_idx_place))
+                let ip_rb_val = self.lower_resolved_call_with_operand_args_contract(ip_get_fn, ip_rb_args, ip_rb_ty, place_expr, ip_get_sig, ip_get_mono)
+                return self.read_assigned_place(place_expr, self.body.operand_d0[ip_rb_val], read_back)
         // §6.3 compound assignment single-evaluation: xs[f()] += g() must
         // evaluate f() and g() exactly once.  The parser desugars += to
         // NK_ASSIGN(target, NK_BINARY(op, target, rhs)) sharing the same AST
@@ -7359,6 +7358,19 @@ impl MirBuilder:
                 return p
             if self.is_runtime_pair_multi_index(node) != 0:
                 return self.lower_multi_index_read(node)
+            // A user IndexPlace subscript is its `get`'s value, not a place in
+            // the receiver (#2560): materialize the read into a temp.
+            var ip_pl_base_ty = self.expr_type(self.ast.get_data0(node))
+            while ip_pl_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_pl_base_ty)) == TypeKind.TY_REF:
+                ip_pl_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_pl_base_ty))
+            if self.is_user_index_place(ip_pl_base_ty) != 0:
+                let op = self.lower_expr(node)
+                let ty = self.expr_type(node)
+                let tmp = self.new_temp(ty)
+                let p = self.place_for_local(tmp)
+                self.assign_operand_to_place(p, op, self.ast.get_start(node))
+                self.register_stmt_temp(tmp, ty)
+                return p
             return self.lower_index(node)
 
         if kind == NodeKind.NK_MULTI_INDEX:
@@ -17009,25 +17021,22 @@ impl MirBuilder:
             while ip_rd_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_rd_base_ty)) == TypeKind.TY_REF:
                 ip_rd_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_rd_base_ty))
             if self.is_user_index_place(ip_rd_base_ty) != 0:
-                let ip_get_sym = self.sema.pool_lookup_symbol("get")
-                let ip_rd_type_sym = self.sema.get_type_name(ip_rd_base_ty)
-                let ip_rd_fn_sym = self.sema.lookup_method_fn(ip_rd_type_sym, ip_get_sym)
-                if ip_rd_fn_sym != 0:
-                    let ip_rd_recv_raw = self.lower_expr(self.ast.get_data0(node))
-                    let ip_rd_recv_op = self.borrowed_receiver_operand(ip_rd_recv_raw)
-                    let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
-                    let ip_rd_ret_ty = self.expr_type(node)
-                    let ip_rd_fn_op = self.const_operand(ConstKind.CK_FN, ip_rd_fn_sym, ip_rd_ret_ty)
-                    let ip_rd_args: List[i32] = List.new()
-                    ip_rd_args.push(ip_rd_recv_op)
-                    ip_rd_args.push(ip_rd_idx_op)
-                    let ip_rd_args_id = self.body.new_call_args(ip_rd_args)
-                    let ip_rd_result = self.new_temp(ip_rd_ret_ty)
-                    let ip_rd_place = self.place_for_local(ip_rd_result)
-                    let ip_rd_next = self.new_block()
-                    self.terminate(TermKind.TK_CALL, ip_rd_fn_op, ip_rd_args_id, ip_rd_place, ip_rd_next)
-                    self.switch_to(ip_rd_next)
-                    return self.body.new_operand(OperandKind.OK_COPY, ip_rd_place)
+                // The subscript is the `get` Sema specialized for it (#2560,
+                // D65: the callee is Sema's, never re-derived from the name).
+                if not self.sema.index_place_get_fns.contains(node):
+                    sema_phase_bug(f"BUG: a user IndexPlace read has no recorded get contract: node={node}")
+                let ip_rd_fn_sym: i32 = self.sema.index_place_get_fns.get(node).unwrap()
+                let ip_rd_sig: i32 = self.sema.index_place_get_sigs.get(node).unwrap()
+                let ip_rd_mono: i32 = self.sema.index_place_get_mono_syms.get(node).unwrap()
+                let ip_rd_recv_expr_ty = self.expr_type(self.ast.get_data0(node))
+                let ip_rd_recv_place = self.lower_expr_place(self.ast.get_data0(node))
+                let ip_rd_recv_op = self.index_place_borrowed_receiver(ip_rd_recv_place, ip_rd_recv_expr_ty, ip_rd_sig, self.ast.get_start(node))
+                let ip_rd_idx_op = self.lower_expr(self.ast.get_data1(node))
+                let ip_rd_ret_ty = self.expr_type(node)
+                let ip_rd_args: List[i32] = List.new()
+                ip_rd_args.push(ip_rd_recv_op)
+                ip_rd_args.push(ip_rd_idx_op)
+                return self.lower_resolved_call_with_operand_args_contract(ip_rd_fn_sym, ip_rd_args, ip_rd_ret_ty, node, ip_rd_sig, ip_rd_mono)
             let place = self.lower_index(node)
             let idx_exact_ty = self.expr_type(node)
             if idx_exact_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(idx_exact_ty as TypeId)) == TypeKind.TY_REF:

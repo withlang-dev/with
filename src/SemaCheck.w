@@ -2171,6 +2171,19 @@ impl Sema:
             return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(node), 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type(node)
+        // `Box[(i32, i32)].new()`: a tuple type in type-level position parses
+        // as a tuple expression of types; left unresolved, the instance had
+        // no concrete argument and its methods no contract (#2565).
+        if kind == NodeKind.NK_TUPLE:
+            let tuple_start = self.ast.get_data0(node)
+            let tuple_count = self.ast.get_data1(node)
+            let tuple_elems: List[i32] = List.new()
+            for ei in 0..tuple_count:
+                let elem = self.resolve_type_level_arg_expr(self.ast.get_extra(tuple_start + ei))
+                if elem == 0:
+                    return 0
+                tuple_elems.push(elem)
+            return self.ensure_tuple_type(tuple_elems, tuple_count) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:
@@ -7488,6 +7501,40 @@ impl Sema:
         self.btree_new_sigs.insert(anchor_node, new_sig)
         self.btree_new_mono_syms.insert(anchor_node, self.sig_names[new_sig])
         1
+
+    // A user IndexPlace subscript: the impl's `get` and `set`, specialized
+    // for the receiver type the way record_btree_new_contract specializes a
+    // constructor, keyed by the NK_INDEX node. Returns `get`'s value type
+    // (0 when the type has no usable `get`).
+    mut fn record_index_place_contracts(anchor_node: i32, container_ty: i32) -> i32:
+        let owner_ty = self.resolve_alias(container_ty as TypeId) as i32
+        let owner_sym = self.method_owner_symbol_for_type(owner_ty)
+        if owner_sym == 0:
+            return 0
+        let get_sym = self.pool_lookup_symbol("get")
+        var get_fn = if get_sym != 0: self.lookup_method_fn(owner_sym, get_sym) else: 0
+        if get_fn == 0 and get_sym != 0:
+            get_fn = self.lookup_generic_method_fn(owner_sym, get_sym)
+        if get_fn == 0:
+            return 0
+        let get_sig = self.concrete_owner_method_sig(owner_sym, owner_ty, get_fn)
+        if get_sig < 0:
+            return 0
+        self.index_place_get_fns.insert(anchor_node, get_fn)
+        self.index_place_get_sigs.insert(anchor_node, get_sig)
+        self.index_place_get_mono_syms.insert(anchor_node, self.sig_names[get_sig])
+        let set_sym = self.pool_lookup_symbol("set")
+        var set_fn = if set_sym != 0: self.lookup_method_fn(owner_sym, set_sym) else: 0
+        if set_fn == 0 and set_sym != 0:
+            set_fn = self.lookup_generic_method_fn(owner_sym, set_sym)
+        if set_fn != 0:
+            let set_sig = self.concrete_owner_method_sig(owner_sym, owner_ty, set_fn)
+            if set_sig >= 0:
+                self.index_place_set_fns.insert(anchor_node, set_fn)
+                self.index_place_set_sigs.insert(anchor_node, set_sig)
+                self.index_place_set_mono_syms.insert(anchor_node, self.sig_names[set_sig])
+        let value_ty = self.sig_return_type(get_sig)
+        if value_ty == 0 or value_ty == self.ty_void as i32: 0 else: value_ty
 
     // A compiler-modeled operation that promises an owned clone must carry the
     // same concrete method contract as an ordinary source `value.clone()` call.
@@ -18668,6 +18715,11 @@ impl Sema:
             // Already covered above for plain identifiers via binding-mut. For
             // projection LHS (field, index, deref), consult classify_place.
             // Warnings during P7..P11; promoted to errors at P12 lockdown.
+            // A user type that only implements IndexGet reads through `[i]`
+            // and has no `set` to store through (#2560).
+            if self.ast.kind(target) == NodeKind.NK_INDEX and self.index_place_get_fns.contains(target) and not self.index_place_set_fns.contains(target):
+                self.emit_error("type does not support index assignment (no IndexPlace impl) (§15.11)", node)
+                return 0
             let lhs_packed = self.classify_place(target)
             let lhs_kind = unpack_place_kind(lhs_packed)
             let lhs_mut_state = unpack_place_mut(lhs_packed)
@@ -20665,14 +20717,23 @@ impl Sema:
         // — returning 0 silently let `captures[1]` on a struct with no index
         // method reach MIR and render as "" inside an f-string.
         self.check_runtime_index_operand(index)
+        // A generic instance's IndexPlace may be a bounded blanket impl: settle
+        // it against the instance's arguments here, once, so the read-only
+        // classification sees it (#2560).
+        if self.get_type_kind(self.resolve_alias(container_tid)) == TypeKind.TY_GENERIC_INST:
+            let ip_trait = self.pool_lookup_symbol("IndexPlace")
+            let ig_trait = self.pool_lookup_symbol("IndexGet")
+            if (ip_trait > 0 and self.type_implements_trait(container_tid as i32, ip_trait) != 0) or (ig_trait > 0 and self.type_implements_trait(container_tid as i32, ig_trait) != 0):
+                self.index_place_insts.insert(self.resolve_alias(container_tid) as i32)
         if self.type_is_index_place(container_tid as i32) != 0:
-            let ip_get_fn = self.lookup_method_fn(self.get_type_name(container_tid), self.pool_lookup_symbol("get"))
-            let ip_get_sig = if ip_get_fn != 0: self.get_sig(ip_get_fn) else: -1
-            if ip_get_sig >= 0:
-                let ip_value_ty = self.sig_return_type(ip_get_sig)
-                if ip_value_ty != 0 and ip_value_ty != self.ty_void as i32:
-                    self.typed_expr_types.insert(node, ip_value_ty)
-                    return ip_value_ty
+            // The subscript is the impl's `get` (and, as an assignment target,
+            // its `set`), specialized for this receiver type and recorded for
+            // MIR (#2560: a generic impl's `get` returns its `T`; the
+            // specialization names the concrete type).
+            let ip_value_ty = self.record_index_place_contracts(node, container_tid as i32)
+            if ip_value_ty != 0:
+                self.typed_expr_types.insert(node, ip_value_ty)
+                return ip_value_ty
             return 0
         let indexed_name: str = self.type_name(container_tid as i32)
         self.emit_error(f"type '{indexed_name}' cannot be indexed: it is not a positional collection and implements no IndexPlace", node)
@@ -38275,6 +38336,9 @@ impl Sema:
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)
             if base_sym == self.syms.list or base_sym == self.syms.hashmap:
+                return 1
+            // A bounded blanket impl, settled by the subscript's check (#2560).
+            if self.index_place_insts.contains(resolved as i32):
                 return 1
             let ip_sym = self.pool_lookup_symbol("IndexPlace")
             if ip_sym > 0:

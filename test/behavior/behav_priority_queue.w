@@ -26,7 +26,35 @@ fn ints():
     assert(queue.is_empty())
     var least = PriorityQueue[i32].new_min()
     for v in [3i32, 9, 1, 7]: least.push(v)
+    assert(*least.peek().unwrap() == 1)
     assert(least.pop().unwrap() == 1 and least.pop().unwrap() == 3)
+
+// The word shape (D148): a max-queue of an integer scalar keeps its values
+// in the engine's own heap; negatives, narrow widths and the extremes keep
+// their order, and an unsigned 64-bit key rides the slot shape.
+fn words():
+    var negatives = PriorityQueue[i64].new()
+    for v in [-3i64, 9223372036854775807i64, -9223372036854775807i64 - 1, 0, 5]: negatives.push(v)
+    assert(*negatives.peek().unwrap() == 9223372036854775807)
+    assert(negatives.pop().unwrap() == 9223372036854775807 and negatives.pop().unwrap() == 5)
+    assert(negatives.pop().unwrap() == 0 and negatives.pop().unwrap() == -3)
+    assert(negatives.pop().unwrap() == -9223372036854775807i64 - 1 and negatives.is_empty())
+    var bytes = PriorityQueue[u8].new()
+    for v in [1u8, 255, 128]: bytes.push(v)
+    assert(bytes.pop().unwrap() == 255 and bytes.pop().unwrap() == 128 and bytes.pop().unwrap() == 1)
+    var shorts = PriorityQueue[i16].new()
+    for v in [-32768i16, 32767, -1]: shorts.push(v)
+    assert(*shorts.peek().unwrap() == 32767 and shorts.pop().unwrap() == 32767 and shorts.pop().unwrap() == -1)
+    var big = PriorityQueue[u64].new()
+    for v in [7u64, 18446744073709551615u64, 9223372036854775808u64]: big.push(v)
+    assert(big.pop().unwrap() == 18446744073709551615u64 and big.pop().unwrap() == 9223372036854775808u64 and big.pop().unwrap() == 7)
+    var many = PriorityQueue[i32].new()
+    for i in 0..1000: many.push((i * 7919) % 1000)
+    var prev = 1000
+    for i in 0..1000:
+        let v = many.pop().unwrap()
+        assert(v <= prev)
+        prev = v
 
 fn drops():
     var total: i32 = 0
@@ -44,5 +72,6 @@ fn drops():
 
 fn main:
     ints()
+    words()
     drops()
     print("ok")

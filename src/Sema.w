@@ -1601,6 +1601,21 @@ type Sema {
     // for the concrete type (record_btree_new_contract), keyed by the node.
     btree_new_sigs: HashMap[i32, i32],
     btree_new_mono_syms: HashMap[i32, i32],
+    // A user IndexPlace subscript (`b[i]`, `b[i] = v`): the impl's `get` and
+    // `set` specialized for the receiver type (record_index_place_contracts),
+    // keyed by the NK_INDEX node. MIR lowers these; it never re-derives the
+    // callee from the type's name (#2560, D65).
+    index_place_get_fns: HashMap[i32, i32],
+    index_place_get_sigs: HashMap[i32, i32],
+    index_place_get_mono_syms: HashMap[i32, i32],
+    index_place_set_fns: HashMap[i32, i32],
+    index_place_set_sigs: HashMap[i32, i32],
+    index_place_set_mono_syms: HashMap[i32, i32],
+    // The generic instances whose IndexPlace impl is a bounded blanket impl
+    // (`impl[T: Copy] IndexPlace[isize, T] for Box3[T]`), established by the
+    // subscript's check so the read-only classification (type_is_index_place,
+    // classify_place, MIR) sees them (#2560).
+    index_place_insts: HashSet[i32],
     // Compiler-synthesized Clone calls (currently Option[&T].cloned()).
     // The source node names the builtin eliminator, not the payload's clone
     // method, so resolved_call_* cannot carry both contracts. Sema resolves
@@ -3672,6 +3687,13 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         btree_insert_mono_syms: sema_new_map_i32_i32(),
         btree_new_sigs: sema_new_map_i32_i32(),
         btree_new_mono_syms: sema_new_map_i32_i32(),
+        index_place_get_fns: sema_new_map_i32_i32(),
+        index_place_get_sigs: sema_new_map_i32_i32(),
+        index_place_get_mono_syms: sema_new_map_i32_i32(),
+        index_place_set_fns: sema_new_map_i32_i32(),
+        index_place_set_sigs: sema_new_map_i32_i32(),
+        index_place_set_mono_syms: sema_new_map_i32_i32(),
+        index_place_insts: HashSet.new(),
         clone_contract_fns: sema_new_map_i32_i32(),
         clone_contract_sigs: sema_new_map_i32_i32(),
         clone_contract_mono_syms: sema_new_map_i32_i32(),

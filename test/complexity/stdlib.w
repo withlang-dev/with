@@ -9,6 +9,9 @@ use std.collections.ordered_map.OrderedMap
 use std.collections.deque.Deque
 use std.collections.unordered_set.UnorderedSet
 use std.collections.unordered_map.UnorderedMap
+use std.collections.stack.Stack
+use std.collections.queue.Queue
+use std.collections.linked_list.LinkedList
 use std.algorithms
 use std.time
 use std.process
@@ -265,6 +268,84 @@ fn sort_work(n: i32):
     for i in 1..n: assert(tags[i - 1].0 <= tags[i].0)
     n
 
+// The stable sort (a merge sort over the reference layout) and the shuffle.
+fn stable_sort_work(n: i32):
+    var xs: List[i64] = []
+    for i in 0..n: xs.push(((i as i64) * 7919) % (n as i64))
+    xs.stable_sort()
+    for i in 1..n: assert(xs[i - 1] <= xs[i])
+    var tags: List[(i32, i32)] = []
+    for i in 0..n: tags.push(((n - i) % 16, i))
+    tags.stable_sort_by((a, b) => if a.0 < b.0: -1 else if a.0 > b.0: 1 else: 0)
+    for i in 1..n:
+        assert(tags[i - 1].0 <= tags[i].0)
+        if tags[i - 1].0 == tags[i].0: assert(tags[i - 1].1 < tags[i].1)
+    xs.shuffle()
+    assert(xs.len() == n as isize)
+    n
+
+// Stack, Queue and LinkedList over the STC engines: O(1) ends, both shapes.
+fn stack_work(n: i32):
+    var words = Stack[i32].new()
+    var slots = Stack[str].new()
+    for i in 0..n:
+        words.push(i)
+        slots.push("x")
+    for i in 0..n: assert(*words.get(i as isize) == i)
+    for i in 0..n:
+        assert(words.pop().is_some())
+        assert(slots.pop().is_some())
+    assert(words.is_empty() and slots.is_empty())
+    n
+
+fn queue_work(n: i32):
+    var words = Queue[i32].new()
+    var slots = Queue[str].new()
+    for i in 0..n:
+        words.push(i)
+        slots.push("x")
+    for i in 0..n:
+        assert(words.pop().unwrap() == i)
+        assert(slots.pop().is_some())
+    assert(words.is_empty() and slots.is_empty())
+    n
+
+fn linked_list_work(n: i32):
+    var words = LinkedList[i32].new()
+    var slots = LinkedList[str].new()
+    for i in 0..n:
+        if i % 2 == 0: words.push_back(i) else: words.push_front(i)
+        slots.push_back("x")
+    words.sort()
+    var previous = -1
+    var cursor = words.iter()
+    while let Some(v) = cursor.next():
+        assert(*v > previous)
+        previous = *v
+    for i in 0..n:
+        assert(words.pop_front().is_some())
+        assert(slots.pop_front().is_some())
+    assert(words.is_empty() and slots.is_empty())
+    n
+
+// The slot shapes of the priority queue and the unordered set (their word
+// shapes are the `priority-queue` and `unordered-set` rows).
+fn priority_queue_slots_work(n: i32):
+    var queue = PriorityQueue[str].new()
+    for i in 0..n: queue.push(f"{(i * 7919) % n}")
+    for i in 0..n: assert(queue.pop().is_some())
+    assert(queue.is_empty())
+    n
+
+fn unordered_set_slots_work(n: i32):
+    var set = UnorderedSet[str].new()
+    for i in 0..n: assert(set.insert(f"{(i * 7919) % n}"))
+    for i in 0..n: assert(set.contains(&f"{i}"))
+    for i in 0..n:
+        if i % 2 == 0: assert(set.remove(&f"{i}").is_some())
+    assert(set.len() == n / 2)
+    n
+
 fn trie_work(n: i32):
     var trie = Trie[i32].new()
     for i in 0..n: trie.insert(f"key-{i}", i)
@@ -465,4 +546,10 @@ else:
     measure("unordered-set", unordered_set_work, 4000, 0)
     measure("unordered-map", unordered_map_work, 4000, 0)
     measure("deque-words", deque_words_work, 4000, 0)
+    measure("stable-sort", stable_sort_work, 4000, 0)
+    measure("stack", stack_work, 4000, 0)
+    measure("queue", queue_work, 4000, 0)
+    measure("linked-list", linked_list_work, 4000, 0)
+    measure("priority-queue-slots", priority_queue_slots_work, 4000, 0)
+    measure("unordered-set-slots", unordered_set_slots_work, 4000, 0)
     measure("quadratic-control", quadratic_work, 2000, -1)

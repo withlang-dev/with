@@ -706,6 +706,124 @@ pub type stc_f64s_value = f64
 
 pub type stc_f64s_raw = f64
 
+pub type stc_word_set_key = u64
+
+pub type stc_word_set_mapped = u64
+
+pub type stc_word_set_value = u64
+
+pub type stc_word_set_entry = u64
+
+@[repr(C)]
+pub type stc_word_set_result { pub ref: *mut u64 = null, pub idx: u64 = 0, pub inserted: bool = false, pub hashx: u8 = 0, pub dist: u16 = 0 }
+impl Copy for stc_word_set_result
+
+@[repr(C)]
+pub type stc_word_set_iter { pub ref: *mut u64 = null, pub _end: *mut u64 = null, pub _mref: *mut hmap_meta = null }
+impl Copy for stc_word_set_iter
+
+@[repr(C)]
+pub type stc_word_set { pub table: *mut u64 = null, pub meta: *mut hmap_meta = null, pub size: i64 = 0, pub bucket_count: i64 = 0 }
+impl Copy for stc_word_set
+
+pub type stc_word_set_keyraw = u64
+
+pub type stc_word_set_rmapped = u64
+
+pub type stc_word_set_raw = u64
+
+pub type stc_word_pqueue_value = i64
+
+@[repr(C)]
+pub type stc_word_pqueue_iter { pub ref: *mut i64 = null, pub end: *mut i64 = null }
+impl Copy for stc_word_pqueue_iter
+
+@[repr(C)]
+pub type stc_word_pqueue { pub data: *mut i64 = null, pub size: i64 = 0, pub capacity: i64 = 0 }
+impl Copy for stc_word_pqueue
+
+pub type stc_word_pqueue_raw = i64
+
+pub type stc_slot_stack_value = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_stack_iter { pub ref: *mut *mut stc_slot_head = null, pub end: *mut *mut stc_slot_head = null }
+impl Copy for stc_slot_stack_iter
+
+@[repr(C)]
+pub type stc_slot_stack { pub data: *mut *mut stc_slot_head = null, pub size: i64 = 0, pub capacity: i64 = 0 }
+impl Copy for stc_slot_stack
+
+pub type stc_slot_stack_raw = *mut stc_slot_head
+
+pub type stc_word_stack_value = u64
+
+@[repr(C)]
+pub type stc_word_stack_iter { pub ref: *mut u64 = null, pub end: *mut u64 = null }
+impl Copy for stc_word_stack_iter
+
+@[repr(C)]
+pub type stc_word_stack { pub data: *mut u64 = null, pub size: i64 = 0, pub capacity: i64 = 0 }
+impl Copy for stc_word_stack
+
+pub type stc_word_stack_raw = u64
+
+pub type stc_slot_queue_value = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_queue { pub cbuf: *mut *mut stc_slot_head = null, pub start: i64 = 0, pub end: i64 = 0, pub capmask: i64 = 0 }
+impl Copy for stc_slot_queue
+
+@[repr(C)]
+pub type stc_slot_queue_iter { pub ref: *mut *mut stc_slot_head = null, pub pos: i64 = 0, pub _s: *const stc_slot_queue = null }
+impl Copy for stc_slot_queue_iter
+
+pub type stc_slot_queue_raw = *mut stc_slot_head
+
+pub type stc_word_queue_value = u64
+
+@[repr(C)]
+pub type stc_word_queue { pub cbuf: *mut u64 = null, pub start: i64 = 0, pub end: i64 = 0, pub capmask: i64 = 0 }
+impl Copy for stc_word_queue
+
+@[repr(C)]
+pub type stc_word_queue_iter { pub ref: *mut u64 = null, pub pos: i64 = 0, pub _s: *const stc_word_queue = null }
+impl Copy for stc_word_queue_iter
+
+pub type stc_word_queue_raw = u64
+
+pub type stc_slot_list_value = *mut stc_slot_head
+
+@[repr(C)]
+pub type stc_slot_list_iter { pub ref: *mut *mut stc_slot_head = null, pub _last: *const *mut stc_slot_list_node = null, pub prev: *mut stc_slot_list_node = null }
+impl Copy for stc_slot_list_iter
+
+@[repr(C)]
+pub type stc_slot_list { pub last: *mut stc_slot_list_node = null }
+impl Copy for stc_slot_list
+
+@[repr(C)]
+pub type stc_slot_list_node { pub value: *mut stc_slot_head = null, pub next: *mut stc_slot_list_node = null }
+impl Copy for stc_slot_list_node
+
+pub type stc_slot_list_raw = *mut stc_slot_head
+
+pub type stc_word_list_value = i64
+
+@[repr(C)]
+pub type stc_word_list_iter { pub ref: *mut i64 = null, pub _last: *const *mut stc_word_list_node = null, pub prev: *mut stc_word_list_node = null }
+impl Copy for stc_word_list_iter
+
+@[repr(C)]
+pub type stc_word_list { pub last: *mut stc_word_list_node = null }
+impl Copy for stc_word_list
+
+@[repr(C)]
+pub type stc_word_list_node { pub value: i64 = 0, pub next: *mut stc_word_list_node = null }
+impl Copy for stc_word_list_node
+
+pub type stc_word_list_raw = i64
+
 @[repr(C)]
 pub type cbits { pub buffer: *mut u64 = null, pub _size: i64 = 0 }
 impl Copy for cbits

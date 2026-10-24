@@ -788,6 +788,38 @@ fn sc_deque(kind: &str):
         source = source ++ "    var cursor = d.iter()\n    assert(cursor.next().unwrap().id == 7)\n    assert(cursor.next().unwrap().id == 5)\n"
     source
 
+// Stack, Queue and LinkedList over the STC engines (Phase 3, the slot
+// shape): pops transfer, the facade drops the rest exactly once.
+fn sc_stack(kind: &str):
+    var source = "use std.collections.stack.Stack\nfn go(slot: *mut i32):\n    var s = Stack[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: s.push(mk(i, slot))\n    assert(s.len() == 8 and s.peek().unwrap().id == 8 and s.get(0).id == 1)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let top = s.pop().unwrap()\n        drop(top)\n    assert(s.len() == 4)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = s.iter()\n    assert(cursor.next().unwrap().id == 1)\n    assert(cursor.next().unwrap().id == 2)\n"
+    source
+
+fn sc_queue(kind: &str):
+    var source = "use std.collections.queue.Queue\nfn go(slot: *mut i32):\n    var q = Queue[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9: q.push(mk(i, slot))\n    assert(q.len() == 8 and q.front().unwrap().id == 1 and q.back().unwrap().id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let front = q.pop().unwrap()\n        drop(front)\n    assert(q.len() == 4)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = q.iter()\n    assert(cursor.next().unwrap().id == 1)\n    assert(cursor.next().unwrap().id == 2)\n"
+    source
+
+fn sc_linked_list(kind: &str):
+    var source = "use std.collections.linked_list.LinkedList\nfn go(slot: *mut i32):\n    var l = LinkedList[R].new()\n"
+    if kind == "empty": return source
+    source = source ++ "    for i in 1..9:\n        if i % 2 == 0: l.push_back(mk(i, slot)) else: l.push_front(mk(i, slot))\n    l.sort()\n    assert(l.len() == 8 and l.front().unwrap().id == 1 and l.back().unwrap().id == 8)\n"
+    if kind == "partial":
+        source = source ++ "    for i in 0..4:\n        let front = l.pop_front().unwrap()\n        drop(front)\n    assert(l.len() == 4)\n"
+    if kind == "cursor":
+        source = source ++ "    var cursor = l.iter()\n    assert(cursor.next().unwrap().id == 1)\n    assert(cursor.next().unwrap().id == 2)\n"
+    source
+
 // HashIndex[i32, R] over the TommyDS hashdyn engine (Phase 2): the facade
 // owns every node; a replaced value transfers out, removals transfer, the
 // index drops the rest exactly once.
@@ -840,6 +872,18 @@ fn build_cells():
     cells.push(cell("deque_full/facade", sc_deque("full"), 36))
     cells.push(cell("deque_partial/facade", sc_deque("partial"), 36))
     cells.push(cell("deque_cursor/facade", sc_deque("cursor"), 36))
+    cells.push(cell("stack_empty/facade", sc_stack("empty"), 0))
+    cells.push(cell("stack_full/facade", sc_stack("full"), 36))
+    cells.push(cell("stack_partial/facade", sc_stack("partial"), 36))
+    cells.push(cell("stack_cursor/facade", sc_stack("cursor"), 36))
+    cells.push(cell("queue_empty/facade", sc_queue("empty"), 0))
+    cells.push(cell("queue_full/facade", sc_queue("full"), 36))
+    cells.push(cell("queue_partial/facade", sc_queue("partial"), 36))
+    cells.push(cell("queue_cursor/facade", sc_queue("cursor"), 36))
+    cells.push(cell("linked_list_empty/facade", sc_linked_list("empty"), 0))
+    cells.push(cell("linked_list_full/facade", sc_linked_list("full"), 36))
+    cells.push(cell("linked_list_partial/facade", sc_linked_list("partial"), 36))
+    cells.push(cell("linked_list_cursor/facade", sc_linked_list("cursor"), 36))
     cells.push(cell("unordered_set_empty/facade", sc_unordered_set("empty"), 0))
     // The probe in the full cell drops too: 36 + 3.
     cells.push(cell("unordered_set_full/facade", sc_unordered_set("full"), 39))
