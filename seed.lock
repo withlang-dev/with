@@ -72,8 +72,13 @@ with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64.version=nightly-20261023-local-2-1508cf5cc0d1
-with-linux-x86_64=1bc4c6c81b284d69101d4a38ec680571afa0d37a270d0cc16dfb8a1b351e1c64
+# linux-x86_64 and windows-x86_64 are cut from the D155 bridge rung seed-bridge-20261024
+# (2026-10-24; main since #2599 spells c_char in compiler sources, which their local-2
+# bridge seeds had no builtin for): linux-x86_64 from rung 6138da7f1 on eric-5090,
+# windows-x86_64 from rung f5443bac4 (plus the harness i64 seam, #2607) on win10, each to
+# a stage2 == stage3 fixpoint with :release-checks green. Main-based seeds follow.
+with-linux-x86_64.version=nightly-20261024-local-2-6138da7f1565
+with-linux-x86_64=3c2a1f3935a3ec3563c62e58fd62f2c93e41d15a9995003f1b757652f770d6d1
 # linux-aarch64 is cut from main 47721ee51 (2026-10-24) in tools/docker/linux-aarch64
 # by the bridge-rung seed nightly-20261024-local-2-3c7c68968cb2 (#2605), to a stage2 ==
 # stage3 fixpoint with :release-checks green: the first main-based aarch64 seed since
@@ -90,7 +95,7 @@ with-linux-aarch64=5593bbb682d0b914485fff45662a48e6d977e8f89142d8d687081e79190c8
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe.version=nightly-20261023-local-2-3edfcc663d86
-with-windows-x86_64.exe=8ea399cb95c27ec72b1aeb8f84ae8c51e62abe6af49bd24818937d8ef0aa8d4a
+with-windows-x86_64.exe.version=nightly-20261024-local-2-f5443bac4111
+with-windows-x86_64.exe=ecd176514553ee186ec491fc70276ac194d2f4aec7df32c593e4afe25a5de5c1
 with-windows-aarch64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
