@@ -93,7 +93,7 @@ impl CStr:
         self.len as isize  // the builtin header field is i64 until headers take the size width (D114)
 
     /// Raw pointer to the NUL-terminated bytes this `CStr` borrows.
-    pub fn ptr() -> *const i8: self.ptr
+    pub fn ptr() -> *const c_char: self.ptr
 
     /// An owned copy of the text (D51 §41: allocation is explicit): the `str`
     /// outlives the C storage.
@@ -132,7 +132,7 @@ impl CStr:
 /// compiler applies it to a presented call's result (MirLower.w lower_call);
 /// the facade clause is what vouches for the pointer, so the conversion is
 /// `unsafe`: its caller guarantees `p` is NULL or a live C string (#1473).
-pub unsafe fn cstr_option_from_ptr(p: *const i8) -> Option[CStr]:
+pub unsafe fn cstr_option_from_ptr(p: *const c_char) -> Option[CStr]:
     if p == null: None else: CStr.from_ptr(p)
 
 /// Why a `CStr` is not With text.
@@ -189,7 +189,7 @@ unsafe fn utf8_first_invalid(p: *const u8, n: i64) -> i64:
 /// View the NUL-terminated string C handed back (§16.1). The caller vouches
 /// that `ptr` is non-null, NUL-terminated, and stays valid while the view is
 /// used: that is the one fact With cannot check.
-pub unsafe fn CStr.from_ptr(ptr: *const i8) -> CStr:
+pub unsafe fn CStr.from_ptr(ptr: *const c_char) -> CStr:
     var len: i64 = 0
     while ptr[len] != 0: len += 1
     CStr { ptr, len }

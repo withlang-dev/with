@@ -17,9 +17,9 @@ fn main:
     let migrated = p7_run(case_dir, "va_defs_migrate", "migrate\0input.c\0--no-c-export\0-o\0lib/va_defs.w\0")
     p7_assert_success(migrated, "migrate variadic definitions")
     let source = read_file(p7_join(case_dir, "lib/va_defs.w")).unwrap()
-    assert(source.contains("unsafe fn sum(__param_n: c_int, ...) -> c_int"))
+    assert(source.contains("unsafe fn sum(__param_n: i32, ...) -> i32"))
     assert(source.contains("var __local_ap: c_va_list = va_start()"))
-    assert(source.contains("__local_ap.arg[c_int]()"))
+    assert(source.contains("__local_ap.arg[i32]()"))
     assert(source.contains("__local_ap.arg[f64]()"))
     assert(source.contains("var __local_args_1: c_va_list = va_start()"))
     // A `void` function whose tail is Unit is spelled without `-> Unit`

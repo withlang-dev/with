@@ -6,7 +6,7 @@
 // tolerate it. Declaring and calling one must check, validate, and run.
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
+extern fn with_free(ptr: *mut c_void)
 
 fn main:
     unsafe:

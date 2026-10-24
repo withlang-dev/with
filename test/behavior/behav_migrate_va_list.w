@@ -12,7 +12,7 @@ fn main:
     let migrated = p7_run(case_dir, "va_list_migrate", "migrate\0input.c\0--no-c-export\0-o\0lib/va_sample.w\0")
     p7_assert_success(migrated, "migrate va_list aliases and explicit pointers")
     let source = read_file(p7_join(case_dir, "lib/va_sample.w")).unwrap()
-    assert(source.contains("fn counter() -> c_int"))
+    assert(source.contains("fn counter() -> i32"))
     assert(source.contains("__param_args: c_va_list"))
     assert(source.contains("__param_args: *mut c_va_list"))
     assert(source.contains("__local_args: c_va_list"))

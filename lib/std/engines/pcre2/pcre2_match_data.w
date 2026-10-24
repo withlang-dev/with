@@ -29,31 +29,31 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
-pub unsafe fn pcre2_match_data_create_8(__param_oveccount: c_uint, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8 {
+pub unsafe fn pcre2_match_data_create_8(__param_oveccount: u32, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_data_8 {
     var __local_oveccount = __param_oveccount
     var __local_yield_: *mut pcre2_real_match_data_8
 
     if ((if __local_oveccount < 1: 1 else: 0) != 0) {
-        (__local_oveccount = ((1 as c_uint)))
+        (__local_oveccount = ((1 as u32)))
     }
 
     if ((if __local_oveccount > 65535: 1 else: 0) != 0) {
-        (__local_oveccount = ((65535 as c_uint)))
+        (__local_oveccount = ((65535 as u32)))
     }
 
-    (__local_yield_ = ((_pcre2_memctl_malloc_8(((((offsetof[pcre2_real_match_data_8](ovector) as usize) as c_ulong) +% (((((2 as c_uint) *% (__local_oveccount as c_uint)) as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong)) as c_ulong), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_data_8)))
+    (__local_yield_ = ((_pcre2_memctl_malloc_8(((((offsetof[pcre2_real_match_data_8](ovector) as usize) as u64) +% (((((2 as u32) *% (__local_oveccount as u32)) as u64) *% (sizeof[u64]() as u64)) as u64)) as u64), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_data_8)))
 
     if ((if __local_yield_ == null: 1 else: 0) != 0) {
         return ((null as *mut pcre2_real_match_data_8))
     }
 
-    ((*__local_yield_).oveccount = ((__local_oveccount as c_ushort)))
+    ((*__local_yield_).oveccount = ((__local_oveccount as u16)))
 
     ((*__local_yield_).flags = ((0 as u8)))
 
     ((*__local_yield_).heapframes = ((null as *mut heapframe)))
 
-    ((*__local_yield_).heapframes_size = ((0 as c_ulong)))
+    ((*__local_yield_).heapframes_size = ((0 as u64)))
 
     return __local_yield_
 
@@ -69,7 +69,7 @@ pub unsafe fn pcre2_match_data_create_from_pattern_8(__param_code: *const pcre2_
         (__local_gcontext = ((__param_code as *mut pcre2_real_general_context_8)))
     }
 
-    return ((pcre2_match_data_create_8(((((*__param_code).top_bracket as c_int) + 1) as c_uint), __local_gcontext) as *mut pcre2_real_match_data_8))
+    return ((pcre2_match_data_create_8(((((*__param_code).top_bracket as i32) + 1) as u32), __local_gcontext) as *mut pcre2_real_match_data_8))
 
 }
 
@@ -79,7 +79,7 @@ pub unsafe fn pcre2_match_data_free_8(__param_match_data: *mut pcre2_real_match_
             (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).heapframes as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         }
 
-        if ((if ((((*__param_match_data).flags as c_int) as c_uint) & (1 as c_uint)) != 0: 1 else: 0) != 0) {
+        if ((if ((((*__param_match_data).flags as i32) as u32) & (1 as u32)) != 0: 1 else: 0) != 0) {
             (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).free.unwrap()(((*__param_match_data).subject as *mut c_void), (*(&raw const (*__param_match_data).memctl as *const pcre2_memctl)).memory_data)
         }
 
@@ -94,27 +94,27 @@ pub unsafe fn pcre2_get_mark_8(__param_match_data: *mut pcre2_real_match_data_8)
 
 }
 
-pub unsafe fn pcre2_get_match_data_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
-    return (((offsetof[pcre2_real_match_data_8](ovector) as usize) as c_ulong) +% ((((2 * ((*__param_match_data).oveccount as c_int)) as c_ulong) *% (sizeof[c_ulong]() as c_ulong)) as c_ulong))
+pub unsafe fn pcre2_get_match_data_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> u64 {
+    return (((offsetof[pcre2_real_match_data_8](ovector) as usize) as u64) +% ((((2 * ((*__param_match_data).oveccount as i32)) as u64) *% (sizeof[u64]() as u64)) as u64))
 
 }
 
-pub unsafe fn pcre2_get_match_data_heapframes_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
+pub unsafe fn pcre2_get_match_data_heapframes_size_8(__param_match_data: *mut pcre2_real_match_data_8) -> u64 {
     return (*__param_match_data).heapframes_size
 
 }
 
-pub unsafe fn pcre2_get_ovector_count_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_uint {
-    return (((*__param_match_data).oveccount as c_uint))
+pub unsafe fn pcre2_get_ovector_count_8(__param_match_data: *mut pcre2_real_match_data_8) -> u32 {
+    return (((*__param_match_data).oveccount as u32))
 
 }
 
-pub unsafe fn pcre2_get_ovector_pointer_8(__param_match_data: *mut pcre2_real_match_data_8) -> *mut c_ulong {
-    return (&(*__param_match_data).ovector[0] as *mut c_ulong)
+pub unsafe fn pcre2_get_ovector_pointer_8(__param_match_data: *mut pcre2_real_match_data_8) -> *mut u64 {
+    return (&(*__param_match_data).ovector[0] as *mut u64)
 
 }
 
-pub unsafe fn pcre2_get_startchar_8(__param_match_data: *mut pcre2_real_match_data_8) -> c_ulong {
+pub unsafe fn pcre2_get_startchar_8(__param_match_data: *mut pcre2_real_match_data_8) -> u64 {
     return (*__param_match_data).startchar
 
 }

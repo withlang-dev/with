@@ -56,10 +56,10 @@ extern fn GetCurrentThreadId() -> u32
 extern fn GetTempPathW(size: u32, buf: *mut u16) -> u32
 extern fn GetTempFileNameW(path: *const u16, prefix: *const u16, unique: u32, buf: *mut u16) -> u32
 extern fn GetFullPathNameW(path: *const u16, size: u32, buf: *mut u16, file_part: *mut *mut u16) -> u32
-extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_from_cstr(s: *const c_char) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 // UCRT has no stdin/stdout/stderr global variables; the FILE* streams come from
 // __acrt_iob_func(0/1/2) (the UCRT `#define stdin (__acrt_iob_func(0))` macros).
@@ -229,10 +229,10 @@ fn win_utf8_to_utf16(src: *const u8, len: i64, dst: *mut u16, cap: i64) -> i32:
     win_put_u16(dst, out, 0)
     0
 
-fn win_utf8_to_utf16_buf(src: *const u8, dst: *mut u16, cap: i64) -> i32:
+fn win_utf8_to_utf16_buf(src: *const c_char, dst: *mut u16, cap: i64) -> i32:
     if src as i64 == 0:
         return -WIN_EINVAL
-    win_utf8_to_utf16(src, win_cstr_len(src), dst, cap)
+    win_utf8_to_utf16(src as *const u8, win_cstr_len(src as *const u8), dst, cap)
 
 fn win_str_data(s: &str) -> *const u8:
     unsafe *(s as *const str as *const *const u8)
@@ -386,7 +386,7 @@ pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     // PWD is the runtime's on Windows (#1082; see windows_x86_64.w).
     var cwd: [4096]u8 = [0 as u8; 4096]
     if rt_getcwd(&raw mut cwd as *mut [4096]u8 as *mut u8, 4096) == 0:
-        let _pwd = win_setenv("PWD", with_str_from_cstr(&cwd as *const [4096]u8 as *const u8))
+        let _pwd = win_setenv("PWD", with_str_from_cstr(&cwd as *const [4096]u8 as *const c_char))
 
 pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
@@ -409,7 +409,7 @@ pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
         return -(win_error() as i64)
     got as i64
 
-pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
@@ -466,7 +466,7 @@ fn win_filetime_to_ns(low: u32, high: u32) -> i64:
     let unix_100ns = ticks - 116444736000000000 as u64
     (unix_100ns * 100) as i64
 
-pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
+pub fn rt_stat(path: *const c_char, out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtStatBuf
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
@@ -487,7 +487,7 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     (unsafe *out).modified_ns = win_filetime_to_ns(write_low, write_high)
     0
 
-pub fn rt_file_mode(path: *const u8) -> i32:
+pub fn rt_file_mode(path: *const c_char) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0:
@@ -499,7 +499,7 @@ pub fn rt_file_mode(path: *const u8) -> i32:
         return 0o040755
     0o100644
 
-pub fn rt_chmod(path: *const u8, mode: i32) -> i32:
+pub fn rt_chmod(path: *const c_char, mode: i32) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0:
@@ -626,13 +626,13 @@ extern fn rt_ucrt_fseeki64(stream: *mut c_void, offset: i64, whence: i32) -> i32
 @[link_name("_ftelli64")]
 extern fn rt_ucrt_ftelli64(stream: *mut c_void) -> i64
 @[link_name("strtold")]
-extern fn rt_ucrt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
+extern fn rt_ucrt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
 // std.libc strtol/strtoul parse a 64-bit long on every target (D114: With
 // code sees one width); the UCRT's long is 32 bits, so its 64-bit parses.
 @[link_name("_strtoi64")]
-extern fn rt_ucrt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
+extern fn rt_ucrt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64
 @[link_name("_strtoui64")]
-extern fn rt_ucrt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
+extern fn rt_ucrt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64
 @[link_name("_isatty")]
 extern fn rt_ucrt_isatty(fd: i32) -> i32
 
@@ -640,14 +640,14 @@ pub fn rt_errno_ptr() -> *mut i32: rt_ucrt_errno()
 pub fn rt_fileno(stream: *mut c_void) -> i32: rt_ucrt_fileno(stream)
 pub fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32: rt_ucrt_fseeki64(stream, offset, whence)
 pub fn rt_ftell(stream: *mut c_void) -> i64: rt_ucrt_ftelli64(stream)
-pub fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_ucrt_strtold(nptr, endptr)
-pub fn rt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: rt_ucrt_strtol(nptr, endptr, base)
-pub fn rt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: rt_ucrt_strtoul(nptr, endptr, base)
+pub fn rt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: rt_ucrt_strtold(nptr, endptr)
+pub fn rt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64: rt_ucrt_strtol(nptr, endptr, base)
+pub fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64: rt_ucrt_strtoul(nptr, endptr, base)
 pub fn rt_isatty(fd: i32) -> i32: rt_ucrt_isatty(fd)
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: win_getrlimit(resource, lim)
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: win_setrlimit(resource, lim)
-pub fn rt_mkstemp(template_path: *mut u8) -> i32: win_mkstemp(template_path)
-pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: win_realpath(path, resolved_path)
+pub fn rt_mkstemp(template_path: *mut c_char) -> i32: win_mkstemp(template_path)
+pub fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char: win_realpath(path, resolved_path)
 
 pub fn rt_fiber_page_size() -> i64:
     4096
@@ -730,23 +730,23 @@ fn win_unlink_w(wpath: *const u16) -> i32:
 fn win_rmdir_w(wpath: *const u16) -> i32:
     if RemoveDirectoryW(wpath) == 0: win_neg_error() else: 0
 
-pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
+pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0: rc else: win_mkdir_w(&wpath as *const [4096]u16 as *const u16)
 
-pub fn rt_unlink(path: *const u8) -> i32:
+pub fn rt_unlink(path: *const c_char) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0: rc else: win_unlink_w(&wpath as *const [4096]u16 as *const u16)
 
-pub fn rt_rmdir(path: *const u8) -> i32:
+pub fn rt_rmdir(path: *const c_char) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0: rc else: win_rmdir_w(&wpath as *const [4096]u16 as *const u16)
 
-pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
+pub fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32:
     var oldw: [4096]u16 = [0; 4096]
     var neww: [4096]u16 = [0; 4096]
     let old_rc = win_utf8_to_utf16_buf(old_path, &raw mut oldw as *mut [4096]u16 as *mut u16, 4096)
@@ -823,7 +823,7 @@ fn win_remove_tree_top(wpath: *const u16) -> i32:
     let rc = win_top_entry(wpath, &raw mut attrs as *mut u32, &raw mut tag as *mut u32)
     if rc != 0: rc else: win_remove_tree_w(wpath, attrs, tag)
 
-pub fn rt_remove_tree(path: *const u8) -> i32:
+pub fn rt_remove_tree(path: *const c_char) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut u16, 4096)
     if rc != 0: rc else: win_remove_tree_top(&wpath as *const u16)
@@ -907,7 +907,7 @@ fn win_copy_tree_w(src: *const u16, dst: *const u16, attrs: u32, tag: u32) -> i3
     let _close2 = FindClose(h)
     0
 
-pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
+pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
     var srcw: [4096]u16 = [0; 4096]
     var dstw: [4096]u16 = [0; 4096]
     let src_rc = win_utf8_to_utf16_buf(src, &raw mut srcw as *mut [4096]u16 as *mut u16, 4096)
@@ -923,7 +923,7 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
         return top_rc
     win_copy_tree_w(&srcw as *const [4096]u16 as *const u16, &dstw as *const [4096]u16 as *const u16, attrs, tag)
 
-pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
+pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     var targetw: [4096]u16 = [0; 4096]
     var linkw: [4096]u16 = [0; 4096]
     let target_rc = win_utf8_to_utf16_buf(target, &raw mut targetw as *mut [4096]u16 as *mut u16, 4096)
@@ -939,7 +939,7 @@ pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
         return win_neg_error()
     0
 
-pub fn rt_readlink(path: *const u8) -> str:
+pub fn rt_readlink(path: *const c_char) -> str:
     let _ = path
     win_empty_str()
 
@@ -1015,7 +1015,7 @@ fn win_list_files_walk(wpath: *const u16, path: &str, attrs: u32, tag: u32, acc:
     let _close = FindClose(h)
 
 // A path that is not UTF-8 names nothing, so it lists nothing, like a missing one.
-pub fn rt_list_files(path: *const u8) -> str:
+pub fn rt_list_files(path: *const c_char) -> str:
     var wpath: [4096]u16 = [0; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return win_empty_str()
@@ -1030,7 +1030,7 @@ pub fn rt_list_files(path: *const u8) -> str:
 
 // The names in a directory, one per line, no path and no descent; "" for
 // anything that is not a directory (see windows_x86_64.w).
-pub fn rt_list_dir(path: *const u8) -> str:
+pub fn rt_list_dir(path: *const c_char) -> str:
     var wpath: [4096]u16 = [0; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
         return win_empty_str()
@@ -1060,7 +1060,7 @@ pub fn rt_list_dir(path: *const u8) -> str:
     let _close = FindClose(h)
     win_list_finish(&acc as *mut [3]i64 as *mut i64)
 
-pub fn rt_access(path: *const u8, mode: i32) -> i32:
+pub fn rt_access(path: *const c_char, mode: i32) -> i32:
     let _ = mode
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
@@ -1096,11 +1096,11 @@ pub fn rt_sysinfo_os() -> str:
 pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr(c"aarch64".ptr)
 
-pub fn rt_getenv(name: *const u8) -> *const u8:
+pub fn rt_getenv(name: *const c_char) -> *const c_char:
     var wname: [1024]u16 = [0; 1024]
     var wvalue: [16384]u16 = [0; 16384]
     if win_utf8_to_utf16_buf(name, &raw mut wname as *mut [1024]u16 as *mut u16, 1024) != 0:
-        return 0 as *const u8
+        return 0 as *const c_char
     let wname_ptr = &wname as *const [1024]u16 as *const u16
     var value = &raw mut wvalue as *mut [16384]u16 as *mut u16
     var value_cap: u32 = 16384
@@ -1117,13 +1117,13 @@ pub fn rt_getenv(name: *const u8) -> *const u8:
         big_bytes = n * 2
         big = rt_mmap(big_bytes)
         if big as i64 == 0:
-            return 0 as *const u8
+            return 0 as *const c_char
         value = big as *mut u16
         n = GetEnvironmentVariableW(wname_ptr, value, value_cap)
     if n == 0:
         if big as i64 != 0:
             rt_munmap(big, big_bytes)
-        return 0 as *const u8
+        return 0 as *const c_char
     // Each returned value gets its own allocation so retained `env()`/
     // `with_getenv_str` results never alias. Linux/darwin satisfy this for
     // free because libc `getenv` hands out stable per-variable `environ`
@@ -1148,7 +1148,7 @@ pub fn rt_getenv(name: *const u8) -> *const u8:
         let _ = win_utf16_to_utf8_buf(value as *const u16, buf, len + 1)
     if big as i64 != 0:
         rt_munmap(big, big_bytes)
-    buf as *const u8
+    buf as *const c_char
 
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32:
     var wname: [256]u16 = [0; 256]
@@ -1162,7 +1162,7 @@ pub fn pthread_self() -> i64:
 
 // The name comes from GetTempFileNameW, not the template, and is written back
 // as UTF-8 into a buffer assumed to hold 1024 bytes (see windows_x86_64.w).
-fn win_mkstemp(template_path: *mut u8) -> i32:
+fn win_mkstemp(template_path: *mut c_char) -> i32:
     if template_path as i64 == 0:
         return -1
     var dir: [1024]u16 = [0; 1024]
@@ -1174,25 +1174,25 @@ fn win_mkstemp(template_path: *mut u8) -> i32:
     let name_ptr = &name as *const [1024]u16 as *const u16
     if GetTempFileNameW(&dir as *const [1024]u16 as *const u16, &prefix as *const [5]u16 as *const u16, 0, &raw mut name as *mut [1024]u16 as *mut u16) == 0:
         return -1
-    if win_utf16_to_utf8_buf(name_ptr, template_path, 1024) < 0:
+    if win_utf16_to_utf8_buf(name_ptr, template_path as *mut u8, 1024) < 0:
         let _ = DeleteFileW(name_ptr)
         return -1
     win_open_w(name_ptr, 2)
 
 // `resolved_path` is assumed to hold 1024 bytes, Darwin's PATH_MAX and the
 // compiler's buffer (see windows_x86_64.w).
-fn win_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
+fn win_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
     if path as i64 == 0 or resolved_path as i64 == 0:
-        return 0 as *mut u8
+        return 0 as *mut c_char
     var wpath: [4096]u16 = [0; 4096]
     var wfull: [4096]u16 = [0; 4096]
     if win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096) != 0:
-        return 0 as *mut u8
+        return 0 as *mut c_char
     let n = GetFullPathNameW(&wpath as *const [4096]u16 as *const u16, 4096, &raw mut wfull as *mut [4096]u16 as *mut u16, 0 as *mut *mut u16)
     if n == 0 or n >= 4096:
-        return 0 as *mut u8
-    if win_utf16_to_utf8_buf(&wfull as *const [4096]u16 as *const u16, resolved_path, 1024) < 0:
-        return 0 as *mut u8
+        return 0 as *mut c_char
+    if win_utf16_to_utf8_buf(&wfull as *const [4096]u16 as *const u16, resolved_path as *mut u8, 1024) < 0:
+        return 0 as *mut c_char
     resolved_path
 
 // Buffers sized from the text: UTF-16 never takes more units than its UTF-8
@@ -1401,7 +1401,7 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     // Windows' own limit on a command line; past it the spawn fails, and
     // says why (#1916) instead of returning -1 alone.
     if cmd_rc == -1:
-        let _ = rt_write(2, c"error: a command line longer than Windows allows (32767 UTF-16 units)\n".ptr, 70)
+        let _ = rt_write(2, c"error: a command line longer than Windows allows (32767 UTF-16 units)\n".ptr as *const u8, 70)
     if cmd_rc != 0:
         with_free(cmd)
         return cmd_rc

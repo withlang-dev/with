@@ -2,39 +2,39 @@
 use std.engines.tommyds.defs
 use std.collections
 
-fn tommy_ilog2_u32(__param_value: c_uint) -> c_uint {
-    return (((((__param_value as u32).clz() as c_int) ^ (31 as c_int)) as c_uint))
+fn tommy_ilog2_u32(__param_value: u32) -> u32 {
+    return (((((__param_value as u32).clz() as i32) ^ (31 as i32)) as u32))
 
 }
 
-fn tommy_ilog2_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((((__param_value as u64).clz() as c_int) ^ (63 as c_int)) as c_uint))
+fn tommy_ilog2_u64(__param_value: u64) -> u32 {
+    return (((((__param_value as u64).clz() as i32) ^ (63 as i32)) as u32))
 
 }
 
-fn tommy_ctz_u32(__param_value: c_uint) -> c_uint {
-    return (((__param_value as u32).ctz() as c_uint))
+fn tommy_ctz_u32(__param_value: u32) -> u32 {
+    return (((__param_value as u32).ctz() as u32))
 
 }
 
-fn tommy_ctz_u64(__param_value: c_ulonglong) -> c_uint {
-    return (((__param_value as u64).ctz() as c_uint))
+fn tommy_ctz_u64(__param_value: u64) -> u32 {
+    return (((__param_value as u64).ctz() as u32))
 
 }
 
-fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
+fn tommy_roundup_pow2_u32(__param_value: u32) -> u32 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (1 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (1 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (2 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (2 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (4 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (4 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (8 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (8 as u32)) as u32))
 
-    (__local_value = (__local_value as c_uint) | (((__local_value as c_uint) >> (16 as c_uint)) as c_uint))
+    (__local_value = (__local_value as u32) | (((__local_value as u32) >> (16 as u32)) as u32))
 
     (__local_value = (__local_value +% 1))
 
@@ -42,21 +42,21 @@ fn tommy_roundup_pow2_u32(__param_value: c_uint) -> c_uint {
 
 }
 
-fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
+fn tommy_roundup_pow2_u64(__param_value: u64) -> u64 {
     var __local_value = __param_value
     (__local_value = (__local_value -% 1))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (1 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (1 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (2 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (2 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (4 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (4 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (8 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (8 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (16 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (16 as u32)) as u64))
 
-    (__local_value = (__local_value as c_ulonglong) | (((__local_value as c_ulonglong) >> (32 as c_uint)) as c_ulonglong))
+    (__local_value = (__local_value as u64) | (((__local_value as u64) >> (32 as u32)) as u64))
 
     (__local_value = (__local_value +% 1))
 
@@ -64,8 +64,8 @@ fn tommy_roundup_pow2_u64(__param_value: c_ulonglong) -> c_ulonglong {
 
 }
 
-fn tommy_haszero_u32(__param_value: c_uint) -> c_int {
-    return (if ((((((__param_value as c_uint) -% (16843009 as c_uint)) as c_uint) & ((~__param_value) as c_uint)) as c_uint) & (2155905152 as c_uint)) != 0: 1 else: 0)
+fn tommy_haszero_u32(__param_value: u32) -> i32 {
+    return (if ((((((__param_value as u32) -% (16843009 as u32)) as u32) & ((~__param_value) as u32)) as u32) & (2155905152 as u32)) != 0: 1 else: 0)
 
 }
 
@@ -200,7 +200,7 @@ pub unsafe fn tommy_list_concat(__param_first: *mut *mut tommy_node_struct, __pa
 
 }
 
-pub unsafe fn tommy_list_sort(__param_list: *mut *mut tommy_node_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_list_sort(__param_list: *mut *mut tommy_node_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
     var __local_chain: tommy_chain_struct
 
     var __local_head: *mut tommy_node_struct
@@ -221,13 +221,13 @@ pub unsafe fn tommy_list_sort(__param_list: *mut *mut tommy_node_struct, __param
 
 }
 
-pub unsafe fn tommy_list_empty(__param_list: *mut *mut tommy_node_struct) -> c_int {
+pub unsafe fn tommy_list_empty(__param_list: *mut *mut tommy_node_struct) -> i32 {
     return (if tommy_list_head(__param_list) == 0: 1 else: 0)
 
 }
 
-pub unsafe fn tommy_list_count(__param_list: *mut *mut tommy_node_struct) -> c_ulonglong {
-    var __local_count: c_ulonglong = ((0 as c_ulonglong))
+pub unsafe fn tommy_list_count(__param_list: *mut *mut tommy_node_struct) -> u64 {
+    var __local_count: u64 = ((0 as u64))
 
     var __local_i: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -270,7 +270,7 @@ pub unsafe fn tommy_list_foreach_arg(__param_list: *mut *mut tommy_node_struct, 
 
 }
 
-unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __param_first_after: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct, __param_second_tail: *mut tommy_node_struct) {
+pub unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __param_first_after: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct, __param_second_tail: *mut tommy_node_struct) {
     ((*__param_first_after).prev = __param_second_tail)
 
     ((*__param_second_head).prev = __param_first_before)
@@ -281,14 +281,14 @@ unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __par
 
 }
 
-unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct) {
+pub unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct) {
     ((*__param_second_head).prev = __param_first_tail)
 
     ((*__param_first_tail).next = __param_second_head)
 
 }
 
-unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
     var __local_first_i: *mut tommy_node_struct = (*__param_first).head
 
     var __local_second_i: *mut tommy_node_struct = (*__param_second).head
@@ -331,7 +331,7 @@ unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_seco
 
 }
 
-unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) {
+pub unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
     if ((if __param_cmp(((*(*__param_first).tail).data as *const c_void), ((*(*__param_second).head).data as *const c_void)) <= 0: 1 else: 0) != 0) {
         tommy_chain_concat((*__param_first).tail, (*__param_second).head)
 
@@ -354,20 +354,20 @@ unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, 
 
 }
 
-unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> c_int) -> Unit {
+pub unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) -> Unit {
     var __local_bit: List[tommy_chain_struct] = [tommy_chain_struct.zeroed(); 65]
 
-    var __local_counter: c_ulonglong
+    var __local_counter: u64
 
     var __local_node: *mut tommy_node_struct = (*__param_chain).head
 
     var __local_tail: *mut tommy_node_struct = (*__param_chain).tail
 
-    var __local_mask: c_ulonglong
+    var __local_mask: u64
 
-    var __local_i: c_ulonglong
+    var __local_i: u64
 
-    (__local_counter = ((0 as c_ulonglong)))
+    (__local_counter = ((0 as u64)))
 
     while (1 != 0) {
         var __local_next: *mut tommy_node_struct
@@ -382,14 +382,14 @@ unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_
 
         (__local_next = (*__local_node).next)
 
-        (__local_i = ((0 as c_ulonglong)))
+        (__local_i = ((0 as u64)))
 
         (__local_mask = __local_counter)
 
-        while ((if ((__local_mask as c_ulonglong) & (1 as c_ulonglong)) != 0: 1 else: 0) != 0) {
+        while ((if ((__local_mask as u64) & (1 as u64)) != 0: 1 else: 0) != 0) {
             tommy_chain_merge_degenerated(((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __local_last, __param_cmp)
 
-            (__local_mask = __local_mask >> (1 as c_uint))
+            (__local_mask = __local_mask >> (1 as u32))
 
             (__local_last = (((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct)))
 
@@ -409,17 +409,17 @@ unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_
 
     }
 
-    (__local_i = ((tommy_ctz_u64(__local_counter) as c_ulonglong)))
+    (__local_i = ((tommy_ctz_u64(__local_counter) as u64)))
 
-    (__local_mask = ((((__local_counter as c_ulonglong) >> (__local_i as c_uint)) as c_ulonglong)))
+    (__local_mask = ((((__local_counter as u64) >> (__local_i as u32)) as u64)))
 
     while ((if __local_mask != 1: 1 else: 0) != 0) {
-        (__local_mask = __local_mask >> (1 as c_uint))
+        (__local_mask = __local_mask >> (1 as u32))
 
-        if (((__local_mask as c_ulonglong) & (1 as c_ulonglong)) != 0) {
-            tommy_chain_merge_degenerated(((&raw const __local_bit[((__local_i as c_ulonglong) +% (1 as c_ulonglong))] as *const tommy_chain_struct) as *mut tommy_chain_struct), ((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __param_cmp)
+        if (((__local_mask as u64) & (1 as u64)) != 0) {
+            tommy_chain_merge_degenerated(((&raw const __local_bit[((__local_i as u64) +% (1 as u64))] as *const tommy_chain_struct) as *mut tommy_chain_struct), ((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __param_cmp)
         } else {
-            (__local_bit[((__local_i as c_ulonglong) +% (1 as c_ulonglong))] = __local_bit[__local_i])
+            (__local_bit[((__local_i as u64) +% (1 as u64))] = __local_bit[__local_i])
         }
 
         (__local_i = (__local_i +% 1))

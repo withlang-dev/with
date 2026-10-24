@@ -765,10 +765,10 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ ci_migrate_render_preamble_fn("fn to_lower(c: i32) -> i32", "if c >= 65 and c <= 90: c + 32 else: c", "if c >= 65 and c <= 90 { c + 32 } else { c }")
     p = p ++ ci_migrate_render_preamble_fn("fn to_upper(c: i32) -> i32", "if c >= 97 and c <= 122: c - 32 else: c", "if c >= 97 and c <= 122 { c - 32 } else { c }")
     // String functions from libc
-    p = p ++ "extern fn strlen(s: *const i8) -> u64\n"
-    p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
-    p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
-    p = p ++ "extern fn strchr(s: *const i8, c: i32) -> *mut i8\n"
+    p = p ++ "extern fn strlen(s: *const c_char) -> u64\n"
+    p = p ++ "extern fn strcmp(a: *const c_char, b: *const c_char) -> i32\n"
+    p = p ++ "extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32\n"
+    p = p ++ "extern fn strchr(s: *const c_char, c: i32) -> *mut c_char\n"
     p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
     p = p ++ "extern fn isalpha(c: i32) -> i32\n"
     p = p ++ "extern fn isdigit(c: i32) -> i32\n"
@@ -817,8 +817,12 @@ fn ci_migrate_preamble_text() -> str:
         // semantics).
         p = p ++ "extern fn abort() -> Never\n"
         p = p ++ "fn __ci_unreachable() -> Never: abort()\n"
-    // #2176: the C model's aliases (`--c-target`), the host's when none is named.
-    p = p ++ "\n" ++ ci_c_type_aliases(with_cimport_target_triple())
+    // D156: a migration is compiled against one data model, explicit in the
+    // text: the header names it and a constant carries it for the seam
+    // diagnostic (Sema names the model where a corpus width meets a host
+    // C width); no `type c_*` line (D155), every width is spelled.
+    let model = ci_model_name(with_cimport_target_triple())
+    p = p ++ "\n// data model: " ++ model ++ "\npub const C_DATA_MODEL: str = \"" ++ model ++ "\"\n"
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.

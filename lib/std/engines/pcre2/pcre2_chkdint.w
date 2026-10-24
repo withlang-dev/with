@@ -30,8 +30,8 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.libc
 
-pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __param_b: c_int) -> c_int {
-    var __local_m: c_longlong
+pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut u64, __param_a: i32, __param_b: i32) -> i32 {
+    var __local_m: i64
 
     loop {
         0
@@ -40,12 +40,12 @@ pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __par
         }
     }
 
-    (__local_m = ((((__param_a as c_longlong) * (__param_b as c_longlong)) as c_longlong)))
+    (__local_m = ((((__param_a as i64) * (__param_b as i64)) as i64)))
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
-    if ((if (sizeof[c_longlong]() as usize) > (sizeof[c_ulong]() as usize): 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __local_m > ((libc.UINTPTR_MAX as c_longlong)): 1 else: 0) != 0: 1 else: 0))
+    if ((if (sizeof[i64]() as usize) > (sizeof[u64]() as usize): 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if (if __local_m > ((libc.UINTPTR_MAX as i64)): 1 else: 0) != 0: 1 else: 0))
     }
 
     if (__ci_expr_logic_0 != 0) {
@@ -53,7 +53,7 @@ pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut c_ulong, __param_a: c_int, __par
     }
 
 
-    ((*__param_r) = ((__local_m as c_ulong)))
+    ((*__param_r) = ((__local_m as u64)))
 
     return 0
 

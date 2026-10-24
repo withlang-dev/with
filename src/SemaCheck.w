@@ -26659,8 +26659,26 @@ impl Sema:
         self.emit_error(f"builtins provides no '{member_name}': `builtins.` names the prelude's functions and the compiler's intrinsics (§18.2)", node)
         -1
 
-    // §18.1: the current module's self-name — the last segment of its
-    // `module` header, else its file's stem made an identifier.
+    // D156: the data model a migrated module was compiled against, from its
+    // `pub const C_DATA_MODEL: str = "LP64 (…)"` (the migrator's defs
+    // prelude); "" for a module that declares none. Another module's constant
+    // may have displaced this one's flat name (#1703).
+    fn current_module_data_model() -> str:
+        for di in 0..self.decl_source_paths.len():
+            if self.decl_source_paths[di] != self.current_module_path: continue
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL: continue
+            let name = self.pool_resolve(self.ast.get_data0(decl))
+            if name != "C_DATA_MODEL" and not name.starts_with("C_DATA_MODEL$in$"): continue
+            var value = self.ast.get_data1(decl)
+            if value != 0 and self.ast.kind(value) == NodeKind.NK_COMPTIME: value = self.ast.get_data0(value)
+            if value != 0 and self.ast.kind(value) == NodeKind.NK_STRING_LIT:
+                let text = self.pool_resolve(self.ast.get_data0(value))
+                // A raw literal carries the parser's marker; the text follows it.
+                return if text.starts_with("\x01raw\x01"): text.slice(5, text.len()) else: with_str_clone_ref(text)
+            return ""
+        ""
+
     mut fn module_self_name() -> str:
         if self.self_name_cache_path == self.current_module_path:
             return with_str_clone_ref(self.self_name_cache)
@@ -28196,6 +28214,19 @@ impl Sema:
             return 0
         if self.expr_is_untyped_literal_arith(self.ast.get_data1(decl)): decl else: 0
 
+    // D155: the `&name` / `&raw … name` an unannotated binding holds
+    // (`let target = &raw const value`), or 0: a demand on the pointer's
+    // pointee reaches the local behind it.
+    fn raw_ref_binding_value(node: i32) -> i32:
+        if self.ast.kind(node) != NodeKind.NK_IDENT: return 0
+        let decl = self.binding_decl_nodes.get(self.ast.get_data0(node)) ?? 0
+        if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0: return 0
+        let value = self.ast.get_data1(decl)
+        if value <= 0 or self.ast.kind(value) != NodeKind.NK_UNARY: return 0
+        let op = self.ast.get_data0(value)
+        if op != UnaryOp.UOP_REF and op != UnaryOp.UOP_RAW_REF_CONST and op != UnaryOp.UOP_RAW_REF_MUT: return 0
+        value
+
     // A range bound that is an untyped literal or comes from literal-typed
     // locals (`0..unique`, `1..n + 1`): the loop variable is then literal-typed.
     fn range_bound_is_literal(bound: i32) -> bool:
@@ -28439,13 +28470,30 @@ impl Sema:
     mut fn note_int_local_arg_demand(arg_node: i32, expected: i32, actual: i32) -> bool:
         if arg_node <= 0 or expected == 0 or actual == 0: return false
         var inner = arg_node
-        while inner > 0 and (self.ast.kind(inner) == NodeKind.NK_GROUPED or self.ast.kind(inner) == NodeKind.NK_MOVE_ARG or (self.ast.kind(inner) == NodeKind.NK_UNARY and self.ast.get_data0(inner) == UnaryOp.UOP_REF)):
-            inner = if self.ast.kind(inner) == NodeKind.NK_UNARY: self.ast.get_data1(inner) else: self.ast.get_data0(inner)
+        // D155: `&raw mut c` against `*mut i32` (`var c = 0`) is the same
+        // demand as `&c` against `&i32`; a pointer bound without an
+        // annotation (`let target = &raw const value`) carries it one hop.
+        var hops = 0
+        while inner > 0 and hops < 8:
+            let k = self.ast.kind(inner)
+            if k == NodeKind.NK_GROUPED or k == NodeKind.NK_MOVE_ARG:
+                inner = self.ast.get_data0(inner)
+            else if k == NodeKind.NK_UNARY and (self.ast.get_data0(inner) == UnaryOp.UOP_REF or self.ast.get_data0(inner) == UnaryOp.UOP_RAW_REF_CONST or self.ast.get_data0(inner) == UnaryOp.UOP_RAW_REF_MUT):
+                inner = self.ast.get_data1(inner)
+            else if k == NodeKind.NK_IDENT and self.unannotated_literal_binding(inner) == 0 and self.raw_ref_binding_value(inner) != 0:
+                inner = self.raw_ref_binding_value(inner)
+            else:
+                break
+            hops += 1
         if inner <= 0 or self.ast.kind(inner) != NodeKind.NK_IDENT: return false
         var want = self.resolve_alias(expected as TypeId)
         var have = self.resolve_alias(actual as TypeId)
-        if self.get_type_kind(want) == TypeKind.TY_REF: want = self.resolve_alias(self.get_type_d0(want) as TypeId)
-        if self.get_type_kind(have) == TypeKind.TY_REF: have = self.resolve_alias(self.get_type_d0(have) as TypeId)
+        // An `Option[*const i32]` parameter demands through its payload (D103).
+        if self.is_option_pointer_type(want) != 0 and self.get_type_kind(have) == TypeKind.TY_PTR:
+            let payload = self.option_pointer_payload_type(want)
+            if payload != 0: want = self.resolve_alias(payload as TypeId)
+        if self.get_type_kind(want) == TypeKind.TY_REF or self.get_type_kind(want) == TypeKind.TY_PTR: want = self.resolve_alias(self.get_type_d0(want) as TypeId)
+        if self.get_type_kind(have) == TypeKind.TY_REF or self.get_type_kind(have) == TypeKind.TY_PTR: have = self.resolve_alias(self.get_type_d0(have) as TypeId)
         let int_lets = self.literal_binding_lets_in(inner)
         if int_lets.len() > 0:
             // D116/D128: a sequence demand (`[]i32`, `List[i32]`) on a list
@@ -28533,7 +28581,12 @@ impl Sema:
             self.emit_error(f"a float where an integer is demanded needs an explicit conversion: `x as {want}` truncates, `x.round() as {want}` rounds (§4.2.6)", node)
             return true
         if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId) != 0:
-            let msg = f"implicit integer narrowing or sign change from `{got}` to `{want}`{self.narrowing_target_note}; use an explicit `as` cast (§4.2.6)"
+            // D156: a migrated module carries its data model in C_DATA_MODEL;
+            // a narrowing in it is a seam where the model's width meets the
+            // host's, and the message says which is which.
+            let model = self.current_module_data_model()
+            let seam_note = if model.len() > 0: "; this module was migrated against " ++ model ++ ": the value is the model's width, the destination the host's" else: ""
+            let msg = f"implicit integer narrowing or sign change from `{got}` to `{want}`{self.narrowing_target_note}{seam_note}; use an explicit `as` cast (§4.2.6)"
             // D114: a name whose type its literal chose (`var i = 0` is
             // `isize`) is pointed at, since the use alone does not say why.
             let literal_let = self.unannotated_literal_binding(node)

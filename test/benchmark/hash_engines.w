@@ -21,7 +21,7 @@ use std.engines.c_algorithms.hash_int
 use std.engines.c_algorithms.compare_int
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 /// An intrusive TommyDS item: the node first, then the key.
 type Item { node: tommy_node_struct, key: i32 }

@@ -29,51 +29,51 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
-pub unsafe fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) -> c_int {
+pub unsafe fn pcre2_config_8(__param_what: u32, __param_where_: *mut c_void) -> i32 {
     if ((if __param_where_ == null: 1 else: 0) != 0) {
         while true {
             match __param_what {
                 0 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 14 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 7 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 16 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 12 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 1 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 3 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 4 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 13 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 5 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 6 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 8 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 15 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 9 => {
-                    return 4
+                    return ((4 as i32))
                 },
                 2 => {
                     0
@@ -98,60 +98,60 @@ pub unsafe fn pcre2_config_8(__param_what: c_uint, __param_where_: *mut c_void) 
     while true {
         match __param_what {
             0 => {
-                ((*(__param_where_ as *mut c_uint)) = ((1 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((1 as u32)))
             },
             14 => {
-                ((*(__param_where_ as *mut c_uint)) = ((1 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((1 as u32)))
             },
             7 => {
-                ((*(__param_where_ as *mut c_uint)) = ((10000000 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((10000000 as u32)))
             },
             16 => {
-                ((*(__param_where_ as *mut c_uint)) = ((2 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((2 as u32)))
             },
             12 => {
-                ((*(__param_where_ as *mut c_uint)) = ((20000000 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((20000000 as u32)))
             },
             1 => {
-                ((*(__param_where_ as *mut c_uint)) = ((0 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((0 as u32)))
             },
             2 => {
                 return -34
             },
             3 => {
-                ((*(__param_where_ as *mut c_uint)) = ((2 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((2 as u32)))
             },
             4 => {
-                ((*(__param_where_ as *mut c_uint)) = ((10000000 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((10000000 as u32)))
             },
             5 => {
-                ((*(__param_where_ as *mut c_uint)) = ((2 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((2 as u32)))
             },
             13 => {
-                ((*(__param_where_ as *mut c_uint)) = ((0 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((0 as u32)))
             },
             6 => {
-                ((*(__param_where_ as *mut c_uint)) = ((250 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((250 as u32)))
             },
             8 => {
-                ((*(__param_where_ as *mut c_uint)) = ((0 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((0 as u32)))
             },
             15 => {
-                ((*(__param_where_ as *mut c_uint)) = ((1088 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((1088 as u32)))
             },
             10 => {
-                var __local_v: *const c_char = ((_pcre2_unicode_version_8 as *const c_char))
+                var __local_v: *const c_char = _pcre2_unicode_version_8
 
-                return ((((1 as c_ulong) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v) as c_ulong) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as c_ulong)) as c_ulong)) as c_int))
+                return ((((1 as u64) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as u64)) as u64)) as i32))
 
             },
             9 => {
-                ((*(__param_where_ as *mut c_uint)) = ((1 as c_uint)))
+                ((*(__param_where_ as *mut u32)) = ((1 as u32)))
             },
             11 => {
                 var __local_v_1: *const c_char = (((if (if 0 == 0: 1 else: 0) != 0: ("10.47 2025-10-21" as *mut c_char) else: ("10.47PCRE2_PRERELEASE 2025-10-21" as *mut c_char)) as *const c_char))
 
-                return ((((1 as c_ulong) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v_1) as c_ulong) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as c_ulong)) as c_ulong)) as c_int))
+                return ((((1 as u64) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v_1) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as u64)) as u64)) as i32))
 
             },
             _ => {

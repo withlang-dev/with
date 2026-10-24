@@ -28,7 +28,7 @@ pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mu
 
     }
 
-    (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as c_ulong) as i64)) as *mut c_void) as *mut _ListEntry)))
+    (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as u64) as i64)) as *mut c_void) as *mut _ListEntry)))
 
     if ((if __local_newentry == null: 1 else: 0) != 0) {
         return ((null as *mut _ListEntry))
@@ -62,7 +62,7 @@ pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut
 
     }
 
-    (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as c_ulong) as i64)) as *mut c_void) as *mut _ListEntry)))
+    (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as u64) as i64)) as *mut c_void) as *mut _ListEntry)))
 
     if ((if __local_newentry == null: 1 else: 0) != 0) {
         return ((null as *mut _ListEntry))
@@ -136,14 +136,14 @@ pub unsafe fn list_set_data(__param_listentry: *mut _ListEntry, __param_value: *
 
 }
 
-pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: c_uint) -> *mut _ListEntry {
+pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: u32) -> *mut _ListEntry {
     var __local_entry: *mut _ListEntry
 
-    var __local_i: c_uint
+    var __local_i: u32
 
     (__local_entry = __param_list)
 
-    (__local_i = ((0 as c_uint)))
+    (__local_i = ((0 as u32)))
 
     while ((if __local_i < __param_n: 1 else: 0) != 0) {
         if ((if __local_entry == null: 1 else: 0) != 0) {
@@ -163,7 +163,7 @@ pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: c_uint) -
 
 }
 
-pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: c_uint) -> *mut c_void {
+pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: u32) -> *mut c_void {
     var __local_entry: *mut _ListEntry
 
     (__local_entry = list_nth_entry(__param_list, __param_n))
@@ -177,12 +177,12 @@ pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: c_uint) ->
 
 }
 
-pub unsafe fn list_length(__param_list: *mut _ListEntry) -> c_uint {
+pub unsafe fn list_length(__param_list: *mut _ListEntry) -> u32 {
     var __local_entry: *mut _ListEntry
 
-    var __local_length: c_uint
+    var __local_length: u32
 
-    (__local_length = ((0 as c_uint)))
+    (__local_length = ((0 as u32)))
 
     (__local_entry = __param_list)
 
@@ -202,13 +202,13 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
     var __local_array: *mut *mut c_void
 
-    var __local_length: c_uint
+    var __local_length: u32
 
-    var __local_i: c_uint
+    var __local_i: u32
 
-    (__local_length = ((list_length(__param_list) as c_uint)))
+    (__local_length = ((list_length(__param_list) as u32)))
 
-    (__local_array = (((with_alloc(((((sizeof[usize]() as c_ulong) *% (__local_length as c_ulong)) as c_ulong) as i64)) as *mut c_void) as *mut *mut c_void)))
+    (__local_array = (((with_alloc(((((sizeof[usize]() as u64) *% (__local_length as u64)) as u64) as i64)) as *mut c_void) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut *mut c_void))
@@ -217,7 +217,7 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
     (__local_rover = __param_list)
 
-    (__local_i = ((0 as c_uint)))
+    (__local_i = ((0 as u32)))
 
     while ((if __local_i < __local_length: 1 else: 0) != 0) {
         ((__local_array[__local_i]) = (*__local_rover).data)
@@ -234,10 +234,10 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
 }
 
-pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entry: *mut _ListEntry) -> c_int {
-    var __ci_expr_logic_1: c_int
+pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entry: *mut _ListEntry) -> i32 {
+    var __ci_expr_logic_1: i32
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_list == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -281,14 +281,14 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
 
 }
 
-pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callback: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int], __param_data: *mut c_void) -> c_uint {
-    var __local_entries_removed: c_uint
+pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callback: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32], __param_data: *mut c_void) -> u32 {
+    var __local_entries_removed: u32
 
     var __local_rover: *mut _ListEntry
 
     var __local_next: *mut _ListEntry
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_list == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -297,12 +297,12 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
     }
 
     if (__ci_expr_logic_0 != 0) {
-        return 0
+        return ((0 as u32))
 
     }
 
 
-    (__local_entries_removed = ((0 as c_uint)))
+    (__local_entries_removed = ((0 as u32)))
 
     (__local_rover = (*__param_list))
 
@@ -337,12 +337,12 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
 }
 
-pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> Unit {
+pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> Unit {
     list_sort_internal(__param_list, __param_compare_func)
 
 }
 
-pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int, __param_data: *mut c_void) -> *mut _ListEntry {
+pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32, __param_data: *mut c_void) -> *mut _ListEntry {
     var __local_rover: *mut _ListEntry
 
     (__local_rover = __param_list)
@@ -370,8 +370,8 @@ pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mu
 
 }
 
-pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> c_int {
-    var __ci_expr_logic_0: c_int
+pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> i32 {
+    var __ci_expr_logic_0: i32
 
     if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -390,7 +390,7 @@ pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> c_int {
 }
 
 pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -419,7 +419,7 @@ pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
 }
 
 pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -444,7 +444,7 @@ pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
 
 }
 
-unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _ListEntry {
+unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _ListEntry {
     var __local_pivot: *mut _ListEntry
 
     var __local_rover: *mut _ListEntry
@@ -459,7 +459,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
     var __local_more_list_end: *mut _ListEntry
 
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_list == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -473,7 +473,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
     }
 
 
-    var __ci_expr_logic_1: c_int
+    var __ci_expr_logic_1: i32
 
     if ((if (*__param_list) == null: 1 else: 0) != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))

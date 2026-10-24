@@ -5,7 +5,8 @@
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8)
+use std.builtins.c_void
+extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 extern fn with_ewrite(s: &str)

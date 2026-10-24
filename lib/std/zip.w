@@ -49,8 +49,8 @@ pub fn ZipArchive.open(path: &str) -> Result[ZipArchive, ZipError]:
 // The entry the archive's cursor is on; handle is a live minizip archive.
 unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
     var info = unz_file_info64_s { tmu_date: tm_unz_s {} }
-    let name_buf = with_alloc(ZIP_NAME_MAX as i64 + 1) as *mut i8
-    let rc = unsafe { unzGetCurrentFileInfo64(handle, &raw mut info, name_buf, ZIP_NAME_MAX as c_ulong, null, 0, null, 0) }
+    let name_buf = with_alloc(ZIP_NAME_MAX as i64 + 1) as *mut c_char
+    let rc = unsafe { unzGetCurrentFileInfo64(handle, &raw mut info, name_buf, ZIP_NAME_MAX as u64, null, 0, null, 0) }
     if rc != UNZ_OK:
         with_free(name_buf as *mut u8)
         return Err(zip_error(rc, "cannot read an entry header"))
@@ -79,7 +79,7 @@ impl ZipArchive:
         let cname = match name.to_cstring():
             Ok(c) => c
             Err(_) => return Err(zip_error(UNZ_PARAMERROR, "an entry name cannot hold a NUL byte"))
-        let rc = unsafe { unzLocateFile(self.handle, cname.ptr as *const i8, 1) }
+        let rc = unsafe { unzLocateFile(self.handle, cname.ptr as *const c_char, 1) }
         if rc != UNZ_OK: return Err(zip_error(rc, "no entry named " ++ name))
         unsafe { zip_drain_current(self.handle, null) }
 
@@ -129,7 +129,7 @@ unsafe fn zip_write_current(handle: *mut c_void, target: &str) -> Result[Unit, Z
     let ctarget = match target.to_cstring():
         Ok(c) => c
         Err(_) => return Err(zip_error(UNZ_PARAMERROR, "an entry name cannot hold a NUL byte"))
-    let stream = fopen(ctarget.ptr as *const i8, c"wb".ptr)
+    let stream = fopen(ctarget.ptr as *const c_char, c"wb".ptr)
     if stream == null: return Err(zip_error(UNZ_ERRNO, "cannot create " ++ target))
     let drained = zip_drain_current(handle, stream)
     if fclose(stream) != 0: return Err(zip_error(UNZ_ERRNO, "cannot finish writing " ++ target))

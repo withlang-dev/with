@@ -4,7 +4,7 @@
 // the List. Materializing an owned copy here would free the element's storage
 // once at the accessor caller's scope exit and again with the List.
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 type W { ptr: *mut u8, drops: *mut i32 }
 

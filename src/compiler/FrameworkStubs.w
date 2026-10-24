@@ -21,7 +21,6 @@ use compiler.Runtime
 use std.string.StringBuilder
 use rt.rt_core
 
-extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32
@@ -73,7 +72,7 @@ unsafe fn fs_c_path(s: &str) -> *mut u8:
 fn fs_open(path: &str) -> i32:
     unsafe:
         let c = fs_c_path(path)
-        let fd = rt_open(c as *const u8, 0, 0)
+        let fd = rt_open(c as *const i8, 0, 0)
         with_free(c)
         fd
 

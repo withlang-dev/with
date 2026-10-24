@@ -628,7 +628,7 @@ fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
             LLVMDisposeMessage(default_triple)
             return 0
         let tm = LLVMCreateTargetMachine(target, triple,
-            c"generic".ptr, empty_cstr(),
+            c"generic".ptr as *const u8, empty_cstr(),
             codegen_level(level), LLVM_RelocDefault, LLVM_CodeModelDefault)
         if tm as i64 == 0:
             let msg = "LLVM target machine creation failed\n"
@@ -885,7 +885,7 @@ fn wl_add_call_param_byval_attr(ctx: i64, call_val: i64, param_idx: i32, ty: i64
 
 fn wl_get_byval_type(value: i64, param_idx: i32, call_site: bool) -> i64:
     unsafe:
-        let kind = LLVMGetEnumAttributeKindForName(c"byval".ptr, 5)
+        let kind = LLVMGetEnumAttributeKindForName(c"byval".ptr as *const u8, 5)
         if kind == 0: return 0
         let index = (param_idx + 1) as u32
         let attribute = if call_site:
@@ -1835,7 +1835,7 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         LLVMDisposeMessage(default_triple)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
@@ -1891,7 +1891,7 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         // -O1 codegen level, matching the direct source->object path
         // (wl_init_target_machine -> codegen_level(1)); the IR->object route
         // is not a licence to ship unoptimized objects.
-        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, empty_cstr(), codegen_level(1), LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr as *const u8, empty_cstr(), codegen_level(1), LLVM_RelocDefault, LLVM_CodeModelDefault)
         let layout = LLVMCreateTargetDataLayout(tm)
         LLVMSetModuleDataLayout(m, layout)
         LLVMDisposeTargetData(layout)

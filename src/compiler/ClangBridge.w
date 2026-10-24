@@ -1044,21 +1044,26 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
 
     if kind == CXType_Void: return session_strdup(s, "Unit\0" as *const u8)
     if kind == CXType_Bool: return session_strdup(s, "bool\0" as *const u8)
-    // Plain `char` is CXType_Char_S where char is signed (x86_64, Apple) and
-    // CXType_Char_U where it is unsigned (AArch64/ARM Linux). Both spell C's
-    // `char`, so both map to `c_char` — With's `c_char` is a fixed `i8` alias,
-    // and the char-pointer rule below already treats Char_U as a char. Only
-    // an explicit `unsigned char` (CXType_UChar) is `u8`.
-    if kind == CXType_Char_S or kind == CXType_Char_U or kind == CXType_SChar: return session_strdup(s, "c_char\0" as *const u8)
+    // D156: a migration is compiled against one data model, explicit in the
+    // text: every C integer type is spelled at the width the parsed model
+    // gives it (clang's own size), so a preprocessor choice the model made
+    // is never laundered behind a portable-looking alias. Only `char` stays
+    // symbolic: plain `char` (CXType_Char_S where signed, CXType_Char_U
+    // where unsigned) is `c_char`, the target's, because its sign is a
+    // representation portable C tolerates rather than a branch the
+    // preprocessor took. An explicit `signed char` is `i8`, `unsigned char`
+    // `u8`.
+    if kind == CXType_Char_S or kind == CXType_Char_U: return session_strdup(s, "c_char\0" as *const u8)
+    if kind == CXType_SChar: return session_strdup(s, "i8\0" as *const u8)
     if kind == CXType_UChar: return session_strdup(s, "u8\0" as *const u8)
-    if kind == CXType_Short: return session_strdup(s, "c_short\0" as *const u8)
-    if kind == CXType_UShort: return session_strdup(s, "c_ushort\0" as *const u8)
-    if kind == CXType_Int: return session_strdup(s, "c_int\0" as *const u8)
-    if kind == CXType_UInt: return session_strdup(s, "c_uint\0" as *const u8)
-    if kind == CXType_Long: return session_strdup(s, "c_long\0" as *const u8)
-    if kind == CXType_LongLong: return session_strdup(s, "c_longlong\0" as *const u8)
-    if kind == CXType_ULong: return session_strdup(s, "c_ulong\0" as *const u8)
-    if kind == CXType_ULongLong: return session_strdup(s, "c_ulonglong\0" as *const u8)
+    if kind == CXType_Short: return session_strdup(s, "i16\0" as *const u8)
+    if kind == CXType_UShort: return session_strdup(s, "u16\0" as *const u8)
+    if kind == CXType_Int: return session_strdup(s, "i32\0" as *const u8)
+    if kind == CXType_UInt: return session_strdup(s, "u32\0" as *const u8)
+    if kind == CXType_Long: return session_strdup(s, (if clang_Type_getSizeOf(shape) == 8: "i64\0" else: "i32\0") as *const u8)
+    if kind == CXType_ULong: return session_strdup(s, (if clang_Type_getSizeOf(shape) == 8: "u64\0" else: "u32\0") as *const u8)
+    if kind == CXType_LongLong: return session_strdup(s, "i64\0" as *const u8)
+    if kind == CXType_ULongLong: return session_strdup(s, "u64\0" as *const u8)
     if kind == CXType_Int128: return session_strdup(s, "i128\0" as *const u8)
     if kind == CXType_UInt128: return session_strdup(s, "u128\0" as *const u8)
     if kind == CXType_Half or kind == CXType_Float16: return session_strdup(s, "f16\0" as *const u8)
@@ -1069,7 +1074,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     // extended or binary128, which With has no float for, so whatever needs
     // it is omitted with this reason (wcstold, strtold reached from glibc).
     if kind == CXType_LongDouble:
-        if clang_Type_getSizeOf(shape) == 8: return session_strdup(s, "c_longdouble\0" as *const u8)
+        if clang_Type_getSizeOf(shape) == 8: return session_strdup(s, "f64\0" as *const u8)
         return session_strdup(s, "__UNSUPPORTED:long double is wider than a double on this target, and With has no float for it (§16.1)\0" as *const u8)
     if kind == CXType_Float128: return session_strdup(s, "f128\0" as *const u8)
 
@@ -1104,7 +1109,9 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         // with the scalar's `c_char` on an unsigned-char target: a migrated
         // `*p = *q` narrowed u8 to i8 and `it.ref = null as *const c_char`
         // refused to assign a `*const i8` field (#2582).
-        if can_pointee.kind == CXType_Char_S or can_pointee.kind == CXType_SChar or can_pointee.kind == CXType_Char_U:
+        // (D156: an explicit `signed char *` is `*i8`, as its scalar is;
+        // it takes the general pointer path below.)
+        if can_pointee.kind == CXType_Char_S or can_pointee.kind == CXType_Char_U:
             var buf: [64]u8 = [0 as u8; 64]
             var pos: i64 = 0
             buf_append_str(&raw mut buf as *mut [64]u8 as *mut u8, &raw mut pos, 64, "*\0" as *const u8)
@@ -1272,7 +1279,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         let inner2 = clang_Type_getValueType(canonical)
         if inner2.kind != CXType_Invalid:
             return translate_type_recursive_mode(s, inner2, depth + 1, is_last_struct_field, preserve_incomplete_arrays)
-        return session_strdup(s, "c_int\0" as *const u8)
+        return session_strdup(s, "i32\0" as *const u8)
 
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)

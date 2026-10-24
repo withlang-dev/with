@@ -2401,6 +2401,7 @@ type Sema {
     ty_isize: TypeId,
     ty_c_va_list: TypeId,
     ty_const_i8_ptr: TypeId,
+    ty_c_char: TypeId,
     ty_field_info: TypeId,
     ty_variant_info: TypeId,
 
@@ -4036,7 +4037,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ty_f32: 0, ty_f64: 0, ty_bool: 0, ty_void: 0,
         ty_never: 0, ty_str: 0, ty_str_view: 0,
         ty_cstr: 0, ty_cstr_view: 0,
-        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0,
+        ty_usize: 0, ty_isize: 0, ty_c_va_list: 0, ty_const_i8_ptr: 0, ty_c_char: 0,
         ty_field_info: 0, ty_variant_info: 0,
         decl_source_paths: sema_new_list_str(),
         package_keys: HashMap[str, str].new(),
@@ -4228,7 +4229,33 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     s.ty_usize = s.add_type(TypeKind.TY_INT, size_bits, 0, 1)
     s.ty_isize = s.add_type(TypeKind.TY_INT, size_bits, 1, 1)
     s.ty_c_va_list = s.add_type(TypeKind.TY_VA_LIST, 0, 0, 0)
-    s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_i8, 0, 0)
+    // §16.1 / D155: the C aliases are the target's, owned here from the
+    // target spec and ambient like `c_void` and `c_va_list`: `char` is
+    // unsigned on AArch64 Linux and on wasm, `long` is 32 bits on Windows
+    // (LLP64) and wasm32, and `c_longdouble` is f64. No migration or import
+    // emits a concrete value for one.
+    // The table is TargetSpec's c_alias_fixed_spelling (one owner, D65; the
+    // facade renderer reads it too). `c_longdouble` is f64 on every target:
+    // a corpus never passes one to C, and c_import omits a declaration that
+    // would where C's long double is wider than a double (x86_64 Linux,
+    // AArch64 Linux, wasm).
+    for alias in ["c_char", "c_schar", "c_uchar", "c_short", "c_ushort", "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong", "c_longdouble"]:
+        let fixed = c_alias_fixed_spelling(alias)
+        let tid: i32 = match fixed:
+            "i8" => s.ty_i8
+            "u8" => s.ty_u8
+            "i16" => s.ty_i16
+            "u16" => s.ty_u16
+            "i32" => s.ty_i32
+            "u32" => s.ty_u32
+            "i64" => s.ty_i64
+            "u64" => s.ty_u64
+            _ => s.ty_f64
+        if alias == "c_char": s.ty_c_char = tid
+        s.register_prim(alias, tid)
+    // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
+    // `*const c_char` on every target.
+    s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_c_char, 0, 0)
     let cstr_field_names: List[str] = List.new()
     cstr_field_names.push("ptr")
     cstr_field_names.push("len")
@@ -5184,14 +5211,26 @@ impl Sema:
             return ""
         if modules.len() == 1:
             return "; add: use " ++ modules[0] ++ "." ++ name
+        // Listed in name order: the message does not depend on the order
+        // the modules were loaded in.
         var listed = ""
-        for mi in 0..modules.len():
-            if mi > 0:
+        var taken: List[bool] = List.new()
+        for _ in 0..modules.len(): taken.push(false)
+        for _ in 0..modules.len():
+            var best = -1
+            for mi in 0..modules.len():
+                if taken[mi]: continue
+                if best < 0 or modules[mi] < modules[best]: best = mi
+            taken[best] = true
+            if listed.len() > 0:
                 listed = listed ++ " | "
-            listed = listed ++ "use " ++ modules[mi] ++ "." ++ name
+            listed = listed ++ "use " ++ modules[best] ++ "." ++ name
         "; candidates: " ++ listed
 
     mut fn emit_private_symbol_error(sym: i32, node: i32) -> Unit:
+        // A symbol this unit's own c_import omitted names the import gap,
+        // whatever a std module of the same name would need.
+        if self.emit_ci_omitted_symbol_error(sym, node): return
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         // #1744: a name its module's named imports do not select.
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
@@ -7196,6 +7235,11 @@ impl Sema:
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee) != 0:
             return 1
+        // D155 (§16.1): a pointer to one integer type is not a pointer to
+        // another; equal width with the other signedness is a different
+        // meaning, spelled `p as *const c_char`.
+        if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
+            return 0
         self.types_compatible(exp_pointee, self.get_type_d0(act_r))
 
     // ── Scope management ─────────────────────────────────────────────
@@ -10554,6 +10598,8 @@ impl Sema:
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee) != 0:
             return 1
+        if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
+            return 0
         self.types_compatible_frozen(exp_pointee, self.get_type_d0(act_r))
 
     fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:

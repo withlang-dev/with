@@ -86,6 +86,7 @@ use Ast
 use InternPool
 use render
 use CImport
+use TargetSpec
 use Token
 use std.collections.HashMap
 
@@ -314,7 +315,7 @@ fn facade_render_public(text: &str) -> str:
 // resource whose representation is a C string — `*mut c_char`, `*const
 // c_char`, strdup's `*mut i8` — carries
 //
-//     fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const i8) }
+//     fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const c_char) }
 //
 // a view of the bytes the resource owns, ephemeral like every `CStr`, and
 // kept inside the resource's life by the declared summary Sema puts on it
@@ -324,7 +325,7 @@ fn facade_render_text_view(pool: &AstPool, intern: &InternPool, resource: i32) -
     let repr = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(resource as NodeId)) as NodeId))
     if not facade_render_is_c_string_ptr(repr):
         return ""
-    "    fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const i8) }\n"
+    "    fn as_cstr() -> CStr: unsafe { CStr.from_ptr(self.repr as *const c_char) }\n"
 
 // A callback-scope handle (§16.2b.9, ruling Amendment 1, #1611): "A foreign
 // representation that exists only for a callback's invocation … Nothing
@@ -492,7 +493,7 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
             // declared summary Sema puts on this method
             // (SemaFacade.w verify_facade_borrowed_returns).
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const c_char) })\n"
             continue
         if li.variadic != 0:
             // A variadic contract (D66, §16.2b.5): one method per case,
@@ -2097,7 +2098,12 @@ fn facade_render_unalias(pool: &AstPool, intern: &InternPool, text: &str) -> str
         // chased through, as Sema's resolve_alias chases it: `*mut CURL` is
         // the `*mut c_void` the translated declarations spell (D66).
         if target.len() == 0 or target == "opaque":
-            return t
+            // D155/D156: a C integer alias is a builtin, not a declared
+            // alias; `wraps c_int` meets c_import's `i32` at the fixed
+            // spelling. `c_char` alone stays symbolic: it is the spelling
+            // both sides use, and the one a help prints.
+            let fixed = if t == "c_char": "" else: c_alias_fixed_spelling(t)
+            return if fixed.len() > 0: fixed else: t
         if target.starts_with("*"):
             return facade_render_unalias(pool, intern, target)
         t = target
@@ -3564,7 +3570,7 @@ fn facade_render_record_view_methods(pool: &AstPool, intern: &InternPool, ci: &L
         let head = "    fn "
         if li.text_view:
             let handle = facade_render_fresh("repr", facade_render_param_names(pool, intern, decl))
-            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const i8) })\n"
+            out = out ++ head ++ mname ++ "(" ++ params ++ ") -> Option[CStr]:\n" ++ pro ++ "        let " ++ handle ++ " = " ++ facade_render_call(pool, intern, decl, call_args) ++ "\n        if " ++ handle ++ " == null: None else: Some(unsafe { CStr.from_ptr(" ++ handle ++ " as *const c_char) })\n"
             continue
         if li.record_view:
             let view = facade_render_record_view_type(pool, intern, decl)
@@ -3671,7 +3677,7 @@ fn facade_render_text_return(pool: &AstPool, intern: &InternPool, ci: &List[i32]
         var out = " -> Option[str]:\n" ++ prologue
         out = out ++ indent ++ "let " ++ repr ++ " = " ++ call ++ "\n"
         out = out ++ indent ++ "if " ++ repr ++ " == null: return None\n"
-        out = out ++ indent ++ "let " ++ view ++ " = unsafe { CStr.from_ptr(" ++ repr ++ " as *const i8) }\n"
+        out = out ++ indent ++ "let " ++ view ++ " = unsafe { CStr.from_ptr(" ++ repr ++ " as *const c_char) }\n"
         out = out ++ indent ++ "let " ++ text ++ " = match " ++ view ++ ".to_str():\n"
         out = out ++ indent ++ "    Ok(ok) => ok.to_owned()\n"
         out = out ++ indent ++ "    Err(.InvalidAt(" ++ at ++ ")) => panic(f\"" ++ fname ++ ": the facade declares its text UTF-8, but the text returned is not UTF-8 at byte {" ++ at ++ "} (§16.2b.8)\")\n"

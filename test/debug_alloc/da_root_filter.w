@@ -7,4 +7,4 @@ extern fn with_debug_alloc_mark_root(ptr: *mut u8, reason: *const u8, reason_len
 fn main:
     unsafe:
         let p = with_alloc(32)
-        with_debug_alloc_mark_root(p, c"fixture-root".ptr, 12)
+        with_debug_alloc_mark_root(p, c"fixture-root".ptr as *const u8, 12)

@@ -13,18 +13,18 @@ use std.engines.zlib.adler32
 use std.engines.zlib.crc32
 use std.engines.zlib.inftrees
 
-pub fn zlibVersion() -> *const i8 {
+pub fn zlibVersion() -> *const c_char {
     return (&"1.3.2"[0] as *mut c_char)
 
 }
 
-pub fn zlibCompileFlags() -> c_ulong {
-    var __local_flags: c_ulong
+pub fn zlibCompileFlags() -> u64 {
+    var __local_flags: u64
 
-    (__local_flags = ((0 as c_ulong)))
+    (__local_flags = ((0 as u64)))
 
     while true {
-        match (sizeof[c_uint]() as c_int) {
+        match (sizeof[u32]() as i32) {
             2 => {
                 0
             },
@@ -44,7 +44,7 @@ pub fn zlibCompileFlags() -> c_ulong {
     }
 
     while true {
-        match (sizeof[c_ulong]() as c_int) {
+        match (sizeof[u64]() as i32) {
             2 => {
                 0
             },
@@ -64,7 +64,7 @@ pub fn zlibCompileFlags() -> c_ulong {
     }
 
     while true {
-        match (sizeof[usize]() as c_int) {
+        match (sizeof[usize]() as i32) {
             2 => {
                 0
             },
@@ -84,7 +84,7 @@ pub fn zlibCompileFlags() -> c_ulong {
     }
 
     while true {
-        match (sizeof[i64]() as c_int) {
+        match (sizeof[i64]() as i32) {
             2 => {
                 0
             },
@@ -107,10 +107,10 @@ pub fn zlibCompileFlags() -> c_ulong {
 
 }
 
-pub fn zError(__param_err: c_int) -> *const i8 {
-    var __ci_expr_ternary_1: c_int = 0
+pub fn zError(__param_err: i32) -> *const c_char {
+    var __ci_expr_ternary_1: i32 = 0
 
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_err < -6: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -119,19 +119,19 @@ pub fn zError(__param_err: c_int) -> *const i8 {
     }
 
     if (__ci_expr_logic_0 != 0) {
-        (__ci_expr_ternary_1 = ((9 as c_int)))
+        (__ci_expr_ternary_1 = ((9 as i32)))
     } else {
-        (__ci_expr_ternary_1 = (((2 - __param_err) as c_int)))
+        (__ci_expr_ternary_1 = (((2 - __param_err) as i32)))
     }
 
-    return ((z_errmsg[__ci_expr_ternary_1] as *const i8))
+    return ((z_errmsg[__ci_expr_ternary_1] as *const c_char))
 
 
 }
 
-pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: c_uint, __param_size: c_uint) -> *mut c_void {
+pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: u32, __param_size: u32) -> *mut c_void {
 
-    return (((if (if (sizeof[c_uint]() as usize) > 2: 1 else: 0) != 0: (with_alloc(((((__param_items as c_uint) *% (__param_size as c_uint)) as c_ulong) as i64)) as *mut c_void) else: (with_alloc_zeroed(((__param_items as c_ulong) as i64), ((__param_size as c_ulong) as i64)) as *mut c_void)) as *mut c_void))
+    return (((if (if (sizeof[u32]() as usize) > 2: 1 else: 0) != 0: (with_alloc(((((__param_items as u32) *% (__param_size as u32)) as u64) as i64)) as *mut c_void) else: (with_alloc_zeroed(((__param_items as u64) as i64), ((__param_size as u64) as i64)) as *mut c_void)) as *mut c_void))
 
 }
 

@@ -4252,7 +4252,7 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     // A static definition's own body is evidence for its parameters too.
     rc = bs_assert_contains(ctx, result.stderr, "hidden param 0: Option: body tests it for NULL and continues", "evidence reason: static callee test")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "fn hidden(__param_cb: Option[extern \"C\" fn(c_int) -> c_int]", "evidence: static hidden is Option")
+    rc = bs_file_contains(ctx, out_w, "fn hidden(__param_cb: Option[extern \"C\" fn(i32) -> i32]", "evidence: static hidden is Option")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "contract param 0: non-null: the NULL branch aborts (a contract), no NULL callers", "evidence reason: assert")
     if rc != 0: return rc
@@ -4266,9 +4266,9 @@ fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, result.stderr, "forwarded param 0: Option: passed to direct param 0, which is Option", "evidence reason: forwarded")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "pub fn handled(__param_cb: Option[extern \"C\" fn(c_int) -> c_int]", "evidence: handled is Option")
+    rc = bs_file_contains(ctx, out_w, "pub fn handled(__param_cb: Option[extern \"C\" fn(i32) -> i32]", "evidence: handled is Option")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "pub fn contract(__param_cb: extern \"C\" fn(c_int) -> c_int", "evidence: contract is non-null")
+    rc = bs_file_contains(ctx, out_w, "pub fn contract(__param_cb: extern \"C\" fn(i32) -> i32", "evidence: contract is non-null")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "direct(null, __param_x)", "evidence: NULL caller passes null")
     if rc != 0: return rc
@@ -4545,7 +4545,7 @@ fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_di
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "with_memset(((&__local_bits[0] as *mut u8)", "zeroed_records byte array keeps memset")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "(255 as c_int)", "zeroed_records non-zero fill keeps memset")
+    rc = bs_file_contains(ctx, out_w, "(255 as i32)", "zeroed_records non-zero fill keeps memset")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -4678,7 +4678,7 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, anon_w, "2.2204460492503131e-16", "hexadecimal float in decimal")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = c_long", "builtin-named typedef renamed")
+    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = i64", "builtin-named typedef renamed")
     if rc != 0: return rc
     // `[index] = value` designators in an array initializer, through a macro
     // (STC's Unicode group table), the unreached elements zero.
@@ -4711,9 +4711,9 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "pub type meta { pub __bits_0: u32 = 0 }", "a bitfield record's storage unit")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, bits_w, "pub mut fn set_dist(v: c_uint): self.__bits_0 = (self.__bits_0 & ~((1023 as u32) << 8)) | (((v as u32) & 1023) << 8)", "a setter masks to the width")
+    rc = bs_file_contains(ctx, bits_w, "pub mut fn set_dist(v: u32): self.__bits_0 = (self.__bits_0 & ~((1023 as u32) << 8)) | (((v as u32) & 1023) << 8)", "a setter masks to the width")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, bits_w, "pub fn count() -> c_int: (((self.__bits_0 << 8) as i32) >> 8) as c_int", "a signed member sign-extends")
+    rc = bs_file_contains(ctx, bits_w, "pub fn count() -> i32: (((self.__bits_0 << 8) as i32) >> 8) as i32", "a signed member sign-extends")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, bits_w, "pub fn c() -> i32:", "an enum member's getter returns the integer (an enum is one type everywhere)")
     if rc != 0: return rc
@@ -4747,7 +4747,7 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "recvoid", &rec_src, &rec_w)
     if rc != 0: return rc
-    bs_file_contains(ctx, rec_w, "fn countdown(__param_out: *mut c_int, __param_n: c_int) -> Unit", "a recursive void function declares Unit")
+    bs_file_contains(ctx, rec_w, "fn countdown(__param_out: *mut i32, __param_n: i32) -> Unit", "a recursive void function declares Unit")
 
 // Migrate `src` expecting the migrator to refuse it with `needle` on stderr.
 fn bs_migrate_expect_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, src: &str, needle: &str) -> i32:
@@ -4807,9 +4807,9 @@ fn bs_check_migrate_global_init_list(ctx: &ActionCtx, compiler_path: &str, case_
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "let table: List[config_s]", "global_init_list")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "values: (&raw const static_values[0] as *const c_int)", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "values: (&raw const static_values[0] as *const i32)", "global_init_list")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "mutable_values: (&raw const mutable_values[0] as *mut c_int)", "global_init_list")
+    rc = bs_file_contains(ctx, out_w, "mutable_values: (&raw const mutable_values[0] as *mut i32)", "global_init_list")
     if rc != 0: return rc
     var ir_args: List[str] = List.new()
     ir_args |> push("ir")
@@ -4917,13 +4917,13 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: &str, case
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-assignment-compat", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "(__local_cb.groupinfo = (&__local_stack_groupinfo[0] as *mut c_uint))", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.groupinfo = (&__local_stack_groupinfo[0] as *mut u32))", "assignment_compat")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(__local_cb.parsed_pattern = (&__local_stack_parsed_pattern[0] as *mut c_uint))", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "(__local_cb.parsed_pattern = (&__local_stack_parsed_pattern[0] as *mut u32))", "assignment_compat")
     if rc != 0: return rc
     let pp_simple = "(__local_pp = (__local_pp +% 1))"
-    let pp_casted = "(__local_pp = ((__local_pp as c_uint) +% (1 as c_uint)))"
-    let pp_result_casted = "(__local_pp = ((((__local_pp as c_uint) +% (1 as c_uint)) as c_uint)))"
+    let pp_casted = "(__local_pp = ((__local_pp as u32) +% (1 as u32)))"
+    let pp_result_casted = "(__local_pp = ((((__local_pp as u32) +% (1 as u32)) as u32)))"
     var pp_index = bs_index_of(out_text, pp_simple)
     if pp_index < 0:
         pp_index = bs_index_of(out_text, pp_casted)
@@ -4966,7 +4966,7 @@ fn bs_check_migrate_compound_small_int_promotion(ctx: &ActionCtx, compiler_path:
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-compound-small-int-promotion", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "__local_left - (__local_count[__param_len] as c_int)", "compound_small_int_promotion")
+    rc = bs_assert_contains(ctx, out_text, "__local_left - (__local_count[__param_len] as i32)", "compound_small_int_promotion")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -5002,15 +5002,15 @@ fn bs_check_migrate_enum_constants_are_int(ctx: &ActionCtx, compiler_path: &str,
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-enum-constants-are-int", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let ESC_A: c_int = 1", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "let ESC_A: i32 = 1", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let GREEN: c_int = 5", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "let GREEN: i32 = 5", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let SMALL: c_uint = 2", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "let SMALL: u32 = 2", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let BIG: c_uint = 2147483648", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "let BIG: u32 = 2147483648", "enum_constants_are_int")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "type color = c_int", "enum_constants_are_int")
+    rc = bs_assert_contains(ctx, out_text, "type color = i32", "enum_constants_are_int")
     if rc != 0: return rc
     var run_args: List[str] = List.new()
     run_args |> push("run")
@@ -5038,9 +5038,9 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-d119-arrays", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let table: List[c_uint] = [1, 2, 3, ", "D119 arrays: a file-scope table is a List with bare literals")
+    rc = bs_assert_contains(ctx, out_text, "let table: List[u32] = [1, 2, 3, ", "D119 arrays: a file-scope table is a List with bare literals")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let grid: List[[c_int; 2]] = [[1, 2], [3, 4]]", "D119 arrays: a 2-D table is a List of rows")
+    rc = bs_assert_contains(ctx, out_text, "let grid: List[[i32; 2]] = [[1, 2], [3, 4]]", "D119 arrays: a 2-D table is a List of rows")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let scratch: List[u8] = [0; 8]", "D119 arrays: a tentative definition is a zero fill of the length, a stable binding (C cannot assign an array)")
     if rc != 0: return rc
@@ -5048,17 +5048,17 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let wide: List[u8] = [7, 44]", "D119 arrays: clang folds the converted value")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(5000000000 as c_ulong)", "D119 arrays: a value the element type cannot hold on every target keeps its cast")
+    rc = bs_assert_contains(ctx, out_text, "let big: List[u64] = [5000000000]", "D156 arrays: an unsigned long table is the model's u64 and its literal needs no cast")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, ": List[c_char] = [0; 16]", "D119 arrays: an uninitialized local buffer is a zero fill of the length")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, ": List[c_int] = [5, 6, 7, 8]", "D119 arrays: an initialized local table is a List")
+    rc = bs_assert_contains(ctx, out_text, ": List[i32] = [5, 6, 7, 8]", "D119 arrays: an initialized local table is a List")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, ": List[[c_int; 3]] = [0; 2, 3]", "D119 arrays: a 2-D local is a List of rows, filled in index order")
+    rc = bs_assert_contains(ctx, out_text, ": List[[i32; 3]] = [0; 2, 3]", "D119 arrays: a 2-D local is a List of rows, filled in index order")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "tag: [u8; 4]", "D119 arrays: a struct field stays a fixed array")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "rows: [c_int; 2, 3]", "D119 arrays: a 2-D struct field stays a fixed array")
+    rc = bs_assert_contains(ctx, out_text, "rows: [i32; 2, 3]", "D119 arrays: a 2-D struct field stays a fixed array")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, ": [c_char; 16]", "D119 arrays: no local keeps the fixed-array spelling")
     if rc != 0: return rc
@@ -5312,7 +5312,7 @@ fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: &st
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "        12 =>", "switch_macro_case_values")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let B: c_int = 12", "switch_macro_case_values")
+    rc = bs_assert_contains(ctx, out_text, "let B: i32 = 12", "switch_macro_case_values")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -5546,7 +5546,7 @@ fn bs_check_migrate_enum_one_type(ctx: &ActionCtx, compiler_path: &str, case_dir
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-enum_one_type", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "pub type rc_t = c_int", "enum_one_type")
+    rc = bs_assert_contains(ctx, out_text, "pub type rc_t = i32", "enum_one_type")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -5765,7 +5765,7 @@ fn bs_check_migrate_void_omits_unit(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn noop()", "void_omits_unit")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "fn bump(__param_p: *mut c_int) -> c_int", "void_omits_unit")
+    rc = bs_assert_contains(ctx, out_text, "fn bump(__param_p: *mut i32) -> i32", "void_omits_unit")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "-> Unit", "void_omits_unit")
     if rc != 0: return rc
@@ -5805,7 +5805,7 @@ fn bs_check_migrate_c_model(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-c-model", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "fn model_mark() -> c_int", "c_model")
+    rc = bs_assert_contains(ctx, out_text, "fn model_mark() -> i32", "c_model")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "7", "c_model")
     if rc != 0: return rc
@@ -5839,7 +5839,7 @@ fn bs_check_migrate_void_tail_is_unit(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "unsafe fn store_then_cast(__param_p: *mut c_void):\n", "void_tail_is_unit")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "pub fn pure_ops(__param_a: c_int, __param_b: c_int):\n    return\n", "void_tail_is_unit")
+    rc = bs_assert_contains(ctx, out_text, "pub fn pure_ops(__param_a: i32, __param_b: i32):\n    return\n", "void_tail_is_unit")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "    __param_p\n", "void_tail_is_unit")
     if rc != 0: return rc
@@ -5874,7 +5874,7 @@ fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &st
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-unprototyped-declaration", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "extern fn knr(a0: c_int, a1: f64) -> c_int", "unprototyped_declaration")
+    rc = bs_assert_contains(ctx, out_text, "extern fn knr(a0: i32, a1: f64) -> i32", "unprototyped_declaration")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "fn knr(...)", "unprototyped_declaration")
     if rc != 0: return rc
@@ -5917,7 +5917,7 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     // D75 (§16.2b.5): a `...` definition is unsafe to call; its list is
     // declared where va_start starts it and ends with that scope, so
     // va_end leaves nothing behind.
-    rc = bs_assert_contains(ctx, out_text, "unsafe fn touch(__param_count: c_int, ...) -> c_int:", "variadic_stdarg")
+    rc = bs_assert_contains(ctx, out_text, "unsafe fn touch(__param_count: i32, ...) -> i32:", "variadic_stdarg")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "var __local_ap: c_va_list = va_start()", "variadic_stdarg")
     if rc != 0: return rc
@@ -5957,7 +5957,7 @@ fn bs_check_migrate_variadic_stdarg(ctx: &ActionCtx, compiler_path: &str, case_d
     let va_arg_text_out = ctx.fs().read_text(va_arg_out)
     rc = bs_assert_contains(ctx, va_arg_text_out, "var __local_ap: c_va_list = va_start()", "variadic_va_arg")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, va_arg_text_out, "__local_ap.arg[c_int]()", "variadic_va_arg")
+    rc = bs_assert_contains(ctx, va_arg_text_out, "__local_ap.arg[i32]()", "variadic_va_arg")
     if rc != 0: return rc
     var va_arg_check_args: List[str] = List.new()
     va_arg_check_args |> push("check")
@@ -6320,7 +6320,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "__local_chkmc_length", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "= ((3 as c_ulong))", "macro_initializer_unsigned_minus")
+    rc = bs_assert_contains(ctx, out_text, "= ((3 as u64))", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -6333,7 +6333,7 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "ulong_max_width.c")
     let out_w = bs_join(case_dir, "ulong_max_width.w")
-    let c_text = "#include <limits.h>\n#include <stdlib.h>\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n\ndouble parse_decimal(char *s) {\n  char *end;\n  return strtod(s, &end);\n}\n"
+    let c_text = "#include <limits.h>\n#include <stdlib.h>\n\n#define D156_HIGH_HEX 0xBAADF00D\nstatic unsigned int d156_unsigned[] = { 0x10U };\nstatic long d156_signed[] = { 0x20L };\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n\ndouble parse_decimal(char *s) {\n  char *end;\n  return strtod(s, &end);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "ulong max width source")
     if rc != 0: return rc
     var args: List[str] = List.new()
@@ -6346,9 +6346,15 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ulong-max-width", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "((0 as c_ulong) -% 1)", "ulong_max_width")
+    rc = bs_assert_contains(ctx, out_text, "((0 as u64) -% 1)", "ulong_max_width")
     if rc != 0: return rc
-    rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as c_uint", "ulong_max_width")
+    rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as u32", "ulong_max_width")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let D156_HIGH_HEX: u32 = 0xBAADF00D", "D156 high hex takes the unsigned 32-bit type")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "d156_unsigned: List[u32] = [0x10u32]", "D156 unsigned literal suffix")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "d156_signed: List[i64] = [0x20i64]", "D156 signed long literal suffix")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn parse_decimal", "ulong_max_width")
     if rc != 0: return rc
@@ -6403,7 +6409,7 @@ fn bs_check_migrate_emit_c_reserved_symbols(ctx: &ActionCtx, compiler_path: &str
     if result.rc != 0: return result.rc
     rc = bs_file_contains(ctx, out_w, "fn __with_checked_add", "emit_c_reserved_function")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "var __with_global_counter: c_int", "emit_c_reserved_global")
+    rc = bs_file_contains(ctx, out_w, "var __with_global_counter: i32", "emit_c_reserved_global")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, "var __with_global_source: with_str", "emit_c_reserved_string_global")
     if rc != 0: return rc
@@ -6515,8 +6521,8 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-paste-suffix", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    let signed_type = if os() == "Windows": "c_longlong" else: "c_long"
-    let unsigned_type = if os() == "Windows": "c_ulonglong" else: "c_ulong"
+    let signed_type = "i64"
+    let unsigned_type = "u64"
     rc = bs_assert_contains(ctx, out_text, "let PROJECT_INTMAX_MAX: " ++ signed_type ++ " = 9223372036854775807", "paste_suffix_intmax_max_literal")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let PROJECT_UINTMAX_MAX: " ++ unsigned_type ++ " = ((0 as " ++ unsigned_type ++ ") -% 1)", "paste_suffix_uintmax_max_literal")
@@ -6542,7 +6548,7 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     // only in that echoed name. Only the project alias is public.
     rc = bs_assert_contains_either(ctx, out_text, "fn PROJECT_INTMAX_C[T](v: T) -> i64", "fn PROJECT_INTMAX_C[T](c: T) -> i64", "paste_suffix_project_helper_kept")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let X_MAX: c_longlong = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
+    rc = bs_assert_contains(ctx, out_text, "let X_MAX: i64 = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -6618,11 +6624,11 @@ fn bs_check_migrate_runtime_cabi_aliases(ctx: &ActionCtx, compiler_path: &str, c
     // ABI v8 (D71 §4.8a, #1810): the runtime's `&str` is a `{ptr, len}` view
     // passed by value, the shape of C's by-value with_str, so the C
     // declaration binds the symbol directly — no `&with_str` bridge.
-    rc = bs_assert_contains(ctx, out_text, "@[link_name(\"with_str_len\")]\nextern fn __with_cabi_with_str_len(__param_text: with_str) -> c_longlong", "runtime_cabi_argument_alias")
+    rc = bs_assert_contains(ctx, out_text, "@[link_name(\"with_str_len\")]\nextern fn __with_cabi_with_str_len(__param_text: with_str) -> i64", "runtime_cabi_argument_alias")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "__with_cabi_physical_", "runtime_cabi_no_physical_bridge")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "__with_cabi_with_i64_to_str((42 as c_longlong))", "runtime_cabi_call_alias")
+    rc = bs_assert_contains(ctx, out_text, "__with_cabi_with_i64_to_str((42 as i64))", "runtime_cabi_call_alias")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "return __with_cabi_with_str_concat_n((self as *const with_str), __param_count)", "runtime_cabi_member_wrapper_alias")
     if rc != 0: return rc
@@ -6782,9 +6788,9 @@ fn bs_check_migrate_cross_file_tentative_global_owner(ctx: &ActionCtx, compiler_
     if result.rc != 0: return result.rc
     let a_w = bs_join(generated_dir, "a.w")
     let b_w = bs_join(generated_dir, "b.w")
-    rc = bs_file_contains(ctx, a_w, "var issue127_counter: c_int", "cross_file_tentative_global_owner")
+    rc = bs_file_contains(ctx, a_w, "var issue127_counter: i32", "cross_file_tentative_global_owner")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, b_w, "extern var issue127_counter: c_int", "cross_file_tentative_global_owner")
+    rc = bs_file_contains(ctx, b_w, "extern var issue127_counter: i32", "cross_file_tentative_global_owner")
     if rc != 0: return rc
     var check_a_args: List[str] = List.new()
     check_a_args |> push("check")
@@ -6971,9 +6977,9 @@ fn bs_check_migrate_typed_cast_macros(ctx: &ActionCtx, compiler_path: &str, case
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-typed-cast-macros", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: c_ulong = ((0 as c_ulong) -% 1)", "typed_cast_macros")
+    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: u64 = ((0 as u64) -% 1)", "typed_cast_macros")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as c_ulong))", "typed_cast_macros")
+    rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as u64))", "typed_cast_macros")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")

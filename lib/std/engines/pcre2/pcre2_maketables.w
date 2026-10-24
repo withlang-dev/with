@@ -31,9 +31,9 @@ use std.engines.pcre2.pcre2_xclass
 use std.libc
 
 pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *const u8 {
-    var __local_yield_: *mut u8 = (((if (if __param_gcontext != null: 1 else: 0) != 0: (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as c_ulong), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) else: (with_alloc(((1088 as c_ulong) as i64)) as *mut c_void)) as *mut u8))
+    var __local_yield_: *mut u8 = (((if (if __param_gcontext != null: 1 else: 0) != 0: (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as u64), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) else: (with_alloc(((1088 as u64) as i64)) as *mut c_void)) as *mut u8))
 
-    var __local_i: c_int
+    var __local_i: i32
 
     var __local_p: *mut u8
 
@@ -43,10 +43,10 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_p = __local_yield_)
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
-        var __local_c: c_int = ((tolower(__local_i) as c_int))
+        var __local_c: i32 = ((tolower(__local_i) as i32))
 
         var __ci_expr_old_0: *mut u8 = __local_p
 
@@ -61,10 +61,10 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
     }
 
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
-        var __local_c_1: c_int = (((if islower(__local_i) != 0: (toupper(__local_i) as c_int) else: (tolower(__local_i) as c_int)) as c_int))
+        var __local_c_1: i32 = (((if islower(__local_i) != 0: (toupper(__local_i) as i32) else: (tolower(__local_i) as i32)) as i32))
 
         var __ci_expr_old_1: *mut u8 = __local_p
 
@@ -79,53 +79,53 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
     }
 
 
-    with_memset(((__local_p as *mut c_void) as *mut u8), (0 as c_int), ((320 as c_ulong) as i64))
+    with_memset(((__local_p as *mut c_void) as *mut u8), (0 as i32), ((320 as u64) as i64))
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
         if (isdigit(__local_i) != 0) {
-            ((__local_p[(64 + (__local_i / 8))]) = ((__local_p[(64 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(64 + (__local_i / 8))]) = ((__local_p[(64 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isupper(__local_i) != 0) {
-            ((__local_p[(96 + (__local_i / 8))]) = ((__local_p[(96 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(96 + (__local_i / 8))]) = ((__local_p[(96 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (islower(__local_i) != 0) {
-            ((__local_p[(128 + (__local_i / 8))]) = ((__local_p[(128 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(128 + (__local_i / 8))]) = ((__local_p[(128 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isalnum(__local_i) != 0) {
-            ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if ((if __local_i == 95: 1 else: 0) != 0) {
-            ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isspace(__local_i) != 0) {
-            ((__local_p[(0 + (__local_i / 8))]) = ((__local_p[(0 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(0 + (__local_i / 8))]) = ((__local_p[(0 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isxdigit(__local_i) != 0) {
-            ((__local_p[(32 + (__local_i / 8))]) = ((__local_p[(32 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(32 + (__local_i / 8))]) = ((__local_p[(32 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isgraph(__local_i) != 0) {
-            ((__local_p[(192 + (__local_i / 8))]) = ((__local_p[(192 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(192 + (__local_i / 8))]) = ((__local_p[(192 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (isprint(__local_i) != 0) {
-            ((__local_p[(224 + (__local_i / 8))]) = ((__local_p[(224 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(224 + (__local_i / 8))]) = ((__local_p[(224 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (ispunct(__local_i) != 0) {
-            ((__local_p[(256 + (__local_i / 8))]) = ((__local_p[(256 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(256 + (__local_i / 8))]) = ((__local_p[(256 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
         if (iscntrl(__local_i) != 0) {
-            ((__local_p[(288 + (__local_i / 8))]) = ((__local_p[(288 + (__local_i / 8))]) as u8) | (((1 as c_uint) << (((__local_i as c_int) & (7 as c_int)) as c_uint)) as u8))
+            ((__local_p[(288 + (__local_i / 8))]) = ((__local_p[(288 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
 
@@ -136,10 +136,10 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_p = __local_p + ((320 as isize) as usize))
 
-    (__local_i = ((0 as c_int)))
+    (__local_i = ((0 as i32)))
 
     while ((if __local_i < 256: 1 else: 0) != 0) {
-        var __local_x: c_int = ((0 as c_int))
+        var __local_x: i32 = ((0 as i32))
 
         if (isspace(__local_i) != 0) {
             (__local_x = __local_x + 1)
@@ -157,7 +157,7 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
             (__local_x = __local_x + 8)
         }
 
-        var __ci_expr_logic_2: c_int
+        var __ci_expr_logic_2: i32
 
         if (isalnum(__local_i) != 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))

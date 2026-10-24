@@ -85,6 +85,33 @@ fn target_spec_os() -> str:
         return "Wasi"
     with_sysinfo_os()
 
+// §16.1 / D155: the fixed-width spelling of a C integer alias on the active
+// target, or "" for a name that is not one. One table for every reader:
+// Sema registers the builtins from it and the facade renderer compares a
+// facade's `wraps c_int` to c_import's `i32` through it. `char` is unsigned
+// on AArch64 Linux and on wasm, `long` is 32 bits on Windows (LLP64) and
+// wasm32, and `long double` is f64 everywhere.
+fn c_alias_fixed_spelling(name: &str) -> str:
+    let os = target_spec_os()
+    let arch = target_spec_arch()
+    let wasm = arch == "wasm32" or arch == "wasm64"
+    let char_unsigned = (os == "Linux" and arch == "aarch64") or wasm
+    let long_32 = os == "Windows" or arch == "wasm32"
+    match name:
+        "c_char" => if char_unsigned: "u8" else: "i8"
+        "c_schar" => "i8"
+        "c_uchar" => "u8"
+        "c_short" => "i16"
+        "c_ushort" => "u16"
+        "c_int" => "i32"
+        "c_uint" => "u32"
+        "c_long" => if long_32: "i32" else: "i64"
+        "c_ulong" => if long_32: "u32" else: "u64"
+        "c_longlong" => "i64"
+        "c_ulonglong" => "u64"
+        "c_longdouble" => "f64"
+        _ => ""
+
 // The variants of std.os's OsKind and ArchKind, one per target the compiler
 // has and no other (§17.5): the names a module-level `comptime match` on
 // `Target.os` or `Target.arch` must cover.

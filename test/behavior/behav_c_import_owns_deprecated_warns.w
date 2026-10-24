@@ -12,7 +12,7 @@ fn main:
     let checked = p7_run(case_dir, "owns-warn", "check\0main.w\0")
     p7_assert_success(checked, "with check")
     assert(checked.stderr.contains("owns: \"cwd_owned -> free\" is a deprecated spelling of a facade resource"))
-    assert(checked.stderr.contains("`resource CwdOwned wraps *mut i8` / `from cwd_owned` / `drop free`"))
+    assert(checked.stderr.contains("`resource CwdOwned wraps *mut c_char` / `from cwd_owned` / `drop free`"))
     assert(checked.stderr.contains("borrows: \"telldir(0) -> opendir\" is a deprecated spelling of a facade lend"))
     assert(checked.stderr.contains("`fn telldir` / `lend`"))
     print("ok")

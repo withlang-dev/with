@@ -14,7 +14,7 @@ use std.builtins.c_void
 
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
-extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32
 extern fn rt_close(fd: i32) -> i32
 extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 extern fn rt_fcntl(fd: i32, cmd: i32, arg: i32) -> i32
@@ -28,13 +28,13 @@ extern fn rt_isatty(fd: i32) -> i32
 extern fn rt_cpu_time_ns() -> i64
 extern fn rt_fseek(stream: *mut c_void, offset: i64, whence: i32) -> i32
 extern fn rt_ftell(stream: *mut c_void) -> i64
-extern fn rt_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64
-extern fn rt_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64
-extern fn rt_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64
+extern fn rt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
+extern fn rt_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64
+extern fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64
 extern fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32
 extern fn rt_setrlimit(resource: i32, lim: *const u8) -> i32
-extern fn rt_mkstemp(template_path: *mut u8) -> i32
-extern fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
+extern fn rt_mkstemp(template_path: *mut c_char) -> i32
+extern fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char
 extern fn rt_mmap(size: i64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: i64)
 @[link_name("malloc")]
@@ -45,7 +45,7 @@ extern fn rt_exit(code: i32) -> Never
 extern fn rt_clock_ns() -> i64
 extern fn rt_wall_clock_sec() -> i64
 extern fn rt_wall_clock_ns() -> i64
-extern fn rt_getenv(name: *const u8) -> *const u8
+extern fn rt_getenv(name: *const c_char) -> *const c_char
 extern fn rt_store_args(argc: i32, argv: *const *const u8)
 extern fn rt_args() -> (*const *const u8, i32)
 
@@ -70,21 +70,21 @@ extern fn rt_backtrace_print()
 extern fn rt_fill_random(buf: *mut u8, len: u64) -> Unit
 
 // Filesystem extras (provided by platform backend)
-extern fn rt_mkdir(path: *const u8, mode: i32) -> i32
-extern fn rt_unlink(path: *const u8) -> i32
-extern fn rt_rmdir(path: *const u8) -> i32
-extern fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32
-extern fn rt_remove_tree(path: *const u8) -> i32
-extern fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32
-extern fn rt_symlink(target: *const u8, link_path: *const u8) -> i32
-extern fn rt_list_files(path: *const u8) -> str
-extern fn rt_list_dir(path: *const u8) -> str
-extern fn rt_access(path: *const u8, mode: i32) -> i32
-extern fn rt_chmod(path: *const u8, mode: i32) -> i32
-extern fn rt_file_mode(path: *const u8) -> i32
-extern fn rt_readlink(path: *const u8) -> str
+extern fn rt_mkdir(path: *const c_char, mode: i32) -> i32
+extern fn rt_unlink(path: *const c_char) -> i32
+extern fn rt_rmdir(path: *const c_char) -> i32
+extern fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32
+extern fn rt_remove_tree(path: *const c_char) -> i32
+extern fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32
+extern fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32
+extern fn rt_list_files(path: *const c_char) -> str
+extern fn rt_list_dir(path: *const c_char) -> str
+extern fn rt_access(path: *const c_char, mode: i32) -> i32
+extern fn rt_chmod(path: *const c_char, mode: i32) -> i32
+extern fn rt_file_mode(path: *const c_char) -> i32
+extern fn rt_readlink(path: *const c_char) -> str
 // stat is in the core 13 but declared with a different name to avoid confusion
-extern fn rt_stat(path: *const u8, out: *mut u8) -> i32
+extern fn rt_stat(path: *const c_char, out: *mut u8) -> i32
 
 // ── Float formatting ────────────────────────────────────────────
 // Implements deterministic f64-to-decimal conversion without libc.
@@ -522,7 +522,7 @@ fn make_str(ptr: *const u8, len: i64) -> str:
     // read of a str is a copy, one more holder, and these parts hold nothing.
     unsafe { transmute[str](raw) }
 
-fn cstr_len(s: *const u8) -> i64:
+fn cstr_len(s: *const c_char) -> i64:
     if s as i64 == 0:
         return 0
     var n: i64 = 0
@@ -1138,7 +1138,7 @@ fn dbg_scribble_on() -> i32:
         return 1
     0
 
-fn dbg_cstr_eq_lit(p: *const u8, lit: *const u8, len: i64) -> i32:
+fn dbg_cstr_eq_lit(p: *const c_char, lit: *const c_char, len: i64) -> i32:
     if p as i64 == 0:
         return 0
     var i: i64 = 0
@@ -1174,7 +1174,7 @@ fn dbg_put_i64(v: i64):
     let len = i64_to_buf(v, &buf as *mut u8)
     let _ = rt_write(2, &buf as *const u8, len)
 
-fn rt_parse_limit_cstr(p: *const u8) -> i64:
+fn rt_parse_limit_cstr(p: *const c_char) -> i64:
     if p as i64 == 0:
         return 0
     if unsafe *p == 0:
@@ -1933,7 +1933,7 @@ fn str_has_interior_nul(s: &str) -> bool:
 // bytes (§16.3c), which C would silently truncate at; that is forbidden, so the
 // conversion fails loudly instead of producing a poisoned C string. Raw interop
 // (`str_data(s) as *const c_char`) is unaffected and stays explicit/unsafe.
-fn str_to_cstr(s: &str) -> *const u8:
+fn str_to_cstr(s: &str) -> *const c_char:
     if str_has_interior_nul(s):
         let empty = ""
         with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
@@ -1941,7 +1941,7 @@ fn str_to_cstr(s: &str) -> *const u8:
     let buf = rt_alloc(slen + 1)
     rt_memcpy(buf, str_data(s), slen)
     unsafe *((buf as i64 + slen) as *mut u8) = 0
-    buf as *const u8
+    buf as *const c_char
 
 pub fn with_str_to_cstr_ref(s: &str) -> *mut u8:
     str_to_cstr(s) as *mut u8
@@ -2044,8 +2044,8 @@ pub fn with_alloc_zeroed(count: i64, size: i64) -> *mut u8:
 pub fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8:
     rt_realloc(ptr, old_size, new_size)
 
-pub fn with_free(ptr: *mut u8):
-    rt_free(ptr)
+pub fn with_free(ptr: *mut c_void):
+    rt_free(ptr as *mut u8)
 
 // std's Box, Mutex, RwLock and generator cores: one `T` at alignof[T]
 // (TypeLayout's, #2039). with_free takes it back like any allocation.
@@ -3084,10 +3084,10 @@ pub fn with_str_replace_ref(s: &str, old: &str, new_s: &str) -> str:
 // buffer, which the caller then frees again (#1081: win_list_append's
 // path_text over cpath, then cstr_free(cpath)). Null stays {null, 0} — the
 // c_import `*u8 -> str` coercion relies on it.
-pub fn with_str_from_cstr(s: *const u8) -> str:
+pub fn with_str_from_cstr(s: *const c_char) -> str:
     if s as i64 == 0:
         return make_str(0 as *const u8, 0)
-    alloc_str(s, cstr_len(s))
+    alloc_str(s as *const u8, cstr_len(s))
 
 pub fn with_str_from_bytes(s: *const u8, len: i64) -> str:
     alloc_str(s, len)
@@ -3226,8 +3226,8 @@ pub fn with_arg_count() -> i32:
 pub fn with_arg_at(idx: isize) -> str:
     if idx < 0 or idx >= saved_argc or saved_argv_raw == 0:
         return ""
-    let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const u8)
-    make_str(s, cstr_len(s))
+    let s = unsafe *((saved_argv_raw + idx as i64 * 8) as *const *const c_char)
+    make_str(s as *const u8, cstr_len(s))
 
 pub fn with_getenv_str(name: &str) -> str:
     let cname = str_to_cstr(name)
@@ -3238,7 +3238,7 @@ pub fn with_getenv_str(name: &str) -> str:
     // An owned copy: the environment block is libc's, and a later
     // setenv may free or rewrite the bytes a shared str would still name
     // (D111 copies share their buffer).
-    alloc_str(val, cstr_len(val))
+    with_str_from_cstr(val)
 
 // with_setenv_str: provided by compat_runtime.w (needs libc)
 
@@ -4454,14 +4454,14 @@ pub fn with_sb_build(sb: *mut u8) -> str:
 
 // ── File I/O ───────────────────────────────────────────────────────
 
-fn fs_path_is_dir_c(path: *const u8) -> bool:
+fn fs_path_is_dir_c(path: *const c_char) -> bool:
     var st: [24]u8 = [0 as u8; 24]
     if rt_stat(path, &st as *mut u8) != 0:
         return false
     let base = &raw const st as i64
     unsafe *((base + 8) as *const i32) != 0
 
-fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
+fn fs_mkdir_component(path: *const c_char, mode: i32) -> i32:
     let rc = rt_mkdir(path, mode)
     if rc != 0 and fs_path_is_dir_c(path):
         return 0
@@ -4469,12 +4469,12 @@ fn fs_mkdir_component(path: *const u8, mode: i32) -> i32:
 
 // The C path copy str_to_cstr makes lives exactly as long as the call it
 // serves (#952: every wrapper leaked one per call).
-fn cstr_free(cpath: *const u8): rt_free(cpath as *mut u8)
+fn cstr_free(cpath: *const c_char): rt_free(cpath as *mut u8)
 
 // The file's text with its status: 0, or the negated errno of the failed
 // step (#953: a failure and an empty file used to be the same ""). A
 // directory is EISDIR; a read that stops short of the measured size is EIO.
-fn fs_read_file_status_c(cpath: *const u8, status: *mut i32) -> str:
+fn fs_read_file_status_c(cpath: *const c_char, status: *mut i32) -> str:
     unsafe *status = 0
     if fs_path_is_dir_c(cpath):
         unsafe *status = -21  // EISDIR
@@ -4525,7 +4525,7 @@ pub fn with_fs_read_file(path: &str) -> str:
 
 // 0 when every byte reached the file; a failed open returns its error, a
 // short or failed write -1 (#951: a short write reported success).
-fn fs_write_file_c(cpath: *const u8, data: &str) -> i32:
+fn fs_write_file_c(cpath: *const c_char, data: &str) -> i32:
     // O_WRONLY=1, O_CREAT=0x200, O_TRUNC=0x400
     let fd = rt_open(cpath, 1 | 0x200 | 0x400, 0o644)
     if fd < 0: return fd
@@ -4557,7 +4557,7 @@ pub fn with_fs_is_dir(path: &str) -> i32:
     cstr_free(cpath)
     rc
 
-fn fs_mkdir_p_c(cpath: *const u8, slen: i64):
+fn fs_mkdir_p_c(cpath: *const c_char, slen: i64):
     // Create each directory component
     let windows = rt_sysinfo_os() == "Windows"
     var i: i64 = 1
@@ -4584,7 +4584,7 @@ pub fn with_fs_remove_file(path: &str) -> i32:
     cstr_free(cpath)
     rc
 
-pub fn with_libc_open(path: *const i8, flags: i32, mode: i32) -> i32:
+pub fn with_libc_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     let r = rt_open(path, flags, mode)
     if r < 0: -1 else: r
 
@@ -4614,7 +4614,7 @@ pub fn with_libc_fcntl(fd: i32, cmd: i32, arg: i32) -> i32:
     let r = rt_fcntl(fd, cmd, arg)
     if r < 0: -1 else: r
 
-pub fn with_libc_unlink(path: *const i8) -> i32:
+pub fn with_libc_unlink(path: *const c_char) -> i32:
     let r = rt_unlink(path)
     if r < 0: -1 else: r
 
@@ -4636,21 +4636,21 @@ pub fn with_libc_ftell(stream: *mut c_void) -> i64: rt_ftell(stream)
 // std.libc strtold: With's widest float is f64, which is C's `long double`
 // where that is 8 bytes (Darwin arm64, Windows); where C's is wider the parse
 // is strtod's, the correctly rounded double of the same text (#2176).
-pub fn with_libc_strtold(nptr: *const i8, endptr: *mut *mut i8) -> f64: rt_strtold(nptr, endptr)
+pub fn with_libc_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64: rt_strtold(nptr, endptr)
 // std.libc strtol/strtoul: a 64-bit long on every target (D114). Where C's
 // long is 32 bits (the UCRT) the platform binds its 64-bit parse, so a
 // saturating overflow is the 64-bit one the LP64-modeled corpora expect
 // (pcre2test's repeat-count check on Windows, #2592).
-pub fn with_libc_strtol(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> i64: rt_strtol(nptr, endptr, base)
-pub fn with_libc_strtoul(nptr: *const i8, endptr: *mut *mut i8, base: i32) -> u64: rt_strtoul(nptr, endptr, base)
+pub fn with_libc_strtol(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> i64: rt_strtol(nptr, endptr, base)
+pub fn with_libc_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u64: rt_strtoul(nptr, endptr, base)
 pub fn with_libc_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_getrlimit(resource, lim)
 // #1998: std.libc cpu_time_ns — CPU time (user + system, ns) of this process
 // and every child it has reaped; -1 when the platform cannot say.
 pub fn with_libc_cpu_time_ns() -> i64: rt_cpu_time_ns()
 pub fn with_libc_setrlimit(resource: i32, lim: *const u8) -> i32: rt_setrlimit(resource, lim)
-pub fn with_libc_mkstemp(template_path: *mut i8) -> i32: rt_mkstemp(template_path as *mut u8)
-pub fn with_libc_realpath(path: *const i8, resolved_path: *mut i8) -> *mut i8:
-    rt_realpath(path as *const u8, resolved_path as *mut u8) as *mut i8
+pub fn with_libc_mkstemp(template_path: *mut c_char) -> i32: rt_mkstemp(template_path)
+pub fn with_libc_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
+    rt_realpath(path, resolved_path)
 
 pub fn with_fs_chmod(path: &str, mode: i32) -> i32:
     let cpath = str_to_cstr(path)
@@ -5099,7 +5099,7 @@ pub fn with_sysinfo_hostname() -> str:
     if rt_gethostname(buf_ptr, 256) != 0:
         return "unknown"
     buf[255] = 0
-    alloc_str(buf_ptr as *const u8, cstr_len(buf_ptr as *const u8))
+    with_str_from_cstr(buf_ptr as *const c_char)
 
 // rt_sysinfo wrapper — fills {cpu_cores: i32, memory_total: i64, page_size: i64}
 pub fn with_sysinfo(out: *mut u8) -> i32:

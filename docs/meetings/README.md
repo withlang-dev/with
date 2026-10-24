@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D156 — A corpus is compiled against one data model, explicit in the text: widths are fixed integers, only `c_char` stays symbolic (amends D155; ruled)](2026-10-23-D156-a-corpus-is-compiled-against-one-data-model-explicit-in-the-text.md)
+- [D155 — A migrated corpus never contains a concrete value for a `c_*` alias; `c_char` is the target's everywhere, `c"…"` is `*const c_char`, and a pointer to one integer type is not a pointer to another (ruled)](2026-10-23-D155-a-migrated-corpus-never-contains-a-concrete-value-for-a-c-alias.md)
 - [D154 — A `Drop` impl's bounds are the type's own; drop glue runs a bounded impl for every instantiation (delegated)](2026-10-23-D154-a-drop-impls-bounds-are-the-types-own.md)
 - [D153 — An unsuffixed numeric literal where a distinct type over a number is demanded takes the distinct type (delegated)](2026-10-23-D153-a-literal-at-a-distinct-numeric-demand-takes-the-distinct-type.md)
 - [D152 — A collection's copy class is part of its interface: `List`, `HashMap`, `HashSet` copy with a count; every engine-backed collection is a resource, by D45](2026-10-23-D152-a-collections-copy-class-is-part-of-its-interface-engine-backed-collections-are-resources.md)

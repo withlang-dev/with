@@ -33,7 +33,7 @@ fn main:
     p7_write(case_dir, "input/project.h", "#undef HAVE_UNISTD_H\n#define HAVE_UNISTD_H 0\n" ++ project_macros)
     let redefined = p7_run(case_dir, "macro_origins_redefined", "migrate\0input\0--shared-defs\0sample.defs\0--no-c-export\0-o\0lib/sample\0")
     p7_assert_success(redefined, "migrate project redefinition")
-    p7_assert_file_contains(case_dir, "lib/sample/defs.w", "pub let HAVE_UNISTD_H: c_int = 0")
+    p7_assert_file_contains(case_dir, "lib/sample/defs.w", "pub let HAVE_UNISTD_H: i32 = 0")
 
     // c_import intentionally exposes the requested header and inline macros.
     let header = p7_join(case_dir, "input/SDKs/Fake.sdk/usr/include/system.h").replace("\\", "/")

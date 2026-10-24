@@ -4,7 +4,7 @@
 // a different C symbol. `my_strlen` resolves to libc `strlen`.
 
 @[link_name("strlen")]
-extern fn my_strlen(s: *const u8) -> u64
+extern fn my_strlen(s: *const c_char) -> u64
 
 fn main:
     let n = unsafe { my_strlen(c"hello".ptr) }

@@ -18,7 +18,8 @@ extern fn with_runtime_current_set_cancel_requested() -> Unit
 extern fn with_runtime_current_set_cancelled_return() -> Unit
 extern fn with_runtime_current_cancelled_return() -> i32
 extern fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32
-extern fn with_free(ptr: *mut u8) -> Unit
+use std.builtins.c_void
+extern fn with_free(ptr: *mut c_void)
 extern fn with_ewrite(s: &str) -> Unit
 extern fn with_i64_to_str(n: i64) -> str
 @[link_name("_exit")]

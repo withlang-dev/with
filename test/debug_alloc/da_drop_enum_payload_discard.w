@@ -4,7 +4,7 @@
 // discard and must free each Drop payload exactly once.
 use std.builtins.print_i32
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 type W { ptr: *mut u8, slot: *mut i32 }
 impl Drop for W:

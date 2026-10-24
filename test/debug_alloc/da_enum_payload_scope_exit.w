@@ -5,7 +5,7 @@
 // why this cell existed nowhere until tools/drop_audit.w found the bug.
 use std.builtins.print_i32
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 type R { id: i32, ptr: *mut u8, slot: *mut i32 }
 impl Drop for R:
     fn drop(move self: Self):

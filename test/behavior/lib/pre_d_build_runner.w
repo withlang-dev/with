@@ -5,7 +5,7 @@ use std.sysinfo
 
 extern fn with_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_path: &str, timeout_ms: i32, cwd: &str) -> i32
 extern fn rt_getcwd(buf: *mut u8, size: i64) -> i32
-extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_from_cstr(s: *const c_char) -> str
 
 // The real working directory as a native path. Unlike `env("PWD")` this is
 // correct on Windows cmd.exe (which never sets PWD) and under a bash shell
@@ -22,7 +22,7 @@ fn p7_cwd -> str:
     // the native stage2's frame layout clobbers it, corrupting case_dir into a
     // path with an interior NUL → "str to C string conversion" panic → the p7
     // exit-134 cluster.
-    unsafe { with_str_from_cstr(&buf as *const [4096]u8 as *const u8) }.to_owned()
+    unsafe { with_str_from_cstr(&buf as *const [4096]u8 as *const c_char) }.to_owned()
 
 pub type P7Run {
     rc: i32,
