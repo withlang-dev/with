@@ -8,11 +8,18 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261024-local-1-c1ea1de114eb
-with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4c2f8
-# darwin-aarch64 is cut from main c1ea1de11 (2026-10-24): the first seed with the
-# D155 builtins (c_char and the C aliases are the target's), so compiler sources
-# may spell c_char (#2585, #2596, #2597); :release-checks green on the laptop.
+version=nightly-20261024-local-4-0cca9aee2744
+with-darwin-aarch64=d2c92ad559a612df51759ef060b371ea6297030a75cc40d9381e60b4e9d9512d
+# The four gating platforms are cut from main 0cca9aee2 (2026-10-24), each to a
+# stage2 == stage3 fixpoint with :release-checks green, by the per-platform D155
+# seeds this joint cut retires (#2598, #2606, #2609): darwin on the laptop,
+# linux-x86_64 on eric-5090, windows-x86_64 on win10 (published from the laptop),
+# linux-aarch64 in tools/docker/linux-aarch64. The seeds before it: darwin from
+# main c1ea1de11, the first with the D155 builtins (c_char and the C aliases are
+# the target's), so compiler sources may spell c_char (#2585, #2596, #2597);
+# the other three climbed to it through the bridge rung seed-bridge-20261024
+# (main since #2599 did not build under their pre-D155 bridge seeds, #2605,
+# #2608) and were then cut from main 47721ee51 (aarch64) and 4aeea7b21 (x86_64).
 # All five are cut from main 763d0e54c (2026-10-20): the first seeds built
 # after the D30 step 4 flip (#2500: the runtime bundle is the only link path,
 # no .w-derived runtime objects) and R4c (#2504), with the wasm import
@@ -72,20 +79,10 @@ with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-# linux-x86_64 and windows-x86_64 are cut from main 4aeea7b21 (2026-10-24) on eric-5090
-# and win10 by the D155 bridge-rung seeds of #2608 (main since #2599 spells c_char in
-# compiler sources, which the earlier bridge seeds had no builtin for), each to a stage2
-# == stage3 fixpoint with :release-checks green: the first main-based seeds there since
-# #2583. All five platforms now bootstrap main; the per-platform lines remain because
-# the cuts were made from different main commits, not because any platform lags.
-with-linux-x86_64.version=nightly-20261024-local-3-4aeea7b21612
-with-linux-x86_64=ed922b2a171779f910c42c71439bc2a7ea7f9bc93774696d1f25f0c949efae95
-# linux-aarch64 is cut from main 47721ee51 (2026-10-24) in tools/docker/linux-aarch64
-# by the bridge-rung seed nightly-20261024-local-2-3c7c68968cb2 (#2605), to a stage2 ==
-# stage3 fixpoint with :release-checks green: the first main-based aarch64 seed since
-# #2583, with the D155 builtins (c_char is the target's u8 there).
-with-linux-aarch64.version=nightly-20261024-local-3-47721ee51bc2
-with-linux-aarch64=5593bbb682d0b914485fff45662a48e6d977e8f89142d8d687081e79190c838b
+with-linux-x86_64=b2b4fe8483e52e9e1ad286c750659d37b4f41cfd700fa2c26c3427710ebae763
+# linux-aarch64: the D155 builtins make c_char the target's u8 there; the lane
+# pool in the 7.7 GiB container needs WITH_BUILD_JOBS=3 (#2603).
+with-linux-aarch64=e01e6c39eeb4cad4d5e84a4a21321c0f876f614cb4112ba39209370db472f89c
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -96,7 +93,6 @@ with-linux-aarch64=5593bbb682d0b914485fff45662a48e6d977e8f89142d8d687081e79190c8
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe.version=nightly-20261024-local-3-4aeea7b21612
-with-windows-x86_64.exe=e3d558de5b9765ccc37a91ce98dd70e38a2533fd34c36a1f5c9f7247b13f96da
+with-windows-x86_64.exe=b9a0fc46a7451f47226aa278c9b67a1cd24113c548ce0e80c0ea3205afd7a295
 with-windows-aarch64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
