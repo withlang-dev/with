@@ -4244,8 +4244,7 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     s.register_prim("c_ulong", if c_long_32: s.ty_u32 else: s.ty_u64)
     s.register_prim("c_longlong", s.ty_i64)
     s.register_prim("c_ulonglong", s.ty_u64)
-    if (c_os == "Macos" and c_arch == "aarch64") or c_os == "Windows":
-        s.register_prim("c_longdouble", s.ty_f64)
+    s.register_prim("c_longdouble", s.ty_f64)
     // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
     // `*const c_char` on every target.
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_c_char, 0, 0)
