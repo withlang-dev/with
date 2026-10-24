@@ -4032,6 +4032,4244 @@ unsafe fn stc_f64s_insertsort_lowhigh(__param_self_: *mut f64, __param_lo: i64, 
 
 }
 
+pub fn stc_word_set_clone(__param_map: stc_word_set) -> stc_word_set {
+    if ((if (unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count == 0: 1 else: 0) != 0) {
+        return ((stc_word_set.zeroed() as stc_word_set))
+    }
+
+    var __local_out: stc_word_set = __param_map
+
+    var __local_self_: *mut stc_word_set = ((&raw mut __local_out as *mut stc_word_set))
+
+
+    var __local__mbytes: i64 = (((((unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count + 1) * (sizeof[hmap_meta]() as i64)) as i64))
+
+    (__local_out.table = (((with_alloc((((if 1 != 0: (((unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+
+    (__local_out.meta = (((with_alloc((((if 1 != 0: __local__mbytes else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+
+    var __ci_expr_logic_0: i32 = 0
+
+    if ((unsafe *(&raw const __local_out as *const stc_word_set)).table != null) {
+        (__ci_expr_logic_0 = (if (unsafe *(&raw const __local_out as *const stc_word_set)).meta != null: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        with_memcpy((((unsafe *(&raw const __local_out as *const stc_word_set)).meta as *mut c_void) as *mut u8), (((unsafe *(&raw const __param_map as *const stc_word_set)).meta as *const c_void) as *const u8), (((if 1 != 0: __local__mbytes else: (-1 as i64)) as u64) as i64))
+
+        var __local_i: i64 = ((0 as i64))
+
+        while ((if __local_i < (unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count: 1 else: 0) != 0) {
+            if (((unsafe __param_map.meta[__local_i])).dist() != 0) {
+                ((unsafe __local_out.table[__local_i]) = ((unsafe { stc_word_set_value_clone((__local_self_ as *const stc_word_set), (((*(&raw const __param_map as *const stc_word_set)).table[__local_i]) as u64)) } as u64)))
+            }
+
+            (__local_i = __local_i + 1)
+
+        }
+
+
+        return __local_out
+
+    }
+    if ((unsafe *(&raw const __local_out as *const stc_word_set)).meta != null) {
+        with_free((((unsafe *(&raw const __local_out as *const stc_word_set)).meta as *mut c_void) as *mut u8))
+    }
+
+    if ((unsafe *(&raw const __local_out as *const stc_word_set)).table != null) {
+        with_free((((unsafe *(&raw const __local_out as *const stc_word_set)).table as *mut c_void) as *mut u8))
+    }
+
+    return ((stc_word_set.zeroed() as stc_word_set))
+
+
+
+}
+
+pub unsafe fn stc_word_set_drop(__param_cself: *const stc_word_set) {
+    var __local_self_: *mut stc_word_set = ((__param_cself as *mut stc_word_set))
+
+    if ((if (*__param_cself).meta == null: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_set_wipe_(__local_self_)
+
+    with_free((((*__local_self_).meta as *mut c_void) as *mut u8))
+
+    with_free((((*__local_self_).table as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_word_set_clear(__param_self_: *mut stc_word_set) -> Unit {
+    if ((if (*__param_self_).meta == null: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_set_wipe_(__param_self_)
+
+    ((*__param_self_).size = ((0 as i64)))
+
+    with_memset((((*__param_self_).meta as *mut c_void) as *mut u8), (0 as i32), (((if 1 != 0: (((sizeof[hmap_meta]() as i64) * (*__param_self_).bucket_count) as i64) else: (-1 as i64)) as u64) as i64))
+
+}
+
+pub unsafe fn stc_word_set_reserve(__param__self: *mut stc_word_set, __param__cap: i64) -> bool {
+    var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
+
+    var __local__newbucks: i64 = ((((((__local__newcap as f32) / i_max_load_factor) as i64) + 4) as i64))
+
+    (__local__newbucks = ((c_next_pow2(__local__newbucks) as i64)))
+
+    var __ci_expr_logic_0: i32
+
+    if ((if __local__newbucks == (*__param__self).bucket_count: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (if __param__cap <= (((((*__param__self).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        return ((true as bool))
+    }
+
+
+    var __local_map: stc_word_set = (*__param__self)
+
+    var __local_self_: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
+
+
+
+    (__local_map.table = (((with_alloc((((if 1 != 0: ((__local__newbucks * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+
+    (__local_map.meta = (((with_alloc_zeroed((((if 1 != 0: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if 1 != 0: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+
+    (__local_map.bucket_count = __local__newbucks)
+
+    var __local_ok: bool = with 0 as __ci_expr_seq_26 {
+        var __ci_expr_logic_1: i32 = 0
+        if ((*(&raw const __local_map as *const stc_word_set)).table != null) {
+            (__ci_expr_logic_1 = (if (*(&raw const __local_map as *const stc_word_set)).meta != null: 1 else: 0))
+        }
+        (__ci_expr_logic_1 != 0)
+    }
+
+    if __local_ok {
+        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as u16)))
+
+        var __local_d: *const u64 = (((*__param__self).table as *const u64))
+
+        var __local_m: *const hmap_meta = (((*__param__self).meta as *const hmap_meta))
+
+        var __local_i: i64 = ((0 as i64))
+
+        while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
+            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
+                var __local_r: u64 = (*__local_d)
+
+                ((*(stc_word_set_bucket_insert_(((&raw mut __local_map as *mut stc_word_set) as *const stc_word_set), ((&raw mut __local_r as *mut u64) as *const u64)).ref)) = (*__local_d))
+
+            }
+
+            (__local_i = __local_i + 1)
+
+            (__local_d = __local_d + 1)
+
+
+        }
+
+
+        loop {
+            var __local__xp: *mut stc_word_set = __param__self
+
+            var __local__yp: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
+
+
+            var __local__tv: stc_word_set = (*__local__xp)
+
+            with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[stc_word_set]())
+
+            with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_word_set]())
+
+            if not ((0 != 0)) {
+                break
+            }
+        }
+
+    }
+
+    with_free((((*(&raw const __local_map as *const stc_word_set)).meta as *mut c_void) as *mut u8))
+
+    with_free((((*(&raw const __local_map as *const stc_word_set)).table as *mut c_void) as *mut u8))
+
+    return __local_ok
+
+}
+
+pub unsafe fn stc_word_set_erase_entry(__param_self_: *mut stc_word_set, __param__val: *mut u64) {
+    var __local_d: *mut u64 = (*__param_self_).table
+
+    var __local_m: *mut hmap_meta = (*__param_self_).meta
+
+    var __local_i: u64 = ((((((__param__val as usize) -% (__local_d as usize)) as i64) / (sizeof[u64]() as i64)) as u64))
+
+    var __local_j: u64 = __local_i
+
+
+    var __local_mask: u64 = (((((*__param_self_).bucket_count as u64) -% (1 as u64)) as u64))
+
+    stc_word_set_value_drop((__param_self_ as *const stc_word_set), __param__val)
+
+    while true {
+        (__local_j = ((((((__local_j as u64) +% (1 as u64)) as u64) & (__local_mask as u64)) as u64)))
+
+        if ((if ((__local_m[__local_j])).dist() < 2: 1 else: 0) != 0) {
+            break
+        }
+
+        ((__local_d[__local_i]) = (((__local_d[__local_j]) as u64)))
+
+        ((__local_m[__local_i]) = (__local_m[__local_j]))
+
+        ((__local_m[__local_i])).set_dist((((__local_m[__local_i])).dist() -% 1))
+
+        (__local_i = __local_j)
+
+    }
+
+    ((__local_m[__local_i])).set_dist(((0 as u16)))
+
+    ((*__param_self_).size = (*__param_self_).size - 1)
+
+}
+
+pub unsafe fn stc_word_set_max_load_factor(__param_self_: *const stc_word_set) -> f32 {
+
+    return i_max_load_factor
+
+}
+
+pub unsafe fn stc_word_set_capacity(__param_map: *const stc_word_set) -> i64 {
+    return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
+
+}
+
+pub unsafe fn stc_word_set_bucket_lookup_(__param_self_: *const stc_word_set, __param_rkeyptr: *const u64) -> stc_word_set_result {
+    var __local__hash: u64 = ((c_hash_n((__param_rkeyptr as *const c_void), (8 as i64)) as u64))
+
+    var __local__idxmask: u64 = (((((*__param_self_).bucket_count as u64) -% (1 as u64)) as u64))
+
+    var __local__res: stc_word_set_result = stc_word_set_result { idx: ((__local__hash as u64) & (__local__idxmask as u64)), hashx: (((((((__local__hash as u64) >> (24 as u32))) as u64) & (63 as u64))) as u8), dist: 1 }
+
+    while ((if (*(&raw const __local__res as *const stc_word_set_result)).dist <= (((*__param_self_).meta[(*(&raw const __local__res as *const stc_word_set_result)).idx])).dist(): 1 else: 0) != 0) {
+        if ((if (((*__param_self_).meta[(*(&raw const __local__res as *const stc_word_set_result)).idx])).hashx() == (*(&raw const __local__res as *const stc_word_set_result)).hashx: 1 else: 0) != 0) {
+            var __local__raw: u64 = (*((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const stc_word_set_result)).idx]) as *const u64) as *mut u64))
+
+            if ((if (*(&raw const __local__raw as *const u64)) == (*__param_rkeyptr): 1 else: 0) != 0) {
+                (__local__res.ref = (((&raw const ((*__param_self_).table[(*(&raw const __local__res as *const stc_word_set_result)).idx]) as *const u64) as *mut u64)))
+
+                break
+
+            }
+
+        }
+
+        (__local__res.idx = (((((((*(&raw const __local__res as *const stc_word_set_result)).idx as u64) +% (1 as u64)) as u64) & (__local__idxmask as u64)) as u64)))
+
+        (__local__res.dist = ((*(&raw const __local__res as *const stc_word_set_result)).dist +% 1))
+
+    }
+
+    return __local__res
+
+}
+
+pub unsafe fn stc_word_set_bucket_insert_(__param_self_: *const stc_word_set, __param_rkeyptr: *const u64) -> stc_word_set_result {
+    var __local_res: stc_word_set_result = stc_word_set_bucket_lookup_(__param_self_, __param_rkeyptr)
+
+    if ((*(&raw const __local_res as *const stc_word_set_result)).ref != null) {
+        return __local_res
+    }
+
+    (__local_res.ref = (((&raw const ((*__param_self_).table[(*(&raw const __local_res as *const stc_word_set_result)).idx]) as *const u64) as *mut u64)))
+
+    (__local_res.inserted = true)
+
+    var __local_mnew: hmap_meta = with 0 as __ci_bits_seq_59 { var __ci_bits: hmap_meta = hmap_meta.zeroed(); __ci_bits.set_hashx((((((((*(&raw const __local_res as *const stc_word_set_result)).hashx as u32) as i32) as u32) & (63 as u32))) as u16)); __ci_bits.set_dist((((((((*(&raw const __local_res as *const stc_word_set_result)).dist as u32) as i32) as u32) & (1023 as u32))) as u16)); __ci_bits }
+
+    var __local_mcur: hmap_meta = ((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx])
+
+    (((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx]) = __local_mnew)
+
+    if ((if __local_mcur.dist() != 0: 1 else: 0) != 0) {
+        var __local_mask: u64 = (((((*__param_self_).bucket_count as u64) -% (1 as u64)) as u64))
+
+        var __local_dcur: u64 = (*((*(&raw const __local_res as *const stc_word_set_result)).ref))
+
+        while true {
+            (__local_res.idx = (((((((*(&raw const __local_res as *const stc_word_set_result)).idx as u64) +% (1 as u64)) as u64) & (__local_mask as u64)) as u64)))
+
+            __local_mcur.set_dist((__local_mcur.dist() +% 1))
+
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx])).dist() == 0: 1 else: 0) != 0) {
+                break
+            }
+
+            if ((if (((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx])).dist() < __local_mcur.dist(): 1 else: 0) != 0) {
+                loop {
+                    var __local__xp: *mut hmap_meta = ((&raw mut __local_mcur as *mut hmap_meta))
+
+                    var __local__yp: *mut hmap_meta = (((&raw const ((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx]) as *const hmap_meta) as *mut hmap_meta))
+
+
+                    var __local__tv: hmap_meta = (*__local__xp)
+
+                    with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[hmap_meta]())
+
+                    with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[hmap_meta]())
+
+                    if not ((0 != 0)) {
+                        break
+                    }
+                }
+
+                loop {
+                    var __local__xp_1: *mut u64 = ((&raw mut __local_dcur as *mut u64))
+
+                    var __local__yp_1: *mut u64 = (((&raw const ((*__param_self_).table[(*(&raw const __local_res as *const stc_word_set_result)).idx]) as *const u64) as *mut u64))
+
+
+                    var __local__tv_1: u64 = (*__local__xp_1)
+
+                    ((*__local__xp_1) = (*__local__yp_1))
+
+                    ((*__local__yp_1) = __local__tv_1)
+
+                    if not ((0 != 0)) {
+                        break
+                    }
+                }
+
+            }
+
+        }
+
+        (((*__param_self_).meta[(*(&raw const __local_res as *const stc_word_set_result)).idx]) = __local_mcur)
+
+        (((*__param_self_).table[(*(&raw const __local_res as *const stc_word_set_result)).idx]) = __local_dcur)
+
+    }
+
+    return __local_res
+
+}
+
+pub unsafe fn stc_word_set_is_empty(__param_map: *const stc_word_set) -> bool {
+    return ((((not ((*__param_map).size != 0))) as bool))
+
+}
+
+pub unsafe fn stc_word_set_size(__param_map: *const stc_word_set) -> i64 {
+    return (*__param_map).size
+
+}
+
+pub unsafe fn stc_word_set_bucket_count(__param_map: *mut stc_word_set) -> i64 {
+    return (*__param_map).bucket_count
+
+}
+
+pub unsafe fn stc_word_set_contains(__param_self_: *const stc_word_set, __param_rkey: u64) -> bool {
+    var __ci_expr_logic_0: i32 = 0
+
+    if ((*__param_self_).size != 0) {
+        (__ci_expr_logic_0 = (if stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref != null: 1 else: 0))
+    }
+
+    return (((__ci_expr_logic_0 != 0) as bool))
+
+
+}
+
+pub unsafe fn stc_word_set_shrink_to_fit(__param_self_: *mut stc_word_set) -> Unit {
+    stc_word_set_reserve(__param_self_, (9223372036854775807 as i64))
+
+}
+
+pub unsafe fn stc_word_set_insert_entry_(__param_self_: *mut stc_word_set, __param_rkey: u64) -> stc_word_set_result {
+    if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
+        if ((if not stc_word_set_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
+            return ((stc_word_set_result.zeroed() as stc_word_set_result))
+        }
+    }
+
+    var __local_res: stc_word_set_result = stc_word_set_bucket_insert_((__param_self_ as *const stc_word_set), ((&raw mut __param_rkey as *mut u64) as *const u64))
+
+    ((*__param_self_).size = (*__param_self_).size + ((*(&raw const __local_res as *const stc_word_set_result)).inserted as i32))
+
+    return __local_res
+
+}
+
+pub unsafe fn stc_word_set_copy(__param_self_: *mut stc_word_set, __param_other: *const stc_word_set) -> Unit {
+    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_set_drop((__param_self_ as *const stc_word_set))
+
+    let __ci_copy_18: stc_word_set = stc_word_set_clone((*__param_other))
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_18 as *const u8), sizeof[stc_word_set]())
+
+}
+
+pub unsafe fn stc_word_set_value_clone(__param_self_: *const stc_word_set, __param__val: u64) -> u64 {
+
+    ((*(&raw mut __param__val as *mut u64)) = (*(&raw mut __param__val as *mut u64)))
+
+    return __param__val
+
+}
+
+pub unsafe fn stc_word_set_value_toraw(__param_val: *const u64) -> u64 {
+    return (*__param_val)
+
+}
+
+pub unsafe fn stc_word_set_value_drop(__param_self_: *const stc_word_set, __param__val: *mut u64) {
+    return
+}
+
+pub unsafe fn stc_word_set_move(__param_self_: *mut stc_word_set) -> stc_word_set {
+    var __local_m: stc_word_set = (*__param_self_)
+
+    ((*__param_self_).size = ((0 as i64)))
+
+    ((*__param_self_).bucket_count = (*__param_self_).size)
+
+
+    ((*__param_self_).meta = ((null as *mut hmap_meta)))
+
+    ((*__param_self_).table = ((null as *mut u64)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_word_set_take(__param_self_: *mut stc_word_set, __param_unowned: stc_word_set) -> Unit {
+    stc_word_set_drop((__param_self_ as *const stc_word_set))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_set]())
+
+}
+
+pub unsafe fn stc_word_set_insert(__param_self_: *mut stc_word_set, __param__key: u64) -> stc_word_set_result {
+    var __local__res: stc_word_set_result = stc_word_set_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut u64)))
+
+    if (*(&raw const __local__res as *const stc_word_set_result)).inserted {
+        ((*((*(&raw const __local__res as *const stc_word_set_result)).ref)) = __param__key)
+
+    } else {
+
+    }
+
+    return __local__res
+
+}
+
+pub unsafe fn stc_word_set_push(__param_self_: *mut stc_word_set, __param__val: u64) -> *mut u64 {
+    var __local__res: stc_word_set_result = stc_word_set_insert_entry_(__param_self_, (*(&raw mut __param__val as *mut u64)))
+
+    if ((if not (*(&raw const __local__res as *const stc_word_set_result)).inserted: 1 else: 0) != 0) {
+        stc_word_set_value_drop((__param_self_ as *const stc_word_set), (*(&raw const __local__res as *const stc_word_set_result)).ref)
+    }
+
+    ((*((*(&raw const __local__res as *const stc_word_set_result)).ref)) = __param__val)
+
+    return (*(&raw const __local__res as *const stc_word_set_result)).ref
+
+}
+
+pub unsafe fn stc_word_set_put_n(__param_self_: *mut stc_word_set, __param_raw: *const u64, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_word_set_insert(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub fn stc_word_set_init() -> stc_word_set {
+    var __local_cx: stc_word_set = stc_word_set.zeroed()
+
+    return __local_cx
+
+}
+
+pub unsafe fn stc_word_set_from_n(__param_raw: *const u64, __param_n: i64) -> stc_word_set {
+    var __local_cx: stc_word_set = stc_word_set.zeroed()
+
+    stc_word_set_put_n((&raw mut __local_cx as *mut stc_word_set), __param_raw, __param_n)
+
+    return __local_cx
+
+}
+
+pub fn stc_word_set_with_capacity(__param_cap: i64) -> stc_word_set {
+    var __local_cx: stc_word_set = stc_word_set.zeroed()
+
+    unsafe { stc_word_set_reserve((&raw mut __local_cx as *mut stc_word_set), __param_cap) }
+
+    return __local_cx
+
+}
+
+pub unsafe fn stc_word_set_begin(__param_self_: *const stc_word_set) -> stc_word_set_iter {
+    var __local_it_: stc_word_set_iter = stc_word_set_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
+
+    if ((if (*(&raw const __local_it_ as *const stc_word_set_iter)).ref == null: 1 else: 0) != 0) {
+        return __local_it_
+    }
+
+    (__local_it_._end = (*(&raw const __local_it_ as *const stc_word_set_iter))._end + (((*__param_self_).bucket_count as i64) as usize))
+
+    while ((if (*(*(&raw const __local_it_ as *const stc_word_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_word_set_iter)).ref + 1)
+
+        (__local_it_._mref = (*(&raw const __local_it_ as *const stc_word_set_iter))._mref + 1)
+
+    }
+
+    if ((if (*(&raw const __local_it_ as *const stc_word_set_iter)).ref == (*(&raw const __local_it_ as *const stc_word_set_iter))._end: 1 else: 0) != 0) {
+        (__local_it_.ref = ((null as *mut u64)))
+    }
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_word_set_end(__param_self_: *const stc_word_set) -> stc_word_set_iter {
+
+    return ((stc_word_set_iter.zeroed() as stc_word_set_iter))
+
+}
+
+pub unsafe fn stc_word_set_next(__param_it_: *mut stc_word_set_iter) {
+    while true {
+        ((*__param_it_).ref = (*__param_it_).ref + 1)
+
+        ((*__param_it_)._mref = (*__param_it_)._mref + 1)
+
+        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
+            break
+        }
+
+    }
+
+    if ((if (*__param_it_).ref == (*__param_it_)._end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut u64)))
+    }
+
+}
+
+pub fn stc_word_set_advance(__param_it_: stc_word_set_iter, __param_n: u64) -> stc_word_set_iter {
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_logic_1: i32 = 0
+
+        var __ci_expr_old_0: u64 = __local_n
+
+        (__local_n = (__local_n -% 1))
+
+        if (__ci_expr_old_0 != 0) {
+            (__ci_expr_logic_1 = (if (unsafe *(&raw const __param_it_ as *const stc_word_set_iter)).ref != null: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_1 != 0)) {
+            break
+        }
+
+        unsafe { stc_word_set_next((&raw mut __param_it_ as *mut stc_word_set_iter)) }
+
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_set_find(__param_self_: *const stc_word_set, __param_rkey: u64) -> stc_word_set_iter {
+    var __local_ref: *mut u64
+
+    var __ci_expr_logic_0: i32 = 0
+
+    if ((if (*__param_self_).size != 0: 1 else: 0) != 0) {
+        (__local_ref = stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref)
+
+        (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
+
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        return ((stc_word_set_iter { ref: __local_ref, _end: ((&raw const ((*__param_self_).table[(*__param_self_).bucket_count]) as *const u64) as *mut u64), _mref: ((&raw const ((*__param_self_).meta[((((__local_ref as usize) -% ((*__param_self_).table as usize)) as i64) / (sizeof[u64]() as i64))]) as *const hmap_meta) as *mut hmap_meta) } as stc_word_set_iter))
+    }
+
+
+    return stc_word_set_end(__param_self_)
+
+}
+
+pub unsafe fn stc_word_set_get(__param_self_: *const stc_word_set, __param_rkey: u64) -> *const u64 {
+    return (((if (*__param_self_).size != 0: stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref else: (null as *mut u64)) as *const u64))
+
+}
+
+pub unsafe fn stc_word_set_get_mut(__param_self_: *mut stc_word_set, __param_rkey: u64) -> *mut u64 {
+    return ((stc_word_set_get((__param_self_ as *const stc_word_set), __param_rkey) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_set_erase(__param_self_: *mut stc_word_set, __param_rkey: u64) -> i32 {
+    var __local_ref: *mut u64
+
+    var __ci_expr_logic_0: i32 = 0
+
+    if ((if (*__param_self_).size != 0: 1 else: 0) != 0) {
+        (__local_ref = stc_word_set_bucket_lookup_((__param_self_ as *const stc_word_set), ((&raw mut __param_rkey as *mut u64) as *const u64)).ref)
+
+        (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
+
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        stc_word_set_erase_entry(__param_self_, __local_ref)
+
+        return 1
+
+    }
+
+
+    return 0
+
+}
+
+pub unsafe fn stc_word_set_erase_at(__param_self_: *mut stc_word_set, __param_it_: stc_word_set_iter) -> stc_word_set_iter {
+    stc_word_set_erase_entry(__param_self_, (*(&raw const __param_it_ as *const stc_word_set_iter)).ref)
+
+    if ((if (*(*(&raw const __param_it_ as *const stc_word_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+        stc_word_set_next((&raw mut __param_it_ as *mut stc_word_set_iter))
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_set_eq(__param_self_: *const stc_word_set, __param_other: *const stc_word_set) -> bool {
+    if ((if stc_word_set_size(__param_self_) != stc_word_set_size(__param_other): 1 else: 0) != 0) {
+        return ((false as bool))
+    }
+
+    var __local_i: stc_word_set_iter = stc_word_set_begin(__param_self_)
+
+    while ((*(&raw const __local_i as *const stc_word_set_iter)).ref != null) {
+        var __local__raw: u64 = (*((*(&raw const __local_i as *const stc_word_set_iter)).ref))
+
+        if ((if not stc_word_set_contains(__param_other, __local__raw): 1 else: 0) != 0) {
+            return ((false as bool))
+        }
+
+
+        stc_word_set_next((&raw mut __local_i as *mut stc_word_set_iter))
+
+    }
+
+
+    return ((true as bool))
+
+}
+
+unsafe fn stc_word_set_wipe_(__param_self_: *mut stc_word_set) {
+    var __local_d: *mut u64 = (*__param_self_).table
+
+    var __local_m: *const hmap_meta = (((*__param_self_).meta as *const hmap_meta))
+
+    var __local_n: i64 = (*__param_self_).bucket_count
+
+    var __local_i: i64 = ((0 as i64))
+
+    while ((if __local_i < __local_n: 1 else: 0) != 0) {
+        var __ci_expr_old_0: *const hmap_meta = __local_m
+
+        (__local_m = __local_m + 1)
+
+        if ((*__ci_expr_old_0).dist() != 0) {
+            stc_word_set_value_drop((__param_self_ as *const stc_word_set), ((&raw const (__local_d[__local_i]) as *const u64) as *mut u64))
+        }
+
+
+        (__local_i = __local_i + 1)
+
+    }
+
+
+}
+
+pub unsafe fn stc_word_pqueue_make_heap(__param_self_: *mut stc_word_pqueue) {
+    var __local_n: i64 = (*__param_self_).size
+
+    var __local_k: i64 = (((__local_n / 2) as i64))
+
+    while ((if __local_k != 0: 1 else: 0) != 0) {
+        stc_word_pqueue_sift_down_(__param_self_, __local_k, __local_n)
+
+        (__local_k = __local_k - 1)
+
+    }
+
+
+}
+
+pub unsafe fn stc_word_pqueue_erase_at(__param_self_: *mut stc_word_pqueue, __param_idx: i64) {
+
+    var __local_n: i64 = with 0 as __ci_expr_seq_10 {
+        ((*__param_self_).size = (*__param_self_).size - 1)
+        (*__param_self_).size
+    }
+
+    (((*__param_self_).data[__param_idx]) = ((((*__param_self_).data[__local_n]) as i64)))
+
+    stc_word_pqueue_sift_down_(__param_self_, ((__param_idx + 1) as i64), __local_n)
+
+}
+
+pub unsafe fn stc_word_pqueue_push(__param_self_: *mut stc_word_pqueue, __param_value: i64) -> *mut i64 {
+    if ((if (*__param_self_).size == (*__param_self_).capacity: 1 else: 0) != 0) {
+        if ((if not stc_word_pqueue_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 4) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut i64))
+        }
+    }
+
+    var __local_arr: *mut i64 = ((*__param_self_).data - ((1 as i64) as usize))
+
+    var __local_c: i64 = with 0 as __ci_expr_seq_9 {
+        ((*__param_self_).size = (*__param_self_).size + 1)
+        (*__param_self_).size
+    }
+
+    while true {
+        var __ci_expr_logic_0: i32 = 0
+
+        if ((if __local_c > 1: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if (if (*((&raw const (__local_arr[(__local_c / 2)]) as *const i64) as *mut i64)) < (*(&raw mut __param_value as *mut i64)): 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_0 != 0)) {
+            break
+        }
+
+        ((__local_arr[__local_c]) = (((__local_arr[(__local_c / 2)]) as i64)))
+
+        (__local_c = __local_c / 2)
+
+    }
+
+    ((__local_arr[__local_c]) = __param_value)
+
+    return (((__local_arr + ((__local_c as i64) as usize)) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_pqueue_sift_down_(__param_self_: *mut stc_word_pqueue, __param_idx: i64, __param_n: i64) {
+    var __local_t: i64
+
+    var __local_arr: *mut i64 = ((*__param_self_).data - ((1 as i64) as usize))
+
+
+    var __local_r: i64 = __param_idx
+
+    var __local_c: i64 = (((__param_idx * 2) as i64))
+
+
+    while ((if __local_c <= __param_n: 1 else: 0) != 0) {
+        (__local_c = __local_c + (if (*((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)) < (*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const i64) as *mut i64)): 1 else: 0))
+
+        if ((if not ((if (*((&raw const (__local_arr[__local_r]) as *const i64) as *mut i64)) < (*((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)): 1 else: 0) != 0): 1 else: 0) != 0) {
+            return
+        }
+
+        (__local_t = (((__local_arr[__local_r]) as i64)))
+
+        ((__local_arr[__local_r]) = (((__local_arr[__local_c]) as i64)))
+
+        (__local_r = __local_c)
+
+        ((__local_arr[__local_r]) = __local_t)
+
+
+
+        (__local_c = __local_c * 2)
+
+    }
+
+
+}
+
+pub unsafe fn stc_word_pqueue_put_n(__param_self_: *mut stc_word_pqueue, __param_raw: *const i64, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_word_pqueue_push(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub unsafe fn stc_word_pqueue_reserve(__param_self_: *mut stc_word_pqueue, __param_cap: i64) -> bool {
+    var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as i64))
+
+    if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as i32)) != 0) {
+        var __local_d: *mut i64 = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[i64]() as i64)) as i64) else: (((*__param_self_).capacity * (sizeof[i64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i64))
+
+        if ((if __local_d == null: 1 else: 0) != 0) {
+            return ((false as bool))
+        }
+
+        ((*__param_self_).data = __local_d)
+
+        ((*__param_self_).capacity = __local_n)
+
+    }
+
+    return (((((*__param_self_).data != null)) as bool))
+
+}
+
+pub unsafe fn stc_word_pqueue_shrink_to_fit(__param_self_: *mut stc_word_pqueue) -> Unit {
+    stc_word_pqueue_reserve(__param_self_, (9223372036854775807 as i64))
+
+}
+
+pub fn stc_word_pqueue_init() -> stc_word_pqueue {
+    return ((stc_word_pqueue.zeroed() as stc_word_pqueue))
+
+}
+
+pub unsafe fn stc_word_pqueue_from_n(__param_raw: *const i64, __param_n: i64) -> stc_word_pqueue {
+    var __local_cx: stc_word_pqueue = stc_word_pqueue.zeroed()
+
+    stc_word_pqueue_put_n((&raw mut __local_cx as *mut stc_word_pqueue), __param_raw, __param_n)
+
+    return __local_cx
+
+}
+
+pub fn stc_word_pqueue_with_capacity(__param_cap: i64) -> stc_word_pqueue {
+    var __local_cx: stc_word_pqueue = stc_word_pqueue.zeroed()
+
+    unsafe { stc_word_pqueue_reserve((&raw mut __local_cx as *mut stc_word_pqueue), __param_cap) }
+
+    return __local_cx
+
+}
+
+pub unsafe fn stc_word_pqueue_clear(__param_self_: *mut stc_word_pqueue) {
+    var __local_i: i64 = (*__param_self_).size
+
+    while true {
+        var __ci_expr_old_0: i64 = __local_i
+
+        (__local_i = __local_i - 1)
+
+        if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+            break
+        }
+
+    }
+
+    ((*__param_self_).size = ((0 as i64)))
+
+}
+
+pub unsafe fn stc_word_pqueue_drop(__param_cself: *const stc_word_pqueue) {
+    var __local_self_: *mut stc_word_pqueue = ((__param_cself as *mut stc_word_pqueue))
+
+    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_pqueue_clear(__local_self_)
+
+    with_free((((*__local_self_).data as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_word_pqueue_move(__param_self_: *mut stc_word_pqueue) -> stc_word_pqueue {
+    var __local_m: stc_word_pqueue = (*__param_self_)
+
+    ((*__param_self_).capacity = ((0 as i64)))
+
+    ((*__param_self_).size = (*__param_self_).capacity)
+
+
+    ((*__param_self_).data = ((null as *mut i64)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_word_pqueue_take(__param_self_: *mut stc_word_pqueue, __param_unowned: stc_word_pqueue) -> Unit {
+    stc_word_pqueue_drop((__param_self_ as *const stc_word_pqueue))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_pqueue]())
+
+}
+
+pub unsafe fn stc_word_pqueue_size(__param_q: *const stc_word_pqueue) -> i64 {
+    return (*__param_q).size
+
+}
+
+pub unsafe fn stc_word_pqueue_is_empty(__param_q: *const stc_word_pqueue) -> bool {
+    return ((((not ((*__param_q).size != 0))) as bool))
+
+}
+
+pub unsafe fn stc_word_pqueue_capacity(__param_q: *const stc_word_pqueue) -> i64 {
+    return (*__param_q).capacity
+
+}
+
+pub unsafe fn stc_word_pqueue_top(__param_self_: *const stc_word_pqueue) -> *const i64 {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_pqueue_top".ptr, c"pqueue.h".ptr, (117 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    return ((((&raw const ((*__param_self_).data[0]) as *const i64) as *mut i64) as *const i64))
+
+}
+
+pub unsafe fn stc_word_pqueue_pop(__param_self_: *mut stc_word_pqueue) {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_pqueue_pop".ptr, c"pqueue.h".ptr, (120 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    stc_word_pqueue_erase_at(__param_self_, (0 as i64))
+
+}
+
+pub unsafe fn stc_word_pqueue_pull(__param_self_: *mut stc_word_pqueue) -> i64 {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_pqueue_pull".ptr, c"pqueue.h".ptr, (123 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    var __local_v: i64 = ((((*__param_self_).data[0]) as i64))
+
+    stc_word_pqueue_erase_at(__param_self_, (0 as i64))
+
+    return __local_v
+
+}
+
+pub unsafe fn stc_word_pqueue_pushpull(__param_self_: *mut stc_word_pqueue, __param_val: i64) -> i64 {
+    var __ci_expr_logic_0: i32 = 0
+
+    if ((*__param_self_).size != 0) {
+        (__ci_expr_logic_0 = (if (if (*(&raw mut __param_val as *mut i64)) < (*((&raw const ((*__param_self_).data[0]) as *const i64) as *mut i64)): 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        loop {
+            var __local__xp: *mut i64 = ((&raw mut __param_val as *mut i64))
+
+            var __local__yp: *mut i64 = (((&raw const ((*__param_self_).data[0]) as *const i64) as *mut i64))
+
+
+            var __local__tv: i64 = (*__local__xp)
+
+            ((*__local__xp) = (*__local__yp))
+
+            ((*__local__yp) = __local__tv)
+
+            if not ((0 != 0)) {
+                break
+            }
+        }
+
+        stc_word_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+
+    }
+
+
+    return __param_val
+
+}
+
+pub unsafe fn stc_word_pqueue_exchange(__param_self_: *mut stc_word_pqueue, __param_val: i64) -> i64 {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_pqueue_exchange".ptr, c"pqueue.h".ptr, (138 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    loop {
+        var __local__xp: *mut i64 = ((&raw mut __param_val as *mut i64))
+
+        var __local__yp: *mut i64 = (((&raw const ((*__param_self_).data[0]) as *const i64) as *mut i64))
+
+
+        var __local__tv: i64 = (*__local__xp)
+
+        ((*__local__xp) = (*__local__yp))
+
+        ((*__local__yp) = __local__tv)
+
+        if not ((0 != 0)) {
+            break
+        }
+    }
+
+    stc_word_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+
+    return __param_val
+
+}
+
+pub fn stc_word_pqueue_clone(__param_q: stc_word_pqueue) -> stc_word_pqueue {
+    var __local_out: stc_word_pqueue = __param_q
+
+    var __local_self_: *mut stc_word_pqueue = ((&raw mut __local_out as *mut stc_word_pqueue))
+
+
+
+    (__local_out.size = ((0 as i64)))
+
+    (__local_out.capacity = (unsafe *(&raw const __local_out as *const stc_word_pqueue)).size)
+
+
+    (__local_out.data = ((null as *mut i64)))
+
+    unsafe { stc_word_pqueue_reserve((&raw mut __local_out as *mut stc_word_pqueue), (*(&raw const __param_q as *const stc_word_pqueue)).size) }
+
+    (__local_out.size = (unsafe *(&raw const __param_q as *const stc_word_pqueue)).size)
+
+    var __local_i: i64 = ((0 as i64))
+
+    var __local__c_end_i: i64 = (unsafe *(&raw const __param_q as *const stc_word_pqueue)).size
+
+
+    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+        ((unsafe __local_out.data[__local_i]) = (((unsafe (*(&raw const __param_q as *const stc_word_pqueue)).data[__local_i]) as i64)))
+
+        (__local_i = __local_i + 1)
+
+    }
+
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_pqueue_copy(__param_self_: *mut stc_word_pqueue, __param_other: *const stc_word_pqueue) -> Unit {
+    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_pqueue_drop((__param_self_ as *const stc_word_pqueue))
+
+    let __ci_copy_18: stc_word_pqueue = stc_word_pqueue_clone((*__param_other))
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_18 as *const u8), sizeof[stc_word_pqueue]())
+
+}
+
+pub unsafe fn stc_word_pqueue_value_clone(__param_self_: *const stc_word_pqueue, __param_val: i64) -> i64 {
+
+    return __param_val
+
+}
+
+pub unsafe fn stc_slot_stack_move(__param_self_: *mut stc_slot_stack) -> stc_slot_stack {
+    var __local_m: stc_slot_stack = (*__param_self_)
+
+    ((*__param_self_).size = ((0 as i64)))
+
+    ((*__param_self_).capacity = (*__param_self_).size)
+
+
+    ((*__param_self_).data = ((null as *mut *mut stc_slot_head)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_slot_stack_capacity(__param_self_: *const stc_slot_stack) -> i64 {
+    return (*__param_self_).capacity
+
+}
+
+pub unsafe fn stc_slot_stack_reserve(__param_self_: *mut stc_slot_stack, __param_cap: i64) -> bool {
+    var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as i64))
+
+    if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as i32)) != 0) {
+        var __local_d: *mut *mut stc_slot_head = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (((*__param_self_).capacity * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+
+        if ((if __local_d == null: 1 else: 0) != 0) {
+            return ((false as bool))
+        }
+
+        ((*__param_self_).data = __local_d)
+
+        ((*__param_self_).capacity = __local_n)
+
+    }
+
+    return (((((*__param_self_).data != null)) as bool))
+
+}
+
+pub unsafe fn stc_slot_stack_clear(__param_self_: *mut stc_slot_stack) {
+    var __local_i: i64 = (*__param_self_).size
+
+    while true {
+        var __ci_expr_old_0: i64 = __local_i
+
+        (__local_i = __local_i - 1)
+
+        if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+            break
+        }
+
+    }
+
+    ((*__param_self_).size = ((0 as i64)))
+
+}
+
+pub unsafe fn stc_slot_stack_drop(__param_cself: *const stc_slot_stack) {
+    var __local_self_: *mut stc_slot_stack = ((__param_cself as *mut stc_slot_stack))
+
+    stc_slot_stack_clear(__local_self_)
+
+    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+        return
+    }
+
+    with_free((((*__local_self_).data as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_slot_stack_take(__param_self_: *mut stc_slot_stack, __param_unowned: stc_slot_stack) -> Unit {
+    stc_slot_stack_drop((__param_self_ as *const stc_slot_stack))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_stack]())
+
+}
+
+pub unsafe fn stc_slot_stack_size(__param_self_: *const stc_slot_stack) -> i64 {
+    return (*__param_self_).size
+
+}
+
+pub unsafe fn stc_slot_stack_is_empty(__param_self_: *const stc_slot_stack) -> bool {
+    return ((((not ((*__param_self_).size != 0))) as bool))
+
+}
+
+pub unsafe fn stc_slot_stack_value_drop(__param_self_: *const stc_slot_stack, __param_val: *mut *mut stc_slot_head) {
+    return
+}
+
+pub unsafe fn stc_slot_stack_append_uninit(__param_self_: *mut stc_slot_stack, __param_n: i64) -> *mut *mut stc_slot_head {
+    var __local_len: i64 = (*__param_self_).size
+
+    if ((if (__local_len + __param_n) >= stc_slot_stack_capacity((__param_self_ as *const stc_slot_stack)): 1 else: 0) != 0) {
+        if ((if not stc_slot_stack_reserve(__param_self_, ((((__local_len * 3) / 2) + __param_n) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut *mut stc_slot_head))
+        }
+    }
+
+    ((*__param_self_).size = (*__param_self_).size + __param_n)
+
+    return ((((*__param_self_).data + ((__local_len as i64) as usize)) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_shrink_to_fit(__param_self_: *mut stc_slot_stack) -> Unit {
+    stc_slot_stack_reserve(__param_self_, (9223372036854775807 as i64))
+
+}
+
+pub unsafe fn stc_slot_stack_front(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
+    return ((((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_front_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
+    return (((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_back(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
+    return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_back_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
+    return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_top(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
+    return ((stc_slot_stack_back(__param_self_) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_top_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
+    return ((stc_slot_stack_back_mut(__param_self_) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_push(__param_self_: *mut stc_slot_stack, __param_val: *mut stc_slot_head) -> *mut *mut stc_slot_head {
+    if ((if (*__param_self_).size == stc_slot_stack_capacity((__param_self_ as *const stc_slot_stack)): 1 else: 0) != 0) {
+        if ((if not stc_slot_stack_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 4) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut *mut stc_slot_head))
+        }
+    }
+
+    var __local_vp: *mut *mut stc_slot_head = with 0 as __ci_expr_seq_10 {
+        var __ci_expr_old_0: i64 = (*__param_self_).size
+        ((*__param_self_).size = (*__param_self_).size + 1)
+        ((*__param_self_).data + ((__ci_expr_old_0 as i64) as usize))
+    }
+
+    ((*__local_vp) = __param_val)
+
+    return __local_vp
+
+}
+
+pub unsafe fn stc_slot_stack_pop(__param_self_: *mut stc_slot_stack) {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_stack_pop".ptr, c"stack.h".ptr, (149 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    var __local_p: *mut *mut stc_slot_head = with 0 as __ci_expr_seq_8 {
+        ((*__param_self_).size = (*__param_self_).size - 1)
+        ((&raw const ((*__param_self_).data[(*__param_self_).size]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)
+    }
+
+
+}
+
+pub unsafe fn stc_slot_stack_pull(__param_self_: *mut stc_slot_stack) -> *mut stc_slot_head {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_stack_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    ((*__param_self_).size = (*__param_self_).size - 1)
+
+    return ((((*__param_self_).data[(*__param_self_).size]) as *mut stc_slot_head))
+
+
+}
+
+pub unsafe fn stc_slot_stack_put_n(__param_self_: *mut stc_slot_stack, __param_raw: *const *mut stc_slot_head, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_slot_stack_push(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub fn stc_slot_stack_init() -> stc_slot_stack {
+    var __local_out: stc_slot_stack = stc_slot_stack.zeroed()
+
+    return __local_out
+
+}
+
+pub fn stc_slot_stack_with_capacity(__param_cap: i64) -> stc_slot_stack {
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: 0, capacity: __param_cap }
+
+    return __local_out
+
+}
+
+pub fn stc_slot_stack_with_size_uninit(__param_size: i64) -> stc_slot_stack {
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __param_size, capacity: __param_size }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_stack_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_stack {
+    var __local_size = __param_size
+    var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __local_size, capacity: __local_size }
+
+    while (__local_size != 0) {
+        (__local_size = __local_size - 1)
+
+        ((__local_out.data[__local_size]) = __param_default_raw)
+
+    }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_stack_from_n(__param_raw: *const *mut stc_slot_head, __param_n: i64) -> stc_slot_stack {
+    var __local_out: stc_slot_stack = stc_slot_stack_with_capacity(__param_n)
+
+    stc_slot_stack_put_n((&raw mut __local_out as *mut stc_slot_stack), __param_raw, __param_n)
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_stack_at(__param_self_: *const stc_slot_stack, __param_idx: i64) -> *const *mut stc_slot_head {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
+    } else {
+        0
+    }
+
+    return ((((*__param_self_).data + ((__param_idx as i64) as usize)) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_at_mut(__param_self_: *mut stc_slot_stack, __param_idx: i64) -> *mut *mut stc_slot_head {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
+    } else {
+        0
+    }
+
+    return ((((*__param_self_).data + ((__param_idx as i64) as usize)) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_stack_value_toraw(__param_val: *const *mut stc_slot_head) -> *mut stc_slot_head {
+    return (*__param_val)
+
+}
+
+pub unsafe fn stc_slot_stack_begin(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
+    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
+
+    if ((*__param_self_).size != 0) {
+        (__local_it_.end = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).end + (((*__param_self_).size as i64) as usize))
+    } else {
+        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_slot_stack_rbegin(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
+    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
+
+    if ((*__param_self_).size != 0) {
+        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
+
+        (__local_it_.end = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).end - ((1 as i64) as usize))
+
+    } else {
+        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_slot_stack_end(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
+
+    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_slot_stack_rend(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
+
+    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_slot_stack_next(__param_it_: *mut stc_slot_stack_iter) {
+    ((*__param_it_).ref = (*__param_it_).ref + 1)
+
+    if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+
+}
+
+pub unsafe fn stc_slot_stack_rnext(__param_it_: *mut stc_slot_stack_iter) {
+    ((*__param_it_).ref = (*__param_it_).ref - 1)
+
+    if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+
+}
+
+pub fn stc_slot_stack_advance(__param_it_: stc_slot_stack_iter, __param_n: u64) -> stc_slot_stack_iter {
+    (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const stc_slot_stack_iter)).ref + (__param_n as usize))
+
+    if ((if (unsafe *(&raw const __param_it_ as *const stc_slot_stack_iter)).ref >= (unsafe *(&raw const __param_it_ as *const stc_slot_stack_iter)).end: 1 else: 0) != 0) {
+        (__param_it_.ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_stack_index(__param_self_: *const stc_slot_stack, __param_it_: stc_slot_stack_iter) -> i64 {
+    return (((((*(&raw const __param_it_ as *const stc_slot_stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[usize]() as i64))
+
+}
+
+pub unsafe fn stc_slot_stack_adjust_end_(__param_self_: *mut stc_slot_stack, __param_n: i64) {
+    ((*__param_self_).size = (*__param_self_).size + __param_n)
+
+}
+
+pub unsafe fn stc_word_stack_move(__param_self_: *mut stc_word_stack) -> stc_word_stack {
+    var __local_m: stc_word_stack = (*__param_self_)
+
+    ((*__param_self_).size = ((0 as i64)))
+
+    ((*__param_self_).capacity = (*__param_self_).size)
+
+
+    ((*__param_self_).data = ((null as *mut u64)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_word_stack_capacity(__param_self_: *const stc_word_stack) -> i64 {
+    return (*__param_self_).capacity
+
+}
+
+pub unsafe fn stc_word_stack_reserve(__param_self_: *mut stc_word_stack, __param_cap: i64) -> bool {
+    var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as i64))
+
+    if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as i32)) != 0) {
+        var __local_d: *mut u64 = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[u64]() as i64)) as i64) else: (((*__param_self_).capacity * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+
+        if ((if __local_d == null: 1 else: 0) != 0) {
+            return ((false as bool))
+        }
+
+        ((*__param_self_).data = __local_d)
+
+        ((*__param_self_).capacity = __local_n)
+
+    }
+
+    return (((((*__param_self_).data != null)) as bool))
+
+}
+
+pub unsafe fn stc_word_stack_clear(__param_self_: *mut stc_word_stack) {
+    var __local_i: i64 = (*__param_self_).size
+
+    while true {
+        var __ci_expr_old_0: i64 = __local_i
+
+        (__local_i = __local_i - 1)
+
+        if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+            break
+        }
+
+    }
+
+    ((*__param_self_).size = ((0 as i64)))
+
+}
+
+pub unsafe fn stc_word_stack_drop(__param_cself: *const stc_word_stack) {
+    var __local_self_: *mut stc_word_stack = ((__param_cself as *mut stc_word_stack))
+
+    stc_word_stack_clear(__local_self_)
+
+    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+        return
+    }
+
+    with_free((((*__local_self_).data as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_word_stack_take(__param_self_: *mut stc_word_stack, __param_unowned: stc_word_stack) -> Unit {
+    stc_word_stack_drop((__param_self_ as *const stc_word_stack))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_stack]())
+
+}
+
+pub unsafe fn stc_word_stack_size(__param_self_: *const stc_word_stack) -> i64 {
+    return (*__param_self_).size
+
+}
+
+pub unsafe fn stc_word_stack_is_empty(__param_self_: *const stc_word_stack) -> bool {
+    return ((((not ((*__param_self_).size != 0))) as bool))
+
+}
+
+pub unsafe fn stc_word_stack_value_drop(__param_self_: *const stc_word_stack, __param_val: *mut u64) {
+    return
+}
+
+pub unsafe fn stc_word_stack_append_uninit(__param_self_: *mut stc_word_stack, __param_n: i64) -> *mut u64 {
+    var __local_len: i64 = (*__param_self_).size
+
+    if ((if (__local_len + __param_n) >= stc_word_stack_capacity((__param_self_ as *const stc_word_stack)): 1 else: 0) != 0) {
+        if ((if not stc_word_stack_reserve(__param_self_, ((((__local_len * 3) / 2) + __param_n) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut u64))
+        }
+    }
+
+    ((*__param_self_).size = (*__param_self_).size + __param_n)
+
+    return ((((*__param_self_).data + ((__local_len as i64) as usize)) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_stack_shrink_to_fit(__param_self_: *mut stc_word_stack) -> Unit {
+    stc_word_stack_reserve(__param_self_, (9223372036854775807 as i64))
+
+}
+
+pub unsafe fn stc_word_stack_front(__param_self_: *const stc_word_stack) -> *const u64 {
+    return ((((&raw const ((*__param_self_).data[0]) as *const u64) as *mut u64) as *const u64))
+
+}
+
+pub unsafe fn stc_word_stack_front_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
+    return (((&raw const ((*__param_self_).data[0]) as *const u64) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_stack_back(__param_self_: *const stc_word_stack) -> *const u64 {
+    return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const u64) as *mut u64) as *const u64))
+
+}
+
+pub unsafe fn stc_word_stack_back_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
+    return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const u64) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_stack_top(__param_self_: *const stc_word_stack) -> *const u64 {
+    return ((stc_word_stack_back(__param_self_) as *const u64))
+
+}
+
+pub unsafe fn stc_word_stack_top_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
+    return ((stc_word_stack_back_mut(__param_self_) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_stack_push(__param_self_: *mut stc_word_stack, __param_val: u64) -> *mut u64 {
+    if ((if (*__param_self_).size == stc_word_stack_capacity((__param_self_ as *const stc_word_stack)): 1 else: 0) != 0) {
+        if ((if not stc_word_stack_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 4) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut u64))
+        }
+    }
+
+    var __local_vp: *mut u64 = with 0 as __ci_expr_seq_10 {
+        var __ci_expr_old_0: i64 = (*__param_self_).size
+        ((*__param_self_).size = (*__param_self_).size + 1)
+        ((*__param_self_).data + ((__ci_expr_old_0 as i64) as usize))
+    }
+
+    ((*__local_vp) = __param_val)
+
+    return __local_vp
+
+}
+
+pub unsafe fn stc_word_stack_pop(__param_self_: *mut stc_word_stack) {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_stack_pop".ptr, c"stack.h".ptr, (149 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    var __local_p: *mut u64 = with 0 as __ci_expr_seq_8 {
+        ((*__param_self_).size = (*__param_self_).size - 1)
+        ((&raw const ((*__param_self_).data[(*__param_self_).size]) as *const u64) as *mut u64)
+    }
+
+
+}
+
+pub unsafe fn stc_word_stack_pull(__param_self_: *mut stc_word_stack) -> u64 {
+    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_stack_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
+    } else {
+        0
+    }
+
+    ((*__param_self_).size = (*__param_self_).size - 1)
+
+    return ((*__param_self_).data[(*__param_self_).size])
+
+
+}
+
+pub unsafe fn stc_word_stack_put_n(__param_self_: *mut stc_word_stack, __param_raw: *const u64, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_word_stack_push(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub fn stc_word_stack_init() -> stc_word_stack {
+    var __local_out: stc_word_stack = stc_word_stack.zeroed()
+
+    return __local_out
+
+}
+
+pub fn stc_word_stack_with_capacity(__param_cap: i64) -> stc_word_stack {
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: 0, capacity: __param_cap }
+
+    return __local_out
+
+}
+
+pub fn stc_word_stack_with_size_uninit(__param_size: i64) -> stc_word_stack {
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: __param_size, capacity: __param_size }
+
+    return __local_out
+
+}
+
+pub fn stc_word_stack_with_size(__param_size: i64, __param_default_raw: u64) -> stc_word_stack {
+    var __local_size = __param_size
+    var __local_out: stc_word_stack = stc_word_stack { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), size: __local_size, capacity: __local_size }
+
+    while (__local_size != 0) {
+        (__local_size = __local_size - 1)
+
+        ((unsafe __local_out.data[__local_size]) = __param_default_raw)
+
+    }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_stack_from_n(__param_raw: *const u64, __param_n: i64) -> stc_word_stack {
+    var __local_out: stc_word_stack = stc_word_stack_with_capacity(__param_n)
+
+    stc_word_stack_put_n((&raw mut __local_out as *mut stc_word_stack), __param_raw, __param_n)
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_stack_at(__param_self_: *const stc_word_stack, __param_idx: i64) -> *const u64 {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
+    } else {
+        0
+    }
+
+    return ((((*__param_self_).data + ((__param_idx as i64) as usize)) as *const u64))
+
+}
+
+pub unsafe fn stc_word_stack_at_mut(__param_self_: *mut stc_word_stack, __param_idx: i64) -> *mut u64 {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
+    } else {
+        0
+    }
+
+    return ((((*__param_self_).data + ((__param_idx as i64) as usize)) as *mut u64))
+
+}
+
+pub fn stc_word_stack_clone(__param_stk: stc_word_stack) -> stc_word_stack {
+    var __local_out: stc_word_stack = __param_stk
+
+    var __local_self_: *mut stc_word_stack = ((&raw mut __local_out as *mut stc_word_stack))
+
+
+
+    (__local_out.data = ((null as *mut u64)))
+
+    (__local_out.capacity = ((0 as i64)))
+
+    (__local_out.size = (unsafe *(&raw const __local_out as *const stc_word_stack)).capacity)
+
+
+    unsafe { stc_word_stack_reserve((&raw mut __local_out as *mut stc_word_stack), (*(&raw const __param_stk as *const stc_word_stack)).size) }
+
+    (__local_out.size = (unsafe *(&raw const __param_stk as *const stc_word_stack)).size)
+
+    var __local_i: i64 = ((0 as i64))
+
+    var __local__c_end_i: i64 = (unsafe *(&raw const __param_stk as *const stc_word_stack)).size
+
+
+    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+        ((unsafe __local_out.data[__local_i]) = (((unsafe (*(&raw const __param_stk as *const stc_word_stack)).data[__local_i]) as u64)))
+
+        (__local_i = __local_i + 1)
+
+    }
+
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_stack_copy(__param_self_: *mut stc_word_stack, __param_other: *const stc_word_stack) {
+    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_stack_clear(__param_self_)
+
+    stc_word_stack_reserve(__param_self_, (*__param_other).size)
+
+    var __local_i: i64 = ((0 as i64))
+
+    var __local__c_end_i: i64 = (*__param_other).size
+
+
+    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+        var __ci_expr_old_0: i64 = (*__param_self_).size
+
+        ((*__param_self_).size = (*__param_self_).size + 1)
+
+        (((*__param_self_).data[__ci_expr_old_0]) = ((((*__param_other).data[__local_i]) as u64)))
+
+
+        (__local_i = __local_i + 1)
+
+    }
+
+
+}
+
+pub unsafe fn stc_word_stack_value_clone(__param_self_: *const stc_word_stack, __param_val: u64) -> u64 {
+
+    return __param_val
+
+}
+
+pub unsafe fn stc_word_stack_value_toraw(__param_val: *const u64) -> u64 {
+    return (*__param_val)
+
+}
+
+pub unsafe fn stc_word_stack_begin(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
+    var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
+
+    if ((*__param_self_).size != 0) {
+        (__local_it_.end = (*(&raw const __local_it_ as *const stc_word_stack_iter)).end + (((*__param_self_).size as i64) as usize))
+    } else {
+        (__local_it_.ref = ((null as *mut u64)))
+    }
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_word_stack_rbegin(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
+    var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
+
+    if ((*__param_self_).size != 0) {
+        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_word_stack_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
+
+        (__local_it_.end = (*(&raw const __local_it_ as *const stc_word_stack_iter)).end - ((1 as i64) as usize))
+
+    } else {
+        (__local_it_.ref = ((null as *mut u64)))
+    }
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_word_stack_end(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
+
+    var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_word_stack_rend(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
+
+    var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
+
+    return __local_it_
+
+}
+
+pub unsafe fn stc_word_stack_next(__param_it_: *mut stc_word_stack_iter) {
+    ((*__param_it_).ref = (*__param_it_).ref + 1)
+
+    if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut u64)))
+    }
+
+
+}
+
+pub unsafe fn stc_word_stack_rnext(__param_it_: *mut stc_word_stack_iter) {
+    ((*__param_it_).ref = (*__param_it_).ref - 1)
+
+    if ((if (*__param_it_).ref == (*__param_it_).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut u64)))
+    }
+
+
+}
+
+pub fn stc_word_stack_advance(__param_it_: stc_word_stack_iter, __param_n: u64) -> stc_word_stack_iter {
+    (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const stc_word_stack_iter)).ref + (__param_n as usize))
+
+    if ((if (unsafe *(&raw const __param_it_ as *const stc_word_stack_iter)).ref >= (unsafe *(&raw const __param_it_ as *const stc_word_stack_iter)).end: 1 else: 0) != 0) {
+        (__param_it_.ref = ((null as *mut u64)))
+    }
+
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_stack_index(__param_self_: *const stc_word_stack, __param_it_: stc_word_stack_iter) -> i64 {
+    return (((((*(&raw const __param_it_ as *const stc_word_stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[u64]() as i64))
+
+}
+
+pub unsafe fn stc_word_stack_adjust_end_(__param_self_: *mut stc_word_stack, __param_n: i64) {
+    ((*__param_self_).size = (*__param_self_).size + __param_n)
+
+}
+
+pub unsafe fn stc_slot_queue_reserve(__param_self_: *mut stc_slot_queue, __param_cap: i64) -> bool {
+    var __local_oldpow2: i64 = ((((*__param_self_).capmask + (((*__param_self_).capmask as i64) & (1 as i64))) as i64))
+
+    var __local_newpow2: i64 = ((c_next_pow2(((__param_cap + 1) as i64)) as i64))
+
+    if ((if __local_newpow2 <= __local_oldpow2: 1 else: 0) != 0) {
+        return (((((*__param_self_).cbuf != null)) as bool))
+    }
+
+    var __local_d: *mut *mut stc_slot_head = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head))
+
+    if ((if __local_d == null: 1 else: 0) != 0) {
+        return ((false as bool))
+    }
+
+    var __local_head: i64 = (((__local_oldpow2 - (*__param_self_).start) as i64))
+
+    if (not ((if (*__param_self_).start <= (*__param_self_).end: 1 else: 0) != 0)) {
+        if ((if __local_head < (*__param_self_).end: 1 else: 0) != 0) {
+            with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_head * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+            ((*__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
+
+        } else {
+            with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if 1 != 0: (((*__param_self_).end * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+            ((*__param_self_).end = (*__param_self_).end + __local_oldpow2)
+
+        }
+    }
+
+    ((*__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
+
+    ((*__param_self_).cbuf = __local_d)
+
+    return ((true as bool))
+
+}
+
+pub unsafe fn stc_slot_queue_clear(__param_self_: *mut stc_slot_queue) {
+    var __local_i: stc_slot_queue_iter = stc_slot_queue_begin((((&raw const (*__param_self_) as *const stc_slot_queue) as *mut stc_slot_queue) as *const stc_slot_queue))
+
+    while ((*(&raw const __local_i as *const stc_slot_queue_iter)).ref != null) {
+
+
+        stc_slot_queue_next((&raw mut __local_i as *mut stc_slot_queue_iter))
+
+    }
+
+
+    ((*__param_self_).start = ((0 as i64)))
+
+    ((*__param_self_).end = ((0 as i64)))
+
+
+}
+
+pub unsafe fn stc_slot_queue_drop(__param_cself: *const stc_slot_queue) {
+    var __local_self_: *mut stc_slot_queue = ((__param_cself as *mut stc_slot_queue))
+
+    if ((if (*__local_self_).cbuf == null: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_slot_queue_clear(__local_self_)
+
+    with_free((((*__local_self_).cbuf as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_slot_queue_push(__param_self_: *mut stc_slot_queue, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
+    var __local_end: i64 = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
+
+    if ((if __local_end == (*__param_self_).start: 1 else: 0) != 0) {
+        if ((if not stc_slot_queue_reserve(__param_self_, (((*__param_self_).capmask + 3) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut *mut stc_slot_head))
+        }
+
+        (__local_end = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+    }
+
+    var __local_v: *mut *mut stc_slot_head = ((*__param_self_).cbuf + (((*__param_self_).end as i64) as usize))
+
+    ((*__param_self_).end = __local_end)
+
+    ((*__local_v) = __param_value)
+
+    return __local_v
+
+}
+
+pub unsafe fn stc_slot_queue_shrink_to_fit(__param_self_: *mut stc_slot_queue) {
+    var __local_sz: i64 = ((stc_slot_queue_size((__param_self_ as *const stc_slot_queue)) as i64))
+
+    var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
+
+    if ((if __local_newpow2 > (*__param_self_).capmask: 1 else: 0) != 0) {
+        return
+    }
+
+    if ((if (*__param_self_).start <= (*__param_self_).end: 1 else: 0) != 0) {
+        with_memmove((((*__param_self_).cbuf as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_sz * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+        ((*__param_self_).start = ((0 as i64)))
+
+        ((*__param_self_).end = __local_sz)
+
+
+    } else {
+        var __local_n: i64 = (((((*__param_self_).capmask - (*__param_self_).start) + 1) as i64))
+
+        with_memmove(((((*__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_n * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+        ((*__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
+
+    }
+
+    ((*__param_self_).cbuf = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[usize]() as i64)) as i64) else: ((((*__param_self_).capmask + 1) * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+
+    ((*__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
+
+}
+
+pub fn stc_slot_queue_advance(__param_it_: stc_slot_queue_iter, __param_n: i64) -> stc_slot_queue_iter {
+    var __local_len: i64 = ((unsafe { stc_slot_queue_size((*(&raw const __param_it_ as *const stc_slot_queue_iter))._s) } as i64))
+
+    var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_slot_queue_iter)).pos
+
+    var __local_idx: i64 = (((((__local_pos - (unsafe *(*(&raw const __param_it_ as *const stc_slot_queue_iter))._s).start) as i64) & ((unsafe *(*(&raw const __param_it_ as *const stc_slot_queue_iter))._s).capmask as i64)) as i64))
+
+
+    (__param_it_.pos = (((((__local_pos + __param_n) as i64) & ((unsafe *(*(&raw const __param_it_ as *const stc_slot_queue_iter))._s).capmask as i64)) as i64)))
+
+    (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const stc_slot_queue_iter)).ref + ((((unsafe *(&raw const __param_it_ as *const stc_slot_queue_iter)).pos - __local_pos) as i64) as usize))
+
+    if ((if not ((if (((__local_idx + __param_n) as u64)) < ((__local_len as u64)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        (__param_it_.ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_queue_put_n(__param_self_: *mut stc_slot_queue, __param_raw: *const *mut stc_slot_head, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_slot_queue_push(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub unsafe fn stc_slot_queue_value_drop(__param_self_: *const stc_slot_queue, __param_val: *mut *mut stc_slot_head) {
+    return
+}
+
+pub fn stc_slot_queue_init() -> stc_slot_queue {
+    var __local_out: stc_slot_queue = stc_slot_queue.zeroed()
+
+    return __local_out
+
+}
+
+pub fn stc_slot_queue_with_capacity(__param_cap: i64) -> stc_slot_queue {
+    var __local_cap = __param_cap
+    (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
+
+    var __local_out: stc_slot_queue = stc_slot_queue { cbuf: (((with_alloc((((if 1 != 0: ((__local_cap * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), start: 0, end: 0, capmask: (__local_cap - 1) }
+
+    return __local_out
+
+}
+
+pub fn stc_slot_queue_with_size_uninit(__param_size: i64) -> stc_slot_queue {
+    var __local_out: stc_slot_queue = stc_slot_queue_with_capacity(__param_size)
+
+    (__local_out.end = __param_size)
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_queue_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_queue {
+    var __local_out: stc_slot_queue = stc_slot_queue_with_capacity(__param_size)
+
+    while ((if (*(&raw const __local_out as *const stc_slot_queue)).end < __param_size: 1 else: 0) != 0) {
+        var __ci_expr_old_0: i64 = (*(&raw const __local_out as *const stc_slot_queue)).end
+
+        (__local_out.end = (*(&raw const __local_out as *const stc_slot_queue)).end + 1)
+
+        ((__local_out.cbuf[__ci_expr_old_0]) = __param_default_raw)
+
+    }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_queue_from_n(__param_raw: *const *mut stc_slot_head, __param_n: i64) -> stc_slot_queue {
+    var __local_out: stc_slot_queue = stc_slot_queue_with_capacity(__param_n)
+
+    stc_slot_queue_put_n((&raw mut __local_out as *mut stc_slot_queue), __param_raw, __param_n)
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_slot_queue_size(__param_self_: *const stc_slot_queue) -> i64 {
+    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
+
+}
+
+pub unsafe fn stc_slot_queue_capacity(__param_self_: *const stc_slot_queue) -> i64 {
+    return (*__param_self_).capmask
+
+}
+
+pub unsafe fn stc_slot_queue_is_empty(__param_self_: *const stc_slot_queue) -> bool {
+    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
+
+}
+
+pub unsafe fn stc_slot_queue_value_toraw(__param_pval: *const *mut stc_slot_head) -> *mut stc_slot_head {
+    return (*__param_pval)
+
+}
+
+pub unsafe fn stc_slot_queue_front(__param_self_: *const stc_slot_queue) -> *const *mut stc_slot_head {
+    return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_queue_front_mut(__param_self_: *mut stc_slot_queue) -> *mut *mut stc_slot_head {
+    return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_queue_back(__param_self_: *const stc_slot_queue) -> *const *mut stc_slot_head {
+    return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_queue_back_mut(__param_self_: *mut stc_slot_queue) -> *mut *mut stc_slot_head {
+    return ((stc_slot_queue_back((__param_self_ as *const stc_slot_queue)) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_queue_move(__param_self_: *mut stc_slot_queue) -> stc_slot_queue {
+    var __local_m: stc_slot_queue = (*__param_self_)
+
+    ((*__param_self_).end = ((0 as i64)))
+
+    ((*__param_self_).start = (*__param_self_).end)
+
+    ((*__param_self_).capmask = (*__param_self_).start)
+
+
+    ((*__param_self_).cbuf = ((null as *mut *mut stc_slot_head)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_slot_queue_take(__param_self_: *mut stc_slot_queue, __param_unowned: stc_slot_queue) -> Unit {
+    stc_slot_queue_drop((__param_self_ as *const stc_slot_queue))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_queue]())
+
+}
+
+pub unsafe fn stc_slot_queue_pop(__param_self_: *mut stc_slot_queue) {
+    if (((if not ((if not stc_slot_queue_is_empty((__param_self_ as *const stc_slot_queue)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_queue_pop".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_slot_queue_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+
+    ((*__param_self_).start = ((((((*__param_self_).start + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+}
+
+pub unsafe fn stc_slot_queue_pull(__param_self_: *mut stc_slot_queue) -> *mut stc_slot_head {
+    if (((if not ((if not stc_slot_queue_is_empty((__param_self_ as *const stc_slot_queue)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_queue_pull".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_slot_queue_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+    var __local_s: i64 = (*__param_self_).start
+
+    ((*__param_self_).start = (((((__local_s + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+    return ((((*__param_self_).cbuf[__local_s]) as *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_queue_begin(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
+    return ((stc_slot_queue_iter { ref: (if stc_slot_queue_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_slot_queue_iter))
+
+}
+
+pub unsafe fn stc_slot_queue_rbegin(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
+    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
+
+    return ((stc_slot_queue_iter { ref: (if stc_slot_queue_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_slot_queue_iter))
+
+}
+
+pub unsafe fn stc_slot_queue_end(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
+
+    return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
+
+}
+
+pub unsafe fn stc_slot_queue_rend(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
+
+    return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
+
+}
+
+pub unsafe fn stc_slot_queue_next(__param_it_: *mut stc_slot_queue_iter) {
+    if ((if (*__param_it_).pos != (*(*__param_it_)._s).capmask: 1 else: 0) != 0) {
+        ((*__param_it_).ref = (*__param_it_).ref + 1)
+
+        ((*__param_it_).pos = (*__param_it_).pos + 1)
+
+    } else {
+        ((*__param_it_).ref = (*__param_it_).ref - (((*__param_it_).pos as i64) as usize))
+
+        ((*__param_it_).pos = ((0 as i64)))
+
+    }
+
+    if ((if (*__param_it_).pos == (*(*__param_it_)._s).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut *mut stc_slot_head)))
+    }
+
+}
+
+pub unsafe fn stc_slot_queue_rnext(__param_it_: *mut stc_slot_queue_iter) -> Unit {
+    if ((if (*__param_it_).pos == (*(*__param_it_)._s).start: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut *mut stc_slot_head)))
+    } else {
+        if ((if (*__param_it_).pos != 0: 1 else: 0) != 0) {
+            ((*__param_it_).ref = (*__param_it_).ref - 1)
+
+            ((*__param_it_).pos = (*__param_it_).pos - 1)
+
+        } else {
+            ((*__param_it_).pos = (*(*__param_it_)._s).capmask)
+
+            ((*__param_it_).ref = (*__param_it_).ref + (((*__param_it_).pos as i64) as usize))
+
+        }
+    }
+
+}
+
+pub unsafe fn stc_slot_queue_index(__param_self_: *const stc_slot_queue, __param_it_: stc_slot_queue_iter) -> i64 {
+    return ((((*(&raw const __param_it_ as *const stc_slot_queue_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
+
+}
+
+pub unsafe fn stc_slot_queue_adjust_end_(__param_self_: *mut stc_slot_queue, __param_n: i64) {
+    ((*__param_self_).end = ((((((*__param_self_).end + __param_n) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+}
+
+pub unsafe fn stc_word_queue_reserve(__param_self_: *mut stc_word_queue, __param_cap: i64) -> bool {
+    var __local_oldpow2: i64 = ((((*__param_self_).capmask + (((*__param_self_).capmask as i64) & (1 as i64))) as i64))
+
+    var __local_newpow2: i64 = ((c_next_pow2(((__param_cap + 1) as i64)) as i64))
+
+    if ((if __local_newpow2 <= __local_oldpow2: 1 else: 0) != 0) {
+        return (((((*__param_self_).cbuf != null)) as bool))
+    }
+
+    var __local_d: *mut u64 = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((__local_oldpow2 * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64))
+
+    if ((if __local_d == null: 1 else: 0) != 0) {
+        return ((false as bool))
+    }
+
+    var __local_head: i64 = (((__local_oldpow2 - (*__param_self_).start) as i64))
+
+    if (not ((if (*__param_self_).start <= (*__param_self_).end: 1 else: 0) != 0)) {
+        if ((if __local_head < (*__param_self_).end: 1 else: 0) != 0) {
+            with_memcpy(((((__local_d + ((__local_newpow2 as i64) as usize)) - ((__local_head as i64) as usize)) as *mut c_void) as *mut u8), (((__local_d + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_head * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+            ((*__param_self_).start = (((__local_newpow2 - __local_head) as i64)))
+
+        } else {
+            with_memcpy((((__local_d + ((__local_oldpow2 as i64) as usize)) as *mut c_void) as *mut u8), ((__local_d as *const c_void) as *const u8), (((if 1 != 0: (((*__param_self_).end * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+            ((*__param_self_).end = (*__param_self_).end + __local_oldpow2)
+
+        }
+    }
+
+    ((*__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
+
+    ((*__param_self_).cbuf = __local_d)
+
+    return ((true as bool))
+
+}
+
+pub unsafe fn stc_word_queue_clear(__param_self_: *mut stc_word_queue) {
+    var __local_i: stc_word_queue_iter = stc_word_queue_begin((((&raw const (*__param_self_) as *const stc_word_queue) as *mut stc_word_queue) as *const stc_word_queue))
+
+    while ((*(&raw const __local_i as *const stc_word_queue_iter)).ref != null) {
+
+
+        stc_word_queue_next((&raw mut __local_i as *mut stc_word_queue_iter))
+
+    }
+
+
+    ((*__param_self_).start = ((0 as i64)))
+
+    ((*__param_self_).end = ((0 as i64)))
+
+
+}
+
+pub unsafe fn stc_word_queue_drop(__param_cself: *const stc_word_queue) {
+    var __local_self_: *mut stc_word_queue = ((__param_cself as *mut stc_word_queue))
+
+    if ((if (*__local_self_).cbuf == null: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_queue_clear(__local_self_)
+
+    with_free((((*__local_self_).cbuf as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_word_queue_push(__param_self_: *mut stc_word_queue, __param_value: u64) -> *mut u64 {
+    var __local_end: i64 = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
+
+    if ((if __local_end == (*__param_self_).start: 1 else: 0) != 0) {
+        if ((if not stc_word_queue_reserve(__param_self_, (((*__param_self_).capmask + 3) as i64)): 1 else: 0) != 0) {
+            return ((null as *mut u64))
+        }
+
+        (__local_end = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+    }
+
+    var __local_v: *mut u64 = ((*__param_self_).cbuf + (((*__param_self_).end as i64) as usize))
+
+    ((*__param_self_).end = __local_end)
+
+    ((*__local_v) = __param_value)
+
+    return __local_v
+
+}
+
+pub unsafe fn stc_word_queue_shrink_to_fit(__param_self_: *mut stc_word_queue) {
+    var __local_sz: i64 = ((stc_word_queue_size((__param_self_ as *const stc_word_queue)) as i64))
+
+    var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
+
+    if ((if __local_newpow2 > (*__param_self_).capmask: 1 else: 0) != 0) {
+        return
+    }
+
+    if ((if (*__param_self_).start <= (*__param_self_).end: 1 else: 0) != 0) {
+        with_memmove((((*__param_self_).cbuf as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_sz * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+        ((*__param_self_).start = ((0 as i64)))
+
+        ((*__param_self_).end = __local_sz)
+
+
+    } else {
+        var __local_n: i64 = (((((*__param_self_).capmask - (*__param_self_).start) + 1) as i64))
+
+        with_memmove(((((*__param_self_).cbuf + (((__local_newpow2 - __local_n) as i64) as usize)) as *mut c_void) as *mut u8), ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const c_void) as *const u8), (((if 1 != 0: ((__local_n * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+
+        ((*__param_self_).start = (((__local_newpow2 - __local_n) as i64)))
+
+    }
+
+    ((*__param_self_).cbuf = (((with_realloc((((*__param_self_).cbuf as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_newpow2 * (sizeof[u64]() as i64)) as i64) else: ((((*__param_self_).capmask + 1) * (sizeof[u64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+
+    ((*__param_self_).capmask = (((__local_newpow2 - 1) as i64)))
+
+}
+
+pub fn stc_word_queue_advance(__param_it_: stc_word_queue_iter, __param_n: i64) -> stc_word_queue_iter {
+    var __local_len: i64 = ((unsafe { stc_word_queue_size((*(&raw const __param_it_ as *const stc_word_queue_iter))._s) } as i64))
+
+    var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_word_queue_iter)).pos
+
+    var __local_idx: i64 = (((((__local_pos - (unsafe *(*(&raw const __param_it_ as *const stc_word_queue_iter))._s).start) as i64) & ((unsafe *(*(&raw const __param_it_ as *const stc_word_queue_iter))._s).capmask as i64)) as i64))
+
+
+    (__param_it_.pos = (((((__local_pos + __param_n) as i64) & ((unsafe *(*(&raw const __param_it_ as *const stc_word_queue_iter))._s).capmask as i64)) as i64)))
+
+    (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const stc_word_queue_iter)).ref + ((((unsafe *(&raw const __param_it_ as *const stc_word_queue_iter)).pos - __local_pos) as i64) as usize))
+
+    if ((if not ((if (((__local_idx + __param_n) as u64)) < ((__local_len as u64)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        (__param_it_.ref = ((null as *mut u64)))
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_queue_put_n(__param_self_: *mut stc_word_queue, __param_raw: *const u64, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_word_queue_push(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub unsafe fn stc_word_queue_value_drop(__param_self_: *const stc_word_queue, __param_val: *mut u64) {
+    return
+}
+
+pub fn stc_word_queue_init() -> stc_word_queue {
+    var __local_out: stc_word_queue = stc_word_queue.zeroed()
+
+    return __local_out
+
+}
+
+pub fn stc_word_queue_with_capacity(__param_cap: i64) -> stc_word_queue {
+    var __local_cap = __param_cap
+    (__local_cap = ((c_next_pow2(((__local_cap + 1) as i64)) as i64)))
+
+    var __local_out: stc_word_queue = stc_word_queue { cbuf: (((with_alloc((((if 1 != 0: ((__local_cap * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)), start: 0, end: 0, capmask: (__local_cap - 1) }
+
+    return __local_out
+
+}
+
+pub fn stc_word_queue_with_size_uninit(__param_size: i64) -> stc_word_queue {
+    var __local_out: stc_word_queue = stc_word_queue_with_capacity(__param_size)
+
+    (__local_out.end = __param_size)
+
+    return __local_out
+
+}
+
+pub fn stc_word_queue_with_size(__param_size: i64, __param_default_raw: u64) -> stc_word_queue {
+    var __local_out: stc_word_queue = stc_word_queue_with_capacity(__param_size)
+
+    while ((if (unsafe *(&raw const __local_out as *const stc_word_queue)).end < __param_size: 1 else: 0) != 0) {
+        var __ci_expr_old_0: i64 = (unsafe *(&raw const __local_out as *const stc_word_queue)).end
+
+        (__local_out.end = (unsafe *(&raw const __local_out as *const stc_word_queue)).end + 1)
+
+        ((unsafe __local_out.cbuf[__ci_expr_old_0]) = __param_default_raw)
+
+    }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_queue_from_n(__param_raw: *const u64, __param_n: i64) -> stc_word_queue {
+    var __local_out: stc_word_queue = stc_word_queue_with_capacity(__param_n)
+
+    stc_word_queue_put_n((&raw mut __local_out as *mut stc_word_queue), __param_raw, __param_n)
+
+    return __local_out
+
+}
+
+pub fn stc_word_queue_clone(__param_q: stc_word_queue) -> stc_word_queue {
+    var __local_out: stc_word_queue = __param_q
+
+    var __local_self_: *mut stc_word_queue = ((&raw mut __local_out as *mut stc_word_queue))
+
+
+
+    (__local_out.start = ((0 as i64)))
+
+    (__local_out.end = ((unsafe { stc_word_queue_size(((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)) } as i64)))
+
+    (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const stc_word_queue)).end + 1) as i64)) - 1) as i64)))
+
+    (__local_out.cbuf = (((with_alloc((((if 1 != 0: ((((unsafe *(&raw const __local_out as *const stc_word_queue)).capmask + 1) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+
+    var __local_i: i64 = ((0 as i64))
+
+    if ((unsafe *(&raw const __local_out as *const stc_word_queue)).cbuf != null) {
+        var __local_it_: stc_word_queue_iter = unsafe { stc_word_queue_begin(((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)) }
+
+        while ((unsafe *(&raw const __local_it_ as *const stc_word_queue_iter)).ref != null) {
+            var __ci_expr_old_0: i64 = __local_i
+
+            (__local_i = __local_i + 1)
+
+            ((unsafe __local_out.cbuf[__ci_expr_old_0]) = (unsafe *((*(&raw const __local_it_ as *const stc_word_queue_iter)).ref)))
+
+
+            unsafe { stc_word_queue_next((&raw mut __local_it_ as *mut stc_word_queue_iter)) }
+
+        }
+
+    }
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_queue_value_clone(__param_self_: *const stc_word_queue, __param_val: u64) -> u64 {
+
+    return __param_val
+
+}
+
+pub unsafe fn stc_word_queue_copy(__param_self_: *mut stc_word_queue, __param_other: *const stc_word_queue) -> Unit {
+    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_queue_drop((__param_self_ as *const stc_word_queue))
+
+    let __ci_copy_18: stc_word_queue = stc_word_queue_clone((*__param_other))
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_18 as *const u8), sizeof[stc_word_queue]())
+
+}
+
+pub unsafe fn stc_word_queue_size(__param_self_: *const stc_word_queue) -> i64 {
+    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
+
+}
+
+pub unsafe fn stc_word_queue_capacity(__param_self_: *const stc_word_queue) -> i64 {
+    return (*__param_self_).capmask
+
+}
+
+pub unsafe fn stc_word_queue_is_empty(__param_self_: *const stc_word_queue) -> bool {
+    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
+
+}
+
+pub unsafe fn stc_word_queue_value_toraw(__param_pval: *const u64) -> u64 {
+    return (*__param_pval)
+
+}
+
+pub unsafe fn stc_word_queue_front(__param_self_: *const stc_word_queue) -> *const u64 {
+    return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const u64))
+
+}
+
+pub unsafe fn stc_word_queue_front_mut(__param_self_: *mut stc_word_queue) -> *mut u64 {
+    return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_queue_back(__param_self_: *const stc_word_queue) -> *const u64 {
+    return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const u64))
+
+}
+
+pub unsafe fn stc_word_queue_back_mut(__param_self_: *mut stc_word_queue) -> *mut u64 {
+    return ((stc_word_queue_back((__param_self_ as *const stc_word_queue)) as *mut u64))
+
+}
+
+pub unsafe fn stc_word_queue_move(__param_self_: *mut stc_word_queue) -> stc_word_queue {
+    var __local_m: stc_word_queue = (*__param_self_)
+
+    ((*__param_self_).end = ((0 as i64)))
+
+    ((*__param_self_).start = (*__param_self_).end)
+
+    ((*__param_self_).capmask = (*__param_self_).start)
+
+
+    ((*__param_self_).cbuf = ((null as *mut u64)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_word_queue_take(__param_self_: *mut stc_word_queue, __param_unowned: stc_word_queue) -> Unit {
+    stc_word_queue_drop((__param_self_ as *const stc_word_queue))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_queue]())
+
+}
+
+pub unsafe fn stc_word_queue_pop(__param_self_: *mut stc_word_queue) {
+    if (((if not ((if not stc_word_queue_is_empty((__param_self_ as *const stc_word_queue)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_queue_pop".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_word_queue_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+
+    ((*__param_self_).start = ((((((*__param_self_).start + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+}
+
+pub unsafe fn stc_word_queue_pull(__param_self_: *mut stc_word_queue) -> u64 {
+    if (((if not ((if not stc_word_queue_is_empty((__param_self_ as *const stc_word_queue)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_queue_pull".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_word_queue_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+    var __local_s: i64 = (*__param_self_).start
+
+    ((*__param_self_).start = (((((__local_s + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+    return ((*__param_self_).cbuf[__local_s])
+
+}
+
+pub unsafe fn stc_word_queue_begin(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
+    return ((stc_word_queue_iter { ref: (if stc_word_queue_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_word_queue_iter))
+
+}
+
+pub unsafe fn stc_word_queue_rbegin(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
+    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
+
+    return ((stc_word_queue_iter { ref: (if stc_word_queue_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_word_queue_iter))
+
+}
+
+pub unsafe fn stc_word_queue_end(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
+
+    return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
+
+}
+
+pub unsafe fn stc_word_queue_rend(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
+
+    return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
+
+}
+
+pub unsafe fn stc_word_queue_next(__param_it_: *mut stc_word_queue_iter) {
+    if ((if (*__param_it_).pos != (*(*__param_it_)._s).capmask: 1 else: 0) != 0) {
+        ((*__param_it_).ref = (*__param_it_).ref + 1)
+
+        ((*__param_it_).pos = (*__param_it_).pos + 1)
+
+    } else {
+        ((*__param_it_).ref = (*__param_it_).ref - (((*__param_it_).pos as i64) as usize))
+
+        ((*__param_it_).pos = ((0 as i64)))
+
+    }
+
+    if ((if (*__param_it_).pos == (*(*__param_it_)._s).end: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut u64)))
+    }
+
+}
+
+pub unsafe fn stc_word_queue_rnext(__param_it_: *mut stc_word_queue_iter) -> Unit {
+    if ((if (*__param_it_).pos == (*(*__param_it_)._s).start: 1 else: 0) != 0) {
+        ((*__param_it_).ref = ((null as *mut u64)))
+    } else {
+        if ((if (*__param_it_).pos != 0: 1 else: 0) != 0) {
+            ((*__param_it_).ref = (*__param_it_).ref - 1)
+
+            ((*__param_it_).pos = (*__param_it_).pos - 1)
+
+        } else {
+            ((*__param_it_).pos = (*(*__param_it_)._s).capmask)
+
+            ((*__param_it_).ref = (*__param_it_).ref + (((*__param_it_).pos as i64) as usize))
+
+        }
+    }
+
+}
+
+pub unsafe fn stc_word_queue_index(__param_self_: *const stc_word_queue, __param_it_: stc_word_queue_iter) -> i64 {
+    return ((((*(&raw const __param_it_ as *const stc_word_queue_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
+
+}
+
+pub unsafe fn stc_word_queue_adjust_end_(__param_self_: *mut stc_word_queue, __param_n: i64) {
+    ((*__param_self_).end = ((((((*__param_self_).end + __param_n) as i64) & ((*__param_self_).capmask as i64)) as i64)))
+
+}
+
+pub unsafe fn stc_slot_list_drop(__param_cself: *const stc_slot_list) {
+    var __local_self_: *mut stc_slot_list = ((__param_cself as *mut stc_slot_list))
+
+    while ((*__local_self_).last != null) {
+        stc_slot_list_erase_after_node(__local_self_, (*__local_self_).last)
+    }
+
+}
+
+pub unsafe fn stc_slot_list_push_back(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if ((*__param_self_).last != null) {
+        ((*__local_entry).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    ((*__param_self_).last = __local_entry)
+
+    return (((&raw const (*__local_entry).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_push_front(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if ((*__param_self_).last != null) {
+        ((*__local_entry).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = __local_entry)
+    }
+
+    return (((&raw const (*__local_entry).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_insert_at(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter, __param_value: *mut stc_slot_head) -> stc_slot_list_iter {
+    var __local_node: *mut stc_slot_list_node = (if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev else: (*__param_self_).last)
+
+    var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if (__local_node != null) {
+        ((*__local_entry).next = (*__local_node).next)
+
+        ((*__local_node).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    var __ci_expr_logic_0: i32
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref == null: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        (__param_it_.prev = (if (*__param_self_).last != null: (*__param_self_).last else: __local_entry))
+
+        ((*__param_self_).last = __local_entry)
+
+    }
+
+
+    (__param_it_.ref = (((&raw const (*__local_entry).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_list_erase_at(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter) -> stc_slot_list_iter {
+    var __local_node: *mut stc_slot_list_node = (((if 1 != 0: (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node))
+
+    (__param_it_.ref = (if (if __local_node == (*__param_self_).last: 1 else: 0) != 0: (null as *mut *mut stc_slot_head) else: ((&raw const (*(*__local_node).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+    stc_slot_list_erase_after_node(__param_self_, (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev)
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_list_erase_range(__param_self_: *mut stc_slot_list, __param_it1: stc_slot_list_iter, __param_it2: stc_slot_list_iter) -> stc_slot_list_iter {
+    var __local_end: *mut stc_slot_list_node = (if (*(&raw const __param_it2 as *const stc_slot_list_iter)).ref != null: ((if 1 != 0: (*(&raw const __param_it2 as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node) else: (*(*__param_self_).last).next)
+
+    if ((if (*(&raw const __param_it1 as *const stc_slot_list_iter)).ref != (*(&raw const __param_it2 as *const stc_slot_list_iter)).ref: 1 else: 0) != 0) {
+        loop {
+            stc_slot_list_erase_after_node(__param_self_, (*(&raw const __param_it1 as *const stc_slot_list_iter)).prev)
+
+            if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+                break
+            }
+
+            if not (((if (*(*(&raw const __param_it1 as *const stc_slot_list_iter)).prev).next != __local_end: 1 else: 0) != 0)) {
+                break
+            }
+        }
+    }
+
+    return __param_it2
+
+}
+
+pub unsafe fn stc_slot_list_sort(__param_self_: *mut stc_slot_list) -> bool {
+    var __local_len__goto_410_13: i64 = 0
+
+    var __local_cap__goto_410_22: i64 = 0
+
+    var __local_arr__goto_411_15: *mut *mut stc_slot_head = null
+
+    var __local_p__goto_411_28: *mut *mut stc_slot_head = null
+
+    var __local_keep__goto_412_14: *mut stc_slot_list_node = null
+
+    var __local_i__goto_413_10: stc_slot_list_iter = stc_slot_list_iter.zeroed()
+
+    var __local_cap_n__goto_415_21: i64 = 0
+
+    var __local_i__goto_426_10: stc_slot_list_iter = stc_slot_list_iter.zeroed()
+
+    var __ci_expr_old_0: i64 = 0
+
+    var __ci_expr_old_1: *mut *mut stc_slot_head = null
+
+    goto '__ci_bb_0
+
+    '__ci_bb_0 {
+        (__local_len__goto_410_13 = ((0 as i64)))
+        (__local_cap__goto_410_22 = ((0 as i64)))
+        (__local_arr__goto_411_15 = ((null as *mut *mut stc_slot_head)))
+        (__local_p__goto_411_28 = ((null as *mut *mut stc_slot_head)))
+        (__local_i__goto_413_10 = stc_slot_list_begin((((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)))
+        goto '__ci_bb_1
+    }
+
+    '__ci_bb_1 {
+        if ((*(&raw const __local_i__goto_413_10 as *const stc_slot_list_iter)).ref != null) {
+            goto '__ci_bb_2
+        } else {
+            goto '__ci_bb_4
+        }
+    }
+
+    '__ci_bb_2 {
+        if ((if __local_len__goto_410_13 == __local_cap__goto_410_22: 1 else: 0) != 0) {
+            goto '__ci_bb_5
+        } else {
+            goto '__ci_bb_6
+        }
+    }
+
+    '__ci_bb_3 {
+        stc_slot_list_next((&raw mut __local_i__goto_413_10 as *mut stc_slot_list_iter))
+        goto '__ci_bb_1
+    }
+
+    '__ci_bb_4 {
+        (__local_keep__goto_412_14 = (*__param_self_).last)
+        ((*__param_self_).last = ((__local_arr__goto_411_15 as *mut stc_slot_list_node)))
+        stc_slot_list_sort_lowhigh(__param_self_, (0 as i64), ((__local_len__goto_410_13 - 1) as i64))
+        ((*__param_self_).last = __local_keep__goto_412_14)
+        (__local_i__goto_426_10 = stc_slot_list_begin((((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_5 {
+        (__local_cap_n__goto_415_21 = ((((__local_cap__goto_410_22 + (__local_cap__goto_410_22 / 2)) + 8) as i64)))
+        (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_cap_n__goto_415_21 * (sizeof[usize]() as i64)) as i64) else: ((__local_cap__goto_410_22 * (sizeof[usize]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+        if ((if __local_p__goto_411_28 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_7
+        } else {
+            goto '__ci_bb_8
+        }
+    }
+
+    '__ci_bb_6 {
+        (__ci_expr_old_0 = __local_len__goto_410_13)
+        (__local_len__goto_410_13 = __local_len__goto_410_13 + 1)
+        ((__local_arr__goto_411_15[__ci_expr_old_0]) = (*((*(&raw const __local_i__goto_413_10 as *const stc_slot_list_iter)).ref)))
+        goto '__ci_bb_3
+    }
+
+    '__ci_bb_7 {
+        goto '__ci_bb_9
+    }
+
+    '__ci_bb_8 {
+        (__local_arr__goto_411_15 = __local_p__goto_411_28)
+        (__local_cap__goto_410_22 = __local_cap_n__goto_415_21)
+        goto '__ci_bb_6
+    }
+
+    '__ci_bb_9 {
+        with_free(((__local_arr__goto_411_15 as *mut c_void) as *mut u8))
+        return ((__local_p__goto_411_28 != null))
+    }
+
+    '__ci_bb_10 {
+        if ((*(&raw const __local_i__goto_426_10 as *const stc_slot_list_iter)).ref != null) {
+            goto '__ci_bb_11
+        } else {
+            goto '__ci_bb_13
+        }
+    }
+
+    '__ci_bb_11 {
+        (__ci_expr_old_1 = __local_p__goto_411_28)
+        (__local_p__goto_411_28 = __local_p__goto_411_28 + 1)
+        ((*((*(&raw const __local_i__goto_426_10 as *const stc_slot_list_iter)).ref)) = (*__ci_expr_old_1))
+        goto '__ci_bb_12
+    }
+
+    '__ci_bb_12 {
+        stc_slot_list_next((&raw mut __local_i__goto_426_10 as *mut stc_slot_list_iter))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_13 {
+        goto '__ci_bb_9
+    }
+
+    __ci_unreachable()
+
+}
+
+pub unsafe fn stc_slot_list_reverse(__param_self_: *mut stc_slot_list) -> Unit {
+    var __local_rev: stc_slot_list = (*__param_self_)
+
+    (__local_rev.last = ((null as *mut stc_slot_list_node)))
+
+    while ((*__param_self_).last != null) {
+        var __local_node: *mut stc_slot_list_node = stc_slot_list_unlink_after_node(__param_self_, (*__param_self_).last)
+
+        stc_slot_list_insert_after_node((&raw mut __local_rev as *mut stc_slot_list), (*(&raw const __local_rev as *const stc_slot_list)).last, __local_node)
+
+    }
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __local_rev as *const u8), sizeof[stc_slot_list]())
+
+}
+
+pub unsafe fn stc_slot_list_splice(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter, __param_other: *mut stc_slot_list) -> stc_slot_list_iter {
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = (*__param_other).last)
+    } else {
+        if ((*__param_other).last != null) {
+            var __local_p: *mut stc_slot_list_node = (if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev else: (*__param_self_).last)
+
+            var __local_next: *mut stc_slot_list_node = (*__local_p).next
+
+
+            (__param_it_.prev = (*__param_other).last)
+
+            ((*__local_p).next = (*(*(&raw const __param_it_ as *const stc_slot_list_iter)).prev).next)
+
+            ((*(*(&raw const __param_it_ as *const stc_slot_list_iter)).prev).next = __local_next)
+
+            if ((if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref == null: 1 else: 0) != 0) {
+                ((*__param_self_).last = (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev)
+            }
+
+        }
+    }
+
+    ((*__param_other).last = ((null as *mut stc_slot_list_node)))
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_list_split_off(__param_self_: *mut stc_slot_list, __param_it1: stc_slot_list_iter, __param_it2: stc_slot_list_iter) -> stc_slot_list {
+    var __local_lst: stc_slot_list = (*__param_self_)
+
+    (__local_lst.last = ((null as *mut stc_slot_list_node)))
+
+    if ((if (*(&raw const __param_it1 as *const stc_slot_list_iter)).ref == (*(&raw const __param_it2 as *const stc_slot_list_iter)).ref: 1 else: 0) != 0) {
+        return __local_lst
+    }
+
+    var __local_p1: *mut stc_slot_list_node = (*(&raw const __param_it1 as *const stc_slot_list_iter)).prev
+
+    var __local_p2: *mut stc_slot_list_node = (if (*(&raw const __param_it2 as *const stc_slot_list_iter)).ref != null: (*(&raw const __param_it2 as *const stc_slot_list_iter)).prev else: (*__param_self_).last)
+
+
+    ((*__local_p1).next = (*__local_p2).next)
+
+    ((*__local_p2).next = (((if 1 != 0: (*(&raw const __param_it1 as *const stc_slot_list_iter)).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node)))
+
+    if ((if (*__param_self_).last == __local_p2: 1 else: 0) != 0) {
+        ((*__param_self_).last = (if (if __local_p1 == __local_p2: 1 else: 0) != 0: (null as *mut stc_slot_list_node) else: __local_p1))
+    }
+
+    (__local_lst.last = __local_p2)
+
+    return __local_lst
+
+}
+
+pub unsafe fn stc_slot_list_push_back_node(__param_self_: *mut stc_slot_list, __param_node: *mut stc_slot_list_node) -> *mut *mut stc_slot_head {
+    if ((*__param_self_).last != null) {
+        ((*__param_node).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __param_node)
+
+    } else {
+        ((*__param_node).next = __param_node)
+    }
+
+    ((*__param_self_).last = __param_node)
+
+    return (((&raw const (*__param_node).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_insert_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node, __param_node: *mut stc_slot_list_node) -> *mut *mut stc_slot_head {
+    if (__param_ref != null) {
+        ((*__param_node).next = (*__param_ref).next)
+
+        ((*__param_ref).next = __param_node)
+
+    } else {
+        ((*__param_node).next = __param_node)
+    }
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = __param_node)
+    }
+
+    return (((&raw const (*__param_node).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_unlink_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node) -> *mut stc_slot_list_node {
+    var __local_node: *mut stc_slot_list_node = (*__param_ref).next
+
+    var __local_next: *mut stc_slot_list_node = (*__local_node).next
+
+
+    ((*__param_ref).next = __local_next)
+
+    if ((if __local_node == __local_next: 1 else: 0) != 0) {
+        ((*__param_self_).last = ((null as *mut stc_slot_list_node)))
+    } else {
+        if ((if __local_node == (*__param_self_).last: 1 else: 0) != 0) {
+            ((*__param_self_).last = __param_ref)
+        }
+    }
+
+    return __local_node
+
+}
+
+pub unsafe fn stc_slot_list_erase_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node) {
+    var __local_node: *mut stc_slot_list_node = stc_slot_list_unlink_after_node(__param_self_, __param_ref)
+
+
+    with_free(((__local_node as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_slot_list_get_node(__param_pval: *mut *mut stc_slot_head) -> *mut stc_slot_list_node {
+    return (((if 1 != 0: __param_pval else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node))
+
+}
+
+pub unsafe fn stc_slot_list_unlink_front_node(__param_self_: *mut stc_slot_list) -> *mut stc_slot_list_node {
+    return ((stc_slot_list_unlink_after_node(__param_self_, (*__param_self_).last) as *mut stc_slot_list_node))
+
+}
+
+pub unsafe fn stc_slot_list_put_n(__param_self_: *mut stc_slot_list, __param_raw: *const *mut stc_slot_head, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_slot_list_push_back(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub fn stc_slot_list_init() -> stc_slot_list {
+    return ((stc_slot_list.zeroed() as stc_slot_list))
+
+}
+
+pub unsafe fn stc_slot_list_from_n(__param_raw: *const *mut stc_slot_head, __param_n: i64) -> stc_slot_list {
+    var __local_cx: stc_slot_list = stc_slot_list.zeroed()
+
+    stc_slot_list_put_n((&raw mut __local_cx as *mut stc_slot_list), __param_raw, __param_n)
+
+    return __local_cx
+
+}
+
+pub unsafe fn stc_slot_list_reserve(__param_self_: *mut stc_slot_list, __param_n: i64) -> bool {
+
+    return ((true as bool))
+
+}
+
+pub unsafe fn stc_slot_list_is_empty(__param_self_: *const stc_slot_list) -> bool {
+    return (((((*__param_self_).last == null)) as bool))
+
+}
+
+pub unsafe fn stc_slot_list_clear(__param_self_: *mut stc_slot_list) {
+    stc_slot_list_drop((__param_self_ as *const stc_slot_list))
+
+}
+
+pub unsafe fn stc_slot_list_push(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
+    return ((stc_slot_list_push_back(__param_self_, __param_value) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_pop_front(__param_self_: *mut stc_slot_list) {
+    if (((if not ((if not stc_slot_list_is_empty((__param_self_ as *const stc_slot_list)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_slot_list_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!stc_slot_list_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+    stc_slot_list_erase_after_node(__param_self_, (*__param_self_).last)
+
+}
+
+pub unsafe fn stc_slot_list_front(__param_self_: *const stc_slot_list) -> *const *mut stc_slot_head {
+    return ((((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_front_mut(__param_self_: *mut stc_slot_list) -> *mut *mut stc_slot_head {
+    return (((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_back(__param_self_: *const stc_slot_list) -> *const *mut stc_slot_head {
+    return ((((&raw const (*(*__param_self_).last).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_back_mut(__param_self_: *mut stc_slot_list) -> *mut *mut stc_slot_head {
+    return (((&raw const (*(*__param_self_).last).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+}
+
+pub unsafe fn stc_slot_list_value_toraw(__param_pval: *const *mut stc_slot_head) -> *mut stc_slot_head {
+    return (*__param_pval)
+
+}
+
+pub unsafe fn stc_slot_list_value_drop(__param_self_: *const stc_slot_list, __param_pval: *mut *mut stc_slot_head) {
+    return
+}
+
+pub unsafe fn stc_slot_list_move(__param_self_: *mut stc_slot_list) -> stc_slot_list {
+    var __local_m: stc_slot_list = (*__param_self_)
+
+    ((*__param_self_).last = ((null as *mut stc_slot_list_node)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_slot_list_take(__param_self_: *mut stc_slot_list, __param_unowned: stc_slot_list) -> Unit {
+    stc_slot_list_drop((__param_self_ as *const stc_slot_list))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_list]())
+
+}
+
+pub unsafe fn stc_slot_list_count(__param_self_: *const stc_slot_list) -> i64 {
+    var __local_n: i64 = ((1 as i64))
+
+    var __local_node: *const stc_slot_list_node = (((*__param_self_).last as *const stc_slot_list_node))
+
+    if ((if __local_node == null: 1 else: 0) != 0) {
+        return ((0 as i64))
+    }
+
+    while true {
+        (__local_node = (((*__local_node).next as *const stc_slot_list_node)))
+
+        if (not ((if __local_node != (*__param_self_).last: 1 else: 0) != 0)) {
+            break
+        }
+
+        (__local_n = __local_n + 1)
+
+    }
+
+    return __local_n
+
+}
+
+pub unsafe fn stc_slot_list_begin(__param_self_: *const stc_slot_list) -> stc_slot_list_iter {
+    var __local_head: *mut *mut stc_slot_head = (if (*__param_self_).last != null: ((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) else: (null as *mut *mut stc_slot_head))
+
+    return ((stc_slot_list_iter { ref: __local_head, _last: (&raw const (*__param_self_).last as *const *mut stc_slot_list_node), prev: (*__param_self_).last } as stc_slot_list_iter))
+
+}
+
+pub unsafe fn stc_slot_list_end(__param_self_: *const stc_slot_list) -> stc_slot_list_iter {
+
+    return ((stc_slot_list_iter.zeroed() as stc_slot_list_iter))
+
+}
+
+pub unsafe fn stc_slot_list_next(__param_it_: *mut stc_slot_list_iter) {
+    var __local_node: *mut stc_slot_list_node = with 0 as __ci_expr_seq_5 {
+        ((*__param_it_).prev = (((if 1 != 0: (*__param_it_).ref else: (null as *mut *mut stc_slot_head)) as *mut stc_slot_list_node)))
+        (*__param_it_).prev
+    }
+
+    ((*__param_it_).ref = (if (if __local_node == (*((*__param_it_)._last)): 1 else: 0) != 0: (null as *mut *mut stc_slot_head) else: ((&raw const (*(*__local_node).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+}
+
+pub fn stc_slot_list_advance(__param_it_: stc_slot_list_iter, __param_n: u64) -> stc_slot_list_iter {
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_logic_1: i32 = 0
+
+        var __ci_expr_old_0: u64 = __local_n
+
+        (__local_n = (__local_n -% 1))
+
+        if (__ci_expr_old_0 != 0) {
+            (__ci_expr_logic_1 = (if (unsafe *(&raw const __param_it_ as *const stc_slot_list_iter)).ref != null: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_1 != 0)) {
+            break
+        }
+
+        unsafe { stc_slot_list_next((&raw mut __param_it_ as *mut stc_slot_list_iter)) }
+
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_slot_list_splice_range(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter, __param_other: *mut stc_slot_list, __param_it1: stc_slot_list_iter, __param_it2: stc_slot_list_iter) -> stc_slot_list_iter {
+    var __local_tmp: stc_slot_list = stc_slot_list_split_off(__param_other, __param_it1, __param_it2)
+
+    return stc_slot_list_splice(__param_self_, __param_it_, (&raw mut __local_tmp as *mut stc_slot_list))
+
+}
+
+pub unsafe fn stc_slot_list_sort_lowhigh(__param_self_: *mut stc_slot_list, __param_lo: i64, __param_hi: i64) -> Unit {
+    var __local_lo = __param_lo
+    var __local_i: i64 = __local_lo
+
+    var __local_j: i64
+
+
+    while ((if __local_lo < __param_hi: 1 else: 0) != 0) {
+        var __local_pivot: *mut stc_slot_head = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[(__local_lo + (((__param_hi - __local_lo) * 7) / 16))]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+        var __local_rx: *mut stc_slot_head
+
+
+        (__local_j = __param_hi)
+
+        loop {
+            loop {
+                (__local_rx = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_i]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+                var __ci_expr_logic_0: i32 = 0
+
+                if ((if (*(*(&raw mut __local_rx as *mut *mut stc_slot_head))).cmp.unwrap()(((*(&raw mut __local_rx as *mut *mut stc_slot_head)) as *const c_void), ((*(&raw mut __local_pivot as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0) {
+                    (__local_i = __local_i + 1)
+
+                    (__ci_expr_logic_0 = (if __local_i != 0: 1 else: 0))
+
+                }
+
+                if not ((__ci_expr_logic_0 != 0)) {
+                    break
+                }
+            }
+
+            loop {
+                (__local_rx = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_j]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+                var __ci_expr_logic_1: i32 = 0
+
+                if ((if (*(*(&raw mut __local_pivot as *mut *mut stc_slot_head))).cmp.unwrap()(((*(&raw mut __local_pivot as *mut *mut stc_slot_head)) as *const c_void), ((*(&raw mut __local_rx as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0) {
+                    (__local_j = __local_j - 1)
+
+                    (__ci_expr_logic_1 = (if __local_j != 0: 1 else: 0))
+
+                }
+
+                if not ((__ci_expr_logic_1 != 0)) {
+                    break
+                }
+            }
+
+            if ((if __local_i > __local_j: 1 else: 0) != 0) {
+                break
+            }
+
+            loop {
+                var __local__xp: *mut *mut stc_slot_head = (((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_i]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+                var __local__yp: *mut *mut stc_slot_head = (((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_j]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+
+                var __local__tv: *mut stc_slot_head = (*__local__xp)
+
+                ((*__local__xp) = (*__local__yp))
+
+                ((*__local__yp) = __local__tv)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+            (__local_i = __local_i + 1)
+
+            (__local_j = __local_j - 1)
+
+            if not (((if __local_i <= __local_j: 1 else: 0) != 0)) {
+                break
+            }
+        }
+
+        if ((if (__local_j - __local_lo) > (__param_hi - __local_i): 1 else: 0) != 0) {
+            loop {
+                var __local__xp_1: *mut i64 = ((&raw mut __local_lo as *mut i64))
+
+                var __local__yp_1: *mut i64 = ((&raw mut __local_i as *mut i64))
+
+
+                var __local__tv_1: i64 = (*__local__xp_1)
+
+                ((*__local__xp_1) = (*__local__yp_1))
+
+                ((*__local__yp_1) = __local__tv_1)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+            loop {
+                var __local__xp_2: *mut i64 = ((&raw mut __param_hi as *mut i64))
+
+                var __local__yp_2: *mut i64 = ((&raw mut __local_j as *mut i64))
+
+
+                var __local__tv_2: i64 = (*__local__xp_2)
+
+                ((*__local__xp_2) = (*__local__yp_2))
+
+                ((*__local__yp_2) = __local__tv_2)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+        }
+
+        if ((if (__local_j - __local_lo) > 64: 1 else: 0) != 0) {
+            stc_slot_list_sort_lowhigh(__param_self_, __local_lo, __local_j)
+        } else {
+            if ((if __local_j > __local_lo: 1 else: 0) != 0) {
+                stc_slot_list_insertsort_lowhigh(__param_self_, __local_lo, __local_j)
+            }
+        }
+
+        (__local_lo = __local_i)
+
+    }
+
+}
+
+unsafe fn stc_slot_list_insertsort_lowhigh(__param_self_: *mut stc_slot_list, __param_lo: i64, __param_hi: i64) {
+    var __local_j: i64 = __param_lo
+
+    var __local_i: i64 = (((__param_lo + 1) as i64))
+
+
+    while ((if __local_i <= __param_hi: 1 else: 0) != 0) {
+        var __local_x: *mut stc_slot_head = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_i]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+        var __local_rx: *mut stc_slot_head = (*(&raw mut __local_x as *mut *mut stc_slot_head))
+
+        while ((if __local_j >= 0: 1 else: 0) != 0) {
+            var __local_ry: *mut stc_slot_head = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_j]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
+
+            if ((if not ((if (*(*(&raw mut __local_rx as *mut *mut stc_slot_head))).cmp.unwrap()(((*(&raw mut __local_rx as *mut *mut stc_slot_head)) as *const c_void), ((*(&raw mut __local_ry as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+                break
+            }
+
+            ((*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[(__local_j + 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) = (*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[__local_j]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)))
+
+            (__local_j = __local_j - 1)
+
+        }
+
+        ((*((&raw const (((*__param_self_).last as *mut *mut stc_slot_head)[(__local_j + 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) = __local_x)
+
+
+        (__local_j = __local_i)
+
+        (__local_i = __local_i + 1)
+
+
+    }
+
+
+}
+
+pub unsafe fn stc_word_list_drop(__param_cself: *const stc_word_list) {
+    var __local_self_: *mut stc_word_list = ((__param_cself as *mut stc_word_list))
+
+    while ((*__local_self_).last != null) {
+        stc_word_list_erase_after_node(__local_self_, (*__local_self_).last)
+    }
+
+}
+
+pub unsafe fn stc_word_list_push_back(__param_self_: *mut stc_word_list, __param_value: i64) -> *mut i64 {
+    var __local_entry: *mut stc_word_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if ((*__param_self_).last != null) {
+        ((*__local_entry).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    ((*__param_self_).last = __local_entry)
+
+    return (((&raw const (*__local_entry).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_push_front(__param_self_: *mut stc_word_list, __param_value: i64) -> *mut i64 {
+    var __local_entry: *mut stc_word_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if ((*__param_self_).last != null) {
+        ((*__local_entry).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = __local_entry)
+    }
+
+    return (((&raw const (*__local_entry).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_insert_at(__param_self_: *mut stc_word_list, __param_it_: stc_word_list_iter, __param_value: i64) -> stc_word_list_iter {
+    var __local_node: *mut stc_word_list_node = (if (*(&raw const __param_it_ as *const stc_word_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_word_list_iter)).prev else: (*__param_self_).last)
+
+    var __local_entry: *mut stc_word_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_word_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_word_list_node))
+
+    ((*__local_entry).value = __param_value)
+
+    if (__local_node != null) {
+        ((*__local_entry).next = (*__local_node).next)
+
+        ((*__local_node).next = __local_entry)
+
+    } else {
+        ((*__local_entry).next = __local_entry)
+    }
+
+    var __ci_expr_logic_0: i32
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        (__ci_expr_logic_0 = (if true: 1 else: 0))
+    } else {
+        (__ci_expr_logic_0 = (if (if (*(&raw const __param_it_ as *const stc_word_list_iter)).ref == null: 1 else: 0) != 0: 1 else: 0))
+    }
+
+    if (__ci_expr_logic_0 != 0) {
+        (__param_it_.prev = (if (*__param_self_).last != null: (*__param_self_).last else: __local_entry))
+
+        ((*__param_self_).last = __local_entry)
+
+    }
+
+
+    (__param_it_.ref = (((&raw const (*__local_entry).value as *const i64) as *mut i64)))
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_list_erase_at(__param_self_: *mut stc_word_list, __param_it_: stc_word_list_iter) -> stc_word_list_iter {
+    var __local_node: *mut stc_word_list_node = (((if 1 != 0: (*(&raw const __param_it_ as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node))
+
+    (__param_it_.ref = (if (if __local_node == (*__param_self_).last: 1 else: 0) != 0: (null as *mut i64) else: ((&raw const (*(*__local_node).next).value as *const i64) as *mut i64)))
+
+    stc_word_list_erase_after_node(__param_self_, (*(&raw const __param_it_ as *const stc_word_list_iter)).prev)
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_list_erase_range(__param_self_: *mut stc_word_list, __param_it1: stc_word_list_iter, __param_it2: stc_word_list_iter) -> stc_word_list_iter {
+    var __local_end: *mut stc_word_list_node = (if (*(&raw const __param_it2 as *const stc_word_list_iter)).ref != null: ((if 1 != 0: (*(&raw const __param_it2 as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node) else: (*(*__param_self_).last).next)
+
+    if ((if (*(&raw const __param_it1 as *const stc_word_list_iter)).ref != (*(&raw const __param_it2 as *const stc_word_list_iter)).ref: 1 else: 0) != 0) {
+        loop {
+            stc_word_list_erase_after_node(__param_self_, (*(&raw const __param_it1 as *const stc_word_list_iter)).prev)
+
+            if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+                break
+            }
+
+            if not (((if (*(*(&raw const __param_it1 as *const stc_word_list_iter)).prev).next != __local_end: 1 else: 0) != 0)) {
+                break
+            }
+        }
+    }
+
+    return __param_it2
+
+}
+
+pub unsafe fn stc_word_list_sort(__param_self_: *mut stc_word_list) -> bool {
+    var __local_len__goto_410_13: i64 = 0
+
+    var __local_cap__goto_410_22: i64 = 0
+
+    var __local_arr__goto_411_15: *mut i64 = null
+
+    var __local_p__goto_411_28: *mut i64 = null
+
+    var __local_keep__goto_412_14: *mut stc_word_list_node = null
+
+    var __local_i__goto_413_10: stc_word_list_iter = stc_word_list_iter.zeroed()
+
+    var __local_cap_n__goto_415_21: i64 = 0
+
+    var __local_i__goto_426_10: stc_word_list_iter = stc_word_list_iter.zeroed()
+
+    var __ci_expr_old_0: i64 = 0
+
+    var __ci_expr_old_1: *mut i64 = null
+
+    goto '__ci_bb_0
+
+    '__ci_bb_0 {
+        (__local_len__goto_410_13 = ((0 as i64)))
+        (__local_cap__goto_410_22 = ((0 as i64)))
+        (__local_arr__goto_411_15 = ((null as *mut i64)))
+        (__local_p__goto_411_28 = ((null as *mut i64)))
+        (__local_i__goto_413_10 = stc_word_list_begin((((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)))
+        goto '__ci_bb_1
+    }
+
+    '__ci_bb_1 {
+        if ((*(&raw const __local_i__goto_413_10 as *const stc_word_list_iter)).ref != null) {
+            goto '__ci_bb_2
+        } else {
+            goto '__ci_bb_4
+        }
+    }
+
+    '__ci_bb_2 {
+        if ((if __local_len__goto_410_13 == __local_cap__goto_410_22: 1 else: 0) != 0) {
+            goto '__ci_bb_5
+        } else {
+            goto '__ci_bb_6
+        }
+    }
+
+    '__ci_bb_3 {
+        stc_word_list_next((&raw mut __local_i__goto_413_10 as *mut stc_word_list_iter))
+        goto '__ci_bb_1
+    }
+
+    '__ci_bb_4 {
+        (__local_keep__goto_412_14 = (*__param_self_).last)
+        ((*__param_self_).last = ((__local_arr__goto_411_15 as *mut stc_word_list_node)))
+        stc_word_list_sort_lowhigh(__param_self_, (0 as i64), ((__local_len__goto_410_13 - 1) as i64))
+        ((*__param_self_).last = __local_keep__goto_412_14)
+        (__local_i__goto_426_10 = stc_word_list_begin((((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_5 {
+        (__local_cap_n__goto_415_21 = ((((__local_cap__goto_410_22 + (__local_cap__goto_410_22 / 2)) + 8) as i64)))
+        (__local_p__goto_411_28 = (((with_realloc(((__local_arr__goto_411_15 as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_cap_n__goto_415_21 * (sizeof[i64]() as i64)) as i64) else: ((__local_cap__goto_410_22 * (sizeof[i64]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i64)))
+        if ((if __local_p__goto_411_28 == null: 1 else: 0) != 0) {
+            goto '__ci_bb_7
+        } else {
+            goto '__ci_bb_8
+        }
+    }
+
+    '__ci_bb_6 {
+        (__ci_expr_old_0 = __local_len__goto_410_13)
+        (__local_len__goto_410_13 = __local_len__goto_410_13 + 1)
+        ((__local_arr__goto_411_15[__ci_expr_old_0]) = (*((*(&raw const __local_i__goto_413_10 as *const stc_word_list_iter)).ref)))
+        goto '__ci_bb_3
+    }
+
+    '__ci_bb_7 {
+        goto '__ci_bb_9
+    }
+
+    '__ci_bb_8 {
+        (__local_arr__goto_411_15 = __local_p__goto_411_28)
+        (__local_cap__goto_410_22 = __local_cap_n__goto_415_21)
+        goto '__ci_bb_6
+    }
+
+    '__ci_bb_9 {
+        with_free(((__local_arr__goto_411_15 as *mut c_void) as *mut u8))
+        return ((__local_p__goto_411_28 != null))
+    }
+
+    '__ci_bb_10 {
+        if ((*(&raw const __local_i__goto_426_10 as *const stc_word_list_iter)).ref != null) {
+            goto '__ci_bb_11
+        } else {
+            goto '__ci_bb_13
+        }
+    }
+
+    '__ci_bb_11 {
+        (__ci_expr_old_1 = __local_p__goto_411_28)
+        (__local_p__goto_411_28 = __local_p__goto_411_28 + 1)
+        ((*((*(&raw const __local_i__goto_426_10 as *const stc_word_list_iter)).ref)) = (*__ci_expr_old_1))
+        goto '__ci_bb_12
+    }
+
+    '__ci_bb_12 {
+        stc_word_list_next((&raw mut __local_i__goto_426_10 as *mut stc_word_list_iter))
+        goto '__ci_bb_10
+    }
+
+    '__ci_bb_13 {
+        goto '__ci_bb_9
+    }
+
+    __ci_unreachable()
+
+}
+
+pub unsafe fn stc_word_list_reverse(__param_self_: *mut stc_word_list) -> Unit {
+    var __local_rev: stc_word_list = (*__param_self_)
+
+    (__local_rev.last = ((null as *mut stc_word_list_node)))
+
+    while ((*__param_self_).last != null) {
+        var __local_node: *mut stc_word_list_node = stc_word_list_unlink_after_node(__param_self_, (*__param_self_).last)
+
+        stc_word_list_insert_after_node((&raw mut __local_rev as *mut stc_word_list), (*(&raw const __local_rev as *const stc_word_list)).last, __local_node)
+
+    }
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __local_rev as *const u8), sizeof[stc_word_list]())
+
+}
+
+pub unsafe fn stc_word_list_splice(__param_self_: *mut stc_word_list, __param_it_: stc_word_list_iter, __param_other: *mut stc_word_list) -> stc_word_list_iter {
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = (*__param_other).last)
+    } else {
+        if ((*__param_other).last != null) {
+            var __local_p: *mut stc_word_list_node = (if (*(&raw const __param_it_ as *const stc_word_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_word_list_iter)).prev else: (*__param_self_).last)
+
+            var __local_next: *mut stc_word_list_node = (*__local_p).next
+
+
+            (__param_it_.prev = (*__param_other).last)
+
+            ((*__local_p).next = (*(*(&raw const __param_it_ as *const stc_word_list_iter)).prev).next)
+
+            ((*(*(&raw const __param_it_ as *const stc_word_list_iter)).prev).next = __local_next)
+
+            if ((if (*(&raw const __param_it_ as *const stc_word_list_iter)).ref == null: 1 else: 0) != 0) {
+                ((*__param_self_).last = (*(&raw const __param_it_ as *const stc_word_list_iter)).prev)
+            }
+
+        }
+    }
+
+    ((*__param_other).last = ((null as *mut stc_word_list_node)))
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_list_split_off(__param_self_: *mut stc_word_list, __param_it1: stc_word_list_iter, __param_it2: stc_word_list_iter) -> stc_word_list {
+    var __local_lst: stc_word_list = (*__param_self_)
+
+    (__local_lst.last = ((null as *mut stc_word_list_node)))
+
+    if ((if (*(&raw const __param_it1 as *const stc_word_list_iter)).ref == (*(&raw const __param_it2 as *const stc_word_list_iter)).ref: 1 else: 0) != 0) {
+        return __local_lst
+    }
+
+    var __local_p1: *mut stc_word_list_node = (*(&raw const __param_it1 as *const stc_word_list_iter)).prev
+
+    var __local_p2: *mut stc_word_list_node = (if (*(&raw const __param_it2 as *const stc_word_list_iter)).ref != null: (*(&raw const __param_it2 as *const stc_word_list_iter)).prev else: (*__param_self_).last)
+
+
+    ((*__local_p1).next = (*__local_p2).next)
+
+    ((*__local_p2).next = (((if 1 != 0: (*(&raw const __param_it1 as *const stc_word_list_iter)).ref else: (null as *mut i64)) as *mut stc_word_list_node)))
+
+    if ((if (*__param_self_).last == __local_p2: 1 else: 0) != 0) {
+        ((*__param_self_).last = (if (if __local_p1 == __local_p2: 1 else: 0) != 0: (null as *mut stc_word_list_node) else: __local_p1))
+    }
+
+    (__local_lst.last = __local_p2)
+
+    return __local_lst
+
+}
+
+pub unsafe fn stc_word_list_push_back_node(__param_self_: *mut stc_word_list, __param_node: *mut stc_word_list_node) -> *mut i64 {
+    if ((*__param_self_).last != null) {
+        ((*__param_node).next = (*(*__param_self_).last).next)
+
+        ((*(*__param_self_).last).next = __param_node)
+
+    } else {
+        ((*__param_node).next = __param_node)
+    }
+
+    ((*__param_self_).last = __param_node)
+
+    return (((&raw const (*__param_node).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_insert_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node, __param_node: *mut stc_word_list_node) -> *mut i64 {
+    if (__param_ref != null) {
+        ((*__param_node).next = (*__param_ref).next)
+
+        ((*__param_ref).next = __param_node)
+
+    } else {
+        ((*__param_node).next = __param_node)
+    }
+
+    if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
+        ((*__param_self_).last = __param_node)
+    }
+
+    return (((&raw const (*__param_node).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_unlink_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node) -> *mut stc_word_list_node {
+    var __local_node: *mut stc_word_list_node = (*__param_ref).next
+
+    var __local_next: *mut stc_word_list_node = (*__local_node).next
+
+
+    ((*__param_ref).next = __local_next)
+
+    if ((if __local_node == __local_next: 1 else: 0) != 0) {
+        ((*__param_self_).last = ((null as *mut stc_word_list_node)))
+    } else {
+        if ((if __local_node == (*__param_self_).last: 1 else: 0) != 0) {
+            ((*__param_self_).last = __param_ref)
+        }
+    }
+
+    return __local_node
+
+}
+
+pub unsafe fn stc_word_list_erase_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node) {
+    var __local_node: *mut stc_word_list_node = stc_word_list_unlink_after_node(__param_self_, __param_ref)
+
+
+    with_free(((__local_node as *mut c_void) as *mut u8))
+
+}
+
+pub unsafe fn stc_word_list_get_node(__param_pval: *mut i64) -> *mut stc_word_list_node {
+    return (((if 1 != 0: __param_pval else: (null as *mut i64)) as *mut stc_word_list_node))
+
+}
+
+pub unsafe fn stc_word_list_unlink_front_node(__param_self_: *mut stc_word_list) -> *mut stc_word_list_node {
+    return ((stc_word_list_unlink_after_node(__param_self_, (*__param_self_).last) as *mut stc_word_list_node))
+
+}
+
+pub fn stc_word_list_clone(__param_lst: stc_word_list) -> stc_word_list {
+    var __local_out: stc_word_list = __param_lst
+
+    var __local_self_: *mut stc_word_list = ((&raw mut __local_out as *mut stc_word_list))
+
+
+
+    (__local_out.last = ((null as *mut stc_word_list_node)))
+
+    var __local_it_: stc_word_list_iter = unsafe { stc_word_list_begin(((&raw mut __param_lst as *mut stc_word_list) as *const stc_word_list)) }
+
+    while ((unsafe *(&raw const __local_it_ as *const stc_word_list_iter)).ref != null) {
+        unsafe { stc_word_list_push_back((&raw mut __local_out as *mut stc_word_list), (*((*(&raw const __local_it_ as *const stc_word_list_iter)).ref))) }
+
+        unsafe { stc_word_list_next((&raw mut __local_it_ as *mut stc_word_list_iter)) }
+
+    }
+
+
+    return __local_out
+
+}
+
+pub unsafe fn stc_word_list_value_clone(__param_self_: *const stc_word_list, __param_val: i64) -> i64 {
+
+    return __param_val
+
+}
+
+pub unsafe fn stc_word_list_copy(__param_self_: *mut stc_word_list, __param_other: *const stc_word_list) -> Unit {
+    if ((if (*__param_self_).last == (*__param_other).last: 1 else: 0) != 0) {
+        return
+    }
+
+    stc_word_list_drop((__param_self_ as *const stc_word_list))
+
+    let __ci_copy_20: stc_word_list = stc_word_list_clone((*__param_other))
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_20 as *const u8), sizeof[stc_word_list]())
+
+}
+
+pub unsafe fn stc_word_list_put_n(__param_self_: *mut stc_word_list, __param_raw: *const i64, __param_n: i64) {
+    var __local_raw = __param_raw
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_old_0: i64 = __local_n
+
+        (__local_n = __local_n - 1)
+
+        if (not (__ci_expr_old_0 != 0)) {
+            break
+        }
+
+        stc_word_list_push_back(__param_self_, (*__local_raw))
+
+        (__local_raw = __local_raw + 1)
+
+    }
+
+}
+
+pub fn stc_word_list_init() -> stc_word_list {
+    return ((stc_word_list.zeroed() as stc_word_list))
+
+}
+
+pub unsafe fn stc_word_list_from_n(__param_raw: *const i64, __param_n: i64) -> stc_word_list {
+    var __local_cx: stc_word_list = stc_word_list.zeroed()
+
+    stc_word_list_put_n((&raw mut __local_cx as *mut stc_word_list), __param_raw, __param_n)
+
+    return __local_cx
+
+}
+
+pub unsafe fn stc_word_list_reserve(__param_self_: *mut stc_word_list, __param_n: i64) -> bool {
+
+    return ((true as bool))
+
+}
+
+pub unsafe fn stc_word_list_is_empty(__param_self_: *const stc_word_list) -> bool {
+    return (((((*__param_self_).last == null)) as bool))
+
+}
+
+pub unsafe fn stc_word_list_clear(__param_self_: *mut stc_word_list) {
+    stc_word_list_drop((__param_self_ as *const stc_word_list))
+
+}
+
+pub unsafe fn stc_word_list_push(__param_self_: *mut stc_word_list, __param_value: i64) -> *mut i64 {
+    return ((stc_word_list_push_back(__param_self_, __param_value) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_pop_front(__param_self_: *mut stc_word_list) {
+    if (((if not ((if not stc_word_list_is_empty((__param_self_ as *const stc_word_list)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        __assert_rtn(c"stc_word_list_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!stc_word_list_is_empty(self)".ptr)
+    } else {
+        0
+    }
+
+    stc_word_list_erase_after_node(__param_self_, (*__param_self_).last)
+
+}
+
+pub unsafe fn stc_word_list_front(__param_self_: *const stc_word_list) -> *const i64 {
+    return ((((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64) as *const i64))
+
+}
+
+pub unsafe fn stc_word_list_front_mut(__param_self_: *mut stc_word_list) -> *mut i64 {
+    return (((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_back(__param_self_: *const stc_word_list) -> *const i64 {
+    return ((((&raw const (*(*__param_self_).last).value as *const i64) as *mut i64) as *const i64))
+
+}
+
+pub unsafe fn stc_word_list_back_mut(__param_self_: *mut stc_word_list) -> *mut i64 {
+    return (((&raw const (*(*__param_self_).last).value as *const i64) as *mut i64))
+
+}
+
+pub unsafe fn stc_word_list_value_toraw(__param_pval: *const i64) -> i64 {
+    return (*__param_pval)
+
+}
+
+pub unsafe fn stc_word_list_value_drop(__param_self_: *const stc_word_list, __param_pval: *mut i64) {
+    return
+}
+
+pub unsafe fn stc_word_list_move(__param_self_: *mut stc_word_list) -> stc_word_list {
+    var __local_m: stc_word_list = (*__param_self_)
+
+    ((*__param_self_).last = ((null as *mut stc_word_list_node)))
+
+    return __local_m
+
+}
+
+pub unsafe fn stc_word_list_take(__param_self_: *mut stc_word_list, __param_unowned: stc_word_list) -> Unit {
+    stc_word_list_drop((__param_self_ as *const stc_word_list))
+
+    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_list]())
+
+}
+
+pub unsafe fn stc_word_list_count(__param_self_: *const stc_word_list) -> i64 {
+    var __local_n: i64 = ((1 as i64))
+
+    var __local_node: *const stc_word_list_node = (((*__param_self_).last as *const stc_word_list_node))
+
+    if ((if __local_node == null: 1 else: 0) != 0) {
+        return ((0 as i64))
+    }
+
+    while true {
+        (__local_node = (((*__local_node).next as *const stc_word_list_node)))
+
+        if (not ((if __local_node != (*__param_self_).last: 1 else: 0) != 0)) {
+            break
+        }
+
+        (__local_n = __local_n + 1)
+
+    }
+
+    return __local_n
+
+}
+
+pub unsafe fn stc_word_list_begin(__param_self_: *const stc_word_list) -> stc_word_list_iter {
+    var __local_head: *mut i64 = (if (*__param_self_).last != null: ((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64) else: (null as *mut i64))
+
+    return ((stc_word_list_iter { ref: __local_head, _last: (&raw const (*__param_self_).last as *const *mut stc_word_list_node), prev: (*__param_self_).last } as stc_word_list_iter))
+
+}
+
+pub unsafe fn stc_word_list_end(__param_self_: *const stc_word_list) -> stc_word_list_iter {
+
+    return ((stc_word_list_iter.zeroed() as stc_word_list_iter))
+
+}
+
+pub unsafe fn stc_word_list_next(__param_it_: *mut stc_word_list_iter) {
+    var __local_node: *mut stc_word_list_node = with 0 as __ci_expr_seq_5 {
+        ((*__param_it_).prev = (((if 1 != 0: (*__param_it_).ref else: (null as *mut i64)) as *mut stc_word_list_node)))
+        (*__param_it_).prev
+    }
+
+    ((*__param_it_).ref = (if (if __local_node == (*((*__param_it_)._last)): 1 else: 0) != 0: (null as *mut i64) else: ((&raw const (*(*__local_node).next).value as *const i64) as *mut i64)))
+
+}
+
+pub fn stc_word_list_advance(__param_it_: stc_word_list_iter, __param_n: u64) -> stc_word_list_iter {
+    var __local_n = __param_n
+    while true {
+        var __ci_expr_logic_1: i32 = 0
+
+        var __ci_expr_old_0: u64 = __local_n
+
+        (__local_n = (__local_n -% 1))
+
+        if (__ci_expr_old_0 != 0) {
+            (__ci_expr_logic_1 = (if (unsafe *(&raw const __param_it_ as *const stc_word_list_iter)).ref != null: 1 else: 0))
+        }
+
+        if (not (__ci_expr_logic_1 != 0)) {
+            break
+        }
+
+        unsafe { stc_word_list_next((&raw mut __param_it_ as *mut stc_word_list_iter)) }
+
+    }
+
+    return __param_it_
+
+}
+
+pub unsafe fn stc_word_list_splice_range(__param_self_: *mut stc_word_list, __param_it_: stc_word_list_iter, __param_other: *mut stc_word_list, __param_it1: stc_word_list_iter, __param_it2: stc_word_list_iter) -> stc_word_list_iter {
+    var __local_tmp: stc_word_list = stc_word_list_split_off(__param_other, __param_it1, __param_it2)
+
+    return stc_word_list_splice(__param_self_, __param_it_, (&raw mut __local_tmp as *mut stc_word_list))
+
+}
+
+pub unsafe fn stc_word_list_sort_lowhigh(__param_self_: *mut stc_word_list, __param_lo: i64, __param_hi: i64) -> Unit {
+    var __local_lo = __param_lo
+    var __local_i: i64 = __local_lo
+
+    var __local_j: i64
+
+
+    while ((if __local_lo < __param_hi: 1 else: 0) != 0) {
+        var __local_pivot: i64 = (*((&raw const (((*__param_self_).last as *mut i64)[(__local_lo + (((__param_hi - __local_lo) * 7) / 16))]) as *const i64) as *mut i64))
+
+        var __local_rx: i64
+
+
+        (__local_j = __param_hi)
+
+        loop {
+            loop {
+                (__local_rx = (*((&raw const (((*__param_self_).last as *mut i64)[__local_i]) as *const i64) as *mut i64)))
+
+                var __ci_expr_logic_0: i32 = 0
+
+                if ((if (*(&raw mut __local_rx as *mut i64)) < (*(&raw mut __local_pivot as *mut i64)): 1 else: 0) != 0) {
+                    (__local_i = __local_i + 1)
+
+                    (__ci_expr_logic_0 = (if __local_i != 0: 1 else: 0))
+
+                }
+
+                if not ((__ci_expr_logic_0 != 0)) {
+                    break
+                }
+            }
+
+            loop {
+                (__local_rx = (*((&raw const (((*__param_self_).last as *mut i64)[__local_j]) as *const i64) as *mut i64)))
+
+                var __ci_expr_logic_1: i32 = 0
+
+                if ((if (*(&raw mut __local_pivot as *mut i64)) < (*(&raw mut __local_rx as *mut i64)): 1 else: 0) != 0) {
+                    (__local_j = __local_j - 1)
+
+                    (__ci_expr_logic_1 = (if __local_j != 0: 1 else: 0))
+
+                }
+
+                if not ((__ci_expr_logic_1 != 0)) {
+                    break
+                }
+            }
+
+            if ((if __local_i > __local_j: 1 else: 0) != 0) {
+                break
+            }
+
+            loop {
+                var __local__xp: *mut i64 = (((&raw const (((*__param_self_).last as *mut i64)[__local_i]) as *const i64) as *mut i64))
+
+                var __local__yp: *mut i64 = (((&raw const (((*__param_self_).last as *mut i64)[__local_j]) as *const i64) as *mut i64))
+
+
+                var __local__tv: i64 = (*__local__xp)
+
+                ((*__local__xp) = (*__local__yp))
+
+                ((*__local__yp) = __local__tv)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+            (__local_i = __local_i + 1)
+
+            (__local_j = __local_j - 1)
+
+            if not (((if __local_i <= __local_j: 1 else: 0) != 0)) {
+                break
+            }
+        }
+
+        if ((if (__local_j - __local_lo) > (__param_hi - __local_i): 1 else: 0) != 0) {
+            loop {
+                var __local__xp_1: *mut i64 = ((&raw mut __local_lo as *mut i64))
+
+                var __local__yp_1: *mut i64 = ((&raw mut __local_i as *mut i64))
+
+
+                var __local__tv_1: i64 = (*__local__xp_1)
+
+                ((*__local__xp_1) = (*__local__yp_1))
+
+                ((*__local__yp_1) = __local__tv_1)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+            loop {
+                var __local__xp_2: *mut i64 = ((&raw mut __param_hi as *mut i64))
+
+                var __local__yp_2: *mut i64 = ((&raw mut __local_j as *mut i64))
+
+
+                var __local__tv_2: i64 = (*__local__xp_2)
+
+                ((*__local__xp_2) = (*__local__yp_2))
+
+                ((*__local__yp_2) = __local__tv_2)
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+        }
+
+        if ((if (__local_j - __local_lo) > 64: 1 else: 0) != 0) {
+            stc_word_list_sort_lowhigh(__param_self_, __local_lo, __local_j)
+        } else {
+            if ((if __local_j > __local_lo: 1 else: 0) != 0) {
+                stc_word_list_insertsort_lowhigh(__param_self_, __local_lo, __local_j)
+            }
+        }
+
+        (__local_lo = __local_i)
+
+    }
+
+}
+
+unsafe fn stc_word_list_insertsort_lowhigh(__param_self_: *mut stc_word_list, __param_lo: i64, __param_hi: i64) {
+    var __local_j: i64 = __param_lo
+
+    var __local_i: i64 = (((__param_lo + 1) as i64))
+
+
+    while ((if __local_i <= __param_hi: 1 else: 0) != 0) {
+        var __local_x: i64 = (*((&raw const (((*__param_self_).last as *mut i64)[__local_i]) as *const i64) as *mut i64))
+
+        var __local_rx: i64 = (*(&raw mut __local_x as *mut i64))
+
+        while ((if __local_j >= 0: 1 else: 0) != 0) {
+            var __local_ry: i64 = (*((&raw const (((*__param_self_).last as *mut i64)[__local_j]) as *const i64) as *mut i64))
+
+            if ((if not ((if (*(&raw mut __local_rx as *mut i64)) < (*(&raw mut __local_ry as *mut i64)): 1 else: 0) != 0): 1 else: 0) != 0) {
+                break
+            }
+
+            ((*((&raw const (((*__param_self_).last as *mut i64)[(__local_j + 1)]) as *const i64) as *mut i64)) = (*((&raw const (((*__param_self_).last as *mut i64)[__local_j]) as *const i64) as *mut i64)))
+
+            (__local_j = __local_j - 1)
+
+        }
+
+        ((*((&raw const (((*__param_self_).last as *mut i64)[(__local_j + 1)]) as *const i64) as *mut i64)) = __local_x)
+
+
+        (__local_j = __local_i)
+
+        (__local_i = __local_i + 1)
+
+
+    }
+
+
+}
+
 pub fn c_popcount(__param_x: u64) -> i32 {
     return (__param_x as u64).popcount()
 

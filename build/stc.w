@@ -158,6 +158,37 @@ fn stc_facade_shapes_source() -> str:
     "#define T stc_f64s, double\n" ++
     "#include \"../include/stc/sort.h\"\n" ++
     "\n" ++
+    "// The word shapes D148 named for the hot paths: an integer key hashed by\n" ++
+    "// the engine itself, and an integer priority ordered by the engine's <.\n" ++
+    "#define T stc_word_set, uint64_t\n" ++
+    "#include \"../include/stc/hset.h\"\n" ++
+    "\n" ++
+    "#define T stc_word_pqueue, int64_t\n" ++
+    "#include \"../include/stc/pqueue.h\"\n" ++
+    "\n" ++
+    "// Stack, Queue and LinkedList: the slot shape and the word shape each.\n" ++
+    "#define T stc_slot_stack, stc_slot, (c_no_clone)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/stack.h\"\n" ++
+    "\n" ++
+    "#define T stc_word_stack, uint64_t\n" ++
+    "#include \"../include/stc/stack.h\"\n" ++
+    "\n" ++
+    "#define T stc_slot_queue, stc_slot, (c_no_clone)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/queue.h\"\n" ++
+    "\n" ++
+    "#define T stc_word_queue, uint64_t\n" ++
+    "#include \"../include/stc/queue.h\"\n" ++
+    "\n" ++
+    "#define T stc_slot_list, stc_slot, (c_no_clone)\n" ++
+    "#define i_cmp(a, b) STC_SLOT_CMP(a, b)\n" ++
+    "#define i_keydrop(p) (void)0\n" ++
+    "#include \"../include/stc/list.h\"\n" ++
+    "\n" ++
+    "#define T stc_word_list, int64_t, (c_use_cmp)\n" ++
+    "#include \"../include/stc/list.h\"\n" ++
+    "\n" ++
     "#include \"../include/stc/cbits.h\"\n"
 
 fn stc_stage_library(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
