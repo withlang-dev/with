@@ -316,57 +316,57 @@ pub type ushf = u16
 
 pub type ulg = u64
 
-pub let MAX_MEM_LEVEL: c_int = 9
-pub let MAX_WBITS: c_int = 15
+pub let MAX_MEM_LEVEL: i32 = 9
+pub let MAX_WBITS: i32 = 15
 pub fn OF[T](args: T) -> T {
     args
 }
 pub let ZLIB_VERSION = "1.3.2"
-pub let ZLIB_VERNUM: c_int = 0x1320
-pub let ZLIB_VER_MAJOR: c_int = 1
-pub let ZLIB_VER_MINOR: c_int = 3
-pub let ZLIB_VER_REVISION: c_int = 2
-pub let ZLIB_VER_SUBREVISION: c_int = 0
-pub let Z_NO_FLUSH: c_int = 0
-pub let Z_PARTIAL_FLUSH: c_int = 1
-pub let Z_SYNC_FLUSH: c_int = 2
-pub let Z_FULL_FLUSH: c_int = 3
-pub let Z_FINISH: c_int = 4
-pub let Z_BLOCK: c_int = 5
-pub let Z_TREES: c_int = 6
-pub let Z_OK: c_int = 0
-pub let Z_STREAM_END: c_int = 1
-pub let Z_NEED_DICT: c_int = 2
-pub let Z_ERRNO: c_int = -1
-pub let Z_STREAM_ERROR: c_int = -2
-pub let Z_DATA_ERROR: c_int = -3
-pub let Z_MEM_ERROR: c_int = -4
-pub let Z_BUF_ERROR: c_int = -5
-pub let Z_VERSION_ERROR: c_int = -6
-pub let Z_NO_COMPRESSION: c_int = 0
-pub let Z_BEST_SPEED: c_int = 1
-pub let Z_BEST_COMPRESSION: c_int = 9
-pub let Z_DEFAULT_COMPRESSION: c_int = -1
-pub let Z_FILTERED: c_int = 1
-pub let Z_HUFFMAN_ONLY: c_int = 2
-pub let Z_RLE: c_int = 3
-pub let Z_FIXED: c_int = 4
-pub let Z_DEFAULT_STRATEGY: c_int = 0
-pub let Z_BINARY: c_int = 0
-pub let Z_TEXT: c_int = 1
+pub let ZLIB_VERNUM: i32 = 0x1320
+pub let ZLIB_VER_MAJOR: i32 = 1
+pub let ZLIB_VER_MINOR: i32 = 3
+pub let ZLIB_VER_REVISION: i32 = 2
+pub let ZLIB_VER_SUBREVISION: i32 = 0
+pub let Z_NO_FLUSH: i32 = 0
+pub let Z_PARTIAL_FLUSH: i32 = 1
+pub let Z_SYNC_FLUSH: i32 = 2
+pub let Z_FULL_FLUSH: i32 = 3
+pub let Z_FINISH: i32 = 4
+pub let Z_BLOCK: i32 = 5
+pub let Z_TREES: i32 = 6
+pub let Z_OK: i32 = 0
+pub let Z_STREAM_END: i32 = 1
+pub let Z_NEED_DICT: i32 = 2
+pub let Z_ERRNO: i32 = -1
+pub let Z_STREAM_ERROR: i32 = -2
+pub let Z_DATA_ERROR: i32 = -3
+pub let Z_MEM_ERROR: i32 = -4
+pub let Z_BUF_ERROR: i32 = -5
+pub let Z_VERSION_ERROR: i32 = -6
+pub let Z_NO_COMPRESSION: i32 = 0
+pub let Z_BEST_SPEED: i32 = 1
+pub let Z_BEST_COMPRESSION: i32 = 9
+pub let Z_DEFAULT_COMPRESSION: i32 = -1
+pub let Z_FILTERED: i32 = 1
+pub let Z_HUFFMAN_ONLY: i32 = 2
+pub let Z_RLE: i32 = 3
+pub let Z_FIXED: i32 = 4
+pub let Z_DEFAULT_STRATEGY: i32 = 0
+pub let Z_BINARY: i32 = 0
+pub let Z_TEXT: i32 = 1
 pub let Z_ASCII: i32 = 1
-pub let Z_UNKNOWN: c_int = 2
-pub let Z_DEFLATED: c_int = 8
-pub let Z_NULL: c_int = 0
+pub let Z_UNKNOWN: i32 = 2
+pub let Z_DEFLATED: i32 = 8
+pub let Z_NULL: i32 = 0
 pub let DEF_WBITS: i32 = 15
-pub let DEF_MEM_LEVEL: c_int = 8
-pub let STORED_BLOCK: c_int = 0
-pub let STATIC_TREES: c_int = 1
-pub let DYN_TREES: c_int = 2
-pub let MIN_MATCH: c_int = 3
-pub let MAX_MATCH: c_int = 258
-pub let PRESET_DICT: c_int = 0x20
-pub let OS_CODE: c_int = 19
+pub let DEF_MEM_LEVEL: i32 = 8
+pub let STORED_BLOCK: i32 = 0
+pub let STATIC_TREES: i32 = 1
+pub let DYN_TREES: i32 = 2
+pub let MIN_MATCH: i32 = 3
+pub let MAX_MATCH: i32 = 258
+pub let PRESET_DICT: i32 = 0x20
+pub let OS_CODE: i32 = 19
 pub fn zmemzero[T](dest: T, len: T) -> i64 {
     with_memset(dest as *mut u8, 0, len as i64)
 }
@@ -391,13 +391,13 @@ pub fn Tracecv(c: i32, x: i32) {
 pub fn ZSWAP32[T](q: T) -> T {
     (((((q >> 24) & 0xff) + ((q >> 8) & 0xff00)) + ((q & 0xff00) << 8)) + ((q & 0xff) << 24))
 }
-pub let BASE: c_uint = 65521
-pub let NMAX: c_int = 5552
+pub let BASE: u32 = 65521
+pub let NMAX: i32 = 5552
 pub type z_word_t = u64
 
-pub let N: c_int = 5
-pub let W: c_int = 8
-pub let POLY: c_uint = 0xedb88320
+pub let N: i32 = 5
+pub let W: i32 = 8
+pub let POLY: u32 = 0xedb88320
 @[repr(C)]
 pub type ct_data_s_fc = union { freq: u16 = 0, code: u16 = 0 }
 impl Copy for ct_data_s_fc
@@ -446,37 +446,37 @@ pub type config = config_s
 
 pub let deflate_copyright: List[c_char] = [32, 100, 101, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 74, 101, 97, 110, 45, 108, 111, 117, 112, 32, 71, 97, 105, 108, 108, 121, 32, 97, 110, 100, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
-pub let LENGTH_CODES: c_int = 29
-pub let LITERALS: c_int = 256
+pub let LENGTH_CODES: i32 = 29
+pub let LITERALS: i32 = 256
 pub let L_CODES: i32 = 286
-pub let D_CODES: c_int = 30
-pub let BL_CODES: c_int = 19
+pub let D_CODES: i32 = 30
+pub let BL_CODES: i32 = 19
 pub let HEAP_SIZE: i32 = 573
-pub let MAX_BITS: c_int = 15
-pub let Buf_size: c_int = 16
-pub let INIT_STATE: c_int = 42
-pub let GZIP_STATE: c_int = 57
-pub let EXTRA_STATE: c_int = 69
-pub let NAME_STATE: c_int = 73
-pub let COMMENT_STATE: c_int = 91
-pub let HCRC_STATE: c_int = 103
-pub let BUSY_STATE: c_int = 113
-pub let FINISH_STATE: c_int = 666
-pub let LIT_BUFS: c_int = 4
+pub let MAX_BITS: i32 = 15
+pub let Buf_size: i32 = 16
+pub let INIT_STATE: i32 = 42
+pub let GZIP_STATE: i32 = 57
+pub let EXTRA_STATE: i32 = 69
+pub let NAME_STATE: i32 = 73
+pub let COMMENT_STATE: i32 = 91
+pub let HCRC_STATE: i32 = 103
+pub let BUSY_STATE: i32 = 113
+pub let FINISH_STATE: i32 = 666
+pub let LIT_BUFS: i32 = 4
 pub let MIN_LOOKAHEAD: i32 = 262
 pub let WIN_INIT: i32 = 258
 pub fn d_code[T](dist: T) -> T {
     (if (dist < 256): _dist_code[dist] else: _dist_code[(256 + (dist >> 7))])
 }
-pub let NIL: c_int = 0
-pub let TOO_FAR: c_int = 4096
+pub let NIL: i32 = 0
+pub let TOO_FAR: i32 = 4096
 pub fn RANK[T](f: T) -> T {
     ((f * 2) - (if (f > 4): 9 else: 0))
 }
 pub fn check_match(s: i32, start: i32, match_: i32, length: i32) {
     return
 }
-pub let MAX_STORED: c_int = 65535
+pub let MAX_STORED: i32 = 65535
 pub fn MIN[T](a: T, b: T) -> T {
     (if (a > b): b else: a)
 }
@@ -486,14 +486,14 @@ impl Copy for gz_state
 
 pub type gz_statep = *mut gz_state
 
-pub let GZBUFSIZE: c_int = 8192
-pub let GZ_NONE: c_int = 0
-pub let GZ_READ: c_int = 7247
-pub let GZ_WRITE: c_int = 31153
-pub let GZ_APPEND: c_int = 1
-pub let LOOK: c_int = 0
-pub let COPY: c_int = 1
-pub let GZIP: c_int = 2
+pub let GZBUFSIZE: i32 = 8192
+pub let GZ_NONE: i32 = 0
+pub let GZ_READ: i32 = 7247
+pub let GZ_WRITE: i32 = 31153
+pub let GZ_APPEND: i32 = 1
+pub let LOOK: i32 = 0
+pub let COPY: i32 = 1
+pub let GZIP: i32 = 2
 pub fn GT_OFF[T](x: T) -> T {
     sizeof[i32]()
 }
@@ -543,12 +543,12 @@ pub let SYNC: i32 = 16211
 pub type inflate_state { pub strm: *mut z_stream_s = null, pub mode: i32 = 0, pub last: i32 = 0, pub wrap: i32 = 0, pub havedict: i32 = 0, pub flags: i32 = 0, pub dmax: u32 = 0, pub check_: u64 = 0, pub total: u64 = 0, pub head: *mut gz_header_s = null, pub wbits: u32 = 0, pub wsize: u32 = 0, pub whave: u32 = 0, pub wnext: u32 = 0, pub window: *mut u8 = null, pub hold: u64 = 0, pub bits: u32 = 0, pub length: u32 = 0, pub offset: u32 = 0, pub extra: u32 = 0, pub lencode: *const code = null, pub distcode: *const code = null, pub lenbits: u32 = 0, pub distbits: u32 = 0, pub ncode: u32 = 0, pub nlen: u32 = 0, pub ndist: u32 = 0, pub have: u32 = 0, pub next: *mut code = null, pub lens: [u16; 320] = [0 as u16; 320], pub work: [u16; 288] = [0 as u16; 288], pub codes: [code; 1444], pub sane: i32 = 0, pub back: i32 = 0, pub was: u32 = 0 }
 impl Copy for inflate_state
 
-pub let ENOUGH_LENS: c_int = 852
-pub let ENOUGH_DISTS: c_int = 592
+pub let ENOUGH_LENS: i32 = 852
+pub let ENOUGH_DISTS: i32 = 592
 pub let ENOUGH: i32 = 1444
 pub let inflate_copyright: List[c_char] = [32, 105, 110, 102, 108, 97, 116, 101, 32, 49, 46, 51, 46, 50, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 53, 45, 50, 48, 50, 54, 32, 77, 97, 114, 107, 32, 65, 100, 108, 101, 114, 32, 0]
 
-pub let MAXBITS: c_int = 15
+pub let MAXBITS: i32 = 15
 pub type i8_t = i8
 
 pub type ui8_t = u8
@@ -609,15 +609,15 @@ pub let PI32 = "d"
 pub let PUI32 = "u"
 pub let PI64 = "ld"
 pub let PUI64 = "lu"
-pub let MAXU32: c_uint = 0xffffffff
-pub let ZLIB_FILEFUNC_SEEK_CUR: c_int = 1
-pub let ZLIB_FILEFUNC_SEEK_END: c_int = 2
-pub let ZLIB_FILEFUNC_SEEK_SET: c_int = 0
-pub let ZLIB_FILEFUNC_MODE_READ: c_int = 1
-pub let ZLIB_FILEFUNC_MODE_WRITE: c_int = 2
-pub let ZLIB_FILEFUNC_MODE_READWRITEFILTER: c_int = 3
-pub let ZLIB_FILEFUNC_MODE_EXISTING: c_int = 4
-pub let ZLIB_FILEFUNC_MODE_CREATE: c_int = 8
+pub let MAXU32: u32 = 0xffffffff
+pub let ZLIB_FILEFUNC_SEEK_CUR: i32 = 1
+pub let ZLIB_FILEFUNC_SEEK_END: i32 = 2
+pub let ZLIB_FILEFUNC_SEEK_SET: i32 = 0
+pub let ZLIB_FILEFUNC_MODE_READ: i32 = 1
+pub let ZLIB_FILEFUNC_MODE_WRITE: i32 = 2
+pub let ZLIB_FILEFUNC_MODE_READWRITEFILTER: i32 = 3
+pub let ZLIB_FILEFUNC_MODE_EXISTING: i32 = 4
+pub let ZLIB_FILEFUNC_MODE_CREATE: i32 = 8
 pub fn ZOPEN64[T](filefunc: T, filename: T, mode: T) -> T {
     unsafe { call_zopen64(&filefunc, filename, mode) }
 }
@@ -671,15 +671,15 @@ impl Copy for unz64_file_pos_s
 
 pub type unz64_file_pos = unz64_file_pos_s
 
-pub let Z_BZIP2ED: c_int = 12
-pub let UNZ_OK: c_int = 0
-pub let UNZ_END_OF_LIST_OF_FILE: c_int = -100
+pub let Z_BZIP2ED: i32 = 12
+pub let UNZ_OK: i32 = 0
+pub let UNZ_END_OF_LIST_OF_FILE: i32 = -100
 pub let UNZ_ERRNO: i32 = -1
-pub let UNZ_EOF: c_int = 0
-pub let UNZ_PARAMERROR: c_int = -102
-pub let UNZ_BADZIPFILE: c_int = -103
-pub let UNZ_INTERNALERROR: c_int = -104
-pub let UNZ_CRCERROR: c_int = -105
+pub let UNZ_EOF: i32 = 0
+pub let UNZ_PARAMERROR: i32 = -102
+pub let UNZ_BADZIPFILE: i32 = -103
+pub let UNZ_INTERNALERROR: i32 = -104
+pub let UNZ_CRCERROR: i32 = -105
 pub fn READ_8[T](adr: T) -> u8 {
     ((unsafe *adr) as u8)
 }
@@ -687,13 +687,13 @@ pub let _dist_code: List[u8] = [0, 1, 2, 3, 4, 4, 5, 5, 6, 6, 6, 6, 7, 7, 7, 7, 
 
 pub let _length_code: List[u8] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 8, 9, 9, 10, 10, 11, 11, 12, 12, 12, 12, 13, 13, 13, 13, 14, 14, 14, 14, 15, 15, 15, 15, 16, 16, 16, 16, 16, 16, 16, 16, 17, 17, 17, 17, 17, 17, 17, 17, 18, 18, 18, 18, 18, 18, 18, 18, 19, 19, 19, 19, 19, 19, 19, 19, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 21, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 22, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 23, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 24, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 25, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 26, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 27, 28]
 
-pub let MAX_BL_BITS: c_int = 7
-pub let END_BLOCK: c_int = 256
-pub let REP_3_6: c_int = 16
-pub let REPZ_3_10: c_int = 17
-pub let REPZ_11_138: c_int = 18
-pub let DIST_CODE_LEN: c_int = 512
-pub let SMALLEST: c_int = 1
+pub let MAX_BL_BITS: i32 = 7
+pub let END_BLOCK: i32 = 256
+pub let REP_3_6: i32 = 16
+pub let REPZ_3_10: i32 = 17
+pub let REPZ_11_138: i32 = 18
+pub let DIST_CODE_LEN: i32 = 512
+pub let SMALLEST: i32 = 1
 pub fn smaller[T](tree: T, n: T, m: T, depth: T) -> i32 {
     (((tree[n].Freq < tree[m].Freq) or ((tree[n].Freq == tree[m].Freq) and (depth[n] <= depth[m]))) as i32)
 }
@@ -713,14 +713,14 @@ impl Copy for unz64_s
 
 pub let unz_copyright: List[c_char] = [32, 117, 110, 122, 105, 112, 32, 49, 46, 48, 49, 32, 67, 111, 112, 121, 114, 105, 103, 104, 116, 32, 49, 57, 57, 56, 45, 50, 48, 48, 52, 32, 71, 105, 108, 108, 101, 115, 32, 86, 111, 108, 108, 97, 110, 116, 32, 45, 32, 104, 116, 116, 112, 115, 58, 47, 47, 119, 119, 119, 46, 119, 105, 110, 105, 109, 97, 103, 101, 46, 99, 111, 109, 47, 122, 76, 105, 98, 68, 108, 108, 47, 109, 105, 110, 105, 122, 105, 112, 46, 104, 116, 109, 108, 0]
 
-pub let UNZ_BUFSIZE: c_int = 16384
-pub let UNZ_MAXFILENAMEINZIP: c_int = 256
+pub let UNZ_BUFSIZE: i32 = 16384
+pub let UNZ_MAXFILENAMEINZIP: i32 = 256
 pub fn ALLOC[T](size: T) -> *mut c_void {
     (with_alloc((size) as i64) as *mut c_void)
 }
-pub let SIZECENTRALDIRITEM: c_int = 0x2e
-pub let SIZEZIPLOCALHEADER: c_int = 0x1e
-pub let CASESENSITIVITYDEFAULTVALUE: c_int = 2
-pub let BUFREADCOMMENT: c_int = 0x400
+pub let SIZECENTRALDIRITEM: i32 = 0x2e
+pub let SIZEZIPLOCALHEADER: i32 = 0x1e
+pub let CASESENSITIVITYDEFAULTVALUE: i32 = 2
+pub let BUFREADCOMMENT: i32 = 0x400
 pub let CENTRALDIRINVALID: u64 = ((0 as u64) -% 1)
 pub let z_errmsg: List[*mut c_char] = [("need dictionary" as *mut c_char), ("stream end" as *mut c_char), ("" as *mut c_char), ("file error" as *mut c_char), ("stream error" as *mut c_char), ("data error" as *mut c_char), ("insufficient memory" as *mut c_char), ("buffer error" as *mut c_char), ("incompatible version" as *mut c_char), ("" as *mut c_char)]

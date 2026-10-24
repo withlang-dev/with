@@ -253,9 +253,9 @@ impl Copy for _BlockHeader
 
 pub var allocation_limit: i32 = -1
 
-pub let ALLOC_TEST_MAGIC: c_int = 0x72ec82d2
-pub let MALLOC_PATTERN: c_uint = 0xBAADF00D
-pub let FREE_PATTERN: c_uint = 0xDEADBEEF
+pub let ALLOC_TEST_MAGIC: i32 = 0x72ec82d2
+pub let MALLOC_PATTERN: u32 = 0xBAADF00D
+pub let FREE_PATTERN: u32 = 0xDEADBEEF
 pub type ArrayListValue = *mut c_void
 
 pub type ArrayList = _ArrayList

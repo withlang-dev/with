@@ -335,8 +335,8 @@ pub fn c_default_drop[T](vp: T) -> T {
 pub fn c_arraylen[T](a: T) -> i64 {
     c_countof(a)
 }
-pub let FNV_BASIS: c_ulonglong = 0xcbf29ce484222325
-pub let FNV_PRIME: c_longlong = 0x00000100000001b3
+pub let FNV_BASIS: u64 = 0xcbf29ce484222325
+pub let FNV_PRIME: i64 = 0x00000100000001b3
 pub let c_END: i32 = 2147483647
 @[repr(C)]
 pub type cutf8_decode_t { pub state: u32 = 0, pub codep: u32 = 0 }
@@ -741,8 +741,8 @@ pub let cco_CANCEL: u32 = 1073741824
 pub let cco_SHUTDOWN: u32 = 536870912
 pub let cco_SUBTASK_FAIL: u32 = 536870913
 pub let cco_NONE: i32 = 0
-pub fn cco_timer_freq() -> u64 {
-    1000000u64
+pub fn cco_timer_freq() -> i64 {
+    1000000i64
 }
 @[repr(C)]
 pub type URange16 { pub lo: u16 = 0, pub hi: u16 = 0 }
