@@ -74,8 +74,14 @@ with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4
 # on local-3 until the legs are cut (issue below).
 with-linux-x86_64.version=nightly-20261023-local-2-1508cf5cc0d1
 with-linux-x86_64=1bc4c6c81b284d69101d4a38ec680571afa0d37a270d0cc16dfb8a1b351e1c64
-with-linux-aarch64.version=nightly-20261020-local-3-763d0e54c82a
-with-linux-aarch64=0cf98a17047fd6b01fb92fa56c85f2da0b9bbd6f530870393895d2288a2ad1aa
+# linux-aarch64 is cut from the bridge rung seed-bridge-20261024 3c7c68968 (2026-10-24):
+# the linux-x86_64 bridge plus the D155 builtins, std/rt c_char, the D156 migrator and
+# the corpora and test programs re-promoted under them, built in tools/docker/linux-
+# aarch64 from local-3 (main does not build under local-3 since #2583; this is the first
+# aarch64 compiler whose c_char is a builtin). Main 97b47d6d1 builds and fixpoints under
+# it; the main-based seed follows once this pin lands (seed-driver refuses it before).
+with-linux-aarch64.version=nightly-20261024-local-2-3c7c68968cb2
+with-linux-aarch64=cf90b11dfa51d3edafcaeb7f9b5167d717c01e9a71f256fbe10000e948aa3434
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
