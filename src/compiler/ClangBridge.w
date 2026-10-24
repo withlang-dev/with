@@ -11,9 +11,9 @@ extern fn rt_close(fd: i32) -> i32
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per
 // backend; Windows has neither name), never the host's symbols.
-unsafe fn mkstemp(template_path: *mut u8) -> i32: with_libc_mkstemp(template_path as *mut i8)
-unsafe fn realpath(path: *const u8, resolved_name: *mut u8) -> *mut u8:
-    with_libc_realpath(path as *const i8, resolved_name as *mut i8) as *mut u8
+unsafe fn mkstemp(template_path: *mut c_char) -> i32: with_libc_mkstemp(template_path)
+unsafe fn realpath(path: *const c_char, resolved_name: *mut c_char) -> *mut c_char:
+    with_libc_realpath(path, resolved_name)
 // unlink(2) under its own name here: the pinned seed predates #1919, so an
 // `extern fn unlink` in this module still collides with std.libc's `pub fn
 // unlink` once the compiler imports std.zip (compiler.TarExtract).
@@ -2479,7 +2479,7 @@ fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut c_char)
         if fd < 0:
             (*s).err_msg = c_strdup("failed to create temp file\0" as *const u8)
             return s as i64
@@ -3336,8 +3336,8 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
             let target_buf = with_alloc(4096)
             var presumed_matches: i32 = 0
             if actual_buf as i64 != 0 and target_buf as i64 != 0:
-                let actual_real = realpath(presumed_name, actual_buf)
-                let target_real = realpath(c_path as *const u8, target_buf)
+                let actual_real = realpath(presumed_name as *const c_char, actual_buf as *mut c_char)
+                let target_real = realpath(c_path as *const c_char, target_buf as *mut c_char)
                 if actual_real as i64 != 0 and target_real as i64 != 0:
                     presumed_matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
                 else:
@@ -3368,8 +3368,8 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
         let target_buf = with_alloc(4096)
         var matches: i32 = 0
         if fname_str as i64 != 0 and actual_buf as i64 != 0 and target_buf as i64 != 0:
-            let actual_real = realpath(fname_str, actual_buf)
-            let target_real = realpath(c_path as *const u8, target_buf)
+            let actual_real = realpath(fname_str as *const c_char, actual_buf as *mut c_char)
+            let target_real = realpath(c_path as *const c_char, target_buf as *mut c_char)
             if actual_real as i64 != 0 and target_real as i64 != 0:
                 matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
             else:
@@ -3428,10 +3428,10 @@ fn with_cimport_realpath(path: &str) -> str:
         let cpath = str_to_cstr(path)
         if cpath as i64 == 0: return ""
         var buf: [1024]u8 = [0 as u8; 1024]
-        let r = realpath(cpath, &raw mut buf as *mut [1024]u8 as *mut u8)
+        let r = realpath(cpath as *const c_char, &raw mut buf as *mut [1024]u8 as *mut c_char)
         with_free(cpath)
         if r as i64 == 0: return ""
-        make_path_str(r)
+        make_path_str(r as *const u8)
 
 // ── Macro extraction ────────────────────────────────────────
 
@@ -3738,7 +3738,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
     let tmpl = "/tmp/with_cimport_macro_XXXXXX\0"
     let tp = *(&tmpl as *const *const u8)
     with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 31)
-    let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
+    let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut c_char)
     if fd < 0:
         with_cimport_dispose(s as i64)
         return 0
@@ -3789,7 +3789,7 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut c_char)
         if fd < 0:
             with_cimport_dispose(s as i64)
             return ""
@@ -3867,7 +3867,7 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
         let tmpl = "/tmp/with_cimport_XXXXXX\0"
         let tp = *(&tmpl as *const *const u8)
         with_memcpy(&raw mut template_path as *mut [4096]u8 as *mut u8, tp, 25)
-        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut u8)
+        let fd = mkstemp(&raw mut template_path as *mut [4096]u8 as *mut c_char)
         if fd < 0:
             with_cimport_dispose(s as i64)
             return 0

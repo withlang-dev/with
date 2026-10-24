@@ -72,7 +72,7 @@ unsafe fn fs_c_path(s: &str) -> *mut u8:
 fn fs_open(path: &str) -> i32:
     unsafe:
         let c = fs_c_path(path)
-        let fd = rt_open(c as *const i8, 0, 0)
+        let fd = rt_open(c as *const c_char, 0, 0)
         with_free(c)
         fd
 
