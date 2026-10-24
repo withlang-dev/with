@@ -74,14 +74,12 @@ with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4
 # on local-3 until the legs are cut (issue below).
 with-linux-x86_64.version=nightly-20261023-local-2-1508cf5cc0d1
 with-linux-x86_64=1bc4c6c81b284d69101d4a38ec680571afa0d37a270d0cc16dfb8a1b351e1c64
-# linux-aarch64 is cut from the bridge rung seed-bridge-20261024 3c7c68968 (2026-10-24):
-# the linux-x86_64 bridge plus the D155 builtins, std/rt c_char, the D156 migrator and
-# the corpora and test programs re-promoted under them, built in tools/docker/linux-
-# aarch64 from local-3 (main does not build under local-3 since #2583; this is the first
-# aarch64 compiler whose c_char is a builtin). Main 97b47d6d1 builds and fixpoints under
-# it; the main-based seed follows once this pin lands (seed-driver refuses it before).
-with-linux-aarch64.version=nightly-20261024-local-2-3c7c68968cb2
-with-linux-aarch64=cf90b11dfa51d3edafcaeb7f9b5167d717c01e9a71f256fbe10000e948aa3434
+# linux-aarch64 is cut from main 47721ee51 (2026-10-24) in tools/docker/linux-aarch64
+# by the bridge-rung seed nightly-20261024-local-2-3c7c68968cb2 (#2605), to a stage2 ==
+# stage3 fixpoint with :release-checks green: the first main-based aarch64 seed since
+# #2583, with the D155 builtins (c_char is the target's u8 there).
+with-linux-aarch64.version=nightly-20261024-local-3-47721ee51bc2
+with-linux-aarch64=5593bbb682d0b914485fff45662a48e6d977e8f89142d8d687081e79190c838b
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
