@@ -4274,7 +4274,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                 let safe_name = ci_escape_reserved(name)
                 ci_mark_macro_const_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
-                let let_line = "let " ++ safe_name ++ ": c_int = " ++ char_val
+                let let_line = "let " ++ safe_name ++ ": i32 = " ++ char_val
                 if not ci_migrate_shared_decl_add("let", safe_name, let_line):
                     output = output ++ let_line ++ "\n"
         else if ci_is_float_literal(stripped) and ci_float_type_from_suffix(stripped) == "c_longdouble" and not ci_c_long_double_representable(with_cimport_target_triple()):
@@ -15632,16 +15632,15 @@ fn ci_render_int_value(v: &str) -> str:
         return "(0 - 9223372036854775807 - 1)"
     v ++ ""
 
-fn ci_int_type_is_c_integer(t: &str) -> bool:
-    t == "c_int" or t == "c_uint" or t == "c_long" or t == "c_ulong" or t == "c_longlong" or t == "c_ulonglong" or t == "c_short" or t == "c_ushort" or t == "c_char" or t == "c_uchar" or t == "c_schar"
+fn ci_int_type_is_c_integer(t: &str) -> bool: ci_c_int_type_width(t) > 0
 
 fn ci_int_type_rank(t: &str) -> i32:
-    if t == "c_char" or t == "c_uchar" or t == "c_schar": return 1
-    if t == "c_short" or t == "c_ushort": return 2
-    if t == "c_int": return 3
-    if t == "c_uint": return 4
-    if t == "c_long" or t == "c_longlong": return 5
-    if t == "c_ulong" or t == "c_ulonglong": return 6
+    if t == "i8" or t == "u8" or t == "c_char" or t == "c_uchar" or t == "c_schar": return 1
+    if t == "i16" or t == "u16" or t == "c_short" or t == "c_ushort": return 2
+    if t == "i32" or t == "c_int": return 3
+    if t == "u32" or t == "c_uint": return 4
+    if t == "i64" or t == "c_long" or t == "c_longlong": return 5
+    if t == "u64" or t == "c_ulong" or t == "c_ulonglong": return 6
     0
 
 // C's usual arithmetic conversions (C11 6.3.1.8) in a translated binary
@@ -15747,14 +15746,14 @@ fn ci_int_annotation_for_value(v0: &str) -> str:
             hj += 1
         let hn = v0.len() - hj
         if hn > 16:
-            return "c_ulonglong"
+            return "u64"
         if hn == 16:
             let hb = v0[hj]
             if hb >= 56 or (hb >= 97 and hb <= 102) or (hb >= 65 and hb <= 70):
-                return "c_ulonglong"
-            return "c_longlong"
+                return "u64"
+            return "i64"
         if hn > 8:
-            return "c_longlong"
+            return "i64"
         if hn == 8:
             let hb8 = v0[hj]
             if hb8 >= 56 or (hb8 >= 97 and hb8 <= 102) or (hb8 >= 65 and hb8 <= 70):
@@ -15764,21 +15763,20 @@ fn ci_int_annotation_for_value(v0: &str) -> str:
         return "i32"
     let v = v0
     if v[0] == 45:
-        // Negative: c_int unless it underflows i32.
         if v.len() > 11:
-            return "c_longlong"
+            return "i64"
         if v.len() == 11 and v.slice(1, v.len()) > "2147483648":
-            return "c_longlong"
+            return "i64"
         return "i32"
     if ci_int_literal_exceeds_i64(v):
-        return "c_ulonglong"
+        return "u64"
     var j: i64 = 0
     while j < v.len() and v[j] == 48:
         j += 1
     let n = v.len() - j
     let mag = v.slice(j, v.len())
     if n > 10 or (n == 10 and mag > "4294967295"):
-        return "c_longlong"
+        return "i64"
     if n == 10 and mag > "2147483647":
         return "u32"
     "i32"
@@ -15892,16 +15890,21 @@ fn ci_int_type_from_suffix(s: &str) -> str:
     "i32"
 
 // The With literal suffix a C integer literal's own suffix gives it, or ""
-// when it has none (C11 6.4.4.1: the first type of the suffix's list that
-// holds the value; `long` is c_import's c_long, i64). `2ULL` is `2u64`.
+// when it has none or is the model's i32 (C11 6.4.4.1: the first type of the
+// suffix's list that holds the value). `2ULL` is `2u64`; `L` follows the model.
 fn ci_with_int_literal_suffix(literal: &str) -> str:
     let digits = ci_strip_int_suffix(literal)
     if digits.len() == literal.len() or digits.len() == 0 or digits[0] == '-':
         return ""
     let c_type = ci_int_type_from_suffix(literal)
-    if c_type == "c_uint":
+    if c_type == "u32":
         return if ci_int_type_rank(ci_int_annotation_for_value(digits)) > ci_int_type_rank(c_type): "u64" else: "u32"
-    if c_type == "c_long" or c_type == "c_longlong":
+    if c_type == "i64":
+        return if ci_int_literal_exceeds_i64(digits): "u64" else: "i64"
+    if c_type == "i32":
+        let range = ci_int_annotation_for_value(digits)
+        if range == "i32": return ""
+        if digits.len() > 2 and digits[0] == 48 and (digits[1] == 120 or digits[1] == 88): return range
         return if ci_int_literal_exceeds_i64(digits): "u64" else: "i64"
     "u64"
 

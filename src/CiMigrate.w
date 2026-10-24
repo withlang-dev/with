@@ -822,7 +822,7 @@ fn ci_migrate_preamble_text() -> str:
     // diagnostic (Sema names the model where a corpus width meets a host
     // C width); no `type c_*` line (D155), every width is spelled.
     let model = ci_model_name(with_cimport_target_triple())
-    p = p ++ "\n// data model: " ++ model ++ "\npub let C_DATA_MODEL: str = \"" ++ model ++ "\"\n"
+    p = p ++ "\n// data model: " ++ model ++ "\npub const C_DATA_MODEL: str = \"" ++ model ++ "\"\n"
     // Clang's overflow builtins both store the wrapped result and report the
     // overflow bit. Keep both effects: the structural call lowerer selects
     // the helper from the result-pointer type and rejects mixed types loudly.

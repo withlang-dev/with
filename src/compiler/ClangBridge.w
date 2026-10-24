@@ -1279,7 +1279,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
         let inner2 = clang_Type_getValueType(canonical)
         if inner2.kind != CXType_Invalid:
             return translate_type_recursive_mode(s, inner2, depth + 1, is_last_struct_field, preserve_incomplete_arrays)
-        return session_strdup(s, "c_int\0" as *const u8)
+        return session_strdup(s, "i32\0" as *const u8)
 
     // Default: unsupported — must produce a loud compile error
     session_strdup(s, "__UNSUPPORTED:unknown_type_kind\0" as *const u8)

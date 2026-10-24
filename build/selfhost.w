@@ -6333,7 +6333,7 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "ulong_max_width.c")
     let out_w = bs_join(case_dir, "ulong_max_width.w")
-    let c_text = "#include <limits.h>\n#include <stdlib.h>\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n\ndouble parse_decimal(char *s) {\n  char *end;\n  return strtod(s, &end);\n}\n"
+    let c_text = "#include <limits.h>\n#include <stdlib.h>\n\n#define D156_HIGH_HEX 0xBAADF00D\nstatic unsigned int d156_unsigned[] = { 0x10U };\nstatic long d156_signed[] = { 0x20L };\n\nint cmp_ulong_max(unsigned long x) {\n  return x == ULONG_MAX;\n}\n\nint parse_overflow(char *s) {\n  char *end;\n  unsigned long value = strtoul(s, &end, 10);\n  return value == ULONG_MAX;\n}\n\ndouble parse_decimal(char *s) {\n  char *end;\n  return strtod(s, &end);\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "ulong max width source")
     if rc != 0: return rc
     var args: List[str] = List.new()
@@ -6349,6 +6349,12 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     rc = bs_assert_contains(ctx, out_text, "((0 as u64) -% 1)", "ulong_max_width")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as u32", "ulong_max_width")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "let D156_HIGH_HEX: u32 = 0xBAADF00D", "D156 high hex takes the unsigned 32-bit type")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "d156_unsigned: List[u32] = [0x10u32]", "D156 unsigned literal suffix")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, out_text, "d156_signed: List[i64] = [0x20i64]", "D156 signed long literal suffix")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn parse_decimal", "ulong_max_width")
     if rc != 0: return rc

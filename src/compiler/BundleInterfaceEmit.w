@@ -506,7 +506,9 @@ impl BundleEmitter:
     mut fn emit_let(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
         let flags = ast.get_data2(node)
-        let name = with_str_clone_ref(sema.pool_resolve(ast.get_data0(node)))
+        let resolved_name = with_str_clone_ref(sema.pool_resolve(ast.get_data0(node)))
+        let displaced_at = resolved_name.index_of("$in$")
+        let name = if displaced_at >= 0: resolved_name.slice(0, displaced_at as i64) else: resolved_name
         let is_const = ast.is_const_decl_node(node) != 0
         // A private global is printed only as a returned view's origin.
         let is_pub = (flags / 2) % 2 != 0
