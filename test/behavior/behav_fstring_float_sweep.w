@@ -2,7 +2,7 @@
 
 // D68: use C itself as the oracle, across the binary64 range. This is a
 // compiler/runtime conformance test, so the raw foreign buffer stays here.
-extern fn snprintf(buffer: *mut u8, capacity: usize, format: *const u8, ...) -> i32
+extern fn snprintf(buffer: *mut u8, capacity: usize, format: *const c_char, ...) -> i32
 
 fn check_text(actual: &str, expected: &[2048]u8, n: i32):
     assert(n >= 0 and n < 2048)

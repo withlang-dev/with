@@ -16,7 +16,7 @@ use c_import("typedef int (*WithInlineCb)(int);\ntypedef struct WithInlineHolder
 use c_import("struct WithTimeval { long tv_sec; int tv_usec; };\nextern long with_timezone;\nint with_settimeofday(const struct WithTimeval *tv, const struct with_timezone *tz);\n")
 use std.builtins.write
 
-extern "C" fn atoi(s: *const u8) -> i32
+extern "C" fn atoi(s: *const c_char) -> i32
 
 fn test_c_import_functions_callable_directly:
     assert(abs(-42) == 42)
@@ -30,7 +30,7 @@ fn test_c_import_structs_are_usable:
     assert(result != -1)
 
 fn test_manual_extern_c_declaration:
-    assert(unsafe { atoi(c"42".ptr) } == 42)
+    assert(atoi(c"42".ptr) == 42)
 
 fn test_c_import_raw_c_string_literal_to_const_char_ptr:
     assert(strlen("hello") == 5usize)

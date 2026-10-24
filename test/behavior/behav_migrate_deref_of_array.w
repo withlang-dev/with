@@ -30,7 +30,7 @@ fn main:
     // by-value `[4]c_int`, which no caller's decayed argument fits), so
     // there is nothing to decay at its dereference.
     let migrated_unit = read_file(p7_join(case_dir, "lib/da/unit.w")).unwrap()
-    assert(migrated_unit.contains("__param_v: *mut c_int"))
+    assert(migrated_unit.contains("__param_v: *mut i32"))
     assert(not migrated_unit.contains("__param_v[0]"))
     var main_text = "use da.unit\nuse da.defs\nfn main:\n"
     main_text = main_text ++ "    var held = holder { f: [10 as c_char; 4] }\n"

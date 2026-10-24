@@ -19,7 +19,7 @@ fn main:
     let case_dir = p7_prepare_case("two_modules_c_import", "two_modules_c_import")
     p7_write(case_dir, "src/cu.w", "use c_import(\"<stdio.h>\")\npub fn greet() -> str: \"hi\"\n")
     p7_write(case_dir, "src/m.w", "use cu\nuse c_import(\"<stdlib.h>\")\nfn main:\n    print(greet())\n    print(f\"{abs(-3)} {atoi(\"42\")}\")\n")
-    p7_write(case_dir, "src/plain.w", "use cu\nfn main:\n    let n: c_uint = 3\n    print(f\"{n} {greet()}\")\n")
+    p7_write(case_dir, "src/plain.w", "use cu\nfn main:\n    let f: *mut FILE = null\n    print(f\"{greet()}\")\n")
     let src_dir = p7_join(case_dir, "src")
     let ran = p7_run(src_dir, "two_modules_run", "run\0m.w\0")
     p7_assert_success(ran, "root and imported module each use c_import")
@@ -29,5 +29,5 @@ fn main:
     // does not use c_import.
     let plain = p7_run(src_dir, "plain_module_run", "run\0plain.w\0")
     assert(plain.rc != 0)
-    assert((plain.stdout ++ plain.stderr).contains("c_uint"))
+    assert((plain.stdout ++ plain.stderr).contains("FILE"))
     print("ok")
