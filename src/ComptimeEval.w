@@ -56,7 +56,6 @@ fn comptime_float_of(value: &ComptimeValue) -> f64:
     if value.kind == ComptimeValueKind.CV_FLOAT:
         return value.real
     value.data0 as f64
-extern fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32
 extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_close(fd: i32) -> i32

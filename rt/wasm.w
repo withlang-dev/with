@@ -635,7 +635,7 @@ pub fn rt_getcwd(buf: *mut u8, size: i64) -> i32:
     let _ = with_memcpy(buf, wasm_cwd as *const u8, wasm_cwd_len + 1)
     0
 
-pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8:
+pub fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char:
     wasm_init_cwd()
     if wasm_absolute_into(path, resolved_path, WASM_PATH_MAX) < 0:
         return 0 as *mut u8
@@ -703,7 +703,7 @@ fn wasm_path_stat(path: *const u8, follow: i32, out_base: i64) -> i32:
         return wasm_fail(rc)
     0
 
-pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
+pub fn rt_stat(path: *const c_char, out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtStatBuf
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
@@ -719,7 +719,7 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
 
 // lstat-style mode word: WASI has no permission bits, so a plausible
 // default accompanies the file type.
-pub fn rt_file_mode(path: *const u8) -> i32:
+pub fn rt_file_mode(path: *const c_char) -> i32:
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
     if wasm_path_stat(path, 0, base) != 0:
@@ -735,13 +735,13 @@ fn wasm_lstat_is_dir(path: *const u8) -> bool:
     let mode = rt_file_mode(path)
     mode >= 0 and (mode & RT_S_IFMT) == RT_S_IFDIR
 
-pub fn rt_access(path: *const u8, mode: i32) -> i32:
+pub fn rt_access(path: *const c_char, mode: i32) -> i32:
     let _ = mode
     var st: [64]u8 = [0 as u8; 64]
     let base = (&raw mut st) as *mut [64]u8 as i64
     wasm_path_stat(path, 1, base)
 
-pub fn rt_chmod(path: *const u8, mode: i32) -> i32:
+pub fn rt_chmod(path: *const c_char, mode: i32) -> i32:
     // WASI preview1 has no permission bits to set; the file keeps the
     // host's defaults.
     let _ = path
@@ -768,17 +768,17 @@ fn wasm_path_call(path: *const u8, op: i32) -> i32:
         return wasm_fail(rc)
     0
 
-pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
+pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
     let _ = mode
     wasm_path_call(path, 0)
 
 pub fn rt_unlink(path: *const c_char) -> i32:
     wasm_path_call(path, 1)
 
-pub fn rt_rmdir(path: *const u8) -> i32:
+pub fn rt_rmdir(path: *const c_char) -> i32:
     wasm_path_call(path, 2)
 
-pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
+pub fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32:
     var old_rel: [4096]u8 = [0 as u8; 4096]
     var new_rel: [4096]u8 = [0 as u8; 4096]
     let ob = (&raw mut old_rel) as *mut [4096]u8 as *mut u8
@@ -796,7 +796,7 @@ pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
         return wasm_fail(rc)
     0
 
-pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
+pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     var rel: [4096]u8 = [0 as u8; 4096]
     let rb = (&raw mut rel) as *mut [4096]u8 as *mut u8
     var dirfd: i32 = -1
@@ -811,7 +811,7 @@ pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
 fn rt_empty_str() -> str:
     with_str_from_bytes(c" ".ptr, 0)
 
-pub fn rt_readlink(path: *const u8) -> str:
+pub fn rt_readlink(path: *const c_char) -> str:
     var rel: [4096]u8 = [0 as u8; 4096]
     let rb = (&raw mut rel) as *mut [4096]u8 as *mut u8
     var dirfd: i32 = -1
@@ -946,14 +946,14 @@ fn rt_list_files_walk(path: *const u8, acc: *mut i64):
         at = at + nlen + 1
     with_free(names)
 
-pub fn rt_list_files(path: *const u8) -> str:
+pub fn rt_list_files(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
     rt_list_files_walk(path, &acc as *mut [3]i64 as *mut i64)
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 // The names in a directory, one per line, no path and no descent; "" for
 // anything that is not a directory.
-pub fn rt_list_dir(path: *const u8) -> str:
+pub fn rt_list_dir(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
     if not wasm_lstat_is_dir(path):
         return rt_empty_str()
@@ -970,7 +970,7 @@ pub fn rt_list_dir(path: *const u8) -> str:
     with_free(names)
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
-pub fn rt_remove_tree(path: *const u8) -> i32:
+pub fn rt_remove_tree(path: *const c_char) -> i32:
     if not wasm_lstat_is_dir(path):
         return rt_unlink(path)
     var names_len: i64 = 0
@@ -1021,7 +1021,7 @@ fn rt_copy_file(src: *const u8, dst: *const u8) -> i32:
     let _ = fd_close(out_fd)
     rc
 
-pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
+pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
     if not wasm_lstat_is_dir(src):
         return rt_copy_file(src, dst)
     let mk = rt_mkdir(dst, 0o755)
@@ -1048,7 +1048,7 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
     with_free(names)
     rc
 
-pub fn rt_mkstemp(template_path: *mut u8) -> i32:
+pub fn rt_mkstemp(template_path: *mut c_char) -> i32:
     let len = wasm_cstr_len(template_path as *const u8)
     if len < 6:
         return wasm_fail(WASI_EINVAL)

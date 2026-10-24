@@ -6,7 +6,7 @@
 // after the loop runs.
 use std.builtins.print_i32
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 type W { ptr: *mut u8, drops: *mut i32, n: i32 }
 

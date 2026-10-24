@@ -3,7 +3,7 @@
 // — the receiver is borrowed (not consumed) per call, the destructor runs
 // exactly once at scope end, and every allocation is freed.
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 type Buf { ptr: *mut u8, len: i64 }
 impl Drop for Buf:
