@@ -142,9 +142,9 @@ pub fn __assert_fail(expression: *const c_char, file: *const c_char, line: u32, 
 pub fn _assert(expression: *const c_char, file: *const c_char, line: u32) -> Never:
     libc_assert_failed(expression, c"".ptr, file, line as i64)
 fn libc_assert_failed(expression: *const c_char, function: *const c_char, file: *const c_char, line: i64) -> Never:
-    let function_name = with_str_from_cstr(function as *const u8)
+    let function_name = with_str_from_cstr(function)
     let site = if function_name.len() > 0: ", function " ++ function_name else: ""
-    let text = f"Assertion failed: ({with_str_from_cstr(expression as *const u8)}){site}, file {with_str_from_cstr(file as *const u8)}, line {line}."
+    let text = f"Assertion failed: ({with_str_from_cstr(expression)}){site}, file {with_str_from_cstr(file)}, line {line}."
     eprint(text)
     abort()
 pub extern fn exit(code: i32) -> Never
