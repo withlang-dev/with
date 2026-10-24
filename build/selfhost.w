@@ -5048,7 +5048,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let wide: List[u8] = [7, 44]", "D119 arrays: clang folds the converted value")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(5000000000 as u64)", "D119 arrays: a value the element type cannot hold on every target keeps its cast")
+    rc = bs_assert_contains(ctx, out_text, "let big: List[u64] = [5000000000]", "D156 arrays: an unsigned long table is the model's u64 and its literal needs no cast")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, ": List[c_char] = [0; 16]", "D119 arrays: an uninitialized local buffer is a zero fill of the length")
     if rc != 0: return rc
@@ -6352,9 +6352,9 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let D156_HIGH_HEX: u32 = 0xBAADF00D", "D156 high hex takes the unsigned 32-bit type")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "d156_unsigned: List[u32] = [0x10u32]", "D156 unsigned literal suffix")
+    rc = bs_assert_contains(ctx, out_text, "let d156_unsigned: List[u32] = [16]", "D156: an unsigned int table is List[u32] with clang's folded literal (D119)")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "d156_signed: List[i64] = [0x20i64]", "D156 signed long literal suffix")
+    rc = bs_assert_contains(ctx, out_text, "let d156_signed: List[i64] = [32]", "D156: a long table is the model's List[i64]")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn parse_decimal", "ulong_max_width")
     if rc != 0: return rc
