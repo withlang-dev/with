@@ -49,7 +49,7 @@ use compiler.FacadeRender
 
 fn libc_facade_source() -> str:
     "c facade libc:
-    resource CHeapStr wraps *mut i8
+    resource CHeapStr wraps *mut c_char
         from strdup
         from strndup
         drop free

@@ -4234,25 +4234,25 @@ fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
     // unsigned on AArch64 Linux and on wasm, `long` is 32 bits on Windows
     // (LLP64) and wasm32, and `c_longdouble` is f64. No migration or import
     // emits a concrete value for one.
-    let c_os = target_spec_os()
-    let c_arch = target_spec_arch()
-    let c_wasm = c_arch == "wasm32" or c_arch == "wasm64"
-    let c_char_unsigned = (c_os == "Linux" and c_arch == "aarch64") or c_wasm
-    let c_long_32 = c_os == "Windows" or c_arch == "wasm32"
-    s.ty_c_char = if c_char_unsigned: s.ty_u8 else: s.ty_i8
-    s.register_prim("c_char", s.ty_c_char)
-    s.register_prim("c_short", s.ty_i16)
-    s.register_prim("c_ushort", s.ty_u16)
-    s.register_prim("c_int", s.ty_i32)
-    s.register_prim("c_uint", s.ty_u32)
-    s.register_prim("c_long", if c_long_32: s.ty_i32 else: s.ty_i64)
-    s.register_prim("c_ulong", if c_long_32: s.ty_u32 else: s.ty_u64)
-    s.register_prim("c_longlong", s.ty_i64)
-    s.register_prim("c_ulonglong", s.ty_u64)
-    // `c_longdouble` is f64 on every target: a corpus never passes one to C,
-    // and c_import omits a declaration that would where C's long double is
-    // wider than a double (x86_64 Linux, AArch64 Linux, wasm).
-    s.register_prim("c_longdouble", s.ty_f64)
+    // The table is TargetSpec's c_alias_fixed_spelling (one owner, D65; the
+    // facade renderer reads it too). `c_longdouble` is f64 on every target:
+    // a corpus never passes one to C, and c_import omits a declaration that
+    // would where C's long double is wider than a double (x86_64 Linux,
+    // AArch64 Linux, wasm).
+    for alias in ["c_char", "c_schar", "c_uchar", "c_short", "c_ushort", "c_int", "c_uint", "c_long", "c_ulong", "c_longlong", "c_ulonglong", "c_longdouble"]:
+        let fixed = c_alias_fixed_spelling(alias)
+        let tid: i32 = match fixed:
+            "i8" => s.ty_i8
+            "u8" => s.ty_u8
+            "i16" => s.ty_i16
+            "u16" => s.ty_u16
+            "i32" => s.ty_i32
+            "u32" => s.ty_u32
+            "i64" => s.ty_i64
+            "u64" => s.ty_u64
+            _ => s.ty_f64
+        if alias == "c_char": s.ty_c_char = tid
+        s.register_prim(alias, tid)
     // A C string literal's bytes are `c_char`s (D155): `c"…".ptr` is
     // `*const c_char` on every target.
     s.ty_const_i8_ptr = s.add_type(TypeKind.TY_PTR, s.ty_c_char, 0, 0)

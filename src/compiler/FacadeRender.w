@@ -86,6 +86,7 @@ use Ast
 use InternPool
 use render
 use CImport
+use TargetSpec
 use Token
 use std.collections.HashMap
 
@@ -2097,7 +2098,12 @@ fn facade_render_unalias(pool: &AstPool, intern: &InternPool, text: &str) -> str
         // chased through, as Sema's resolve_alias chases it: `*mut CURL` is
         // the `*mut c_void` the translated declarations spell (D66).
         if target.len() == 0 or target == "opaque":
-            return t
+            // D155/D156: a C integer alias is a builtin, not a declared
+            // alias; `wraps c_int` meets c_import's `i32` at the fixed
+            // spelling. `c_char` alone stays symbolic: it is the spelling
+            // both sides use, and the one a help prints.
+            let fixed = if t == "c_char": "" else: c_alias_fixed_spelling(t)
+            return if fixed.len() > 0: fixed else: t
         if target.starts_with("*"):
             return facade_render_unalias(pool, intern, target)
         t = target
