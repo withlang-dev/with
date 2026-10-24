@@ -8,8 +8,11 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261023-local-1-f78d2c24f59d
-with-darwin-aarch64=b9c35a107a1f3e7a8cd5ef4beee13849480482b4c8382781acb3f9659a264cc7
+version=nightly-20261024-local-1-c1ea1de114eb
+with-darwin-aarch64=709b14834061ae0d0c0e82f440f620b1bc683c159a27129c88cdb46d06a4c2f8
+# darwin-aarch64 is cut from main c1ea1de11 (2026-10-24): the first seed with the
+# D155 builtins (c_char and the C aliases are the target's), so compiler sources
+# may spell c_char (#2585, #2596, #2597); :release-checks green on the laptop.
 # All five are cut from main 763d0e54c (2026-10-20): the first seeds built
 # after the D30 step 4 flip (#2500: the runtime bundle is the only link path,
 # no .w-derived runtime objects) and R4c (#2504), with the wasm import
