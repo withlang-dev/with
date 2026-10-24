@@ -5048,7 +5048,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let wide: List[u8] = [7, 44]", "D119 arrays: clang folds the converted value")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "(5000000000 as u64)", "D119 arrays: a value the element type cannot hold on every target keeps its cast")
+    rc = bs_assert_contains(ctx, out_text, "let big: List[u64] = [5000000000]", "D156 arrays: an unsigned long table is the model's u64 and its literal needs no cast")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, ": List[c_char] = [0; 16]", "D119 arrays: an uninitialized local buffer is a zero fill of the length")
     if rc != 0: return rc

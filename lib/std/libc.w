@@ -89,7 +89,7 @@ pub extern fn fputc(c: i32, stream: *mut c_void) -> i32
 pub extern fn fputs(s: *const c_char, stream: *mut c_void) -> i32
 pub extern fn putc(c: i32, stream: *mut c_void) -> i32
 pub extern fn putchar(c: i32) -> i32
-pub extern fn perror(s: *const c_char) -> Unit
+pub extern fn perror(s: *const c_char)
 pub extern fn feof(stream: *mut c_void) -> i32
 pub extern fn ferror(stream: *mut c_void) -> i32
 pub extern fn rewind(stream: *mut c_void)

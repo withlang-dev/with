@@ -808,7 +808,7 @@ extern fn rt_libc_getaddrinfo(node: *const u8, service: *const u8, hints: *const
 @[link_name("freeaddrinfo")]
 extern fn rt_libc_freeaddrinfo(res: *mut LinuxAddrInfo) -> Unit
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_free(ptr: *mut c_void) -> Unit
+extern fn with_free(ptr: *mut c_void)
 
 type LinuxAddrInfo:
     ai_flags: i32
@@ -1047,7 +1047,7 @@ pub fn rt_getenv(name: *const c_char) -> *const c_char:
 // ---- Compiler compatibility process/env adapter ----
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut c_void) -> Unit
+extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 @[link_name("setenv")]

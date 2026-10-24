@@ -59,7 +59,7 @@ extern fn GetFullPathNameW(path: *const u16, size: u32, buf: *mut u16, file_part
 extern fn with_str_from_cstr(s: *const c_char) -> str
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
-extern fn with_free(ptr: *mut c_void) -> Unit
+extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 // UCRT has no stdin/stdout/stderr global variables; the FILE* streams come from
 // __acrt_iob_func(0/1/2) (the UCRT `#define stdin (__acrt_iob_func(0))` macros).
