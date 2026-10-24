@@ -3,10 +3,10 @@ use std.engines.c_algorithms_testing.defs
 use std.engines.c_algorithms_testing.alloc_testing
 use std.option
 
-pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> c_int]) -> *mut _AVLTree writes allocation_limit {
+pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _AVLTree writes allocation_limit {
     var __local_new_tree: *mut _AVLTree
 
-    (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as c_ulong)) as *mut _AVLTree)))
+    (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as u64)) as *mut _AVLTree)))
 
     if ((if __local_new_tree == null: 1 else: 0) != 0) {
         return ((null as *mut _AVLTree))
@@ -17,7 +17,7 @@ pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_voi
 
     ((unsafe *__local_new_tree).compare_func = __param_compare_func)
 
-    ((unsafe *__local_new_tree).num_nodes = ((0 as c_uint)))
+    ((unsafe *__local_new_tree).num_nodes = ((0 as u32)))
 
     return __local_new_tree
 
@@ -54,7 +54,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
     }
 
-    (__local_new_node = ((alloc_test_malloc((sizeof[_AVLTreeNode]() as c_ulong)) as *mut _AVLTreeNode)))
+    (__local_new_node = ((alloc_test_malloc((sizeof[_AVLTreeNode]() as u64)) as *mut _AVLTreeNode)))
 
     if ((if __local_new_node == null: 1 else: 0) != 0) {
         return ((null as *mut _AVLTreeNode))
@@ -71,7 +71,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
     ((*__local_new_node).value = __param_value)
 
-    ((*__local_new_node).height = ((1 as c_int)))
+    ((*__local_new_node).height = ((1 as i32)))
 
     ((*__local_rover) = __local_new_node)
 
@@ -88,7 +88,7 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
     var __local_balance_startpoint: *mut _AVLTreeNode
 
-    var __local_i: c_int
+    var __local_i: i32
 
     (__local_swap_node = avl_tree_node_get_replacement(__param_tree, __param_node))
 
@@ -106,7 +106,7 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
         }
 
-        (__local_i = ((0 as c_int)))
+        (__local_i = ((0 as i32)))
 
         while ((if __local_i < 2: 1 else: 0) != 0) {
             ((*__local_swap_node).children[__local_i] = (*__param_node).children[__local_i])
@@ -136,7 +136,7 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
 }
 
-pub unsafe fn avl_tree_remove(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> c_int {
+pub unsafe fn avl_tree_remove(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> i32 {
     var __local_node: *mut _AVLTreeNode
 
     (__local_node = avl_tree_lookup_node(__param_tree, __param_key))
@@ -155,12 +155,12 @@ pub unsafe fn avl_tree_remove(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 pub unsafe fn avl_tree_lookup_node(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> *mut _AVLTreeNode {
     var __local_node: *mut _AVLTreeNode
 
-    var __local_diff: c_int
+    var __local_diff: i32
 
     (__local_node = (*__param_tree).root_node)
 
     while ((if __local_node != null: 1 else: 0) != 0) {
-        (__local_diff = (((*__param_tree).compare_func.unwrap()(__param_key, (*__local_node).key) as c_int)))
+        (__local_diff = (((*__param_tree).compare_func.unwrap()(__param_key, (*__local_node).key) as i32)))
 
         if ((if __local_diff == 0: 1 else: 0) != 0) {
             return __local_node
@@ -210,7 +210,7 @@ pub unsafe fn avl_tree_node_value(__param_node: *mut _AVLTreeNode) -> *mut c_voi
 }
 
 pub unsafe fn avl_tree_node_child(__param_node: *mut _AVLTreeNode, __param_side: i32) -> *mut _AVLTreeNode {
-    var __ci_expr_logic_0: c_int
+    var __ci_expr_logic_0: i32
 
     if ((if __param_side == 0: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
@@ -233,7 +233,7 @@ pub unsafe fn avl_tree_node_parent(__param_node: *mut _AVLTreeNode) -> *mut _AVL
 
 }
 
-pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int {
+pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> i32 {
     if ((if __param_node == null: 1 else: 0) != 0) {
         return 0
 
@@ -246,29 +246,29 @@ pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> c_int 
 pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void writes allocation_limit {
     var __local_array: *mut *mut c_void
 
-    var __local_index: c_int
+    var __local_index: i32
 
-    (__local_array = ((alloc_test_malloc((((sizeof[usize]() as c_ulong) *% ((*__param_tree).num_nodes as c_ulong)) as c_ulong)) as *mut *mut c_void)))
+    (__local_array = ((alloc_test_malloc((((sizeof[usize]() as u64) *% ((*__param_tree).num_nodes as u64)) as u64)) as *mut *mut c_void)))
 
     if ((if __local_array == null: 1 else: 0) != 0) {
         return ((null as *mut *mut c_void))
 
     }
 
-    (__local_index = ((0 as c_int)))
+    (__local_index = ((0 as i32)))
 
-    avl_tree_to_array_add_subtree((*__param_tree).root_node, __local_array, (&raw mut __local_index as *mut c_int))
+    avl_tree_to_array_add_subtree((*__param_tree).root_node, __local_array, (&raw mut __local_index as *mut i32))
 
     return __local_array
 
 }
 
-pub unsafe fn avl_tree_num_entries(__param_tree: *mut _AVLTree) -> c_uint {
+pub unsafe fn avl_tree_num_entries(__param_tree: *mut _AVLTree) -> u32 {
     return (*__param_tree).num_nodes
 
 }
 
-unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
+unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
     if ((if __param_node == null: 1 else: 0) != 0) {
         return
 
@@ -287,24 +287,24 @@ unsafe fn avl_tree_update_height(__param_node: *mut _AVLTreeNode) -> Unit {
 
     var __local_right_subtree: *mut _AVLTreeNode
 
-    var __local_left_height: c_int
+    var __local_left_height: i32
 
-    var __local_right_height: c_int
+    var __local_right_height: i32
 
 
     (__local_left_subtree = (*__param_node).children[AVL_TREE_NODE_LEFT])
 
     (__local_right_subtree = (*__param_node).children[AVL_TREE_NODE_RIGHT])
 
-    (__local_left_height = ((avl_tree_subtree_height(__local_left_subtree) as c_int)))
+    (__local_left_height = ((avl_tree_subtree_height(__local_left_subtree) as i32)))
 
-    (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as c_int)))
+    (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as i32)))
 
     if ((if __local_left_height > __local_right_height: 1 else: 0) != 0) {
-        ((*__param_node).height = (((__local_left_height + 1) as c_int)))
+        ((*__param_node).height = (((__local_left_height + 1) as i32)))
 
     } else {
-        ((*__param_node).height = (((__local_right_height + 1) as c_int)))
+        ((*__param_node).height = (((__local_right_height + 1) as i32)))
 
     }
 
@@ -321,7 +321,7 @@ unsafe fn avl_tree_node_parent_side(__param_node: *mut _AVLTreeNode) -> i32 {
 }
 
 unsafe fn avl_tree_node_replace(__param_tree: *mut _AVLTree, __param_node1: *mut _AVLTreeNode, __param_node2: *mut _AVLTreeNode) -> Unit {
-    var __local_side: c_int
+    var __local_side: i32
 
     if ((if __param_node2 != null: 1 else: 0) != 0) {
         ((*__param_node2).parent = (*__param_node1).parent)
@@ -332,7 +332,7 @@ unsafe fn avl_tree_node_replace(__param_tree: *mut _AVLTree, __param_node1: *mut
         ((*__param_tree).root_node = __param_node2)
 
     } else {
-        (__local_side = ((avl_tree_node_parent_side(__param_node1) as c_int)))
+        (__local_side = ((avl_tree_node_parent_side(__param_node1) as i32)))
 
         ((*(*__param_node1).parent).children[__local_side] = __param_node2)
 
@@ -345,18 +345,18 @@ unsafe fn avl_tree_node_replace(__param_tree: *mut _AVLTree, __param_node1: *mut
 unsafe fn avl_tree_rotate(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode, __param_direction: i32) -> *mut _AVLTreeNode {
     var __local_new_root: *mut _AVLTreeNode
 
-    (__local_new_root = (*__param_node).children[((1 as c_uint) -% (__param_direction as c_uint))])
+    (__local_new_root = (*__param_node).children[((1 as u32) -% (__param_direction as u32))])
 
     avl_tree_node_replace(__param_tree, __param_node, __local_new_root)
 
-    ((*__param_node).children[((1 as c_uint) -% (__param_direction as c_uint))] = (*__local_new_root).children[__param_direction])
+    ((*__param_node).children[((1 as u32) -% (__param_direction as u32))] = (*__local_new_root).children[__param_direction])
 
     ((*__local_new_root).children[__param_direction] = __param_node)
 
     ((*__param_node).parent = __local_new_root)
 
-    if ((if (*__param_node).children[((1 as c_uint) -% (__param_direction as c_uint))] != null: 1 else: 0) != 0) {
-        ((*__param_node).children[((1 as c_uint) -% (__param_direction as c_uint))].parent = __param_node)
+    if ((if (*__param_node).children[((1 as u32) -% (__param_direction as u32))] != null: 1 else: 0) != 0) {
+        ((*__param_node).children[((1 as u32) -% (__param_direction as u32))].parent = __param_node)
 
     }
 
@@ -376,13 +376,13 @@ unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut 
 
     var __local_child: *mut _AVLTreeNode
 
-    var __local_diff: c_int
+    var __local_diff: i32
 
     (__local_left_subtree = (*__local_node).children[AVL_TREE_NODE_LEFT])
 
     (__local_right_subtree = (*__local_node).children[AVL_TREE_NODE_RIGHT])
 
-    (__local_diff = (((avl_tree_subtree_height(__local_right_subtree) - avl_tree_subtree_height(__local_left_subtree)) as c_int)))
+    (__local_diff = (((avl_tree_subtree_height(__local_right_subtree) - avl_tree_subtree_height(__local_left_subtree)) as i32)))
 
     if ((if __local_diff >= 2: 1 else: 0) != 0) {
         (__local_child = __local_right_subtree)
@@ -437,18 +437,18 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
     var __local_child: *mut _AVLTreeNode
 
-    var __local_left_height: c_int
+    var __local_left_height: i32
 
-    var __local_right_height: c_int
+    var __local_right_height: i32
 
 
-    var __local_side: c_int
+    var __local_side: i32
 
     (__local_left_subtree = (*__param_node).children[AVL_TREE_NODE_LEFT])
 
     (__local_right_subtree = (*__param_node).children[AVL_TREE_NODE_RIGHT])
 
-    var __ci_expr_logic_0: c_int = 0
+    var __ci_expr_logic_0: i32 = 0
 
     if ((if __local_left_subtree == null: 1 else: 0) != 0) {
         (__ci_expr_logic_0 = (if (if __local_right_subtree == null: 1 else: 0) != 0: 1 else: 0))
@@ -460,9 +460,9 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
     }
 
 
-    (__local_left_height = ((avl_tree_subtree_height(__local_left_subtree) as c_int)))
+    (__local_left_height = ((avl_tree_subtree_height(__local_left_subtree) as i32)))
 
-    (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as c_int)))
+    (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as i32)))
 
     if ((if __local_left_height < __local_right_height: 1 else: 0) != 0) {
         (__local_side = AVL_TREE_NODE_RIGHT)
@@ -489,7 +489,7 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
 }
 
-unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut c_int) {
+unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut i32) -> Unit {
     if ((if __param_subtree == null: 1 else: 0) != 0) {
         return
 
