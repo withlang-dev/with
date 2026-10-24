@@ -2373,7 +2373,10 @@ impl MirBuilder:
             return 0
         let resolved = self.sema.resolve_alias(base_ty) as i32
         let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+        // The compiler's own positional kinds (arrays, slices, SIMD vectors
+        // and masks) have their own lowering; a user IndexPlace is a struct
+        // or generic instance with the impl.
+        if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
             return 0
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema.get_generic_inst_base(resolved)
