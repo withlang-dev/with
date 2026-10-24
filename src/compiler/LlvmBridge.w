@@ -122,7 +122,7 @@ extern fn LLVMInitializeWebAssemblyAsmParser()
 // embedded_llvm_wasm_backend_linked() fact before codegen starts.
 extern fn LLVMGetDefaultTargetTriple() -> *mut u8
 extern fn LLVMGetTargetFromTriple(triple: *const u8, target: *mut *mut u8, err: *mut *mut u8) -> i32
-extern fn LLVMCreateTargetMachine(target: *mut u8, triple: *const u8, cpu: *const u8, features: *const u8, level: i32, reloc: i32, model: i32) -> *mut u8
+extern fn LLVMCreateTargetMachine(target: *mut u8, triple: *const u8, cpu: *const c_char, features: *const c_char, level: i32, reloc: i32, model: i32) -> *mut u8
 extern fn LLVMCreateTargetDataLayout(tm: *mut u8) -> *mut u8
 extern fn LLVMSetModuleDataLayout(m: *mut u8, dl: *mut u8)
 extern fn LLVMSetTarget(m: *mut u8, triple: *const u8)
@@ -628,7 +628,7 @@ fn wl_init_target_machine(mod_ref: i64, level: i32) -> i64:
             LLVMDisposeMessage(default_triple)
             return 0
         let tm = LLVMCreateTargetMachine(target, triple,
-            c"generic".ptr as *const u8, empty_cstr(),
+            c"generic".ptr, c"".ptr,
             codegen_level(level), LLVM_RelocDefault, LLVM_CodeModelDefault)
         if tm as i64 == 0:
             let msg = "LLVM target machine creation failed\n"
@@ -1835,7 +1835,7 @@ fn wl_assemble_to_object_for_triple(source_path: &str, output_path: &str, triple
             LLVMDisposeModule(m)
             LLVMContextDispose(ctx)
             return 1
-        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr as *const u8, empty_cstr(), LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, c"".ptr, LLVM_CodeGenLevelDefault, LLVM_RelocDefault, LLVM_CodeModelDefault)
         LLVMDisposeMessage(default_triple)
         var out_buf: [4096]u8 = [0 as u8; 4096]
         let out_cstr = path_to_cstr(output_path, &out_buf as *mut u8)
@@ -1891,7 +1891,7 @@ fn wl_compile_ir_to_object(source_path: &str, output_path: &str) -> i32:
         // -O1 codegen level, matching the direct source->object path
         // (wl_init_target_machine -> codegen_level(1)); the IR->object route
         // is not a licence to ship unoptimized objects.
-        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr as *const u8, empty_cstr(), codegen_level(1), LLVM_RelocDefault, LLVM_CodeModelDefault)
+        let tm = LLVMCreateTargetMachine(target, triple, c"generic".ptr, c"".ptr, codegen_level(1), LLVM_RelocDefault, LLVM_CodeModelDefault)
         let layout = LLVMCreateTargetDataLayout(tm)
         LLVMSetModuleDataLayout(m, layout)
         LLVMDisposeTargetData(layout)

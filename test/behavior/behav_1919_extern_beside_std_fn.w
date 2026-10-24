@@ -10,5 +10,5 @@ use std.libc
 
 fn main:
     let owned = extern_owner_remove(c"/nonexistent/with-1919-a".ptr)
-    let imported = unlink(c"/nonexistent/with-1919-b".ptr as *const i8)
+    let imported = unlink(c"/nonexistent/with-1919-b".ptr)
     print(f"{owned} {imported}")

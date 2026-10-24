@@ -24,15 +24,15 @@ use compiler.Compilation.Config
 use rt.rt_core
 use rt.compat_runtime
 
-extern fn strerror(errnum: i32) -> *mut i8
-extern fn strtod(nptr: *const i8, endptr: *mut *mut i8) -> f64
+extern fn strerror(errnum: i32) -> *mut c_char
+extern fn strtod(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
 
 // #1668: the value of a float literal's text, rounded once the way the
 // backend rounds it (strtod is correctly rounded), so a comptime result
 // agrees with the same arithmetic at run time.
 fn comptime_parse_float(text: &str) -> f64:
     match float_literal_value_text(text).to_cstring():
-        Ok(c) => unsafe { strtod(c.as_cstr().ptr(), 0 as *mut *mut i8) }
+        Ok(c) => unsafe { strtod(c.as_cstr().ptr(), 0 as *mut *mut c_char) }
         Err(_) => 0.0
 
 // D125 (§4.2.6): a float to an integer of `bits` truncates toward zero,
@@ -877,7 +877,7 @@ unsafe fn comptime_open_path(path: &str, flags: i32, mode: i32) -> i32:
     let cpath = comptime_alloc_cstr(path)
     if cpath as i64 == 0:
         return -1
-    let fd = rt_open(cpath as *const i8, flags, mode)
+    let fd = rt_open(cpath as *const c_char, flags, mode)
     with_free(cpath)
     fd
 
