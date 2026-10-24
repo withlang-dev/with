@@ -7223,6 +7223,11 @@ impl Sema:
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee) != 0:
             return 1
+        // D155 (§16.1): a pointer to one integer type is not a pointer to
+        // another; equal width with the other signedness is a different
+        // meaning, spelled `p as *const c_char`.
+        if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
+            return 0
         self.types_compatible(exp_pointee, self.get_type_d0(act_r))
 
     // ── Scope management ─────────────────────────────────────────────
@@ -10581,6 +10586,8 @@ impl Sema:
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee) != 0:
             return 1
+        if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
+            return 0
         self.types_compatible_frozen(exp_pointee, self.get_type_d0(act_r))
 
     fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:

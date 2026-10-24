@@ -548,7 +548,7 @@ fn comptime_tool_path_is_parent_of(parent: &str, child: &str) -> bool:
 // `No such file or directory (os error 2)`.
 fn comptime_os_error_message(code: i32) -> str:
     let text = unsafe { strerror(code) }
-    with_str_from_cstr(text as *const u8) ++ f" (os error {code})"
+    with_str_from_cstr(text) ++ f" (os error {code})"
 
 fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()
@@ -878,7 +878,7 @@ unsafe fn comptime_open_path(path: &str, flags: i32, mode: i32) -> i32:
     let cpath = comptime_alloc_cstr(path)
     if cpath as i64 == 0:
         return -1
-    let fd = rt_open(cpath as *const u8, flags, mode)
+    let fd = rt_open(cpath as *const i8, flags, mode)
     with_free(cpath)
     fd
 
