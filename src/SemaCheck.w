@@ -2171,6 +2171,19 @@ impl Sema:
             return self.ensure_exact_type(TypeKind.TY_ARRAY, elem, self.ast.get_data1(node), 0) as i32
         if kind == NodeKind.NK_TYPE_GENERIC:
             return self.resolve_generic_type(node)
+        // `Box[(i32, i32)].new()`: a tuple type in type-level position parses
+        // as a tuple expression of types; left unresolved, the instance had
+        // no concrete argument and its methods no contract (#2565).
+        if kind == NodeKind.NK_TUPLE:
+            let tuple_start = self.ast.get_data0(node)
+            let tuple_count = self.ast.get_data1(node)
+            let tuple_elems: List[i32] = List.new()
+            for ei in 0..tuple_count:
+                let elem = self.resolve_type_level_arg_expr(self.ast.get_extra(tuple_start + ei))
+                if elem == 0:
+                    return 0
+                tuple_elems.push(elem)
+            return self.ensure_tuple_type(tuple_elems, tuple_count) as i32
         if kind == NodeKind.NK_INDEX:
             let base = self.ast.get_data0(node)
             if self.ast.kind(base) != NodeKind.NK_IDENT:
