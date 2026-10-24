@@ -765,10 +765,10 @@ fn ci_migrate_preamble_text() -> str:
     p = p ++ ci_migrate_render_preamble_fn("fn to_lower(c: i32) -> i32", "if c >= 65 and c <= 90: c + 32 else: c", "if c >= 65 and c <= 90 { c + 32 } else { c }")
     p = p ++ ci_migrate_render_preamble_fn("fn to_upper(c: i32) -> i32", "if c >= 97 and c <= 122: c - 32 else: c", "if c >= 97 and c <= 122 { c - 32 } else { c }")
     // String functions from libc
-    p = p ++ "extern fn strlen(s: *const i8) -> u64\n"
-    p = p ++ "extern fn strcmp(a: *const i8, b: *const i8) -> i32\n"
-    p = p ++ "extern fn strncmp(a: *const i8, b: *const i8, n: i64) -> i32\n"
-    p = p ++ "extern fn strchr(s: *const i8, c: i32) -> *mut i8\n"
+    p = p ++ "extern fn strlen(s: *const c_char) -> u64\n"
+    p = p ++ "extern fn strcmp(a: *const c_char, b: *const c_char) -> i32\n"
+    p = p ++ "extern fn strncmp(a: *const c_char, b: *const c_char, n: i64) -> i32\n"
+    p = p ++ "extern fn strchr(s: *const c_char, c: i32) -> *mut c_char\n"
     p = p ++ "extern fn memchr(s: *const c_void, c: i32, n: i64) -> *mut c_void\n"
     p = p ++ "extern fn isalpha(c: i32) -> i32\n"
     p = p ++ "extern fn isdigit(c: i32) -> i32\n"
