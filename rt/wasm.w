@@ -31,7 +31,7 @@ extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
 extern fn with_free(ptr: *mut u8) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
-extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_from_cstr(s: *const c_char) -> str
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
 
 // ── WASI preview1 imports ─────────────────────────────────────────────
@@ -668,7 +668,7 @@ fn wasm_open_wasi(path: *const u8, oflags: i32, fdflags: i32, rights: i64) -> i3
         return n as i32
     wasm_open_rel(dirfd, rb as *const u8, n, oflags, fdflags, rights, 1)
 
-pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     let _ = mode
     var oflags = 0
     var fdflags = 0
@@ -680,7 +680,7 @@ pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
 
 // The cimport_stubs spelling of open(2): its flag bits are
 // O_APPEND=0x0008, O_CREAT=0x0200, O_TRUNC=0x0400, O_EXCL=0x0800.
-pub fn __open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn __open(path: *const c_char, flags: i32, mode: i32) -> i32:
     let _ = mode
     var oflags = 0
     var fdflags = 0
@@ -772,7 +772,7 @@ pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
     let _ = mode
     wasm_path_call(path, 0)
 
-pub fn rt_unlink(path: *const u8) -> i32:
+pub fn rt_unlink(path: *const c_char) -> i32:
     wasm_path_call(path, 1)
 
 pub fn rt_rmdir(path: *const u8) -> i32:
@@ -1109,7 +1109,7 @@ fn wasm_init_env():
         if environ_get(wasm_env as *mut *mut u8, blob) == 0:
             wasm_env_count = count as i64
 
-pub fn rt_getenv(name: *const u8) -> *const u8:
+pub fn rt_getenv(name: *const c_char) -> *const c_char:
     wasm_init_env()
     let nlen = wasm_cstr_len(name)
     var i: i64 = 0

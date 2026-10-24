@@ -10,7 +10,7 @@ extern fn rt_libc_write(fd: i32, buf: *const u8, len: u64) -> i64
 @[link_name("read")]
 extern fn rt_libc_read(fd: i32, buf: *mut u8, len: u64) -> i64
 @[link_name("open")]
-extern fn rt_libc_open(path: *const u8, flags: i32, mode: i32) -> i32
+extern fn rt_libc_open(path: *const c_char, flags: i32, mode: i32) -> i32
 @[link_name("close")]
 extern fn rt_libc_close(fd: i32) -> i32
 @[link_name("lseek")]
@@ -25,11 +25,11 @@ extern fn rt_libc_mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, 
 @[link_name("munmap")]
 extern fn rt_libc_munmap(addr: *mut u8, len: u64) -> i32
 @[link_name("getenv")]
-extern fn rt_libc_getenv(name: *const u8) -> *const u8
+extern fn rt_libc_getenv(name: *const c_char) -> *const c_char
 @[link_name("stat")]
-extern fn rt_libc_stat(path: *const u8, buf: *mut u8) -> i32
+extern fn rt_libc_stat(path: *const c_char, buf: *mut u8) -> i32
 @[link_name("chmod")]
-extern fn rt_libc_chmod(path: *const u8, mode: i32) -> i32
+extern fn rt_libc_chmod(path: *const c_char, mode: i32) -> i32
 @[link_name("_exit")]
 extern fn rt_libc_exit(code: i32) -> Never
 @[link_name("__errno_location")]
@@ -83,7 +83,7 @@ pub fn rt_fill_random(buf: *mut u8, len: u64):
                 continue
             break
     if off < len:
-        let fd = rt_libc_open("/dev/urandom" as *const u8, 0, 0)
+        let fd = rt_libc_open(c"/dev/urandom".ptr, 0, 0)
         if fd < 0:
             rt_random_fail()
         while off < len:
@@ -124,9 +124,9 @@ extern fn rt_libc_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i
 @[link_name("isatty")]
 extern fn rt_libc_isatty(fd: i32) -> i32
 @[link_name("mkstemp")]
-extern fn rt_libc_mkstemp(template_path: *mut u8) -> i32
+extern fn rt_libc_mkstemp(template_path: *mut c_char) -> i32
 @[link_name("realpath")]
-extern fn rt_libc_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8
+extern fn rt_libc_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char
 
 pub fn rt_errno_ptr() -> *mut i32: rt_libc_errno_location()
 pub fn rt_fileno(stream: *mut c_void) -> i32: rt_libc_fileno(stream)
@@ -138,8 +138,8 @@ pub fn rt_strtoul(nptr: *const c_char, endptr: *mut *mut c_char, base: i32) -> u
 pub fn rt_isatty(fd: i32) -> i32: rt_libc_isatty(fd)
 pub fn rt_getrlimit(resource: i32, lim: *mut u8) -> i32: rt_libc_getrlimit(resource, lim)
 pub fn rt_setrlimit(resource: i32, lim: *const u8) -> i32: rt_libc_setrlimit(resource, lim)
-pub fn rt_mkstemp(template_path: *mut u8) -> i32: rt_libc_mkstemp(template_path)
-pub fn rt_realpath(path: *const u8, resolved_path: *mut u8) -> *mut u8: rt_libc_realpath(path, resolved_path)
+pub fn rt_mkstemp(template_path: *mut c_char) -> i32: rt_libc_mkstemp(template_path)
+pub fn rt_realpath(path: *const c_char, resolved_path: *mut c_char) -> *mut c_char: rt_libc_realpath(path, resolved_path)
 
 pub fn rt_fiber_page_size() -> i64:
     let page_size = rt_libc_sysconf(30)
@@ -188,7 +188,7 @@ pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64,
     let _ = rt_libc_sigaction(11, sa_base as *const u8, 0 as *mut u8)
     let _ = rt_libc_sigaction(7, sa_base as *const u8, 0 as *mut u8)
 
-pub fn __open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn __open(path: *const c_char, flags: i32, mode: i32) -> i32:
     var native = flags & 3
     if (flags & 0x0008) != 0: native = native | 0x400
     if (flags & 0x0200) != 0: native = native | 0x40
@@ -221,7 +221,7 @@ pub fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64:
         return -(get_errno() as i64)
     r
 
-pub fn rt_open(path: *const u8, flags: i32, mode: i32) -> i32:
+pub fn rt_open(path: *const c_char, flags: i32, mode: i32) -> i32:
     // Canonical (std.libc's O_* constants, D90): O_RDONLY=0, O_WRONLY=1,
     // O_RDWR=2, O_CREAT=0x200, O_TRUNC=0x400, O_APPEND=0x800, O_EXCL=0x1000,
     // O_NONBLOCK=0x2000, O_CLOEXEC=0x4000.
@@ -290,7 +290,7 @@ let LINUX_STAT_SIZE_OFFSET: i64 = 48
 let LINUX_STAT_MTIME_SEC_OFFSET: i64 = 88
 let LINUX_STAT_MTIME_NSEC_OFFSET: i64 = 96
 
-pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
+pub fn rt_stat(path: *const c_char, out_raw: *mut u8) -> i32:
     let out = out_raw as *mut RtStatBuf
     var native_buf: [144]u8 = [0 as u8; 144]
     let r = rt_libc_stat(path, &native_buf as *mut [144]u8 as *mut u8)
@@ -307,7 +307,7 @@ pub fn rt_stat(path: *const u8, out_raw: *mut u8) -> i32:
     (unsafe *out).modified_ns = mtime_sec * 1000000000 + mtime_nsec
     0
 
-pub fn rt_chmod(path: *const u8, mode: i32) -> i32:
+pub fn rt_chmod(path: *const c_char, mode: i32) -> i32:
     let r = rt_libc_chmod(path, mode)
     if r < 0:
         return -get_errno()
@@ -421,33 +421,33 @@ pub fn rt_thread_join(handle: i64) -> i32:
     0
 
 @[link_name("mkdir")]
-extern fn rt_libc_mkdir(path: *const u8, mode: i32) -> i32
+extern fn rt_libc_mkdir(path: *const c_char, mode: i32) -> i32
 @[link_name("unlink")]
-extern fn rt_libc_unlink(path: *const u8) -> i32
+extern fn rt_libc_unlink(path: *const c_char) -> i32
 @[link_name("rmdir")]
-extern fn rt_libc_rmdir(path: *const u8) -> i32
+extern fn rt_libc_rmdir(path: *const c_char) -> i32
 @[link_name("rename")]
-extern fn rt_libc_rename(old_path: *const u8, new_path: *const u8) -> i32
+extern fn rt_libc_rename(old_path: *const c_char, new_path: *const c_char) -> i32
 @[link_name("symlink")]
-extern fn rt_libc_symlink(target: *const u8, link_path: *const u8) -> i32
+extern fn rt_libc_symlink(target: *const c_char, link_path: *const c_char) -> i32
 @[link_name("access")]
-extern fn rt_libc_access(path: *const u8, mode: i32) -> i32
+extern fn rt_libc_access(path: *const c_char, mode: i32) -> i32
 @[link_name("lstat")]
-extern fn rt_libc_lstat(path: *const u8, st: *mut u8) -> i32
+extern fn rt_libc_lstat(path: *const c_char, st: *mut u8) -> i32
 @[link_name("readlink")]
-extern fn rt_libc_readlink(path: *const u8, buf: *mut u8, bufsize: u64) -> i64
+extern fn rt_libc_readlink(path: *const c_char, buf: *mut u8, bufsize: u64) -> i64
 @[link_name("opendir")]
-extern fn rt_libc_opendir(path: *const u8) -> *mut u8
+extern fn rt_libc_opendir(path: *const c_char) -> *mut u8
 @[link_name("readdir")]
 extern fn rt_libc_readdir(dirp: *mut u8) -> *mut u8
 @[link_name("closedir")]
 extern fn rt_libc_closedir(dirp: *mut u8) -> i32
-extern fn with_str_from_cstr(s: *const u8) -> str
+extern fn with_str_from_cstr(s: *const c_char) -> str
 
 let LINUX_DIRENT_NAME_OFFSET: i64 = 19
 let RT_PATH_MAX: i64 = 4096
 
-fn rt_cstr_len(s: *const u8) -> i64:
+fn rt_cstr_len(s: *const c_char) -> i64:
     if s as i64 == 0:
         return 0
     var len: i64 = 0
@@ -455,10 +455,10 @@ fn rt_cstr_len(s: *const u8) -> i64:
         len = len + 1
     len
 
-fn rt_dirent_name(ent: *mut u8) -> *const u8:
-    (ent as i64 + LINUX_DIRENT_NAME_OFFSET) as *const u8
+fn rt_dirent_name(ent: *mut u8) -> *const c_char:
+    (ent as i64 + LINUX_DIRENT_NAME_OFFSET) as *const c_char
 
-fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
+fn rt_dirent_is_dot_or_dotdot(name: *const c_char) -> bool:
     let first = unsafe *name
     if first != 46:
         return false
@@ -469,7 +469,7 @@ fn rt_dirent_is_dot_or_dotdot(name: *const u8) -> bool:
         return false
     (unsafe *((name as i64 + 2) as *const u8)) == 0
 
-fn rt_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i32:
+fn rt_path_join(parent: *const c_char, name: *const c_char, out: *mut c_char, cap: i64) -> i32:
     let parent_len = rt_cstr_len(parent)
     let name_len = rt_cstr_len(name)
     var need_slash = true
@@ -492,7 +492,7 @@ fn rt_path_join(parent: *const u8, name: *const u8, out: *mut u8, cap: i64) -> i
     unsafe *((out as i64 + i + j) as *mut u8) = 0
     0
 
-fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
+fn rt_lstat_mode(path: *const c_char, mode_out: *mut i32) -> i32:
     var st: [144]u8 = [0 as u8; 144]
     let r = rt_libc_lstat(path, &st as *mut [144]u8 as *mut u8)
     if r < 0:
@@ -500,20 +500,20 @@ fn rt_lstat_mode(path: *const u8, mode_out: *mut i32) -> i32:
     unsafe *mode_out = unsafe *((&raw const st as i64 + LINUX_STAT_MODE_OFFSET) as *const i32)
     0
 
-fn rt_lstat_is_dir(path: *const u8) -> bool:
+fn rt_lstat_is_dir(path: *const c_char) -> bool:
     var mode: i32 = 0
     if rt_lstat_mode(path, &mode as *mut i32) != 0:
         return false
     (mode & RT_S_IFMT) == RT_S_IFDIR
 
-pub fn rt_file_mode(path: *const u8) -> i32:
+pub fn rt_file_mode(path: *const c_char) -> i32:
     var mode: i32 = 0
     let rc = rt_lstat_mode(path, &mode as *mut i32)
     if rc != 0:
         return rc
     mode
 
-pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
+pub fn rt_mkdir(path: *const c_char, mode: i32) -> i32:
     var r: i32 = 0
     loop:
         r = rt_libc_mkdir(path, mode)
@@ -523,19 +523,19 @@ pub fn rt_mkdir(path: *const u8, mode: i32) -> i32:
         return -get_errno()
     0
 
-pub fn rt_unlink(path: *const u8) -> i32:
+pub fn rt_unlink(path: *const c_char) -> i32:
     let r = rt_libc_unlink(path)
     if r < 0:
         return -get_errno()
     0
 
-pub fn rt_rmdir(path: *const u8) -> i32:
+pub fn rt_rmdir(path: *const c_char) -> i32:
     let r = rt_libc_rmdir(path)
     if r < 0:
         return -get_errno()
     0
 
-pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
+pub fn rt_rename(old_path: *const c_char, new_path: *const c_char) -> i32:
     let r = rt_libc_rename(old_path, new_path)
     if r < 0:
         return -get_errno()
@@ -548,7 +548,7 @@ pub fn rt_rename(old_path: *const u8, new_path: *const u8) -> i32:
 // in a separator (rt_path_join), so only the top path is stripped, and "/"
 // stays "/". Windows strips the same way before its reparse-point query
 // (#1863).
-pub fn rt_remove_tree(path: *const u8) -> i32:
+pub fn rt_remove_tree(path: *const c_char) -> i32:
     var top: [4096]u8 = [0 as u8; 4096]
     var len = rt_cstr_len(path)
     if len >= RT_PATH_MAX:
@@ -559,9 +559,9 @@ pub fn rt_remove_tree(path: *const u8) -> i32:
     while i < len:
         unsafe *((&raw mut top as i64 + i) as *mut u8) = unsafe *((path as i64 + i) as *const u8)
         i = i + 1
-    rt_remove_tree_entry(&top as *const [4096]u8 as *const u8)
+    rt_remove_tree_entry(&top as *const [4096]u8 as *const c_char)
 
-fn rt_remove_tree_entry(path: *const u8) -> i32:
+fn rt_remove_tree_entry(path: *const c_char) -> i32:
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
@@ -580,11 +580,11 @@ fn rt_remove_tree_entry(path: *const u8) -> i32:
         if rt_dirent_is_dot_or_dotdot(name):
             continue
         var child: [4096]u8 = [0 as u8; 4096]
-        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut c_char, RT_PATH_MAX)
         if join_rc != 0:
             let _close_on_join = rt_libc_closedir(dir)
             return join_rc
-        let child_rc = rt_remove_tree_entry(&child as *const [4096]u8 as *const u8)
+        let child_rc = rt_remove_tree_entry(&child as *const [4096]u8 as *const c_char)
         if child_rc != 0:
             let _close_on_child = rt_libc_closedir(dir)
             return child_rc
@@ -593,7 +593,7 @@ fn rt_remove_tree_entry(path: *const u8) -> i32:
         return -get_errno()
     rt_rmdir(path)
 
-fn rt_copy_file(src: *const u8, dst: *const u8, mode: i32) -> i32:
+fn rt_copy_file(src: *const c_char, dst: *const c_char, mode: i32) -> i32:
     let in_fd = rt_open(src, 0, 0)
     if in_fd < 0:
         return in_fd
@@ -638,7 +638,7 @@ fn rt_copy_file(src: *const u8, dst: *const u8, mode: i32) -> i32:
         return close_out
     rt_chmod(dst, mode & 0o777)
 
-pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
+pub fn rt_copy_tree(src: *const c_char, dst: *const c_char) -> i32:
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(src, &mode as *mut i32)
     if stat_rc != 0:
@@ -661,16 +661,16 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
         if rt_dirent_is_dot_or_dotdot(name):
             continue
         var child_src: [4096]u8 = [0 as u8; 4096]
-        let src_join_rc = rt_path_join(src, name, &child_src as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        let src_join_rc = rt_path_join(src, name, &child_src as *mut [4096]u8 as *mut c_char, RT_PATH_MAX)
         if src_join_rc != 0:
             let _close_on_src_join = rt_libc_closedir(dir)
             return src_join_rc
         var child_dst: [4096]u8 = [0 as u8; 4096]
-        let dst_join_rc = rt_path_join(dst, name, &child_dst as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        let dst_join_rc = rt_path_join(dst, name, &child_dst as *mut [4096]u8 as *mut c_char, RT_PATH_MAX)
         if dst_join_rc != 0:
             let _close_on_dst_join = rt_libc_closedir(dir)
             return dst_join_rc
-        let child_rc = rt_copy_tree(&child_src as *const [4096]u8 as *const u8, &child_dst as *const [4096]u8 as *const u8)
+        let child_rc = rt_copy_tree(&child_src as *const [4096]u8 as *const c_char, &child_dst as *const [4096]u8 as *const c_char)
         if child_rc != 0:
             let _close_on_child = rt_libc_closedir(dir)
             return child_rc
@@ -679,23 +679,23 @@ pub fn rt_copy_tree(src: *const u8, dst: *const u8) -> i32:
         return -get_errno()
     rt_chmod(dst, mode & 0o777)
 
-pub fn rt_symlink(target: *const u8, link_path: *const u8) -> i32:
+pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     let r = rt_libc_symlink(target, link_path)
     if r < 0:
         return -get_errno()
     0
 
-pub fn rt_readlink(path: *const u8) -> str:
+pub fn rt_readlink(path: *const c_char) -> str:
     var buf: [4096]u8 = [0 as u8; 4096]
     let n = rt_libc_readlink(path, &buf as *mut [4096]u8 as *mut u8, 4095 as u64)
     if n < 0:
         return rt_empty_str()
     unsafe *((&raw const buf as i64 + n) as *mut u8) = 0
-    with_str_from_cstr(&buf as *const [4096]u8 as *const u8)
+    with_str_from_cstr(&buf as *const [4096]u8 as *const c_char)
 
 fn rt_empty_str() -> str:
     var empty: [1]u8 = [0 as u8; 1]
-    with_str_from_cstr(&empty as *const [1]u8 as *const u8)
+    with_str_from_cstr(&empty as *const [1]u8 as *const c_char)
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_realloc(ptr: *mut u8, old_size: i64, new_size: i64) -> *mut u8
@@ -728,13 +728,13 @@ fn rt_list_finish(acc: *mut i64) -> str:
     with_free(buf)
     out
 
-fn rt_list_files_walk(path: *const u8, acc: *mut i64):
+fn rt_list_files_walk(path: *const c_char, acc: *mut i64):
     var mode: i32 = 0
     let stat_rc = rt_lstat_mode(path, &mode as *mut i32)
     if stat_rc != 0:
         return
     if (mode & RT_S_IFMT) != RT_S_IFDIR:
-        rt_list_push(acc, path, rt_cstr_len(path))
+        rt_list_push(acc, path as *const u8, rt_cstr_len(path))
         return
     let dir = rt_libc_opendir(path)
     if dir as i64 == 0:
@@ -747,20 +747,20 @@ fn rt_list_files_walk(path: *const u8, acc: *mut i64):
         if rt_dirent_is_dot_or_dotdot(name):
             continue
         var child: [4096]u8 = [0 as u8; 4096]
-        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut u8, RT_PATH_MAX)
+        let join_rc = rt_path_join(path, name, &child as *mut [4096]u8 as *mut c_char, RT_PATH_MAX)
         if join_rc != 0:
             continue
-        rt_list_files_walk(&child as *const [4096]u8 as *const u8, acc)
+        rt_list_files_walk(&child as *const [4096]u8 as *const c_char, acc)
     let _close = rt_libc_closedir(dir)
 
-pub fn rt_list_files(path: *const u8) -> str:
+pub fn rt_list_files(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
     rt_list_files_walk(path, &acc as *mut [3]i64 as *mut i64)
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
 // The names in a directory, one per line, no path and no descent; "" for
 // anything that is not a directory.
-pub fn rt_list_dir(path: *const u8) -> str:
+pub fn rt_list_dir(path: *const c_char) -> str:
     var acc: [3]i64 = [0 as i64; 3]
     let dir = rt_libc_opendir(path)
     if dir as i64 == 0:
@@ -772,11 +772,11 @@ pub fn rt_list_dir(path: *const u8) -> str:
         let name = rt_dirent_name(ent)
         if rt_dirent_is_dot_or_dotdot(name):
             continue
-        rt_list_push(&acc as *mut [3]i64 as *mut i64, name, rt_cstr_len(name))
+        rt_list_push(&acc as *mut [3]i64 as *mut i64, name as *const u8, rt_cstr_len(name))
     let _close = rt_libc_closedir(dir)
     rt_list_finish(&acc as *mut [3]i64 as *mut i64)
 
-pub fn rt_access(path: *const u8, mode: i32) -> i32:
+pub fn rt_access(path: *const c_char, mode: i32) -> i32:
     let r = rt_libc_access(path, mode)
     if r < 0:
         return -get_errno()
@@ -805,7 +805,7 @@ extern fn rt_libc_getaddrinfo(node: *const u8, service: *const u8, hints: *const
 @[link_name("freeaddrinfo")]
 extern fn rt_libc_freeaddrinfo(res: *mut LinuxAddrInfo) -> Unit
 extern fn with_str_from_bytes(s: *const u8, len: i64) -> str
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void) -> Unit
 
 type LinuxAddrInfo:
     ai_flags: i32
@@ -1038,17 +1038,17 @@ pub fn rt_sysinfo_arch() -> str:
 
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32: rt_libc_gethostname(name, len)
 
-pub fn rt_getenv(name: *const u8) -> *const u8:
+pub fn rt_getenv(name: *const c_char) -> *const c_char:
     rt_libc_getenv(name)
 
 // ---- Compiler compatibility process/env adapter ----
 
 extern fn with_alloc(size: i64) -> *mut u8
-extern fn with_free(ptr: *mut u8) -> Unit
+extern fn with_free(ptr: *mut c_void) -> Unit
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 @[link_name("setenv")]
-extern fn rt_libc_setenv(name: *const u8, value: *const u8, overwrite: i32) -> i32
+extern fn rt_libc_setenv(name: *const c_char, value: *const c_char, overwrite: i32) -> i32
 @[link_name("sigprocmask")]
 extern fn rt_libc_sigprocmask(how: i32, set: *const PosixSigset, old: *mut PosixSigset) -> i32
 @[link_name("fork")]
@@ -1056,7 +1056,7 @@ extern fn rt_libc_fork() -> i32
 @[link_name("setpgid")]
 extern fn rt_libc_setpgid(pid: i32, pgid: i32) -> i32
 @[link_name("execv")]
-extern fn rt_libc_execv(path: *const u8, argv: *const *const u8) -> i32
+extern fn rt_libc_execv(path: *const c_char, argv: *const *const u8) -> i32
 @[link_name("execvp")]
 extern fn rt_libc_execvp(file: *const u8, argv: *const *const u8) -> i32
 @[link_name("waitpid")]
@@ -1073,7 +1073,7 @@ var posix_last_child_maxrss: i64 = 0
 fn posix_rusage_maxrss(buf: *const u8) -> i64:
     (unsafe *((buf as i64 + 32) as *const i64)) * 1024
 @[link_name("chdir")]
-extern fn rt_libc_chdir(path: *const u8) -> i32
+extern fn rt_libc_chdir(path: *const c_char) -> i32
 @[link_name("dup2")]
 extern fn rt_libc_dup2(oldfd: i32, newfd: i32) -> i32
 @[link_name("getrlimit")]
@@ -1117,15 +1117,15 @@ fn posix_signal_bit(signo: i32) -> u64:
         return 0
     (1 as u64) << ((signo - 1) as u64)
 
-fn posix_str_to_c_buf(s: &str) -> *mut u8:
+fn posix_str_to_c_buf(s: &str) -> *mut c_char:
     let out = with_alloc(s.len() + 1)
     if out as i64 == 0:
-        return 0 as *mut u8
+        return 0 as *mut c_char
     if s.len() > 0:
         let sp = unsafe *(s as *const str as *const *const u8)
         with_memcpy(out, sp, s.len())
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
-    out
+    out as *mut c_char
 
 fn posix_restore_default_signal_handler(signo: i32): linux_zero_sigaction(signo)
 
@@ -1193,7 +1193,7 @@ fn posix_fill_argv(blob: *const u8, len: i64, argv: *mut *const u8) -> i32:
     unsafe *((argv as i64 + argi as i64 * 8) as *mut *const u8) = 0 as *const u8
     argi
 
-fn posix_redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
+fn posix_redirect_fd_to_path(path: *const c_char, fd: i32) -> i32:
     let out_fd = rt_open(path, 1 | 0x200 | 0x400, 0o644)
     if out_fd < 0:
         return -1
@@ -1203,7 +1203,7 @@ fn posix_redirect_fd_to_path(path: *const u8, fd: i32) -> i32:
     let _ = rt_close(out_fd)
     0
 
-fn posix_redirect_fd_from_path(path: *const u8, fd: i32) -> i32:
+fn posix_redirect_fd_from_path(path: *const c_char, fd: i32) -> i32:
     let in_fd = rt_open(path, 0, 0)
     if in_fd < 0:
         return -1
@@ -1222,7 +1222,7 @@ fn posix_child_common(mask_rc: i32, prev_mask: *const PosixSigset):
     posix_restore_default_signal_handler(POSIX_SIGHUP)
     posix_restore_default_signal_handler(POSIX_SIGQUIT)
 
-fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path: *const u8, stdin_path: *const u8, cwd: *const u8, timeout_ms: i32, wait: bool) -> i32:
+fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_path: *const c_char, stdin_path: *const c_char, cwd: *const c_char, timeout_ms: i32, wait: bool) -> i32:
     let argc = posix_argv_blob_count(blob, len)
     if argc <= 0:
         return -1
@@ -1232,7 +1232,7 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const u8, stderr_path
     let table_bytes = (argc as i64 + 1) * 8
     let table = rt_mmap(table_bytes) as *mut *const u8
     if table as i64 == 0:
-        let _ = rt_write(2, c"error: could not map the argument table for a command\n".ptr, 54)
+        let _ = rt_write(2, c"error: could not map the argument table for a command\n".ptr as *const u8, 54)
         return -1
     var prev_mask = PosixSigset { words: [0 as u64; 16] }
     let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
@@ -1284,7 +1284,7 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     if value_buf as i64 == 0:
         with_free(name_buf)
         return -1
-    let rc = rt_libc_setenv(name_buf as *const u8, value_buf as *const u8, 1)
+    let rc = rt_libc_setenv(name_buf, value_buf, 1)
     with_free(name_buf)
     with_free(value_buf)
     rc
@@ -1338,7 +1338,7 @@ pub fn rt_compat_exec_binary(path: &str) -> i32:
     if posix_interrupted():
         with_free(buf)
         return -1
-    let rc = posix_run_argv(buf as *const u8, path.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, 0 as *const u8, 0, true)
+    let rc = posix_run_argv(buf as *const u8, path.len(), 0 as *const c_char, 0 as *const c_char, 0 as *const c_char, 0 as *const c_char, 0, true)
     with_free(buf)
     rc
 
@@ -1346,7 +1346,7 @@ pub fn rt_compat_exec_argv(args: &str) -> i32:
     let buf = posix_str_to_c_buf(args)
     if buf as i64 == 0:
         return -1
-    let rc = if posix_interrupted(): -1 else: posix_run_argv(buf as *const u8, args.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, 0 as *const u8, 0, true)
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(buf as *const u8, args.len(), 0 as *const c_char, 0 as *const c_char, 0 as *const c_char, 0 as *const c_char, 0, true)
     with_free(buf)
     rc
 
@@ -1355,7 +1355,7 @@ pub fn rt_compat_exec_argv_cwd(args: &str, cwd: &str) -> i32:
     let cwd_buf = posix_str_to_c_buf(cwd)
     if arg_buf as i64 == 0 or cwd_buf as i64 == 0:
         return -1
-    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), 0 as *const u8, 0 as *const u8, 0 as *const u8, cwd_buf as *const u8, 0, true)
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), 0 as *const c_char, 0 as *const c_char, 0 as *const c_char, cwd_buf, 0, true)
     with_free(arg_buf)
     with_free(cwd_buf)
     rc
@@ -1370,7 +1370,7 @@ pub fn rt_compat_exec_argv_capture_input(args: &str, stdout_path: &str, stderr_p
     let in_buf = posix_str_to_c_buf(stdin_path)
     if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0 or in_buf as i64 == 0:
         return -1
-    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, in_buf as *const u8, 0 as *const u8, timeout_ms, true)
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf, err_buf, in_buf, 0 as *const c_char, timeout_ms, true)
     with_free(arg_buf)
     with_free(out_buf)
     with_free(err_buf)
@@ -1381,10 +1381,10 @@ pub fn rt_compat_exec_argv_capture_cwd(args: &str, stdout_path: &str, stderr_pat
     let arg_buf = posix_str_to_c_buf(args)
     let out_buf = posix_str_to_c_buf(stdout_path)
     let err_buf = posix_str_to_c_buf(stderr_path)
-    let cwd_buf = if cwd.len() > 0: posix_str_to_c_buf(cwd) else: 0 as *mut u8
+    let cwd_buf = if cwd.len() > 0: posix_str_to_c_buf(cwd) else: 0 as *mut c_char
     if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0:
         return -1
-    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, 0 as *const u8, cwd_buf as *const u8, timeout_ms, true)
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf, err_buf, 0 as *const c_char, cwd_buf, timeout_ms, true)
     with_free(arg_buf)
     with_free(out_buf)
     with_free(err_buf)
@@ -1398,7 +1398,7 @@ pub fn rt_compat_exec_argv_capture_spawn(args: &str, stdout_path: &str, stderr_p
     let err_buf = posix_str_to_c_buf(stderr_path)
     if arg_buf as i64 == 0 or out_buf as i64 == 0 or err_buf as i64 == 0:
         return -1
-    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf as *const u8, err_buf as *const u8, 0 as *const u8, 0 as *const u8, 0, false)
+    let rc = if posix_interrupted(): -1 else: posix_run_argv(arg_buf as *const u8, args.len(), out_buf, err_buf, 0 as *const c_char, 0 as *const c_char, 0, false)
     with_free(arg_buf)
     with_free(out_buf)
     with_free(err_buf)

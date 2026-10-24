@@ -60,7 +60,7 @@ pub error IoError =
 /// `No such file or directory (os error 2)`.
 pub fn IoError.message(self: &Self) -> str:
     match self:
-        .Os(code, _) => with_str_from_cstr(strerror(code) as *const u8) ++ f" (os error {code})"
+        .Os(code, _) => with_str_from_cstr(strerror(code)) ++ f" (os error {code})"
 
 /// Read an entire file. `Err` carries the OS error (a missing path, a
 /// directory, a permission failure, a short read); an empty file is `Ok("")`.
