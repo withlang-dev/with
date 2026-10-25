@@ -197,11 +197,7 @@ fn sema_name_is_compiler_abi_extern(name: &str) -> i32:
     0
 
 fn sema_path_is_compiler_source_implementation(path: &str) -> i32:
-    if path.starts_with("src/") or path.starts_with("src\\"):
-        return 1
-    if path.contains("/src/") or path.contains("\\src\\"):
-        return 1
-    0
+    if resolve_path_is_compiler_source(path): 1 else: 0
 
 fn sema_path_is_user_lint_source(path: &str) -> i32:
     if path.len() == 0:
@@ -210,7 +206,7 @@ fn sema_path_is_user_lint_source(path: &str) -> i32:
         return 0
     if sema_path_is_runtime_implementation(path) != 0:
         return 0
-    if path.starts_with("src/") or path.starts_with("build/"):
+    if resolve_path_is_compiler_source(path) or path.starts_with("build/"):
         return 0
     // #838: one-liner programs (`<cli -e/-n/-p ...>`) are synthesized and
     // throwaway; every consumer of this gate is style/perf advice, and in

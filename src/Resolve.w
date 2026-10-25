@@ -1759,8 +1759,27 @@ fn dump_resolved(result: &ResolveResult, pool: &InternPool, root_path: &str) -> 
 
     out
 
-// The compiler's own sources (the tree's src/, as Sema's
-// sema_path_is_compiler_source_implementation judges them): they import
-// the runtime as the standard library does (D30 step 4).
+// The compiler's own sources: the files under the `src/` of a With compiler
+// checkout, the directory that holds `seed.lock`. They import the runtime as
+// the standard library does (D30 step 4), and Sema gives them the compiler's
+// extern rules. A path with some other `src` directory in it is not one
+// (#2613): a user project's `src/main.w`, or a checkout kept under `~/src`,
+// whose `tools/with-sha256.w` was judged compiler source by its `/src/`.
+var resolve_compiler_root_memo: HashMap[str, bool] = HashMap.new()
+
+fn resolve_dir_is_compiler_checkout(dir: &str) -> bool:
+    if resolve_compiler_root_memo.contains(dir):
+        return resolve_compiler_root_memo.get(dir) ?? false
+    let marker = if dir.len() == 0: "seed.lock" else: dir ++ "seed.lock"
+    let found = runtime_file_exists(marker) != 0
+    resolve_compiler_root_memo.insert(dir, found)
+    found
+
 fn resolve_path_is_compiler_source(path: &str) -> bool:
-    path.starts_with("src/") or path.starts_with("src\\") or path.contains("/src/") or path.contains("\\src\\")
+    for i in 0..path.len():
+        if path[i] != 's' or (i > 0 and path[i - 1] != '/' and path[i - 1] != '\\'):
+            continue
+        let at = path.slice(i, path.len())
+        if (at.starts_with("src/") or at.starts_with("src\\")) and resolve_dir_is_compiler_checkout(path.slice(0, i)):
+            return true
+    false
