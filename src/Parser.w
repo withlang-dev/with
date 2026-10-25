@@ -4383,6 +4383,12 @@ impl Parser:
             let move_inner = self.parse_expr()
             return self.pool.add_node(NodeKind.NK_MOVE_ARG, move_kw_start, self.prev_end(), move_inner, 0, 0)
 
+        // #1005: the lexer gives an unterminated string literal as an invalid
+        // token that starts with its opening quote.
+        if t == TokenKind.TK_INVALID and lexed_text_opens_string(self.source.slice(self.current_start() as i64, self.current_end() as i64)):
+            self.emit_error("unterminated string literal: nothing closes the quote that opens it here before the end of the file")
+            self.advance()
+            return self.poisoned_expr()
         self.emit_error("expected expression")
         // Skip to next statement boundary for recovery
         self.recover_to_statement()
@@ -6038,6 +6044,9 @@ fn strip_string_token_text(text: &str) -> str:
     if text.len() >= 2:
         return text.slice(1, text.len() as i64 - 1)
     ""
+
+fn lexed_text_opens_string(text: &str) -> bool:
+    text.starts_with("\"") or text.starts_with("f\"") or text.starts_with("c\"") or text.starts_with("r\"") or text.starts_with("r#")
 
 fn is_fstring_token_text(text: &str) -> bool:
     if text.len() < 3:
