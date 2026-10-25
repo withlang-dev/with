@@ -2955,32 +2955,6 @@ fn str_index_of_ref(hay: &str, needle: &str) -> i64:
 pub fn with_str_index_of_ref(hay: &str, needle: &str) -> i64:
     str_index_of_ref(hay, needle)
 
-// #2225: `str.trim()` is a std view method now; this owned copy serves only
-// the STR_TRIM intrinsic a PINNED SEED still lowers the compiler's own
-// `.trim()` calls to. It retires with the next seed bump (seed-gated).
-fn str_trim_ref(s: &str) -> str:
-    let slen = str_length(s)
-    let sp = str_data(s)
-    var start: i64 = 0
-    while start < slen:
-        let c = unsafe sp[start]
-        if c != 32 and c != 9 and c != 10 and c != 13:  // ' ', '\t', '\n', '\r'
-            break
-        start = start + 1
-    var end = slen
-    while end > start:
-        let c = unsafe sp[end - 1]
-        if c != 32 and c != 9 and c != 10 and c != 13:
-            break
-        end = end - 1
-    if start >= end:
-        return ""
-    // #747: owned copy, never `return s`/a view (see with_str_slice).
-    alloc_str((sp as i64 + start) as *const u8, end - start)
-
-pub fn with_str_trim_ref(s: &str) -> str:
-    str_trim_ref(s)
-
 fn str_to_upper_ref(s: &str) -> str:
     let slen = str_length(s)
     if slen == 0: return ""  // #747: never return s (alias)
@@ -5112,14 +5086,6 @@ pub fn with_system_info() -> SysInfo:
     var info = SysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
     rt_sysinfo(&info as *mut u8)
     info
-
-/// Seed-bound: the compiler's own modules are compiled by the pinned seed
-/// against the seed's runtime interface, which has `with_sysinfo` in this
-/// byte form and no `SysInfo`, so two of them (BuildGraphRuntime,
-/// CodegenUnits) still read the bytes through it. Delete it, and their
-/// record copies, once a seed carrying `with_system_info` is pinned.
-pub fn with_sysinfo(out: *mut u8) -> i32:
-    rt_sysinfo(out)
 
 // ── Async Scopes (structured concurrency) ──────────────────────────
 // Stable scope handle layout: [count: i32, capacity: i32, entries: *mut u8]

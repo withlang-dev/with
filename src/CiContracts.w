@@ -181,22 +181,11 @@ impl CiProject:
 
     // The artifact: one line per defined function, sorted by name.
     fn contracts_tsv() -> str:
-        // Sorted by name, by insertion. `List[str].sort()` here made the pinned
-        // seed fail to link stage1 (#2618: a closure's symbol was external and
-        // the multi-unit build stripped it; fixed in gen_closure, but the seed
-        // that builds this module predates the fix). `names.sort()` once a seed
-        // carrying it is pinned.
         var names: List[str] = List.new()
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
-            names.push(with_str_clone_ref(self.symbols[si].name))
-        for i in 1..names.len():
-            var j = i
-            while j > 0 and names[j] < names[j - 1]:
-                let later: str = names[j]
-                names[j] = names[j - 1]
-                names[j - 1] = later
-                j = j - 1
+            names.push(self.symbols[si].name)
+        names.sort()
         var text = ""
         for name in names:
             let si = self.find_symbol(CiProjectSymbolKind.CIPS_FN, name)

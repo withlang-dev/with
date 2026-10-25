@@ -462,8 +462,10 @@ code (2026-10-25 sweep). A runtime fact crosses the seam typed:
 One constraint shapes the order of such changes: `src/` is compiled by the
 pinned seed against the seed's runtime interface and linked with the seed's
 runtime, so a new runtime API reaches `src/` only after a seed carrying it is
-pinned (`with_sysinfo`'s byte form stays, marked seed-bound, until then);
-`lib/std` is compiled by the tree's compiler and uses it at once.
+pinned (a byte-form stand-in stays, marked seed-bound, until then and is
+deleted in the pin's own stack: `with_sysinfo` lived from #2621 to the
+2026-10-25 seed); `lib/std` is compiled by the tree's compiler and uses it
+at once.
 
 ---
 
