@@ -118,7 +118,7 @@ impl[T: Ord] LinkedList[T]:
         var cursor = stc_word_list_begin(&raw const self.words)
         while cursor.ref as i64 != 0:
             *cursor.ref = ((*cursor.ref as u64) ^ 9223372036854775808) as i64
-            stc_word_list_next(&raw mut cursor)
+            cursor.next()
 
     /// Sorts ascending by `Ord` (D41): a word list by the engine's own `<`;
     /// a slot list through the facade's comparator, which every slot is
