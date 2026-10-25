@@ -4813,6 +4813,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     require_last_green = require_last_green.dep("with-sha256")
     out = out.add_target(require_last_green)
 
+    // tools/battery.w asks first whether these committed sources already
+    // have a published green (build/retention.w run_sources_green_action):
+    // the green keys on the inputs without docs/ and top-level *.md, so a
+    // docs-only change never costs a battery. It builds nothing.
+    var sources_green = target_new(.Action, "sources-green", "").output("out/command/sources-green/ok")
+    sources_green.action = run_sources_green_action
+    sources_green = sources_green.write_scope("out/command/sources-green")
+    out = out.add_target(sources_green)
+
     if release_platform_asset_is_distinct():
         var release_platform_asset = target_new(.Action, "release-platform-asset", "").output(release_platform_asset_bin())
         release_platform_asset.action = run_release_platform_asset_action
