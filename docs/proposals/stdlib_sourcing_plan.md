@@ -792,8 +792,11 @@ the tree does not have:
    use case beyond `PriorityQueue`/`BinaryHeap`; stays unexposed until one.
 6. **The engine boundary's `unsafe` — ruled, D159 (2026-10-24); a new
    migrator stage, non-compliant until it lands.** The migrator emits a
-   safe signature where the function's body proves the contract: (a) an
-   in-place receiver/`inout` parameter, (b) a stored argument that a
+   safe signature where the function's body proves the contract: (a) a
+   `mut self` receiver when the engine handle is the first parameter, or
+   an out-parameter the body writes on every returning path presented as
+   a returned `Copy` value (`T` or `(status, T)`; written conditionally
+   stays `unsafe`; no new parameter mode), (b) a stored argument that a
    destroyer in the same corpus frees along the same path (store alone is
    "stored, ownership unknown" and stays `unsafe`), (c) a returned
    pointer's origin; an unproved point keeps `pub unsafe fn` with the

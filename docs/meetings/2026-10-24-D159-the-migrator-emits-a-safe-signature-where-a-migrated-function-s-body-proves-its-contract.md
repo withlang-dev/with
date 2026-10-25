@@ -46,6 +46,44 @@ D51's test:
 > names as the strongest evidence, applied at the moment you have the most
 > of it.
 
+## Amendment (Eric, 2026-10-24): inference (a) uses only the spec's spellings
+
+The ruling's "`mut` receiver or `inout`" was loose; there is no new
+parameter mode. The record line: *receiver when the handle is the first
+parameter; an out-parameter becomes a returned value when the body writes
+it unconditionally; otherwise unproved.*
+
+> - **First parameter is the engine handle and the body mutates through
+>   it:** `mut self` receiver. That's the common STC shape, and it's the
+>   one case where the inference is also a presentation.
+> - **A second pointer parameter the body writes through, where the
+>   function returns `void` or a status:** the migrator may present it as a
+>   returned value, `T` or `(status, T)`, when the body *always* writes it
+>   on every path that returns. That's an out-parameter, and the spec
+>   already has the pattern for modeled C: `out param N` with `ok`
+>   projecting a status to `Result[T, E]`. If the body writes it on only
+>   some paths (a partial fill, or a write guarded by the status), the
+>   function stays `unsafe fn`, with "out-parameter written conditionally"
+>   in the generated comment.
+> - **Everything else** (a second pointer the body reads and writes in
+>   place, a pointer used as both input and output, an array the body
+>   mutates): unproved, `unsafe fn`.
+
+> Two reasons to allow the out-parameter case rather than leaving it
+> unproved. First, it's exactly what the C-facade machinery already does
+> for headers, so it's a proven spelling with no new spec. Second, STC's
+> `_insert` returning a result record is the common case in the containers
+> you're about to facade, and leaving every insert `unsafe` would put the
+> `unsafe` back around the hot path that this stage exists to remove.
+
+> One check for the implementer: "returned value" means a *copy* out of
+> the engine's write, so the pattern is sound only when the written record
+> is plain data (`Copy`, or something whose copy class rt_core can
+> produce). If the out-written record contains an owned pointer, that's
+> inference (b)'s territory and the stricter "stored and freed by a
+> destroyer in the same corpus" rule applies. If that doesn't hold,
+> `unsafe fn`.
+
 ## Context
 
 Every migrated corpus function is emitted `pub unsafe fn` over raw
@@ -62,12 +100,16 @@ body is in hand.
 ## What this changes (the campaign)
 
 1. A migrator stage, after translation and before emission, that proves
-   per function: (a) an in-place receiver/`inout` parameter, (b) a stored
-   argument freed by a destroyer in the same corpus along the same path
-   (both halves, or "stored, ownership unknown"), (c) a returned pointer's
-   origin. The proof reads the C AST the migrator already has (libclang);
-   a function it cannot prove keeps `pub unsafe fn` and a generated comment
-   naming the unproved point.
+   per function: (a) a `mut self` receiver when the engine handle is the
+   first parameter and the body mutates through it, or an out-parameter
+   the body writes on every returning path, presented as a returned `Copy`
+   value (`T` or `(status, T)`; a conditional write stays `unsafe` with
+   "out-parameter written conditionally"); (b) a stored argument freed by a
+   destroyer in the same corpus along the same path (both halves, or
+   "stored, ownership unknown"); (c) a returned pointer's origin. The proof
+   reads the C AST the migrator already has (libclang); a function it
+   cannot prove keeps `pub unsafe fn` and a generated comment naming the
+   unproved point.
 2. The emitted signature carries the contract in With's own spellings
    (receiver modes, an owned parameter, `-> &T from <param>`), so a facade
    calls a proved function without `unsafe`.
