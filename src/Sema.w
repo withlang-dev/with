@@ -10339,6 +10339,16 @@ impl Sema:
 
     // ── Type compatibility ───────────────────────────────────────────
 
+    // #2326: a raw pointer and a function value convert both ways (a C
+    // callback's `*const c_void`), but a view is a view of what it names:
+    // `&T` and a function value meet only when T is a function type or one
+    // still being inferred. A closure passed where `&str` is demanded
+    // (`s.contains(c => …)`) was accepted and reached codegen as a str.
+    fn ref_admits_fn_value(ref_tid: TypeId) -> bool:
+        let pointee = self.get_type_d0(ref_tid)
+        let pk = self.get_type_kind(self.resolve_alias(pointee as TypeId))
+        pk == TypeKind.TY_FN or pk == TypeKind.TY_EXTERN_FN or self.type_has_unresolved_parts(pointee) != 0
+
     mut fn types_compatible_fast(expected: TypeId, actual: TypeId) -> i32:
         if expected == actual:
             return 1
@@ -10391,10 +10401,14 @@ impl Sema:
             return if exp_lane_k == act_lane_k: 1 else: 0
         if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
             return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
-        if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
+        if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_FN:
             return 1
-        if exp_k == TypeKind.TY_FN and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
+        if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_PTR:
             return 1
+        if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_FN:
+            return if self.ref_admits_fn_value(exp_r): 1 else: 0
+        if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
+            return if self.ref_admits_fn_value(act_r): 1 else: 0
         if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
@@ -10673,10 +10687,14 @@ impl Sema:
             return if exp_lane_k == act_lane_k: 1 else: 0
         if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
             return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
-        if (exp_k == TypeKind.TY_PTR or exp_k == TypeKind.TY_REF) and act_k == TypeKind.TY_FN:
+        if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_FN:
             return 1
-        if exp_k == TypeKind.TY_FN and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF):
+        if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_PTR:
             return 1
+        if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_FN:
+            return if self.ref_admits_fn_value(exp_r): 1 else: 0
+        if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
+            return if self.ref_admits_fn_value(act_r): 1 else: 0
         if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
