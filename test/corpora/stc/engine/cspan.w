@@ -3,11 +3,13 @@ use std.engines.stc_testing.defs
 use std.libc
 use std.collections
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
     return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
@@ -53,6 +55,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_b8: u64
 
@@ -78,6 +81,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
@@ -99,6 +103,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
@@ -136,6 +141,7 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
@@ -176,6 +182,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn _cspan_size(__param_shape: *mut i32, __param_rank: i32) -> i64 {
     var __local_rank = __param_rank
     var __local_size: i64 = (((__param_shape[0]) as i64))
@@ -195,6 +202,7 @@ pub unsafe fn _cspan_size(__param_shape: *mut i32, __param_rank: i32) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn _cspan_swap_axes(__param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32, __param_ax1: i32, __param_ax2: i32) {
 
     if (((if not ((((if ((__param_ax1 as u64)) < ((__param_rank as u64)): 1 else: 0) as i32) & ((if ((__param_ax2 as u64)) < ((__param_rank as u64)): 1 else: 0) as i32)) != 0): 1 else: 0) as i64) != 0) {
@@ -239,6 +247,7 @@ pub unsafe fn _cspan_swap_axes(__param_shape: *mut i32, __param_stride: *mut i32
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn _cspan_transpose(__param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32) {
     var __local_rank = __param_rank
     var __local_i: i32 = ((0 as i32))
@@ -291,6 +300,7 @@ pub unsafe fn _cspan_transpose(__param_shape: *mut i32, __param_stride: *mut i32
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only,unproved:2:read only
 pub unsafe fn _cspan_index(__param_shape: *mut i32, __param_stride: *mut i32, __param_args: *mut i64, __param_rank: i32) -> i64 {
     var __local_rank = __param_rank
     var __local_off: i64 = ((0 as i64))
@@ -319,6 +329,7 @@ pub unsafe fn _cspan_index(__param_shape: *mut i32, __param_stride: *mut i32, __
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only,unproved:3:read only,unproved:4:out-parameter read before the write
 pub unsafe fn _cspan_print_assist(__param_pos: *mut i32, __param_shape: *mut i32, __param_rank: i32, __param_brackets: *const c_char, __param_result: *mut [c_char; 20]) {
     var __local_n: i32 = ((0 as i32))
 
@@ -412,6 +423,7 @@ pub unsafe fn _cspan_print_assist(__param_pos: *mut i32, __param_shape: *mut i32
 
 }
 
+// contract: unproved:0:out-parameter read before the write,unproved:1:read only,unproved:2:read only,unproved:4:out-parameter read before the write
 pub unsafe fn _cspan_nextN(__param_pos: *mut i32, __param_shape: *mut i32, __param_stride: *mut i32, __param_rank: i32, __param_off: *mut i64) -> bool {
     var __local_rank = __param_rank
     (__local_rank = __local_rank - 1)
@@ -444,6 +456,7 @@ pub unsafe fn _cspan_nextN(__param_pos: *mut i32, __param_shape: *mut i32, __par
 
 }
 
+// contract: unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write,out:2:i32,unproved:3:read only,unproved:4:read only,unproved:5:read only
 pub unsafe fn _cspan_slice(__param_oshape: *mut i32, __param_ostride: *mut i32, __param_orank: *mut i32, __param_shape: *mut i32, __param_stride: *mut i32, __param_args: *mut [i64; 3], __param_rank: i32) -> i64 {
     var __local_end: i64
 
@@ -523,6 +536,7 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut i32, __param_ostride: *mut i32, 
 
 }
 
+// contract: unproved:1:out-parameter read before the write
 pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut i32, __param_rank: i32) -> *mut i32 {
     var __local_rank = __param_rank
     var __local_i: i32
@@ -574,6 +588,7 @@ pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut i32
 
 }
 
+// contract: unproved:1:read only,unproved:2:read only
 pub unsafe fn _cspan_is_layout(__param_layout: i32, __param_shape: *mut i32, __param_strides: *mut i32, __param_rank: i32) -> bool {
     var __local_tmpshape: List[i32] = [0; 16]
 

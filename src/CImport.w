@@ -18743,6 +18743,9 @@ fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> 
 //   `outcond:<i>:<reason>`           parameter i is written through, but
 //                                    not provably on every path, or read
 //                                    before the write
+//   `arrayparam:<i>`                 parameter i is indexed (`p[k]`) or
+//                                    stepped (`p + k`, `p - k`): an array
+//                                    in the body's eyes, never a receiver
 // A body no proof can walk gives `unanalyzable`.
 
 // Whether `cursor`'s subtree has a statement of `kind`.
@@ -18803,6 +18806,12 @@ fn ci_contract_walk(session: i64, cursor: i32, params: &List[str]) -> str:
         if op >= UO_PRE_INC and op <= UO_POST_DEC:
             let target = ci_contract_target_param(session, with_ci_child(session, cursor, 0), params)
             if target >= 0: out = out ++ f"mutparam:{target}\n"
+    if kind == CXK_ARRAY_SUBSCRIPT and nc == 2:
+        for pi in 0..params.len():
+            if params[pi].len() > 0 and ci_cursor_names(session, with_ci_child(session, cursor, 0), params[pi]): out = out ++ f"arrayparam:{pi}\n"
+    if kind == CXK_BINARY_OP and nc == 2 and (with_ci_binary_op(session, cursor) == BO_ADD or with_ci_binary_op(session, cursor) == BO_SUB):
+        for pi in 0..params.len():
+            if params[pi].len() > 0 and (ci_cursor_names(session, with_ci_child(session, cursor, 0), params[pi]) or ci_cursor_names(session, with_ci_child(session, cursor, 1), params[pi])): out = out ++ f"arrayparam:{pi}\n"
     if kind == CXK_CALL_EXPR and nc >= 1:
         let callee = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
         var ai = 1

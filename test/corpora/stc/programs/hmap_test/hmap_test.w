@@ -10,11 +10,13 @@ use std.engines.stc_testing.cstr_io
 use std.libc
 use std.option
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
     return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
@@ -60,6 +62,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_b8: u64
 
@@ -85,6 +88,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
@@ -106,6 +110,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
@@ -143,6 +148,7 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
@@ -183,11 +189,13 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_chr_size(__param_s: *const c_char) -> i32 {
     return ((((((4837428950035665169 as u64) >> (((((((*__param_s) as u8) as i32) >> (4 as u32)) as i32) << (2 as u32)) as u32)) as u64) & (15 as u64)) as i32))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_count(__param_s: *const c_char) -> i64 {
     var __local_s = __param_s
     var __local_size: i64 = ((0 as i64))
@@ -203,6 +211,7 @@ unsafe fn cutf8_count(__param_s: *const c_char) -> i64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
     var __local_s = __param_s
     var __local_nbytes = __param_nbytes
@@ -233,6 +242,7 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -253,6 +263,7 @@ unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_cha
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -292,11 +303,13 @@ unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_to_index(__param_s: *const c_char, __param_u8pos: i64) -> i64 {
     return ((((cutf8_at(__param_s, __param_u8pos) as usize) -% (__param_s as usize)) as i64) / (sizeof[c_char]() as i64))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_subview(__param_s: *const c_char, __param_u8pos: i64, __param_u8len: i64) -> csview {
     var __local_span: csview
 
@@ -322,6 +335,7 @@ unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_peek_at(__param_s: *const c_char, __param_offset: i64) -> u32 {
     return cutf8_peek(cutf8_offset(__param_s, __param_offset))
 
@@ -337,6 +351,7 @@ fn cutf8_islower(__param_c: u32) -> bool {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cutf8_icmp(__param_s1: *const c_char, __param_s2: *const c_char) -> i32 {
     return cutf8_icmp_sv((csview { buf: __param_s1, size: 9223372036854775807 } as csview), (csview { buf: __param_s2, size: 9223372036854775807 } as csview))
 
@@ -449,30 +464,35 @@ fn cutf8_isspace(__param_c: u32) -> bool {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_getbuf(__param_s: *mut cstr) -> cstr_buf {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (cstr_buf { data: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64), cap: (((~(*(&raw const (*__param_s).lon as *const cstr_lon)).ncap)) as i64) } as cstr_buf) else: (cstr_buf { data: (&raw const (*__param_s).sml.data[0] as *mut c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)), cap: 22 } as cstr_buf))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_zv(__param_s: *const cstr) -> zsview {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (zsview { str: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64) } as zsview) else: (zsview { str: (&raw const (*__param_s).sml.data[0] as *const c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)) } as zsview))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_sv(__param_s: *const cstr) -> csview {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (csview { buf: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64) } as csview) else: (csview { buf: (&raw const (*__param_s).sml.data[0] as *const c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)) } as csview))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_from_n(__param_str: *const c_char, __param_len: i64) -> cstr {
     var __local_s: cstr
 
-    with_memcpy(((_cstr_init((&raw mut __local_s as *mut cstr), __param_len, __param_len) as *mut c_void) as *mut u8), ((__param_str as *const c_void) as *const u8), (((if 1 != 0: __param_len else: (-1 as i64)) as u64) as i64))
+    with_memcpy((((*(&raw mut __local_s as *mut cstr))._cstr_init(__param_len, __param_len) as *mut c_void) as *mut u8), ((__param_str as *const c_void) as *const u8), (((if 1 != 0: __param_len else: (-1 as i64)) as u64) as i64))
 
     return __local_s
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_from(__param_str: *const c_char) -> cstr {
     return cstr_from_n(__param_str, (strlen(__param_str) as i64))
 
@@ -491,7 +511,7 @@ fn cstr_from_zv(__param_zv: zsview) -> cstr {
 fn cstr_with_size(__param_size: i64, __param_value: c_char) -> cstr {
     var __local_s: cstr
 
-    with_memset(((unsafe { _cstr_init((&raw mut __local_s as *mut cstr), __param_size, __param_size) } as *mut c_void) as *mut u8), (__param_value as i32), (((if 1 != 0: __param_size else: (-1 as i64)) as u64) as i64))
+    with_memset(((unsafe { (*(&raw mut __local_s as *mut cstr))._cstr_init(__param_size, __param_size) } as *mut c_void) as *mut u8), (__param_value as i32), (((if 1 != 0: __param_size else: (-1 as i64)) as u64) as i64))
 
     return __local_s
 
@@ -500,7 +520,7 @@ fn cstr_with_size(__param_size: i64, __param_value: c_char) -> cstr {
 fn cstr_with_capacity(__param_cap: i64) -> cstr {
     var __local_s: cstr
 
-    unsafe { _cstr_init((&raw mut __local_s as *mut cstr), (0 as i64), __param_cap) }
+    unsafe { (*(&raw mut __local_s as *mut cstr))._cstr_init((0 as i64), __param_cap) }
 
     return __local_s
 
@@ -543,36 +563,43 @@ unsafe fn cstr_clear(__param_self_: *mut cstr) {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_data(__param_self_: *mut cstr) -> *mut c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (*(&raw const (*__param_self_).lon as *const cstr_lon)).data else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *mut c_char)) as *mut c_char))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_str(__param_self_: *const cstr) -> *const c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).data as *const c_char) else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *const c_char)) as *const c_char))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_toraw(__param_self_: *const cstr) -> *const c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).data as *const c_char) else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *const c_char)) as *const c_char))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_size(__param_self_: *const cstr) -> i64 {
     return (if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).size as i64) else: ((*(&raw const (*__param_self_).sml as *const cstr_sml)).size as i64))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_is_empty(__param_self_: *const cstr) -> bool {
     return ((((cstr_size(__param_self_) == 0)) as bool))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_capacity(__param_self_: *const cstr) -> i64 {
     return (if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((~(*(&raw const (*__param_self_).lon as *const cstr_lon)).ncap) as i64) else: (22 as i64))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_to_index(__param_self_: *const cstr, __param_it_: cstr_iter) -> i64 {
     return (((((*(&raw const __param_it_ as *const cstr_iter)).ref as usize) -% (cstr_str(__param_self_) as usize)) as i64) / (sizeof[c_char]() as i64))
 
@@ -583,6 +610,7 @@ fn cstr_from_s(__param_s: cstr, __param_pos: i64, __param_len: i64) -> cstr {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_subview(__param_self_: *const cstr, __param_pos: i64, __param_len: i64) -> csview {
     var __local_len = __param_len
     var __local_sv: csview = cstr_sv(__param_self_)
@@ -601,6 +629,7 @@ unsafe fn cstr_subview(__param_self_: *const cstr, __param_pos: i64, __param_len
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_tail(__param_self_: *const cstr, __param_len: i64) -> zsview {
     var __local_len = __param_len
     if (((if not ((if __local_len >= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
@@ -619,6 +648,7 @@ unsafe fn cstr_tail(__param_self_: *const cstr, __param_len: i64) -> zsview {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_from(__param_str: *const c_char, __param_u8pos: i64, __param_u8len: i64) -> cstr {
     var __local_str = __param_str
     (__local_str = cutf8_at(__local_str, __param_u8pos))
@@ -627,16 +657,19 @@ unsafe fn cstr_u8_from(__param_str: *const c_char, __param_u8pos: i64, __param_u
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_size(__param_self_: *const cstr) -> i64 {
     return cutf8_count(cstr_str(__param_self_))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_to_index(__param_self_: *const cstr, __param_u8pos: i64) -> i64 {
     return cutf8_to_index(cstr_str(__param_self_), __param_u8pos)
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_tail(__param_self_: *const cstr, __param_u8len: i64) -> zsview {
     var __local_u8len = __param_u8len
     var __local_sv: csview = cstr_sv(__param_self_)
@@ -664,11 +697,13 @@ unsafe fn cstr_u8_tail(__param_self_: *const cstr, __param_u8len: i64) -> zsview
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_subview(__param_self_: *const cstr, __param_u8pos: i64, __param_u8len: i64) -> csview {
     return cutf8_subview(cstr_str(__param_self_), __param_u8pos, __param_u8len)
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_u8_at(__param_self_: *const cstr, __param_u8pos: i64) -> cstr_iter {
     var __local_it_: cstr_iter = cstr_iter { u8: cstr_iter_u8 { chr: csview { buf: cutf8_at(cstr_str(__param_self_), __param_u8pos) }, dec: cutf8_decode_t.zeroed() } }
 
@@ -682,6 +717,7 @@ unsafe fn cstr_u8_at(__param_self_: *const cstr, __param_u8pos: i64) -> cstr_ite
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_begin(__param_self_: *const cstr) -> cstr_iter {
     var __local_it_: cstr_iter = cstr_iter { u8: cstr_iter_u8 { chr: csview { buf: cstr_str(__param_self_) }, dec: cutf8_decode_t.zeroed() } }
 
@@ -695,6 +731,7 @@ unsafe fn cstr_begin(__param_self_: *const cstr) -> cstr_iter {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_end(__param_self_: *const cstr) -> cstr_iter {
 
     var __local_it_: cstr_iter = cstr_iter.zeroed()
@@ -727,6 +764,7 @@ fn cstr_advance(__param_it_: cstr_iter, __param_u8pos: i64) -> cstr_iter {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_codepoint(__param_it_: *const cstr_iter) -> u32 {
     return (*(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
 
@@ -747,26 +785,29 @@ fn cstr_toupper_sv(__param_sv: csview) -> cstr {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_tolower(__param_str: *const c_char) -> cstr {
     return cstr_tolower_sv((csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_toupper(__param_str: *const c_char) -> cstr {
     return cstr_toupper_sv((csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
 unsafe fn cstr_lowercase(__param_self_: *mut cstr) -> Unit {
-    cstr_take(__param_self_, cstr_tolower_sv(cstr_sv((__param_self_ as *const cstr))))
+    (*__param_self_).take(cstr_tolower_sv(cstr_sv((__param_self_ as *const cstr))))
 
 }
 
 unsafe fn cstr_uppercase(__param_self_: *mut cstr) -> Unit {
-    cstr_take(__param_self_, cstr_toupper_sv(cstr_sv((__param_self_ as *const cstr))))
+    (*__param_self_).take(cstr_toupper_sv(cstr_sv((__param_self_ as *const cstr))))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_istarts_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -786,6 +827,7 @@ unsafe fn cstr_istarts_with(__param_self_: *const cstr, __param_sub: *const c_ch
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_iends_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -802,11 +844,13 @@ unsafe fn cstr_iends_with(__param_self_: *const cstr, __param_sub: *const c_char
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_icmp(__param_s1: *const cstr, __param_s2: *const cstr) -> i32 {
     return cutf8_icmp(cstr_str(__param_s1), cstr_str(__param_s2))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_ieq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
     var __local_x: csview = cstr_sv(__param_s1)
 
@@ -824,16 +868,19 @@ unsafe fn cstr_ieq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_iequals(__param_self_: *const cstr, __param_str: *const c_char) -> bool {
     return ((((not (cutf8_icmp(cstr_str(__param_self_), __param_str) != 0))) as bool))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_cmp(__param_s1: *const cstr, __param_s2: *const cstr) -> i32 {
     return strcmp(cstr_str(__param_s1), cstr_str(__param_s2))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_eq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
     var __local_x: csview = cstr_sv(__param_s1)
 
@@ -851,11 +898,13 @@ unsafe fn cstr_eq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_equals(__param_self_: *const cstr, __param_str: *const c_char) -> bool {
     return ((((not (strcmp(cstr_str(__param_self_), __param_str) != 0))) as bool))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_equals_sv(__param_self_: *const cstr, __param_sv: csview) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -868,6 +917,7 @@ unsafe fn cstr_equals_sv(__param_self_: *const cstr, __param_sv: csview) -> bool
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_find(__param_self_: *const cstr, __param_search: *const c_char) -> i64 {
     var __local_str: *const c_char = cstr_str(__param_self_)
 
@@ -878,16 +928,19 @@ unsafe fn cstr_find(__param_self_: *const cstr, __param_search: *const c_char) -
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_contains(__param_self_: *const cstr, __param_search: *const c_char) -> bool {
     return ((((strstr(((cstr_str(__param_self_) as *mut c_char) as *const c_char), __param_search) != null)) as bool))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_contains_sv(__param_self_: *const cstr, __param_search: csview) -> bool {
     return ((((cstr_find_sv(__param_self_, __param_search) != 9223372036854775807)) as bool))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_starts_with_sv(__param_self_: *const cstr, __param_sub: csview) -> bool {
     if ((if (*(&raw const __param_sub as *const csview)).size > cstr_size(__param_self_): 1 else: 0) != 0) {
         return ((false as bool))
@@ -897,6 +950,7 @@ unsafe fn cstr_starts_with_sv(__param_self_: *const cstr, __param_sub: csview) -
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_starts_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sub = __param_sub
     var __local_str: *const c_char = cstr_str(__param_self_)
@@ -922,6 +976,7 @@ unsafe fn cstr_starts_with(__param_self_: *const cstr, __param_sub: *const c_cha
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cstr_ends_with_sv(__param_self_: *const cstr, __param_sub: csview) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -933,11 +988,13 @@ unsafe fn cstr_ends_with_sv(__param_self_: *const cstr, __param_sub: csview) -> 
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cstr_ends_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     return cstr_ends_with_sv(__param_self_, (csview { buf: __param_sub, size: (strlen(__param_sub) as i64) } as csview))
 
 }
 
+// contract: receiver-mut:cstr,unproved:1:read only
 unsafe fn cstr_assign(__param_self_: *mut cstr, __param_str: *const c_char) -> *mut c_char {
     return ((cstr_assign_n(__param_self_, __param_str, (strlen(__param_str) as i64)) as *mut c_char))
 
@@ -955,6 +1012,7 @@ unsafe fn cstr_copy(__param_self_: *mut cstr, __param_s: cstr) -> *mut c_char {
 
 }
 
+// contract: receiver-mut:cstr,unproved:1:read only
 unsafe fn cstr_push(__param_self_: *mut cstr, __param_chr: *const c_char) -> *mut c_char {
     return ((cstr_append_n(__param_self_, __param_chr, (cutf8_chr_size(__param_chr) as i64)) as *mut c_char))
 
@@ -978,6 +1036,7 @@ unsafe fn cstr_pop(__param_self_: *mut cstr) {
 
 }
 
+// contract: receiver-mut:cstr,unproved:1:read only
 unsafe fn cstr_append(__param_self_: *mut cstr, __param_str: *const c_char) -> *mut c_char {
     return ((cstr_append_n(__param_self_, __param_str, (strlen(__param_str) as i64)) as *mut c_char))
 
@@ -993,6 +1052,7 @@ unsafe fn cstr_append_s(__param_self_: *mut cstr, __param_s: cstr) -> *mut c_cha
 
 }
 
+// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only
 unsafe fn cstr_join_array(__param_self_: *mut cstr, __param_sep: *const c_char, __param_arr: *mut *const c_char, __param_n: i64) {
     var __local_arr = __param_arr
     var __local_n = __param_n
@@ -1021,6 +1081,7 @@ unsafe fn cstr_join_array(__param_self_: *mut cstr, __param_sep: *const c_char, 
 
 }
 
+// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only
 unsafe fn cstr_join_array_s(__param_self_: *mut cstr, __param_sep: *const c_char, __param_arr: *mut cstr, __param_n: i64) {
     var __local_arr = __param_arr
     var __local_n = __param_n
@@ -1050,32 +1111,36 @@ unsafe fn cstr_join_array_s(__param_self_: *mut cstr, __param_sep: *const c_char
 }
 
 unsafe fn cstr_replace_sv(__param_self_: *mut cstr, __param_search: csview, __param_repl: csview, __param_count: i32) -> Unit {
-    cstr_take(__param_self_, cstr_from_replace(cstr_sv((__param_self_ as *const cstr)), __param_search, __param_repl, __param_count))
+    (*__param_self_).take(cstr_from_replace(cstr_sv((__param_self_ as *const cstr)), __param_search, __param_repl, __param_count))
 
 }
 
+// contract: receiver-mut:cstr,unproved:1:read only,unproved:2:read only
 unsafe fn cstr_replace_nfirst(__param_self_: *mut cstr, __param_search: *const c_char, __param_repl: *const c_char, __param_count: i32) {
     cstr_replace_sv(__param_self_, (csview { buf: __param_search, size: (strlen(__param_search) as i64) } as csview), (csview { buf: __param_repl, size: (strlen(__param_repl) as i64) } as csview), __param_count)
 
 }
 
+// contract: receiver-mut:cstr,unproved:1:read only,unproved:2:read only
 unsafe fn cstr_replace(__param_self_: *mut cstr, __param_search: *const c_char, __param_repl: *const c_char) {
     cstr_replace_nfirst(__param_self_, __param_search, __param_repl, (2147483647 as i32))
 
 }
 
 unsafe fn cstr_replace_at_sv(__param_self_: *mut cstr, __param_pos: i64, __param_len: i64, __param_repl: csview) -> Unit {
-    var __local_d: *mut c_char = _cstr_internal_move(__param_self_, ((__param_pos + __param_len) as i64), ((__param_pos + (*(&raw const __param_repl as *const csview)).size) as i64))
+    var __local_d: *mut c_char = (*__param_self_)._cstr_internal_move(((__param_pos + __param_len) as i64), ((__param_pos + (*(&raw const __param_repl as *const csview)).size) as i64))
 
     with_memcpy((((__local_d + ((__param_pos as i64) as usize)) as *mut c_void) as *mut u8), (((*(&raw const __param_repl as *const csview)).buf as *const c_void) as *const u8), (((if 1 != 0: (*(&raw const __param_repl as *const csview)).size else: (-1 as i64)) as u64) as i64))
 
 }
 
+// contract: receiver-mut:cstr,unproved:3:read only
 unsafe fn cstr_replace_at(__param_self_: *mut cstr, __param_pos: i64, __param_len: i64, __param_repl: *const c_char) {
     cstr_replace_at_sv(__param_self_, __param_pos, __param_len, (csview { buf: __param_repl, size: (strlen(__param_repl) as i64) } as csview))
 
 }
 
+// contract: receiver-mut:cstr,unproved:3:read only
 unsafe fn cstr_u8_replace(__param_self_: *mut cstr, __param_u8pos: i64, __param_u8len: i64, __param_repl: *const c_char) {
     var __local_s: *const c_char = cstr_str((__param_self_ as *const cstr))
 
@@ -1090,16 +1155,19 @@ unsafe fn cstr_insert_sv(__param_self_: *mut cstr, __param_pos: i64, __param_sv:
 
 }
 
+// contract: receiver-mut:cstr,unproved:2:read only
 unsafe fn cstr_insert(__param_self_: *mut cstr, __param_pos: i64, __param_str: *const c_char) {
     cstr_replace_at_sv(__param_self_, __param_pos, (0 as i64), (csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: receiver-mut:cstr,unproved:2:read only
 unsafe fn cstr_u8_insert(__param_self_: *mut cstr, __param_u8pos: i64, __param_str: *const c_char) {
     cstr_insert(__param_self_, (cutf8_to_index(cstr_str((__param_self_ as *const cstr)), __param_u8pos) as i64), __param_str)
 
 }
 
+// contract: receiver-mut:cstr,stored-unknown:1
 unsafe fn cstr_getline(__param_self_: *mut cstr, __param_fp: *mut c_void) -> bool {
     return cstr_getdelim(__param_self_, (10 as i32), __param_fp)
 
@@ -1167,6 +1235,7 @@ fn Intmap_clone(__param_map: Intmap) -> Intmap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_drop(__param_cself: *const Intmap) {
     var __local_self_: *mut Intmap = ((__param_cself as *mut Intmap))
 
@@ -1195,6 +1264,7 @@ unsafe fn Intmap_clear(__param_self_: *mut Intmap) -> Unit {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_reserve(__param__self: *mut Intmap, __param__cap: i64) -> bool {
     var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
 
@@ -1287,6 +1357,7 @@ unsafe fn Intmap_reserve(__param__self: *mut Intmap, __param__cap: i64) -> bool 
 
 }
 
+// contract: receiver-mut:Intmap,unproved:1:read only
 unsafe fn Intmap_erase_entry(__param_self_: *mut Intmap, __param__val: *mut Intmap_value) {
     var __local_d: *mut Intmap_value = (*__param_self_).table
 
@@ -1324,17 +1395,20 @@ unsafe fn Intmap_erase_entry(__param_self_: *mut Intmap, __param__val: *mut Intm
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_max_load_factor(__param_self_: *const Intmap) -> f32 {
 
     return i_max_load_factor
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_capacity(__param_map: *const Intmap) -> i64 {
     return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn Intmap_bucket_lookup_(__param_self_: *const Intmap, __param_rkeyptr: *const i32) -> Intmap_result {
     var __local__hash: u64 = ((c_hash_n((__param_rkeyptr as *const c_void), (4 as i64)) as u64))
 
@@ -1365,6 +1439,7 @@ unsafe fn Intmap_bucket_lookup_(__param_self_: *const Intmap, __param_rkeyptr: *
 
 }
 
+// contract: receiver-mut:Intmap,unproved:1:read only
 unsafe fn Intmap_bucket_insert_(__param_self_: *const Intmap, __param_rkeyptr: *const i32) -> Intmap_result {
     var __local_res: Intmap_result = Intmap_bucket_lookup_(__param_self_, __param_rkeyptr)
 
@@ -1445,21 +1520,25 @@ unsafe fn Intmap_bucket_insert_(__param_self_: *const Intmap, __param_rkeyptr: *
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_is_empty(__param_map: *const Intmap) -> bool {
     return ((((not ((*__param_map).size != 0))) as bool))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_size(__param_map: *const Intmap) -> i64 {
     return (*__param_map).size
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_bucket_count(__param_map: *mut Intmap) -> i64 {
     return (*__param_map).bucket_count
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: i32) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -1472,28 +1551,14 @@ pub unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: i32) -
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_shrink_to_fit(__param_self_: *mut Intmap) -> Unit {
     Intmap_reserve(__param_self_, (9223372036854775807 as i64))
 
 }
 
-pub unsafe fn Intmap_insert_entry_(__param_self_: *mut Intmap, __param_rkey: i32) -> Intmap_result {
-    if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
-        if ((if not Intmap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
-            return ((Intmap_result.zeroed() as Intmap_result))
-        }
-    }
-
-    var __local_res: Intmap_result = Intmap_bucket_insert_((__param_self_ as *const Intmap), ((&raw mut __param_rkey as *mut i32) as *const i32))
-
-    ((*__param_self_).size = (*__param_self_).size + ((*(&raw const __local_res as *const Intmap_result)).inserted as i32))
-
-    return __local_res
-
-}
-
 unsafe fn Intmap_insert_or_assign(__param_self_: *mut Intmap, __param__key: i32, __param__mapped: i32) -> Intmap_result {
-    var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut i32)))
+    var __local__res: Intmap_result = (*__param_self_).insert_entry_((*(&raw mut __param__key as *mut i32)))
 
     var __local__mp: *mut i32 = (if (*(&raw const __local__res as *const Intmap_result)).ref != null: ((&raw const (*(*(&raw const __local__res as *const Intmap_result)).ref).second as *const i32) as *mut i32) else: (&raw mut __param__mapped as *mut i32))
 
@@ -1510,6 +1575,7 @@ unsafe fn Intmap_insert_or_assign(__param_self_: *mut Intmap, __param__key: i32,
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: i32) -> *const i32 {
     var __local_res: Intmap_result = Intmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut i32) as *const i32))
 
@@ -1523,11 +1589,13 @@ pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: i32) -> *con
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: i32) -> *mut i32 {
     return ((Intmap_at((__param_self_ as *const Intmap), __param_rkey) as *mut i32))
 
 }
 
+// contract: receiver-mut:Intmap,unproved:1:read only
 pub unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intmap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
@@ -1540,6 +1608,7 @@ pub unsafe fn Intmap_copy(__param_self_: *mut Intmap, __param_other: *const Intm
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
 
     ((*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)) = (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)))
@@ -1550,73 +1619,18 @@ pub unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Int
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
     return ((Intmap_raw { first: ((*(&raw const (*__param_val).first as *const i32))), second: ((*(&raw const (*__param_val).second as *const i32))) } as Intmap_raw))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param__val: *mut Intmap_value) {
     return
 }
 
-pub unsafe fn Intmap_move(__param_self_: *mut Intmap) -> Intmap {
-    var __local_m: Intmap = (*__param_self_)
-
-    ((*__param_self_).size = ((0 as i64)))
-
-    ((*__param_self_).bucket_count = (*__param_self_).size)
-
-
-    ((*__param_self_).meta = ((null as *mut hmap_meta)))
-
-    ((*__param_self_).table = ((null as *mut Intmap_value)))
-
-    return __local_m
-
-}
-
-pub unsafe fn Intmap_take(__param_self_: *mut Intmap, __param_unowned: Intmap) -> Unit {
-    Intmap_drop((__param_self_ as *const Intmap))
-
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Intmap]())
-
-}
-
-pub unsafe fn Intmap_insert(__param_self_: *mut Intmap, __param__key: i32, __param__mapped: i32) -> Intmap_result {
-    var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut i32)))
-
-    if (*(&raw const __local__res as *const Intmap_result)).inserted {
-        ((*((&raw const (*(*(&raw const __local__res as *const Intmap_result)).ref).first as *const i32) as *mut i32)) = __param__key)
-
-        ((*(*(&raw const __local__res as *const Intmap_result)).ref).second = __param__mapped)
-
-    } else {
-
-
-    }
-
-    return __local__res
-
-}
-
-pub unsafe fn Intmap_push(__param_self_: *mut Intmap, __param__val: Intmap_value) -> *mut Intmap_value {
-    var __local__res: Intmap_result = Intmap_insert_entry_(__param_self_, (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)))
-
-    if ((if not (*(&raw const __local__res as *const Intmap_result)).inserted: 1 else: 0) != 0) {
-        Intmap_value_drop((__param_self_ as *const Intmap), (*(&raw const __local__res as *const Intmap_result)).ref)
-    }
-
-    with_memcpy((&raw mut (*((*(&raw const __local__res as *const Intmap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[Intmap_value]())
-
-    return (*(&raw const __local__res as *const Intmap_result)).ref
-
-}
-
-pub unsafe fn Intmap_put(__param_self_: *mut Intmap, __param_rkey: i32, __param_rmapped: i32) -> Intmap_result {
-    return Intmap_insert_or_assign(__param_self_, __param_rkey, __param_rmapped)
-
-}
-
+// contract: receiver-mut:Intmap,unproved:1:read only
 pub unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intmap_raw, __param_n: i64) {
     var __local_raw = __param_raw
     var __local_n = __param_n
@@ -1629,7 +1643,7 @@ pub unsafe fn Intmap_put_n(__param_self_: *mut Intmap, __param_raw: *const Intma
             break
         }
 
-        Intmap_put(__param_self_, (*__local_raw).first, (*__local_raw).second)
+        (*__param_self_).put((*__local_raw).first, (*__local_raw).second)
 
         (__local_raw = __local_raw + 1)
 
@@ -1644,6 +1658,7 @@ pub fn Intmap_init() -> Intmap {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: i64) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
@@ -1662,6 +1677,7 @@ pub fn Intmap_with_capacity(__param_cap: i64) -> Intmap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_begin(__param_self_: *const Intmap) -> Intmap_iter {
     var __local_it_: Intmap_iter = Intmap_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
 
@@ -1686,27 +1702,10 @@ unsafe fn Intmap_begin(__param_self_: *const Intmap) -> Intmap_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
 
     return ((Intmap_iter.zeroed() as Intmap_iter))
-
-}
-
-pub unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) {
-    while true {
-        ((*__param_it_).ref = (*__param_it_).ref + 1)
-
-        ((*__param_it_)._mref = (*__param_it_)._mref + 1)
-
-        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
-            break
-        }
-
-    }
-
-    if ((if (*__param_it_).ref == (*__param_it_)._end: 1 else: 0) != 0) {
-        ((*__param_it_).ref = ((null as *mut Intmap_value)))
-    }
 
 }
 
@@ -1727,7 +1726,7 @@ pub fn Intmap_advance(__param_it_: Intmap_iter, __param_n: u64) -> Intmap_iter {
             break
         }
 
-        unsafe { Intmap_next((&raw mut __param_it_ as *mut Intmap_iter)) }
+        unsafe { (*(&raw mut __param_it_ as *mut Intmap_iter)).next() }
 
     }
 
@@ -1735,6 +1734,7 @@ pub fn Intmap_advance(__param_it_: Intmap_iter, __param_n: u64) -> Intmap_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: i32) -> Intmap_iter {
     var __local_ref: *mut Intmap_value
 
@@ -1756,51 +1756,19 @@ pub unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: i32) -> In
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: i32) -> *const Intmap_value {
     return (((if (*__param_self_).size != 0: Intmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut i32) as *const i32)).ref else: (null as *mut Intmap_value)) as *const Intmap_value))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: i32) -> *mut Intmap_value {
     return ((Intmap_get((__param_self_ as *const Intmap), __param_rkey) as *mut Intmap_value))
 
 }
 
-pub unsafe fn Intmap_erase(__param_self_: *mut Intmap, __param_rkey: i32) -> i32 {
-    var __local_ref: *mut Intmap_value
-
-    var __ci_expr_logic_0: i32 = 0
-
-    if ((if (*__param_self_).size != 0: 1 else: 0) != 0) {
-        (__local_ref = Intmap_bucket_lookup_((__param_self_ as *const Intmap), ((&raw mut __param_rkey as *mut i32) as *const i32)).ref)
-
-        (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
-
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        Intmap_erase_entry(__param_self_, __local_ref)
-
-        return 1
-
-    }
-
-
-    return 0
-
-}
-
-pub unsafe fn Intmap_erase_at(__param_self_: *mut Intmap, __param_it_: Intmap_iter) -> Intmap_iter {
-    Intmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Intmap_iter)).ref)
-
-    if ((if (*(*(&raw const __param_it_ as *const Intmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
-        Intmap_next((&raw mut __param_it_ as *mut Intmap_iter))
-    }
-
-    return __param_it_
-
-}
-
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
     if ((if Intmap_size(__param_self_) != Intmap_size(__param_other): 1 else: 0) != 0) {
         return ((false as bool))
@@ -1816,7 +1784,7 @@ pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intm
         }
 
 
-        Intmap_next((&raw mut __local_i as *mut Intmap_iter))
+        (*(&raw mut __local_i as *mut Intmap_iter)).next()
 
     }
 
@@ -1825,6 +1793,7 @@ pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intm
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Intmap_wipe_(__param_self_: *mut Intmap) {
     var __local_d: *mut Intmap_value = (*__param_self_).table
 
@@ -1854,9 +1823,9 @@ unsafe fn Intmap_wipe_(__param_self_: *mut Intmap) {
 fn ctest_hashmap_mapdemo1_run() {
     var __local_nums: Intmap = Intmap.zeroed()
 
-    unsafe { Intmap_insert((&raw mut __local_nums as *mut Intmap), (8 as i32), (64 as i32)) }
+    unsafe { (*(&raw mut __local_nums as *mut Intmap)).insert((8 as i32), (64 as i32)) }
 
-    unsafe { Intmap_insert((&raw mut __local_nums as *mut Intmap), (11 as i32), (121 as i32)) }
+    unsafe { (*(&raw mut __local_nums as *mut Intmap)).insert((11 as i32), (121 as i32)) }
 
     assert_compare((1 as i32), c"==".ptr, (64 as i64), ((unsafe *unsafe { Intmap_at(((&raw mut __local_nums as *mut Intmap) as *const Intmap), (8 as i32)) }) as i64), c"hmap_test.c".ptr, (13 as i32))
 
@@ -1918,6 +1887,7 @@ fn SImap_clone(__param_map: SImap) -> SImap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_drop(__param_cself: *const SImap) {
     var __local_self_: *mut SImap = ((__param_cself as *mut SImap))
 
@@ -1946,6 +1916,7 @@ unsafe fn SImap_clear(__param_self_: *mut SImap) -> Unit {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_reserve(__param__self: *mut SImap, __param__cap: i64) -> bool {
     var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
 
@@ -2038,6 +2009,7 @@ unsafe fn SImap_reserve(__param__self: *mut SImap, __param__cap: i64) -> bool {
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 unsafe fn SImap_erase_entry(__param_self_: *mut SImap, __param__val: *mut SImap_value) {
     var __local_d: *mut SImap_value = (*__param_self_).table
 
@@ -2075,17 +2047,20 @@ unsafe fn SImap_erase_entry(__param_self_: *mut SImap, __param__val: *mut SImap_
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_max_load_factor(__param_self_: *const SImap) -> f32 {
 
     return i_max_load_factor
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_capacity(__param_map: *const SImap) -> i64 {
     return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn SImap_bucket_lookup_(__param_self_: *const SImap, __param_rkeyptr: *const *const c_char) -> SImap_result {
     var __local__hash: u64 = ((c_hash_str((*__param_rkeyptr)) as u64))
 
@@ -2116,6 +2091,7 @@ unsafe fn SImap_bucket_lookup_(__param_self_: *const SImap, __param_rkeyptr: *co
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 unsafe fn SImap_bucket_insert_(__param_self_: *const SImap, __param_rkeyptr: *const *const c_char) -> SImap_result {
     var __local_res: SImap_result = SImap_bucket_lookup_(__param_self_, __param_rkeyptr)
 
@@ -2196,21 +2172,25 @@ unsafe fn SImap_bucket_insert_(__param_self_: *const SImap, __param_rkeyptr: *co
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_is_empty(__param_map: *const SImap) -> bool {
     return ((((not ((*__param_map).size != 0))) as bool))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_size(__param_map: *const SImap) -> i64 {
     return (*__param_map).size
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_bucket_count(__param_map: *mut SImap) -> i64 {
     return (*__param_map).bucket_count
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_contains(__param_self_: *const SImap, __param_rkey: *const c_char) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -2223,11 +2203,13 @@ pub unsafe fn SImap_contains(__param_self_: *const SImap, __param_rkey: *const c
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_shrink_to_fit(__param_self_: *mut SImap) -> Unit {
     SImap_reserve(__param_self_, (9223372036854775807 as i64))
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_insert_entry_(__param_self_: *mut SImap, __param_rkey: *const c_char) -> SImap_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
         if ((if not SImap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
@@ -2262,6 +2244,7 @@ unsafe fn SImap_insert_or_assign(__param_self_: *mut SImap, __param__key: cstr, 
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 unsafe fn SImap_emplace_or_assign(__param_self_: *mut SImap, __param_rkey: *const c_char, __param_rmapped: i32) -> SImap_result {
     var __local__res: SImap_result = SImap_insert_entry_(__param_self_, __param_rkey)
 
@@ -2282,6 +2265,7 @@ unsafe fn SImap_emplace_or_assign(__param_self_: *mut SImap, __param_rkey: *cons
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_at(__param_self_: *const SImap, __param_rkey: *const c_char) -> *const i32 {
     var __local_res: SImap_result = SImap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const c_char) as *const *const c_char))
 
@@ -2295,11 +2279,13 @@ pub unsafe fn SImap_at(__param_self_: *const SImap, __param_rkey: *const c_char)
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_at_mut(__param_self_: *mut SImap, __param_rkey: *const c_char) -> *mut i32 {
     return ((SImap_at((__param_self_ as *const SImap), __param_rkey) as *mut i32))
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_copy(__param_self_: *mut SImap, __param_other: *const SImap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
@@ -2312,6 +2298,7 @@ pub unsafe fn SImap_copy(__param_self_: *mut SImap, __param_other: *const SImap)
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_value_clone(__param_self_: *const SImap, __param__val: SImap_value) -> SImap_value {
 
     let __ci_copy_18: cstr = cstr_clone((*((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr)))
@@ -2323,6 +2310,7 @@ pub unsafe fn SImap_value_clone(__param_self_: *const SImap, __param__val: SImap
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_emplace(__param_self_: *mut SImap, __param_rkey: *const c_char, __param_rmapped: i32) -> SImap_result {
     var __local__res: SImap_result = SImap_insert_entry_(__param_self_, __param_rkey)
 
@@ -2338,11 +2326,13 @@ pub unsafe fn SImap_emplace(__param_self_: *mut SImap, __param_rkey: *const c_ch
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_value_toraw(__param_val: *const SImap_value) -> SImap_raw {
     return ((SImap_raw { first: cstr_toraw((&raw const (*__param_val).first as *const cstr)), second: ((*(&raw const (*__param_val).second as *const i32))) } as SImap_raw))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_value_drop(__param_self_: *const SImap, __param__val: *mut SImap_value) {
 
     cstr_drop((((&raw const (*__param__val).first as *const cstr) as *mut cstr) as *const cstr))
@@ -2350,65 +2340,13 @@ pub unsafe fn SImap_value_drop(__param_self_: *const SImap, __param__val: *mut S
 
 }
 
-pub unsafe fn SImap_move(__param_self_: *mut SImap) -> SImap {
-    var __local_m: SImap = (*__param_self_)
-
-    ((*__param_self_).size = ((0 as i64)))
-
-    ((*__param_self_).bucket_count = (*__param_self_).size)
-
-
-    ((*__param_self_).meta = ((null as *mut hmap_meta)))
-
-    ((*__param_self_).table = ((null as *mut SImap_value)))
-
-    return __local_m
-
-}
-
-pub unsafe fn SImap_take(__param_self_: *mut SImap, __param_unowned: SImap) -> Unit {
-    SImap_drop((__param_self_ as *const SImap))
-
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[SImap]())
-
-}
-
-pub unsafe fn SImap_insert(__param_self_: *mut SImap, __param__key: cstr, __param__mapped: i32) -> SImap_result {
-    var __local__res: SImap_result = SImap_insert_entry_(__param_self_, cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)))
-
-    if (*(&raw const __local__res as *const SImap_result)).inserted {
-        with_memcpy((&raw mut (*((&raw const (*(*(&raw const __local__res as *const SImap_result)).ref).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __param__key as *const u8), sizeof[cstr]())
-
-        ((*(*(&raw const __local__res as *const SImap_result)).ref).second = __param__mapped)
-
-    } else {
-        cstr_drop(((&raw mut __param__key as *mut cstr) as *const cstr))
-
-
-    }
-
-    return __local__res
-
-}
-
-pub unsafe fn SImap_push(__param_self_: *mut SImap, __param__val: SImap_value) -> *mut SImap_value {
-    var __local__res: SImap_result = SImap_insert_entry_(__param_self_, cstr_toraw((((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr) as *const cstr)))
-
-    if ((if not (*(&raw const __local__res as *const SImap_result)).inserted: 1 else: 0) != 0) {
-        SImap_value_drop((__param_self_ as *const SImap), (*(&raw const __local__res as *const SImap_result)).ref)
-    }
-
-    with_memcpy((&raw mut (*((*(&raw const __local__res as *const SImap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[SImap_value]())
-
-    return (*(&raw const __local__res as *const SImap_result)).ref
-
-}
-
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_put(__param_self_: *mut SImap, __param_rkey: *const c_char, __param_rmapped: i32) -> SImap_result {
     return SImap_emplace_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_put_n(__param_self_: *mut SImap, __param_raw: *const SImap_raw, __param_n: i64) {
     var __local_raw = __param_raw
     var __local_n = __param_n
@@ -2436,6 +2374,7 @@ pub fn SImap_init() -> SImap {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_from_n(__param_raw: *const SImap_raw, __param_n: i64) -> SImap {
     var __local_cx: SImap = SImap.zeroed()
 
@@ -2454,6 +2393,7 @@ pub fn SImap_with_capacity(__param_cap: i64) -> SImap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_begin(__param_self_: *const SImap) -> SImap_iter {
     var __local_it_: SImap_iter = SImap_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
 
@@ -2478,27 +2418,10 @@ unsafe fn SImap_begin(__param_self_: *const SImap) -> SImap_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn SImap_end(__param_self_: *const SImap) -> SImap_iter {
 
     return ((SImap_iter.zeroed() as SImap_iter))
-
-}
-
-pub unsafe fn SImap_next(__param_it_: *mut SImap_iter) {
-    while true {
-        ((*__param_it_).ref = (*__param_it_).ref + 1)
-
-        ((*__param_it_)._mref = (*__param_it_)._mref + 1)
-
-        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
-            break
-        }
-
-    }
-
-    if ((if (*__param_it_).ref == (*__param_it_)._end: 1 else: 0) != 0) {
-        ((*__param_it_).ref = ((null as *mut SImap_value)))
-    }
 
 }
 
@@ -2519,7 +2442,7 @@ pub fn SImap_advance(__param_it_: SImap_iter, __param_n: u64) -> SImap_iter {
             break
         }
 
-        unsafe { SImap_next((&raw mut __param_it_ as *mut SImap_iter)) }
+        unsafe { (*(&raw mut __param_it_ as *mut SImap_iter)).next() }
 
     }
 
@@ -2527,6 +2450,7 @@ pub fn SImap_advance(__param_it_: SImap_iter, __param_n: u64) -> SImap_iter {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_find(__param_self_: *const SImap, __param_rkey: *const c_char) -> SImap_iter {
     var __local_ref: *mut SImap_value
 
@@ -2548,16 +2472,19 @@ pub unsafe fn SImap_find(__param_self_: *const SImap, __param_rkey: *const c_cha
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_get(__param_self_: *const SImap, __param_rkey: *const c_char) -> *const SImap_value {
     return (((if (*__param_self_).size != 0: SImap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const c_char) as *const *const c_char)).ref else: (null as *mut SImap_value)) as *const SImap_value))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_get_mut(__param_self_: *mut SImap, __param_rkey: *const c_char) -> *mut SImap_value {
     return ((SImap_get((__param_self_ as *const SImap), __param_rkey) as *mut SImap_value))
 
 }
 
+// contract: receiver-mut:SImap,unproved:1:read only
 pub unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const c_char) -> i32 {
     var __local_ref: *mut SImap_value
 
@@ -2582,17 +2509,7 @@ pub unsafe fn SImap_erase(__param_self_: *mut SImap, __param_rkey: *const c_char
 
 }
 
-pub unsafe fn SImap_erase_at(__param_self_: *mut SImap, __param_it_: SImap_iter) -> SImap_iter {
-    SImap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const SImap_iter)).ref)
-
-    if ((if (*(*(&raw const __param_it_ as *const SImap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
-        SImap_next((&raw mut __param_it_ as *mut SImap_iter))
-    }
-
-    return __param_it_
-
-}
-
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn SImap_eq(__param_self_: *const SImap, __param_other: *const SImap) -> bool {
     if ((if SImap_size(__param_self_) != SImap_size(__param_other): 1 else: 0) != 0) {
         return ((false as bool))
@@ -2608,7 +2525,7 @@ pub unsafe fn SImap_eq(__param_self_: *const SImap, __param_other: *const SImap)
         }
 
 
-        SImap_next((&raw mut __local_i as *mut SImap_iter))
+        (*(&raw mut __local_i as *mut SImap_iter)).next()
 
     }
 
@@ -2617,6 +2534,7 @@ pub unsafe fn SImap_eq(__param_self_: *const SImap, __param_other: *const SImap)
 
 }
 
+// contract: unproved:0:read only
 unsafe fn SImap_wipe_(__param_self_: *mut SImap) {
     var __local_d: *mut SImap_value = (*__param_self_).table
 
@@ -2716,6 +2634,7 @@ fn Strmap_clone(__param_map: Strmap) -> Strmap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_drop(__param_cself: *const Strmap) {
     var __local_self_: *mut Strmap = ((__param_cself as *mut Strmap))
 
@@ -2744,6 +2663,7 @@ unsafe fn Strmap_clear(__param_self_: *mut Strmap) -> Unit {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_reserve(__param__self: *mut Strmap, __param__cap: i64) -> bool {
     var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
 
@@ -2836,6 +2756,7 @@ unsafe fn Strmap_reserve(__param__self: *mut Strmap, __param__cap: i64) -> bool 
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 unsafe fn Strmap_erase_entry(__param_self_: *mut Strmap, __param__val: *mut Strmap_value) {
     var __local_d: *mut Strmap_value = (*__param_self_).table
 
@@ -2873,17 +2794,20 @@ unsafe fn Strmap_erase_entry(__param_self_: *mut Strmap, __param__val: *mut Strm
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_max_load_factor(__param_self_: *const Strmap) -> f32 {
 
     return i_max_load_factor
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_capacity(__param_map: *const Strmap) -> i64 {
     return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn Strmap_bucket_lookup_(__param_self_: *const Strmap, __param_rkeyptr: *const *const c_char) -> Strmap_result {
     var __local__hash: u64 = ((c_hash_str((*__param_rkeyptr)) as u64))
 
@@ -2914,6 +2838,7 @@ unsafe fn Strmap_bucket_lookup_(__param_self_: *const Strmap, __param_rkeyptr: *
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 unsafe fn Strmap_bucket_insert_(__param_self_: *const Strmap, __param_rkeyptr: *const *const c_char) -> Strmap_result {
     var __local_res: Strmap_result = Strmap_bucket_lookup_(__param_self_, __param_rkeyptr)
 
@@ -2994,21 +2919,25 @@ unsafe fn Strmap_bucket_insert_(__param_self_: *const Strmap, __param_rkeyptr: *
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_is_empty(__param_map: *const Strmap) -> bool {
     return ((((not ((*__param_map).size != 0))) as bool))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_size(__param_map: *const Strmap) -> i64 {
     return (*__param_map).size
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_bucket_count(__param_map: *mut Strmap) -> i64 {
     return (*__param_map).bucket_count
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_contains(__param_self_: *const Strmap, __param_rkey: *const c_char) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -3021,11 +2950,13 @@ pub unsafe fn Strmap_contains(__param_self_: *const Strmap, __param_rkey: *const
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_shrink_to_fit(__param_self_: *mut Strmap) -> Unit {
     Strmap_reserve(__param_self_, (9223372036854775807 as i64))
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 pub unsafe fn Strmap_insert_entry_(__param_self_: *mut Strmap, __param_rkey: *const c_char) -> Strmap_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
         if ((if not Strmap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
@@ -3061,6 +2992,7 @@ unsafe fn Strmap_insert_or_assign(__param_self_: *mut Strmap, __param__key: cstr
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only,unproved:2:read only
 unsafe fn Strmap_emplace_or_assign(__param_self_: *mut Strmap, __param_rkey: *const c_char, __param_rmapped: *const c_char) -> Strmap_result {
     var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, __param_rkey)
 
@@ -3083,6 +3015,7 @@ unsafe fn Strmap_emplace_or_assign(__param_self_: *mut Strmap, __param_rkey: *co
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_at(__param_self_: *const Strmap, __param_rkey: *const c_char) -> *const cstr {
     var __local_res: Strmap_result = Strmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const c_char) as *const *const c_char))
 
@@ -3096,11 +3029,13 @@ pub unsafe fn Strmap_at(__param_self_: *const Strmap, __param_rkey: *const c_cha
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_at_mut(__param_self_: *mut Strmap, __param_rkey: *const c_char) -> *mut cstr {
     return ((Strmap_at((__param_self_ as *const Strmap), __param_rkey) as *mut cstr))
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 pub unsafe fn Strmap_copy(__param_self_: *mut Strmap, __param_other: *const Strmap) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
         return
@@ -3113,6 +3048,7 @@ pub unsafe fn Strmap_copy(__param_self_: *mut Strmap, __param_other: *const Strm
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_value_clone(__param_self_: *const Strmap, __param__val: Strmap_value) -> Strmap_value {
 
     let __ci_copy_18: cstr = cstr_clone((*((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr)))
@@ -3125,6 +3061,7 @@ pub unsafe fn Strmap_value_clone(__param_self_: *const Strmap, __param__val: Str
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only,unproved:2:read only
 pub unsafe fn Strmap_emplace(__param_self_: *mut Strmap, __param_rkey: *const c_char, __param_rmapped: *const c_char) -> Strmap_result {
     var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, __param_rkey)
 
@@ -3141,11 +3078,13 @@ pub unsafe fn Strmap_emplace(__param_self_: *mut Strmap, __param_rkey: *const c_
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_value_toraw(__param_val: *const Strmap_value) -> Strmap_raw {
     return ((Strmap_raw { first: cstr_toraw((&raw const (*__param_val).first as *const cstr)), second: cstr_toraw((&raw const (*__param_val).second as *const cstr)) } as Strmap_raw))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_value_drop(__param_self_: *const Strmap, __param__val: *mut Strmap_value) {
 
     cstr_drop((((&raw const (*__param__val).first as *const cstr) as *mut cstr) as *const cstr))
@@ -3154,66 +3093,13 @@ pub unsafe fn Strmap_value_drop(__param_self_: *const Strmap, __param__val: *mut
 
 }
 
-pub unsafe fn Strmap_move(__param_self_: *mut Strmap) -> Strmap {
-    var __local_m: Strmap = (*__param_self_)
-
-    ((*__param_self_).size = ((0 as i64)))
-
-    ((*__param_self_).bucket_count = (*__param_self_).size)
-
-
-    ((*__param_self_).meta = ((null as *mut hmap_meta)))
-
-    ((*__param_self_).table = ((null as *mut Strmap_value)))
-
-    return __local_m
-
-}
-
-pub unsafe fn Strmap_take(__param_self_: *mut Strmap, __param_unowned: Strmap) -> Unit {
-    Strmap_drop((__param_self_ as *const Strmap))
-
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Strmap]())
-
-}
-
-pub unsafe fn Strmap_insert(__param_self_: *mut Strmap, __param__key: cstr, __param__mapped: cstr) -> Strmap_result {
-    var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)))
-
-    if (*(&raw const __local__res as *const Strmap_result)).inserted {
-        with_memcpy((&raw mut (*((&raw const (*(*(&raw const __local__res as *const Strmap_result)).ref).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __param__key as *const u8), sizeof[cstr]())
-
-        with_memcpy((&raw mut (*(*(&raw const __local__res as *const Strmap_result)).ref).second as *mut u8), (&raw const __param__mapped as *const u8), sizeof[cstr]())
-
-    } else {
-        cstr_drop(((&raw mut __param__key as *mut cstr) as *const cstr))
-
-        cstr_drop(((&raw mut __param__mapped as *mut cstr) as *const cstr))
-
-    }
-
-    return __local__res
-
-}
-
-pub unsafe fn Strmap_push(__param_self_: *mut Strmap, __param__val: Strmap_value) -> *mut Strmap_value {
-    var __local__res: Strmap_result = Strmap_insert_entry_(__param_self_, cstr_toraw((((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr) as *const cstr)))
-
-    if ((if not (*(&raw const __local__res as *const Strmap_result)).inserted: 1 else: 0) != 0) {
-        Strmap_value_drop((__param_self_ as *const Strmap), (*(&raw const __local__res as *const Strmap_result)).ref)
-    }
-
-    with_memcpy((&raw mut (*((*(&raw const __local__res as *const Strmap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[Strmap_value]())
-
-    return (*(&raw const __local__res as *const Strmap_result)).ref
-
-}
-
+// contract: receiver-mut:Strmap,unproved:1:read only,unproved:2:read only
 pub unsafe fn Strmap_put(__param_self_: *mut Strmap, __param_rkey: *const c_char, __param_rmapped: *const c_char) -> Strmap_result {
     return Strmap_emplace_or_assign(__param_self_, __param_rkey, __param_rmapped)
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 pub unsafe fn Strmap_put_n(__param_self_: *mut Strmap, __param_raw: *const Strmap_raw, __param_n: i64) {
     var __local_raw = __param_raw
     var __local_n = __param_n
@@ -3241,6 +3127,7 @@ pub fn Strmap_init() -> Strmap {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_from_n(__param_raw: *const Strmap_raw, __param_n: i64) -> Strmap {
     var __local_cx: Strmap = Strmap.zeroed()
 
@@ -3259,6 +3146,7 @@ pub fn Strmap_with_capacity(__param_cap: i64) -> Strmap {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_begin(__param_self_: *const Strmap) -> Strmap_iter {
     var __local_it_: Strmap_iter = Strmap_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
 
@@ -3283,27 +3171,10 @@ unsafe fn Strmap_begin(__param_self_: *const Strmap) -> Strmap_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn Strmap_end(__param_self_: *const Strmap) -> Strmap_iter {
 
     return ((Strmap_iter.zeroed() as Strmap_iter))
-
-}
-
-pub unsafe fn Strmap_next(__param_it_: *mut Strmap_iter) {
-    while true {
-        ((*__param_it_).ref = (*__param_it_).ref + 1)
-
-        ((*__param_it_)._mref = (*__param_it_)._mref + 1)
-
-        if (not ((if (*(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
-            break
-        }
-
-    }
-
-    if ((if (*__param_it_).ref == (*__param_it_)._end: 1 else: 0) != 0) {
-        ((*__param_it_).ref = ((null as *mut Strmap_value)))
-    }
 
 }
 
@@ -3324,7 +3195,7 @@ pub fn Strmap_advance(__param_it_: Strmap_iter, __param_n: u64) -> Strmap_iter {
             break
         }
 
-        unsafe { Strmap_next((&raw mut __param_it_ as *mut Strmap_iter)) }
+        unsafe { (*(&raw mut __param_it_ as *mut Strmap_iter)).next() }
 
     }
 
@@ -3332,6 +3203,7 @@ pub fn Strmap_advance(__param_it_: Strmap_iter, __param_n: u64) -> Strmap_iter {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_find(__param_self_: *const Strmap, __param_rkey: *const c_char) -> Strmap_iter {
     var __local_ref: *mut Strmap_value
 
@@ -3353,16 +3225,19 @@ pub unsafe fn Strmap_find(__param_self_: *const Strmap, __param_rkey: *const c_c
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_get(__param_self_: *const Strmap, __param_rkey: *const c_char) -> *const Strmap_value {
     return (((if (*__param_self_).size != 0: Strmap_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *const c_char) as *const *const c_char)).ref else: (null as *mut Strmap_value)) as *const Strmap_value))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_get_mut(__param_self_: *mut Strmap, __param_rkey: *const c_char) -> *mut Strmap_value {
     return ((Strmap_get((__param_self_ as *const Strmap), __param_rkey) as *mut Strmap_value))
 
 }
 
+// contract: receiver-mut:Strmap,unproved:1:read only
 pub unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const c_char) -> i32 {
     var __local_ref: *mut Strmap_value
 
@@ -3387,17 +3262,7 @@ pub unsafe fn Strmap_erase(__param_self_: *mut Strmap, __param_rkey: *const c_ch
 
 }
 
-pub unsafe fn Strmap_erase_at(__param_self_: *mut Strmap, __param_it_: Strmap_iter) -> Strmap_iter {
-    Strmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Strmap_iter)).ref)
-
-    if ((if (*(*(&raw const __param_it_ as *const Strmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
-        Strmap_next((&raw mut __param_it_ as *mut Strmap_iter))
-    }
-
-    return __param_it_
-
-}
-
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn Strmap_eq(__param_self_: *const Strmap, __param_other: *const Strmap) -> bool {
     if ((if Strmap_size(__param_self_) != Strmap_size(__param_other): 1 else: 0) != 0) {
         return ((false as bool))
@@ -3413,7 +3278,7 @@ pub unsafe fn Strmap_eq(__param_self_: *const Strmap, __param_other: *const Strm
         }
 
 
-        Strmap_next((&raw mut __local_i as *mut Strmap_iter))
+        (*(&raw mut __local_i as *mut Strmap_iter)).next()
 
     }
 
@@ -3422,6 +3287,7 @@ pub unsafe fn Strmap_eq(__param_self_: *const Strmap, __param_other: *const Strm
 
 }
 
+// contract: unproved:0:read only
 unsafe fn Strmap_wipe_(__param_self_: *mut Strmap) {
     var __local_d: *mut Strmap_value = (*__param_self_).table
 
@@ -3464,7 +3330,7 @@ fn ctest_hashmap_mapdemo3_run() {
 
     var __local_it_: Strmap_iter = unsafe { Strmap_find(((&raw mut __local_map as *mut Strmap) as *const Strmap), c"Make".ptr) }
 
-    unsafe { Strmap_erase_at((&raw mut __local_map as *mut Strmap), __local_it_) }
+    unsafe { (*(&raw mut __local_map as *mut Strmap)).erase_at(__local_it_) }
 
     unsafe { Strmap_erase((&raw mut __local_map as *mut Strmap), c"Hello".ptr) }
 
@@ -3507,6 +3373,338 @@ fn ctest_hashmap_mapdemo3_run() {
         if not ((0 != 0)) {
             break
         }
+    }
+
+}
+
+impl Intmap {
+    pub mut fn insert_entry_(__param_rkey: i32) -> Intmap_result {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        if ((if (unsafe *__param_self_).size >= (((((unsafe *__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
+            if ((if not unsafe { Intmap_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)) }: 1 else: 0) != 0) {
+                return ((Intmap_result.zeroed() as Intmap_result))
+            }
+        }
+
+        var __local_res: Intmap_result = unsafe { Intmap_bucket_insert_((__param_self_ as *const Intmap), ((&raw mut __param_rkey as *mut i32) as *const i32)) }
+
+        ((unsafe *__param_self_).size = (unsafe *__param_self_).size + ((unsafe *(&raw const __local_res as *const Intmap_result)).inserted as i32))
+
+        return __local_res
+
+    }
+
+    pub mut fn move_() -> Intmap {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        var __local_m: Intmap = (unsafe *__param_self_)
+
+        ((unsafe *__param_self_).size = ((0 as i64)))
+
+        ((unsafe *__param_self_).bucket_count = (unsafe *__param_self_).size)
+
+
+        ((unsafe *__param_self_).meta = ((null as *mut hmap_meta)))
+
+        ((unsafe *__param_self_).table = ((null as *mut Intmap_value)))
+
+        return __local_m
+
+    }
+
+    pub mut fn take(__param_unowned: Intmap) -> Unit {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        unsafe { Intmap_drop((__param_self_ as *const Intmap)) }
+
+        with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Intmap]())
+
+    }
+
+    pub mut fn insert(__param__key: i32, __param__mapped: i32) -> Intmap_result {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        var __local__res: Intmap_result = unsafe { (*__param_self_).insert_entry_((*(&raw mut __param__key as *mut i32))) }
+
+        if (unsafe *(&raw const __local__res as *const Intmap_result)).inserted {
+            ((unsafe *((&raw const (*(*(&raw const __local__res as *const Intmap_result)).ref).first as *const i32) as *mut i32)) = __param__key)
+
+            ((unsafe *(*(&raw const __local__res as *const Intmap_result)).ref).second = __param__mapped)
+
+        } else {
+
+
+        }
+
+        return __local__res
+
+    }
+
+    pub mut fn push(__param__val: Intmap_value) -> *mut Intmap_value {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        var __local__res: Intmap_result = unsafe { (*__param_self_).insert_entry_((*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32))) }
+
+        if ((if not (unsafe *(&raw const __local__res as *const Intmap_result)).inserted: 1 else: 0) != 0) {
+            unsafe { Intmap_value_drop((__param_self_ as *const Intmap), (*(&raw const __local__res as *const Intmap_result)).ref) }
+        }
+
+        with_memcpy((&raw mut (unsafe *((*(&raw const __local__res as *const Intmap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[Intmap_value]())
+
+        return (unsafe *(&raw const __local__res as *const Intmap_result)).ref
+
+    }
+
+    pub mut fn put(__param_rkey: i32, __param_rmapped: i32) -> Intmap_result {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        return unsafe { Intmap_insert_or_assign(__param_self_, __param_rkey, __param_rmapped) }
+
+    }
+
+    pub mut fn erase(__param_rkey: i32) -> i32 {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        var __local_ref: *mut Intmap_value
+
+        var __ci_expr_logic_0: i32 = 0
+
+        if ((if (unsafe *__param_self_).size != 0: 1 else: 0) != 0) {
+            (__local_ref = unsafe { Intmap_bucket_lookup_((__param_self_ as *const Intmap), ((&raw mut __param_rkey as *mut i32) as *const i32)) }.ref)
+
+            (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
+
+        }
+
+        if (__ci_expr_logic_0 != 0) {
+            unsafe { Intmap_erase_entry(__param_self_, __local_ref) }
+
+            return 1
+
+        }
+
+
+        return 0
+
+    }
+
+    pub mut fn erase_at(__param_it_: Intmap_iter) -> Intmap_iter {
+        let __param_self_: *mut Intmap = self as *mut Intmap
+        unsafe { Intmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Intmap_iter)).ref) }
+
+        if ((if (unsafe *(*(&raw const __param_it_ as *const Intmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+            unsafe { (*(&raw mut __param_it_ as *mut Intmap_iter)).next() }
+        }
+
+        return __param_it_
+
+    }
+
+}
+
+impl Intmap_iter {
+    pub mut fn next() {
+        let __param_it_: *mut Intmap_iter = self as *mut Intmap_iter
+        while true {
+            ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
+
+            ((unsafe *__param_it_)._mref = (unsafe *__param_it_)._mref + 1)
+
+            if (not ((if (unsafe *(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
+                break
+            }
+
+        }
+
+        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_)._end: 1 else: 0) != 0) {
+            ((unsafe *__param_it_).ref = ((null as *mut Intmap_value)))
+        }
+
+    }
+
+}
+
+impl SImap {
+    pub mut fn move_() -> SImap {
+        let __param_self_: *mut SImap = self as *mut SImap
+        var __local_m: SImap = (unsafe *__param_self_)
+
+        ((unsafe *__param_self_).size = ((0 as i64)))
+
+        ((unsafe *__param_self_).bucket_count = (unsafe *__param_self_).size)
+
+
+        ((unsafe *__param_self_).meta = ((null as *mut hmap_meta)))
+
+        ((unsafe *__param_self_).table = ((null as *mut SImap_value)))
+
+        return __local_m
+
+    }
+
+    pub mut fn take(__param_unowned: SImap) -> Unit {
+        let __param_self_: *mut SImap = self as *mut SImap
+        unsafe { SImap_drop((__param_self_ as *const SImap)) }
+
+        with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[SImap]())
+
+    }
+
+    pub mut fn insert(__param__key: cstr, __param__mapped: i32) -> SImap_result {
+        let __param_self_: *mut SImap = self as *mut SImap
+        var __local__res: SImap_result = unsafe { SImap_insert_entry_(__param_self_, unsafe { cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)) }) }
+
+        if (unsafe *(&raw const __local__res as *const SImap_result)).inserted {
+            with_memcpy((&raw mut (unsafe *((&raw const (*(*(&raw const __local__res as *const SImap_result)).ref).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __param__key as *const u8), sizeof[cstr]())
+
+            ((unsafe *(*(&raw const __local__res as *const SImap_result)).ref).second = __param__mapped)
+
+        } else {
+            unsafe { cstr_drop(((&raw mut __param__key as *mut cstr) as *const cstr)) }
+
+
+        }
+
+        return __local__res
+
+    }
+
+    pub mut fn push(__param__val: SImap_value) -> *mut SImap_value {
+        let __param_self_: *mut SImap = self as *mut SImap
+        var __local__res: SImap_result = unsafe { SImap_insert_entry_(__param_self_, unsafe { cstr_toraw((((&raw const (*(&raw mut __param__val as *mut SImap_value)).first as *const cstr) as *mut cstr) as *const cstr)) }) }
+
+        if ((if not (unsafe *(&raw const __local__res as *const SImap_result)).inserted: 1 else: 0) != 0) {
+            unsafe { SImap_value_drop((__param_self_ as *const SImap), (*(&raw const __local__res as *const SImap_result)).ref) }
+        }
+
+        with_memcpy((&raw mut (unsafe *((*(&raw const __local__res as *const SImap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[SImap_value]())
+
+        return (unsafe *(&raw const __local__res as *const SImap_result)).ref
+
+    }
+
+    pub mut fn erase_at(__param_it_: SImap_iter) -> SImap_iter {
+        let __param_self_: *mut SImap = self as *mut SImap
+        unsafe { SImap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const SImap_iter)).ref) }
+
+        if ((if (unsafe *(*(&raw const __param_it_ as *const SImap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+            unsafe { (*(&raw mut __param_it_ as *mut SImap_iter)).next() }
+        }
+
+        return __param_it_
+
+    }
+
+}
+
+impl SImap_iter {
+    pub mut fn next() {
+        let __param_it_: *mut SImap_iter = self as *mut SImap_iter
+        while true {
+            ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
+
+            ((unsafe *__param_it_)._mref = (unsafe *__param_it_)._mref + 1)
+
+            if (not ((if (unsafe *(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
+                break
+            }
+
+        }
+
+        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_)._end: 1 else: 0) != 0) {
+            ((unsafe *__param_it_).ref = ((null as *mut SImap_value)))
+        }
+
+    }
+
+}
+
+impl Strmap {
+    pub mut fn move_() -> Strmap {
+        let __param_self_: *mut Strmap = self as *mut Strmap
+        var __local_m: Strmap = (unsafe *__param_self_)
+
+        ((unsafe *__param_self_).size = ((0 as i64)))
+
+        ((unsafe *__param_self_).bucket_count = (unsafe *__param_self_).size)
+
+
+        ((unsafe *__param_self_).meta = ((null as *mut hmap_meta)))
+
+        ((unsafe *__param_self_).table = ((null as *mut Strmap_value)))
+
+        return __local_m
+
+    }
+
+    pub mut fn take(__param_unowned: Strmap) -> Unit {
+        let __param_self_: *mut Strmap = self as *mut Strmap
+        unsafe { Strmap_drop((__param_self_ as *const Strmap)) }
+
+        with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[Strmap]())
+
+    }
+
+    pub mut fn insert(__param__key: cstr, __param__mapped: cstr) -> Strmap_result {
+        let __param_self_: *mut Strmap = self as *mut Strmap
+        var __local__res: Strmap_result = unsafe { Strmap_insert_entry_(__param_self_, unsafe { cstr_toraw(((&raw mut __param__key as *mut cstr) as *const cstr)) }) }
+
+        if (unsafe *(&raw const __local__res as *const Strmap_result)).inserted {
+            with_memcpy((&raw mut (unsafe *((&raw const (*(*(&raw const __local__res as *const Strmap_result)).ref).first as *const cstr) as *mut cstr)) as *mut u8), (&raw const __param__key as *const u8), sizeof[cstr]())
+
+            with_memcpy((&raw mut (unsafe *(*(&raw const __local__res as *const Strmap_result)).ref).second as *mut u8), (&raw const __param__mapped as *const u8), sizeof[cstr]())
+
+        } else {
+            unsafe { cstr_drop(((&raw mut __param__key as *mut cstr) as *const cstr)) }
+
+            unsafe { cstr_drop(((&raw mut __param__mapped as *mut cstr) as *const cstr)) }
+
+        }
+
+        return __local__res
+
+    }
+
+    pub mut fn push(__param__val: Strmap_value) -> *mut Strmap_value {
+        let __param_self_: *mut Strmap = self as *mut Strmap
+        var __local__res: Strmap_result = unsafe { Strmap_insert_entry_(__param_self_, unsafe { cstr_toraw((((&raw const (*(&raw mut __param__val as *mut Strmap_value)).first as *const cstr) as *mut cstr) as *const cstr)) }) }
+
+        if ((if not (unsafe *(&raw const __local__res as *const Strmap_result)).inserted: 1 else: 0) != 0) {
+            unsafe { Strmap_value_drop((__param_self_ as *const Strmap), (*(&raw const __local__res as *const Strmap_result)).ref) }
+        }
+
+        with_memcpy((&raw mut (unsafe *((*(&raw const __local__res as *const Strmap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[Strmap_value]())
+
+        return (unsafe *(&raw const __local__res as *const Strmap_result)).ref
+
+    }
+
+    pub mut fn erase_at(__param_it_: Strmap_iter) -> Strmap_iter {
+        let __param_self_: *mut Strmap = self as *mut Strmap
+        unsafe { Strmap_erase_entry(__param_self_, (*(&raw const __param_it_ as *const Strmap_iter)).ref) }
+
+        if ((if (unsafe *(*(&raw const __param_it_ as *const Strmap_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+            unsafe { (*(&raw mut __param_it_ as *mut Strmap_iter)).next() }
+        }
+
+        return __param_it_
+
+    }
+
+}
+
+impl Strmap_iter {
+    pub mut fn next() {
+        let __param_it_: *mut Strmap_iter = self as *mut Strmap_iter
+        while true {
+            ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
+
+            ((unsafe *__param_it_)._mref = (unsafe *__param_it_)._mref + 1)
+
+            if (not ((if (unsafe *(*__param_it_)._mref).dist() == 0: 1 else: 0) != 0)) {
+                break
+            }
+
+        }
+
+        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_)._end: 1 else: 0) != 0) {
+            ((unsafe *__param_it_).ref = ((null as *mut Strmap_value)))
+        }
+
     }
 
 }

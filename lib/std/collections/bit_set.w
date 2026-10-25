@@ -29,20 +29,20 @@ impl BitSet:
 
     pub mut fn set(i: isize):
         self.check(i)
-        unsafe { cbits_set(&raw mut self.bits, i as c_long) }
+        self.bits.set(i as c_long)
 
     pub mut fn clear(i: isize):
         self.check(i)
-        unsafe { cbits_reset(&raw mut self.bits, i as c_long) }
+        self.bits.reset(i as c_long)
 
     pub mut fn flip(i: isize):
         self.check(i)
-        unsafe { cbits_flip(&raw mut self.bits, i as c_long) }
+        self.bits.flip(i as c_long)
 
     pub mut fn set_all(value: bool): unsafe { cbits_set_all(&raw mut self.bits, value) }
 
     /// Grows or shrinks to `len` bits; new bits take `value`.
-    pub mut fn resize(len: isize, value: bool): assert(unsafe { cbits_resize(&raw mut self.bits, len as c_long, value) })
+    pub mut fn resize(len: isize, value: bool): assert(self.bits.resize(len as c_long, value))
 
     /// The number of set bits.
     pub fn count() -> isize: unsafe { cbits_count(&raw const self.bits) } as isize

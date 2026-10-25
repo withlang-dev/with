@@ -1,11 +1,13 @@
 // Migrated from C
 use std.engines.stc.defs
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
     return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
@@ -51,6 +53,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_b8: u64
 
@@ -76,6 +79,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
@@ -97,6 +101,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
@@ -134,6 +139,7 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
@@ -174,11 +180,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
-pub unsafe fn crand64_normal(__param_d: *mut crand64_normal_dist) -> f64 {
-    return crand64_normal_r(_stc64(), (1 as u64), __param_d)
-
-}
-
+// contract: unproved:0:read only,unproved:2:out-parameter written conditionally
 pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, __param_d: *mut crand64_normal_dist) -> f64 {
     var __local_v1: f64
 
@@ -226,6 +228,7 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand64_seed_r(__param_rng: *mut crand64, __param_seed: u64) {
     var __local_s: *mut u64 = ((&raw const (*__param_rng).data[0] as *mut u64))
 
@@ -245,6 +248,7 @@ pub unsafe fn crand64_seed_r(__param_rng: *mut crand64, __param_seed: u64) {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand64_uint_r(__param_rng: *mut crand64, __param_stream: u64) -> u64 {
     var __local_s: *mut u64 = ((&raw const (*__param_rng).data[0] as *mut u64))
 
@@ -263,6 +267,7 @@ pub unsafe fn crand64_uint_r(__param_rng: *mut crand64, __param_stream: u64) -> 
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand64_real_r(__param_rng: *mut crand64, __param_stream: u64) -> f64 {
     return ((((crand64_uint_r(__param_rng, __param_stream) as u64) >> (11 as u32)) as f64) * 1.1102230246251565e-16)
 
@@ -308,6 +313,7 @@ pub fn crand64_make_uniform(__param_low: i64, __param_high: i64) -> crand64_unif
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, __param_d: *mut crand64_uniform_dist) -> i64 {
     var __local_lo: u64
 
@@ -337,11 +343,13 @@ pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, 
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand64_uniform(__param_d: *mut crand64_uniform_dist) -> i64 {
     return crand64_uniform_r(_stc64(), (1 as u64), __param_d)
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand32_seed_r(__param_rng: *mut crand32, __param_seed: u32) {
     var __local_s: *mut u32 = ((&raw const (*__param_rng).data[0] as *mut u32))
 
@@ -361,6 +369,7 @@ pub unsafe fn crand32_seed_r(__param_rng: *mut crand32, __param_seed: u32) {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand32_uint_r(__param_rng: *mut crand32, __param_stream: u32) -> u32 {
     var __local_s: *mut u32 = ((&raw const (*__param_rng).data[0] as *mut u32))
 
@@ -379,6 +388,7 @@ pub unsafe fn crand32_uint_r(__param_rng: *mut crand32, __param_stream: u32) -> 
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand32_real_r(__param_rng: *mut crand32, __param_stream: u32) -> f64 {
     return ((crand32_uint_r(__param_rng, __param_stream) as f64) * 2.3283064365386963e-10)
 
@@ -424,6 +434,7 @@ pub fn crand32_make_uniform(__param_low: i32, __param_high: i32) -> crand32_unif
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: u32, __param_d: *mut crand32_uniform_dist) -> i32 {
     var __local_r: u64
 
@@ -439,7 +450,17 @@ pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: u32, 
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn crand32_uniform(__param_d: *mut crand32_uniform_dist) -> i64 {
     return ((crand32_uniform_r(_stc32(), (1 as u32), __param_d) as i64))
+
+}
+
+impl crand64_normal_dist {
+    pub mut fn crand64_normal() -> f64 {
+        let __param_d: *mut crand64_normal_dist = self as *mut crand64_normal_dist
+        return unsafe { crand64_normal_r(_stc64(), (1 as u64), __param_d) }
+
+    }
 
 }

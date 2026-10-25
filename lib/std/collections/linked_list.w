@@ -43,14 +43,14 @@ impl[T] LinkedList[T]:
 
     pub mut fn push_back(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_list_push_back(&raw mut self.words, stc_to_word(value) as i64) }
+            self.words.push_back(stc_to_word(value) as i64)
         else:
             unsafe { stc_slot_list_push_back(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
         self.count = self.count + 1
 
     pub mut fn push_front(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_list_push_front(&raw mut self.words, stc_to_word(value) as i64) }
+            self.words.push_front(stc_to_word(value) as i64)
         else:
             unsafe { stc_slot_list_push_front(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
         self.count = self.count + 1
@@ -61,11 +61,11 @@ impl[T] LinkedList[T]:
         self.count = self.count - 1
         comptime if stc_is_word[T]():
             let word = unsafe { *stc_word_list_front(&raw const self.words) }
-            unsafe { stc_word_list_pop_front(&raw mut self.words) }
+            self.words.pop_front()
             Some(stc_from_word(word as u64))
         else:
             let slot = unsafe { *stc_slot_list_front(&raw const self.slots) } as *mut StcSlot[T]
-            unsafe { stc_slot_list_pop_front(&raw mut self.slots) }
+            self.slots.pop_front()
             Some(unsafe { stc_slot_take(slot) })
 
     unsafe fn front_place() -> *const T:
@@ -88,8 +88,8 @@ impl[T] LinkedList[T]:
 
     /// Reverses the list in place (the engine relinks the nodes).
     pub mut fn reverse():
-        comptime if stc_is_word[T](): unsafe { stc_word_list_reverse(&raw mut self.words) }
-        else: unsafe { stc_slot_list_reverse(&raw mut self.slots) }
+        comptime if stc_is_word[T](): self.words.reverse()
+        else: self.slots.reverse()
 
     /// Drops every value and empties the list.
     pub mut fn clear():
@@ -118,7 +118,7 @@ impl[T: Ord] LinkedList[T]:
         var cursor = stc_word_list_begin(&raw const self.words)
         while cursor.ref as i64 != 0:
             *cursor.ref = ((*cursor.ref as u64) ^ 9223372036854775808) as i64
-            stc_word_list_next(&raw mut cursor)
+            cursor.next()
 
     /// Sorts ascending by `Ord` (D41): a word list by the engine's own `<`;
     /// a slot list through the facade's comparator, which every slot is
@@ -127,17 +127,17 @@ impl[T: Ord] LinkedList[T]:
     pub mut fn sort():
         comptime if T.name() == "u64" or T.name() == "usize":
             unsafe { self.flip_sign_bits() }
-            unsafe { stc_word_list_sort(&raw mut self.words) }
+            self.words.sort()
             unsafe { self.flip_sign_bits() }
         else if stc_is_word[T]():
-            unsafe { stc_word_list_sort(&raw mut self.words) }
+            self.words.sort()
         else:
             var cursor = unsafe { stc_slot_list_begin(&raw const self.slots) }
             while cursor.ref as i64 != 0:
                 let prefix = unsafe { *cursor.ref } as *mut StcSlotPrefix
                 unsafe { (*prefix).compare = self.comparator() }
-                unsafe { stc_slot_list_next(&raw mut cursor) }
-            unsafe { stc_slot_list_sort(&raw mut self.slots) }
+                cursor.next()
+            self.slots.sort()
 
 impl[T] Drop for LinkedList[T]:
     move fn drop():
@@ -148,7 +148,7 @@ impl[T] Drop for LinkedList[T]:
             var cursor = unsafe { stc_slot_list_begin(&raw const self.slots) }
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-                unsafe { stc_slot_list_next(&raw mut cursor) }
+                cursor.next()
             unsafe { stc_slot_list_drop(&raw const self.slots) }
             unsafe { stc_word_list_drop(&raw const self.words) }
 
@@ -159,10 +159,10 @@ impl[T] LinkedListIter[T]:
         comptime if stc_is_word[T]():
             if self.words.ref as i64 == 0: return None
             let place = self.words.ref as *const T
-            unsafe { stc_word_list_next(&raw mut self.words) }
+            self.words.next()
             Some(unsafe { &*place })
         else:
             if self.slots.ref as i64 == 0: return None
             let slot = unsafe { *self.slots.ref } as *const StcSlot[T]
-            unsafe { stc_slot_list_next(&raw mut self.slots) }
+            self.slots.next()
             Some(unsafe { stc_slot_view(slot) })

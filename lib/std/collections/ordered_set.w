@@ -85,8 +85,8 @@ impl[T: Ord] OrderedSet[T]:
         var cursor = unsafe { stc_slot_sset_begin(&raw const self.set) }
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-            unsafe { stc_slot_sset_next(&raw mut cursor) }
-        unsafe { stc_slot_sset_clear(&raw mut self.set) }
+            cursor.next()
+        self.set.clear()
 
     /// In-order views of the values (D44: traversal observes).
     pub fn iter() -> OrderedSetIter[T]:
@@ -97,7 +97,7 @@ impl[T] Drop for OrderedSet[T]:
         var cursor = unsafe { stc_slot_sset_begin(&raw const self.set) }
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-            unsafe { stc_slot_sset_next(&raw mut cursor) }
+            cursor.next()
         unsafe { stc_slot_sset_drop(&raw const self.set) }
 
 pub type OrderedSetIter[T] ephemeral { cursor: stc_slot_sset_iter }
@@ -106,5 +106,5 @@ impl[T] OrderedSetIter[T]:
     pub mut fn next() -> Option[&T]:
         if self.cursor.ref as i64 == 0: return None
         let slot = unsafe { *self.cursor.ref } as *const StcSlot[T]
-        unsafe { stc_slot_sset_next(&raw mut self.cursor) }
+        self.cursor.next()
         Some(unsafe { stc_slot_view(slot) })

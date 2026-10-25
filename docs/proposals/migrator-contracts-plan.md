@@ -176,6 +176,22 @@ ordered_set,ordered_map,unordered_set,unordered_map,bit_set}.w` and
 census records the fall. The `unsafe` left in a facade is the slot-lifetime
 step that crosses an ownership boundary the engine never sees.
 
+*Step 3 status (2026-10-25, branch `migrator-contracts-3`):* the migrator
+generation is a hash of its sources (D112), so it moved with step 2; the STC
+corpus and its test programs were re-promoted under `migrator-pin:#2615`. The
+first promotion found two more refusals the ruling needs: a handle the body
+indexes or steps (`refs[i]`, `p + k`), itself or through a corpus callee, is
+an array of records and no receiver (`std.algorithms` calls
+`stc_slotrefs_sort(refs, n)` over n records: a method on one would write past
+it), and an iterator record's functions are named after it
+(`stc_word_stack_next` on `stc_word_stack_iter` is `next`). The facades call
+the methods — `self.words.push(w)`, `self.slots.pop()`, `cursor.next()` —
+and 47 engine-call `unsafe` blocks are gone (370 → 323 across
+`lib/std/collections`). What stays `unsafe` is what the ruling left out: the
+read-only surface (`size`, `top`, `at`, `front`, `begin`, `drop`; a `&self`
+receiver is the follow-up brief) and the slot pushes, which store a pointer
+the engine never frees (`stored-unknown`: the facade's slot lifetime).
+
 **Step 4 — the contract diff is a gate.** `wo-drift` red on a changed
 `contracts.tsv` until a human marks the new contracts reviewed (the promote
 rewrites the file; the lane compares the promoted file against the fresh

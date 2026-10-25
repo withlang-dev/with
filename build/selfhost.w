@@ -4535,8 +4535,10 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         "void eng_init(struct eng *e);\nvoid eng_push(struct eng *e, struct item *it);\nvoid eng_set_user(struct eng *e, void *user);\nint eng_count(const struct eng *e);\n" ++
         "struct item *eng_first(struct eng *e);\nvoid eng_bump(struct eng *e, int *out);\nint eng_find(struct eng *e, int key, int *out);\nvoid eng_fill(struct eng *e, struct pair *out);\n" ++
         "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n" ++
-        "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\n"
+        "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\nvoid eng_zero_all(struct eng *es, int n);\n"
     let unit = "#include <stdlib.h>\n#include \"eng.h\"\n" ++
+        "void eng_zero_all(struct eng *es, int n) { for (int i = 0; i < n; i++) es[i].count = 0; }\n" ++
+        "void eng_zero_via(struct eng *es, int n) { eng_zero_all(es, n); }\n" ++
         "void eng_init(struct eng *e) { e->count = 0; e->items = 0; e->user = 0; }\n" ++
         "void eng_push(struct eng *e, struct item *it) { it->next = e->items; e->items = it; e->count++; }\n" ++
         "void eng_set_user(struct eng *e, void *user) { e->user = user; }\n" ++
@@ -4604,6 +4606,11 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     rc = bs_file_contains(ctx, contracts, "eng_first\tret-from:0\n", "contracts returned parameter is a borrow")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_touch\treceiver-mut:eng,ret-from:0\n", "contracts returned receiver")
+    if rc != 0: return rc
+    // A handle the body indexes is an array of records, not a receiver.
+    rc = bs_file_contains(ctx, contracts, "eng_zero_all\tunproved:0:indexed as an array\n", "contracts indexed handle is no receiver")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_zero_via\tunproved:0:indexed as an array\n", "contracts handle indexed by a callee is no receiver")
     if rc != 0: return rc
     // #2602: a migration is byte-identical wherever it runs — its header
     // names the source by its path under the input directory, never the
