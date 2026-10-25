@@ -2227,7 +2227,7 @@ var g_migrate_writes_paths: List[str] = List.new()
 // none.
 var g_migrate_contracts_path: str = ""
 
-pub fn ci_migrate_set_contracts_path(path: &str):
+fn ci_migrate_set_contracts_path(path: &str):
     g_migrate_contracts_path = with_str_clone_ref(path)
 
 // The contracts artifact (D159), written when asked for, from the verdicts
