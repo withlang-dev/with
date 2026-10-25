@@ -1205,6 +1205,10 @@ fn run_cli(full_argc: i32) -> i32:
     if cli_command(argc) == "clean":
         return run_clean_command()
     if cli_command(argc) == "install-user":
+        // #1146: anywhere but a project, the running compiler installs
+        // itself, as the help says; a project (a With checkout) runs its
+        // own install-user target, which installs the compiler it built.
+        if build_graph_find_build_root(".").len() == 0: return run_install_self()
         return run_graph_target_command("install-user")
     if cli_command(argc) == "init":
         return run_init_command(argc)
@@ -3663,6 +3667,28 @@ fn reseed_gate_smoke(root: &str, compiler_path: &str) -> i32:
         with_eprint("error: reseed gate: candidate cannot compile the native build runner (build.w + std.build) and fell back to comptime evaluation; a seed must drive every action natively")
         return 1
     with_write("[reseed-gate] candidate checks build.w, compiles the native build runner and orchestrates ':" ++ smoke_target ++ "' natively (" ++ build_graph_time_fmt(spent) ++ f", peak {smoke_rss / 1048576}M)\n")
+    0
+
+// `with install-user` outside a project: the downloaded compiler puts
+// itself on ~/.local/bin, by the same placement as the build's install
+// (temp sibling, rename, `<dest> version` proving it starts).
+fn run_install_self() -> i32:
+    let self_exe = with_self_exe()
+    let data = with_fs_read_file(self_exe)
+    if data.len() == 0:
+        with_eprint("error: install-user: could not read the running compiler at " ++ self_exe)
+        return 1
+    let home = build_graph_home_dir()
+    if home.len() == 0:
+        with_eprint("error: install-user: HOME (or USERPROFILE on Windows) is unset or empty: no home for ~/.local/bin/with")
+        return 1
+    let dest = home ++ "/.local/bin/with"
+    if self_exe == dest:
+        with_write(f"[install-user] {dest} is already this compiler\n")
+        return 0
+    if build_graph_install_path("[install-user]", self_exe, data, dest, 0o755, "version") != 0:
+        return 1
+    with_write(f"[install-user] {dest} <- {self_exe}\n")
     0
 
 fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
