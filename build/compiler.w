@@ -1909,6 +1909,11 @@ fn comp_doc_path_file_exempt(file: &str) -> bool:
     if file.starts_with("lib/std/engines/") or file.starts_with("test/corpora/"): return true
     // Its job is moving documents: the paths are its data.
     if file == "tools/docs_restructure.w": return true
+    // The ABI's sources: their bytes are the key every .wo bundle is stored
+    // under (docs/with-abi.sha256, abi-hash-check), so a comment edit would
+    // re-key every bundle on every host. Their citations change only with
+    // the ABI itself.
+    if file == "src/FnAbi.w" or file == "src/TypeLayout.w": return true
     // Path classification data for the green identity (D49), not citations.
     file == "test/behavior/behav_green_identity_keys_on_inputs.w"
 
