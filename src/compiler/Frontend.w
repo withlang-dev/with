@@ -610,13 +610,31 @@ impl Zcu:
             if self.c_import_is_strict_frontend(out, decl):
                 self.c_import_emit_strict_omissions_frontend(out, decl, synthetic)
 
+        // §16.2a: "User-written `impl` methods always take priority over
+        // auto-generated ones." A method c_import generates for a C type
+        // (`xdoc_root` presented as `xdoc.root`) yields to a written method
+        // of the same name. Kept, both registered and MIR lowered the
+        // generated body, which Sema never checked (#2403: "call of
+        // `xdoc_root` has callee kind 0").
+        var written_methods: List[i32] = List.new()
+        for oi in 0..ordered.len():
+            if ordered_ci[oi] == 0 and frontend_fn_decl_is_method(out, self.pool, ordered[oi]):
+                written_methods.push(out.get_data0(ordered[oi]))
+        let kept_paths = frontend_new_list_str()
+        let kept_file_ids: List[i32] = List.new()
+        let kept_ci: List[i32] = List.new()
         while out.decl_count() > 0:
             out.state.decls.pop()
         for oi in 0..ordered.len():
+            if ordered_ci[oi] != 0 and frontend_fn_decl_is_method(out, self.pool, ordered[oi]) and frontend_list_contains_i32(written_methods, out.get_data0(ordered[oi])):
+                continue
             out.add_decl(ordered[oi])
-        self.decl_source_paths = ordered_paths
-        self.decl_source_file_ids = ordered_file_ids
-        self.decl_is_c_import = ordered_ci
+            kept_paths.push(frontend_owned_text(ordered_paths[oi]))
+            kept_file_ids.push(ordered_file_ids[oi])
+            kept_ci.push(ordered_ci[oi])
+        self.decl_source_paths = kept_paths
+        self.decl_source_file_ids = kept_file_ids
+        self.decl_is_c_import = kept_ci
         frontend_cimport_unlock()
         out
 
