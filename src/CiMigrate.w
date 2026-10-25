@@ -1085,7 +1085,10 @@ impl CiProject:
             let definers = self.symbols[symbol_id].header_definers
             if definers.len() == 0: continue
             let sole = ci_pipe_i32_sole(definers)
-            if sole < 0: continue
+            // Several definers: a private copy per includer, static in each.
+            if sole < 0:
+                self.symbols[symbol_id].static_definition = 1
+                continue
             self.symbols[symbol_id].owner_module = sole
             self.symbols[symbol_id].owner_rank = 1
             self.symbols[symbol_id].owner_definition_kind = 1
@@ -1210,10 +1213,15 @@ impl CiProject:
                     // was rendered non-null and its NULL test folded, #2230
                     // smoke). The table is name-keyed: a second static of the
                     // same name in another unit keeps the first's evidence.
+                    let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
                     if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
                         self.record_call_evidence(session, cursor, name)
                         let static_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
-                        self.symbols[static_symbol].static_definition = 1
+                        // A unit's own static keeps its raw signature; a
+                        // header's inline definition is decided by who
+                        // publishes it (header_owner_module,
+                        // resolve_header_definers).
+                        if not header_inline_definition: self.symbols[static_symbol].static_definition = 1
                         if self.symbols[static_symbol].has_definition == 0:
                             self.record_fn_evidence(session, i, cursor, static_symbol)
                     // A `static inline` function DEFINED in a header is the
@@ -1223,7 +1231,6 @@ impl CiProject:
                     // header's code. That unit publishes the one definition;
                     // includers import it. A header no unit owns keeps a
                     // private copy per includer (tommytypes.h's tommy_ilog2).
-                    let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
                     let header_owner = if header_inline_definition: self.header_owner_module(loc) else: -1
                     // A header no unit owns: each includer that defines it is
                     // recorded; a sole definer publishes it once the scan is
@@ -1231,11 +1238,10 @@ impl CiProject:
                     if header_owner < 0 and header_inline_definition:
                         let definer_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[definer_symbol].add_header_definer(module_id)
-                        self.symbols[definer_symbol].static_definition = 1
+                    // The owner publishes it (`pub`), so it may be a method.
                     if header_owner >= 0:
                         let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[symbol_id].add_consumer(module_id)
-                        self.symbols[symbol_id].static_definition = 1
                         self.symbols[symbol_id].owner_module = header_owner
                         self.symbols[symbol_id].owner_rank = 1
                         self.symbols[symbol_id].owner_definition_kind = 1
@@ -2537,10 +2543,15 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     let safe_name = ci_migrate_c_function_name(name)
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
+    // A header's `static inline` definition is published once, by the unit
+    // that owns the header (the project scan's header_owner_module); every
+    // other unit imports it instead of keeping a private copy.
+    let header_owner = if storage == CX_SC_STATIC and with_cimport_fn_is_inline(session, idx) != 0: ci_migrate_project_fn_owner_path(project_active, project, name) else: ""
     // D159 step 2: a function the contracts print as a method of its first
-    // parameter's record (ci_migrate_method_shapes_for). A static function,
-    // a variadic one, or a corpus keeping C linkage prints the raw signature.
-    let method_shape = if storage != CX_SC_STATIC and g_migrate_no_c_export != 0 and is_variadic == 0: ci_migrate_method_shape(safe_name) else: ""
+    // parameter's record (ci_migrate_method_shapes_for). A unit's own static
+    // function, a variadic one, or a corpus keeping C linkage prints the raw
+    // signature; a header-owned definition is published, so it may be one.
+    let method_shape = if (storage != CX_SC_STATIC or header_owner.len() > 0) and g_migrate_no_c_export != 0 and is_variadic == 0: ci_migrate_method_shape(safe_name) else: ""
     let method = method_shape.split("|")
     let as_method = method_shape.len() > 0
     let method_out: i32 = if as_method: parse(method[2]) else: -1
@@ -2680,10 +2691,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let link_prefix = if safe_name != name: "@[link_name(\"" ++ name ++ "\")]\n" else: ""
         return link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret_render) ++ "\n"
 
-    // A header's `static inline` definition is published once, by the unit
-    // that owns the header (the project scan's header_owner_module); every
-    // other unit imports it instead of keeping a private copy.
-    let header_owner = if storage == CX_SC_STATIC and with_cimport_fn_is_inline(session, idx) != 0: ci_migrate_project_fn_owner_path(project_active, project, name) else: ""
     if header_owner.len() > 0 and header_owner != g_migrate_current_input_path:
         return ""
 
