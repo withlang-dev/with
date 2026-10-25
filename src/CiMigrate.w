@@ -1085,7 +1085,10 @@ impl CiProject:
             let definers = self.symbols[symbol_id].header_definers
             if definers.len() == 0: continue
             let sole = ci_pipe_i32_sole(definers)
-            if sole < 0: continue
+            // Several definers: a private copy per includer, static in each.
+            if sole < 0:
+                self.symbols[symbol_id].static_definition = 1
+                continue
             self.symbols[symbol_id].owner_module = sole
             self.symbols[symbol_id].owner_rank = 1
             self.symbols[symbol_id].owner_definition_kind = 1
@@ -1131,7 +1134,19 @@ impl CiProject:
         let count = with_cimport_decl_count(session)
         var i: i32 = 0
         while i < count:
-            if with_cimport_decl_kind(session, i) == CK_VAR:
+            let decl_kind = with_cimport_decl_kind(session, i)
+            // D159 step 2: the corpus's own records, for the methods.
+            if decl_kind == CK_STRUCT or decl_kind == CK_UNION or decl_kind == CK_TYPEDEF:
+                let rname = with_cimport_decl_name(session, i)
+                let rcursor = with_cimport_decl_cursor(session, i)
+                let rloc = if rcursor >= 0: with_ci_cursor_location(session, rcursor) else: ""
+                // A typedef that renames a record is an alias, not a record:
+                // its `impl` would attach to no type.
+                let underlying = if decl_kind == CK_TYPEDEF: ci_trim(with_cimport_typedef_underlying_translated(session, i)) else: ""
+                let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
+                if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
+                    self.records.insert(ci_escape_reserved(rname), true)
+            if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
                 let cursor = with_cimport_decl_cursor(session, i)
                 let loc = if cursor >= 0: with_ci_cursor_location(session, cursor) else: ""
@@ -1198,9 +1213,15 @@ impl CiProject:
                     // was rendered non-null and its NULL test folded, #2230
                     // smoke). The table is name-keyed: a second static of the
                     // same name in another unit keeps the first's evidence.
+                    let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
                     if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
                         self.record_call_evidence(session, cursor, name)
                         let static_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
+                        // A unit's own static keeps its raw signature; a
+                        // header's inline definition is decided by who
+                        // publishes it (header_owner_module,
+                        // resolve_header_definers).
+                        if not header_inline_definition: self.symbols[static_symbol].static_definition = 1
                         if self.symbols[static_symbol].has_definition == 0:
                             self.record_fn_evidence(session, i, cursor, static_symbol)
                     // A `static inline` function DEFINED in a header is the
@@ -1210,7 +1231,6 @@ impl CiProject:
                     // header's code. That unit publishes the one definition;
                     // includers import it. A header no unit owns keeps a
                     // private copy per includer (tommytypes.h's tommy_ilog2).
-                    let header_inline_definition = with_cimport_fn_is_inline(session, i) != 0 and cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0 and ci_migrate_location_is_header(loc)
                     let header_owner = if header_inline_definition: self.header_owner_module(loc) else: -1
                     // A header no unit owns: each includer that defines it is
                     // recorded; a sole definer publishes it once the scan is
@@ -1218,6 +1238,7 @@ impl CiProject:
                     if header_owner < 0 and header_inline_definition:
                         let definer_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[definer_symbol].add_header_definer(module_id)
+                    // The owner publishes it (`pub`), so it may be a method.
                     if header_owner >= 0:
                         let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[symbol_id].add_consumer(module_id)
@@ -1370,6 +1391,10 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
 
     let count = with_cimport_decl_count(session)
     ci_migrate_collect_unsafe_extern_fns(session, count, input_path, project_active, project)
+    // D159 step 2: the functions this corpus prints as methods, for this
+    // unit's definitions and its calls.
+    ci_migrate_set_method_shapes(ci_migrate_method_shapes_for(project_active, project))
+    ci_migrate_impl_reset()
 
     // Pre-scan: collect demoted types and prepopulate names
     let demoted_types = ci_collect_demoted_types(session, count)
@@ -1424,6 +1449,7 @@ fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: boo
                 output_parts.push("// static_assert: " ++ sa_name ++ "\n")
         i = i + 1
 
+    output_parts.push(ci_migrate_take_impl_blocks())
     output_parts.push(ci_migrate_translate_vars(session, count, input_path, project_active, project))
     if g_migrate_file_error.len() > 0:
         eprint(g_migrate_file_error)
@@ -1756,10 +1782,14 @@ impl CiProject:
         for pi in 0..count:
             let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(ptype)
-            if not ci_type_text_is_fn_ptr(ptype): continue
-            self.symbols[symbol_id].param_fn_ptr[pi] = 1
+            // D159 step 2: the first pointer's NULL test too — a handle the
+            // body accepts as NULL (`if (ctx == NULL) return ERR`) is no
+            // receiver.
+            let first_pointer = pi == 0 and ci_migrate_type_is_raw_pointer(ptype)
+            if not ci_type_text_is_fn_ptr(ptype) and not first_pointer: continue
+            if ci_type_text_is_fn_ptr(ptype): self.symbols[symbol_id].param_fn_ptr[pi] = 1
             if names[pi].len() == 0:
-                self.symbols[symbol_id].unanalyzable = 1
+                if not first_pointer: self.symbols[symbol_id].unanalyzable = 1
                 continue
             let test = ci_body_null_test_evidence(session, cursor, names[pi])
             if test == 1: self.symbols[symbol_id].param_tested[pi] = 1
@@ -2251,6 +2281,95 @@ fn ci_migrate_write_contracts(project: &CiProject) -> i32:
         return 1
     0
 
+// ── D159 step 2: methods ──────────────────────────────────────────
+// The impl blocks of this unit: one per record whose proved functions it
+// defines, the methods in definition order, the blocks sorted by record at
+// the end of the unit (ci_migrate_take_impl_blocks).
+var g_migrate_impl_records: List[str] = List.new()
+var g_migrate_impl_texts: List[str] = List.new()
+
+fn ci_migrate_impl_reset():
+    g_migrate_impl_records = List.new()
+    g_migrate_impl_texts = List.new()
+
+fn ci_migrate_impl_add(record: &str, text: &str):
+    for i in 0..g_migrate_impl_records.len():
+        if g_migrate_impl_records[i] == record:
+            g_migrate_impl_texts[i] = g_migrate_impl_texts[i] ++ text
+            return
+    g_migrate_impl_records.push(record.to_owned())
+    g_migrate_impl_texts.push(text.to_owned())
+
+fn ci_migrate_take_impl_blocks() -> str:
+    var names: List[str] = List.new()
+    for i in 0..g_migrate_impl_records.len(): names.push(g_migrate_impl_records[i])
+    names.sort()
+    var out = ""
+    for name in names:
+        for i in 0..g_migrate_impl_records.len():
+            if g_migrate_impl_records[i] != name: continue
+            out = out ++ (if migrate_prefer_brace(): "impl " ++ name ++ " {\n" ++ g_migrate_impl_texts[i] ++ "}\n\n" else: "impl " ++ name ++ ":\n" ++ g_migrate_impl_texts[i] ++ "\n")
+    ci_migrate_impl_reset()
+    out
+
+// The shapes of the corpus's proved functions, by their With name
+// (CiContracts resolve_method_shapes): `record|method|out|out_ty|view|status|ret`.
+fn ci_migrate_method_shapes_for(project_active: bool, project: &CiProject) -> HashMap[str, str]:
+    var shapes: HashMap[str, str] = HashMap.new()
+    if not project_active: return shapes
+    for si in 0..project.symbols.len():
+        if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].method_record.len() == 0: continue
+        let ret = ci_unsafe_fn_ptr_type(ci_pointer_type_explicit_mut(project.symbols[si].ret_ty))
+        let status = if ret.len() == 0 or ret == "Unit" or ret == "void": "0" else: "1"
+        shapes.insert(ci_migrate_c_function_name(project.symbols[si].name), project.symbols[si].method_record ++ "|" ++ project.symbols[si].method_name ++ f"|{project.symbols[si].method_out}|" ++ project.symbols[si].method_out_ty ++ f"|{project.symbols[si].method_view}|" ++ status ++ "|" ++ ret)
+    shapes
+
+fn ci_migrate_indent_lines(text: &str) -> str:
+    let lines = text.split("\n")
+    var out = ""
+    for i in 0..lines.len():
+        if i == lines.len() - 1 and lines[i].len() == 0: break
+        out = out ++ (if lines[i].len() > 0: "    " ++ lines[i] else: "") ++ "\n"
+    out
+
+// The method text of one proved function, under its record's block: the
+// signature the contracts give it; a prologue binding the names the body
+// reads (the receiver's parameter as `self` cast back to the raw type, the
+// out-parameter's as a raw pointer to the local the method returns); the
+// body, printed in a safe context, its raw operations carrying their own
+// `unsafe`; and `return __ci_out` where a C void body falls off its end.
+fn ci_migrate_push_method(method: &List[str], params: &str, self_name: &str, self_type: &str, out_name: &str, out_type: &str, ret_render: &str, ret_suffix_default: &str, body: &str, body_terminates: bool, writes_mark: &str) -> str:
+    let has_out = out_name.len() > 0
+    let view = method[4] == "1"
+    let status = ret_render != "Unit"
+    let out_value_type = ci_extract_struct_name_from_ptr(out_type)
+    var ret_suffix = ret_suffix_default.to_owned()
+    if view: ret_suffix = " -> &" ++ ci_extract_struct_name_from_ptr(ret_render) ++ " from self"
+    else if has_out: ret_suffix = " -> " ++ (if status: "(" ++ ret_render ++ ", " ++ out_value_type ++ ")" else: out_value_type)
+    let pad = "        "
+    var text = "    pub mut fn " ++ method[1] ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ (if migrate_prefer_brace(): " {\n" else: ":\n")
+    text = text ++ pad ++ "let " ++ self_name ++ ": " ++ self_type ++ " = self as " ++ self_type ++ "\n"
+    if has_out:
+        let default_text = ci_default_for_type(out_value_type)
+        text = text ++ pad ++ "var __ci_out: " ++ out_value_type ++ " = " ++ (if default_text.len() > 0: default_text else: out_value_type ++ ".zeroed()") ++ "\n"
+        text = text ++ pad ++ "let " ++ out_name ++ ": " ++ out_type ++ " = &raw mut __ci_out\n"
+    let blank = ci_migrate_text_is_blank(body)
+    if not blank: text = text ++ ci_migrate_indent_lines(body)
+    if has_out and not status and (blank or not body_terminates): text = text ++ pad ++ "return __ci_out\n"
+    else if blank and not has_out: text = text ++ pad ++ "return\n"
+    text = text ++ (if migrate_prefer_brace(): "    }\n\n" else: "\n")
+    ci_migrate_impl_add(method[0], text)
+    ""
+
+// Above a function printed raw because a pointer it takes is unproved: the
+// contract, so the reader sees why the signature stayed.
+fn ci_migrate_contract_note(project_active: bool, project: &CiProject, name: &str) -> str:
+    let si = ci_migrate_project_fn_symbol(project_active, project, name)
+    if si < 0: return ""
+    let contract = project.symbols[si].contract
+    if not (contract.contains("unproved:") or contract.contains("stored-unknown:") or contract.contains("method-collision:")): return ""
+    "// contract: " ++ contract ++ "\n"
+
 fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
 
 fn ci_migrate_writes_reset():
@@ -2424,6 +2543,23 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     let safe_name = ci_migrate_c_function_name(name)
     let param_count = with_cimport_fn_param_count(session, idx)
     let is_variadic = with_cimport_fn_is_variadic(session, idx)
+    // A header's `static inline` definition is published once, by the unit
+    // that owns the header (the project scan's header_owner_module); every
+    // other unit imports it instead of keeping a private copy.
+    let header_owner = if storage == CX_SC_STATIC and with_cimport_fn_is_inline(session, idx) != 0: ci_migrate_project_fn_owner_path(project_active, project, name) else: ""
+    // D159 step 2: a function the contracts print as a method of its first
+    // parameter's record (ci_migrate_method_shapes_for). A unit's own static
+    // function, a variadic one, or a corpus keeping C linkage prints the raw
+    // signature; a header-owned definition is published, so it may be one.
+    let method_shape = if (storage != CX_SC_STATIC or header_owner.len() > 0) and g_migrate_no_c_export != 0 and is_variadic == 0: ci_migrate_method_shape(safe_name) else: ""
+    let method = method_shape.split("|")
+    let as_method = method_shape.len() > 0
+    let method_out: i32 = if as_method: parse(method[2]) else: -1
+    var method_params = ""
+    var method_self_name = ""
+    var method_self_type = ""
+    var method_out_name = ""
+    var method_out_type = ""
 
     // Build parameter list — use cursor API for real param names
     // (the old decl API returns "" for many PCRE2 functions)
@@ -2484,6 +2620,15 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let escaped_pname = if pname.len() > 0: ci_escape_reserved(pname) else: ""
         let sig_pname = ci_param_signature_name(escaped_pname, pi)
         params = params ++ sig_pname ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
+        if as_method:
+            if pi == 0:
+                method_self_name = sig_pname
+                method_self_type = ci_unsafe_fn_ptr_type(ptype)
+            else if pi == method_out:
+                method_out_name = sig_pname
+                method_out_type = ci_unsafe_fn_ptr_type(ptype)
+            else:
+                method_params = method_params ++ (if method_params.len() > 0: ", " else: "") ++ sig_pname ++ ": " ++ ci_unsafe_fn_ptr_type(ptype)
 
     if is_variadic != 0:
         if param_count > 0:
@@ -2515,6 +2660,11 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         // skip; definitions still translate (and collide loudly).
         if ci_migrate_preamble_declares_runtime_extern(name):
             return ""
+        // D159 step 2: a function another unit defines as a method has no
+        // C symbol an extern could bind; its callers reach it through the
+        // record.
+        if as_method:
+            return ""
         // #1848: a declaration without a prototype (the fact #1831's
         // with_cimport_fn_is_unprototyped states). Migrated source is
         // ordinary With, which has no spelling for an unprototyped call, and
@@ -2541,10 +2691,6 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         let link_prefix = if safe_name != name: "@[link_name(\"" ++ name ++ "\")]\n" else: ""
         return link_prefix ++ cc_prefix ++ "extern fn " ++ safe_name ++ "(" ++ params ++ ")" ++ ci_ret_suffix(ret_render) ++ "\n"
 
-    // A header's `static inline` definition is published once, by the unit
-    // that owns the header (the project scan's header_owner_module); every
-    // other unit imports it instead of keeping a private copy.
-    let header_owner = if storage == CX_SC_STATIC and with_cimport_fn_is_inline(session, idx) != 0: ci_migrate_project_fn_owner_path(project_active, project, name) else: ""
     if header_owner.len() > 0 and header_owner != g_migrate_current_input_path:
         return ""
 
@@ -2554,10 +2700,15 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
     // Try to translate the function body. Unsafe migrated functions already
     // provide the required unsafe context for extern/runtime calls, so the
     // expression lowerer should not wrap those calls in nested unsafe blocks.
-    let body_is_unsafe_context = ci_migrate_extern_fn_call_requires_unsafe(safe_name)
+    // A method is safe to call: its body is printed in a safe context, the
+    // raw operations inside it carrying their own `unsafe`.
+    let body_is_unsafe_context = not as_method and ci_migrate_extern_fn_call_requires_unsafe(safe_name)
     ci_migrate_set_unsafe_function_body_context(body_is_unsafe_context)
+    if as_method: ci_print_set_return_shape(if method_out >= 0: "__ci_out" else: "", ret != "Unit", method[4] == "1")
     let body = ci_try_translate_fn_body(session, idx)
     let body_tail_unit = ci_take_body_tail_unit()
+    let body_terminates = ci_body_ends_with_terminator()
+    ci_print_set_return_shape("", false, false)
     ci_migrate_set_unsafe_function_body_context(false)
     // #1878: the declarations the body's locals need, beside the function.
     let hoisted_decls = ci_take_body_hoisted_decls()
@@ -2589,9 +2740,12 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         g_migrate_writes_fn_names.push(with_str_clone_ref(safe_name))
         g_migrate_writes_fn_bodies.push(with_str_clone_ref(body_for_emit))
         let writes_mark = if visibility.len() > 0: ci_migrate_writes_mark(safe_name) else: ""
+        if as_method:
+            return hoisted_decls ++ ci_migrate_push_method(&method, method_params, method_self_name, method_self_type, method_out_name, method_out_type, ret_render, ret_suffix, body, body_terminates, writes_mark)
+        let contract_note = ci_migrate_contract_note(project_active, project, name)
         if migrate_prefer_brace():
-            return hoisted_decls ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
-        return hoisted_decls ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ ":\n" ++ body_for_emit ++ "\n"
+            return hoisted_decls ++ contract_note ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
+        return hoisted_decls ++ contract_note ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ ":\n" ++ body_for_emit ++ "\n"
 
     // Any body translation failure is fatal. Never emit partial output that
     // merely comments out the source function.

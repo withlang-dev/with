@@ -1011,6 +1011,20 @@ type CiProjectSymbol {
     contract_evidence: str,
     param_mutates: List[i32],
     contract: str,
+    // D159 step 2 (CiContracts.w resolve_method_shapes): how a proved
+    // function is printed. `method_record` the record whose `impl` block
+    // holds it as `pub mut fn method_name` ("" for a raw signature);
+    // `method_out` the out-parameter returned instead (-1 none) and
+    // `method_out_ty` its pointer type; `method_view` 1 when the return is
+    // `&R from self`.
+    method_record: str,
+    method_name: str,
+    method_out: i32,
+    method_out_ty: str,
+    method_view: i32,
+    // 1 when the definition is `static` (a unit's own, or a header's inline
+    // one): it keeps its raw signature, as the printer keeps every static.
+    static_definition: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1053,6 +1067,12 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         contract_evidence: "",
         param_mutates: List.new(),
         contract: "",
+        method_record: "",
+        method_name: "",
+        method_out: -1,
+        method_out_ty: "",
+        method_view: 0,
+        static_definition: 0,
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
@@ -1142,6 +1162,10 @@ type CiProject {
     unread: List[str],
     // Why the last migrate_scan_file failed, "" when it did not.
     scan_problem: str,
+    // D159 step 2: the records the corpus declares, by their With name. A
+    // method is printed only on one of them: an `impl` of a record another
+    // package declares has no home (§11.4).
+    records: HashMap[str, bool],
 }
 
 fn CiProject.new -> CiProject:
@@ -1157,6 +1181,7 @@ fn CiProject.new -> CiProject:
         presented: List.new(),
         unread: List.new(),
         scan_problem: "",
+        records: HashMap.new(),
     }
 
 impl CiProject:

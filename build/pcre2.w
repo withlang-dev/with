@@ -597,7 +597,12 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
     // Cohesive check: compile pcre2test.w (whose imports pull in every module)
     // from a lib/std/engines/pcre2 layout, so `use std.engines.pcre2.X` resolves to the migrated siblings
     // and the whole library is type-checked and MIR-validated together — matching
-    // how std.regex is actually built. The old per-module check compiled each module
+    // how std.regex is actually built. The layout is the import path's: the
+    // units were once copied under lib/std/re, where `use std.engines.pcre2.X`
+    // found no sibling and fell back to the checkout's promoted corpus, so
+    // the fresh harness was checked against the old library (D159 step 2's
+    // methods found it: a signature change in the fresh library could not
+    // be seen). The old per-module check compiled each module
     // in isolation with its `use std.engines.pcre2.*` imports stripped, so every cross-module
     // reference was undefined: it manufactured hundreds of false errors and never
     // validated a real migration (it was added after the last promote).
@@ -612,7 +617,7 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
     // while the harness reaches the tree under check, and one std module
     // loaded from two files is refused (Zcu add_imported_path).
     let check_root = pcre2_join(pcre2_scratch_dir(ctx), "cohesive-check-" ++ ctx.target_name())
-    let re_dir = pcre2_join(pcre2_join(pcre2_join(check_root, "lib"), "std"), "re")
+    let re_dir = pcre2_join(pcre2_join(pcre2_join(pcre2_join(check_root, "lib"), "std"), "engines"), "pcre2")
     if fs.exists(check_root) and fs.remove_tree(check_root) != 0:
         return pcre2_fail(ctx, "could not clear cohesive-check dir: " ++ check_root)
     if fs.mkdir_all(re_dir) != 0:
@@ -772,7 +777,9 @@ pub fn run_pcre2_build_action(ctx: ActionCtx) -> i32:
         return pcre2_fail(ctx, "could not create scratch directory: " ++ scratch_dir)
 
     let tmp_dir = pcre2_join(scratch_dir, "build-" ++ ctx.target_name())
-    let re_dir = pcre2_join(pcre2_join(pcre2_join(tmp_dir, "lib"), "std"), "re")
+    // The import path's layout, as the cohesive check's: under lib/std/re the
+    // units' `use std.engines.pcre2.X` fell back to the promoted corpus.
+    let re_dir = pcre2_join(pcre2_join(pcre2_join(pcre2_join(tmp_dir, "lib"), "std"), "engines"), "pcre2")
     let bin_dir = pcre2_join(tmp_dir, "bin")
     if fs.exists(tmp_dir) and fs.remove_tree(tmp_dir) != 0:
         return pcre2_fail(ctx, "could not remove old build temp directory: " ++ tmp_dir)

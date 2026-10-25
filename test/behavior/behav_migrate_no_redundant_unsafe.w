@@ -21,18 +21,24 @@ fn main:
     let migrated = p7_run(case_dir, "no_redundant_unsafe_migrate", "migrate\0source\0--no-c-export\0-I\0source\0--shared-defs\0ru.defs\0-o\0lib/ru\0")
     p7_assert_success(migrated, "migrate raw pointer operations")
     let migrated_unit = read_file(p7_join(case_dir, "lib/ru/unit.w")).unwrap()
-    for name in ["deref", "sum", "field", "bump"]:
+    for name in ["deref", "sum", "field"]:
         assert(migrated_unit.contains("pub unsafe fn " ++ name ++ "("))
-    // Every function of the unit is an `unsafe fn`, so no prefix survives.
-    assert(not migrated_unit.contains("(unsafe "))
+    // Every raw function of the unit is an `unsafe fn`, so no prefix survives
+    // there. `bump` writes only through its `struct pt *`: it is a method of
+    // the record (D159 step 2), its body a safe context where each raw
+    // operation carries its own prefix.
+    let impl_at = migrated_unit.find("impl pt")
+    assert(impl_at > 0)
+    assert(not migrated_unit.slice(0, impl_at).contains("(unsafe "))
     assert(migrated_unit.contains("(*__param_p)"))
     assert(migrated_unit.contains("(__param_v[__local_i])"))
-    assert(migrated_unit.contains("(*__param_q).x"))
+    assert(migrated_unit.contains("    pub mut fn bump()"))
+    assert(migrated_unit.contains("(unsafe *__param_q).x"))
     var main_text = "use ru.unit\nuse ru.defs\nfn main:\n"
     main_text = main_text ++ "    var held = pt { x: 5, y: 6 }\n"
     main_text = main_text ++ "    let a: [4]c_int = [1, 2, 3, 4]\n"
+    main_text = main_text ++ "    held.bump()\n"
     main_text = main_text ++ "    unsafe:\n"
-    main_text = main_text ++ "        bump(&raw mut held)\n"
     main_text = main_text ++ "        assert(deref(&raw const a[2]) == 3)\n"
     main_text = main_text ++ "        assert(sum(&raw const a[0], 4) == 10)\n"
     main_text = main_text ++ "        assert(field(&raw const held) == 68)\n"

@@ -4534,20 +4534,24 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     let header = "struct item { int v; struct item *next; };\nstruct pair { int a; int b; };\nstruct eng { int count; struct item *items; void *user; };\n" ++
         "void eng_init(struct eng *e);\nvoid eng_push(struct eng *e, struct item *it);\nvoid eng_set_user(struct eng *e, void *user);\nint eng_count(const struct eng *e);\n" ++
         "struct item *eng_first(struct eng *e);\nvoid eng_bump(struct eng *e, int *out);\nint eng_find(struct eng *e, int key, int *out);\nvoid eng_fill(struct eng *e, struct pair *out);\n" ++
-        "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n"
+        "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n" ++
+        "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\n"
     let unit = "#include <stdlib.h>\n#include \"eng.h\"\n" ++
         "void eng_init(struct eng *e) { e->count = 0; e->items = 0; e->user = 0; }\n" ++
         "void eng_push(struct eng *e, struct item *it) { it->next = e->items; e->items = it; e->count++; }\n" ++
         "void eng_set_user(struct eng *e, void *user) { e->user = user; }\n" ++
         "int eng_count(const struct eng *e) { return e->count; }\n" ++
         "struct item *eng_first(struct eng *e) { return e->items; }\n" ++
-        "void eng_bump(struct eng *e, int *out) { *out = e->count + 1; }\n" ++
+        "void eng_bump(struct eng *e, int *out) { e->count++; *out = e->count; }\n" ++
         "int eng_find(struct eng *e, int key, int *out) { if (e->count == 0) return 0; *out = key; return 1; }\n" ++
-        "void eng_fill(struct eng *e, struct pair *out) { *out = (struct pair){ e->count, 1 }; }\n" ++
+        "void eng_fill(struct eng *e, struct pair *out) { e->count++; *out = (struct pair){ e->count, 1 }; }\n" ++
         "void eng_bump_twice(struct eng *e, int *out) { eng_bump(e, out); *out = *out + 1; }\n" ++
         "void eng_free(struct eng *e) { struct item *it = e->items; while (it) { struct item *n = it->next; free(it); it = n; } e->items = 0; }\n" ++
         "void eng_drop_user(struct eng *e) { free(e->user); e->user = 0; }\n" ++
-        "void eng_via(struct eng *e) { eng_init(e); }\n"
+        "void eng_via(struct eng *e) { eng_init(e); }\n" ++
+        "int eng_take(struct eng *e, int *out) { *out = e->count; e->count = 0; return 1; }\n" ++
+        "struct eng *eng_touch(struct eng *e) { e->count++; return e; }\n" ++
+        "int eng_use(struct eng *e) { int v; struct pair p; eng_bump(e, &v); eng_fill(e, &p); int s = eng_take(e, &v); eng_touch(e); eng_init(e); return v + p.a + s; }\n"
     var rc = bs_write_fixture(ctx, bs_join(src_dir, "eng.h"), header, "contracts header")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(src_dir, "eng.c"), unit, "contracts unit")
@@ -4578,13 +4582,15 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     // (a2) out-parameters: written whole on every path, a scalar and a
     // record; after a return; read (by a callee) before the write.
-    rc = bs_file_contains(ctx, contracts, "eng_bump\tunproved:0:read only,out:1:i32\n", "contracts scalar out-parameter")
+    rc = bs_file_contains(ctx, contracts, "eng_bump\treceiver-mut:eng,out:1:i32\n", "contracts scalar out-parameter")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, contracts, "eng_fill\tunproved:0:read only,out-record:1:pair\n", "contracts record out-parameter")
+    rc = bs_file_contains(ctx, contracts, "eng_fill\treceiver-mut:eng,out-record:1:pair\n", "contracts record out-parameter")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_take\treceiver-mut:eng,out:1:i32\n", "contracts out-parameter beside a status")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_find\tunproved:0:read only,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, contracts, "eng_bump_twice\tunproved:0:read only,unproved:1:out-parameter read before the write\n", "contracts out-parameter read first")
+    rc = bs_file_contains(ctx, contracts, "eng_bump_twice\treceiver-mut:eng,unproved:1:out-parameter read before the write\n", "contracts out-parameter read first")
     if rc != 0: return rc
     // (b) a stored pointer: owned only when a corpus function frees the
     // field it was stored into; an intrusive link freed through a local
@@ -4593,15 +4599,54 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_push\treceiver-mut:eng,stored-unknown:1\n", "contracts stored without a proved destroyer stays unknown")
     if rc != 0: return rc
-    // (c) a returned pointer that is a part of a parameter.
+    // (c) a returned pointer that is a part of a parameter; the receiver
+    // itself, beside (a1).
     rc = bs_file_contains(ctx, contracts, "eng_first\tret-from:0\n", "contracts returned parameter is a borrow")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_touch\treceiver-mut:eng,ret-from:0\n", "contracts returned receiver")
     if rc != 0: return rc
     // #2602: a migration is byte-identical wherever it runs — its header
     // names the source by its path under the input directory, never the
     // absolute scratch path of the worktree that ran it (D50).
-    rc = bs_file_forbids(ctx, bs_join(case_dir, "out/eng.w"), bs_abs(root, src_dir), "migration header names no absolute path")
+    let out_w = bs_join(case_dir, "out/eng.w")
+    rc = bs_file_forbids(ctx, out_w, bs_abs(root, src_dir), "migration header names no absolute path")
     if rc != 0: return rc
-    bs_file_contains(ctx, bs_join(case_dir, "out/eng.w"), "// Generated by: with migrate eng.c\n", "migration header names the source under the input directory")
+    rc = bs_file_contains(ctx, out_w, "// Generated by: with migrate eng.c\n", "migration header names the source under the input directory")
+    if rc != 0: return rc
+    // Step 2, emission: a proved function is a `pub mut fn` of its record,
+    // the out-parameter its return (`T`, or `(status, T)`), the returned
+    // receiver a view of self; a corpus call to one is a method call, an
+    // out-argument assigned from the return; a function with an unproved
+    // pointer keeps its raw signature and says why above it.
+    rc = bs_file_contains(ctx, out_w, "impl eng {\n", "emission impl block")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub mut fn init()", "emission mutating receiver")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub mut fn bump() -> i32", "emission scalar out-parameter returned")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub mut fn fill() -> pair", "emission record out-parameter returned")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub mut fn take() -> (i32, i32)", "emission status and out-parameter returned")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub mut fn touch() -> &eng from self", "emission returned receiver is a view")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "return (1, __ci_out)", "emission status return carries the out value")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, ".bump()", "emission void out-parameter call")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, ".take()", "emission status out-parameter call")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, ".touch()", "emission view method call")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "// contract: unproved:0:read only\npub unsafe fn eng_count(", "emission unproved stays raw and says why")
+    if rc != 0: return rc
+    rc = bs_file_forbids(ctx, out_w, "fn eng_init(", "emission replaces the free function")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let check = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-migrate-contracts", check_args)
+    check.rc
 
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
