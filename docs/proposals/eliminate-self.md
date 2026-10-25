@@ -15,16 +15,24 @@ This document is the implementation plan. The normative surface is amended in
 `docs/spec/002_ownership.md` (§2.4, §9.5); the rationale is recorded in
 `docs/meetings/2026-07-07-D7-eliminate-self-the-receiver-mode-is-a-fn-prefix-keyword-self.md` (D7).
 
-**Status (2026-10-25).** The receiver half (phases 0–3, §4) is the language:
-`fn` / `mut fn` / `move fn` inside an `impl` synthesise the receiver, the
-dotted top-level form is associated, and the tree is written that way. Phase
-4's refusal of an explicit receiver parameter is not done: `fn m(self: &Self)`
-inside an `impl` is still accepted (41 such declarations remain, 18 dotted
-top-level forms with a written `self`). The second half — the receiver's
-*members* by bare name, so that `self.` itself stops being written — is §8
-below: D83 (2026-10-03) landed bare fields in a method declared in the type's
-own module; bare fields in an `impl` elsewhere and bare method calls are the
-open plan, proposed, not ruled.
+**Status (2026-10-25, audited against main 0a07df6e6).** The receiver half
+(phases 0–3, §4) is the language: `fn` / `mut fn` / `move fn` inside an
+`impl` synthesise the receiver, a trait impl may omit it against a trait
+method that wrote `self` (verified), the dotted top-level form is
+associated, `with migrate-receivers` exists, #644/#645/#646 are closed, and
+the tree is written that way. Phase 4's refusal of an explicit receiver
+parameter is not done: `fn m(self: &Self)` inside an `impl` and
+`fn Type.m(self: &Self)` at top level are both still accepted. What still
+writes a receiver: 22 trait *declarations* in `lib/std/traits.w` (the D7
+carve-out, by design), 19 trait impls in `lib/std/sync.w` and the
+collections' `IndexGet` impls (could drop it today), and 18 dotted
+top-level methods in `lib/std/alloc.w` and `lib/std/build.w` (phase 3's
+last relocations). The second half — the receiver's *members* by bare name,
+so that `self.` itself stops being written — is §8 below: D83 (2026-10-03)
+landed bare fields in a method declared in the type's own module; bare
+fields in an `impl` elsewhere and bare method calls are the open plan,
+proposed, not ruled. Sections 2–7 are kept as the record of the receiver
+half; where they are stale, a bracketed note says so.
 
 ---
 
@@ -84,6 +92,9 @@ new one.
 
 ### What this dissolves (not patches)
 
+[2026-10-25: all three issues below are closed; the bare-`mut self` codegen
+failure no longer has a surface to occur on.]
+
 - **#646** (unflagged `self: ConcreteType` escapes the mode check) — there is no
   `self` parameter to annotate, so nothing escapes. The mode is the keyword.
 - **#645 part 2** (`mut` silently discarded on a non-self param) — already
@@ -99,11 +110,15 @@ new one.
 
 ## 2. Feasibility (verified, not assumed)
 
+[2026-10-25: this section is the record of the decision; the line numbers
+were the tree of 2026-07. The functions it names are `Parser.parse_impl_block`,
+`Parser.build_synth_receiver` and `Parser.flush_receiver_only_param`, which
+is how the receiver is synthesised today.]
+
 1. **Owner known at parse time.**
-   - `impl` form: `parse_impl_block` holds `type_name` (`src/Parser.w:3023`).
-   - `fn Type.method` form: the owner `type_str` is in hand at
-     `src/Parser.w:1179`, *before* the parameter list is parsed
-     (`src/Parser.w:1187`).
+   - `impl` form: `parse_impl_block` holds `type_name`.
+   - `fn Type.method` form: the owner `type_str` is in hand *before* the
+     parameter list is parsed.
 2. **Synthesis precedent.** The parser already synthesises declarations and
    params: `synthesize_implicit_main` (`:237`), `queue_synthetic_copy_impl`
    (`:1550`), synthetic parameter patterns (`:7565`), synthetic type nodes
@@ -153,6 +168,12 @@ Each phase self-hosts and passes the full gate
 diff the tree, review every flip before gating. Until the campaign-end seed
 update, compiler sources must not rely on the new spelling.
 
+[2026-10-25: superseded. Verification is the tiered gate and the one
+seed-driven battery per stack (D14, D131, `tools/battery.w`); the flip sweep
+and the "campaign-end seed update" were the 2026-07 bootstrap discipline.
+A compiler-source spelling that needs a newer seed is cut and pinned
+through `seed.lock` (`:seed`; there is no `:update-seed`), never held back.]
+
 ### Phase 0 — Grammar (done as part of P1)
 - Parser: accept a `mut` / `move` prefix on a method `fn` **inside** an
   `impl`/`extend` block; error it at top level. No `static` keyword. The impl
@@ -171,9 +192,11 @@ update, compiler sources must not rely on the new spelling.
   means **moving them into an `impl` block**. Deferred to the migrator (§4a) with
   the P3 read-borrow bulk; explicit forms stay accepted meanwhile.
 
-### Phase 2 — Synthesise read-borrow `fn` inside `impl`/`extend`
+### Phase 2 — Synthesise read-borrow `fn` inside `impl`/`extend` — **DONE**
 - A plain `fn` inside `impl`/`extend` with no explicit receiver prepends
   `self: &Self`. (This is where plain `fn` inside a type gains meaning.)
+  [The generic blocker below is fixed: `impl[T] Stack[T]:` with receiver
+  methods is how every facade is written.]
 - Migrate the read-borrow methods **already in** `impl`/`extend` blocks (drop the
   explicit `self: &Self`/`self: Self`).
 - **Blocker to fix first:** generic `impl Type[T]:` blocks with receiver methods
@@ -181,20 +204,33 @@ update, compiler sources must not rely on the new spelling.
   form is top-level `fn Type.m[T](self…)`). Generic types can only migrate into
   `impl` blocks once this is fixed.
 
-### Phase 3 — Relocate top-level instance methods into `impl` blocks
+### Phase 3 — Relocate top-level instance methods into `impl` blocks — **DONE but 18**
+- [Remaining: `fn Arena.add_block(mut self: Arena, …)` and its two siblings
+  in `lib/std/alloc.w`, and the `ToolFs.*(self: &Self, …)` methods in
+  `lib/std/build.w`, which the pinned seed's evaluator compiles (a
+  build-layer spelling is seed-gated); they move with the next seed that
+  allows it.]
 - The ~3,386 top-level `fn Type.method(self: Type)` are associated-by-location;
   to become implicit-`self` instance methods they move into `impl Type:` blocks.
   This is the large mechanical restructuring — needs the migrator (§4a).
   Associated/top-level `fn Type.name()` (no self) stay put.
 
-### Phase 4 — Enforce
-- Reject an explicit `self` parameter with a fix-it; reject `mut`/`move fn` at
-  top level. Update remaining spec examples / `examples/` and the compile-error
-  test pins. Campaign-end bootstrap: one chain
-  `:test → :last-green → :update-seed → :install-user`; verify the new seed
-  compiles a self-less probe.
+### Phase 4 — Enforce — **OPEN**
+- Reject an explicit `self` parameter with a fix-it (outside a `trait` body,
+  where D7's carve-out keeps it as the instance/associated discriminator);
+  reject `mut`/`move fn` at top level [done]. Update remaining spec examples
+  / `examples/` and the compile-error test pins. [The campaign-end chain
+  this phase named (`:update-seed`) no longer exists: the sweep of the 37
+  remaining explicit receivers outside trait bodies lands as one stack, its
+  battery, a merge, a reseed; a seed cut only if the build layer's spelling
+  needs one.] Resumes after §8's sweep, which removes `self.` first.
 
 ## 4a. Migration tooling
+
+[2026-10-25: exists — `with migrate-receivers` (`src/ReceiverMigration.w`:
+`--report`, `--list`, `--apply`) and `tools/migrate_receivers.w`, selection
+from `compiler_analyze_file` facts, byte edits through the Lexer. The same
+shape serves §8's sweep.]
 
 The volume (~3,900 receivers + relocations) needs a **compiler-driven migrator**
 (`with migrate-receivers`, reusing the parser) — it must handle multi-line
@@ -218,7 +254,11 @@ its flags. Regex will not survive 3,900 self-host-critical sites.
   (`behav_mut_self_drop_generic` is the guard test).
 - **Trait / interface methods without a body** — the modifier must be parseable
   on a signature-only method declaration and flow into the trait's expected
-  receiver shape. **Trait carve-out (ruled, see D7):** inside a `trait` body
+  receiver shape. [Verified 2026-10-25: a trait method written `fn area(self:
+  &Self)` is an instance contract and its impl may write `fn area()`; a trait
+  method written `fn area()` is associated and `self` in its impl is
+  undefined, with the "call it as `D.area(...)`" help.] **Trait carve-out
+  (ruled, see D7):** inside a `trait` body
   only `mut fn` / `move fn` synthesise; plain `fn` keeps the explicit spelling
   because a trait must hold both instance and associated contracts and location
   cannot discriminate there — with a receiver param it is an instance contract,
@@ -249,7 +289,10 @@ its flags. Regex will not survive 3,900 self-host-critical sites.
   `self` parameter.
 - Full gate + fixpoint. Fixpoint is the self-host regression proof for the
   parser change.
-- `/drop-audit` before/after Phase 1 and 3 (receiver-mode drop discipline).
+- `with build :drop-audit` before/after Phase 1 and 3 (receiver-mode drop
+  discipline). [The fast check is `with check` with the installed compiler
+  and `out/bootstrap/bin/with-stage1` after `:dev`; `with-stage2` exists only
+  after a full build.]
 
 ---
 
