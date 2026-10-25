@@ -864,11 +864,12 @@ fn run_cli(full_argc: i32) -> i32:
             return 1
         print(tools_dir)
         return 0
-    // #2198: a flag `check`, `ir` or `run` does not know is an error. It
-    // used to be ignored, so a misspelled `--validate-al` (or the removed
-    // `--dump-drop-flags`) printed `ok` for a check that never ran.
+    // #2198: a flag the driver does not know is an error. It used to be
+    // ignored, so a misspelled `--validate-al` (or the removed
+    // `--dump-drop-flags`) printed `ok` for a check that never ran, and
+    // `build --emit-llvm` wrote an executable to the `.ll` path (#2634, #1097).
     let cli_cmd = cli_command(argc)
-    if cli_cmd == "check" or cli_cmd == "ir" or cli_cmd == "run":
+    if cli_cmd == "check" or cli_cmd == "ir" or cli_cmd == "run" or cli_cmd == "build" or cli_cmd == "test" or cli_cmd == "analyze":
         let unknown = cli_unknown_flag(argc)
         if unknown.len() > 0:
             let near = cli_nearest_flag(unknown)

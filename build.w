@@ -2665,21 +2665,31 @@ fn deep_debug_analyze_expect(ctx: &ActionCtx, root: &str, compiler: &str, source
         ctx.diagnostics().error("deep-debug-tool-tests: " ++ name ++ " report missing '" ++ needle ++ "'; stdout=" ++ stdout_path)
     0
 
-// #2198: a flag `check` does not know is refused, never ignored: the removed
-// `--dump-drop-flags` printed `ok` for a dump that never ran.
+// #2198: a flag the driver does not know is refused, never ignored: the
+// removed `--dump-drop-flags` printed `ok` for a dump that never ran, and
+// `build --emit-llvm` wrote an executable where IR was asked for (#2634,
+// #1097). Each case is `command:flag`.
 fn deep_debug_unknown_flag_refused(ctx: &ActionCtx, root: &str, compiler: &str, source_path: &str, out_dir: &str) -> i32:
-    let args: List[str] = List.new()
-    args.push(build_owned_text(compiler))
-    args.push("check")
-    args.push(build_owned_text(source_path))
-    args.push("--dump-drop-flags")
-    let stdout_path = build_project_abs(root, build_project_join(out_dir, "unknown-flag.stdout"))
-    let stderr_rel = build_project_join(out_dir, "unknown-flag.stderr")
-    let result = ctx.process_runner().run_capture_cwd(args, stdout_path, build_project_abs(root, stderr_rel), 120000, root)
-    if result.rc == 0:
-        ctx.diagnostics().error("deep-debug-tool-tests: `check --dump-drop-flags` (a removed flag) exited 0; an unknown flag must be refused (#2198)")
-    if not ctx.fs().read_text(stderr_rel).contains("unknown option `--dump-drop-flags`"):
-        ctx.diagnostics().error("deep-debug-tool-tests: the unknown-flag refusal does not name the flag; stderr=" ++ build_project_abs(root, stderr_rel))
+    for case in "check:--dump-drop-flags build:--emit-llvm build:--no-such-flag-2634 test:--no-such-flag-2634 analyze:--no-such-flag-2634".split(" "):
+        let parts = case.split(":")
+        let command = parts[0]
+        let flag = parts[1]
+        let args: List[str] = List.new()
+        args.push(build_owned_text(compiler))
+        args.push(build_owned_text(command))
+        args.push(build_owned_text(source_path))
+        args.push(build_owned_text(flag))
+        if command == "build":
+            args.push("-o")
+            args.push(build_project_abs(root, build_project_join(out_dir, "unknown-flag.out")))
+        let stem = "unknown-flag-" ++ command ++ flag
+        let stdout_path = build_project_abs(root, build_project_join(out_dir, stem ++ ".stdout"))
+        let stderr_rel = build_project_join(out_dir, stem ++ ".stderr")
+        let result = ctx.process_runner().run_capture_cwd(args, stdout_path, build_project_abs(root, stderr_rel), 120000, root)
+        if result.rc == 0:
+            ctx.diagnostics().error("deep-debug-tool-tests: `" ++ command ++ " " ++ flag ++ "` exited 0; an unknown flag must be refused (#2198, #2634)")
+        if not ctx.fs().read_text(stderr_rel).contains("unknown option `" ++ flag ++ "` for `with " ++ command ++ "`"):
+            ctx.diagnostics().error("deep-debug-tool-tests: the unknown-flag refusal of `" ++ command ++ "` does not name the flag; stderr=" ++ build_project_abs(root, stderr_rel))
     0
 
 // An audit fixture with a planted defect: the audit must exit nonzero, name
