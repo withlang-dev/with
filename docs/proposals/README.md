@@ -24,7 +24,7 @@ folder. A finished phase is archived in [docs/completed](../completed).
 - [Storage Types and Caller-Place Parameters — Specification](storage-types-and-caller-places-spec.md)
 - [Structural Types and Anonymous Struct Literals](structural-types.md)
 - [Unified `from` Query Expressions](from-query-expressions.md)
-- [Eliminate `self`: Swift-style implicit receiver](eliminate-self.md)
+- [Eliminate `self`: the receiver's members by bare name](eliminate-self.md)
 - [Claims: a human-known fact enters the type system through the front door](claims.md)
 - [i128/u128 End-to-End Implementation Plan (#914)](i128.md)
 - [comptime Integer Width — Implementation Plan (#943)](comptime-int-width.md)
