@@ -1,9 +1,8 @@
 // CiContracts — D159: the contracts a migrated function's own body proves,
 // drawn once over the whole corpus and written as the contracts artifact
 // (`with migrate --emit-contracts FILE`, one line per defined function:
-// `name<TAB>verdict[,verdict…]`). Step 1 of
-// docs/proposals/migrator-contracts-plan.md: the verdicts are recorded and
-// diffed; nothing changes a signature yet.
+// `name<TAB>verdict[,verdict…]`), and the shape each proved function is
+// printed in (docs/proposals/migrator-contracts-plan.md, steps 1 and 2).
 //
 // The evidence is the body's (CImport.w ci_body_contract_evidence) joined
 // with D121's ownership proofs (CiFacadeDraft.w resolve_ownership:
@@ -29,6 +28,16 @@
 //
 // A read-only first pointer is `unproved: read only`: a `&self` receiver is
 // not in the ruling's list.
+//
+// Step 2, the shape (resolve_method_shapes): a function whose first
+// parameter is `receiver-mut:R` on a record the corpus declares, with every
+// other pointer parameter an out-parameter, is printed as the method
+// `pub mut fn <m>` of `impl R:` (CiMigrate.w ci_migrate_push_method); the
+// out-parameter comes back as the return, `T` or `(status, T)`; a return
+// that is the receiver itself (`return self`, the one source that is a part
+// of it for certain) is `-> &R from self`. Every other function keeps its
+// raw signature. A corpus call to a method is printed as one (CImport.w
+// lower_method_call_ir).
 
 use CiIR
 use CImport
@@ -65,6 +74,16 @@ fn ct_has_line(evidence: &str, line: &str) -> bool:
     for l in evidence.split("\n"):
         if l == line: return true
     false
+
+// The method name for C function `c_name` on `record`: the C name less the
+// record's prefix (`stc_word_stack_push` on `stc_word_stack` is `push`,
+// `GHashTable`'s `g_hash_table_` prefix the same way), the whole C name
+// when it has no such prefix; reserved words escape as everywhere else.
+fn ct_method_name(c_name: &str, record: &str) -> str:
+    var method = ci_strip_snake_prefix(c_name, record ++ "_")
+    if method.len() == 0: method = ci_strip_snake_prefix(c_name, ci_compute_snake_prefix(record))
+    if method.len() == 0: method = c_name.to_owned()
+    ci_escape_reserved(method)
 
 impl CiProject:
     // The pointer parameters each function writes through: a direct write
@@ -132,6 +151,8 @@ impl CiProject:
             let mutates = pi < self.symbols[si].param_mutates.len() and self.symbols[si].param_mutates[pi] != 0
             if pi == 0 and record.len() > 0 and mutates:
                 out.push("receiver-mut:" ++ record)
+                // (c) beside (a1): the receiver is also what is returned.
+                if self.symbols[si].borrow_from == 0 and not self.ct_returns_null(si): out.push("ret-from:0")
                 continue
             if pi > 0 and ct_has_line(evidence, f"outfull:{pi}"):
                 let pointee = ct_pointee(ty)
@@ -152,7 +173,10 @@ impl CiProject:
                 out.push(if owned: f"owned:{pi}" else: f"stored-unknown:{pi}")
                 continue
             if self.symbols[si].borrow_from == pi:
-                out.push(f"ret-from:{pi}")
+                // A NULL the body may also return is no part of the
+                // parameter: the ownership proof skips a NULL source (a NULL
+                // is nobody's to free), a view of one would be unsafety.
+                out.push(if self.ct_returns_null(si): f"unproved:{pi}:returns NULL on a path" else: f"ret-from:{pi}")
                 continue
             // A pointer the body never writes through is read only; one it
             // writes through is named by how the out-parameter proof failed,
@@ -178,6 +202,67 @@ impl CiProject:
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             self.symbols[si].contract = self.ct_verdicts(si as i32)
+        self.resolve_method_shapes()
+
+    // Whether a `return` of the body may hand back NULL.
+    fn ct_returns_null(si: i32) -> bool:
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line.starts_with("ret:") and self.fd_source_verdict(si, line.slice(4, line.len()), 0) == "null": return true
+        false
+
+    // The shape one function prints in, `record|method|out|out_ty|view`, or
+    // "" for the raw signature (the module comment above).
+    fn ct_method_shape(si: i32) -> str:
+        let contract = self.symbols[si].contract
+        if self.symbols[si].variadic != 0 or contract == "plain" or contract == "unanalyzable": return ""
+        var record = ""
+        var out = -1
+        var out_ty = ""
+        var view = 0
+        for verdict in contract.split(","):
+            if verdict.starts_with("receiver-mut:"): record = verdict.slice(13, verdict.len()).to_owned()
+            else if verdict.starts_with("out:") or verdict.starts_with("out-record:"):
+                let parts = verdict.split(":")
+                if out >= 0 or parts.len() != 3: return ""
+                out = parse(parts[1])
+                out_ty = parts[2].to_owned()
+            else if verdict == "ret-from:0":
+                // Only `return self` is a part of the receiver for certain: a
+                // pointer loaded from one of its fields, or arithmetic on
+                // one, may be NULL or point anywhere.
+                for line in self.symbols[si].own_evidence.split("\n"):
+                    if line.starts_with("ret:") and line != "ret:param:0": return ""
+                view = 1
+            else: return ""
+        if record.len() == 0 or not self.records.contains(record): return ""
+        if view != 0 and ct_pointee(self.symbols[si].ret_ty).len() == 0: return ""
+        f"{record}|" ++ ct_method_name(self.symbols[si].name, record) ++ f"|{out}|{out_ty}|{view}"
+
+    // D159 step 2: every proved function's shape, once. Two functions that
+    // would share a method name both keep their raw signatures, and the
+    // artifact says which.
+    mut fn resolve_method_shapes():
+        var taken: HashMap[str, str] = HashMap.new()
+        for si in 0..self.symbols.len():
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            let shape = self.ct_method_shape(si as i32)
+            if shape.len() == 0: continue
+            let parts = shape.split("|")
+            let key = parts[0] ++ "." ++ parts[1]
+            if taken.contains(key):
+                let other_name = (taken.get(key) ?? "").to_owned()
+                let other = self.find_symbol(CiProjectSymbolKind.CIPS_FN, other_name)
+                self.symbols[si].contract = self.symbols[si].contract ++ ",method-collision:" ++ other_name
+                if other >= 0:
+                    self.symbols[other].contract = self.symbols[other].contract ++ ",method-collision:" ++ self.symbols[si].name
+                    self.symbols[other].method_record = ""
+                continue
+            taken.insert(key, self.symbols[si].name)
+            self.symbols[si].method_record = parts[0].to_owned()
+            self.symbols[si].method_name = parts[1].to_owned()
+            self.symbols[si].method_out = parse(parts[2])
+            self.symbols[si].method_out_ty = parts[3].to_owned()
+            self.symbols[si].method_view = parse(parts[4])
 
     // The artifact: one line per defined function, sorted by name.
     fn contracts_tsv() -> str:

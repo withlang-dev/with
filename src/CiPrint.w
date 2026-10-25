@@ -330,13 +330,7 @@ fn ci_print_compact_stmt_local(stmts: CiStmtPool, exprs: CiExprPool, types: CiTy
         return indent ++ ci_print_expr(exprs, types, e, 0, 0) ++ "\n"
 
     if kind == CiStmtKind.CIS_RETURN:
-        let e = (stmts.get_d0(id)) as CiExprId
-        if (e as i32) == 0:
-            return indent ++ "return\n"
-        var expr_text = ci_print_expr(exprs, types, e, 0, 0)
-        if exprs.kind(e) == CiExprKind.CIE_CAST:
-            expr_text = "(" ++ expr_text ++ ")"
-        return indent ++ "return " ++ expr_text ++ "\n"
+        return ci_print_return_stmt(exprs, types, (stmts.get_d0(id)) as CiExprId, indent)
 
     if kind == CiStmtKind.CIS_IF:
         let cond = (stmts.get_d0(id)) as CiExprId
@@ -585,6 +579,32 @@ var g_ci_print_in_unsafe_fn: bool = false
 
 fn ci_print_set_unsafe_fn_context(enabled: bool) -> Unit:
     g_ci_print_in_unsafe_fn = enabled
+
+// D159 step 2: how a `return` prints inside a method whose out-parameter is
+// its return (`return x` is `return (x, out)`, a bare `return` is
+// `return out`) or whose return is a view of the receiver (`return p` is
+// `return unsafe { &*(p) }`). CiMigrate sets it around one body.
+var g_ci_print_return_out: str = ""
+var g_ci_print_return_status: bool = false
+var g_ci_print_return_view: bool = false
+
+fn ci_print_set_return_shape(out_local: &str, status: bool, view: bool) -> Unit:
+    g_ci_print_return_out = out_local.to_owned()
+    g_ci_print_return_status = status
+    g_ci_print_return_view = view
+
+fn ci_print_return_stmt(exprs: CiExprPool, types: CiTypePool, e: CiExprId, indent: &str) -> str:
+    if (e as i32) == 0:
+        if g_ci_print_return_out.len() > 0: return indent ++ "return " ++ g_ci_print_return_out ++ "\n"
+        return indent ++ "return\n"
+    if g_ci_print_return_view:
+        return indent ++ "return unsafe { &*(" ++ ci_print_wrapped_operand(exprs, types, e, 0, 0) ++ ") }\n"
+    var expr_text = ci_print_expr(exprs, types, e, 0, 0)
+    if exprs.kind(e) == CiExprKind.CIE_CAST:
+        expr_text = "(" ++ expr_text ++ ")"
+    if g_ci_print_return_out.len() > 0 and g_ci_print_return_status:
+        return indent ++ "return (" ++ expr_text ++ ", " ++ g_ci_print_return_out ++ ")\n"
+    indent ++ "return " ++ expr_text ++ "\n"
 
 // D30 R4c: with_memcpy is the runtime's own safe definition wherever a
 // migration declares it, so the copy needs no `unsafe` of its own in a
@@ -1028,13 +1048,7 @@ fn ci_print_stmt(stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, id: Ci
         return indent ++ ci_print_expr(exprs, types, e, 0, 0) ++ "\n"
 
     if kind == CiStmtKind.CIS_RETURN:
-        let e = (stmts.get_d0(id)) as CiExprId
-        if (e as i32) == 0:
-            return indent ++ "return\n"
-        var expr_text = ci_print_expr(exprs, types, e, 0, 0)
-        if exprs.kind(e) == CiExprKind.CIE_CAST:
-            expr_text = "(" ++ expr_text ++ ")"
-        return indent ++ "return " ++ expr_text ++ "\n"
+        return ci_print_return_stmt(exprs, types, (stmts.get_d0(id)) as CiExprId, indent)
 
     if kind == CiStmtKind.CIS_BLOCK:
         let start = stmts.get_d0(id)

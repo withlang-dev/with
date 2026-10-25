@@ -89,6 +89,65 @@ fn ci_migrate_set_unsafe_function_body_context(enabled: bool) -> Unit:
     g_ci_migrate_in_unsafe_function_body = enabled
     ci_print_set_unsafe_fn_context(enabled)
 
+// D159 step 2: the corpus functions this migration prints as methods
+// (CiMigrate installs them from the project's shapes before a unit is
+// translated): the function's With name ->
+// `record|method|out|out_ty|view|status|ret`. A call to one is printed as a
+// method call (lower_method_call_ir).
+var g_ci_migrate_method_shapes: HashMap[str, str] = HashMap.new()
+
+fn ci_migrate_set_method_shapes(shapes: HashMap[str, str]) -> Unit:
+    g_ci_migrate_method_shapes = shapes
+
+fn ci_migrate_method_shape(name: &str) -> str:
+    (g_ci_migrate_method_shapes.get(name) ?? "").to_owned()
+
+// Whether the body just translated (ci_trans_stmt_ir) ends in a return,
+// break or continue on every path: a method returning its out-parameter
+// adds `return __ci_out` only where the body can fall off its end.
+var g_ci_body_ends_with_terminator = false
+
+fn ci_body_ends_with_terminator() -> bool: g_ci_body_ends_with_terminator
+
+impl CiStmtPool:
+    // D159 step 2: `f(p, a, o)` where f is printed as the method `m` of p's
+    // record is `(*p).m(a)`; when f returned through o it is
+    // `*o = (*p).m(a)` for a C void function, else
+    // `let r = (*p).m(a); *o = r.1; r.0`. The receiver is reached through a
+    // raw pointer, so the call supplies its own `unsafe` where the function
+    // around it is not already unsafe.
+    fn lower_method_call_ir(exprs: CiExprPool, types: CiTypePool, shape: &str, arg_ids: &List[i32], setup_in: CiStmtId) -> CiValueExprIR:
+        let parts = shape.split("|")
+        let out_index: i32 = parse(parts[2])
+        let in_unsafe = g_ci_migrate_in_unsafe_function_body
+        let receiver = exprs.add(CiExprKind.CIE_DEREF, arg_ids[0], 0, 0, 0)
+        let callee = exprs.add(CiExprKind.CIE_FIELD, receiver as i32, exprs.add_string(parts[1]), 0, 0)
+        let args_start = exprs.extra_len() as i32
+        var count: i32 = 0
+        for i in 1..arg_ids.len():
+            if i == out_index: continue
+            exprs.add_extra(arg_ids[i])
+            count = count + 1
+        let call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, count, 0)
+        if out_index < 0:
+            return CiValueExprIR { setup_stmt: setup_in, value_expr: if in_unsafe: call else: exprs.unsafe_expr(call) }
+        let target = exprs.add(CiExprKind.CIE_DEREF, arg_ids[out_index], 0, 0, 0)
+        if parts[5] == "0":
+            let store = exprs.add(CiExprKind.CIE_ASSIGN, target as i32, call as i32, 0, 0)
+            return CiValueExprIR { setup_stmt: setup_in, value_expr: if in_unsafe: store else: exprs.unsafe_expr(store) }
+        let temp = "__ci_method_" ++ i32_to_string(call as i32)
+        let pair_ty = types.named_type_from_text("(" ++ parts[6] ++ ", " ++ parts[3] ++ ")")
+        let decl = self.var_decl(self.add_string(temp), pair_ty, if in_unsafe: call else: exprs.unsafe_expr(call), 0)
+        // The temporary's fields read plainly: an untyped base takes no borrow.
+        let temp_ref = exprs.ident(exprs.add_string(temp), 0)
+        let second = exprs.add(CiExprKind.CIE_FIELD, temp_ref as i32, exprs.add_string("1"), 0, 0)
+        let store = exprs.add(CiExprKind.CIE_ASSIGN, target as i32, second as i32, 0, 0)
+        let store_stmt = self.expr_stmt(if in_unsafe: store else: exprs.unsafe_expr(store))
+        CiValueExprIR {
+            setup_stmt: self.merge_ir(self.merge_ir(setup_in, decl), store_stmt),
+            value_expr: exprs.add(CiExprKind.CIE_FIELD, temp_ref as i32, exprs.add_string("0"), 0, 0),
+        }
+
 fn ci_set_no_methods(all_flag: i32, types: List[str]):
     g_cimport_no_methods_all = all_flag
     g_cimport_no_methods_types = types
@@ -2242,7 +2301,8 @@ fn ci_detect_member_functions(session: i64, count: i32, known_structs: &str) -> 
         let kind = with_cimport_decl_kind(session, i)
         if kind == CK_FUNCTION:
             let name = with_cimport_decl_name(session, i)
-            if name.len() > 0 and name[0] != 95 and not ci_omitted_symbol_recorded(name):
+            // D159 step 2: a function printed as a method is one already.
+            if name.len() > 0 and name[0] != 95 and not ci_omitted_symbol_recorded(name) and ci_migrate_method_shape(ci_migrate_c_function_name(name)).len() == 0:
                 let param_count = with_cimport_fn_param_count(session, i)
                 let ret_type = with_cimport_fn_return_type_translated(session, i)
                 // Try first-param-based matching (existing logic)
@@ -13222,6 +13282,12 @@ impl CiStmtPool:
                 let referenced_cursor = if nc > 0: with_ci_child(session, cursor, 0) else: cursor
                 if not ci_note_filtered_system_symbol_ref_at(session, referenced_cursor, callee_text, CI_LIBC_KIND_FN):
                     return ci_value_ir_invalid()
+            // D159 step 2: a corpus function the contracts print as a method
+            // is called as one.
+            if callee_decl_idx >= 0 and ci_is_c_ident(callee_text) and arg_ids.len() == callee_param_count and callee_param_count >= 1 and (callee_cursor < 0 or ci_cursor_is_function_ref(session, callee_cursor)):
+                let method_shape = ci_migrate_method_shape(callee_text)
+                if method_shape.len() > 0:
+                    return self.lower_method_call_ir(exprs, types, method_shape, &arg_ids, setup)
             let args_start = exprs.extra_len()
             var j: i64 = 0
             while j < arg_ids.len():
@@ -14301,6 +14367,7 @@ fn ci_trans_stmt_ir(session: i64, cursor: i32, kind: i32, indent: i32, scope: Ci
         let target_depth = indent * 4
         rendered = ci_print_stmt(stmts, exprs, types, id, target_depth)
     let tail_unit = ci_stmt_ir_tail_is_unit(stmts, exprs, types, id, true)
+    g_ci_body_ends_with_terminator = ci_stmt_ir_ends_with_terminator(stmts, id)
     stmts.deinit()
     exprs.deinit()
     types.deinit()
