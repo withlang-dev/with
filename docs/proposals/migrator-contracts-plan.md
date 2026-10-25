@@ -233,7 +233,9 @@ may be NULL or point anywhere and keeps the function raw. The STC read
 surface that pays off at once: `size`, `is_empty`, `capacity`, `begin`,
 `end`, `index` (no pointer return); `at`, `top`, `front`, `back` return
 `self->data + k` and stay raw until a non-NULL proof exists (a brief if
-the facades need it; today they read through `unsafe fn place`).
+the facades need it; today they read through `unsafe fn place`; the
+human form is `docs/proposals/claims.md`, tier 1: a cited facts line that
+makes the return `-> &u64 from self`).
 Inference (b)'s three rows (c-algorithms) keep `pub unsafe fn` with
 "stores an argument; ownership not modeled" in the generated comment; the
 owned-field design is its own proposal.
