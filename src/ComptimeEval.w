@@ -2128,6 +2128,15 @@ impl ComptimeEvaluator:
         if self.capability_write_file_allowed(record, self.capability_project_relative_path(record, resolved)): return
         self.record_effect("read\t" ++ resolved)
 
+    // #2452: a directory build(ctx) lists is an input of the graph: a file
+    // added there or deleted makes a different graph (a different input or
+    // target list). The driver's graph cache key re-lists each recorded
+    // directory (build_cache_graph_env_fingerprint); keyed on build.w alone,
+    // a deleted source stayed a declared input of the cached graph.
+    mut fn record_listing_effect(record: &ComptimeCapabilityRecord, resolved: &str):
+        if record.write_scoped != 0: return
+        self.record_effect("list\t" ++ resolved)
+
 fn comptime_effect_join_argv_parts(parts: &List[str]) -> str:
     var out = ""
     for i in 0..parts.len():
@@ -5697,6 +5706,7 @@ impl ComptimeEvaluator:
             if self.had_error != 0:
                 return comptime_control_error()
             self.record_read_effect(record, resolved_base)
+            self.record_listing_effect(record, resolved_base)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved_base))
             let pat_segs = comptime_glob_split_by_slash(glob_suffix)
             let results: List[str] = List.new()
@@ -5770,6 +5780,7 @@ impl ComptimeEvaluator:
                     return comptime_control_value(comptime_value_str(""))
                 return comptime_control_value(comptime_value_str(comptime_sha256_text(with_fs_read_file(resolved))))
             if method == "list_files":
+                self.record_listing_effect(record, resolved)
                 let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(resolved))
                 let list_type = self.node_type_or(node, 0)
                 if list_type == 0:
@@ -5813,6 +5824,7 @@ impl ComptimeEvaluator:
             if self.had_error != 0:
                 return comptime_control_error()
             self.record_read_effect(record, path)
+            self.record_listing_effect(record, path)
             let raw_files = comptime_tool_split_nonempty_lines(with_fs_list_files(path))
             let list_type = self.node_type_or(node, 0)
             if list_type == 0:
