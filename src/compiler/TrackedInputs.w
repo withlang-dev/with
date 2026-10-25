@@ -176,4 +176,8 @@ fn tracked_embed_read(source_path: &str, raw_path: &str, package_root: &str) -> 
         return tracked_read_error(resolved, "embed_file: '" ++ resolved ++ "' is outside the package root '" ++ display_root ++ "'; embed_file reads only tracked inputs inside the package (broader access requires an explicit build capability)")
     if runtime_file_exists(resolved) == 0:
         return tracked_read_error(resolved, "embed_file: could not read '" ++ resolved ++ "'")
+    // #1028: a directory exists and reads as ""; embedding that is a typo
+    // the program would never see.
+    if runtime_is_dir(resolved) != 0:
+        return tracked_read_error(resolved, "embed_file: '" ++ resolved ++ "' is a directory; embed_file embeds one file")
     tracked_read_ok(resolved, runtime_read_file(resolved))
