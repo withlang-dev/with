@@ -29,6 +29,7 @@ type BuildCommandOptions {
     emit_all: bool,
     opt_level: i32,
     debug_info: bool,
+    release: bool,
     no_std: bool,
     alloc_mode: bool,
     runtime_available: bool,
@@ -130,6 +131,7 @@ fn build_command_options_default -> BuildCommandOptions:
         emit_all: false,
         opt_level: 1,
         debug_info: true,
+        release: false,
         no_std: false,
         alloc_mode: false,
         runtime_available: true,
@@ -172,6 +174,7 @@ fn build_command_options_clone(base: &BuildCommandOptions) -> BuildCommandOption
         emit_all: base.emit_all,
         opt_level: base.opt_level,
         debug_info: base.debug_info,
+        release: base.release,
         no_std: base.no_std,
         alloc_mode: base.alloc_mode,
         runtime_available: base.runtime_available,
@@ -490,6 +493,7 @@ fn parse_build_command_options(argc: i32) -> BuildCommandParseResult:
     build.alloc_mode = driver_has_flag(argc, "--alloc")
     build.runtime_available = not driver_has_flag(argc, "--no-runtime") and not driver_has_flag(argc, "--freestanding")
     build.debug_info = not driver_has_flag(argc, "-g0") and not driver_has_flag(argc, "--release")
+    build.release = driver_has_flag(argc, "--release")
     build.deterministic = driver_has_flag(argc, "--deterministic")
     build.strict_effects = driver_has_flag(argc, "--strict-effects")
     let prelude = driver_parse_prelude_mode(argc)

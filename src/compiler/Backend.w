@@ -18,7 +18,7 @@ fn backend_debug_pool_flow_enabled() -> i32:
     1
 
 impl Zcu:
-    mut fn compile_to_object_backend(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, module_object_mode: bool) -> i32:
+    mut fn compile_to_object_backend(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, release: bool, module_object_mode: bool) -> i32:
         if self.last_mir_module.body_count() == 0:
             runtime_eprint("error: missing MIR input for LLVM backend")
             return 1
@@ -31,7 +31,7 @@ impl Zcu:
             let unit_count0 = if env_units0 > 0: env_units0 else: codegen_units_default_count(self.last_mir_module.body_count())
             if unit_count0 > 1:
                 let backend_pool0 = if self.last_sema.ast.decl_count() > 0: self.last_sema.ast.clone() else: pool.clone()
-                return self.compile_units_generated(backend_pool0, opt_level, output_path, debug_info, unit_count0)
+                return self.compile_units_generated(backend_pool0, opt_level, output_path, debug_info, release, unit_count0)
         // D17/#697: codegen OWNS the sema for the emission (take-and-return,
         // the lower_module pattern) and every exit path hands it back —
         // last_sema is blank in between, never aliased. The pools it works
@@ -52,6 +52,7 @@ impl Zcu:
         cg.module_object_mode = if module_object_mode: 1 else: 0
         if not debug_info:
             cg.debug_info = 0
+        cg.release = release
         if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled() != 0:
             runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
             runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_count()}")
@@ -104,7 +105,7 @@ impl Zcu:
     // applies the shared global-ownership surgery, writes the unit's small
     // bitcode, and disposes everything before the next round. Threads then
     // optimize+emit the small bitcodes concurrently.
-    mut fn compile_units_generated(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, unit_count: i32) -> i32:
+    mut fn compile_units_generated(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, release: bool, unit_count: i32) -> i32:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
         var backend_mir = move self.last_mir_module
         let mir_ptr = &raw const backend_mir as i64
@@ -144,6 +145,7 @@ impl Zcu:
             cg.module_object_mode = 0
             if not debug_info:
                 cg.debug_info = 0
+            cg.release = release
             cg.unit_total = unit_count
             cg.unit_index = k
             var ai: i32 = 0

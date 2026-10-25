@@ -442,6 +442,7 @@ impl Compilation:
         self.set_prelude_mode(options.prelude_mode)
         self.set_overflow_mode(options.overflow_mode)
         self.set_debug_info(options.debug_info)
+        self.set_release(options.release)
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
         self.emit_all = options.emit_all
@@ -738,6 +739,11 @@ impl Compilation:
     mut fn set_debug_info(enabled: bool):
         var cfg = move self.config
         cfg.debug_info = enabled
+        self.config = cfg
+
+    mut fn set_release(enabled: bool):
+        var cfg = move self.config
+        cfg.release = enabled
         self.config = cfg
 
     mut fn set_compiler_hooks_enabled(enabled: bool):
@@ -1060,6 +1066,7 @@ impl Compilation:
         runner_comp.configure(self.config.opt_level, self.config.no_std, self.config.alloc_mode, self.config.runtime_available)
         runner_comp.set_prelude_mode(self.config.prelude_mode)
         runner_comp.set_debug_info(self.config.debug_info)
+        runner_comp.set_release(self.config.release)
         runner_comp.set_compiler_hooks_enabled(false)
         runner_comp.set_tool_mode_entry_path(runner_path)
         runner_comp.set_import_root_dir(root)
@@ -1290,7 +1297,7 @@ impl Compilation:
         let requires_async_runtime = self.zcu.last_async_mir_module.requires_async_runtime()
         compilation_debug_pool_flow("build_binary_to_path:after_codegen", self.zcu.pool, active_pool, self.zcu.last_sema)
         compilation_debug_init("build_binary_to_path:compile_to_object_backend")
-        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, false)
+        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, false)
         if backend_rc != 0:
             compilation_debug_init(f"build_binary_to_path:backend FAILED rc={backend_rc}")
             compilation_cleanup_build_products(obj_path, bin_path)
@@ -1419,7 +1426,7 @@ impl Compilation:
             return ""
         let active_pool: AstPool = self.active_pool(prepared_pool)
         let opt_level = self.config.opt_level
-        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
+        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
             compilation_remove_file_best_effort(obj_path)
             return ""
@@ -1622,7 +1629,7 @@ impl Compilation:
             return ""
         let active_pool: AstPool = self.active_pool(pool)
         let opt_level = self.config.opt_level
-        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, true)
+        let backend_rc = self.zcu.compile_to_object_backend(active_pool, opt_level, obj_path, self.config.debug_info, self.config.release, true)
         if backend_rc != 0:
             compilation_remove_file_best_effort(obj_path)
             return ""

@@ -814,6 +814,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     comp.configure(one.opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(false)
+    comp.set_release(cli_release_flag())
     comp.set_statements_entry(true)
     for mi in 0..synthetic.gen_starts.len():
         comp.add_cli_diag_mapping(
@@ -845,6 +846,10 @@ fn cli_driver_argc(argc: i32) -> i32:
     for i in 2..argc:
         if with_arg_at(i) == source: return i + 1
     argc
+
+// `--release` among the driver's own arguments (run_cli's argc, never the
+// program's): the build leaves bounds unchecked (§4.3a, #2268).
+fn cli_release_flag() -> bool: cli_has_flag(cli_driver_argc(with_arg_count()), "--release")
 
 fn run_cli(full_argc: i32) -> i32:
     let argc = cli_driver_argc(full_argc)
@@ -939,7 +944,7 @@ fn run_cli(full_argc: i32) -> i32:
     let dump_place_map_flag = cli_has_flag(argc, "--dump-place-map")
     let trace_cleanup_edge_spec = cli_value_or_prefix(argc, "--trace-cleanup-edge", "--trace-cleanup-edge=")
     let validate_all_flag = cli_has_flag(argc, "--validate-all")
-    let debug_info = not cli_has_flag(argc, "-g0") and not cli_has_flag(argc, "--release")
+    let debug_info = not cli_has_flag(argc, "-g0") and not cli_release_flag()
 
     // --debug-alloc: enable the native debug allocator (see debug-allocator.md)
     // in the program we are about to run. Runtime-gated via WITH_DEBUG_ALLOC; the
@@ -3886,6 +3891,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     options.runtime_available = runtime_available
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
+    options.release = cli_release_flag()
     var load_result = load_build_graph_from_build_w(root, &cfg, &options)
     let graph = load_result.graph
     if not graph.ok:
@@ -3935,6 +3941,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_release(cli_release_flag())
     comp.set_target_kind(cli_platform_target_kind)
     // The binary, its object and the object's nm report live in a directory
     // of this invocation's own (#1374). Named by the source alone
@@ -5148,6 +5155,7 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     comp.configure(effective_opt_level, effective_no_std, effective_alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_release(cli_release_flag())
     comp.set_target_kind(cli_platform_target_kind)
     let synthetic_source = maybe_synthesize_test_source(target)
     comp.set_link_paths(link_search_paths, link_rpaths)
@@ -5250,6 +5258,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         build_options.runtime_available = runtime_available
         build_options.prelude_mode = prelude_mode
         build_options.debug_info = debug_info
+        build_options.release = cli_release_flag()
         var graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
         return run_build_command(move build_options, graph_options)
@@ -5315,6 +5324,7 @@ fn run_bench_file(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, 
     comp.configure(opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
     comp.set_debug_info(debug_info)
+    comp.set_release(cli_release_flag())
     let bin_path = comp.build_binary_from_source(target, synthetic_source)
     if bin_path == "":
         with_eprint("error: bench build failed for '" ++ target ++ "'")

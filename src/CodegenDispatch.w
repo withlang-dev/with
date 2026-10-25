@@ -8664,8 +8664,10 @@ impl Codegen:
             len_val = self.coerce_int(len_val, i64_ty)
         len_val
 
+    // §4.3a: checked in every build but `--release`; a build without debug
+    // info (`-g0`, a one-liner, the REPL) read past the end (#2268).
     mut fn mir_emit_debug_index_bounds_check(idx_val: i64, idx_sema_ty: i32, len_val: i64):
-        if self.debug_info == 0 or len_val == 0:
+        if self.release or len_val == 0:
             return
         let i64_ty = wl_i64_type(self.context)
         let zero = wl_const_int(i64_ty, 0, 0)
@@ -8684,7 +8686,7 @@ impl Codegen:
         wl_position_at_end(self.builder, ok_bb)
 
     mut fn mir_emit_debug_slice_bounds_check(start_val: i64, end_val: i64, len_val: i64):
-        if self.debug_info == 0 or len_val == 0:
+        if self.release or len_val == 0:
             return
         let i64_ty = wl_i64_type(self.context)
         let zero = wl_const_int(i64_ty, 0, 0)
