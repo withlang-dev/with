@@ -6,6 +6,10 @@
 //   tx.send(42)
 //   let val = rx.recv()          // Option[T]: None once closed and drained
 //
+// A send to a full channel and a recv from an empty open one wait for another
+// task. With no task left that could make that progress, the wait would
+// never end: the program stops with a deadlock panic (#1000).
+//
 // chan[T](capacity) is a compiler builtin that returns (Sender[T], Receiver[T]).
 // Sender and Receiver enforce directionality at compile time.
 
