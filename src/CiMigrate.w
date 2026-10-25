@@ -11,6 +11,7 @@ use CiIR
 use CiPrint
 use CImport
 use CiFacadeDraft
+use CiContracts
 use CiGir
 use CiFacts
 use Lexer
@@ -1750,6 +1751,8 @@ impl CiProject:
         self.symbols[symbol_id].ret_ty = ci_ir_owned_text(with_cimport_fn_return_type_translated(session, decl_idx))
         self.symbols[symbol_id].variadic = with_cimport_fn_is_variadic(session, decl_idx)
         self.symbols[symbol_id].own_evidence = ci_ir_owned_text(ci_body_ownership_evidence(session, cursor, names))
+        // D159: what the body proves about the pointers it is handed.
+        self.symbols[symbol_id].contract_evidence = ci_ir_owned_text(ci_body_contract_evidence(session, cursor, names))
         for pi in 0..count:
             let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(ptype)
@@ -1941,6 +1944,11 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
         project.resolve_header_definers()
         project.resolve_fn_ptr_nullability()
         project.export_fn_ptr_nullability(i == 0)
+        // D159: the same corpus is scanned per file; the contracts are
+        // drawn each time and the artifact written once.
+        project.resolve_ownership()
+        project.resolve_contracts()
+        if i == 0 and ci_migrate_write_contracts(&project) != 0: return 1
         let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
         if rc != 0:
             eprint(f"migrate: failed while migrating {base}")
@@ -2143,6 +2151,10 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
     project.resolve_header_definers()
     project.resolve_fn_ptr_nullability()
     project.export_fn_ptr_nullability(true)
+    // D159: the contracts the bodies prove, drawn once; the artifact if asked.
+    project.resolve_ownership()
+    project.resolve_contracts()
+    if ci_migrate_write_contracts(&project) != 0: return 1
 
     var fi = 0
     let total_files = sorted_files.len()
@@ -2209,6 +2221,26 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
 var g_migrate_writes_fn_names: List[str] = List.new()
 var g_migrate_writes_fn_bodies: List[str] = List.new()
 var g_migrate_writes_paths: List[str] = List.new()
+
+// D159: `--emit-contracts FILE` writes the contracts artifact
+// (CiContracts.w contracts_tsv) once the whole corpus is scanned; "" writes
+// none.
+var g_migrate_contracts_path: str = ""
+
+fn ci_migrate_set_contracts_path(path: &str):
+    g_migrate_contracts_path = with_str_clone_ref(path)
+
+// The contracts artifact (D159), written when asked for, from the verdicts
+// the caller drew (resolve_ownership, then resolve_contracts) once the whole
+// corpus is scanned.
+fn ci_migrate_write_contracts(project: &CiProject) -> i32:
+    if g_migrate_contracts_path.len() == 0: return 0
+    let path = ci_migrate_fs_path(g_migrate_contracts_path)
+    ci_migrate_ensure_parent_dir(path)
+    if with_fs_write_file(path, project.contracts_tsv()) != 0:
+        eprint("migrate: could not write the contracts artifact " ++ path)
+        return 1
+    0
 
 fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
 

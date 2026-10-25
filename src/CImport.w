@@ -13,6 +13,7 @@ use compiler.EmbeddedClangResource
 use compiler.EmbeddedSysroot
 use compiler.EmbeddedStdlib
 use std.string.StringBuilder
+use std.string.parse
 use TargetSpec
 use MathBuiltins
 use rt.rt_core
@@ -18649,6 +18650,157 @@ fn ci_own_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]
 fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> str:
     let locals = ci_own_collect_locals(session, cursor)
     ci_own_walk(session, cursor, params, locals)
+
+// ── D159: contract evidence for a migrated function's own signature ──────
+//
+// What one body says about the pointers it is handed, for the migrator to
+// emit a safe signature where the body proves it (CiContracts.w draws the
+// verdicts). The records, one per line:
+//   `mutparam:<i>`                   an assignment, compound assignment or
+//                                    ++/-- whose target is a part of
+//                                    parameter i's memory (`p->f = …`,
+//                                    `*p = …`, `p[k] += …`); never the
+//                                    pointer variable itself (`p = …`)
+//   `fieldstore:<i>:<j>:<member>`    `x->member = p` / `x.member = p`: the
+//                                    value of parameter j stored into field
+//                                    `member` of parameter i's memory
+//   `freesmember:<i>:<member>`       `free(p->member)` (C's free; a corpus
+//                                    alias is the resolver's business)
+//   `memberarg:<i>:<member>:<callee>:<k>`
+//                                    `callee(…, p->member, …)` at argument k
+//   `outfull:<i>`                    a whole-value write `*p = …` at the
+//                                    top level of the body, before any
+//                                    `return` and before any other use of
+//                                    `p`: every returning path writes it
+//   `outcond:<i>:<reason>`           parameter i is written through, but
+//                                    not provably on every path, or read
+//                                    before the write
+// A body no proof can walk gives `unanalyzable`.
+
+// Whether `cursor`'s subtree has a statement of `kind`.
+fn ci_subtree_has_kind(session: i64, cursor: i32, kind: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) == kind: return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_kind(session, with_ci_child(session, cursor, i), kind): return true
+        i = i + 1
+    false
+
+// Whether `cursor`'s subtree mentions parameter `name` anywhere.
+fn ci_subtree_mentions(session: i64, cursor: i32, name: &str) -> bool:
+    if ci_cursor_names(session, cursor, name): return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_mentions(session, with_ci_child(session, cursor, i), name): return true
+        i = i + 1
+    false
+
+// The parameter whose memory an assignment target is a part of, through
+// `->`, `.`, `[k]`, `*` and pointer arithmetic: the index, or -1 when the
+// target is the parameter variable itself or no parameter at all.
+fn ci_contract_target_param(session: i64, lhs: i32, params: &List[str]) -> i32:
+    let l = ci_peel_transparent(session, lhs)
+    let kind = with_ci_cursor_kind(session, l)
+    if kind == CXK_DECL_REF: return -1
+    let locals: List[str] = List.new()
+    let root = ci_own_place_root(session, l, params, locals)
+    if not root.starts_with("param:"): return -1
+    parse(root.slice(6, root.len()))
+
+// Whether `lhs` is exactly `*p` for parameter `name` (the whole value).
+fn ci_contract_is_whole_deref(session: i64, lhs: i32, name: &str) -> bool:
+    let l = ci_peel_transparent(session, lhs)
+    if with_ci_cursor_kind(session, l) != CXK_UNARY_OP or with_ci_unary_op(session, l) != UO_DEREF: return false
+    ci_cursor_names(session, with_ci_child(session, l, 0), name)
+
+fn ci_contract_walk(session: i64, cursor: i32, params: &List[str]) -> str:
+    var out = ""
+    let kind = with_ci_cursor_kind(session, cursor)
+    let nc = with_ci_num_children(session, cursor)
+    if (kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) >= BO_ASSIGN) or (kind == CXK_COMPOUND_ASSIGN_OP and nc == 2):
+        let lhs = with_ci_child(session, cursor, 0)
+        let target = ci_contract_target_param(session, lhs, params)
+        if target >= 0: out = out ++ f"mutparam:{target}\n"
+        if kind == CXK_BINARY_OP and with_ci_binary_op(session, cursor) == BO_ASSIGN:
+            let l = ci_peel_transparent(session, lhs)
+            if target >= 0 and with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
+                let rhs = with_ci_child(session, cursor, 1)
+                for pj in 0..params.len():
+                    if ci_cursor_names(session, rhs, params[pj]):
+                        out = out ++ f"fieldstore:{target}:{pj}:" ++ with_ci_cursor_spelling(session, l) ++ "\n"
+    if kind == CXK_UNARY_OP and nc == 1:
+        let op = with_ci_unary_op(session, cursor)
+        if op >= UO_PRE_INC and op <= UO_POST_DEC:
+            let target = ci_contract_target_param(session, with_ci_child(session, cursor, 0), params)
+            if target >= 0: out = out ++ f"mutparam:{target}\n"
+    if kind == CXK_CALL_EXPR and nc >= 1:
+        let callee = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
+        var ai = 1
+        while ai < nc:
+            let arg = ci_own_peel(session, with_ci_child(session, cursor, ai))
+            if with_ci_cursor_kind(session, arg) == CXK_MEMBER_REF:
+                let owner = ci_contract_target_param(session, arg, params)
+                if owner >= 0:
+                    let member = with_ci_cursor_spelling(session, arg)
+                    if ci_own_is_libc_free(callee): out = out ++ f"freesmember:{owner}:" ++ member ++ "\n"
+                    else if callee.len() > 0: out = out ++ f"memberarg:{owner}:" ++ member ++ ":" ++ callee ++ f":{ai - 1}\n"
+            ai = ai + 1
+    var i = 0
+    while i < nc:
+        out = out ++ ci_contract_walk(session, with_ci_child(session, cursor, i), params)
+        i = i + 1
+    out
+
+// The out-parameter proof over the body's top-level statements, in order:
+// a whole-value write `*p = …` that no `return` precedes and no other use
+// of `p` precedes is written on every returning path.
+fn ci_contract_out_params(session: i64, body: i32, params: &List[str]) -> str:
+    var out = ""
+    let n = params.len()
+    var written: List[bool] = List.new()
+    var spoiled: List[str] = List.new()
+    for pi in 0..n:
+        written.push(false)
+        spoiled.push("")
+    let nc = with_ci_num_children(session, body)
+    var si = 0
+    while si < nc:
+        let stmt = with_ci_child(session, body, si)
+        var whole = -1
+        let peeled = ci_peel_transparent(session, stmt)
+        if with_ci_cursor_kind(session, peeled) == CXK_BINARY_OP and with_ci_num_children(session, peeled) == 2 and with_ci_binary_op(session, peeled) == BO_ASSIGN:
+            for pi in 0..n:
+                if params[pi].len() > 0 and ci_contract_is_whole_deref(session, with_ci_child(session, peeled, 0), params[pi]): whole = pi as i32
+        if whole >= 0:
+            // The right-hand side may read other parameters, not this one.
+            if not written[whole] and spoiled[whole].len() == 0 and ci_subtree_mentions(session, with_ci_child(session, peeled, 1), params[whole]):
+                spoiled[whole] = "read before the write"
+            if not written[whole] and spoiled[whole].len() == 0: written[whole] = true
+        else:
+            let returns = ci_subtree_has_kind(session, stmt, CXK_RETURN_STMT)
+            for pi in 0..n:
+                if written[pi] or spoiled[pi].len() > 0 or params[pi].len() == 0: continue
+                if returns and ci_subtree_mentions(session, stmt, params[pi]): spoiled[pi] = "written conditionally"
+                else if returns: spoiled[pi] = "a return before the write"
+                else if ci_subtree_mentions(session, stmt, params[pi]): spoiled[pi] = "read before the write"
+        si = si + 1
+    for pi in 0..n:
+        if written[pi]: out = out ++ f"outfull:{pi}\n"
+        else if spoiled[pi].len() > 0: out = out ++ f"outcond:{pi}:" ++ spoiled[pi] ++ "\n"
+    out
+
+fn ci_body_contract_evidence(session: i64, fn_cursor: i32, params: &List[str]) -> str:
+    var body = -1
+    let nc = with_ci_num_children(session, fn_cursor)
+    var i = 0
+    while i < nc:
+        let child = with_ci_child(session, fn_cursor, i)
+        if with_ci_cursor_kind(session, child) == CXK_COMPOUND_STMT: body = child
+        i = i + 1
+    if body < 0: return "unanalyzable\n"
+    ci_contract_walk(session, body, params) ++ ci_contract_out_params(session, body, params)
 
 // D121: the allocator or deallocator a global's initializer names, through
 // casts: `xmlFreeFunc xmlFree = free`. "" when it names neither.

@@ -1002,6 +1002,15 @@ type CiProjectSymbol {
     // D121 step 6: 1 when the function is variadic (never presentable
     // without a `variadic` clause the draft does not write).
     variadic: i32,
+    // D159 (CiContracts.w): the body's contract evidence (CImport.w
+    // ci_body_contract_evidence: `mutparam:`, `fieldstore:`, `freesmember:`,
+    // `memberarg:`, `outfull:`, `outcond:` lines), `param_mutates[i]` 1 when
+    // the body writes through parameter i (itself or through a corpus
+    // callee), and `contract` the resolved verdicts, one per pointer
+    // parameter and the return, as the contracts artifact prints them.
+    contract_evidence: str,
+    param_mutates: List[i32],
+    contract: str,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1041,6 +1050,9 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         header_file: "",
         definition_location: "",
         attrs: "",
+        contract_evidence: "",
+        param_mutates: List.new(),
+        contract: "",
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
@@ -1091,6 +1103,7 @@ impl CiProjectSymbol:
         while self.param_ty.len() < n: self.param_ty.push("")
         while self.param_stores.len() < n: self.param_stores.push(0)
         while self.param_destroys.len() < n: self.param_destroys.push(0)
+        while self.param_mutates.len() < n: self.param_mutates.push(0)
 
 fn ci_project_symbol_key(kind: i32, name: &str) -> str:
     if kind == CiProjectSymbolKind.CIPS_VAR:
