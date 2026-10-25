@@ -10827,22 +10827,24 @@ impl Sema:
     // match EXACTLY: a `[]mut` write goes back into the collection, so no
     // element widening is sound; the same exactness keeps the immutable case
     // symmetric.
+    // #604: the element a fixed array or a List presents to a slice
+    // parameter; 0 for anything else. The coercion check and generic
+    // inference (#1019) both read it.
+    fn collection_slice_element(actual: TypeId) -> i32:
+        let act_r = self.resolve_alias(actual)
+        let act_k = self.get_type_kind(act_r)
+        if act_k == TypeKind.TY_ARRAY:
+            return self.get_type_d0(act_r)
+        if act_k == TypeKind.TY_GENERIC_INST and self.get_type_d0(act_r) == self.syms.list and self.get_generic_inst_arg_count(act_r as i32) > 0:
+            return self.get_generic_inst_arg(act_r as i32, 0)
+        0
+
     fn can_coerce_collection_to_slice(expected: TypeId, actual: TypeId) -> i32:
         let exp_r = self.resolve_alias(expected)
         if self.get_type_kind(exp_r) != TypeKind.TY_SLICE:
             return 0
-        let want_elem = self.resolve_alias(self.get_type_d0(exp_r) as TypeId) as i32
-        let act_r = self.resolve_alias(actual)
-        let act_k = self.get_type_kind(act_r)
-        if act_k == TypeKind.TY_ARRAY:
-            if (self.resolve_alias(self.get_type_d0(act_r) as TypeId) as i32) == want_elem:
-                return 1
-            return 0
-        if act_k == TypeKind.TY_GENERIC_INST:
-            if self.get_type_d0(act_r) == self.syms.list and self.get_generic_inst_arg_count(act_r as i32) > 0:
-                if (self.resolve_alias(self.get_generic_inst_arg(act_r as i32, 0) as TypeId) as i32) == want_elem:
-                    return 1
-        0
+        let elem = self.collection_slice_element(actual)
+        if elem != 0 and self.resolve_alias(elem as TypeId) == self.resolve_alias(self.get_type_d0(exp_r) as TypeId): 1 else: 0
 
     fn generic_inst_accepts_unit_enum_value(generic_tid: TypeId, enum_tid: TypeId) -> i32:
         if self.get_type_kind(generic_tid) != TypeKind.TY_GENERIC_INST or self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:

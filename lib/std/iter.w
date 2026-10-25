@@ -42,9 +42,8 @@ pub fn filter(arr: List[i32], pred: fn(i32) -> bool) -> List[i32]:
         i = i + 1
     result
 
-/// Return the number of elements in an array.
-pub fn count[T](arr: [T]) -> i32:
-    arr.len
+/// Return the number of elements in an array (D108: a length is an isize).
+pub fn count[T](arr: [T]) -> isize: arr.len()
 
 /// Return true if `target` is in the array.
 pub fn contains(arr: [i32], target: i32) -> bool:

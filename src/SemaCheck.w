@@ -29802,6 +29802,13 @@ impl Sema:
             let resolved = self.resolve_alias(arg_tid)
             if self.get_type_kind(resolved) == TypeKind.TY_SLICE:
                 self.bind_type_params_from_type_expr(inner_node, self.get_type_d0(resolved), tp_start, tp_count, err_node, 0)
+                return
+            // #1019: a List or fixed array argument meets a slice parameter
+            // by the #604 coercion, so its element binds the slice's: a
+            // `[T]` parameter called with `[1, 2, 3]` binds T.
+            let elem = self.collection_slice_element(resolved)
+            if elem != 0:
+                self.bind_type_params_from_type_expr(inner_node, elem, tp_start, tp_count, err_node, 0)
             return
 
         // A callable parameter `fn(A) -> R` binds from the argument's callable
