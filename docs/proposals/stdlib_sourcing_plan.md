@@ -121,7 +121,7 @@ map; there is no `Vec` in `lib/std`), and the sorted array is
 
 | `lib/std` facade | Primary engine | Secondary / comparison engine | Status |
 | --- | --- | --- | --- |
-| `List[T]` (this map's `Vec`) | **STC `vec`** | TommyDS `array` | Not done: `List` is rt_core's engine; its algorithms are STC's (below) |
+| `List[T]` (this map's `Vec`) | **rt_core** (D157: the compiler's knowledge of the layout is the engine) | STC `vec` (the benchmark's comparison row), TommyDS `array` | Ruled 2026-10-24; its algorithms are STC's (below) |
 | `Deque[T]` | **STC `deque`** | — | Done (D148: slot shape, word shape for integer scalars); `d[i]` is the element view through `IndexGet` (#2560 fixed 2026-10-24) |
 | `Stack[T]` | **STC `stack`** | — | Done 2026-10-24 (`std.collections.stack`; slot and word shapes) |
 | `Queue[T]` | **STC `queue`** | c-algorithms queue | Done 2026-10-24 (`std.collections.queue`; slot and word shapes) |
@@ -136,7 +136,7 @@ map; there is no `Vec` in `lib/std`), and the sorted array is
 | `BTreeSet[T]` | **M*LIB `m-bptree`** | — | Done (D151) |
 | `Trie[V]` | **c-algorithms trie** | TommyDS `trie` / `trie_inplace` | Done |
 | `BitSet` | **STC `cbits`** | — | Done |
-| `Span[T]` | **STC span machinery** | — | Not done |
+| `Span[T]` | Dropped (D158): strided and multi-dimensional views are the language's (§4.8a slices, D119 arrays, the multi-dimensional indexing goal) | STC `cspan` stays a migrated engine | Ruled 2026-10-24 |
 | `String` / internal string engine | **STC `cstr` where useful** | Existing With string implementation | Not done; `str` stays the contract (D111) |
 | `SortedList[T]` (this map's `SortedVec`) | **c-algorithms sorted array** | STC algorithms + `List` | Done |
 | `ChunkedVec[T]` / internal block storage | **TommyDS `arrayblk`** | — | Migrated, no facade (internal engine) |
@@ -167,8 +167,8 @@ The public surface is grouped as follows (D146):
 - `std.algorithms`: `List.sort`, `sort_by`, `stable_sort`, `stable_sort_by`,
   `binary_search`, `lower_bound`, `upper_bound`, `reverse`, `shuffle`
   (`lib/std/algorithms.w`).
-- `std.slice` / `std.span`: non-owning sequence/view machinery — not
-  started.
+- There is no `std.slice`/`std.span` (D158): `[]T` and D119's arrays are
+  the views, and multi-dimensional slicing is a language feature.
 
 Several imported structures remain engines rather than public types.
 TommyDS `hashdyn`, `hashlin`, `arrayblk`, c-algorithms’ AVL/RB trees,
@@ -767,30 +767,20 @@ Every phase gate is met. The 2026-10-24 close-out landed `Stack`, `Queue`,
 (`IndexPlace` on a generic user type). What the facade map still names and
 the tree does not have:
 
-1. **`List[T]` over STC `vec` — a ruling, not a task.** `List` is the
-   compiler's own type: ten compiler sources know its layout (literals,
-   comprehensions, `for`, `xs[i]` as a place, the push/pop intrinsics, the
-   D152 counted copy, D120 copy-on-write), and rt_core holds that layout.
-   STC's `vec` is a template per element type, so an arbitrary `T` would
-   ride a byte vector with the facade doing the element arithmetic — that
-   is rt_core's engine again with STC supplying `realloc`. D149 kept
-   rt_core for the hash family on the same evidence (the ruled engine
-   bought nothing the builtin did not have). Brief: (what the others do)
-   Zig's `ArrayList`, Rust's `Vec`, Go's slices are each the language's
-   own, none sources its growable array from a library; (spec) §13 says
-   nothing about the engine; (mission fit) the user feels neither choice,
-   the compiler owns `List`'s meaning either way; (prediction, 85%) Eric
-   rules as D149: rt_core stays `List`'s engine, STC `vec` is the comparison
-   row in `test/benchmark/stc_engines.w` (`List push/index/pop (rt_core)`
-   at 2/0/1 ns is already there) and the facade map's `List` row reads
-   "rt_core, STC `vec` comparison". Waiting on the ruling; no code.
-2. **`Span[T]` — needs the same brief first.** The language's `[]T` slices
-   and `&T` views (D27, §15.17) are the non-owning contiguous case; STC's
-   `cspan` adds multi-dimensional strided views (`cspan_md`, slicing with
-   `c_ALL`/`c_END`). The row is a design question (is a strided
-   multi-dimensional view a std type or a language slice feature?), not
-   a facade: prediction (70%) a `std.span` module over `cspan_md` for
-   numeric code, after a use case exists. Waiting; no code.
+1. **`List[T]` over STC `vec` — ruled, D157 (2026-10-24).** rt_core stays
+   the engine: the compiler's knowledge of the layout (literals,
+   comprehensions, `for`, `xs[i]` as a place, push/pop, copy-on-write, the
+   counted copy class) is the engine; STC `vec` is the benchmark's
+   comparison row, never a dependency of the runtime. The sourcing rule
+   was written for library containers, not for types the compiler itself
+   lowers to. Reopens on a measured gap in the comparison row or a feature
+   rt_core lacks.
+2. **`Span[T]` — dropped, D158 (2026-10-24).** `[]T` (§4.8a) and D119's
+   arrays are the views; multi-dimensional and strided slicing
+   (`tensor[2:5, :, newaxis]`, the design goal) is a language feature over
+   them. `cspan` was the one row whose reason to import was shape, not
+   hardening; it stays a migrated engine. Reopens when a numeric program
+   needs strided views first, by scheduling the language feature.
 3. **STC `cstr`** as an internal string engine: not started; `str` keeps its
    D111 contract whatever engine sits under it, and nothing measured asks
    for a change.
@@ -800,14 +790,19 @@ the tree does not have:
    only when a facade needs them (open question 3).
 5. **Generic heap utilities** (`heapify`, `push_heap` over a `List`): no
    use case beyond `PriorityQueue`/`BinaryHeap`; stays unexposed until one.
-6. **The engine boundary's `unsafe`.** Every facade still writes `unsafe`
-   around each engine call, because a migrated corpus function takes raw
-   pointers and nothing models its contract (the modeled-C machinery, D51
-   and D121, models `c_import` headers, not migrated modules). The next
-   step is the migrator emitting the contract of each engine function
-   (mutates its receiver, stores its argument, returns a pointer into the
-   receiver) so the call is safe by declaration — "modeled C becomes
-   humane" applied to corpora. A ruling (Eric raised it 2026-10-24).
+6. **The engine boundary's `unsafe` — ruled, D159 (2026-10-24); a new
+   migrator stage, non-compliant until it lands.** The migrator emits a
+   safe signature where the function's body proves the contract: (a) an
+   in-place receiver/`inout` parameter, (b) a stored argument that a
+   destroyer in the same corpus frees along the same path (store alone is
+   "stored, ownership unknown" and stays `unsafe`), (c) a returned
+   pointer's origin; an unproved point keeps `pub unsafe fn` with the
+   point named in the generated comment; the drift lane diffs the
+   inferred contracts and a change is red until a human looks; a migrator
+   generation bump, so promoted corpora keep compiling raw until their pin
+   or a ruling moves them (D112). The campaign issue is filed with the
+   ruling; the STC facades drop their engine-call `unsafe` at the corpus's
+   next re-promotion.
 7. **The compiler defects the facades found are closed** (2026-10-24):
    #2560 (`IndexPlace`/`IndexGet` on a generic user type; `Deque` and
    `Stack` spell `d[i]`), #2565 (a tuple type argument at a static call),

@@ -12,6 +12,9 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D159 — The migrator emits a safe signature where a migrated function's body proves its contract (in-place receiver; stored-and-freed-by-the-corpus transfer; a returned pointer's origin); an unproved point keeps `unsafe fn`; the drift lane diffs the inferred contracts (ruled; a new migrator stage, non-compliant until it lands)](2026-10-24-D159-the-migrator-emits-a-safe-signature-where-a-migrated-function-s-body-proves-its-contract.md)
+- [D158 — There is no `std.span` facade: strided and multi-dimensional views are the language's (§4.8a slices, D119 arrays, the multi-dimensional indexing goal); STC `cspan` stays an engine (ruled)](2026-10-24-D158-there-is-no-std-span-facade-strided-views-are-the-language-s.md)
+- [D157 — `List[T]` is implemented by the runtime; STC `vec` is a comparison engine, never a dependency of the runtime; the sourcing rule is for library containers, not types the compiler lowers to (ruled; amends the facade map, as D149 did)](2026-10-24-D157-list-t-is-implemented-by-the-runtime-stc-vec-is-a-comparison-engine.md)
 - [D156 — A corpus is compiled against one data model, explicit in the text: widths are fixed integers, only `c_char` stays symbolic (amends D155; ruled)](2026-10-23-D156-a-corpus-is-compiled-against-one-data-model-explicit-in-the-text.md)
 - [D155 — A migrated corpus never contains a concrete value for a `c_*` alias; `c_char` is the target's everywhere, `c"…"` is `*const c_char`, and a pointer to one integer type is not a pointer to another (ruled)](2026-10-23-D155-a-migrated-corpus-never-contains-a-concrete-value-for-a-c-alias.md)
 - [D154 — A `Drop` impl's bounds are the type's own; drop glue runs a bounded impl for every instantiation (delegated)](2026-10-23-D154-a-drop-impls-bounds-are-the-types-own.md)

@@ -12,7 +12,7 @@ cleanup scans capacity; permanently retired generations also retain their slot.
 
 | Surface | Current implementation | Required cost | Gap / next source |
 |---|---|---|---|
-| `List[T]` | Contiguous runtime buffer, geometric growth | Amortized O(1) push/pop; O(1) access; O(n) arbitrary insertion/removal | STC `vec` in Phase 3, preserving language integration and D27 views |
+| `List[T]` | Contiguous runtime buffer, geometric growth | Amortized O(1) push/pop; O(1) access; O(n) arbitrary insertion/removal | Ruled D157: rt_core is the engine (the compiler's knowledge of the layout is the engine); STC `vec` is the comparison row in `test/benchmark/stc_engines.w` |
 | `ListIter[T]` | Borrowed contiguous traversal | O(1) per next, O(n) full traversal | Retain; iteration must preserve element views |
 | `ListIntoIter[T]` | `next()` calls `remove(0)` | O(1) amortized per next; O(n) full consumption, including partial-iterator cleanup | **#938:** each next shifts the tail; O(n²) full consumption |
 | `HashMap[K, V]` | Runtime open addressing and linear probing | Expected O(1) lookup/insert; removal O(cluster length), with no allocation | **#939:** removal allocates two temporary buffers for each displaced entry; selected replacement is STC `hmap` in Phase 3 |
