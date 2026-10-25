@@ -2480,8 +2480,11 @@ fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
     fallback
 
 // The fetch program an action compiles and runs. With a connect timeout it
-// first opens and closes a TCP connection to the host and exits 3 when that
-// fails (a host that is down is not worth five download attempts); every
+// first opens and closes a TCP connection to the host, retrying after 1, 2,
+// 3 and 4 s (#2412: one resolver blip failed four corpus downloads at once;
+// ten seconds in all, inside the shortest download budget a fetch is given),
+// and exits 3 when every probe fails (a host that is down
+// is not worth five download attempts); every
 // download attempt then gives up when the server says nothing for `idle_ms`.
 // A fetch retries with a growing pause, so one dropped connection does not
 // fail a lane. build/https_fetch.w is the build layer's own copy for drivers
@@ -2527,9 +2530,13 @@ fn build_https_fetch_source() -> str:
     "        if host.len() == 0 or port <= 0:\n" ++
     "            print(\"not an https URL: \" ++ url)\n" ++
     "            return 2\n" ++
-    "        let fd = tcp_connect_timeout(host, port, connect_ms)\n" ++
+    "        var fd = -1\n" ++
+    "        for probe in 1i32..ATTEMPTS + 1:\n" ++
+    "            fd = tcp_connect_timeout(host, port, connect_ms)\n" ++
+    "            if fd >= 0: break\n" ++
+    "            if probe < ATTEMPTS: sleep_secs(probe)\n" ++
     "        if fd < 0:\n" ++
-    "            print(f\"no connection to {host}:{port} (waited at most {connect_ms / 1000} s)\")\n" ++
+    "            print(f\"no connection to {host}:{port} after {ATTEMPTS} attempts (each waited at most {connect_ms / 1000} s)\")\n" ++
     "            return 3\n" ++
     "        let _ = socket_close(fd)\n" ++
     "    for attempt in 1i32..ATTEMPTS + 1:\n" ++
