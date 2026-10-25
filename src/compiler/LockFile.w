@@ -495,3 +495,20 @@ fn lock_restore(project_root: &str) -> i32:
 // #747: explicit owned copy — LockEntry's fields are owned strs now.
 fn lock_entry_clone(e: &LockEntry) -> LockEntry:
     LockEntry { name: with_str_clone_ref(e.name), source: with_str_clone_ref(e.source), version: with_str_clone_ref(e.version), recipe_rev: with_str_clone_ref(e.recipe_rev), package_id: with_str_clone_ref(e.package_id), package_rev: with_str_clone_ref(e.package_rev), sha256: with_str_clone_ref(e.sha256), registry: with_str_clone_ref(e.registry), facts_sha256: with_str_clone_ref(e.facts_sha256) }
+
+// #2355: a with.toml constraint that names one version, not a range
+// (`[>=3 <4]`, `^1.2`, ...). Only such a pin can disagree with the lock.
+fn lock_pin_is_exact(constraint: &str) -> bool:
+    if constraint.len() == 0: return false
+    for i in 0..constraint.len():
+        let ch = constraint[i]
+        if ch == '[' or ch == '<' or ch == '>' or ch == '~' or ch == '^' or ch == '*' or ch == ' ' or ch == ',': return false
+    true
+
+// #2355: whether the lock already holds `c.<name>` at `version`. A pin it
+// does not hold is installed before a restore, so the lock never overrides
+// with.toml.
+fn lock_holds_pin(lock: &LockFile, name: &str, version: &str) -> bool:
+    for entry in lock.entries:
+        if entry.name == "c." ++ name and entry.version == version: return true
+    false
