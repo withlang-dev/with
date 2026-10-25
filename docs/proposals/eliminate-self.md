@@ -15,6 +15,17 @@ This document is the implementation plan. The normative surface is amended in
 `docs/spec/002_ownership.md` (§2.4, §9.5); the rationale is recorded in
 `docs/meetings/2026-07-07-D7-eliminate-self-the-receiver-mode-is-a-fn-prefix-keyword-self.md` (D7).
 
+**Status (2026-10-25).** The receiver half (phases 0–3, §4) is the language:
+`fn` / `mut fn` / `move fn` inside an `impl` synthesise the receiver, the
+dotted top-level form is associated, and the tree is written that way. Phase
+4's refusal of an explicit receiver parameter is not done: `fn m(self: &Self)`
+inside an `impl` is still accepted (41 such declarations remain, 18 dotted
+top-level forms with a written `self`). The second half — the receiver's
+*members* by bare name, so that `self.` itself stops being written — is §8
+below: D83 (2026-10-03) landed bare fields in a method declared in the type's
+own module; bare fields in an `impl` elsewhere and bare method calls are the
+open plan, proposed, not ruled.
+
 ---
 
 ## 1. The design
@@ -255,3 +266,159 @@ its flags. Regex will not survive 3,900 self-host-critical sites.
   (D12).
 - SE-0377 `consuming`/`borrowing` — Swift's later split of ownership on the
   receiver; our `move fn` is `consuming`, plain `fn` is `borrowing`.
+
+---
+
+## 8. The second half: the receiver's members by bare name
+
+Proposed 2026-10-25, not ruled. The spec words below are a draft for Eric
+to bless or rewrite; until then §9.5 stands as D83 wrote it.
+
+### 8.1 What exists and what does not
+
+The receiver is implicit (§4), but its use is not: the tree writes `self.`
+80,137 times (39,241 method calls, 39,930 field reads), the single largest
+ceremony count in the codebase. Two rules decide which of those are forced:
+
+- **D83 (§9.5, 2026-10-03):** in an instance method declared in its type's
+  *own module*, a receiver field is in scope by its bare name; a parameter or
+  local named like a field is a shadowing error (§29.8); a bare name that
+  resolves to a field and to any other name in scope is an error at that use,
+  `self.field` and the qualified name staying valid. D83's reason for the
+  module boundary: "so a field name never enters scope across a module
+  boundary the reader cannot see." Its reopen clause: "if the own-module
+  boundary proves to split real types."
+- **Methods were never in the rule.** `get()` for `self.get()` is refused
+  everywhere, the type's own module included (probed on the installed
+  compiler, 2026-10-25: `undefined variable`).
+
+The boundary splits real types. `impl Sema` sits in eight files beside
+Sema.w (66 blocks); `impl CiProject` in four (CiIR.w declares it; CiContracts,
+CiFacadeDraft and CiMigrate hold its methods). Inside those blocks every
+field is `self.field`, and every method call is `self.method()` everywhere.
+Eric's question, on a line of CiContracts.w:
+
+> why do we need 'self'? Can we make it so instead of
+> `let ret_part = ct_is_pointer(self.symbols[si].ret_ty) and self.ct_ret_from(si, 0)`
+> they can write `let ret_part = ct_is_pointer(symbols[si].ret_ty) and ct_ret_from(si, 0)`
+
+Two gaps stand between the two spellings: the method lives in another
+module than its type (D83's boundary), and `ct_ret_from` is a method (never
+ruled).
+
+### 8.2 The brief
+
+**What the others do.** Swift: implicit `self` for stored properties and
+methods, in the type's body and in every extension in any file; the compiler
+synthesises the receiver (`getImplicitSelfDecl`), and an explicit `self.` is
+required only where a closure captures it or a local shadows the member.
+Kotlin, Scala, C++ and Java: the same, the whole type, any file. Rust, Zig,
+Go, Mojo: always explicit; Vale's own tests write `self.hp`. D7 already chose
+Swift's receiver model over Rust's; D83 took the field half of it and stopped
+at the module boundary.
+
+**What the spec says.** §9.5 as quoted above; §29.8 no-shadowing; §18 (D100)
+package visibility: a member a module cannot see by `self.` it cannot see
+bare either, so nothing here widens visibility. §11.4: extension methods
+never shadow inherent ones and are resolved by import.
+
+**Mission fit.** Inside `impl CiProject:` the compiler knows exactly one
+receiver; a `self.` on a member it resolves uniquely is a character the
+program has already determined. The guardrail the mission asks for is D83's
+collision rule unchanged: when a bare name could be the receiver's or
+something else's, the programmer spells which, and the shadowing error
+forces that spelling. D83's boundary argument does not hold for the module
+that *declares the impl*: the reader of `impl CiProject:` in CiContracts.w
+knows which type's names are in scope exactly as the reader of CiIR.w does;
+what carries the fact is the `impl` header, not the file.
+
+**Prediction.** Eric rules yes to both, at about 90 percent: bare receiver
+methods wherever a receiver exists, and bare fields in any `impl`/`extend`
+of the type within the package, under D83's unchanged collision rule and
+D100's unchanged visibility; `self.` stays valid and remains the spelling
+for a shadowed name and for passing or returning `self` itself. Not a D98
+delegation: a surface rule that code will lean on is hard to reverse.
+
+### 8.3 Proposed §9.5 wording (draft)
+
+> In an instance method, a field or method of the receiver is in scope by
+> its bare name wherever the method's module may see it through `self.`;
+> `self.field` and `self.method()` remain valid. A bare name that resolves to
+> a receiver member and to any other name in scope is an error at that use
+> (§29.8); the member is then `self.name` and the other name its qualified
+> form. A parameter or local binding named like a receiver member is a
+> shadowing error. `self` itself is written where the receiver is passed,
+> returned, compared or captured as a value.
+
+### 8.4 Design rules the wording carries
+
+- **One lookup step, after locals, before module scope.** A bare name in an
+  instance method resolves to a local or parameter first (which the
+  shadowing error has already made unique), then to a receiver member, then
+  to module and imported names. A name found in both of the last two is the
+  §29.8 error with both candidates named.
+- **A field and a method of the same name** (`len` the field, `len()` the
+  method) resolve by use: a call is the method, a place is the field. The
+  pair is legal today through `self.`; nothing changes.
+- **Visibility is D100's.** In an `impl` of a foreign package's type
+  (`extend`), only `pub` members are in scope bare, exactly the set `self.`
+  reaches.
+- **Closures.** A bare member inside a closure body captures `self` as
+  `self.member` would. Open question (§8.6): whether an escaping closure
+  must write `self.` so the capture is visible at the site, as Swift
+  requires.
+- **No change to what the receiver is.** A bare method call is
+  `self.method()` with the method's own receiver mode; a `mut fn` called
+  bare inside a `fn` is the same error as `self.mutating()` there.
+
+### 8.5 Phases
+
+Each phase self-hosts and passes the gate; the sweep is its own PR under
+the ceremony census's falling bar.
+
+- **Phase 5a — bare fields in every `impl` of the type.** Sema's name
+  resolution gains the receiver-member step for any `impl`/`extend` of the
+  receiver's type in the package (today: the type's own module only); the
+  collision check runs against module and imported names of the *declaring*
+  module. Fixtures: a bare field in an `impl` in another module; a collision
+  with that module's own `fn` (error, both named); a `pub` field in an
+  `extend` of a foreign type; a private field there (undefined, with the
+  `self.`-cannot-reach-it-either help).
+- **Phase 5b — bare method calls.** The same step resolves a call to a
+  receiver method; a bare `mut fn` call checks the enclosing receiver mode as
+  `self.m()` does; the collision rule covers a method name that is also a
+  module-level function (error at the use). Fixtures: `get() * 2` in the
+  type's module and in another; a method named like a prelude function
+  (`len`), which is the collision error until spelled `self.len()`.
+- **Phase 5c — the sweep.** A compiler-driven rewrite, not a regex
+  (`compiler-driven-rewrites-not-regex`): a tool over `compiler_analyze_file`
+  facts selects every `self.member` whose bare spelling resolves to the same
+  member under the new rule and no collision, and applies the byte edits
+  through the Lexer. Expected: most of the 80,137; the remainder are
+  collisions the error names, and `self` as a value. Run per directory,
+  `with check src/main.w` and `:dev` between, the census diff at each step.
+- **Phase 5d — the census row.** `self.member` where the bare name would
+  resolve becomes a counted ceremony pattern, so new code does not reintroduce
+  it; the bar is main's count after the sweep.
+- **Phase 4, resumed.** With the members implicit, the explicit receiver
+  parameter (41 in-impl, 18 dotted) is swept and then refused with its
+  fix-it, closing the receiver half.
+
+### 8.6 Open questions
+
+1. Escaping closures: require `self.` for a captured member at the capture
+   site (Swift), or let the bare name capture silently?
+2. A bare member inside a nested function declared in a method body (no
+   receiver of its own): undefined, or an error naming the enclosing
+   receiver? Draft: undefined, as today.
+3. Whether the sweep also rewrites `self.method()` in the standard library's
+   facades at once or leaves `lib/std` to its own PR (D100's sweep policy
+   left `lib/std` alone; the census bar decides either way).
+
+### 8.7 Reference
+
+- Swift `lib/Sema/TypeCheckExpr.cpp`, unqualified lookup: locals, then the
+  implicit `self`'s members, then module scope; `SE-0269` (implicit `self` in
+  escaping closures) is the closure precedent.
+- With: `docs/meetings/2026-10-03-D83-receiver-fields-are-in-scope-by-bare-name-in-the-type-s-own-module.md`
+  (the collision rule and the boundary this section reopens), §29.8, §18 (D100).
