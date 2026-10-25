@@ -2889,11 +2889,18 @@ impl Zcu:
 
         // Collect fn names from higher-priority tiers for deduplication.
         var root_fn_names: List[i32] = List.new()
+        // #2554: a `@[c_export]` definition defines the C symbol a root
+        // `extern fn` of the same name declares; only a root DEFINITION of
+        // the name may shadow it. Dropped, the definition vanished and the
+        // link failed with the symbol undefined.
+        var root_defined_fn_names: List[i32] = List.new()
         for ri in 0..root_ordered.len():
             let rd = root_ordered[ri]
             let rk = merged_pool.kind(rd)
             if rk == NodeKind.NK_FN_DECL or rk == NodeKind.NK_EXTERN_FN:
                 root_fn_names.push(merged_pool.get_data0(rd))
+            if rk == NodeKind.NK_FN_DECL:
+                root_defined_fn_names.push(merged_pool.get_data0(rd))
 
         var user_fn_names: List[i32] = List.new()
         for ui in 0..user_import_ordered.len():
@@ -3000,7 +3007,8 @@ impl Zcu:
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
                 continue
-            let user_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, root_fn_names) else: FRONTEND_FN_KEEP
+            let user_shadow_names = if ik == NodeKind.NK_FN_DECL and frontend_fn_decl_is_c_export(merged_pool, self.pool, id): &root_defined_fn_names else: &root_fn_names
+            let user_verdict = if ik == NodeKind.NK_FN_DECL or ik == NodeKind.NK_EXTERN_FN: frontend_fn_tier_verdict(user_import_ordered, user_import_paths, merged_pool, self.pool, oi, user_shadow_names) else: FRONTEND_FN_KEEP
             if user_verdict == FRONTEND_FN_DROP:
                 continue
             if user_verdict == FRONTEND_FN_DISPLACE:

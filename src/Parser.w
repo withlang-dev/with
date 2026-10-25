@@ -809,14 +809,21 @@ impl Parser:
                 // @[c_export("name")] — parse and store the export name as callconv
                 // with "c_export:" prefix so codegen can detect it
                 self.advance()
+                // #2554: the exported C name is required (§16.5); a bare
+                // `@[c_export]` exported nothing and said nothing.
+                var named = false
                 if self.peek() == TokenKind.TK_L_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_STRING_LIT:
                         let export_name = self.source.slice((self.current_start() + 1) as i64, (self.current_end() - 1) as i64)
-                        self.pending_callconv = self.intern.intern("c_export:" ++ export_name)
+                        if export_name.len() > 0:
+                            self.pending_callconv = self.intern.intern("c_export:" ++ export_name)
+                            named = true
                         self.advance()
                     if self.peek() == TokenKind.TK_R_PAREN:
                         self.advance()
+                if not named:
+                    self.emit_error("`@[c_export]` needs the C name it exports: `@[c_export(\"name\")]` (§16.5)")
             else if self.is_ident_named("import_module"):
                 // @[import_module("namespace")] — the WebAssembly import
                 // namespace an extern fn is imported from (clang's
