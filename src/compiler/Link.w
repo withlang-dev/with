@@ -91,15 +91,38 @@ fn link_stage_read_u32_le(data: &str, offset: isize) -> i64:
         ((data[(offset + 2)] as i64) << 16) |
         ((data[(offset + 3)] as i64) << 24)
 
+// The macOS a file was built for: a Mach-O object's own, an archive's
+// newest member's (#2316: a package's static library built for 13.0 linked
+// into a program targeting 11.0 warned once per object), 0 for anything else.
 fn link_stage_macho_macos_minos(path: &str) -> i64:
     let data = runtime_read_file(path)
-    if data.len() < 32:
+    if data.starts_with("!<arch>\n"): link_stage_archive_macos_minos(data) else: link_stage_macho_minos_at(data, 0)
+
+// An ar archive's members: a 60-byte header (name, decimal size at 48), the
+// body padded to even length; a BSD name `#1/<n>` puts n name bytes first.
+fn link_stage_archive_macos_minos(data: &str) -> i64:
+    var best: i64 = 0
+    var offset: isize = 8
+    while offset + 60 <= data.len():
+        let header: str = data.slice(offset, offset + 60)
+        let size = host_lib_decimal(header.slice(48, 58).trim())
+        if size < 0: break
+        let body = offset + 60
+        let name: str = header.slice(0, 16).trim()
+        let name_len = if name.starts_with("#1/"): host_lib_decimal(name.slice(3, name.len())) else: 0
+        let minos = link_stage_macho_minos_at(data, body + name_len)
+        if minos > best: best = minos
+        offset = body + size + (size & 1)
+    best
+
+fn link_stage_macho_minos_at(data: &str, base: isize) -> i64:
+    if data.len() < base + 32:
         return 0
     // 64-bit little-endian Mach-O object.
-    if link_stage_read_u32_le(data, 0) != 0xfeedfacf:
+    if link_stage_read_u32_le(data, base) != 0xfeedfacf:
         return 0
-    let ncmds = link_stage_read_u32_le(data, 16) as i32
-    var offset = 32
+    let ncmds = link_stage_read_u32_le(data, base + 16) as i32
+    var offset = base + 32
     var best: i64 = 0
     var i = 0
     while i < ncmds and offset + 8 <= data.len():
@@ -128,16 +151,34 @@ fn link_stage_darwin_version_string(encoded: i64) -> str:
         return f"{major}.{minor}.{patch}"
     f"{major}.{minor}"
 
-fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str]) -> str:
+// The link's deployment target: 11.0, or the newest macOS an input was
+// built for — the program's objects, its extra inputs, and the archives its
+// `-l` names resolve to — so no input is newer than the program.
+fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_libs: &List[str], link_args: &List[str]) -> str:
     var best: i64 = 11 * 65536
-    let obj_minos = link_stage_macho_macos_minos(obj_path)
-    if obj_minos > best:
-        best = obj_minos
-    for i in 0..extras.len():
-        let extra_minos = link_stage_macho_macos_minos(extras[i])
-        if extra_minos > best:
-            best = extra_minos
+    let inputs: List[str] = List.new()
+    inputs.push(obj_path.to_owned())
+    for extra in extras: inputs.push(extra)
+    let dirs = link_stage_explicit_search_dirs(extras, link_args, "")
+    for lib in link_libs:
+        let archive = link_stage_darwin_lib_archive(&dirs, lib)
+        if archive.len() > 0: inputs.push(archive)
+    for input in inputs:
+        let minos = link_stage_macho_macos_minos(input)
+        if minos > best:
+            best = minos
     link_stage_darwin_version_string(best)
+
+// The archive `-l<name>` links on Darwin, as ld64 searches: in each
+// directory a dylib or text stub first, then the archive. "" for a dylib, a
+// framework, or a name found nowhere.
+fn link_stage_darwin_lib_archive(dirs: &List[str], name: &str) -> str:
+    if link_stage_framework_name(name).len() > 0: return ""
+    for dir in dirs:
+        let base = dir ++ "/lib" ++ name
+        if link_stage_file_exists(base ++ ".dylib") or link_stage_file_exists(base ++ ".tbd"): return ""
+        if link_stage_file_exists(base ++ ".a"): return base ++ ".a"
+    ""
 
 fn link_stage_is_temp_archive_path(path: &str) -> bool:
     if not path.ends_with(".a"):
@@ -460,7 +501,7 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
     let env: List[LinkStageEnvVar] = List.new()
     let inputs: List[str] = List.new()
     let outputs: List[str] = List.new()
-    let platform_version = link_stage_darwin_platform_version(obj_path, extras)
+    let platform_version = link_stage_darwin_platform_version(obj_path, extras, link_libs, link_args)
     args.push("-arch")
     args.push("arm64")
     args.push("-platform_version")
