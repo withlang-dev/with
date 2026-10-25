@@ -1013,6 +1013,10 @@ type CiProjectSymbol {
     // 1 when the body indexes or steps parameter i, itself or through a
     // corpus callee (`arrayparam:` lines): an array, never a receiver.
     param_array: List[i32],
+    // 1 when the body provably never writes through parameter i (Amendment
+    // 2's four conditions, CiContracts resolve_param_mutation): a `&self`
+    // receiver when it is the first parameter.
+    param_readonly: List[i32],
     contract: str,
     // D159 step 2 (CiContracts.w resolve_method_shapes): how a proved
     // function is printed. `method_record` the record whose `impl` block
@@ -1025,6 +1029,9 @@ type CiProjectSymbol {
     method_out: i32,
     method_out_ty: str,
     method_view: i32,
+    // 1 for `pub mut fn` (the body writes through the receiver), 0 for
+    // `pub fn` (Amendment 2's read receiver).
+    method_mut: i32,
     // 1 when the definition is `static` (a unit's own, or a header's inline
     // one): it keeps its raw signature, as the printer keeps every static.
     static_definition: i32,
@@ -1070,12 +1077,14 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         contract_evidence: "",
         param_mutates: List.new(),
         param_array: List.new(),
+        param_readonly: List.new(),
         contract: "",
         method_record: "",
         method_name: "",
         method_out: -1,
         method_out_ty: "",
         method_view: 0,
+        method_mut: 1,
         static_definition: 0,
     }
 
@@ -1129,6 +1138,7 @@ impl CiProjectSymbol:
         while self.param_destroys.len() < n: self.param_destroys.push(0)
         while self.param_mutates.len() < n: self.param_mutates.push(0)
         while self.param_array.len() < n: self.param_array.push(0)
+        while self.param_readonly.len() < n: self.param_readonly.push(0)
 
 fn ci_project_symbol_key(kind: i32, name: &str) -> str:
     if kind == CiProjectSymbolKind.CIPS_VAR:

@@ -192,7 +192,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 unsafe fn IVec_drop(__param_cself: *const IVec) {
     var __local_self_: *mut IVec = ((__param_cself as *mut IVec))
 
@@ -315,7 +315,7 @@ unsafe fn IVec_erase_n(__param_self_: *mut IVec, __param_idx: i64, __param_len: 
 unsafe fn IVec_insert_uninit(__param_self_: *mut IVec, __param_idx: i64, __param_n: i64) -> IVec_iter {
     if ((if ((*__param_self_).size + __param_n) >= (*__param_self_).capacity: 1 else: 0) != 0) {
         if ((if not IVec_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + __param_n) as i64)): 1 else: 0) != 0) {
-            return IVec_end((__param_self_ as *const IVec))
+            return (*(__param_self_ as *const IVec)).end()
         }
     }
 
@@ -329,7 +329,6 @@ unsafe fn IVec_insert_uninit(__param_self_: *mut IVec, __param_idx: i64, __param
 
 }
 
-// contract: unproved:0:read only
 unsafe fn IVec_find_in(__param_self_: *const IVec, __param_i1: IVec_iter, __param_i2: IVec_iter, __param_raw: i32) -> IVec_iter {
 
     var __local_p2: *const i32 = with 0 as __ci_expr_seq_15 {
@@ -364,7 +363,7 @@ unsafe fn IVec_find_in(__param_self_: *const IVec, __param_i1: IVec_iter, __para
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:IVec,unproved:1:read only
 pub unsafe fn IVec_value_drop(__param_self_: *const IVec, __param_val: *mut i32) {
     return
 }
@@ -482,55 +481,30 @@ fn IVec_clone(__param_vec: IVec) -> IVec {
 }
 
 // contract: unproved:0:read only
-pub unsafe fn IVec_value_clone(__param_self_: *const IVec, __param_val: i32) -> i32 {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_size(__param_self_: *const IVec) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_capacity(__param_self_: *const IVec) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_is_empty(__param_self_: *const IVec) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn IVec_value_toraw(__param_val: *const i32) -> i32 {
     return (*__param_val)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_front(__param_self_: *const IVec) -> *const i32 {
     return (((*__param_self_).data as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_front_mut(__param_self_: *mut IVec) -> *mut i32 {
     return (*__param_self_).data
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_back(__param_self_: *const IVec) -> *const i32 {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const i32) as *mut i32) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_back_mut(__param_self_: *mut IVec) -> *mut i32 {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const i32) as *mut i32))
 
@@ -592,7 +566,7 @@ pub unsafe fn IVec_insert_n(__param_self_: *mut IVec, __param_idx: i64, __param_
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_at(__param_self_: *const IVec, __param_idx: i64) -> *const i32 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"IVec_at".ptr, c"vec.h".ptr, (206 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -604,7 +578,7 @@ pub unsafe fn IVec_at(__param_self_: *const IVec, __param_idx: i64) -> *const i3
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_at_mut(__param_self_: *mut IVec, __param_idx: i64) -> *mut i32 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"IVec_at_mut".ptr, c"vec.h".ptr, (210 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -613,55 +587,6 @@ pub unsafe fn IVec_at_mut(__param_self_: *mut IVec, __param_idx: i64) -> *mut i3
     }
 
     return ((*__param_self_).data + ((__param_idx as i64) as usize))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_begin(__param_self_: *const IVec) -> IVec_iter {
-    var __local_it_: IVec_iter = IVec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const IVec_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut i32)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_rbegin(__param_self_: *const IVec) -> IVec_iter {
-    var __local_it_: IVec_iter = IVec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const IVec_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const IVec_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut i32)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_end(__param_self_: *const IVec) -> IVec_iter {
-
-    var __local_it_: IVec_iter = IVec_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_rend(__param_self_: *const IVec) -> IVec_iter {
-
-    var __local_it_: IVec_iter = IVec_iter.zeroed()
-
-    return __local_it_
 
 }
 
@@ -677,25 +602,7 @@ pub fn IVec_advance(__param_it_: IVec_iter, __param_n: u64) -> IVec_iter {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn IVec_index(__param_self_: *const IVec, __param_it_: IVec_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const IVec_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[i32]() as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_find(__param_self_: *const IVec, __param_raw: i32) -> IVec_iter {
-    return IVec_find_in(__param_self_, IVec_begin(__param_self_), IVec_end(__param_self_), __param_raw)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IVec_contains(__param_self_: *const IVec, __param_raw: i32) -> bool {
-    return ((((IVec_find(__param_self_, __param_raw).ref != null)) as bool))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:IVec,unproved:1:read only
 pub unsafe fn IVec_eq(__param_self_: *const IVec, __param_other: *const IVec) -> bool {
     return ((((with_memcmp((((*__param_self_).data as *const c_void) as *const u8), (((*__param_other).data as *const c_void) as *const u8), (((if 1 != 0: (((*__param_self_).size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) == 0)) as bool))
 
@@ -710,7 +617,7 @@ fn ctest_vec_basics_run() {
         unsafe { IVec_from_n((&__ci_expr_lit_0[0] as *mut i32), (12 as i64)) }
     }
 
-    assert_compare((1 as i32), c"==".ptr, (12 as i64), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as i64), c"vec_test.c".ptr, (9 as i32))
+    assert_compare((1 as i32), c"==".ptr, (12 as i64), (unsafe { (*((&raw mut __local_d as *mut IVec) as *const IVec)).size() } as i64), c"vec_test.c".ptr, (9 as i32))
 
     unsafe { IVec_erase_n((&raw mut __local_d as *mut IVec), (0 as i64), (5 as i64)) }
 
@@ -734,7 +641,7 @@ fn ctest_vec_basics_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (16 as i32))
 
-    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as i64), c"vec_test.c".ptr, (17 as i32))
+    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { (*((&raw mut __local_d as *mut IVec) as *const IVec)).size() } as i64), c"vec_test.c".ptr, (17 as i32))
 
     unsafe { IVec_erase_n((&raw mut __local_d as *mut IVec), (7 as i64), (4 as i64)) }
 
@@ -756,7 +663,7 @@ fn ctest_vec_basics_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (28 as i32))
 
-    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { IVec_size(((&raw mut __local_d as *mut IVec) as *const IVec)) } as i64), c"vec_test.c".ptr, (30 as i32))
+    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { (*((&raw mut __local_d as *mut IVec) as *const IVec)).size() } as i64), c"vec_test.c".ptr, (30 as i32))
 
     assert_compare((1 as i32), c"==".ptr, (200 as i64), ((unsafe *unsafe { IVec_at(((&raw mut __local_d as *mut IVec) as *const IVec), (7 as i64)) }) as i64), c"vec_test.c".ptr, (31 as i32))
 
@@ -830,6 +737,31 @@ impl IVec {
         ((unsafe *__local_v) = __param_value)
 
         return __local_v
+
+    }
+
+    pub fn value_clone(__param_val: i32) -> i32 {
+        let __param_self_: *const IVec = self as *const IVec
+
+        return __param_val
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const IVec = self as *const IVec
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const IVec = self as *const IVec
+        return (unsafe *__param_self_).capacity
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const IVec = self as *const IVec
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
 
     }
 
@@ -915,9 +847,76 @@ impl IVec {
 
     }
 
+    pub fn begin() -> IVec_iter {
+        let __param_self_: *const IVec = self as *const IVec
+        var __local_it_: IVec_iter = IVec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const IVec_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut i32)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> IVec_iter {
+        let __param_self_: *const IVec = self as *const IVec
+        var __local_it_: IVec_iter = IVec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const IVec_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const IVec_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut i32)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> IVec_iter {
+        let __param_self_: *const IVec = self as *const IVec
+
+        var __local_it_: IVec_iter = IVec_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> IVec_iter {
+        let __param_self_: *const IVec = self as *const IVec
+
+        var __local_it_: IVec_iter = IVec_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: IVec_iter) -> i64 {
+        let __param_self_: *const IVec = self as *const IVec
+        return (((((unsafe *(&raw const __param_it_ as *const IVec_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[i32]() as i64))
+
+    }
+
     pub mut fn adjust_end_(__param_n: i64) {
         let __param_self_: *mut IVec = self as *mut IVec
         ((unsafe *__param_self_).size = (unsafe *__param_self_).size + __param_n)
+
+    }
+
+    pub fn find(__param_raw: i32) -> IVec_iter {
+        let __param_self_: *const IVec = self as *const IVec
+        return unsafe { IVec_find_in(__param_self_, unsafe { (*__param_self_).begin() }, unsafe { (*__param_self_).end() }, __param_raw) }
+
+    }
+
+    pub fn contains(__param_raw: i32) -> bool {
+        let __param_self_: *const IVec = self as *const IVec
+        return ((((unsafe { (*__param_self_).find(__param_raw) }.ref != null)) as bool))
 
     }
 

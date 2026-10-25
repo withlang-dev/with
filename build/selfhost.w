@@ -4535,8 +4535,14 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         "void eng_init(struct eng *e);\nvoid eng_push(struct eng *e, struct item *it);\nvoid eng_set_user(struct eng *e, void *user);\nint eng_count(const struct eng *e);\n" ++
         "struct item *eng_first(struct eng *e);\nvoid eng_bump(struct eng *e, int *out);\nint eng_find(struct eng *e, int key, int *out);\nvoid eng_fill(struct eng *e, struct pair *out);\n" ++
         "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n" ++
-        "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\nvoid eng_zero_all(struct eng *es, int n);\n"
-    let unit = "#include <stdlib.h>\n#include \"eng.h\"\n" ++
+        "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\nvoid eng_zero_all(struct eng *es, int n);\n" ++
+        "int *eng_count_place(struct eng *e);\nvoid eng_alias(struct eng *e);\nint eng_peek_cast(const struct eng *e);\nint eng_count_via(const struct eng *e);\nint eng_same(const struct eng *e, const struct eng *o);\n"
+    let unit = "#include <stdlib.h>\n#include <string.h>\n#include \"eng.h\"\n" ++
+        "int *eng_count_place(struct eng *e) { return &e->count; }\n" ++
+        "void eng_alias(struct eng *e) { struct eng *q = e; q->count = 1; }\n" ++
+        "int eng_peek_cast(const struct eng *e) { struct eng *w = (struct eng *)e; return w->count; }\n" ++
+        "int eng_count_via(const struct eng *e) { return eng_count(e) + 0; }\n" ++
+        "int eng_same(const struct eng *e, const struct eng *o) { return memcmp(e, o, sizeof *e); }\n" ++
         "void eng_zero_all(struct eng *es, int n) { for (int i = 0; i < n; i++) es[i].count = 0; }\n" ++
         "void eng_zero_via(struct eng *es, int n) { eng_zero_all(es, n); }\n" ++
         "void eng_init(struct eng *e) { e->count = 0; e->items = 0; e->user = 0; }\n" ++
@@ -4579,8 +4585,21 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_free\treceiver-mut:eng\n", "contracts destroyer is a mutating receiver")
     if rc != 0: return rc
-    // A read-only handle is not in the ruling's list: unproved, said so.
-    rc = bs_file_contains(ctx, contracts, "eng_count\tunproved:0:read only\n", "contracts read-only receiver stays unproved")
+    // Amendment 2: a read-only handle is a `&self` receiver when the body
+    // proves it is never written through — directly, through a local alias,
+    // through a corpus callee, or a function off the pure list — never
+    // stored, never cast away from const; a pointer return needs (c).
+    rc = bs_file_contains(ctx, contracts, "eng_count\treceiver:eng\n", "contracts read-only receiver")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_count_via\treceiver:eng\n", "contracts read-only receiver through a read-only callee")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_same\treceiver:eng,unproved:1:read only\n", "contracts read-only receiver through a pure reader")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_count_place\treceiver:eng,ret-from:0\n", "contracts read-only receiver returning a part of itself")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_alias\treceiver-mut:eng\n", "contracts a write through a local alias is a write")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_peek_cast\tunproved:0:casts away const\n", "contracts a const cast away is no read receiver")
     if rc != 0: return rc
     // (a2) out-parameters: written whole on every path, a scalar and a
     // record; after a return; read (by a callee) before the write.
@@ -4590,7 +4609,7 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_take\treceiver-mut:eng,out:1:i32\n", "contracts out-parameter beside a status")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, contracts, "eng_find\tunproved:0:read only,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
+    rc = bs_file_contains(ctx, contracts, "eng_find\treceiver:eng,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_bump_twice\treceiver-mut:eng,unproved:1:out-parameter read before the write\n", "contracts out-parameter read first")
     if rc != 0: return rc
@@ -4603,7 +4622,7 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     // (c) a returned pointer that is a part of a parameter; the receiver
     // itself, beside (a1).
-    rc = bs_file_contains(ctx, contracts, "eng_first\tret-from:0\n", "contracts returned parameter is a borrow")
+    rc = bs_file_contains(ctx, contracts, "eng_first\tunproved:0:returns a pointer the receiver's view cannot carry\n", "contracts a loaded pointer is no view")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_touch\treceiver-mut:eng,ret-from:0\n", "contracts returned receiver")
     if rc != 0: return rc
@@ -4645,7 +4664,13 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     rc = bs_file_contains(ctx, out_w, ".touch()", "emission view method call")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, out_w, "// contract: unproved:0:read only\npub unsafe fn eng_count(", "emission unproved stays raw and says why")
+    rc = bs_file_contains(ctx, out_w, "    pub fn count() -> i32", "emission read receiver")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "    pub fn count_place() -> &i32 from self", "emission read receiver returning a view of itself")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "// contract: unproved:0:returns a pointer the receiver's view cannot carry\npub unsafe fn eng_first(", "emission unproved stays raw and says why")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, out_w, "// contract: receiver-mut:eng,stored-unknown:1 — stores an argument; ownership not modeled\npub unsafe fn eng_push(", "emission a stored argument says ownership is not modeled")
     if rc != 0: return rc
     rc = bs_file_forbids(ctx, out_w, "fn eng_init(", "emission replaces the free function")
     if rc != 0: return rc

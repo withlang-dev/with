@@ -126,3 +126,23 @@ body is in hand.
 A proved contract turning out wrong on a real engine (the inference list
 is then narrowed, never widened silently), or D51 §66's SQLite facade
 landing a different contract vocabulary the stage must speak.
+
+## Amendment 2 (Eric, 2026-10-25): the read-only receiver; owned fields are a proposal
+
+Ruled on the two briefs after steps 1–4 (#2623, #2624, #2625):
+
+> **A. Yes, with the four conditions as the record line, plus one.**
+>
+> The argument for out-parameters applies verbatim: a stage that leaves `len`, `peek`, `s[i]` and `front` wrapped in `unsafe` has left the hot path where it was. And the inference passes D51's test exactly when the no-write proof is real, so the conditions are the ruling, not decoration. Record it as:
+>
+> > A pointer-typed first parameter is presented as a `&self` receiver when the body proves it is never written through: no store through the handle or any local aliasing it; every callee that receives it is a corpus function proved read-only at that position (the mutation fixpoint inverted) or a non-corpus function known pure; it is never stored and never cast away from `const`. Otherwise the parameter is unproved and the function stays `unsafe fn`.
+>
+> The addition: **a `&self` function may not return a pointer derived from the receiver unless inference (c) also fires**, so the return is a view carrying the receiver's origin. Otherwise `front()` presents as a safe method returning a raw pointer that outlives the borrow, which is the use-after-free the receiver inference was supposed to make impossible. In STC, the read-side functions the facades call (`front`, `at`, `iter`) return pointers into the engine, so (a-read) and (c) have to land together for this to pay off. Where (c) can't prove the origin, keep `unsafe fn`.
+>
+> One check on "non-corpus function known pure": that list must be explicit and small (`memcmp`, `strlen`, `memchr`), never inferred from a name. A `printf` with `%p` reads only, but the point is that nothing outside the corpus gets trusted without appearing in the list.
+>
+> **B. Not now. Write the field-level design as its own proposal.**
+>
+> Three rows, all in c-algorithms, don't justify a representation change that touches every reader of the record atomically. And the right form is the one you name: an owned field with `Drop` at the record level, not a parameter attribute, because ownership is a property of where the value lives, and the parameter is only where it arrives. D148 already gives STC's slots to the facade, so the containers that matter don't need this. Until the proposal lands, the three functions stay `unsafe fn` with "stores an argument; ownership not modeled" in the generated comment, which is loud and correct.
+
+The briefs (`docs/proposals/migrator-contracts-plan.md`, the two follow-ups) carry the reference comparison and D51 analysis behind both.

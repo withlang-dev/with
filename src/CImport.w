@@ -128,7 +128,13 @@ impl CiStmtPool:
             if i == out_index: continue
             exprs.add_extra(arg_ids[i])
             count = count + 1
-        let call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, count, 0)
+        var call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, count, 0)
+        // A view the method returns (inference c) is the raw pointer the C
+        // caller expects: `&T as *const T`, then the declared pointer type.
+        if parts[4] == "1":
+            let pointee = ci_extract_struct_name_from_ptr(parts[6])
+            let as_const = exprs.add(CiExprKind.CIE_CAST, types.named_type_from_text("*const " ++ pointee) as i32, call as i32, 0, 0)
+            call = exprs.add(CiExprKind.CIE_CAST, types.named_type_from_text(parts[6]) as i32, as_const as i32, 0, 0)
         if out_index < 0:
             return CiValueExprIR { setup_stmt: setup_in, value_expr: if in_unsafe: call else: exprs.unsafe_expr(call) }
         let target = exprs.add(CiExprKind.CIE_DEREF, arg_ids[out_index], 0, 0, 0)
@@ -18746,6 +18752,21 @@ fn ci_body_ownership_evidence(session: i64, cursor: i32, params: &List[str]) -> 
 //   `arrayparam:<i>`                 parameter i is indexed (`p[k]`) or
 //                                    stepped (`p + k`, `p - k`): an array
 //                                    in the body's eyes, never a receiver
+//   `mutlocal:<name>`                an assignment, compound assignment or
+//                                    ++/-- whose target is a part of local
+//                                    `name`'s pointee (a local that aliases
+//                                    a parameter writes through it,
+//                                    Amendment 2)
+//   `castaway:<i>:<type>`            parameter i cast to <type> (a `const`
+//                                    cast away is a write intent)
+//   `retaddr:<i>`                    a `return` of parameter i itself or of
+//                                    the address of one of its members
+//                                    reached without a load (`&p->f`): a
+//                                    part of it for certain (inference c)
+//   `retload:<i>`                    a `return` of a pointer loaded from
+//                                    parameter i or computed from one
+//                                    (`p->data + k`): may be NULL or point
+//                                    anywhere
 // A body no proof can walk gives `unanalyzable`.
 
 // Whether `cursor`'s subtree has a statement of `kind`.
@@ -18786,14 +18807,58 @@ fn ci_contract_is_whole_deref(session: i64, lhs: i32, name: &str) -> bool:
     if with_ci_cursor_kind(session, l) != CXK_UNARY_OP or with_ci_unary_op(session, l) != UO_DEREF: return false
     ci_cursor_names(session, with_ci_child(session, l, 0), name)
 
-fn ci_contract_walk(session: i64, cursor: i32, params: &List[str]) -> str:
+// The local whose pointee an assignment target is a part of ("" when none):
+// the alias side of `mutparam:`.
+fn ci_contract_target_local(session: i64, lhs: i32, params: &List[str], locals: &List[str]) -> str:
+    let l = ci_peel_transparent(session, lhs)
+    if with_ci_cursor_kind(session, l) == CXK_DECL_REF: return ""
+    let root = ci_own_place_root(session, l, params, locals)
+    if root.starts_with("local:"): root.slice(6, root.len()).to_owned() else: ""
+
+// The parameter whose record `expr` addresses without a load: the parameter
+// itself, or a member chain (`p->f`, `p->f.g`) whose only pointer step is
+// the parameter's own; -1 otherwise.
+fn ci_contract_direct_part(session: i64, expr: i32, params: &List[str]) -> i32:
+    let e = ci_peel_transparent(session, expr)
+    let kind = with_ci_cursor_kind(session, e)
+    if kind == CXK_DECL_REF:
+        for pi in 0..params.len():
+            if params[pi].len() > 0 and ci_cursor_names(session, e, params[pi]): return pi as i32
+        return -1
+    if kind == CXK_MEMBER_REF and with_ci_num_children(session, e) >= 1:
+        let base = ci_peel_transparent(session, with_ci_child(session, e, 0))
+        if with_ci_cursor_kind(session, base) == CXK_DECL_REF: return ci_contract_direct_part(session, base, params)
+        // A member of an embedded record is a part; one behind a pointer
+        // field is a load.
+        if with_ci_cursor_kind(session, base) == CXK_MEMBER_REF and not ci_trim(with_ci_type_translated(session, with_ci_cursor_type(session, base))).starts_with("*"):
+            return ci_contract_direct_part(session, base, params)
+    -1
+
+fn ci_contract_walk(session: i64, cursor: i32, params: &List[str], locals: &List[str]) -> str:
     var out = ""
     let kind = with_ci_cursor_kind(session, cursor)
     let nc = with_ci_num_children(session, cursor)
+    if kind == CXK_RETURN_STMT and nc >= 1:
+        let value = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        // The parameter itself, or the address of a member reached without
+        // a load; a member's value (`p->items`) is a load.
+        var part = if with_ci_cursor_kind(session, value) == CXK_DECL_REF: ci_contract_direct_part(session, value, params) else: -1
+        if part < 0 and with_ci_cursor_kind(session, value) == CXK_UNARY_OP and with_ci_unary_op(session, value) == UO_ADDR and with_ci_num_children(session, value) == 1:
+            part = ci_contract_direct_part(session, with_ci_child(session, value, 0), params)
+        if part >= 0: out = out ++ f"retaddr:{part}\n"
+        else:
+            let root = ci_own_place_root(session, value, params, locals)
+            if root.starts_with("param:"): out = out ++ "retload:" ++ root.slice(6, root.len()) ++ "\n"
+    if kind == CXK_CSTYLE_CAST and nc >= 1:
+        let operand = ci_peel_transparent(session, with_ci_child(session, cursor, nc - 1))
+        for pi in 0..params.len():
+            if params[pi].len() > 0 and ci_cursor_names(session, operand, params[pi]): out = out ++ f"castaway:{pi}:" ++ ci_trim(with_ci_type_translated(session, with_ci_cursor_type(session, cursor))) ++ "\n"
     if (kind == CXK_BINARY_OP and nc == 2 and with_ci_binary_op(session, cursor) >= BO_ASSIGN) or (kind == CXK_COMPOUND_ASSIGN_OP and nc == 2):
         let lhs = with_ci_child(session, cursor, 0)
         let target = ci_contract_target_param(session, lhs, params)
         if target >= 0: out = out ++ f"mutparam:{target}\n"
+        let local = ci_contract_target_local(session, lhs, params, locals)
+        if local.len() > 0: out = out ++ "mutlocal:" ++ local ++ "\n"
         if kind == CXK_BINARY_OP and with_ci_binary_op(session, cursor) == BO_ASSIGN:
             let l = ci_peel_transparent(session, lhs)
             if target >= 0 and with_ci_cursor_kind(session, l) == CXK_MEMBER_REF:
@@ -18806,6 +18871,8 @@ fn ci_contract_walk(session: i64, cursor: i32, params: &List[str]) -> str:
         if op >= UO_PRE_INC and op <= UO_POST_DEC:
             let target = ci_contract_target_param(session, with_ci_child(session, cursor, 0), params)
             if target >= 0: out = out ++ f"mutparam:{target}\n"
+            let local = ci_contract_target_local(session, with_ci_child(session, cursor, 0), params, locals)
+            if local.len() > 0: out = out ++ "mutlocal:" ++ local ++ "\n"
     if kind == CXK_ARRAY_SUBSCRIPT and nc == 2:
         for pi in 0..params.len():
             if params[pi].len() > 0 and ci_cursor_names(session, with_ci_child(session, cursor, 0), params[pi]): out = out ++ f"arrayparam:{pi}\n"
@@ -18826,7 +18893,7 @@ fn ci_contract_walk(session: i64, cursor: i32, params: &List[str]) -> str:
             ai = ai + 1
     var i = 0
     while i < nc:
-        out = out ++ ci_contract_walk(session, with_ci_child(session, cursor, i), params)
+        out = out ++ ci_contract_walk(session, with_ci_child(session, cursor, i), params, locals)
         i = i + 1
     out
 
@@ -18877,7 +18944,8 @@ fn ci_body_contract_evidence(session: i64, fn_cursor: i32, params: &List[str]) -
         if with_ci_cursor_kind(session, child) == CXK_COMPOUND_STMT: body = child
         i = i + 1
     if body < 0: return "unanalyzable\n"
-    ci_contract_walk(session, body, params) ++ ci_contract_out_params(session, body, params)
+    let locals = ci_own_collect_locals(session, body)
+    ci_contract_walk(session, body, params, &locals) ++ ci_contract_out_params(session, body, params)
 
 // D121: the allocator or deallocator a global's initializer names, through
 // casts: `xmlFreeFunc xmlFree = free`. "" when it names neither.

@@ -209,13 +209,56 @@ fresh migration against the promoted artifact (it never gates, D112: a
 migrator change alone never re-promotes a corpus, so a red there would be
 permanent). Corpora promoted before the artifact existed carry none and
 hash as before; STC was re-stamped under the rule. The two follow-ups the
-ruling left open are briefs: a `&self` receiver for the read-only surface
-(427 STC rows, the facades' `size`/`top`/`at`), and an owned parameter
-stored into a record ((b) emission: the record would hold the owned value).
+ruling left open were briefs, ruled as Amendment 2 (Eric, 2026-10-25): the
+read receiver is step 5; owned fields are a proposal of their own.
+
+**Step 5 — the read receiver (Amendment 2).** A pointer-typed first
+parameter is presented as a `&self` receiver (`pub fn <m>`) when the body
+proves it is never written through: no store through the handle or any
+local aliasing it (`mutparam:`, `mutlocal:` against the `localsrc:`
+aliases); every callee that receives it, or a part of it, is a corpus
+function proved read-only at that position (the mutation fixpoint
+inverted: a greatest fixed point over `param_sinks`, `localsink:` and
+`memberarg:`) or a non-corpus function on the explicit pure list
+(`memcmp`, `memchr`, `strlen`, `strcmp`, `strncmp`; never a name's
+guess); it is never stored (`param_stores`), never freed in part
+(`freesmember:`), never cast away from `const` (`castaway:`), never
+indexed, never NULL-accepting. A read receiver that returns a pointer
+needs inference (c) on the same function or stays `unsafe fn`
+("returns a pointer the receiver's view cannot carry"); (c) itself is
+tightened to what is a part of the parameter for certain — the parameter
+(`return self`) or the address of one of its members (`&self->f`,
+`retaddr:`) — a pointer loaded from a field (`self->data`, `retload:`)
+may be NULL or point anywhere and keeps the function raw. The STC read
+surface that pays off at once: `size`, `is_empty`, `capacity`, `begin`,
+`end`, `index` (no pointer return); `at`, `top`, `front`, `back` return
+`self->data + k` and stay raw until a non-NULL proof exists (a brief if
+the facades need it; today they read through `unsafe fn place`).
+Inference (b)'s three rows (c-algorithms) keep `pub unsafe fn` with
+"stores an argument; ownership not modeled" in the generated comment; the
+owned-field design is its own proposal.
+
+*Step 5 status (2026-10-25, branch `migrator-contracts-5`):* landed as
+written; every corpus lane green on fresh migrations. Fresh counts: STC 179
+read receivers (121 `pub fn` methods beside 181 `pub mut fn`), pcre2 26,
+zlib 27, TommyDS 35, c-algorithms 30, M*LIB 34; refused for a pointer
+return without (c): STC 58, TommyDS 18, c-algorithms 29, M*LIB 20; refused
+for a callee that may write or is off the pure list: pcre2 14, STC 12. One
+more call-site rule the corpora forced: a corpus call to a method whose
+return became a view hands the C site the raw pointer it expects (`&T as
+*const T`, then the declared type). STC re-promoted under
+`migrator-pin:#2615`; the facades call the read methods (`self.words.size()`,
+`self.set.begin()`, `self.bits.test(i)`) and lost 34 more `unsafe` blocks
+(319 → 285). What stays `unsafe` in a facade now: the loaded-pointer reads
+(`at`, `top`, `front`, `back`, `get`, which need a non-NULL proof), the
+destroyers (`drop` frees a part of the record: consuming, not a receiver),
+the slot pushes and the keyed `insert`/`erase` (a second pointer parameter),
+and the slot-lifetime steps the facade owns.
 
 ## What is deliberately not inferred
 
-- A read-only first pointer (no `&self` receiver): not in the ruling.
+- A read-only first pointer that returns a loaded pointer (`front`, `at`):
+  the view would need a non-NULL proof the body does not give.
 - A second pointer the body reads and writes in place, an input/output
   pointer, an array the body mutates: unproved (the ruling's "everything
   else").

@@ -2,7 +2,7 @@
 use std.engines.stc_testing.defs
 use std.libc
 
-// contract: stored-unknown:0,stored-unknown:1,stored-unknown:2
+// contract: stored-unknown:0,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn _fmt_time(__param_fmt: *const c_char, __param_tm: *const tm, __param_buf: *mut c_char, __param_bufsize: i32) -> *const c_char {
     strftime(__param_buf, (__param_bufsize as u64), __param_fmt, __param_tm)
 
@@ -10,13 +10,13 @@ pub unsafe fn _fmt_time(__param_fmt: *const c_char, __param_tm: *const tm, __par
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:frees a part of it
 pub unsafe fn fmt_close(__param_ss: *mut fmt_stream) {
     with_free((((*__param_ss).data as *mut c_void) as *mut u8))
 
 }
 
-// contract: stored-unknown:0,stored-unknown:2,variadic
+// contract: stored-unknown:0,stored-unknown:2,variadic — stores an argument; ownership not modeled
 pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt: *const c_char, ...) -> i32 {
     var __local_p = __param_p
     var __local_fmt = __param_fmt
@@ -445,7 +445,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
 }
 
-// contract: unproved:0:NULL is an accepted argument,stored-unknown:1,variadic
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:1,variadic — stores an argument; ownership not modeled
 pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_char, ...) -> Unit {
     var __local_args__goto_229_13: c_va_list = va_start()
 

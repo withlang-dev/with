@@ -24,7 +24,9 @@ fn main:
     p7_assert_success(migrated, "migrate through a backslash include and a backslash output path")
     let engine = read_file(p7_join(case_dir, "lib/eng/engine.w")).unwrap()
     let user = read_file(p7_join(case_dir, "lib/eng/user.w")).unwrap()
-    assert(engine.contains("pub unsafe fn engine_peek("))
+    // engine_peek only reads through its handle: the owner publishes it as
+    // a `&self` method of the record (D159 Amendment 2).
+    assert(engine.contains("    pub fn peek() -> i32"))
     assert(not user.contains("fn engine_peek("))
     assert(user.contains("use eng.engine"))
     assert(not engine.contains("\\") and not user.contains("\\"))

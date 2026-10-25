@@ -36,7 +36,7 @@ impl[T: Ord] OrderedSet[T]:
             let right = unsafe { &(*(b as *const StcSlot[T])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> isize: unsafe { stc_slot_sset_size(&raw const self.set) } as isize
+    pub fn len() -> isize: self.set.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     fn find_slot(value: &T) -> *mut StcSlot[T]:
@@ -82,7 +82,7 @@ impl[T: Ord] OrderedSet[T]:
 
     /// Drops every value and empties the set.
     pub mut fn clear():
-        var cursor = unsafe { stc_slot_sset_begin(&raw const self.set) }
+        var cursor = self.set.begin()
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
             cursor.next()
@@ -90,11 +90,11 @@ impl[T: Ord] OrderedSet[T]:
 
     /// In-order views of the values (D44: traversal observes).
     pub fn iter() -> OrderedSetIter[T]:
-        OrderedSetIter { cursor: unsafe { stc_slot_sset_begin(&raw const self.set) } }
+        OrderedSetIter { cursor: self.set.begin() }
 
 impl[T] Drop for OrderedSet[T]:
     move fn drop():
-        var cursor = unsafe { stc_slot_sset_begin(&raw const self.set) }
+        var cursor = self.set.begin()
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
             cursor.next()

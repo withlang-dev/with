@@ -21,7 +21,9 @@ fn main:
     p7_assert_success(migrated, "migrate a header-inline API owned by its unit")
     let engine = read_file(p7_join(case_dir, "lib/eng/engine.w")).unwrap()
     let user = read_file(p7_join(case_dir, "lib/eng/user.w")).unwrap()
-    assert(engine.contains("pub unsafe fn engine_peek("))
+    // engine_peek only reads through its handle: the owner publishes it as
+    // a `&self` method of the record (D159 Amendment 2).
+    assert(engine.contains("    pub fn peek() -> i32"))
     assert(not user.contains("fn engine_peek("))
     assert(user.contains("use eng.engine"))
     // util.h has no util.c: its only includer publishes util_twice.

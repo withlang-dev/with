@@ -49,8 +49,8 @@ impl[T: Key] UnorderedSet[T]:
         p => hash_of(unsafe { &(*(p as *const StcSlot[T])).value })
 
     pub fn len() -> isize:
-        comptime if stc_is_word[T](): unsafe { stc_word_set_size(&raw const self.words) } as isize
-        else: unsafe { stc_slot_set_size(&raw const self.set) } as isize
+        comptime if stc_is_word[T](): self.words.size() as isize
+        else: self.set.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     fn find_slot(value: &T) -> *mut StcSlot[T]:
@@ -75,7 +75,7 @@ impl[T: Key] UnorderedSet[T]:
             false
 
     pub fn contains(value: &T) -> bool:
-        comptime if stc_is_word[T](): unsafe { stc_word_set_contains(&raw const self.words, self.word(value)) }
+        comptime if stc_is_word[T](): self.words.contains(self.word(value))
         else: self.find_slot(value) as i64 != 0
 
     /// Observes the stored value equal to `value`, if any (D22: a word
@@ -107,7 +107,7 @@ impl[T: Key] UnorderedSet[T]:
         comptime if stc_is_word[T]():
             self.words.clear()
         else:
-            var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
+            var cursor = self.set.begin()
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
                 cursor.next()
@@ -116,13 +116,13 @@ impl[T: Key] UnorderedSet[T]:
     /// Views of the values, in no stated order (D44: traversal observes).
     pub fn iter() -> UnorderedSetIter[T]:
         comptime if stc_is_word[T]():
-            UnorderedSetIter { cursor: stc_slot_set_iter.zeroed(), words: unsafe { stc_word_set_begin(&raw const self.words) } }
+            UnorderedSetIter { cursor: stc_slot_set_iter.zeroed(), words: self.words.begin() }
         else:
-            UnorderedSetIter { cursor: unsafe { stc_slot_set_begin(&raw const self.set) }, words: stc_word_set_iter.zeroed() }
+            UnorderedSetIter { cursor: self.set.begin(), words: stc_word_set_iter.zeroed() }
 
 impl[T] Drop for UnorderedSet[T]:
     move fn drop():
-        var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
+        var cursor = self.set.begin()
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
             cursor.next()

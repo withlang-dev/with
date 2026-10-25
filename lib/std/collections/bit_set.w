@@ -20,12 +20,12 @@ pub fn BitSet.with_value(len: isize, value: bool) -> BitSet:
     BitSet { bits: cbits_with_size(len as c_long, value) }
 
 impl BitSet:
-    pub fn len() -> isize: unsafe { cbits_size(&raw const self.bits) } as isize
+    pub fn len() -> isize: self.bits.size() as isize
     fn check(i: isize): assert(i >= 0 and i < self.len(), "BitSet index out of bounds")
 
     pub fn test(i: isize) -> bool:
         self.check(i)
-        unsafe { cbits_test(&raw const self.bits, i as c_long) }
+        self.bits.test(i as c_long)
 
     pub mut fn set(i: isize):
         self.check(i)
@@ -61,5 +61,5 @@ impl BitSetIter:
         while self.index < self.len:
             let i = self.index
             self.index = i + 1
-            if unsafe { cbits_test(self.bits as *const cbits, i as c_long) }: return Some(i)
+            if unsafe { (*(self.bits as *const cbits)).test(i as c_long) }: return Some(i)
         None

@@ -182,7 +182,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_set_drop(__param_cself: *const stc_slot_set) {
     var __local_self_: *mut stc_slot_set = ((__param_cself as *mut stc_slot_set))
 
@@ -195,99 +195,6 @@ pub unsafe fn stc_slot_set_drop(__param_cself: *const stc_slot_set) {
     with_free((((*__local_self_).meta as *mut c_void) as *mut u8))
 
     with_free((((*__local_self_).table as *mut c_void) as *mut u8))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_reserve(__param__self: *mut stc_slot_set, __param__cap: i64) -> bool {
-    var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
-
-    var __local__newbucks: i64 = ((((((__local__newcap as f32) / i_max_load_factor) as i64) + 4) as i64))
-
-    (__local__newbucks = ((c_next_pow2(__local__newbucks) as i64)))
-
-    var __ci_expr_logic_0: i32
-
-    if ((if __local__newbucks == (*__param__self).bucket_count: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if __param__cap <= (((((*__param__self).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        return ((true as bool))
-    }
-
-
-    var __local_map: stc_slot_set = (*__param__self)
-
-    var __local_self_: *mut stc_slot_set = ((&raw mut __local_map as *mut stc_slot_set))
-
-
-
-    (__local_map.table = (((with_alloc((((if 1 != 0: ((__local__newbucks * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
-
-    (__local_map.meta = (((with_alloc_zeroed((((if 1 != 0: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if 1 != 0: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
-
-    (__local_map.bucket_count = __local__newbucks)
-
-    var __local_ok: bool = with 0 as __ci_expr_seq_26 {
-        var __ci_expr_logic_1: i32 = 0
-        if ((*(&raw const __local_map as *const stc_slot_set)).table != null) {
-            (__ci_expr_logic_1 = (if (*(&raw const __local_map as *const stc_slot_set)).meta != null: 1 else: 0))
-        }
-        (__ci_expr_logic_1 != 0)
-    }
-
-    if __local_ok {
-        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as u16)))
-
-        var __local_d: *const *mut stc_slot_head = (((*__param__self).table as *const *mut stc_slot_head))
-
-        var __local_m: *const hmap_meta = (((*__param__self).meta as *const hmap_meta))
-
-        var __local_i: i64 = ((0 as i64))
-
-        while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
-            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
-                var __local_r: *mut stc_slot_head = (*__local_d)
-
-                ((*(stc_slot_set_bucket_insert_(((&raw mut __local_map as *mut stc_slot_set) as *const stc_slot_set), ((&raw mut __local_r as *mut *mut stc_slot_head) as *const *mut stc_slot_head)).ref)) = (*__local_d))
-
-            }
-
-            (__local_i = __local_i + 1)
-
-            (__local_d = __local_d + 1)
-
-
-        }
-
-
-        loop {
-            var __local__xp: *mut stc_slot_set = __param__self
-
-            var __local__yp: *mut stc_slot_set = ((&raw mut __local_map as *mut stc_slot_set))
-
-
-            var __local__tv: stc_slot_set = (*__local__xp)
-
-            with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[stc_slot_set]())
-
-            with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_slot_set]())
-
-            if not ((0 != 0)) {
-                break
-            }
-        }
-
-    }
-
-    with_free((((*(&raw const __local_map as *const stc_slot_set)).meta as *mut c_void) as *mut u8))
-
-    with_free((((*(&raw const __local_map as *const stc_slot_set)).table as *mut c_void) as *mut u8))
-
-    return __local_ok
 
 }
 
@@ -329,20 +236,7 @@ pub unsafe fn stc_slot_set_erase_entry(__param_self_: *mut stc_slot_set, __param
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_max_load_factor(__param_self_: *const stc_slot_set) -> f32 {
-
-    return i_max_load_factor
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_capacity(__param_map: *const stc_slot_set) -> i64 {
-    return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_bucket_lookup_(__param_self_: *const stc_slot_set, __param_rkeyptr: *const *mut stc_slot_head) -> stc_slot_set_result {
     var __local__hash: u64 = (((*(*__param_rkeyptr)).hash.unwrap()(((*__param_rkeyptr) as *const c_void)) as u64))
 
@@ -454,25 +348,7 @@ pub unsafe fn stc_slot_set_bucket_insert_(__param_self_: *const stc_slot_set, __
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_is_empty(__param_map: *const stc_slot_set) -> bool {
-    return ((((not ((*__param_map).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_size(__param_map: *const stc_slot_set) -> i64 {
-    return (*__param_map).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_bucket_count(__param_map: *mut stc_slot_set) -> i64 {
-    return (*__param_map).bucket_count
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_contains(__param_self_: *const stc_slot_set, __param_rkey: *mut stc_slot_head) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -485,16 +361,10 @@ pub unsafe fn stc_slot_set_contains(__param_self_: *const stc_slot_set, __param_
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_shrink_to_fit(__param_self_: *mut stc_slot_set) -> Unit {
-    stc_slot_set_reserve(__param_self_, (9223372036854775807 as i64))
-
-}
-
 // contract: receiver-mut:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_insert_entry_(__param_self_: *mut stc_slot_set, __param_rkey: *mut stc_slot_head) -> stc_slot_set_result {
     if ((if (*__param_self_).size >= (((((*__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
-        if ((if not stc_slot_set_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
+        if ((if not (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 2) as i64)): 1 else: 0) != 0) {
             return ((stc_slot_set_result.zeroed() as stc_slot_set_result))
         }
     }
@@ -507,17 +377,18 @@ pub unsafe fn stc_slot_set_insert_entry_(__param_self_: *mut stc_slot_set, __par
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_set_value_toraw(__param_val: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_val)
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_value_drop(__param_self_: *const stc_slot_set, __param__val: *mut *mut stc_slot_head) {
     return
 }
 
-// contract: receiver-mut:stc_slot_set,stored-unknown:1
+// contract: receiver-mut:stc_slot_set,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_set_insert(__param_self_: *mut stc_slot_set, __param__key: *mut stc_slot_head) -> stc_slot_set_result {
     var __local__res: stc_slot_set_result = stc_slot_set_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut *mut stc_slot_head)))
 
@@ -532,7 +403,7 @@ pub unsafe fn stc_slot_set_insert(__param_self_: *mut stc_slot_set, __param__key
 
 }
 
-// contract: receiver-mut:stc_slot_set,stored-unknown:1
+// contract: receiver-mut:stc_slot_set,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_set_push(__param_self_: *mut stc_slot_set, __param__val: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local__res: stc_slot_set_result = stc_slot_set_insert_entry_(__param_self_, (*(&raw mut __param__val as *mut *mut stc_slot_head)))
 
@@ -587,41 +458,9 @@ pub unsafe fn stc_slot_set_from_n(__param_raw: *const *mut stc_slot_head, __para
 pub fn stc_slot_set_with_capacity(__param_cap: i64) -> stc_slot_set {
     var __local_cx: stc_slot_set = stc_slot_set.zeroed()
 
-    unsafe { stc_slot_set_reserve((&raw mut __local_cx as *mut stc_slot_set), __param_cap) }
+    unsafe { (*(&raw mut __local_cx as *mut stc_slot_set)).reserve(__param_cap) }
 
     return __local_cx
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_begin(__param_self_: *const stc_slot_set) -> stc_slot_set_iter {
-    var __local_it_: stc_slot_set_iter = stc_slot_set_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
-
-    if ((if (*(&raw const __local_it_ as *const stc_slot_set_iter)).ref == null: 1 else: 0) != 0) {
-        return __local_it_
-    }
-
-    (__local_it_._end = (*(&raw const __local_it_ as *const stc_slot_set_iter))._end + (((*__param_self_).bucket_count as i64) as usize))
-
-    while ((if (*(*(&raw const __local_it_ as *const stc_slot_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_slot_set_iter)).ref + 1)
-
-        (__local_it_._mref = (*(&raw const __local_it_ as *const stc_slot_set_iter))._mref + 1)
-
-    }
-
-    if ((if (*(&raw const __local_it_ as *const stc_slot_set_iter)).ref == (*(&raw const __local_it_ as *const stc_slot_set_iter))._end: 1 else: 0) != 0) {
-        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_set_end(__param_self_: *const stc_slot_set) -> stc_slot_set_iter {
-
-    return ((stc_slot_set_iter.zeroed() as stc_slot_set_iter))
 
 }
 
@@ -650,7 +489,7 @@ pub fn stc_slot_set_advance(__param_it_: stc_slot_set_iter, __param_n: u64) -> s
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_find(__param_self_: *const stc_slot_set, __param_rkey: *mut stc_slot_head) -> stc_slot_set_iter {
     var __local_ref: *mut *mut stc_slot_head
 
@@ -668,17 +507,17 @@ pub unsafe fn stc_slot_set_find(__param_self_: *const stc_slot_set, __param_rkey
     }
 
 
-    return stc_slot_set_end(__param_self_)
+    return (*__param_self_).end()
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 pub unsafe fn stc_slot_set_get(__param_self_: *const stc_slot_set, __param_rkey: *mut stc_slot_head) -> *const *mut stc_slot_head {
     return (((if (*__param_self_).size != 0: stc_slot_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut *mut stc_slot_head) as *const *mut stc_slot_head)).ref else: (null as *mut *mut stc_slot_head)) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 pub unsafe fn stc_slot_set_get_mut(__param_self_: *mut stc_slot_set, __param_rkey: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     return ((stc_slot_set_get((__param_self_ as *const stc_slot_set), __param_rkey) as *mut *mut stc_slot_head))
 
@@ -709,13 +548,13 @@ pub unsafe fn stc_slot_set_erase(__param_self_: *mut stc_slot_set, __param_rkey:
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_set,unproved:1:read only
 pub unsafe fn stc_slot_set_eq(__param_self_: *const stc_slot_set, __param_other: *const stc_slot_set) -> bool {
-    if ((if stc_slot_set_size(__param_self_) != stc_slot_set_size(__param_other): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size() != (*__param_other).size(): 1 else: 0) != 0) {
         return ((false as bool))
     }
 
-    var __local_i: stc_slot_set_iter = stc_slot_set_begin(__param_self_)
+    var __local_i: stc_slot_set_iter = (*__param_self_).begin()
 
     while ((*(&raw const __local_i as *const stc_slot_set_iter)).ref != null) {
         var __local__raw: *mut stc_slot_head = (*((*(&raw const __local_i as *const stc_slot_set_iter)).ref))
@@ -734,7 +573,6 @@ pub unsafe fn stc_slot_set_eq(__param_self_: *const stc_slot_set, __param_other:
 
 }
 
-// contract: unproved:0:read only
 unsafe fn stc_slot_set_wipe_(__param_self_: *mut stc_slot_set) {
     var __local_d: *mut *mut stc_slot_head = (*__param_self_).table
 
@@ -761,7 +599,7 @@ unsafe fn stc_slot_set_wipe_(__param_self_: *mut stc_slot_set) {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_sset_drop(__param_cself: *const stc_slot_sset) {
     var __local_self_: *mut stc_slot_sset = ((__param_cself as *mut stc_slot_sset))
 
@@ -775,7 +613,7 @@ pub unsafe fn stc_slot_sset_drop(__param_cself: *const stc_slot_sset) {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only,unproved:2:out-parameter read before the write
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only,unproved:2:out-parameter read before the write
 pub unsafe fn stc_slot_sset_find_it(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head, __param_out: *mut stc_slot_sset_iter) -> *mut *mut stc_slot_head {
     var __local_tn: i32 = (*__param_self_).root
 
@@ -827,7 +665,7 @@ pub unsafe fn stc_slot_sset_find_it(__param_self_: *const stc_slot_sset, __param
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_sset,unproved:1:read only
 pub unsafe fn stc_slot_sset_lower_bound(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head) -> stc_slot_sset_iter {
     var __local_it_: stc_slot_sset_iter
 
@@ -856,7 +694,7 @@ pub unsafe fn stc_slot_sset_lower_bound(__param_self_: *const stc_slot_sset, __p
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_sset_front(__param_self_: *const stc_slot_sset) -> *mut *mut stc_slot_head {
     var __local_d: *mut stc_slot_sset_node = (*__param_self_).nodes
 
@@ -870,7 +708,7 @@ pub unsafe fn stc_slot_sset_front(__param_self_: *const stc_slot_sset) -> *mut *
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_sset_back(__param_self_: *const stc_slot_sset) -> *mut *mut stc_slot_head {
     var __local_d: *mut stc_slot_sset_node = (*__param_self_).nodes
 
@@ -902,46 +740,7 @@ pub unsafe fn stc_slot_sset_erase(__param_self_: *mut stc_slot_sset, __param_rke
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_sset_begin(__param_self_: *const stc_slot_sset) -> stc_slot_sset_iter {
-    var __local_it_: stc_slot_sset_iter
-
-    (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
-
-    (__local_it_._d = (*__param_self_).nodes)
-
-    (__local_it_._top = ((0 as i32)))
-
-
-    (__local_it_._tn = (*__param_self_).root)
-
-    if ((*(&raw const __local_it_ as *const stc_slot_sset_iter))._tn != 0) {
-        (*(&raw mut __local_it_ as *mut stc_slot_sset_iter)).next()
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_sset_is_empty(__param_self_: *const stc_slot_sset) -> bool {
-    return (((((*__param_self_).size == 0)) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_sset_size(__param_self_: *const stc_slot_sset) -> i64 {
-    return (((*__param_self_).size as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_sset_capacity(__param_self_: *const stc_slot_sset) -> i64 {
-    return (((*__param_self_).capacity as i64))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_sset,unproved:1:read only
 pub unsafe fn stc_slot_sset_find(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head) -> stc_slot_sset_iter {
     var __local_it_: stc_slot_sset_iter
 
@@ -951,7 +750,7 @@ pub unsafe fn stc_slot_sset_find(__param_self_: *const stc_slot_sset, __param_rk
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_sset,unproved:1:read only
 pub unsafe fn stc_slot_sset_contains(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head) -> bool {
     var __local_it_: stc_slot_sset_iter
 
@@ -959,7 +758,7 @@ pub unsafe fn stc_slot_sset_contains(__param_self_: *const stc_slot_sset, __para
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 pub unsafe fn stc_slot_sset_get(__param_self_: *const stc_slot_sset, __param_rkey: *mut stc_slot_head) -> *const *mut stc_slot_head {
     var __local_it_: stc_slot_sset_iter
 
@@ -967,7 +766,7 @@ pub unsafe fn stc_slot_sset_get(__param_self_: *const stc_slot_sset, __param_rke
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 pub unsafe fn stc_slot_sset_get_mut(__param_self_: *mut stc_slot_sset, __param_rkey: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_it_: stc_slot_sset_iter
 
@@ -975,12 +774,13 @@ pub unsafe fn stc_slot_sset_get_mut(__param_self_: *mut stc_slot_sset, __param_r
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_sset_value_toraw(__param_val: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_val)
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_sset,unproved:1:read only
 pub unsafe fn stc_slot_sset_value_drop(__param_self_: *const stc_slot_sset, __param_val: *mut *mut stc_slot_head) {
     return
 }
@@ -996,22 +796,6 @@ pub unsafe fn stc_slot_sset_insert_entry_(__param_self_: *mut stc_slot_sset, __p
     ((*__param_self_).size = (*__param_self_).size + ((*(&raw const __local_res as *const stc_slot_sset_result)).inserted as i32))
 
     return __local_res
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_sset_end(__param_self_: *const stc_slot_sset) -> stc_slot_sset_iter {
-    var __local_it_: stc_slot_sset_iter
-
-
-    (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
-
-    (__local_it_._top = ((0 as i32)))
-
-    (__local_it_._tn = ((0 as i32)))
-
-
-    return __local_it_
 
 }
 
@@ -1040,7 +824,7 @@ pub fn stc_slot_sset_advance(__param_it_: stc_slot_sset_iter, __param_n: u64) ->
 
 }
 
-// contract: receiver-mut:stc_slot_sset,stored-unknown:1
+// contract: receiver-mut:stc_slot_sset,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_sset_insert(__param_self_: *mut stc_slot_sset, __param__key: *mut stc_slot_head) -> stc_slot_sset_result {
     var __local__res: stc_slot_sset_result = stc_slot_sset_insert_entry_(__param_self_, (*(&raw mut __param__key as *mut *mut stc_slot_head)))
 
@@ -1055,7 +839,7 @@ pub unsafe fn stc_slot_sset_insert(__param_self_: *mut stc_slot_sset, __param__k
 
 }
 
-// contract: receiver-mut:stc_slot_sset,stored-unknown:1
+// contract: receiver-mut:stc_slot_sset,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_sset_push(__param_self_: *mut stc_slot_sset, __param__val: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local__res: stc_slot_sset_result = stc_slot_sset_insert_entry_(__param_self_, (*(&raw mut __param__val as *mut *mut stc_slot_head)))
 
@@ -1382,7 +1166,6 @@ pub unsafe fn stc_slot_sset_erase_r_(__param_self_: *mut stc_slot_sset, __param_
 
 }
 
-// contract: unproved:0:read only
 unsafe fn stc_slot_sset_drop_r_(__param_s: *mut stc_slot_sset, __param_tn: i32) -> Unit {
     if ((if __param_tn != 0: 1 else: 0) != 0) {
         stc_slot_sset_drop_r_(__param_s, (((*__param_s).nodes[__param_tn]).link[0] as i32))
@@ -1395,23 +1178,7 @@ unsafe fn stc_slot_sset_drop_r_(__param_s: *mut stc_slot_sset, __param_tn: i32) 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_pqueue_make_heap(__param_self_: *mut stc_slot_pqueue) {
-    var __local_n: i64 = (*__param_self_).size
-
-    var __local_k: i64 = (((__local_n / 2) as i64))
-
-    while ((if __local_k != 0: 1 else: 0) != 0) {
-        stc_slot_pqueue_sift_down_(__param_self_, __local_k, __local_n)
-
-        (__local_k = __local_k - 1)
-
-    }
-
-
-}
-
-// contract: receiver-mut:stc_slot_pqueue,stored-unknown:1
+// contract: receiver-mut:stc_slot_pqueue,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_pqueue_push(__param_self_: *mut stc_slot_pqueue, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     if ((if (*__param_self_).size == (*__param_self_).capacity: 1 else: 0) != 0) {
         if ((if not (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)): 1 else: 0) != 0) {
@@ -1446,42 +1213,6 @@ pub unsafe fn stc_slot_pqueue_push(__param_self_: *mut stc_slot_pqueue, __param_
     ((__local_arr[__local_c]) = __param_value)
 
     return (__local_arr + ((__local_c as i64) as usize))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_pqueue_sift_down_(__param_self_: *mut stc_slot_pqueue, __param_idx: i64, __param_n: i64) {
-    var __local_t: *mut stc_slot_head
-
-    var __local_arr: *mut *mut stc_slot_head = ((*__param_self_).data - ((1 as i64) as usize))
-
-
-    var __local_r: i64 = __param_idx
-
-    var __local_c: i64 = (((__param_idx * 2) as i64))
-
-
-    while ((if __local_c <= __param_n: 1 else: 0) != 0) {
-        (__local_c = __local_c + (if (*(*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0))
-
-        if ((if not ((if (*(*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) < 0: 1 else: 0) != 0): 1 else: 0) != 0) {
-            return
-        }
-
-        (__local_t = (__local_arr[__local_r]))
-
-        ((__local_arr[__local_r]) = (__local_arr[__local_c]))
-
-        (__local_r = __local_c)
-
-        ((__local_arr[__local_r]) = __local_t)
-
-
-
-        (__local_c = __local_c * 2)
-
-    }
-
 
 }
 
@@ -1530,7 +1261,7 @@ pub fn stc_slot_pqueue_with_capacity(__param_cap: i64) -> stc_slot_pqueue {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_pqueue_drop(__param_cself: *const stc_slot_pqueue) {
     var __local_self_: *mut stc_slot_pqueue = ((__param_cself as *mut stc_slot_pqueue))
 
@@ -1544,25 +1275,7 @@ pub unsafe fn stc_slot_pqueue_drop(__param_cself: *const stc_slot_pqueue) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_pqueue_size(__param_q: *const stc_slot_pqueue) -> i64 {
-    return (*__param_q).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_pqueue_is_empty(__param_q: *const stc_slot_pqueue) -> bool {
-    return ((((not ((*__param_q).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_pqueue_capacity(__param_q: *const stc_slot_pqueue) -> i64 {
-    return (*__param_q).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_pqueue_top(__param_self_: *const stc_slot_pqueue) -> *const *mut stc_slot_head {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_slot_pqueue_top".ptr, c"pqueue.h".ptr, (117 as i32), c"self->size".ptr)
@@ -1574,22 +1287,7 @@ pub unsafe fn stc_slot_pqueue_top(__param_self_: *const stc_slot_pqueue) -> *con
 
 }
 
-pub unsafe fn stc_slot_pqueue_pull(__param_self_: *mut stc_slot_pqueue) -> *mut stc_slot_head {
-    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"stc_slot_pqueue_pull".ptr, c"pqueue.h".ptr, (123 as i32), c"self->size".ptr)
-    } else {
-        0
-    }
-
-    var __local_v: *mut stc_slot_head = ((*__param_self_).data[0])
-
-    (*__param_self_).erase_at((0 as i64))
-
-    return __local_v
-
-}
-
-// contract: unproved:0:read only,ret-from:1
+// contract: unproved:0:stc_slot_pqueue_sift_down_ may write through it,ret-from:1
 pub unsafe fn stc_slot_pqueue_pushpull(__param_self_: *mut stc_slot_pqueue, __param_val: *mut stc_slot_head) -> *mut stc_slot_head {
     var __ci_expr_logic_0: i32 = 0
 
@@ -1615,7 +1313,7 @@ pub unsafe fn stc_slot_pqueue_pushpull(__param_self_: *mut stc_slot_pqueue, __pa
             }
         }
 
-        stc_slot_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+        (*__param_self_).sift_down_((1 as i64), (*__param_self_).size)
 
     }
 
@@ -1624,7 +1322,7 @@ pub unsafe fn stc_slot_pqueue_pushpull(__param_self_: *mut stc_slot_pqueue, __pa
 
 }
 
-// contract: unproved:0:read only,ret-from:1
+// contract: unproved:0:stc_slot_pqueue_sift_down_ may write through it,ret-from:1
 pub unsafe fn stc_slot_pqueue_exchange(__param_self_: *mut stc_slot_pqueue, __param_val: *mut stc_slot_head) -> *mut stc_slot_head {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_slot_pqueue_exchange".ptr, c"pqueue.h".ptr, (138 as i32), c"self->size".ptr)
@@ -1649,13 +1347,13 @@ pub unsafe fn stc_slot_pqueue_exchange(__param_self_: *mut stc_slot_pqueue, __pa
         }
     }
 
-    stc_slot_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+    (*__param_self_).sift_down_((1 as i64), (*__param_self_).size)
 
     return __param_val
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_deque_drop(__param_cself: *const stc_slot_deque) {
     var __local_self_: *mut stc_slot_deque = ((__param_cself as *mut stc_slot_deque))
 
@@ -1669,7 +1367,7 @@ pub unsafe fn stc_slot_deque_drop(__param_cself: *const stc_slot_deque) {
 
 }
 
-// contract: receiver-mut:stc_slot_deque,stored-unknown:1
+// contract: receiver-mut:stc_slot_deque,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_deque_push(__param_self_: *mut stc_slot_deque, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_end: i64 = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
 
@@ -1693,7 +1391,7 @@ pub unsafe fn stc_slot_deque_push(__param_self_: *mut stc_slot_deque, __param_va
 }
 
 pub fn stc_slot_deque_advance(__param_it_: stc_slot_deque_iter, __param_n: i64) -> stc_slot_deque_iter {
-    var __local_len: i64 = ((unsafe { stc_slot_deque_size((*(&raw const __param_it_ as *const stc_slot_deque_iter))._s) } as i64))
+    var __local_len: i64 = ((unsafe { (*((*(&raw const __param_it_ as *const stc_slot_deque_iter))._s)).size() } as i64))
 
     var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_slot_deque_iter)).pos
 
@@ -1733,7 +1431,7 @@ pub unsafe fn stc_slot_deque_put_n(__param_self_: *mut stc_slot_deque, __param_r
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_deque,unproved:1:read only
 pub unsafe fn stc_slot_deque_value_drop(__param_self_: *const stc_slot_deque, __param_val: *mut *mut stc_slot_head) {
     return
 }
@@ -1764,7 +1462,7 @@ pub fn stc_slot_deque_with_size_uninit(__param_size: i64) -> stc_slot_deque {
 
 }
 
-// contract: stored-unknown:1
+// contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_deque_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_deque {
     var __local_out: stc_slot_deque = stc_slot_deque_with_capacity(__param_size)
 
@@ -1791,103 +1489,37 @@ pub unsafe fn stc_slot_deque_from_n(__param_raw: *const *mut stc_slot_head, __pa
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_size(__param_self_: *const stc_slot_deque) -> i64 {
-    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_capacity(__param_self_: *const stc_slot_deque) -> i64 {
-    return (*__param_self_).capmask
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_is_empty(__param_self_: *const stc_slot_deque) -> bool {
-    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
-
-}
-
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_deque_value_toraw(__param_pval: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_front(__param_self_: *const stc_slot_deque) -> *const *mut stc_slot_head {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_front_mut(__param_self_: *mut stc_slot_deque) -> *mut *mut stc_slot_head {
     return ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_back(__param_self_: *const stc_slot_deque) -> *const *mut stc_slot_head {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_back_mut(__param_self_: *mut stc_slot_deque) -> *mut *mut stc_slot_head {
     return ((stc_slot_deque_back((__param_self_ as *const stc_slot_deque)) as *mut *mut stc_slot_head))
 
 }
 
-pub unsafe fn stc_slot_deque_pull_front(__param_self_: *mut stc_slot_deque) -> *mut stc_slot_head {
-    if (((if not ((if not stc_slot_deque_is_empty((__param_self_ as *const stc_slot_deque)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"stc_slot_deque_pull_front".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
-    } else {
-        0
-    }
-
-    var __local_s: i64 = (*__param_self_).start
-
-    ((*__param_self_).start = (((((__local_s + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
-
-    return ((((*__param_self_).cbuf[__local_s]) as *mut stc_slot_head))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_begin(__param_self_: *const stc_slot_deque) -> stc_slot_deque_iter {
-    return ((stc_slot_deque_iter { ref: (if stc_slot_deque_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_slot_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_rbegin(__param_self_: *const stc_slot_deque) -> stc_slot_deque_iter {
-    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
-
-    return ((stc_slot_deque_iter { ref: (if stc_slot_deque_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_slot_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_end(__param_self_: *const stc_slot_deque) -> stc_slot_deque_iter {
-
-    return ((stc_slot_deque_iter.zeroed() as stc_slot_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_rend(__param_self_: *const stc_slot_deque) -> stc_slot_deque_iter {
-
-    return ((stc_slot_deque_iter.zeroed() as stc_slot_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_deque_index(__param_self_: *const stc_slot_deque, __param_it_: stc_slot_deque_iter) -> i64 {
-    return ((((*(&raw const __param_it_ as *const stc_slot_deque_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: receiver-mut:stc_slot_deque,stored-unknown:1
+// contract: receiver-mut:stc_slot_deque,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_deque_push_front(__param_self_: *mut stc_slot_deque, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_start: i64 = ((((((*__param_self_).start - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
 
@@ -1934,9 +1566,9 @@ pub unsafe fn stc_slot_deque_insert_n(__param_self_: *mut stc_slot_deque, __para
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_at(__param_self_: *const stc_slot_deque, __param_idx: i64) -> *const *mut stc_slot_head {
-    if (((if not ((if ((__param_idx as u64)) < ((stc_slot_deque_size(__param_self_) as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size() as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_slot_deque_at".ptr, c"deque.h".ptr, (53 as i32), c"((size_t)(idx) < (size_t)(stc_slot_deque_size(self)))".ptr)
     } else {
         0
@@ -1946,28 +1578,15 @@ pub unsafe fn stc_slot_deque_at(__param_self_: *const stc_slot_deque, __param_id
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_deque_at_mut(__param_self_: *mut stc_slot_deque, __param_idx: i64) -> *mut *mut stc_slot_head {
     return ((stc_slot_deque_at((__param_self_ as *const stc_slot_deque), __param_idx) as *mut *mut stc_slot_head))
 
 }
 
-// contract: receiver-mut:stc_slot_deque,stored-unknown:1
+// contract: receiver-mut:stc_slot_deque,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_deque_push_back(__param_self_: *mut stc_slot_deque, __param_val: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     return ((stc_slot_deque_push(__param_self_, __param_val) as *mut *mut stc_slot_head))
-
-}
-
-pub unsafe fn stc_slot_deque_pull_back(__param_self_: *mut stc_slot_deque) -> *mut stc_slot_head {
-    if (((if not ((if not stc_slot_deque_is_empty((__param_self_ as *const stc_slot_deque)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"stc_slot_deque_pull_back".ptr, c"deque.h".ptr, (73 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
-    } else {
-        0
-    }
-
-    ((*__param_self_).end = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
-
-    return ((((*__param_self_).cbuf[(*__param_self_).end]) as *mut stc_slot_head))
 
 }
 
@@ -1979,7 +1598,7 @@ pub unsafe fn stc_slot_deque_insert_at(__param_self_: *mut stc_slot_deque, __par
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_deque_drop(__param_cself: *const stc_word_deque) {
     var __local_self_: *mut stc_word_deque = ((__param_cself as *mut stc_word_deque))
 
@@ -1994,7 +1613,7 @@ pub unsafe fn stc_word_deque_drop(__param_cself: *const stc_word_deque) {
 }
 
 pub fn stc_word_deque_advance(__param_it_: stc_word_deque_iter, __param_n: i64) -> stc_word_deque_iter {
-    var __local_len: i64 = ((unsafe { stc_word_deque_size((*(&raw const __param_it_ as *const stc_word_deque_iter))._s) } as i64))
+    var __local_len: i64 = ((unsafe { (*((*(&raw const __param_it_ as *const stc_word_deque_iter))._s)).size() } as i64))
 
     var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_word_deque_iter)).pos
 
@@ -2034,7 +1653,7 @@ pub unsafe fn stc_word_deque_put_n(__param_self_: *mut stc_word_deque, __param_r
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_deque,unproved:1:read only
 pub unsafe fn stc_word_deque_value_drop(__param_self_: *const stc_word_deque, __param_val: *mut u64) {
     return
 }
@@ -2100,7 +1719,7 @@ pub fn stc_word_deque_clone(__param_q: stc_word_deque) -> stc_word_deque {
 
     (__local_out.start = ((0 as i64)))
 
-    (__local_out.end = ((unsafe { stc_word_deque_size(((&raw mut __param_q as *mut stc_word_deque) as *const stc_word_deque)) } as i64)))
+    (__local_out.end = ((unsafe { (*((&raw mut __param_q as *mut stc_word_deque) as *const stc_word_deque)).size() } as i64)))
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const stc_word_deque)).end + 1) as i64)) - 1) as i64)))
 
@@ -2109,7 +1728,7 @@ pub fn stc_word_deque_clone(__param_q: stc_word_deque) -> stc_word_deque {
     var __local_i: i64 = ((0 as i64))
 
     if ((unsafe *(&raw const __local_out as *const stc_word_deque)).cbuf != null) {
-        var __local_it_: stc_word_deque_iter = unsafe { stc_word_deque_begin(((&raw mut __param_q as *mut stc_word_deque) as *const stc_word_deque)) }
+        var __local_it_: stc_word_deque_iter = unsafe { (*((&raw mut __param_q as *mut stc_word_deque) as *const stc_word_deque)).begin() }
 
         while ((unsafe *(&raw const __local_it_ as *const stc_word_deque_iter)).ref != null) {
             var __ci_expr_old_0: i64 = __local_i
@@ -2129,13 +1748,6 @@ pub fn stc_word_deque_clone(__param_q: stc_word_deque) -> stc_word_deque {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_value_clone(__param_self_: *const stc_word_deque, __param_val: u64) -> u64 {
-
-    return __param_val
-
-}
-
 // contract: receiver-mut:stc_word_deque,unproved:1:read only
 pub unsafe fn stc_word_deque_copy(__param_self_: *mut stc_word_deque, __param_other: *const stc_word_deque) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
@@ -2150,84 +1762,32 @@ pub unsafe fn stc_word_deque_copy(__param_self_: *mut stc_word_deque, __param_ot
 }
 
 // contract: unproved:0:read only
-pub unsafe fn stc_word_deque_size(__param_self_: *const stc_word_deque) -> i64 {
-    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_capacity(__param_self_: *const stc_word_deque) -> i64 {
-    return (*__param_self_).capmask
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_is_empty(__param_self_: *const stc_word_deque) -> bool {
-    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn stc_word_deque_value_toraw(__param_pval: *const u64) -> u64 {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_front(__param_self_: *const stc_word_deque) -> *const u64 {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_front_mut(__param_self_: *mut stc_word_deque) -> *mut u64 {
     return ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_back(__param_self_: *const stc_word_deque) -> *const u64 {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_back_mut(__param_self_: *mut stc_word_deque) -> *mut u64 {
     return ((stc_word_deque_back((__param_self_ as *const stc_word_deque)) as *mut u64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_begin(__param_self_: *const stc_word_deque) -> stc_word_deque_iter {
-    return ((stc_word_deque_iter { ref: (if stc_word_deque_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_word_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_rbegin(__param_self_: *const stc_word_deque) -> stc_word_deque_iter {
-    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
-
-    return ((stc_word_deque_iter { ref: (if stc_word_deque_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_word_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_end(__param_self_: *const stc_word_deque) -> stc_word_deque_iter {
-
-    return ((stc_word_deque_iter.zeroed() as stc_word_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_rend(__param_self_: *const stc_word_deque) -> stc_word_deque_iter {
-
-    return ((stc_word_deque_iter.zeroed() as stc_word_deque_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_deque_index(__param_self_: *const stc_word_deque, __param_it_: stc_word_deque_iter) -> i64 {
-    return ((((*(&raw const __param_it_ as *const stc_word_deque_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
 
 }
 
@@ -2255,9 +1815,9 @@ pub unsafe fn stc_word_deque_insert_n(__param_self_: *mut stc_word_deque, __para
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_at(__param_self_: *const stc_word_deque, __param_idx: i64) -> *const u64 {
-    if (((if not ((if ((__param_idx as u64)) < ((stc_word_deque_size(__param_self_) as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size() as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_word_deque_at".ptr, c"deque.h".ptr, (53 as i32), c"((size_t)(idx) < (size_t)(stc_word_deque_size(self)))".ptr)
     } else {
         0
@@ -2267,7 +1827,7 @@ pub unsafe fn stc_word_deque_at(__param_self_: *const stc_word_deque, __param_id
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_deque_at_mut(__param_self_: *mut stc_word_deque, __param_idx: i64) -> *mut u64 {
     return ((stc_word_deque_at((__param_self_ as *const stc_word_deque), __param_idx) as *mut u64))
 
@@ -2405,7 +1965,7 @@ pub unsafe fn stc_slotrefs_sort_lowhigh(__param_self_: *mut stc_slotref, __param
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_slotrefs_lower_bound_range(__param_self_: *const stc_slotref, __param_raw: stc_slotref, __param_start: i64, __param_end: i64) -> i64 {
     var __local_start = __param_start
     var __local_count: i64 = (((__param_end - __local_start) as i64))
@@ -2436,7 +1996,7 @@ pub unsafe fn stc_slotrefs_lower_bound_range(__param_self_: *const stc_slotref, 
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_slotrefs_binary_search_range(__param_self_: *const stc_slotref, __param_raw: stc_slotref, __param_start: i64, __param_end: i64) -> i64 {
     var __local_res: i64 = ((stc_slotrefs_lower_bound_range(__param_self_, __param_raw, __param_start, __param_end) as i64))
 
@@ -2459,13 +2019,13 @@ pub unsafe fn stc_slotrefs_sort(__param_arr: *mut stc_slotref, __param_n: i64) {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_slotrefs_lower_bound(__param_arr: *const stc_slotref, __param_raw: stc_slotref, __param_n: i64) -> i64 {
     return stc_slotrefs_lower_bound_range(__param_arr, __param_raw, (0 as i64), __param_n)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_slotrefs_binary_search(__param_arr: *const stc_slotref, __param_raw: stc_slotref, __param_n: i64) -> i64 {
     return stc_slotrefs_binary_search_range(__param_arr, __param_raw, (0 as i64), __param_n)
 
@@ -3246,7 +2806,7 @@ pub fn stc_word_set_clone(__param_map: stc_word_set) -> stc_word_set {
 
         while ((if __local_i < (unsafe *(&raw const __param_map as *const stc_word_set)).bucket_count: 1 else: 0) != 0) {
             if (((unsafe __param_map.meta[__local_i])).dist() != 0) {
-                ((unsafe __local_out.table[__local_i]) = ((unsafe { stc_word_set_value_clone((__local_self_ as *const stc_word_set), (((*(&raw const __param_map as *const stc_word_set)).table[__local_i]) as u64)) } as u64)))
+                ((unsafe __local_out.table[__local_i]) = ((unsafe { (*(__local_self_ as *const stc_word_set)).value_clone((((*(&raw const __param_map as *const stc_word_set)).table[__local_i]) as u64)) } as u64)))
             }
 
             (__local_i = __local_i + 1)
@@ -3271,7 +2831,7 @@ pub fn stc_word_set_clone(__param_map: stc_word_set) -> stc_word_set {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_set_drop(__param_cself: *const stc_word_set) {
     var __local_self_: *mut stc_word_set = ((__param_cself as *mut stc_word_set))
 
@@ -3284,99 +2844,6 @@ pub unsafe fn stc_word_set_drop(__param_cself: *const stc_word_set) {
     with_free((((*__local_self_).meta as *mut c_void) as *mut u8))
 
     with_free((((*__local_self_).table as *mut c_void) as *mut u8))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_reserve(__param__self: *mut stc_word_set, __param__cap: i64) -> bool {
-    var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (*__param__self).size else: __param__cap) as i64))
-
-    var __local__newbucks: i64 = ((((((__local__newcap as f32) / i_max_load_factor) as i64) + 4) as i64))
-
-    (__local__newbucks = ((c_next_pow2(__local__newbucks) as i64)))
-
-    var __ci_expr_logic_0: i32
-
-    if ((if __local__newbucks == (*__param__self).bucket_count: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if __param__cap <= (((((*__param__self).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        return ((true as bool))
-    }
-
-
-    var __local_map: stc_word_set = (*__param__self)
-
-    var __local_self_: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
-
-
-
-    (__local_map.table = (((with_alloc((((if 1 != 0: ((__local__newbucks * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
-
-    (__local_map.meta = (((with_alloc_zeroed((((if 1 != 0: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if 1 != 0: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
-
-    (__local_map.bucket_count = __local__newbucks)
-
-    var __local_ok: bool = with 0 as __ci_expr_seq_26 {
-        var __ci_expr_logic_1: i32 = 0
-        if ((*(&raw const __local_map as *const stc_word_set)).table != null) {
-            (__ci_expr_logic_1 = (if (*(&raw const __local_map as *const stc_word_set)).meta != null: 1 else: 0))
-        }
-        (__ci_expr_logic_1 != 0)
-    }
-
-    if __local_ok {
-        ((__local_map.meta[__local__newbucks])).set_dist(((1023 as u16)))
-
-        var __local_d: *const u64 = (((*__param__self).table as *const u64))
-
-        var __local_m: *const hmap_meta = (((*__param__self).meta as *const hmap_meta))
-
-        var __local_i: i64 = ((0 as i64))
-
-        while ((if __local_i < (*__param__self).bucket_count: 1 else: 0) != 0) {
-            if ((if ((__local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
-                var __local_r: u64 = (*__local_d)
-
-                ((*(stc_word_set_bucket_insert_(((&raw mut __local_map as *mut stc_word_set) as *const stc_word_set), ((&raw mut __local_r as *mut u64) as *const u64)).ref)) = (*__local_d))
-
-            }
-
-            (__local_i = __local_i + 1)
-
-            (__local_d = __local_d + 1)
-
-
-        }
-
-
-        loop {
-            var __local__xp: *mut stc_word_set = __param__self
-
-            var __local__yp: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
-
-
-            var __local__tv: stc_word_set = (*__local__xp)
-
-            with_memcpy((&raw mut (*__local__xp) as *mut u8), (&raw const (*__local__yp) as *const u8), sizeof[stc_word_set]())
-
-            with_memcpy((&raw mut (*__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_word_set]())
-
-            if not ((0 != 0)) {
-                break
-            }
-        }
-
-    }
-
-    with_free((((*(&raw const __local_map as *const stc_word_set)).meta as *mut c_void) as *mut u8))
-
-    with_free((((*(&raw const __local_map as *const stc_word_set)).table as *mut c_void) as *mut u8))
-
-    return __local_ok
 
 }
 
@@ -3418,20 +2885,7 @@ pub unsafe fn stc_word_set_erase_entry(__param_self_: *mut stc_word_set, __param
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_max_load_factor(__param_self_: *const stc_word_set) -> f32 {
-
-    return i_max_load_factor
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_capacity(__param_map: *const stc_word_set) -> i64 {
-    return (((((*__param_map).bucket_count as f32) * i_max_load_factor) as i64))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_set,unproved:1:read only
 pub unsafe fn stc_word_set_bucket_lookup_(__param_self_: *const stc_word_set, __param_rkeyptr: *const u64) -> stc_word_set_result {
     var __local__hash: u64 = ((c_hash_n((__param_rkeyptr as *const c_void), (8 as i64)) as u64))
 
@@ -3543,43 +2997,6 @@ pub unsafe fn stc_word_set_bucket_insert_(__param_self_: *const stc_word_set, __
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_is_empty(__param_map: *const stc_word_set) -> bool {
-    return ((((not ((*__param_map).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_size(__param_map: *const stc_word_set) -> i64 {
-    return (*__param_map).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_bucket_count(__param_map: *mut stc_word_set) -> i64 {
-    return (*__param_map).bucket_count
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_contains(__param_self_: *const stc_word_set, __param_rkey: u64) -> bool {
-    var __ci_expr_logic_0: i32 = 0
-
-    if ((*__param_self_).size != 0) {
-        (__ci_expr_logic_0 = (if stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref != null: 1 else: 0))
-    }
-
-    return (((__ci_expr_logic_0 != 0) as bool))
-
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_shrink_to_fit(__param_self_: *mut stc_word_set) -> Unit {
-    stc_word_set_reserve(__param_self_, (9223372036854775807 as i64))
-
-}
-
 // contract: receiver-mut:stc_word_set,unproved:1:read only
 pub unsafe fn stc_word_set_copy(__param_self_: *mut stc_word_set, __param_other: *const stc_word_set) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
@@ -3594,21 +3011,12 @@ pub unsafe fn stc_word_set_copy(__param_self_: *mut stc_word_set, __param_other:
 }
 
 // contract: unproved:0:read only
-pub unsafe fn stc_word_set_value_clone(__param_self_: *const stc_word_set, __param__val: u64) -> u64 {
-
-    ((*(&raw mut __param__val as *mut u64)) = (*(&raw mut __param__val as *mut u64)))
-
-    return __param__val
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn stc_word_set_value_toraw(__param_val: *const u64) -> u64 {
     return (*__param_val)
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_set,unproved:1:read only
 pub unsafe fn stc_word_set_value_drop(__param_self_: *const stc_word_set, __param__val: *mut u64) {
     return
 }
@@ -3654,41 +3062,9 @@ pub unsafe fn stc_word_set_from_n(__param_raw: *const u64, __param_n: i64) -> st
 pub fn stc_word_set_with_capacity(__param_cap: i64) -> stc_word_set {
     var __local_cx: stc_word_set = stc_word_set.zeroed()
 
-    unsafe { stc_word_set_reserve((&raw mut __local_cx as *mut stc_word_set), __param_cap) }
+    unsafe { (*(&raw mut __local_cx as *mut stc_word_set)).reserve(__param_cap) }
 
     return __local_cx
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_begin(__param_self_: *const stc_word_set) -> stc_word_set_iter {
-    var __local_it_: stc_word_set_iter = stc_word_set_iter { ref: (*__param_self_).table, _end: (*__param_self_).table, _mref: (*__param_self_).meta }
-
-    if ((if (*(&raw const __local_it_ as *const stc_word_set_iter)).ref == null: 1 else: 0) != 0) {
-        return __local_it_
-    }
-
-    (__local_it_._end = (*(&raw const __local_it_ as *const stc_word_set_iter))._end + (((*__param_self_).bucket_count as i64) as usize))
-
-    while ((if (*(*(&raw const __local_it_ as *const stc_word_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_word_set_iter)).ref + 1)
-
-        (__local_it_._mref = (*(&raw const __local_it_ as *const stc_word_set_iter))._mref + 1)
-
-    }
-
-    if ((if (*(&raw const __local_it_ as *const stc_word_set_iter)).ref == (*(&raw const __local_it_ as *const stc_word_set_iter))._end: 1 else: 0) != 0) {
-        (__local_it_.ref = ((null as *mut u64)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_end(__param_self_: *const stc_word_set) -> stc_word_set_iter {
-
-    return ((stc_word_set_iter.zeroed() as stc_word_set_iter))
 
 }
 
@@ -3717,52 +3093,30 @@ pub fn stc_word_set_advance(__param_it_: stc_word_set_iter, __param_n: u64) -> s
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_set_find(__param_self_: *const stc_word_set, __param_rkey: u64) -> stc_word_set_iter {
-    var __local_ref: *mut u64
-
-    var __ci_expr_logic_0: i32 = 0
-
-    if ((if (*__param_self_).size != 0: 1 else: 0) != 0) {
-        (__local_ref = stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref)
-
-        (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
-
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        return ((stc_word_set_iter { ref: __local_ref, _end: ((&raw const ((*__param_self_).table[(*__param_self_).bucket_count]) as *const u64) as *mut u64), _mref: ((&raw const ((*__param_self_).meta[((((__local_ref as usize) -% ((*__param_self_).table as usize)) as i64) / (sizeof[u64]() as i64))]) as *const hmap_meta) as *mut hmap_meta) } as stc_word_set_iter))
-    }
-
-
-    return stc_word_set_end(__param_self_)
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_set_get(__param_self_: *const stc_word_set, __param_rkey: u64) -> *const u64 {
     return (((if (*__param_self_).size != 0: stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)).ref else: (null as *mut u64)) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_set_get_mut(__param_self_: *mut stc_word_set, __param_rkey: u64) -> *mut u64 {
     return ((stc_word_set_get((__param_self_ as *const stc_word_set), __param_rkey) as *mut u64))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_set,unproved:1:read only
 pub unsafe fn stc_word_set_eq(__param_self_: *const stc_word_set, __param_other: *const stc_word_set) -> bool {
-    if ((if stc_word_set_size(__param_self_) != stc_word_set_size(__param_other): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size() != (*__param_other).size(): 1 else: 0) != 0) {
         return ((false as bool))
     }
 
-    var __local_i: stc_word_set_iter = stc_word_set_begin(__param_self_)
+    var __local_i: stc_word_set_iter = (*__param_self_).begin()
 
     while ((*(&raw const __local_i as *const stc_word_set_iter)).ref != null) {
         var __local__raw: u64 = (*((*(&raw const __local_i as *const stc_word_set_iter)).ref))
 
-        if ((if not stc_word_set_contains(__param_other, __local__raw): 1 else: 0) != 0) {
+        if ((if not (*__param_other).contains(__local__raw): 1 else: 0) != 0) {
             return ((false as bool))
         }
 
@@ -3776,7 +3130,6 @@ pub unsafe fn stc_word_set_eq(__param_self_: *const stc_word_set, __param_other:
 
 }
 
-// contract: unproved:0:read only
 unsafe fn stc_word_set_wipe_(__param_self_: *mut stc_word_set) {
     var __local_d: *mut u64 = (*__param_self_).table
 
@@ -3797,58 +3150,6 @@ unsafe fn stc_word_set_wipe_(__param_self_: *mut stc_word_set) {
 
 
         (__local_i = __local_i + 1)
-
-    }
-
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_make_heap(__param_self_: *mut stc_word_pqueue) {
-    var __local_n: i64 = (*__param_self_).size
-
-    var __local_k: i64 = (((__local_n / 2) as i64))
-
-    while ((if __local_k != 0: 1 else: 0) != 0) {
-        stc_word_pqueue_sift_down_(__param_self_, __local_k, __local_n)
-
-        (__local_k = __local_k - 1)
-
-    }
-
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_sift_down_(__param_self_: *mut stc_word_pqueue, __param_idx: i64, __param_n: i64) {
-    var __local_t: i64
-
-    var __local_arr: *mut i64 = ((*__param_self_).data - ((1 as i64) as usize))
-
-
-    var __local_r: i64 = __param_idx
-
-    var __local_c: i64 = (((__param_idx * 2) as i64))
-
-
-    while ((if __local_c <= __param_n: 1 else: 0) != 0) {
-        (__local_c = __local_c + (if (*((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)) < (*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const i64) as *mut i64)): 1 else: 0))
-
-        if ((if not ((if (*((&raw const (__local_arr[__local_r]) as *const i64) as *mut i64)) < (*((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)): 1 else: 0) != 0): 1 else: 0) != 0) {
-            return
-        }
-
-        (__local_t = (((__local_arr[__local_r]) as i64)))
-
-        ((__local_arr[__local_r]) = (((__local_arr[__local_c]) as i64)))
-
-        (__local_r = __local_c)
-
-        ((__local_arr[__local_r]) = __local_t)
-
-
-
-        (__local_c = __local_c * 2)
 
     }
 
@@ -3900,7 +3201,7 @@ pub fn stc_word_pqueue_with_capacity(__param_cap: i64) -> stc_word_pqueue {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_pqueue_drop(__param_cself: *const stc_word_pqueue) {
     var __local_self_: *mut stc_word_pqueue = ((__param_cself as *mut stc_word_pqueue))
 
@@ -3914,25 +3215,7 @@ pub unsafe fn stc_word_pqueue_drop(__param_cself: *const stc_word_pqueue) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_size(__param_q: *const stc_word_pqueue) -> i64 {
-    return (*__param_q).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_is_empty(__param_q: *const stc_word_pqueue) -> bool {
-    return ((((not ((*__param_q).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_capacity(__param_q: *const stc_word_pqueue) -> i64 {
-    return (*__param_q).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_pqueue_top(__param_self_: *const stc_word_pqueue) -> *const i64 {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_word_pqueue_top".ptr, c"pqueue.h".ptr, (117 as i32), c"self->size".ptr)
@@ -3944,7 +3227,7 @@ pub unsafe fn stc_word_pqueue_top(__param_self_: *const stc_word_pqueue) -> *con
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:stc_word_pqueue_sift_down_ may write through it
 pub unsafe fn stc_word_pqueue_pushpull(__param_self_: *mut stc_word_pqueue, __param_val: i64) -> i64 {
     var __ci_expr_logic_0: i32 = 0
 
@@ -3970,7 +3253,7 @@ pub unsafe fn stc_word_pqueue_pushpull(__param_self_: *mut stc_word_pqueue, __pa
             }
         }
 
-        stc_word_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+        (*__param_self_).sift_down_((1 as i64), (*__param_self_).size)
 
     }
 
@@ -3979,7 +3262,7 @@ pub unsafe fn stc_word_pqueue_pushpull(__param_self_: *mut stc_word_pqueue, __pa
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:stc_word_pqueue_sift_down_ may write through it
 pub unsafe fn stc_word_pqueue_exchange(__param_self_: *mut stc_word_pqueue, __param_val: i64) -> i64 {
     if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_word_pqueue_exchange".ptr, c"pqueue.h".ptr, (138 as i32), c"self->size".ptr)
@@ -4004,7 +3287,7 @@ pub unsafe fn stc_word_pqueue_exchange(__param_self_: *mut stc_word_pqueue, __pa
         }
     }
 
-    stc_word_pqueue_sift_down_(__param_self_, (1 as i64), (*__param_self_).size)
+    (*__param_self_).sift_down_((1 as i64), (*__param_self_).size)
 
     return __param_val
 
@@ -4058,20 +3341,7 @@ pub unsafe fn stc_word_pqueue_copy(__param_self_: *mut stc_word_pqueue, __param_
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_pqueue_value_clone(__param_self_: *const stc_word_pqueue, __param_val: i64) -> i64 {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_capacity(__param_self_: *const stc_slot_stack) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_stack_drop(__param_cself: *const stc_slot_stack) {
     var __local_self_: *mut stc_slot_stack = ((__param_cself as *mut stc_slot_stack))
 
@@ -4085,62 +3355,50 @@ pub unsafe fn stc_slot_stack_drop(__param_cself: *const stc_slot_stack) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_size(__param_self_: *const stc_slot_stack) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_is_empty(__param_self_: *const stc_slot_stack) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_stack,unproved:1:read only
 pub unsafe fn stc_slot_stack_value_drop(__param_self_: *const stc_slot_stack, __param_val: *mut *mut stc_slot_head) {
     return
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_front(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
     return ((((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_front_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
     return (((&raw const ((*__param_self_).data[0]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_back(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_back_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_top(__param_self_: *const stc_slot_stack) -> *const *mut stc_slot_head {
     return ((stc_slot_stack_back(__param_self_) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_top_mut(__param_self_: *mut stc_slot_stack) -> *mut *mut stc_slot_head {
     return ((stc_slot_stack_back_mut(__param_self_) as *mut *mut stc_slot_head))
 
 }
 
-// contract: receiver-mut:stc_slot_stack,stored-unknown:1
+// contract: receiver-mut:stc_slot_stack,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_stack_push(__param_self_: *mut stc_slot_stack, __param_val: *mut stc_slot_head) -> *mut *mut stc_slot_head {
-    if ((if (*__param_self_).size == stc_slot_stack_capacity((__param_self_ as *const stc_slot_stack)): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size == (*(__param_self_ as *const stc_slot_stack)).capacity(): 1 else: 0) != 0) {
         if ((if not (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)): 1 else: 0) != 0) {
             return ((null as *mut *mut stc_slot_head))
         }
@@ -4155,20 +3413,6 @@ pub unsafe fn stc_slot_stack_push(__param_self_: *mut stc_slot_stack, __param_va
     ((*__local_vp) = __param_val)
 
     return __local_vp
-
-}
-
-pub unsafe fn stc_slot_stack_pull(__param_self_: *mut stc_slot_stack) -> *mut stc_slot_head {
-    if (((if not ((*__param_self_).size != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"stc_slot_stack_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
-    } else {
-        0
-    }
-
-    ((*__param_self_).size = (*__param_self_).size - 1)
-
-    return ((((*__param_self_).data[(*__param_self_).size]) as *mut stc_slot_head))
-
 
 }
 
@@ -4214,7 +3458,7 @@ pub fn stc_slot_stack_with_size_uninit(__param_size: i64) -> stc_slot_stack {
 
 }
 
-// contract: stored-unknown:1
+// contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_stack_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_stack {
     var __local_size = __param_size
     var __local_out: stc_slot_stack = stc_slot_stack { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)), size: __local_size, capacity: __local_size }
@@ -4240,7 +3484,7 @@ pub unsafe fn stc_slot_stack_from_n(__param_raw: *const *mut stc_slot_head, __pa
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_at(__param_self_: *const stc_slot_stack, __param_idx: i64) -> *const *mut stc_slot_head {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_slot_stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -4252,7 +3496,7 @@ pub unsafe fn stc_slot_stack_at(__param_self_: *const stc_slot_stack, __param_id
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_stack_at_mut(__param_self_: *mut stc_slot_stack, __param_idx: i64) -> *mut *mut stc_slot_head {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_slot_stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -4264,57 +3508,9 @@ pub unsafe fn stc_slot_stack_at_mut(__param_self_: *mut stc_slot_stack, __param_
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_stack_value_toraw(__param_val: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_val)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_begin(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
-    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_rbegin(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
-    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const stc_slot_stack_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_end(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
-
-    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_rend(__param_self_: *const stc_slot_stack) -> stc_slot_stack_iter {
-
-    var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
-
-    return __local_it_
 
 }
 
@@ -4330,19 +3526,7 @@ pub fn stc_slot_stack_advance(__param_it_: stc_slot_stack_iter, __param_n: u64) 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_stack_index(__param_self_: *const stc_slot_stack, __param_it_: stc_slot_stack_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const stc_slot_stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[usize]() as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_capacity(__param_self_: *const stc_word_stack) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_stack_drop(__param_cself: *const stc_word_stack) {
     var __local_self_: *mut stc_word_stack = ((__param_cself as *mut stc_word_stack))
 
@@ -4356,54 +3540,42 @@ pub unsafe fn stc_word_stack_drop(__param_cself: *const stc_word_stack) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_size(__param_self_: *const stc_word_stack) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_is_empty(__param_self_: *const stc_word_stack) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_stack,unproved:1:read only
 pub unsafe fn stc_word_stack_value_drop(__param_self_: *const stc_word_stack, __param_val: *mut u64) {
     return
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_front(__param_self_: *const stc_word_stack) -> *const u64 {
     return ((((&raw const ((*__param_self_).data[0]) as *const u64) as *mut u64) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_front_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
     return (((&raw const ((*__param_self_).data[0]) as *const u64) as *mut u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_back(__param_self_: *const stc_word_stack) -> *const u64 {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const u64) as *mut u64) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_back_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const u64) as *mut u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_top(__param_self_: *const stc_word_stack) -> *const u64 {
     return ((stc_word_stack_back(__param_self_) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_top_mut(__param_self_: *mut stc_word_stack) -> *mut u64 {
     return ((stc_word_stack_back_mut(__param_self_) as *mut u64))
 
@@ -4476,7 +3648,7 @@ pub unsafe fn stc_word_stack_from_n(__param_raw: *const u64, __param_n: i64) -> 
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_at(__param_self_: *const stc_word_stack, __param_idx: i64) -> *const u64 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_word_stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -4488,7 +3660,7 @@ pub unsafe fn stc_word_stack_at(__param_self_: *const stc_word_stack, __param_id
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_stack_at_mut(__param_self_: *mut stc_word_stack, __param_idx: i64) -> *mut u64 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"stc_word_stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -4566,64 +3738,8 @@ pub unsafe fn stc_word_stack_copy(__param_self_: *mut stc_word_stack, __param_ot
 }
 
 // contract: unproved:0:read only
-pub unsafe fn stc_word_stack_value_clone(__param_self_: *const stc_word_stack, __param_val: u64) -> u64 {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn stc_word_stack_value_toraw(__param_val: *const u64) -> u64 {
     return (*__param_val)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_begin(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
-    var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const stc_word_stack_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut u64)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_rbegin(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
-    var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const stc_word_stack_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const stc_word_stack_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut u64)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_end(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
-
-    var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_rend(__param_self_: *const stc_word_stack) -> stc_word_stack_iter {
-
-    var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
-
-    return __local_it_
 
 }
 
@@ -4639,13 +3755,7 @@ pub fn stc_word_stack_advance(__param_it_: stc_word_stack_iter, __param_n: u64) 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_stack_index(__param_self_: *const stc_word_stack, __param_it_: stc_word_stack_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const stc_word_stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[u64]() as i64))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_queue_drop(__param_cself: *const stc_slot_queue) {
     var __local_self_: *mut stc_slot_queue = ((__param_cself as *mut stc_slot_queue))
 
@@ -4659,7 +3769,7 @@ pub unsafe fn stc_slot_queue_drop(__param_cself: *const stc_slot_queue) {
 
 }
 
-// contract: receiver-mut:stc_slot_queue,stored-unknown:1
+// contract: receiver-mut:stc_slot_queue,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_queue_push(__param_self_: *mut stc_slot_queue, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_end: i64 = ((((((*__param_self_).end + 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
 
@@ -4683,7 +3793,7 @@ pub unsafe fn stc_slot_queue_push(__param_self_: *mut stc_slot_queue, __param_va
 }
 
 pub fn stc_slot_queue_advance(__param_it_: stc_slot_queue_iter, __param_n: i64) -> stc_slot_queue_iter {
-    var __local_len: i64 = ((unsafe { stc_slot_queue_size((*(&raw const __param_it_ as *const stc_slot_queue_iter))._s) } as i64))
+    var __local_len: i64 = ((unsafe { (*((*(&raw const __param_it_ as *const stc_slot_queue_iter))._s)).size() } as i64))
 
     var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_slot_queue_iter)).pos
 
@@ -4723,7 +3833,7 @@ pub unsafe fn stc_slot_queue_put_n(__param_self_: *mut stc_slot_queue, __param_r
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_queue,unproved:1:read only
 pub unsafe fn stc_slot_queue_value_drop(__param_self_: *const stc_slot_queue, __param_val: *mut *mut stc_slot_head) {
     return
 }
@@ -4754,7 +3864,7 @@ pub fn stc_slot_queue_with_size_uninit(__param_size: i64) -> stc_slot_queue {
 
 }
 
-// contract: stored-unknown:1
+// contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_queue_with_size(__param_size: i64, __param_default_raw: *mut stc_slot_head) -> stc_slot_queue {
     var __local_out: stc_slot_queue = stc_slot_queue_with_capacity(__param_size)
 
@@ -4781,103 +3891,37 @@ pub unsafe fn stc_slot_queue_from_n(__param_raw: *const *mut stc_slot_head, __pa
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_size(__param_self_: *const stc_slot_queue) -> i64 {
-    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_capacity(__param_self_: *const stc_slot_queue) -> i64 {
-    return (*__param_self_).capmask
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_is_empty(__param_self_: *const stc_slot_queue) -> bool {
-    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
-
-}
-
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_queue_value_toraw(__param_pval: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_queue_front(__param_self_: *const stc_slot_queue) -> *const *mut stc_slot_head {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_queue_front_mut(__param_self_: *mut stc_slot_queue) -> *mut *mut stc_slot_head {
     return ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_queue_back(__param_self_: *const stc_slot_queue) -> *const *mut stc_slot_head {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_queue_back_mut(__param_self_: *mut stc_slot_queue) -> *mut *mut stc_slot_head {
     return ((stc_slot_queue_back((__param_self_ as *const stc_slot_queue)) as *mut *mut stc_slot_head))
 
 }
 
-pub unsafe fn stc_slot_queue_pull(__param_self_: *mut stc_slot_queue) -> *mut stc_slot_head {
-    if (((if not ((if not stc_slot_queue_is_empty((__param_self_ as *const stc_slot_queue)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"stc_slot_queue_pull".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_slot_queue_is_empty(self)".ptr)
-    } else {
-        0
-    }
-
-    var __local_s: i64 = (*__param_self_).start
-
-    ((*__param_self_).start = (((((__local_s + 1) as i64) & ((*__param_self_).capmask as i64)) as i64)))
-
-    return ((((*__param_self_).cbuf[__local_s]) as *mut stc_slot_head))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_begin(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
-    return ((stc_slot_queue_iter { ref: (if stc_slot_queue_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_slot_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_rbegin(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
-    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
-
-    return ((stc_slot_queue_iter { ref: (if stc_slot_queue_is_empty(__param_self_): ((null) as *mut *mut stc_slot_head) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_slot_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_end(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
-
-    return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_rend(__param_self_: *const stc_slot_queue) -> stc_slot_queue_iter {
-
-    return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_queue_index(__param_self_: *const stc_slot_queue, __param_it_: stc_slot_queue_iter) -> i64 {
-    return ((((*(&raw const __param_it_ as *const stc_slot_queue_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_queue_drop(__param_cself: *const stc_word_queue) {
     var __local_self_: *mut stc_word_queue = ((__param_cself as *mut stc_word_queue))
 
@@ -4892,7 +3936,7 @@ pub unsafe fn stc_word_queue_drop(__param_cself: *const stc_word_queue) {
 }
 
 pub fn stc_word_queue_advance(__param_it_: stc_word_queue_iter, __param_n: i64) -> stc_word_queue_iter {
-    var __local_len: i64 = ((unsafe { stc_word_queue_size((*(&raw const __param_it_ as *const stc_word_queue_iter))._s) } as i64))
+    var __local_len: i64 = ((unsafe { (*((*(&raw const __param_it_ as *const stc_word_queue_iter))._s)).size() } as i64))
 
     var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const stc_word_queue_iter)).pos
 
@@ -4932,7 +3976,7 @@ pub unsafe fn stc_word_queue_put_n(__param_self_: *mut stc_word_queue, __param_r
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_queue,unproved:1:read only
 pub unsafe fn stc_word_queue_value_drop(__param_self_: *const stc_word_queue, __param_val: *mut u64) {
     return
 }
@@ -4998,7 +4042,7 @@ pub fn stc_word_queue_clone(__param_q: stc_word_queue) -> stc_word_queue {
 
     (__local_out.start = ((0 as i64)))
 
-    (__local_out.end = ((unsafe { stc_word_queue_size(((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)) } as i64)))
+    (__local_out.end = ((unsafe { (*((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)).size() } as i64)))
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const stc_word_queue)).end + 1) as i64)) - 1) as i64)))
 
@@ -5007,7 +4051,7 @@ pub fn stc_word_queue_clone(__param_q: stc_word_queue) -> stc_word_queue {
     var __local_i: i64 = ((0 as i64))
 
     if ((unsafe *(&raw const __local_out as *const stc_word_queue)).cbuf != null) {
-        var __local_it_: stc_word_queue_iter = unsafe { stc_word_queue_begin(((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)) }
+        var __local_it_: stc_word_queue_iter = unsafe { (*((&raw mut __param_q as *mut stc_word_queue) as *const stc_word_queue)).begin() }
 
         while ((unsafe *(&raw const __local_it_ as *const stc_word_queue_iter)).ref != null) {
             var __ci_expr_old_0: i64 = __local_i
@@ -5027,13 +4071,6 @@ pub fn stc_word_queue_clone(__param_q: stc_word_queue) -> stc_word_queue {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_value_clone(__param_self_: *const stc_word_queue, __param_val: u64) -> u64 {
-
-    return __param_val
-
-}
-
 // contract: receiver-mut:stc_word_queue,unproved:1:read only
 pub unsafe fn stc_word_queue_copy(__param_self_: *mut stc_word_queue, __param_other: *const stc_word_queue) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
@@ -5048,88 +4085,36 @@ pub unsafe fn stc_word_queue_copy(__param_self_: *mut stc_word_queue, __param_ot
 }
 
 // contract: unproved:0:read only
-pub unsafe fn stc_word_queue_size(__param_self_: *const stc_word_queue) -> i64 {
-    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_capacity(__param_self_: *const stc_word_queue) -> i64 {
-    return (*__param_self_).capmask
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_is_empty(__param_self_: *const stc_word_queue) -> bool {
-    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn stc_word_queue_value_toraw(__param_pval: *const u64) -> u64 {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_queue_front(__param_self_: *const stc_word_queue) -> *const u64 {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_queue_front_mut(__param_self_: *mut stc_word_queue) -> *mut u64 {
     return ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_queue_back(__param_self_: *const stc_word_queue) -> *const u64 {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const u64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_queue_back_mut(__param_self_: *mut stc_word_queue) -> *mut u64 {
     return ((stc_word_queue_back((__param_self_ as *const stc_word_queue)) as *mut u64))
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_begin(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
-    return ((stc_word_queue_iter { ref: (if stc_word_queue_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as stc_word_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_rbegin(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
-    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
-
-    return ((stc_word_queue_iter { ref: (if stc_word_queue_is_empty(__param_self_): ((null) as *mut u64) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_word_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_end(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
-
-    return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_rend(__param_self_: *const stc_word_queue) -> stc_word_queue_iter {
-
-    return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_queue_index(__param_self_: *const stc_word_queue, __param_it_: stc_word_queue_iter) -> i64 {
-    return ((((*(&raw const __param_it_ as *const stc_word_queue_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_slot_list_drop(__param_cself: *const stc_slot_list) {
     var __local_self_: *mut stc_slot_list = ((__param_cself as *mut stc_slot_list))
 
@@ -5139,7 +4124,7 @@ pub unsafe fn stc_slot_list_drop(__param_cself: *const stc_slot_list) {
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push_back(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
 
@@ -5160,7 +4145,7 @@ pub unsafe fn stc_slot_list_push_back(__param_self_: *mut stc_slot_list, __param
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push_front(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     var __local_entry: *mut stc_slot_list_node = (((with_alloc((((if 1 != 0: ((1 * (sizeof[stc_slot_list_node]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut stc_slot_list_node))
 
@@ -5183,7 +4168,7 @@ pub unsafe fn stc_slot_list_push_front(__param_self_: *mut stc_slot_list, __para
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:2
+// contract: receiver-mut:stc_slot_list,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_insert_at(__param_self_: *mut stc_slot_list, __param_it_: stc_slot_list_iter, __param_value: *mut stc_slot_head) -> stc_slot_list_iter {
     var __local_node: *mut stc_slot_list_node = (if (*(&raw const __param_it_ as *const stc_slot_list_iter)).ref != null: (*(&raw const __param_it_ as *const stc_slot_list_iter)).prev else: (*__param_self_).last)
 
@@ -5252,7 +4237,7 @@ pub unsafe fn stc_slot_list_splice(__param_self_: *mut stc_slot_list, __param_it
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push_back_node(__param_self_: *mut stc_slot_list, __param_node: *mut stc_slot_list_node) -> *mut *mut stc_slot_head {
     if ((*__param_self_).last != null) {
         ((*__param_node).next = (*(*__param_self_).last).next)
@@ -5269,7 +4254,7 @@ pub unsafe fn stc_slot_list_push_back_node(__param_self_: *mut stc_slot_list, __
 
 }
 
-// contract: receiver-mut:stc_slot_list,unproved:1:out-parameter read before the write,stored-unknown:2
+// contract: receiver-mut:stc_slot_list,unproved:1:out-parameter read before the write,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_insert_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node, __param_node: *mut stc_slot_list_node) -> *mut *mut stc_slot_head {
     if (__param_ref != null) {
         ((*__param_node).next = (*__param_ref).next)
@@ -5288,7 +4273,7 @@ pub unsafe fn stc_slot_list_insert_after_node(__param_self_: *mut stc_slot_list,
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_unlink_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node) -> *mut stc_slot_list_node {
     var __local_node: *mut stc_slot_list_node = (*__param_ref).next
 
@@ -5309,7 +4294,7 @@ pub unsafe fn stc_slot_list_unlink_after_node(__param_self_: *mut stc_slot_list,
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_erase_after_node(__param_self_: *mut stc_slot_list, __param_ref: *mut stc_slot_list_node) {
     var __local_node: *mut stc_slot_list_node = stc_slot_list_unlink_after_node(__param_self_, __param_ref)
 
@@ -5360,103 +4345,58 @@ pub unsafe fn stc_slot_list_from_n(__param_raw: *const *mut stc_slot_head, __par
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_slot_list_reserve(__param_self_: *mut stc_slot_list, __param_n: i64) -> bool {
 
     return ((true as bool))
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_list_is_empty(__param_self_: *const stc_slot_list) -> bool {
-    return (((((*__param_self_).last == null)) as bool))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:stc_slot_list_drop may write through it
 pub unsafe fn stc_slot_list_clear(__param_self_: *mut stc_slot_list) {
     stc_slot_list_drop((__param_self_ as *const stc_slot_list))
 
 }
 
-// contract: receiver-mut:stc_slot_list,stored-unknown:1
+// contract: receiver-mut:stc_slot_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_slot_list_push(__param_self_: *mut stc_slot_list, __param_value: *mut stc_slot_head) -> *mut *mut stc_slot_head {
     return ((stc_slot_list_push_back(__param_self_, __param_value) as *mut *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_list_front(__param_self_: *const stc_slot_list) -> *const *mut stc_slot_head {
     return ((((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_list_front_mut(__param_self_: *mut stc_slot_list) -> *mut *mut stc_slot_head {
     return (((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_list_back(__param_self_: *const stc_slot_list) -> *const *mut stc_slot_head {
     return ((((&raw const (*(*__param_self_).last).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) as *const *mut stc_slot_head))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_slot_list_back_mut(__param_self_: *mut stc_slot_list) -> *mut *mut stc_slot_head {
     return (((&raw const (*(*__param_self_).last).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head))
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn stc_slot_list_value_toraw(__param_pval: *const *mut stc_slot_head) -> *mut stc_slot_head {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_slot_list,unproved:1:read only
 pub unsafe fn stc_slot_list_value_drop(__param_self_: *const stc_slot_list, __param_pval: *mut *mut stc_slot_head) {
     return
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_list_count(__param_self_: *const stc_slot_list) -> i64 {
-    var __local_n: i64 = ((1 as i64))
-
-    var __local_node: *const stc_slot_list_node = (((*__param_self_).last as *const stc_slot_list_node))
-
-    if ((if __local_node == null: 1 else: 0) != 0) {
-        return ((0 as i64))
-    }
-
-    while true {
-        (__local_node = (((*__local_node).next as *const stc_slot_list_node)))
-
-        if (not ((if __local_node != (*__param_self_).last: 1 else: 0) != 0)) {
-            break
-        }
-
-        (__local_n = __local_n + 1)
-
-    }
-
-    return __local_n
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_list_begin(__param_self_: *const stc_slot_list) -> stc_slot_list_iter {
-    var __local_head: *mut *mut stc_slot_head = (if (*__param_self_).last != null: ((&raw const (*(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) else: (null as *mut *mut stc_slot_head))
-
-    return ((stc_slot_list_iter { ref: __local_head, _last: (&raw const (*__param_self_).last as *const *mut stc_slot_list_node), prev: (*__param_self_).last } as stc_slot_list_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_slot_list_end(__param_self_: *const stc_slot_list) -> stc_slot_list_iter {
-
-    return ((stc_slot_list_iter.zeroed() as stc_slot_list_iter))
-
 }
 
 pub fn stc_slot_list_advance(__param_it_: stc_slot_list_iter, __param_n: u64) -> stc_slot_list_iter {
@@ -5529,7 +4469,7 @@ unsafe fn stc_slot_list_insertsort_lowhigh(__param_self_: *mut stc_slot_list, __
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn stc_word_list_drop(__param_cself: *const stc_word_list) {
     var __local_self_: *mut stc_word_list = ((__param_cself as *mut stc_word_list))
 
@@ -5569,7 +4509,7 @@ pub unsafe fn stc_word_list_splice(__param_self_: *mut stc_word_list, __param_it
 
 }
 
-// contract: receiver-mut:stc_word_list,stored-unknown:1
+// contract: receiver-mut:stc_word_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_word_list_push_back_node(__param_self_: *mut stc_word_list, __param_node: *mut stc_word_list_node) -> *mut i64 {
     if ((*__param_self_).last != null) {
         ((*__param_node).next = (*(*__param_self_).last).next)
@@ -5586,7 +4526,7 @@ pub unsafe fn stc_word_list_push_back_node(__param_self_: *mut stc_word_list, __
 
 }
 
-// contract: receiver-mut:stc_word_list,unproved:1:out-parameter read before the write,stored-unknown:2
+// contract: receiver-mut:stc_word_list,unproved:1:out-parameter read before the write,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn stc_word_list_insert_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node, __param_node: *mut stc_word_list_node) -> *mut i64 {
     if (__param_ref != null) {
         ((*__param_node).next = (*__param_ref).next)
@@ -5605,7 +4545,7 @@ pub unsafe fn stc_word_list_insert_after_node(__param_self_: *mut stc_word_list,
 
 }
 
-// contract: receiver-mut:stc_word_list,stored-unknown:1
+// contract: receiver-mut:stc_word_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_word_list_unlink_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node) -> *mut stc_word_list_node {
     var __local_node: *mut stc_word_list_node = (*__param_ref).next
 
@@ -5626,7 +4566,7 @@ pub unsafe fn stc_word_list_unlink_after_node(__param_self_: *mut stc_word_list,
 
 }
 
-// contract: receiver-mut:stc_word_list,stored-unknown:1
+// contract: receiver-mut:stc_word_list,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn stc_word_list_erase_after_node(__param_self_: *mut stc_word_list, __param_ref: *mut stc_word_list_node) {
     var __local_node: *mut stc_word_list_node = stc_word_list_unlink_after_node(__param_self_, __param_ref)
 
@@ -5650,7 +4590,7 @@ pub fn stc_word_list_clone(__param_lst: stc_word_list) -> stc_word_list {
 
     (__local_out.last = ((null as *mut stc_word_list_node)))
 
-    var __local_it_: stc_word_list_iter = unsafe { stc_word_list_begin(((&raw mut __param_lst as *mut stc_word_list) as *const stc_word_list)) }
+    var __local_it_: stc_word_list_iter = unsafe { (*((&raw mut __param_lst as *mut stc_word_list) as *const stc_word_list)).begin() }
 
     while ((unsafe *(&raw const __local_it_ as *const stc_word_list_iter)).ref != null) {
         unsafe { (*(&raw mut __local_out as *mut stc_word_list)).push_back((*((*(&raw const __local_it_ as *const stc_word_list_iter)).ref))) }
@@ -5661,13 +4601,6 @@ pub fn stc_word_list_clone(__param_lst: stc_word_list) -> stc_word_list {
 
 
     return __local_out
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_list_value_clone(__param_self_: *const stc_word_list, __param_val: i64) -> i64 {
-
-    return __param_val
 
 }
 
@@ -5720,44 +4653,38 @@ pub unsafe fn stc_word_list_from_n(__param_raw: *const i64, __param_n: i64) -> s
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:indexed as an array
 pub unsafe fn stc_word_list_reserve(__param_self_: *mut stc_word_list, __param_n: i64) -> bool {
 
     return ((true as bool))
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn stc_word_list_is_empty(__param_self_: *const stc_word_list) -> bool {
-    return (((((*__param_self_).last == null)) as bool))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:stc_word_list_drop may write through it
 pub unsafe fn stc_word_list_clear(__param_self_: *mut stc_word_list) {
     stc_word_list_drop((__param_self_ as *const stc_word_list))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_list_front(__param_self_: *const stc_word_list) -> *const i64 {
     return ((((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64) as *const i64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_list_front_mut(__param_self_: *mut stc_word_list) -> *mut i64 {
     return (((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_list_back(__param_self_: *const stc_word_list) -> *const i64 {
     return ((((&raw const (*(*__param_self_).last).value as *const i64) as *mut i64) as *const i64))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn stc_word_list_back_mut(__param_self_: *mut stc_word_list) -> *mut i64 {
     return (((&raw const (*(*__param_self_).last).value as *const i64) as *mut i64))
 
@@ -5769,49 +4696,9 @@ pub unsafe fn stc_word_list_value_toraw(__param_pval: *const i64) -> i64 {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:stc_word_list,unproved:1:read only
 pub unsafe fn stc_word_list_value_drop(__param_self_: *const stc_word_list, __param_pval: *mut i64) {
     return
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_list_count(__param_self_: *const stc_word_list) -> i64 {
-    var __local_n: i64 = ((1 as i64))
-
-    var __local_node: *const stc_word_list_node = (((*__param_self_).last as *const stc_word_list_node))
-
-    if ((if __local_node == null: 1 else: 0) != 0) {
-        return ((0 as i64))
-    }
-
-    while true {
-        (__local_node = (((*__local_node).next as *const stc_word_list_node)))
-
-        if (not ((if __local_node != (*__param_self_).last: 1 else: 0) != 0)) {
-            break
-        }
-
-        (__local_n = __local_n + 1)
-
-    }
-
-    return __local_n
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_list_begin(__param_self_: *const stc_word_list) -> stc_word_list_iter {
-    var __local_head: *mut i64 = (if (*__param_self_).last != null: ((&raw const (*(*(*__param_self_).last).next).value as *const i64) as *mut i64) else: (null as *mut i64))
-
-    return ((stc_word_list_iter { ref: __local_head, _last: (&raw const (*__param_self_).last as *const *mut stc_word_list_node), prev: (*__param_self_).last } as stc_word_list_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn stc_word_list_end(__param_self_: *const stc_word_list) -> stc_word_list_iter {
-
-    return ((stc_word_list_iter.zeroed() as stc_word_list_iter))
-
 }
 
 pub fn stc_word_list_advance(__param_it_: stc_word_list_iter, __param_n: u64) -> stc_word_list_iter {
@@ -5913,7 +4800,7 @@ pub unsafe fn _cbits_count(__param_set: *const u64, __param_sz: i64) -> i64 {
 
 }
 
-// contract: unproved:0:read only,unproved:2:out-parameter read before the write
+// contract: unproved:0:read only,ret-from:2
 pub unsafe fn _cbits_to_str(__param_set: *const u64, __param_sz: i64, __param_out: *mut c_char, __param_start: i64, __param_stop: i64) -> *mut c_char {
     var __local_stop = __param_stop
     if ((if __local_stop > __param_sz: 1 else: 0) != 0) {
@@ -6004,15 +4891,9 @@ pub unsafe fn _cbits_disjoint(__param_set: *const u64, __param_other: *const u64
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:frees a part of it
 pub unsafe fn cbits_drop(__param_self_: *mut cbits) {
     with_free((((*__param_self_).buffer as *mut c_void) as *mut u8))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn cbits_size(__param_self_: *const cbits) -> i64 {
-    return (*__param_self_)._size
 
 }
 
@@ -6027,14 +4908,14 @@ pub fn cbits_clone(__param_other: cbits) -> cbits {
 
 }
 
-// contract: receiver-mut:cbits,ret-from:0,unproved:1:read only
+// contract: receiver-mut:cbits,unproved:1:read only
 pub unsafe fn cbits_copy(__param_self_: *mut cbits, __param_other: *const cbits) -> *mut cbits {
     if ((if (*__param_self_).buffer == (*__param_other).buffer: 1 else: 0) != 0) {
         return __param_self_
     }
 
     if ((if (*__param_self_)._size != (*__param_other)._size: 1 else: 0) != 0) {
-        return (((*__param_self_).take(cbits_clone((*__param_other))) as *mut cbits))
+        return ((((*__param_self_).take(cbits_clone((*__param_other))) as *const cbits) as *mut cbits))
     }
 
     with_memcpy((((*__param_self_).buffer as *mut c_void) as *mut u8), (((*__param_other).buffer as *const c_void) as *const u8), (((if 1 != 0: (((((*__param_other)._size + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
@@ -6043,9 +4924,9 @@ pub unsafe fn cbits_copy(__param_self_: *mut cbits, __param_other: *const cbits)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:memset is outside the corpus and not a known pure reader
 pub unsafe fn cbits_set_all(__param_self_: *mut cbits, __param_value: bool) -> Unit {
-    with_memset((((*__param_self_).buffer as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((if 1 != 0: ((((cbits_size((__param_self_ as *const cbits)) + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+    with_memset((((*__param_self_).buffer as *mut c_void) as *mut u8), ((0 - (__param_value as i32)) as i32), (((if 1 != 0: (((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
 
 }
 
@@ -6064,24 +4945,6 @@ pub fn cbits_with_pattern(__param_size: i64, __param_pattern: u64) -> cbits {
     unsafe { (*(&raw mut __local_set as *mut cbits)).set_pattern(__param_pattern) }
 
     return __local_set
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn cbits_test(__param_self_: *const cbits, __param_i: i64) -> bool {
-    return ((((((((*__param_self_).buffer[(__param_i / (8 * (sizeof[u64]() as i64)))]) as u64) & (((1 as u64) << (((__param_i as i64) & (((8 * (sizeof[u64]() as i64)) - 1) as i64)) as u32)) as u64)) != 0)) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn cbits_at(__param_self_: *const cbits, __param_i: i64) -> bool {
-    if (((if not ((if ((__param_i as u64)) < ((cbits_size(__param_self_) as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"cbits_at".ptr, c"cbits.h".ptr, (269 as i32), c"((size_t)(i) < (size_t)(cbits_size(self)))".ptr)
-    } else {
-        0
-    }
-
-    return cbits_test(__param_self_, __param_i)
 
 }
 
@@ -6118,7 +4981,7 @@ pub unsafe fn cbits_intersect(__param_self_: *mut cbits, __param_other: *const c
         0
     }
 
-    var __local_n: i64 = ((((cbits_size((__param_self_ as *const cbits)) + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
+    var __local_n: i64 = (((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
     while true {
         var __ci_expr_old_0: i64 = __local_n
@@ -6143,7 +5006,7 @@ pub unsafe fn cbits_union(__param_self_: *mut cbits, __param_other: *const cbits
         0
     }
 
-    var __local_n: i64 = ((((cbits_size((__param_self_ as *const cbits)) + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
+    var __local_n: i64 = (((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
     while true {
         var __ci_expr_old_0: i64 = __local_n
@@ -6168,7 +5031,7 @@ pub unsafe fn cbits_xor(__param_self_: *mut cbits, __param_other: *const cbits) 
         0
     }
 
-    var __local_n: i64 = ((((cbits_size((__param_self_ as *const cbits)) + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
+    var __local_n: i64 = (((((*(__param_self_ as *const cbits)).size() + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
     while true {
         var __ci_expr_old_0: i64 = __local_n
@@ -6185,19 +5048,19 @@ pub unsafe fn cbits_xor(__param_self_: *mut cbits, __param_other: *const cbits) 
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:_cbits_count may write through it
 pub unsafe fn cbits_count(__param_self_: *const cbits) -> i64 {
-    return _cbits_count(((*__param_self_).buffer as *const u64), (cbits_size(__param_self_) as i64))
+    return _cbits_count(((*__param_self_).buffer as *const u64), ((*__param_self_).size() as i64))
 
 }
 
-// contract: unproved:0:read only,unproved:1:out-parameter written conditionally
+// contract: unproved:0:_cbits_to_str may write through it,unproved:1:out-parameter written conditionally
 pub unsafe fn cbits_to_str(__param_self_: *const cbits, __param_out: *mut c_char, __param_start: i64, __param_stop: i64) -> *mut c_char {
-    return ((_cbits_to_str(((*__param_self_).buffer as *const u64), (cbits_size(__param_self_) as i64), __param_out, __param_start, __param_stop) as *mut c_char))
+    return ((_cbits_to_str(((*__param_self_).buffer as *const u64), ((*__param_self_).size() as i64), __param_out, __param_start, __param_stop) as *mut c_char))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:_cbits_subset_of may write through it,unproved:1:read only
 pub unsafe fn cbits_subset_of(__param_self_: *const cbits, __param_other: *const cbits) -> bool {
     if (((if not ((if (*__param_self_)._size == (*__param_other)._size: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"cbits_subset_of".ptr, c"cbits.h".ptr, (322 as i32), c"self->_size == other->_size".ptr)
@@ -6205,11 +5068,11 @@ pub unsafe fn cbits_subset_of(__param_self_: *const cbits, __param_other: *const
         0
     }
 
-    return _cbits_subset_of(((*__param_self_).buffer as *const u64), ((*__param_other).buffer as *const u64), (cbits_size(__param_self_) as i64))
+    return _cbits_subset_of(((*__param_self_).buffer as *const u64), ((*__param_other).buffer as *const u64), ((*__param_self_).size() as i64))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: unproved:0:_cbits_disjoint may write through it,unproved:1:read only
 pub unsafe fn cbits_disjoint(__param_self_: *const cbits, __param_other: *const cbits) -> bool {
     if (((if not ((if (*__param_self_)._size == (*__param_other)._size: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"cbits_disjoint".ptr, c"cbits.h".ptr, (327 as i32), c"self->_size == other->_size".ptr)
@@ -6217,11 +5080,17 @@ pub unsafe fn cbits_disjoint(__param_self_: *const cbits, __param_other: *const 
         0
     }
 
-    return _cbits_disjoint(((*__param_self_).buffer as *const u64), ((*__param_other).buffer as *const u64), (cbits_size(__param_self_) as i64))
+    return _cbits_disjoint(((*__param_self_).buffer as *const u64), ((*__param_other).buffer as *const u64), ((*__param_self_).size() as i64))
 
 }
 
 impl cbits {
+    pub fn size() -> i64 {
+        let __param_self_: *const cbits = self as *const cbits
+        return (unsafe *__param_self_)._size
+
+    }
+
     pub mut fn take(__param_other: cbits) -> &cbits from self {
         let __param_self_: *mut cbits = self as *mut cbits
         if ((if (unsafe *__param_self_).buffer != (unsafe *(&raw const __param_other as *const cbits)).buffer: 1 else: 0) != 0) {
@@ -6276,7 +5145,7 @@ impl cbits {
 
     pub mut fn set_pattern(__param_pattern: u64) {
         let __param_self_: *mut cbits = self as *mut cbits
-        var __local_n: i64 = ((((unsafe { cbits_size((__param_self_ as *const cbits)) } + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
+        var __local_n: i64 = ((((unsafe { (*(__param_self_ as *const cbits)).size() } + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
         while true {
             var __ci_expr_old_0: i64 = __local_n
@@ -6306,6 +5175,24 @@ impl cbits {
 
     }
 
+    pub fn test(__param_i: i64) -> bool {
+        let __param_self_: *const cbits = self as *const cbits
+        return (((((((unsafe (*__param_self_).buffer[(__param_i / (8 * (sizeof[u64]() as i64)))]) as u64) & (((1 as u64) << (((__param_i as i64) & (((8 * (sizeof[u64]() as i64)) - 1) as i64)) as u32)) as u64)) != 0)) as bool))
+
+    }
+
+    pub fn at(__param_i: i64) -> bool {
+        let __param_self_: *const cbits = self as *const cbits
+        if (((if not ((if ((__param_i as u64)) < ((unsafe { (*__param_self_).size() } as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"cbits_at".ptr, c"cbits.h".ptr, (269 as i32), c"((size_t)(i) < (size_t)(cbits_size(self)))".ptr)
+        } else {
+            0
+        }
+
+        return unsafe { (*__param_self_).test(__param_i) }
+
+    }
+
     pub mut fn set(__param_i: i64) {
         let __param_self_: *mut cbits = self as *mut cbits
         ((unsafe (*__param_self_).buffer[(__param_i / (8 * (sizeof[u64]() as i64)))]) = ((unsafe (*__param_self_).buffer[(__param_i / (8 * (sizeof[u64]() as i64)))]) as u64) | (((1 as u64) << (((__param_i as i64) & (((8 * (sizeof[u64]() as i64)) - 1) as i64)) as u32)) as u64))
@@ -6332,7 +5219,7 @@ impl cbits {
 
     pub mut fn flip_all() {
         let __param_self_: *mut cbits = self as *mut cbits
-        var __local_n: i64 = ((((unsafe { cbits_size((__param_self_ as *const cbits)) } + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
+        var __local_n: i64 = ((((unsafe { (*(__param_self_ as *const cbits)).size() } + ((8 * (sizeof[u64]() as i64)) - 1)) / (8 * (sizeof[u64]() as i64))) as i64))
 
         while true {
             var __ci_expr_old_0: i64 = __local_n
@@ -6394,7 +5281,7 @@ impl stc_slot_deque {
 
     pub mut fn clear() {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        var __local_i: stc_slot_deque_iter = unsafe { stc_slot_deque_begin((((&raw const (*__param_self_) as *const stc_slot_deque) as *mut stc_slot_deque) as *const stc_slot_deque)) }
+        var __local_i: stc_slot_deque_iter = unsafe { (*(((&raw const (*__param_self_) as *const stc_slot_deque) as *mut stc_slot_deque) as *const stc_slot_deque)).begin() }
 
         while ((unsafe *(&raw const __local_i as *const stc_slot_deque_iter)).ref != null) {
 
@@ -6413,7 +5300,7 @@ impl stc_slot_deque {
 
     pub mut fn shrink_to_fit() {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        var __local_sz: i64 = ((unsafe { stc_slot_deque_size((__param_self_ as *const stc_slot_deque)) } as i64))
+        var __local_sz: i64 = ((unsafe { (*(__param_self_ as *const stc_slot_deque)).size() } as i64))
 
         var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
 
@@ -6444,6 +5331,24 @@ impl stc_slot_deque {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        return ((((unsafe *__param_self_).end - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        return (unsafe *__param_self_).capmask
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        return (((((unsafe *__param_self_).start == (unsafe *__param_self_).end)) as bool))
+
+    }
+
     pub mut fn move_() -> stc_slot_deque {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
         var __local_m: stc_slot_deque = (unsafe *__param_self_)
@@ -6471,7 +5376,7 @@ impl stc_slot_deque {
 
     pub mut fn pop_front() {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        if (((if not ((if not unsafe { stc_slot_deque_is_empty((__param_self_ as *const stc_slot_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_slot_deque_pop_front".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
         } else {
             0
@@ -6479,6 +5384,56 @@ impl stc_slot_deque {
 
 
         ((unsafe *__param_self_).start = ((((((unsafe *__param_self_).start + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
+
+    }
+
+    pub mut fn pull_front() -> *mut stc_slot_head {
+        let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"stc_slot_deque_pull_front".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
+        } else {
+            0
+        }
+
+        var __local_s: i64 = (unsafe *__param_self_).start
+
+        ((unsafe *__param_self_).start = (((((__local_s + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
+
+        return (((unsafe (*__param_self_).cbuf[__local_s]) as *mut stc_slot_head))
+
+    }
+
+    pub fn begin() -> stc_slot_deque_iter {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        return ((stc_slot_deque_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut *mut stc_slot_head) else: ((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize))), pos: (unsafe *__param_self_).start, _s: __param_self_ } as stc_slot_deque_iter))
+
+    }
+
+    pub fn rbegin() -> stc_slot_deque_iter {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        var __local_pos: i64 = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64))
+
+        return ((stc_slot_deque_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut *mut stc_slot_head) else: ((unsafe *__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_slot_deque_iter))
+
+    }
+
+    pub fn end() -> stc_slot_deque_iter {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+
+        return ((stc_slot_deque_iter.zeroed() as stc_slot_deque_iter))
+
+    }
+
+    pub fn rend() -> stc_slot_deque_iter {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+
+        return ((stc_slot_deque_iter.zeroed() as stc_slot_deque_iter))
+
+    }
+
+    pub fn index(__param_it_: stc_slot_deque_iter) -> i64 {
+        let __param_self_: *const stc_slot_deque = self as *const stc_slot_deque
+        return ((((unsafe *(&raw const __param_it_ as *const stc_slot_deque_iter)).pos - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
 
     }
 
@@ -6490,7 +5445,7 @@ impl stc_slot_deque {
 
     pub mut fn insert_uninit(__param_idx: i64, __param_n: i64) -> stc_slot_deque_iter {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        var __local_len: i64 = ((unsafe { stc_slot_deque_size((__param_self_ as *const stc_slot_deque)) } as i64))
+        var __local_len: i64 = ((unsafe { (*(__param_self_ as *const stc_slot_deque)).size() } as i64))
 
         var __local_it_: stc_slot_deque_iter = stc_slot_deque_iter { _s: (__param_self_ as *const stc_slot_deque) }
 
@@ -6532,7 +5487,7 @@ impl stc_slot_deque {
 
     pub mut fn erase_n(__param_idx: i64, __param_n: i64) {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        var __local_len: i64 = ((unsafe { stc_slot_deque_size((__param_self_ as *const stc_slot_deque)) } as i64))
+        var __local_len: i64 = ((unsafe { (*(__param_self_ as *const stc_slot_deque)).size() } as i64))
 
         if (((if not ((if (__param_idx + __param_n) <= __local_len: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_slot_deque_erase_n".ptr, c"deque.h".ptr, (149 as i32), c"idx + n <= len".ptr)
@@ -6571,7 +5526,7 @@ impl stc_slot_deque {
 
     pub mut fn pop_back() {
         let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
-        if (((if not ((if not unsafe { stc_slot_deque_is_empty((__param_self_ as *const stc_slot_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_slot_deque_pop_back".ptr, c"deque.h".ptr, (67 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
         } else {
             0
@@ -6579,6 +5534,20 @@ impl stc_slot_deque {
 
         ((unsafe *__param_self_).end = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
+
+    }
+
+    pub mut fn pull_back() -> *mut stc_slot_head {
+        let __param_self_: *mut stc_slot_deque = self as *mut stc_slot_deque
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"stc_slot_deque_pull_back".ptr, c"deque.h".ptr, (73 as i32), c"!stc_slot_deque_is_empty(self)".ptr)
+        } else {
+            0
+        }
+
+        ((unsafe *__param_self_).end = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
+
+        return (((unsafe (*__param_self_).cbuf[(*__param_self_).end]) as *mut stc_slot_head))
 
     }
 
@@ -6719,7 +5688,7 @@ impl stc_slot_list {
             (__local_cap__goto_410_22 = ((0 as i64)))
             (__local_arr__goto_411_15 = ((null as *mut *mut stc_slot_head)))
             (__local_p__goto_411_28 = ((null as *mut *mut stc_slot_head)))
-            (__local_i__goto_413_10 = unsafe { stc_slot_list_begin((((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)) })
+            (__local_i__goto_413_10 = unsafe { (*(((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)).begin() })
             goto '__ci_bb_1
         }
 
@@ -6749,7 +5718,7 @@ impl stc_slot_list {
             ((unsafe *__param_self_).last = ((__local_arr__goto_411_15 as *mut stc_slot_list_node)))
             unsafe { (*__param_self_).sort_lowhigh((0 as i64), ((__local_len__goto_410_13 - 1) as i64)) }
             ((unsafe *__param_self_).last = __local_keep__goto_412_14)
-            (__local_i__goto_426_10 = unsafe { stc_slot_list_begin((((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)) })
+            (__local_i__goto_426_10 = unsafe { (*(((&raw const (*__param_self_) as *const stc_slot_list) as *mut stc_slot_list) as *const stc_slot_list)).begin() })
             goto '__ci_bb_10
         }
 
@@ -6865,9 +5834,15 @@ impl stc_slot_list {
 
     }
 
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_slot_list = self as *const stc_slot_list
+        return (((((unsafe *__param_self_).last == null)) as bool))
+
+    }
+
     pub mut fn pop_front() {
         let __param_self_: *mut stc_slot_list = self as *mut stc_slot_list
-        if (((if not ((if not unsafe { stc_slot_list_is_empty((__param_self_ as *const stc_slot_list)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_list)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_slot_list_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!stc_slot_list_is_empty(self)".ptr)
         } else {
             0
@@ -6892,6 +5867,46 @@ impl stc_slot_list {
         unsafe { stc_slot_list_drop((__param_self_ as *const stc_slot_list)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_list]())
+
+    }
+
+    pub fn count() -> i64 {
+        let __param_self_: *const stc_slot_list = self as *const stc_slot_list
+        var __local_n: i64 = ((1 as i64))
+
+        var __local_node: *const stc_slot_list_node = (((unsafe *__param_self_).last as *const stc_slot_list_node))
+
+        if ((if __local_node == null: 1 else: 0) != 0) {
+            return ((0 as i64))
+        }
+
+        while true {
+            (__local_node = (((unsafe *__local_node).next as *const stc_slot_list_node)))
+
+            if (not ((if __local_node != (unsafe *__param_self_).last: 1 else: 0) != 0)) {
+                break
+            }
+
+            (__local_n = __local_n + 1)
+
+        }
+
+        return __local_n
+
+    }
+
+    pub fn begin() -> stc_slot_list_iter {
+        let __param_self_: *const stc_slot_list = self as *const stc_slot_list
+        var __local_head: *mut *mut stc_slot_head = (if (unsafe *__param_self_).last != null: ((&raw const (unsafe *(*(*__param_self_).last).next).value as *const *mut stc_slot_head) as *mut *mut stc_slot_head) else: (null as *mut *mut stc_slot_head))
+
+        return ((stc_slot_list_iter { ref: __local_head, _last: (&raw const (unsafe *__param_self_).last as *const *mut stc_slot_list_node), prev: (unsafe *__param_self_).last } as stc_slot_list_iter))
+
+    }
+
+    pub fn end() -> stc_slot_list_iter {
+        let __param_self_: *const stc_slot_list = self as *const stc_slot_list
+
+        return ((stc_slot_list_iter.zeroed() as stc_slot_list_iter))
 
     }
 
@@ -7044,6 +6059,22 @@ impl stc_slot_list_iter {
 }
 
 impl stc_slot_pqueue {
+    pub fn make_heap() {
+        let __param_self_: *mut stc_slot_pqueue = (self as *const stc_slot_pqueue) as *mut stc_slot_pqueue
+        var __local_n: i64 = (unsafe *__param_self_).size
+
+        var __local_k: i64 = (((__local_n / 2) as i64))
+
+        while ((if __local_k != 0: 1 else: 0) != 0) {
+            unsafe { (*__param_self_).sift_down_(__local_k, __local_n) }
+
+            (__local_k = __local_k - 1)
+
+        }
+
+
+    }
+
     pub mut fn erase_at(__param_idx: i64) {
         let __param_self_: *mut stc_slot_pqueue = self as *mut stc_slot_pqueue
 
@@ -7054,7 +6085,43 @@ impl stc_slot_pqueue {
 
         ((unsafe (*__param_self_).data[__param_idx]) = (unsafe (*__param_self_).data[__local_n]))
 
-        unsafe { stc_slot_pqueue_sift_down_(__param_self_, ((__param_idx + 1) as i64), __local_n) }
+        unsafe { (*__param_self_).sift_down_(((__param_idx + 1) as i64), __local_n) }
+
+    }
+
+    pub fn sift_down_(__param_idx: i64, __param_n: i64) {
+        let __param_self_: *mut stc_slot_pqueue = (self as *const stc_slot_pqueue) as *mut stc_slot_pqueue
+        var __local_t: *mut stc_slot_head
+
+        var __local_arr: *mut *mut stc_slot_head = ((unsafe *__param_self_).data - ((1 as i64) as usize))
+
+
+        var __local_r: i64 = __param_idx
+
+        var __local_c: i64 = (((__param_idx * 2) as i64))
+
+
+        while ((if __local_c <= __param_n: 1 else: 0) != 0) {
+            (__local_c = __local_c + (if unsafe { (*(*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) } < 0: 1 else: 0))
+
+            if ((if not ((if unsafe { (*(*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head))).cmp.unwrap()(((*((&raw const (__local_arr[__local_r]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void), ((*((&raw const (__local_arr[__local_c]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)) as *const c_void)) } < 0: 1 else: 0) != 0): 1 else: 0) != 0) {
+                return
+            }
+
+            (__local_t = (unsafe __local_arr[__local_r]))
+
+            ((unsafe __local_arr[__local_r]) = (unsafe __local_arr[__local_c]))
+
+            (__local_r = __local_c)
+
+            ((unsafe __local_arr[__local_r]) = __local_t)
+
+
+
+            (__local_c = __local_c * 2)
+
+        }
+
 
     }
 
@@ -7127,6 +6194,24 @@ impl stc_slot_pqueue {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_q: *const stc_slot_pqueue = self as *const stc_slot_pqueue
+        return (unsafe *__param_q).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_q: *const stc_slot_pqueue = self as *const stc_slot_pqueue
+        return ((((not ((unsafe *__param_q).size != 0))) as bool))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_q: *const stc_slot_pqueue = self as *const stc_slot_pqueue
+        return (unsafe *__param_q).capacity
+
+    }
+
     pub mut fn pop() {
         let __param_self_: *mut stc_slot_pqueue = self as *mut stc_slot_pqueue
         if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
@@ -7136,6 +6221,22 @@ impl stc_slot_pqueue {
         }
 
         unsafe { (*__param_self_).erase_at((0 as i64)) }
+
+    }
+
+    pub mut fn pull() -> *mut stc_slot_head {
+        let __param_self_: *mut stc_slot_pqueue = self as *mut stc_slot_pqueue
+        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"stc_slot_pqueue_pull".ptr, c"pqueue.h".ptr, (123 as i32), c"self->size".ptr)
+        } else {
+            0
+        }
+
+        var __local_v: *mut stc_slot_head = (unsafe (*__param_self_).data[0])
+
+        unsafe { (*__param_self_).erase_at((0 as i64)) }
+
+        return __local_v
 
     }
 
@@ -7184,7 +6285,7 @@ impl stc_slot_queue {
 
     pub mut fn clear() {
         let __param_self_: *mut stc_slot_queue = self as *mut stc_slot_queue
-        var __local_i: stc_slot_queue_iter = unsafe { stc_slot_queue_begin((((&raw const (*__param_self_) as *const stc_slot_queue) as *mut stc_slot_queue) as *const stc_slot_queue)) }
+        var __local_i: stc_slot_queue_iter = unsafe { (*(((&raw const (*__param_self_) as *const stc_slot_queue) as *mut stc_slot_queue) as *const stc_slot_queue)).begin() }
 
         while ((unsafe *(&raw const __local_i as *const stc_slot_queue_iter)).ref != null) {
 
@@ -7203,7 +6304,7 @@ impl stc_slot_queue {
 
     pub mut fn shrink_to_fit() {
         let __param_self_: *mut stc_slot_queue = self as *mut stc_slot_queue
-        var __local_sz: i64 = ((unsafe { stc_slot_queue_size((__param_self_ as *const stc_slot_queue)) } as i64))
+        var __local_sz: i64 = ((unsafe { (*(__param_self_ as *const stc_slot_queue)).size() } as i64))
 
         var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
 
@@ -7234,6 +6335,24 @@ impl stc_slot_queue {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        return ((((unsafe *__param_self_).end - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        return (unsafe *__param_self_).capmask
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        return (((((unsafe *__param_self_).start == (unsafe *__param_self_).end)) as bool))
+
+    }
+
     pub mut fn move_() -> stc_slot_queue {
         let __param_self_: *mut stc_slot_queue = self as *mut stc_slot_queue
         var __local_m: stc_slot_queue = (unsafe *__param_self_)
@@ -7261,7 +6380,7 @@ impl stc_slot_queue {
 
     pub mut fn pop() {
         let __param_self_: *mut stc_slot_queue = self as *mut stc_slot_queue
-        if (((if not ((if not unsafe { stc_slot_queue_is_empty((__param_self_ as *const stc_slot_queue)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_queue)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_slot_queue_pop".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_slot_queue_is_empty(self)".ptr)
         } else {
             0
@@ -7269,6 +6388,56 @@ impl stc_slot_queue {
 
 
         ((unsafe *__param_self_).start = ((((((unsafe *__param_self_).start + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
+
+    }
+
+    pub mut fn pull() -> *mut stc_slot_head {
+        let __param_self_: *mut stc_slot_queue = self as *mut stc_slot_queue
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_slot_queue)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"stc_slot_queue_pull".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_slot_queue_is_empty(self)".ptr)
+        } else {
+            0
+        }
+
+        var __local_s: i64 = (unsafe *__param_self_).start
+
+        ((unsafe *__param_self_).start = (((((__local_s + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
+
+        return (((unsafe (*__param_self_).cbuf[__local_s]) as *mut stc_slot_head))
+
+    }
+
+    pub fn begin() -> stc_slot_queue_iter {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        return ((stc_slot_queue_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut *mut stc_slot_head) else: ((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize))), pos: (unsafe *__param_self_).start, _s: __param_self_ } as stc_slot_queue_iter))
+
+    }
+
+    pub fn rbegin() -> stc_slot_queue_iter {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        var __local_pos: i64 = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64))
+
+        return ((stc_slot_queue_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut *mut stc_slot_head) else: ((unsafe *__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_slot_queue_iter))
+
+    }
+
+    pub fn end() -> stc_slot_queue_iter {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+
+        return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
+
+    }
+
+    pub fn rend() -> stc_slot_queue_iter {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+
+        return ((stc_slot_queue_iter.zeroed() as stc_slot_queue_iter))
+
+    }
+
+    pub fn index(__param_it_: stc_slot_queue_iter) -> i64 {
+        let __param_self_: *const stc_slot_queue = self as *const stc_slot_queue
+        return ((((unsafe *(&raw const __param_it_ as *const stc_slot_queue_iter)).pos - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
 
     }
 
@@ -7338,6 +6507,136 @@ impl stc_slot_set {
 
     }
 
+    pub mut fn reserve(__param__cap: i64) -> bool {
+        let __param__self: *mut stc_slot_set = self as *mut stc_slot_set
+        var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param__self).size else: __param__cap) as i64))
+
+        var __local__newbucks: i64 = ((((((__local__newcap as f32) / i_max_load_factor) as i64) + 4) as i64))
+
+        (__local__newbucks = ((c_next_pow2(__local__newbucks) as i64)))
+
+        var __ci_expr_logic_0: i32
+
+        if ((if __local__newbucks == (unsafe *__param__self).bucket_count: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (if __param__cap <= (((((unsafe *__param__self).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (__ci_expr_logic_0 != 0) {
+            return ((true as bool))
+        }
+
+
+        var __local_map: stc_slot_set = (unsafe *__param__self)
+
+        var __local_self_: *mut stc_slot_set = ((&raw mut __local_map as *mut stc_slot_set))
+
+
+
+        (__local_map.table = (((with_alloc((((if 1 != 0: ((__local__newbucks * (sizeof[usize]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut *mut stc_slot_head)))
+
+        (__local_map.meta = (((with_alloc_zeroed((((if 1 != 0: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if 1 != 0: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+
+        (__local_map.bucket_count = __local__newbucks)
+
+        var __local_ok: bool = with 0 as __ci_expr_seq_26 {
+            var __ci_expr_logic_1: i32 = 0
+            if ((unsafe *(&raw const __local_map as *const stc_slot_set)).table != null) {
+                (__ci_expr_logic_1 = (if (unsafe *(&raw const __local_map as *const stc_slot_set)).meta != null: 1 else: 0))
+            }
+            (__ci_expr_logic_1 != 0)
+        }
+
+        if __local_ok {
+            ((unsafe __local_map.meta[__local__newbucks])).set_dist(((1023 as u16)))
+
+            var __local_d: *const *mut stc_slot_head = (((unsafe *__param__self).table as *const *mut stc_slot_head))
+
+            var __local_m: *const hmap_meta = (((unsafe *__param__self).meta as *const hmap_meta))
+
+            var __local_i: i64 = ((0 as i64))
+
+            while ((if __local_i < (unsafe *__param__self).bucket_count: 1 else: 0) != 0) {
+                if ((if ((unsafe __local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
+                    var __local_r: *mut stc_slot_head = (unsafe *__local_d)
+
+                    ((unsafe *(unsafe { stc_slot_set_bucket_insert_(((&raw mut __local_map as *mut stc_slot_set) as *const stc_slot_set), ((&raw mut __local_r as *mut *mut stc_slot_head) as *const *mut stc_slot_head)) }.ref)) = (unsafe *__local_d))
+
+                }
+
+                (__local_i = __local_i + 1)
+
+                (__local_d = __local_d + 1)
+
+
+            }
+
+
+            loop {
+                var __local__xp: *mut stc_slot_set = __param__self
+
+                var __local__yp: *mut stc_slot_set = ((&raw mut __local_map as *mut stc_slot_set))
+
+
+                var __local__tv: stc_slot_set = (unsafe *__local__xp)
+
+                with_memcpy((&raw mut (unsafe *__local__xp) as *mut u8), (&raw const (unsafe *__local__yp) as *const u8), sizeof[stc_slot_set]())
+
+                with_memcpy((&raw mut (unsafe *__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_slot_set]())
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+        }
+
+        with_free((((unsafe *(&raw const __local_map as *const stc_slot_set)).meta as *mut c_void) as *mut u8))
+
+        with_free((((unsafe *(&raw const __local_map as *const stc_slot_set)).table as *mut c_void) as *mut u8))
+
+        return __local_ok
+
+    }
+
+    pub fn max_load_factor() -> f32 {
+        let __param_self_: *const stc_slot_set = self as *const stc_slot_set
+
+        return i_max_load_factor
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_map: *const stc_slot_set = self as *const stc_slot_set
+        return (((((unsafe *__param_map).bucket_count as f32) * i_max_load_factor) as i64))
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_map: *const stc_slot_set = self as *const stc_slot_set
+        return ((((not ((unsafe *__param_map).size != 0))) as bool))
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_map: *const stc_slot_set = self as *const stc_slot_set
+        return (unsafe *__param_map).size
+
+    }
+
+    pub fn bucket_count() -> i64 {
+        let __param_map: *mut stc_slot_set = (self as *const stc_slot_set) as *mut stc_slot_set
+        return (unsafe *__param_map).bucket_count
+
+    }
+
+    pub mut fn shrink_to_fit() -> Unit {
+        let __param_self_: *mut stc_slot_set = self as *mut stc_slot_set
+        unsafe { (*__param_self_).reserve((9223372036854775807 as i64)) }
+
+    }
+
     pub mut fn move_() -> stc_slot_set {
         let __param_self_: *mut stc_slot_set = self as *mut stc_slot_set
         var __local_m: stc_slot_set = (unsafe *__param_self_)
@@ -7360,6 +6659,38 @@ impl stc_slot_set {
         unsafe { stc_slot_set_drop((__param_self_ as *const stc_slot_set)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_set]())
+
+    }
+
+    pub fn begin() -> stc_slot_set_iter {
+        let __param_self_: *const stc_slot_set = self as *const stc_slot_set
+        var __local_it_: stc_slot_set_iter = stc_slot_set_iter { ref: (unsafe *__param_self_).table, _end: (unsafe *__param_self_).table, _mref: (unsafe *__param_self_).meta }
+
+        if ((if (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter)).ref == null: 1 else: 0) != 0) {
+            return __local_it_
+        }
+
+        (__local_it_._end = (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter))._end + (((unsafe *__param_self_).bucket_count as i64) as usize))
+
+        while ((if (unsafe *(*(&raw const __local_it_ as *const stc_slot_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter)).ref + 1)
+
+            (__local_it_._mref = (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter))._mref + 1)
+
+        }
+
+        if ((if (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter)).ref == (unsafe *(&raw const __local_it_ as *const stc_slot_set_iter))._end: 1 else: 0) != 0) {
+            (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> stc_slot_set_iter {
+        let __param_self_: *const stc_slot_set = self as *const stc_slot_set
+
+        return ((stc_slot_set_iter.zeroed() as stc_slot_set_iter))
 
     }
 
@@ -7482,6 +6813,45 @@ impl stc_slot_sset {
 
     }
 
+    pub fn begin() -> stc_slot_sset_iter {
+        let __param_self_: *const stc_slot_sset = self as *const stc_slot_sset
+        var __local_it_: stc_slot_sset_iter
+
+        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+
+        (__local_it_._d = (unsafe *__param_self_).nodes)
+
+        (__local_it_._top = ((0 as i32)))
+
+
+        (__local_it_._tn = (unsafe *__param_self_).root)
+
+        if ((unsafe *(&raw const __local_it_ as *const stc_slot_sset_iter))._tn != 0) {
+            unsafe { (*(&raw mut __local_it_ as *mut stc_slot_sset_iter)).next() }
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_slot_sset = self as *const stc_slot_sset
+        return (((((unsafe *__param_self_).size == 0)) as bool))
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_slot_sset = self as *const stc_slot_sset
+        return (((unsafe *__param_self_).size as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_slot_sset = self as *const stc_slot_sset
+        return (((unsafe *__param_self_).capacity as i64))
+
+    }
+
     pub mut fn move_() -> stc_slot_sset {
         let __param_self_: *mut stc_slot_sset = self as *mut stc_slot_sset
         var __local_m: stc_slot_sset = (unsafe *__param_self_)
@@ -7516,6 +6886,22 @@ impl stc_slot_sset {
         unsafe { stc_slot_sset_drop((__param_self_ as *const stc_slot_sset)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_slot_sset]())
+
+    }
+
+    pub fn end() -> stc_slot_sset_iter {
+        let __param_self_: *const stc_slot_sset = self as *const stc_slot_sset
+        var __local_it_: stc_slot_sset_iter
+
+
+        (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+
+        (__local_it_._top = ((0 as i32)))
+
+        (__local_it_._tn = ((0 as i32)))
+
+
+        return __local_it_
 
     }
 
@@ -7581,6 +6967,12 @@ impl stc_slot_stack {
 
     }
 
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        return (unsafe *__param_self_).capacity
+
+    }
+
     pub mut fn reserve(__param_cap: i64) -> bool {
         let __param_self_: *mut stc_slot_stack = self as *mut stc_slot_stack
         var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param_self_).size else: __param_cap) as i64))
@@ -7629,11 +7021,23 @@ impl stc_slot_stack {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+
+    }
+
     pub mut fn append_uninit(__param_n: i64) -> *mut *mut stc_slot_head {
         let __param_self_: *mut stc_slot_stack = self as *mut stc_slot_stack
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { stc_slot_stack_capacity((__param_self_ as *const stc_slot_stack)) }: 1 else: 0) != 0) {
+        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const stc_slot_stack)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut *mut stc_slot_head))
             }
@@ -7664,6 +7068,76 @@ impl stc_slot_stack {
             ((&raw const (unsafe (*__param_self_).data[(*__param_self_).size]) as *const *mut stc_slot_head) as *mut *mut stc_slot_head)
         }
 
+
+    }
+
+    pub mut fn pull() -> *mut stc_slot_head {
+        let __param_self_: *mut stc_slot_stack = self as *mut stc_slot_stack
+        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"stc_slot_stack_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
+        } else {
+            0
+        }
+
+        ((unsafe *__param_self_).size = (unsafe *__param_self_).size - 1)
+
+        return (((unsafe (*__param_self_).data[(*__param_self_).size]) as *mut stc_slot_head))
+
+
+    }
+
+    pub fn begin() -> stc_slot_stack_iter {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const stc_slot_stack_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> stc_slot_stack_iter {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const stc_slot_stack_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const stc_slot_stack_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut *mut stc_slot_head)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> stc_slot_stack_iter {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+
+        var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> stc_slot_stack_iter {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+
+        var __local_it_: stc_slot_stack_iter = stc_slot_stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: stc_slot_stack_iter) -> i64 {
+        let __param_self_: *const stc_slot_stack = self as *const stc_slot_stack
+        return (((((unsafe *(&raw const __param_it_ as *const stc_slot_stack_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[usize]() as i64))
 
     }
 
@@ -7743,7 +7217,7 @@ impl stc_word_deque {
 
     pub mut fn clear() {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        var __local_i: stc_word_deque_iter = unsafe { stc_word_deque_begin((((&raw const (*__param_self_) as *const stc_word_deque) as *mut stc_word_deque) as *const stc_word_deque)) }
+        var __local_i: stc_word_deque_iter = unsafe { (*(((&raw const (*__param_self_) as *const stc_word_deque) as *mut stc_word_deque) as *const stc_word_deque)).begin() }
 
         while ((unsafe *(&raw const __local_i as *const stc_word_deque_iter)).ref != null) {
 
@@ -7785,7 +7259,7 @@ impl stc_word_deque {
 
     pub mut fn shrink_to_fit() {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        var __local_sz: i64 = ((unsafe { stc_word_deque_size((__param_self_ as *const stc_word_deque)) } as i64))
+        var __local_sz: i64 = ((unsafe { (*(__param_self_ as *const stc_word_deque)).size() } as i64))
 
         var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
 
@@ -7816,6 +7290,31 @@ impl stc_word_deque {
 
     }
 
+    pub fn value_clone(__param_val: u64) -> u64 {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+
+        return __param_val
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        return ((((unsafe *__param_self_).end - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        return (unsafe *__param_self_).capmask
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        return (((((unsafe *__param_self_).start == (unsafe *__param_self_).end)) as bool))
+
+    }
+
     pub mut fn move_() -> stc_word_deque {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
         var __local_m: stc_word_deque = (unsafe *__param_self_)
@@ -7843,7 +7342,7 @@ impl stc_word_deque {
 
     pub mut fn pop_front() {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        if (((if not ((if not unsafe { stc_word_deque_is_empty((__param_self_ as *const stc_word_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_deque_pop_front".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_word_deque_is_empty(self)".ptr)
         } else {
             0
@@ -7856,7 +7355,7 @@ impl stc_word_deque {
 
     pub mut fn pull_front() -> u64 {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        if (((if not ((if not unsafe { stc_word_deque_is_empty((__param_self_ as *const stc_word_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_deque_pull_front".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_word_deque_is_empty(self)".ptr)
         } else {
             0
@@ -7867,6 +7366,40 @@ impl stc_word_deque {
         ((unsafe *__param_self_).start = (((((__local_s + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
         return (unsafe (*__param_self_).cbuf[__local_s])
+
+    }
+
+    pub fn begin() -> stc_word_deque_iter {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        return ((stc_word_deque_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut u64) else: ((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize))), pos: (unsafe *__param_self_).start, _s: __param_self_ } as stc_word_deque_iter))
+
+    }
+
+    pub fn rbegin() -> stc_word_deque_iter {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        var __local_pos: i64 = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64))
+
+        return ((stc_word_deque_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut u64) else: ((unsafe *__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_word_deque_iter))
+
+    }
+
+    pub fn end() -> stc_word_deque_iter {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+
+        return ((stc_word_deque_iter.zeroed() as stc_word_deque_iter))
+
+    }
+
+    pub fn rend() -> stc_word_deque_iter {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+
+        return ((stc_word_deque_iter.zeroed() as stc_word_deque_iter))
+
+    }
+
+    pub fn index(__param_it_: stc_word_deque_iter) -> i64 {
+        let __param_self_: *const stc_word_deque = self as *const stc_word_deque
+        return ((((unsafe *(&raw const __param_it_ as *const stc_word_deque_iter)).pos - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
 
     }
 
@@ -7901,7 +7434,7 @@ impl stc_word_deque {
 
     pub mut fn insert_uninit(__param_idx: i64, __param_n: i64) -> stc_word_deque_iter {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        var __local_len: i64 = ((unsafe { stc_word_deque_size((__param_self_ as *const stc_word_deque)) } as i64))
+        var __local_len: i64 = ((unsafe { (*(__param_self_ as *const stc_word_deque)).size() } as i64))
 
         var __local_it_: stc_word_deque_iter = stc_word_deque_iter { _s: (__param_self_ as *const stc_word_deque) }
 
@@ -7943,7 +7476,7 @@ impl stc_word_deque {
 
     pub mut fn erase_n(__param_idx: i64, __param_n: i64) {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        var __local_len: i64 = ((unsafe { stc_word_deque_size((__param_self_ as *const stc_word_deque)) } as i64))
+        var __local_len: i64 = ((unsafe { (*(__param_self_ as *const stc_word_deque)).size() } as i64))
 
         if (((if not ((if (__param_idx + __param_n) <= __local_len: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_deque_erase_n".ptr, c"deque.h".ptr, (149 as i32), c"idx + n <= len".ptr)
@@ -7989,7 +7522,7 @@ impl stc_word_deque {
 
     pub mut fn pop_back() {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        if (((if not ((if not unsafe { stc_word_deque_is_empty((__param_self_ as *const stc_word_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_deque_pop_back".ptr, c"deque.h".ptr, (67 as i32), c"!stc_word_deque_is_empty(self)".ptr)
         } else {
             0
@@ -8002,7 +7535,7 @@ impl stc_word_deque {
 
     pub mut fn pull_back() -> u64 {
         let __param_self_: *mut stc_word_deque = self as *mut stc_word_deque
-        if (((if not ((if not unsafe { stc_word_deque_is_empty((__param_self_ as *const stc_word_deque)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_deque)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_deque_pull_back".ptr, c"deque.h".ptr, (73 as i32), c"!stc_word_deque_is_empty(self)".ptr)
         } else {
             0
@@ -8242,7 +7775,7 @@ impl stc_word_list {
             (__local_cap__goto_410_22 = ((0 as i64)))
             (__local_arr__goto_411_15 = ((null as *mut i64)))
             (__local_p__goto_411_28 = ((null as *mut i64)))
-            (__local_i__goto_413_10 = unsafe { stc_word_list_begin((((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)) })
+            (__local_i__goto_413_10 = unsafe { (*(((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)).begin() })
             goto '__ci_bb_1
         }
 
@@ -8272,7 +7805,7 @@ impl stc_word_list {
             ((unsafe *__param_self_).last = ((__local_arr__goto_411_15 as *mut stc_word_list_node)))
             unsafe { (*__param_self_).sort_lowhigh((0 as i64), ((__local_len__goto_410_13 - 1) as i64)) }
             ((unsafe *__param_self_).last = __local_keep__goto_412_14)
-            (__local_i__goto_426_10 = unsafe { stc_word_list_begin((((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)) })
+            (__local_i__goto_426_10 = unsafe { (*(((&raw const (*__param_self_) as *const stc_word_list) as *mut stc_word_list) as *const stc_word_list)).begin() })
             goto '__ci_bb_10
         }
 
@@ -8388,6 +7921,19 @@ impl stc_word_list {
 
     }
 
+    pub fn value_clone(__param_val: i64) -> i64 {
+        let __param_self_: *const stc_word_list = self as *const stc_word_list
+
+        return __param_val
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_word_list = self as *const stc_word_list
+        return (((((unsafe *__param_self_).last == null)) as bool))
+
+    }
+
     pub mut fn push(__param_value: i64) -> *mut i64 {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
         return ((unsafe { (*__param_self_).push_back(__param_value) } as *mut i64))
@@ -8396,7 +7942,7 @@ impl stc_word_list {
 
     pub mut fn pop_front() {
         let __param_self_: *mut stc_word_list = self as *mut stc_word_list
-        if (((if not ((if not unsafe { stc_word_list_is_empty((__param_self_ as *const stc_word_list)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_list)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_list_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!stc_word_list_is_empty(self)".ptr)
         } else {
             0
@@ -8421,6 +7967,46 @@ impl stc_word_list {
         unsafe { stc_word_list_drop((__param_self_ as *const stc_word_list)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[stc_word_list]())
+
+    }
+
+    pub fn count() -> i64 {
+        let __param_self_: *const stc_word_list = self as *const stc_word_list
+        var __local_n: i64 = ((1 as i64))
+
+        var __local_node: *const stc_word_list_node = (((unsafe *__param_self_).last as *const stc_word_list_node))
+
+        if ((if __local_node == null: 1 else: 0) != 0) {
+            return ((0 as i64))
+        }
+
+        while true {
+            (__local_node = (((unsafe *__local_node).next as *const stc_word_list_node)))
+
+            if (not ((if __local_node != (unsafe *__param_self_).last: 1 else: 0) != 0)) {
+                break
+            }
+
+            (__local_n = __local_n + 1)
+
+        }
+
+        return __local_n
+
+    }
+
+    pub fn begin() -> stc_word_list_iter {
+        let __param_self_: *const stc_word_list = self as *const stc_word_list
+        var __local_head: *mut i64 = (if (unsafe *__param_self_).last != null: ((&raw const (unsafe *(*(*__param_self_).last).next).value as *const i64) as *mut i64) else: (null as *mut i64))
+
+        return ((stc_word_list_iter { ref: __local_head, _last: (&raw const (unsafe *__param_self_).last as *const *mut stc_word_list_node), prev: (unsafe *__param_self_).last } as stc_word_list_iter))
+
+    }
+
+    pub fn end() -> stc_word_list_iter {
+        let __param_self_: *const stc_word_list = self as *const stc_word_list
+
+        return ((stc_word_list_iter.zeroed() as stc_word_list_iter))
 
     }
 
@@ -8573,6 +8159,22 @@ impl stc_word_list_iter {
 }
 
 impl stc_word_pqueue {
+    pub fn make_heap() {
+        let __param_self_: *mut stc_word_pqueue = (self as *const stc_word_pqueue) as *mut stc_word_pqueue
+        var __local_n: i64 = (unsafe *__param_self_).size
+
+        var __local_k: i64 = (((__local_n / 2) as i64))
+
+        while ((if __local_k != 0: 1 else: 0) != 0) {
+            unsafe { (*__param_self_).sift_down_(__local_k, __local_n) }
+
+            (__local_k = __local_k - 1)
+
+        }
+
+
+    }
+
     pub mut fn erase_at(__param_idx: i64) {
         let __param_self_: *mut stc_word_pqueue = self as *mut stc_word_pqueue
 
@@ -8583,7 +8185,7 @@ impl stc_word_pqueue {
 
         ((unsafe (*__param_self_).data[__param_idx]) = (((unsafe (*__param_self_).data[__local_n]) as i64)))
 
-        unsafe { stc_word_pqueue_sift_down_(__param_self_, ((__param_idx + 1) as i64), __local_n) }
+        unsafe { (*__param_self_).sift_down_(((__param_idx + 1) as i64), __local_n) }
 
     }
 
@@ -8622,6 +8224,42 @@ impl stc_word_pqueue {
         ((unsafe __local_arr[__local_c]) = __param_value)
 
         return (__local_arr + ((__local_c as i64) as usize))
+
+    }
+
+    pub fn sift_down_(__param_idx: i64, __param_n: i64) {
+        let __param_self_: *mut stc_word_pqueue = (self as *const stc_word_pqueue) as *mut stc_word_pqueue
+        var __local_t: i64
+
+        var __local_arr: *mut i64 = ((unsafe *__param_self_).data - ((1 as i64) as usize))
+
+
+        var __local_r: i64 = __param_idx
+
+        var __local_c: i64 = (((__param_idx * 2) as i64))
+
+
+        while ((if __local_c <= __param_n: 1 else: 0) != 0) {
+            (__local_c = __local_c + (if (unsafe *((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)) < (unsafe *((&raw const (__local_arr[(__local_c + (if __local_c < __param_n: 1 else: 0))]) as *const i64) as *mut i64)): 1 else: 0))
+
+            if ((if not ((if (unsafe *((&raw const (__local_arr[__local_r]) as *const i64) as *mut i64)) < (unsafe *((&raw const (__local_arr[__local_c]) as *const i64) as *mut i64)): 1 else: 0) != 0): 1 else: 0) != 0) {
+                return
+            }
+
+            (__local_t = (((unsafe __local_arr[__local_r]) as i64)))
+
+            ((unsafe __local_arr[__local_r]) = (((unsafe __local_arr[__local_c]) as i64)))
+
+            (__local_r = __local_c)
+
+            ((unsafe __local_arr[__local_r]) = __local_t)
+
+
+
+            (__local_c = __local_c * 2)
+
+        }
+
 
     }
 
@@ -8694,6 +8332,24 @@ impl stc_word_pqueue {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_q: *const stc_word_pqueue = self as *const stc_word_pqueue
+        return (unsafe *__param_q).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_q: *const stc_word_pqueue = self as *const stc_word_pqueue
+        return ((((not ((unsafe *__param_q).size != 0))) as bool))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_q: *const stc_word_pqueue = self as *const stc_word_pqueue
+        return (unsafe *__param_q).capacity
+
+    }
+
     pub mut fn pop() {
         let __param_self_: *mut stc_word_pqueue = self as *mut stc_word_pqueue
         if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
@@ -8719,6 +8375,13 @@ impl stc_word_pqueue {
         unsafe { (*__param_self_).erase_at((0 as i64)) }
 
         return __local_v
+
+    }
+
+    pub fn value_clone(__param_val: i64) -> i64 {
+        let __param_self_: *const stc_word_pqueue = self as *const stc_word_pqueue
+
+        return __param_val
 
     }
 
@@ -8767,7 +8430,7 @@ impl stc_word_queue {
 
     pub mut fn clear() {
         let __param_self_: *mut stc_word_queue = self as *mut stc_word_queue
-        var __local_i: stc_word_queue_iter = unsafe { stc_word_queue_begin((((&raw const (*__param_self_) as *const stc_word_queue) as *mut stc_word_queue) as *const stc_word_queue)) }
+        var __local_i: stc_word_queue_iter = unsafe { (*(((&raw const (*__param_self_) as *const stc_word_queue) as *mut stc_word_queue) as *const stc_word_queue)).begin() }
 
         while ((unsafe *(&raw const __local_i as *const stc_word_queue_iter)).ref != null) {
 
@@ -8809,7 +8472,7 @@ impl stc_word_queue {
 
     pub mut fn shrink_to_fit() {
         let __param_self_: *mut stc_word_queue = self as *mut stc_word_queue
-        var __local_sz: i64 = ((unsafe { stc_word_queue_size((__param_self_ as *const stc_word_queue)) } as i64))
+        var __local_sz: i64 = ((unsafe { (*(__param_self_ as *const stc_word_queue)).size() } as i64))
 
         var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
 
@@ -8840,6 +8503,31 @@ impl stc_word_queue {
 
     }
 
+    pub fn value_clone(__param_val: u64) -> u64 {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+
+        return __param_val
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        return ((((unsafe *__param_self_).end - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        return (unsafe *__param_self_).capmask
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        return (((((unsafe *__param_self_).start == (unsafe *__param_self_).end)) as bool))
+
+    }
+
     pub mut fn move_() -> stc_word_queue {
         let __param_self_: *mut stc_word_queue = self as *mut stc_word_queue
         var __local_m: stc_word_queue = (unsafe *__param_self_)
@@ -8867,7 +8555,7 @@ impl stc_word_queue {
 
     pub mut fn pop() {
         let __param_self_: *mut stc_word_queue = self as *mut stc_word_queue
-        if (((if not ((if not unsafe { stc_word_queue_is_empty((__param_self_ as *const stc_word_queue)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_queue)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_queue_pop".ptr, c"queue_prv.h".ptr, (133 as i32), c"!stc_word_queue_is_empty(self)".ptr)
         } else {
             0
@@ -8880,7 +8568,7 @@ impl stc_word_queue {
 
     pub mut fn pull() -> u64 {
         let __param_self_: *mut stc_word_queue = self as *mut stc_word_queue
-        if (((if not ((if not unsafe { stc_word_queue_is_empty((__param_self_ as *const stc_word_queue)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const stc_word_queue)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"stc_word_queue_pull".ptr, c"queue_prv.h".ptr, (139 as i32), c"!stc_word_queue_is_empty(self)".ptr)
         } else {
             0
@@ -8891,6 +8579,40 @@ impl stc_word_queue {
         ((unsafe *__param_self_).start = (((((__local_s + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
         return (unsafe (*__param_self_).cbuf[__local_s])
+
+    }
+
+    pub fn begin() -> stc_word_queue_iter {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        return ((stc_word_queue_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut u64) else: ((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize))), pos: (unsafe *__param_self_).start, _s: __param_self_ } as stc_word_queue_iter))
+
+    }
+
+    pub fn rbegin() -> stc_word_queue_iter {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        var __local_pos: i64 = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64))
+
+        return ((stc_word_queue_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut u64) else: ((unsafe *__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as stc_word_queue_iter))
+
+    }
+
+    pub fn end() -> stc_word_queue_iter {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+
+        return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
+
+    }
+
+    pub fn rend() -> stc_word_queue_iter {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+
+        return ((stc_word_queue_iter.zeroed() as stc_word_queue_iter))
+
+    }
+
+    pub fn index(__param_it_: stc_word_queue_iter) -> i64 {
+        let __param_self_: *const stc_word_queue = self as *const stc_word_queue
+        return ((((unsafe *(&raw const __param_it_ as *const stc_word_queue_iter)).pos - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
 
     }
 
@@ -8960,10 +8682,153 @@ impl stc_word_set {
 
     }
 
+    pub mut fn reserve(__param__cap: i64) -> bool {
+        let __param__self: *mut stc_word_set = self as *mut stc_word_set
+        var __local__newcap: i64 = (((if (if __param__cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param__self).size else: __param__cap) as i64))
+
+        var __local__newbucks: i64 = ((((((__local__newcap as f32) / i_max_load_factor) as i64) + 4) as i64))
+
+        (__local__newbucks = ((c_next_pow2(__local__newbucks) as i64)))
+
+        var __ci_expr_logic_0: i32
+
+        if ((if __local__newbucks == (unsafe *__param__self).bucket_count: 1 else: 0) != 0) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (if __param__cap <= (((((unsafe *__param__self).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0: 1 else: 0))
+        }
+
+        if (__ci_expr_logic_0 != 0) {
+            return ((true as bool))
+        }
+
+
+        var __local_map: stc_word_set = (unsafe *__param__self)
+
+        var __local_self_: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
+
+
+
+        (__local_map.table = (((with_alloc((((if 1 != 0: ((__local__newbucks * (sizeof[u64]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut u64)))
+
+        (__local_map.meta = (((with_alloc_zeroed((((if 1 != 0: ((__local__newbucks + 1) as i64) else: (-1 as i64)) as u64) as i64), (((if 1 != 0: (sizeof[hmap_meta]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut hmap_meta)))
+
+        (__local_map.bucket_count = __local__newbucks)
+
+        var __local_ok: bool = with 0 as __ci_expr_seq_26 {
+            var __ci_expr_logic_1: i32 = 0
+            if ((unsafe *(&raw const __local_map as *const stc_word_set)).table != null) {
+                (__ci_expr_logic_1 = (if (unsafe *(&raw const __local_map as *const stc_word_set)).meta != null: 1 else: 0))
+            }
+            (__ci_expr_logic_1 != 0)
+        }
+
+        if __local_ok {
+            ((unsafe __local_map.meta[__local__newbucks])).set_dist(((1023 as u16)))
+
+            var __local_d: *const u64 = (((unsafe *__param__self).table as *const u64))
+
+            var __local_m: *const hmap_meta = (((unsafe *__param__self).meta as *const hmap_meta))
+
+            var __local_i: i64 = ((0 as i64))
+
+            while ((if __local_i < (unsafe *__param__self).bucket_count: 1 else: 0) != 0) {
+                if ((if ((unsafe __local_m[__local_i])).dist() != 0: 1 else: 0) != 0) {
+                    var __local_r: u64 = (unsafe *__local_d)
+
+                    ((unsafe *(unsafe { stc_word_set_bucket_insert_(((&raw mut __local_map as *mut stc_word_set) as *const stc_word_set), ((&raw mut __local_r as *mut u64) as *const u64)) }.ref)) = (unsafe *__local_d))
+
+                }
+
+                (__local_i = __local_i + 1)
+
+                (__local_d = __local_d + 1)
+
+
+            }
+
+
+            loop {
+                var __local__xp: *mut stc_word_set = __param__self
+
+                var __local__yp: *mut stc_word_set = ((&raw mut __local_map as *mut stc_word_set))
+
+
+                var __local__tv: stc_word_set = (unsafe *__local__xp)
+
+                with_memcpy((&raw mut (unsafe *__local__xp) as *mut u8), (&raw const (unsafe *__local__yp) as *const u8), sizeof[stc_word_set]())
+
+                with_memcpy((&raw mut (unsafe *__local__yp) as *mut u8), (&raw const __local__tv as *const u8), sizeof[stc_word_set]())
+
+                if not ((0 != 0)) {
+                    break
+                }
+            }
+
+        }
+
+        with_free((((unsafe *(&raw const __local_map as *const stc_word_set)).meta as *mut c_void) as *mut u8))
+
+        with_free((((unsafe *(&raw const __local_map as *const stc_word_set)).table as *mut c_void) as *mut u8))
+
+        return __local_ok
+
+    }
+
+    pub fn max_load_factor() -> f32 {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+
+        return i_max_load_factor
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_map: *const stc_word_set = self as *const stc_word_set
+        return (((((unsafe *__param_map).bucket_count as f32) * i_max_load_factor) as i64))
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_map: *const stc_word_set = self as *const stc_word_set
+        return ((((not ((unsafe *__param_map).size != 0))) as bool))
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_map: *const stc_word_set = self as *const stc_word_set
+        return (unsafe *__param_map).size
+
+    }
+
+    pub fn bucket_count() -> i64 {
+        let __param_map: *mut stc_word_set = (self as *const stc_word_set) as *mut stc_word_set
+        return (unsafe *__param_map).bucket_count
+
+    }
+
+    pub fn contains(__param_rkey: u64) -> bool {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+        var __ci_expr_logic_0: i32 = 0
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__ci_expr_logic_0 = (if unsafe { stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)) }.ref != null: 1 else: 0))
+        }
+
+        return (((__ci_expr_logic_0 != 0) as bool))
+
+
+    }
+
+    pub mut fn shrink_to_fit() -> Unit {
+        let __param_self_: *mut stc_word_set = self as *mut stc_word_set
+        unsafe { (*__param_self_).reserve((9223372036854775807 as i64)) }
+
+    }
+
     pub mut fn insert_entry_(__param_rkey: u64) -> stc_word_set_result {
         let __param_self_: *mut stc_word_set = self as *mut stc_word_set
         if ((if (unsafe *__param_self_).size >= (((((unsafe *__param_self_).bucket_count as f32) * i_max_load_factor) as i64)): 1 else: 0) != 0) {
-            if ((if not unsafe { stc_word_set_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + 2) as i64)) }: 1 else: 0) != 0) {
+            if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 2) as i64)) }: 1 else: 0) != 0) {
                 return ((stc_word_set_result.zeroed() as stc_word_set_result))
             }
         }
@@ -8973,6 +8838,15 @@ impl stc_word_set {
         ((unsafe *__param_self_).size = (unsafe *__param_self_).size + ((unsafe *(&raw const __local_res as *const stc_word_set_result)).inserted as i32))
 
         return __local_res
+
+    }
+
+    pub fn value_clone(__param__val: u64) -> u64 {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+
+        ((unsafe *(&raw mut __param__val as *mut u64)) = (unsafe *(&raw mut __param__val as *mut u64)))
+
+        return __param__val
 
     }
 
@@ -9027,6 +8901,60 @@ impl stc_word_set {
         ((unsafe *((*(&raw const __local__res as *const stc_word_set_result)).ref)) = __param__val)
 
         return (unsafe *(&raw const __local__res as *const stc_word_set_result)).ref
+
+    }
+
+    pub fn begin() -> stc_word_set_iter {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+        var __local_it_: stc_word_set_iter = stc_word_set_iter { ref: (unsafe *__param_self_).table, _end: (unsafe *__param_self_).table, _mref: (unsafe *__param_self_).meta }
+
+        if ((if (unsafe *(&raw const __local_it_ as *const stc_word_set_iter)).ref == null: 1 else: 0) != 0) {
+            return __local_it_
+        }
+
+        (__local_it_._end = (unsafe *(&raw const __local_it_ as *const stc_word_set_iter))._end + (((unsafe *__param_self_).bucket_count as i64) as usize))
+
+        while ((if (unsafe *(*(&raw const __local_it_ as *const stc_word_set_iter))._mref).dist() == 0: 1 else: 0) != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const stc_word_set_iter)).ref + 1)
+
+            (__local_it_._mref = (unsafe *(&raw const __local_it_ as *const stc_word_set_iter))._mref + 1)
+
+        }
+
+        if ((if (unsafe *(&raw const __local_it_ as *const stc_word_set_iter)).ref == (unsafe *(&raw const __local_it_ as *const stc_word_set_iter))._end: 1 else: 0) != 0) {
+            (__local_it_.ref = ((null as *mut u64)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> stc_word_set_iter {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+
+        return ((stc_word_set_iter.zeroed() as stc_word_set_iter))
+
+    }
+
+    pub fn find(__param_rkey: u64) -> stc_word_set_iter {
+        let __param_self_: *const stc_word_set = self as *const stc_word_set
+        var __local_ref: *mut u64
+
+        var __ci_expr_logic_0: i32 = 0
+
+        if ((if (unsafe *__param_self_).size != 0: 1 else: 0) != 0) {
+            (__local_ref = unsafe { stc_word_set_bucket_lookup_(__param_self_, ((&raw mut __param_rkey as *mut u64) as *const u64)) }.ref)
+
+            (__ci_expr_logic_0 = (if (if __local_ref != null: 1 else: 0) != 0: 1 else: 0))
+
+        }
+
+        if (__ci_expr_logic_0 != 0) {
+            return ((stc_word_set_iter { ref: __local_ref, _end: ((&raw const (unsafe (*__param_self_).table[(*__param_self_).bucket_count]) as *const u64) as *mut u64), _mref: ((&raw const (unsafe (*__param_self_).meta[((((__local_ref as usize) -% ((*__param_self_).table as usize)) as i64) / (sizeof[u64]() as i64))]) as *const hmap_meta) as *mut hmap_meta) } as stc_word_set_iter))
+        }
+
+
+        return unsafe { (*__param_self_).end() }
 
     }
 
@@ -9107,6 +9035,12 @@ impl stc_word_stack {
 
     }
 
+    pub fn capacity() -> i64 {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        return (unsafe *__param_self_).capacity
+
+    }
+
     pub mut fn reserve(__param_cap: i64) -> bool {
         let __param_self_: *mut stc_word_stack = self as *mut stc_word_stack
         var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param_self_).size else: __param_cap) as i64))
@@ -9155,11 +9089,23 @@ impl stc_word_stack {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+
+    }
+
     pub mut fn append_uninit(__param_n: i64) -> *mut u64 {
         let __param_self_: *mut stc_word_stack = self as *mut stc_word_stack
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { stc_word_stack_capacity((__param_self_ as *const stc_word_stack)) }: 1 else: 0) != 0) {
+        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const stc_word_stack)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut u64))
             }
@@ -9179,7 +9125,7 @@ impl stc_word_stack {
 
     pub mut fn push(__param_val: u64) -> *mut u64 {
         let __param_self_: *mut stc_word_stack = self as *mut stc_word_stack
-        if ((if (unsafe *__param_self_).size == unsafe { stc_word_stack_capacity((__param_self_ as *const stc_word_stack)) }: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const stc_word_stack)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut u64))
             }
@@ -9225,6 +9171,68 @@ impl stc_word_stack {
 
         return (unsafe (*__param_self_).data[(*__param_self_).size])
 
+
+    }
+
+    pub fn value_clone(__param_val: u64) -> u64 {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+
+        return __param_val
+
+    }
+
+    pub fn begin() -> stc_word_stack_iter {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const stc_word_stack_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut u64)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> stc_word_stack_iter {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        var __local_it_: stc_word_stack_iter = stc_word_stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const stc_word_stack_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const stc_word_stack_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut u64)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> stc_word_stack_iter {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+
+        var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> stc_word_stack_iter {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+
+        var __local_it_: stc_word_stack_iter = stc_word_stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: stc_word_stack_iter) -> i64 {
+        let __param_self_: *const stc_word_stack = self as *const stc_word_stack
+        return (((((unsafe *(&raw const __param_it_ as *const stc_word_stack_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[u64]() as i64))
 
     }
 

@@ -44,7 +44,7 @@ impl[K: Key, V] UnorderedMap[K, V]:
     fn hasher() -> fn(*const u8) -> u64:
         p => hash_of(unsafe { &(*(p as *const StcSlot[K])).value })
 
-    pub fn len() -> isize: unsafe { stc_slot_set_size(&raw const self.set) } as isize
+    pub fn len() -> isize: self.set.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     fn find_entry(key: &K) -> *mut StcEntry[K, V]:
@@ -84,11 +84,11 @@ impl[K: Key, V] UnorderedMap[K, V]:
 
     /// Views of the entries, in no stated order (D44: traversal observes).
     pub fn iter() -> UnorderedMapIter[K, V]:
-        UnorderedMapIter { cursor: unsafe { stc_slot_set_begin(&raw const self.set) } }
+        UnorderedMapIter { cursor: self.set.begin() }
 
 impl[K, V] Drop for UnorderedMap[K, V]:
     move fn drop():
-        var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
+        var cursor = self.set.begin()
         while cursor.ref as i64 != 0:
             unsafe { stc_entry_release(unsafe { *cursor.ref } as *mut StcEntry[K, V]) }
             cursor.next()
