@@ -997,6 +997,8 @@ impl CCodegen:
             return "__with_global_0"
         let decl = self.global_decl_node(sym)
         if decl != 0 as NodeId and self.ast.kind(decl) == NodeKind.NK_EXTERN_VAR:
+            let link_sym = self.ast.state.extern_var_link_names.get(decl as i32) ?? 0
+            if link_sym != 0: return cc_intern_resolve(self.intern, link_sym)
             return cc_sanitize_ident(cc_intern_resolve(self.intern, sym))
         "__with_global_" ++ cc_sanitize_ident(cc_intern_resolve(self.intern, sym)) ++ f"__{sym}"
 

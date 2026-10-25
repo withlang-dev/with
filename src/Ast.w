@@ -769,6 +769,7 @@ type AstPoolState {
     call_named_args: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
+    extern_var_link_names: HashMap[i32, i32],  // NK_EXTERN_VAR node → @[link_name("sym")] symbol (#858)
     fn_target_arch: HashMap[i32, i32],   // fn_node → @[target("arch")] arch name sym
     unsafe_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_FN/EXTERN_FN node → 1 if `unsafe fn(...)`
     variadic_fn_type_nodes: HashMap[i32, i32],  // NK_TYPE_EXTERN_FN node → 1 if `extern "C" fn(A, ...)` (#1832)
@@ -935,6 +936,7 @@ fn AstPool.new -> AstPool:
             call_named_args: HashMap.new(),
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
+            extern_var_link_names: HashMap.new(),
             fn_target_arch: HashMap.new(),
             use_alias_map: HashMap.new(),
             namespace_bound_set: HashMap.new(),
