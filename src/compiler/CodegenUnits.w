@@ -35,13 +35,6 @@ fn codegen_units_env_count() -> i32:
     let n = parse(raw)
     if n < 1: 1 else: if n > 64: 64 else: n
 
-// The seed-bound copy of rt_core's SysInfo (see with_sysinfo there).
-type CodegenUnitsSysInfo {
-    cpu_cores: i32,
-    memory_total: i64,
-    page_size: i64,
-}
-
 // Partition compiler-sized inputs independently of the available workers.
 fn codegen_units_default_count(mir_body_count: i32) -> i32: codegen_units_count_for(mir_body_count)
 
@@ -53,10 +46,7 @@ fn codegen_units_emit_width(unit_count: i32, total_mir_cost: i64) -> i32:
     if raw.len() > 0:
         let n = parse(raw)
         return if n < 1: 1 else: if n > unit_count: unit_count else: n
-    // Seed-bound (rt_core with_sysinfo): the record form `with_system_info`
-    // once a seed carrying it is pinned; until then the bytes.
-    var info = CodegenUnitsSysInfo { cpu_cores: 1, memory_total: 0, page_size: 4096 }
-    with_sysinfo(&info as *mut u8)
+    let info = with_system_info()
     let mem_total = if info.memory_total > 0: info.memory_total else: 8 as i64 * 1024 * 1024 * 1024
     codegen_units_emit_width_for(unit_count, total_mir_cost, mem_total)
 

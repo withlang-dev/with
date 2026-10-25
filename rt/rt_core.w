@@ -5113,14 +5113,6 @@ pub fn with_system_info() -> SysInfo:
     rt_sysinfo(&info as *mut u8)
     info
 
-/// Seed-bound: the compiler's own modules are compiled by the pinned seed
-/// against the seed's runtime interface, which has `with_sysinfo` in this
-/// byte form and no `SysInfo`, so two of them (BuildGraphRuntime,
-/// CodegenUnits) still read the bytes through it. Delete it, and their
-/// record copies, once a seed carrying `with_system_info` is pinned.
-pub fn with_sysinfo(out: *mut u8) -> i32:
-    rt_sysinfo(out)
-
 // ── Async Scopes (structured concurrency) ──────────────────────────
 // Stable scope handle layout: [count: i32, capacity: i32, entries: *mut u8]
 // Async entry layout: [fiber_id: i32, pad: i32, result_buf: *mut u8]
