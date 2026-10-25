@@ -16,6 +16,7 @@ extern fn with_runtime_has_fibers() -> i32
 extern fn with_runtime_run_one_step() -> Unit
 extern fn with_runtime_current_cancel_requested() -> i32
 extern fn with_runtime_current_set_cancelled_return() -> Unit
+extern fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never
 
 let CHAN_INITIAL_CAPACITY: i32 = 16
 let DBG_ALLOC_ORIGIN_CHANNEL: i64 = 3
@@ -198,8 +199,11 @@ pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
             if channel_grow(ch_handle) != 0:
                 break
         channel_block_until_progress()
+        // #1000: outside a fiber, with no fiber left to receive, the wait
+        // §14.7 says suspends would never end. Returning dropped the value
+        // without a word; a deadlock says so.
         if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) >= chan_field_i32(ch_handle, CHAN_OFF_CAPACITY):
-            return
+            with_panic_ref("deadlock: send on a full channel, and no task is left that could receive from it", "", 0)
 
     if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
         return
@@ -224,8 +228,10 @@ pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
         if channel_wait_cut_short():
             return -1
         channel_block_until_progress()
+        // #1000: None means closed and drained (channels.md); an open, empty
+        // channel with no task left to send to it is a deadlock, not None.
         if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:
-            return -1
+            with_panic_ref("deadlock: recv on an empty, open channel, and no task is left that could send to it", "", 0)
 
     let elem_size = chan_field_i32(ch_handle, CHAN_OFF_ELEM_SIZE)
     let head = chan_field_i32(ch_handle, CHAN_OFF_HEAD)
