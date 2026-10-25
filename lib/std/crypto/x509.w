@@ -377,39 +377,6 @@ unsafe fn x509_verify_signature(
         )
 
     if sig_alg == SIG_ALG_ECDSA_SHA256 and issuer.key_type == KEY_TYPE_EC:
-        // ECDSA signature is DER-encoded SEQUENCE { INTEGER r, INTEGER s }
-        let sig_pos = cert.sig_start
-        let sig_end = cert.sig_start + cert.sig_len
-        var stag: u8 = 0u8
-        var scs: i32 = 0
-        var scl: i32 = 0
-        // Outer SEQUENCE
-        der_read_tl(cert_buf, sig_end, sig_pos, &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
-        if scs < 0 or stag != ASN1_SEQUENCE:
-            return 0
-        // r INTEGER
-        der_read_tl(cert_buf, sig_end, scs, &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
-        if scs < 0 or stag != ASN1_INTEGER:
-            return 0
-        var r_start = scs
-        var r_len = scl
-        // Skip leading zero
-        if r_len > 0 and *(cert_buf + r_start as u64) == 0x00u8:
-            r_start = r_start + 1
-            r_len = r_len - 1
-        // Pad to 32 bytes
-        var r_bytes: [u8; 32] = [0u8; 32]
-        var ri = 0
-        while ri < r_len and ri < 32:
-            r_bytes[32 - r_len + ri] = *(cert_buf + (r_start + ri) as u64)
-            ri = ri + 1
-
-        // s INTEGER
-        der_read_tl(cert_buf, sig_end, scs + scl - (scs - r_start - 1), &raw mut stag as *mut u8, &raw mut scs as *mut i32, &raw mut scl as *mut i32)
-        // Hmm, need to track position properly. Let me use the end of r.
-        let r_der_end = r_start + r_len
-        // Actually, r had a leading zero stripped. Go back to original position.
-        // This is getting complicated. Let me re-parse from scratch.
         return ecdsa_verify_der_sig(cert_buf, cert, issuer_buf, issuer, &tbs_hash[0] as *const u8)
 
     0
@@ -444,6 +411,10 @@ unsafe fn ecdsa_verify_der_sig(
     if r_len > 0 and *(cert_buf + r_start as u64) == 0x00u8:
         r_start = r_start + 1
         r_len = r_len - 1
+    // #1057: a P-256 scalar is at most 32 bytes once its sign byte is
+    // stripped; a longer INTEGER is not a signature (it indexed below 0).
+    if r_len > 32:
+        return 0
     var r_bytes: [u8; 32] = [0u8; 32]
     let r_off = 32 - r_len
     var ri = 0
@@ -462,6 +433,8 @@ unsafe fn ecdsa_verify_der_sig(
     if s_len > 0 and *(cert_buf + s_start as u64) == 0x00u8:
         s_start = s_start + 1
         s_len = s_len - 1
+    if s_len > 32:
+        return 0
     var s_bytes: [u8; 32] = [0u8; 32]
     let s_off = 32 - s_len
     var si = 0
