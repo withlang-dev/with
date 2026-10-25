@@ -4902,14 +4902,16 @@ fn run_test_process(bin_path: &str, test_name: &str, quiet: bool) -> TestRunResu
         argv = wasm_program_exec_argv(bin_path)
     else:
         argv = build_graph_argv_append(argv, bin_path)
-    let rc = with_exec_argv_capture(argv, out_path, err_path, 120000)
+    let rc = with_exec_argv_capture(argv, out_path, err_path, TEST_HANG_GUARD_MS)
     if test_name.len() > 0:
         let _restore_filter = build_graph_rt_setenv("WITH_TEST_FILTER", old_filter)
     if quiet:
         let _restore_short = build_graph_rt_setenv("WITH_TEST_SHORT", old_short)
     let _restore_compiler = build_graph_rt_setenv("WITH_TEST_COMPILER", old_compiler)
     let out_text = with_fs_read_file(out_path)
-    let err_text = with_fs_read_file(err_path)
+    // 124 is the capture's verdict that it stopped the binary: say so, not
+    // an exit code the test never returned.
+    let err_text = with_fs_read_file(err_path) ++ (if rc == 124: f"error: the test was still running after {TEST_HANG_GUARD_MS / 60000} minutes, so the hang guard stopped it\n" else: "")
     let _cleanup_stdout = build_graph_rt_remove_file(out_path)
     let _cleanup_stderr = build_graph_rt_remove_file(err_path)
     if not quiet:

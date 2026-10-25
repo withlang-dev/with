@@ -6,6 +6,12 @@ use BuildGraphRuntime
 use compiler.Runtime
 use rt.rt_core
 
+// #2362: how long `with test` lets one test binary run before it stops it.
+// A hang guard, not a speed budget (#2371): a passing test on a slow host
+// (WIPE's 16-seed simulation took 160 s on a Steam Deck) was killed at a
+// fixed 120 s and reported as a failure. Thirty minutes, as a build
+// target's own ceiling.
+const TEST_HANG_GUARD_MS: i32 = 1800000
 
 fn build_graph_output_path(root: &str, target: &BuildGraphTarget, output_path: &str, target_count: i32) -> str:
     if output_path.len() > 0:
