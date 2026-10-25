@@ -1,0 +1,165 @@
+# Migrator contracts: safe signatures where a migrated function's body proves them (D159)
+
+Status: PLAN (2026-10-24), derivative of D159 (`docs/meetings/2026-10-24-D159-*.md`,
+ruled and amended by Eric the same day). This plan cannot amend the ruling;
+where they disagree the ruling wins. Campaign issue: #2615.
+
+## The ruling, restated as work
+
+Every migrated function is emitted `pub unsafe fn` today when a raw pointer
+crosses it (`ci_migrate_fn_is_unsafe_to_call`). D159 lets the migrator emit a
+safe signature where the function's own body proves the contract, with
+exactly these inferences, each one D51-safe (a wrong inference can at worst
+reject a valid program):
+
+| | Proof from the body | Spelling in the output |
+|---|---|---|
+| (a1) | the first parameter is a pointer to a corpus record (the engine handle) and the body mutates through it, directly or through a corpus callee proven to | a `mut self` receiver method on that record (the presentation Eric named) |
+| (a2) | a later pointer parameter the body writes through on **every** returning path, the function returning `void` or a status, the written record plain data | the parameter removed and returned: `T`, or `(status, T)` |
+| (b) | a pointer argument the body stores into the engine's storage **and** a destroyer in the same corpus frees it along that path | an owned parameter (`T`, transfer) |
+| (c) | a returned pointer the body derives from a parameter | `-> &T from <param>` (a view with that parameter's origin) |
+
+Anything short of the proof keeps `pub unsafe fn`, and the generated comment
+names the unproved point: "out-parameter written conditionally", "stored,
+ownership unknown", "mutated through a second pointer", "passed to
+`<callee>`, which no unit defines". A read-only first pointer parameter is
+not in the ruling's list and stays as it is (a raw pointer, `unsafe fn`):
+proving "never mutates" needs the same transitive walk as (a1), and the
+ruling did not grant it; it can be a follow-up ruling once (a1) is in.
+
+Two conditions attached to the ruling shape the design:
+
+1. **(b) needs both halves.** Store alone is "stored, ownership unknown".
+   TommyDS's intrusive links and user-data pointers are stored and not owned.
+2. **Body-derived facts need a visible record.** The inferred contracts are
+   an artifact of their own; the drift lane diffs them, and a change is red
+   until a human has looked (the §3.4 origin-inference lesson).
+
+## What exists
+
+The evidence is already computed, for `with get`'s facades-by-evidence
+(D121): `CiMigrate.record_fn_evidence` runs `ci_body_ownership_evidence`
+(`src/CImport.w`) over each definition's C AST and records per function
+`ret:<source>`, `localsrc:`, `localstore:`, `localsink:<local>:<callee>:<i>`,
+`paramstore:<i>` lines plus `param_sinks` (`field;`, `global;`,
+`<callee>:<i>;`); `CiFacadeDraft.resolve_ownership` turns them into retain
+and destroy verdicts with reasons (`fd_retain_reason`, `fd_destroy_reason`,
+`fd_propagate_destruction`, `fd_destroyers_of`). The §21.1 `writes` clause
+shows the shape of a whole-corpus post-print pass: `ci_migrate_writes_mark`
+places a marker in each emitted signature and `ci_migrate_apply_writes_clauses`
+replaces it once every unit is printed, with a transitive fixpoint over
+corpus callees. The libclang bridge (`src/compiler/ClangBridge.w`) gives the
+walk `with_ci_child`, `with_ci_cursor_kind`, `with_ci_cursor_references_parameter`,
+`with_ci_cursor_type`, `with_ci_binary_op`, `with_ci_unary_op`.
+
+D159 is that evidence applied to the corpus's own signatures.
+
+## Steps
+
+**Step 1 — the contracts artifact, no signature change.** A pass after the
+scan (`CiMigrateProject`, where `record_fn_evidence` has run for every
+definition) computes one verdict per function parameter and return:
+
+- `receiver mut` (a1): parameter 0 is `*mut R` with `R` a record the corpus
+  defines, and the body assigns through it (`ci_body_assigns_to`-class
+  facts on `(*p).f`, `p->f`, `*p`) or passes `p` to a corpus callee whose
+  verdict is `receiver mut` at that position (fixpoint, as the writes
+  clause does).
+- `out <i> <T>` (a2): parameter `i > 0` is `*mut T`, every `return`
+  statement's path writes `*p` before it (a dominance walk over the body:
+  the write is in every path from entry to each return; a write under a
+  condition the return does not share is "conditional"), nothing reads `*p`
+  before the first write on that path, and `T` is plain data (no pointer
+  field; the record's copy class is a bit-copy). The function returns
+  `void` or an integer status.
+- `owned <i>` (b): `paramstore:i` or a `field;` sink **and** a destroyer in
+  the corpus (`fd_destroyers_of` the record the field belongs to, or a
+  corpus function whose body frees that field) frees what was stored;
+  otherwise `stored-unknown <i>`.
+- `ret from <i>` (c): the `ret:` source is `param:i` or a local whose
+  source is `param:i` (`fd_local_alias_param`), and the return type is a
+  pointer.
+- `unproved: <reason>` otherwise, per parameter.
+
+`with migrate --emit-contracts <path>` writes them as TSV, one line per
+function, sorted: `name<TAB>verdict[,verdict…]`, verdicts with their reasons.
+The corpus pipeline writes it as `<corpus>/contracts.tsv` beside
+`corpus.stamp` at promotion, and `wo-drift` diffs it: any changed line is
+red with the diff printed. Basic tests (`build/selfhost.w`,
+`bs_check_migrate_contracts_*`) cover each verdict and each refusal with a
+small C fixture: a handle mutated directly, mutated only through a callee,
+read-only; an out-parameter written on every path, written under a status
+guard, partially filled, holding a pointer; a stored pointer with and
+without a corpus destroyer; a returned parameter, a returned local alias of
+a parameter, a returned allocation. Gate: `c-migrator-basic-tests` green;
+every promoted corpus produces a `contracts.tsv` in a fresh migration
+(`corpus-migrator-gate`) that the test prints and checks for the known
+STC/M*LIB/TommyDS shapes (`stc_slot_stack_push` → `receiver mut, owned 1`
+once (b) proves the destroyer; `tommy_list_insert_tail` → `stored-unknown`).
+
+**Step 2 — emission.** With the artifact green and reviewed, the printer
+reads the verdicts:
+
+- (a1): the function is emitted as `pub mut fn <method>(…)` inside an
+  `impl <Record>:` block the unit prints per record (grouped at the end of
+  the unit, sorted by name); the method name is the C name with the
+  record's prefix removed when the C name starts with it (`stc_slot_stack_push`
+  on `stc_slot_stack` → `push`), the whole C name otherwise. Its body's
+  references to parameter 0 become `self`. Call sites inside the corpus
+  (`f(p, …)`) are printed as `(*p).method(…)` / `p.method(…)`; the migrated
+  tests and the drift harness compile unchanged in meaning.
+- (a2): the parameter is removed; the body's writes to `*p` write a local
+  the function returns (`T`, or `(status, T)` when the C function returned
+  a status); the result record is bit-copied out.
+- (b): the parameter type is the pointee's owned With type; the body moves
+  it where C stored the pointer.
+- (c): `-> &T from <param>`; the body's return of a raw pointer becomes the
+  view.
+- Every other parameter stays as it was; a function with any unproved
+  pointer parameter stays `pub unsafe fn`, and the generated comment above
+  it names the unproved point.
+
+A function proved on every pointer it takes is `pub fn`. The bundle
+interface (`rt.wi`-style `.wi`) carries the new signatures; a facade calling
+a proved function needs no `unsafe`. Basic tests check the emitted text and
+`check` it; the corpus drift harness (`stc`'s `examples/strings/replace.c`,
+TommyDS's `check.c`, M*LIB's multimap example) runs with the new shapes.
+
+**Step 3 — generation bump and the first re-promotion.** The migrator
+generation (`--generation`, D112) moves; the promote guard's trigger is
+`migrator-pin:#2615` for a corpus that re-promotes to take contracts. Under
+D112 no promoted corpus is touched for the bump itself. The STC corpus is
+the first to re-promote (the facades it feeds are the hot path the ruling
+named): `lib/std/collections/{stack,queue,linked_list,deque,priority_queue,
+ordered_set,ordered_map,unordered_set,unordered_map,bit_set}.w` and
+`std.algorithms` call the proved methods without `unsafe`; the ceremony
+census records the fall. The `unsafe` left in a facade is the slot-lifetime
+step that crosses an ownership boundary the engine never sees.
+
+**Step 4 — the contract diff is a gate.** `wo-drift` red on a changed
+`contracts.tsv` until a human marks the new contracts reviewed (the promote
+rewrites the file; the lane compares the promoted file against the fresh
+migration's, exactly as it compares the modules).
+
+## What is deliberately not inferred
+
+- A read-only first pointer (no `&self` receiver): not in the ruling.
+- A second pointer the body reads and writes in place, an input/output
+  pointer, an array the body mutates: unproved (the ruling's "everything
+  else").
+- Ownership from a name (`_free`, `_destroy`): never (D51); only a body that
+  frees proves destruction.
+- A callee no unit defines (libc beyond the observer list, another corpus):
+  the proof stops there and the parameter is unproved with the callee named.
+- Anything in a `c_import` facade: D51/D121 own that path; this plan is the
+  migrated corpus's own signatures only.
+
+## Done means
+
+The contracts artifact exists for every corpus and the drift lane diffs it;
+each inference and refusal has a basic test; the STC corpus re-promoted
+under the new generation compiles its facades without engine-call `unsafe`
+and every facade fixture, complexity row, drop-audit cell and benchmark
+row is unchanged in verdict; the ceremony census's `unsafe` counts in
+`lib/std/collections` fall and the fall is recorded in this plan; #2615
+closes with that evidence.
