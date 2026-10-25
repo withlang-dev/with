@@ -12157,6 +12157,10 @@ impl MirBuilder:
 
         let scrutinee_ty = self.expr_type(scrutinee_expr)
         let observed_place = self.observed_pattern_subject_place(node, scrutinee_expr)
+        // The marks the subject's resets and then each arm's are flushed from.
+        let pending_reset_start = self.pending_reset_locals.len() as i32
+        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
+        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
         var scrutinee_place = observed_place
         if observed_place < 0:
             let saved_scrutinee_expected = self.expected_type
@@ -12167,6 +12171,13 @@ impl MirBuilder:
             let scrutinee_op = self.lower_expr(scrutinee_expr)
             self.expected_type = saved_scrutinee_expected
             scrutinee_place = self.materialize_operand(scrutinee_op, scrutinee_ty, self.ast.get_start(scrutinee_expr))
+            // #2561: the subject's move happened here, on every path, before
+            // any arm. Blank what it vacated now: flushed at the end of the
+            // match statement, the reset of `match move self.list` ran after
+            // an arm's `self.list = rest` and erased it, so a cursor yielded
+            // its first element and leaked the rest. The flush truncates the
+            // queues back to the marks, which the arms then start from.
+            self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
 
         let result_ty = self.expr_type(node)
         let result_is_void = if want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32: 1 else: 0
@@ -12196,9 +12207,6 @@ impl MirBuilder:
         let match_entry_bb = self.cur_bb as i32
         let branch_drop_depth = self.drop_local_ids.len()
         let branch_move_state = self.save_move_state()
-        let pending_reset_start = self.pending_reset_locals.len() as i32
-        let pending_reset_field_start = self.pending_reset_field_places.len() as i32
-        let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
 
         var dispatch_bb = self.cur_bb
         for ai in 0..arms_count:
