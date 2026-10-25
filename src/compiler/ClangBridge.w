@@ -1370,9 +1370,14 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         if i > 0:
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, ", \0" as *const u8)
         let arg_type = clang_getArgType(fn_type, i as u32)
-        var arg_str = translate_parameter_type(s, arg_type, depth + 1)
-        if arg_str as i64 == 0 or c_strncmp(arg_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
-            arg_str = session_strdup(s, "i32\0" as *const u8)
+        let arg_str = translate_parameter_type(s, arg_type, depth + 1)
+        // #1024: a parameter c_import cannot translate makes the function
+        // type untranslatable, as an element does an array's; an `i32` in
+        // its place was a wrong ABI with no word.
+        if arg_str as i64 == 0:
+            return session_strdup(s, "__UNSUPPORTED:a function type's parameter type\0" as *const u8)
+        if c_strncmp(arg_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
+            return arg_str
         buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, arg_str as *const u8)
         i = i + 1
     if is_variadic != 0:
@@ -1381,7 +1386,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
         else:
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, "...\0" as *const u8)
     if c_strncmp(ret_str as *const u8, "__UNSUPPORTED:\0" as *const u8, 14) == 0:
-        ret_str = session_strdup(s, "i32\0" as *const u8)
+        return ret_str
     var buf: [8192]u8 = [0 as u8; 8192]
     var bpos: i64 = 0
     buf_append_str(&raw mut buf as *mut [8192]u8 as *mut u8, &raw mut bpos, 8192, "extern \"C\" fn(\0" as *const u8)
