@@ -63,6 +63,25 @@ pub type Captures {
     spans: List[i32],
 }
 
+// #980: a compiled `g` regex keeps the position `=~` resumes from in a
+// block of its own, as a literal keeps it in the globals codegen emits for
+// it (gen_regex_literal_value); with none, `while text =~ re` returned the
+// first match forever. Three words: position, subject data, subject length
+// (-1: no subject yet). Only an owned regex has one, and its Drop frees it.
+fn regex_attach_global_state(r: Regex) -> Regex:
+    if not r.is_global():
+        return r
+    let block = with_alloc(24) as *mut i64
+    unsafe:
+        *block = 0
+        *((block as i64 + 8) as *mut i64) = 0
+        *((block as i64 + 16) as *mut i64) = -1
+    var out = r
+    out.global_pos = block as *mut i32
+    out.global_subject_ptr = (block as i64 + 8) as *mut i64
+    out.global_subject_len = (block as i64 + 16) as *mut i64
+    out
+
 fn regex_make_flags(options: i32, flags: i32) -> RegexFlags:
     RegexFlags { options: options, flags: flags, }
 
@@ -292,7 +311,7 @@ fn regex_compile_flags(flags: &str) -> Result[RegexFlags, RegexError]:
 
 impl Regex:
     pub fn clone() -> Self:
-        Regex {
+        regex_attach_global_state(Regex {
             ptr: unsafe { regex_copy_code(self.ptr, "Regex.clone") },
             pattern_text: with_str_clone_ref(self.pattern_text),
             flags_text: with_str_clone_ref(self.flags_text),
@@ -303,7 +322,7 @@ impl Regex:
             global_pos: null,
             global_subject_ptr: null,
             global_subject_len: null,
-        }
+        })
 
     pub fn is_global() -> bool:
         (self.flags & REGEX_FLAG_GLOBAL) != 0
@@ -312,6 +331,8 @@ impl Drop for Regex:
     move fn drop():
         if self.owned != 0 and self.ptr != null:
             unsafe { pcre2_code_free_8(self.ptr as *mut pcre2_real_code_8) }
+        if self.owned != 0 and self.global_pos != null:
+            with_free(self.global_pos as *mut u8)
 
 impl Drop for Captures:
     move fn drop():
@@ -332,7 +353,7 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
                     offset: err_offset,
                     message: regex_error_message(err_code),
                 })
-            Ok(Regex {
+            Ok(regex_attach_global_state(Regex {
                 ptr: compiled,
                 pattern_text: pattern,
                 flags_text: flags,
@@ -343,7 +364,7 @@ pub fn Regex.compile_flags(pattern: str, flags: str) -> Result[Regex, RegexError
                 global_pos: null,
                 global_subject_ptr: null,
                 global_subject_len: null,
-            })
+            }))
         }
         Err(err) => Err(err)
 
