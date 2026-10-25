@@ -1137,7 +1137,11 @@ impl CiProject:
                 let rname = with_cimport_decl_name(session, i)
                 let rcursor = with_cimport_decl_cursor(session, i)
                 let rloc = if rcursor >= 0: with_ci_cursor_location(session, rcursor) else: ""
-                if rname.len() > 0 and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
+                // A typedef that renames a record is an alias, not a record:
+                // its `impl` would attach to no type.
+                let underlying = if decl_kind == CK_TYPEDEF: ci_trim(with_cimport_typedef_underlying_translated(session, i)) else: ""
+                let alias = underlying.len() > 0 and ci_is_c_ident(underlying) and underlying != rname
+                if rname.len() > 0 and not alias and not ci_is_system_decl(rname) and not (rloc.len() > 0 and ci_is_system_path(rloc)):
                     self.records.insert(ci_escape_reserved(rname), true)
             if decl_kind == CK_VAR:
                 let name = with_cimport_decl_name(session, i)
@@ -1209,6 +1213,7 @@ impl CiProject:
                     if cursor >= 0 and with_ci_cursor_is_definition(session, cursor) != 0:
                         self.record_call_evidence(session, cursor, name)
                         let static_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
+                        self.symbols[static_symbol].static_definition = 1
                         if self.symbols[static_symbol].has_definition == 0:
                             self.record_fn_evidence(session, i, cursor, static_symbol)
                     // A `static inline` function DEFINED in a header is the
@@ -1226,9 +1231,11 @@ impl CiProject:
                     if header_owner < 0 and header_inline_definition:
                         let definer_symbol = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[definer_symbol].add_header_definer(module_id)
+                        self.symbols[definer_symbol].static_definition = 1
                     if header_owner >= 0:
                         let symbol_id = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, name)
                         self.symbols[symbol_id].add_consumer(module_id)
+                        self.symbols[symbol_id].static_definition = 1
                         self.symbols[symbol_id].owner_module = header_owner
                         self.symbols[symbol_id].owner_rank = 1
                         self.symbols[symbol_id].owner_definition_kind = 1
@@ -1769,10 +1776,14 @@ impl CiProject:
         for pi in 0..count:
             let ptype = with_cimport_fn_param_type_translated(session, decl_idx, pi)
             self.symbols[symbol_id].param_ty[pi] = ci_ir_owned_text(ptype)
-            if not ci_type_text_is_fn_ptr(ptype): continue
-            self.symbols[symbol_id].param_fn_ptr[pi] = 1
+            // D159 step 2: the first pointer's NULL test too — a handle the
+            // body accepts as NULL (`if (ctx == NULL) return ERR`) is no
+            // receiver.
+            let first_pointer = pi == 0 and ci_migrate_type_is_raw_pointer(ptype)
+            if not ci_type_text_is_fn_ptr(ptype) and not first_pointer: continue
+            if ci_type_text_is_fn_ptr(ptype): self.symbols[symbol_id].param_fn_ptr[pi] = 1
             if names[pi].len() == 0:
-                self.symbols[symbol_id].unanalyzable = 1
+                if not first_pointer: self.symbols[symbol_id].unanalyzable = 1
                 continue
             let test = ci_body_null_test_evidence(session, cursor, names[pi])
             if test == 1: self.symbols[symbol_id].param_tested[pi] = 1

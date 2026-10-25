@@ -150,6 +150,13 @@ impl CiProject:
             let record = ct_record_pointee(ty)
             let mutates = pi < self.symbols[si].param_mutates.len() and self.symbols[si].param_mutates[pi] != 0
             if pi == 0 and record.len() > 0 and mutates:
+                // A handle the body accepts as NULL, or a corpus caller
+                // passes NULL (D107's evidence), is a nullable argument, not
+                // a receiver: a method's `self` is never NULL.
+                let nullable = (pi < self.symbols[si].param_tested.len() and self.symbols[si].param_tested[pi] != 0) or (pi < self.symbols[si].param_null_caller.len() and self.symbols[si].param_null_caller[pi].len() > 0)
+                if nullable:
+                    out.push(f"unproved:{pi}:NULL is an accepted argument")
+                    continue
                 out.push("receiver-mut:" ++ record)
                 // (c) beside (a1): the receiver is also what is returned.
                 if self.symbols[si].borrow_from == 0 and not self.ct_returns_null(si): out.push("ret-from:0")
@@ -214,7 +221,7 @@ impl CiProject:
     // "" for the raw signature (the module comment above).
     fn ct_method_shape(si: i32) -> str:
         let contract = self.symbols[si].contract
-        if self.symbols[si].variadic != 0 or contract == "plain" or contract == "unanalyzable": return ""
+        if self.symbols[si].variadic != 0 or self.symbols[si].static_definition != 0 or contract == "plain" or contract == "unanalyzable": return ""
         var record = ""
         var out = -1
         var out_ty = ""

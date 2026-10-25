@@ -11822,7 +11822,9 @@ impl CiExprPool:
             idx_value = self.cast_pointer_index_expr(session, idx_cursor, idx_value, types)
             if idx_value == 0:
                 return 0
-            return self.binary(CiBinOp.CIBO_ADD, ptr_value, idx_value, 0)
+            // The sum is a pointer: a field read through it is a raw access
+            // (the printer supplies the `unsafe` a safe body needs).
+            return self.binary(CiBinOp.CIBO_ADD, ptr_value, idx_value, if result_ty != 0 and types.kind(result_ty) == CiTypeKind.CT_POINTER: result_ty else: 0)
 
         if op == BO_SUB and (lhs_is_ptr or lhs_is_array):
             var lhs_ptr_value = self.decay_array_value_expr(session, lhs_cursor, lhs_id, types.type_from_libclang(session, with_ci_cursor_type(session, lhs_cursor)), types)

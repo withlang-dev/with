@@ -1022,6 +1022,9 @@ type CiProjectSymbol {
     method_out: i32,
     method_out_ty: str,
     method_view: i32,
+    // 1 when the definition is `static` (a unit's own, or a header's inline
+    // one): it keeps its raw signature, as the printer keeps every static.
+    static_definition: i32,
 }
 // #747: str field — owned, non-Copy now; moves/clones spell intent.
 
@@ -1069,6 +1072,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         method_out: -1,
         method_out_ty: "",
         method_view: 0,
+        static_definition: 0,
     }
 
 fn ci_pipe_i32_contains(items: &str, want: i32) -> bool:
