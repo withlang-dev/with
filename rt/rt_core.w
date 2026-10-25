@@ -2855,8 +2855,10 @@ pub fn with_str_len(s: &str) -> i64:
 
 fn str_byte_at_ref(s: &str, idx: i64) -> i32:
     let slen = str_length(s)
+    // #996 (D71): a position outside the string panics, as a List's does;
+    // 0 was an in-band answer (a NUL byte) to an out-of-range read.
     if idx < 0 or idx >= slen:
-        return 0
+        with_panic_ref("str.byte_at index out of bounds", "", 0)
     let p = str_data(s)
     (unsafe p[idx]) as i32
 
@@ -5091,6 +5093,7 @@ pub fn with_system_info() -> SysInfo:
 // Stable scope handle layout: [count: i32, capacity: i32, entries: *mut u8]
 // Async entry layout: [fiber_id: i32, pad: i32, result_buf: *mut u8]
 
+extern fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never
 extern fn with_fiber_await(fiber_id: i32) -> Unit
 extern fn with_fiber_cleanup_await(fiber_id: i32) -> Unit
 extern fn with_fiber_cancel(fiber_id: i32) -> i32
