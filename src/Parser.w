@@ -9504,12 +9504,28 @@ impl Parser:
             var pk = self.pos
             while pk < self.tokens.len() and self.tokens.get_tag(pk) == TokenKind.TK_NEWLINE:
                 pk = pk + 1
+            var written_mode: i32 = 1
             if pk < self.tokens.len() and (self.tokens.get_tag(pk) == TokenKind.TK_KW_MUT or self.tokens.get_tag(pk) == TokenKind.TK_KW_MOVE):
+                written_mode = if self.tokens.get_tag(pk) == TokenKind.TK_KW_MUT: 2 else: 3
                 pk = pk + 1
             var has_explicit_self = false
             if pk < self.tokens.len() and self.tokens.get_tag(pk) == TokenKind.TK_IDENT:
                 if self.source.slice(self.tokens.get_start(pk) as i64, self.tokens.get_end(pk) as i64) == "self":
                     has_explicit_self = true
+            // #897: a written `self` with no type beside a receiver keyword
+            // (`mut fn take_it(mut self)`) is the keyword's receiver, not the
+            // transition form `mut self: Self`; parsed as a parameter it had
+            // no type and MIR assigned the field move to an untyped place
+            // ("use rvalue type is incompatible with assign destination").
+            if has_explicit_self and (pk + 1 >= self.tokens.len() or self.tokens.get_tag(pk + 1) != TokenKind.TK_COLON):
+                has_explicit_self = false
+                if written_mode != self.pending_receiver_mode:
+                    self.emit_error_span("this receiver's mode is not the method keyword's; the keyword decides the receiver (D7): `fn` reads it, `mut fn` mutates it in place, `move fn` consumes it", self.tokens.get_start(pk), self.tokens.get_end(pk))
+                self.pos = pk + 1
+                self.skip_newlines()
+                if self.peek() == TokenKind.TK_COMMA:
+                    self.advance()
+                    self.skip_newlines()
             if has_explicit_self:
                 self.pending_receiver_mode = 0
             else:
