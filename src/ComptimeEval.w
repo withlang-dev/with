@@ -22,17 +22,18 @@ use TargetSpec
 use SemaTypes
 use compiler.Compilation.Config
 use rt.rt_core
+use std.libc.strerror
+use std.libc.strtod
+use rt.platform
 use rt.compat_runtime
 
-extern fn strerror(errnum: i32) -> *mut c_char
-extern fn strtod(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
 
 // #1668: the value of a float literal's text, rounded once the way the
 // backend rounds it (strtod is correctly rounded), so a comptime result
 // agrees with the same arithmetic at run time.
 fn comptime_parse_float(text: &str) -> f64:
     match float_literal_value_text(text).to_cstring():
-        Ok(c) => unsafe { strtod(c.as_cstr().ptr(), 0 as *mut *mut c_char) }
+        Ok(c) => strtod(c.as_cstr().ptr(), 0 as *mut *mut c_char)
         Err(_) => 0.0
 
 // D125 (§4.2.6): a float to an integer of `bits` truncates toward zero,
@@ -56,10 +57,6 @@ fn comptime_float_of(value: &ComptimeValue) -> f64:
     if value.kind == ComptimeValueKind.CV_FLOAT:
         return value.real
     value.data0 as f64
-extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
-extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
-extern fn rt_close(fd: i32) -> i32
-extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
 
 const COMPTIME_RECURSION_LIMIT: i32 = 256
 const COMPTIME_STEP_LIMIT: i32 = 50000
@@ -546,8 +543,7 @@ fn comptime_tool_path_is_parent_of(parent: &str, child: &str) -> bool:
 // The C library's text for an OS error number, in std.fs.IoError's shape:
 // `No such file or directory (os error 2)`.
 fn comptime_os_error_message(code: i32) -> str:
-    let text = unsafe { strerror(code) }
-    with_str_from_cstr(text) ++ f" (os error {code})"
+    with_str_from_cstr(strerror(code)) ++ f" (os error {code})"
 
 fn comptime_tool_split_nonempty_lines(text: &str) -> List[str]:
     let lines: List[str] = List.new()

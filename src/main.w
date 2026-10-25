@@ -59,9 +59,9 @@ use compiler.ConanClient
 use compiler.LockFile
 use std.string.StringBuilder
 use rt.rt_core
+use std.libc.exit
 use rt.compat_runtime
 
-extern fn exit(code: i32) -> Unit
 
 enum PreludeMode: i32:
     FullMode = 0
@@ -392,7 +392,6 @@ fn cli_prelude_mode(argc: i32) -> i32:
             else:
                 with_eprint("error: invalid --prelude value '" ++ value ++ "' (expected full|alloc|core|none)")
                 exit(1)
-                return PreludeMode.FullMode
         i = i + 1
     mode
 

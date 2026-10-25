@@ -451,10 +451,19 @@ compiler: `use rt.*` from a program is refused ("a program reaches it
 through std"). A new `extern fn with_*` in `lib/std` is a regression. A
 runtime function is safe by its declaration: an `unsafe` block whose only
 content is a call of one is vacuous and refused (R4c). The compiler's own
-`src/` modules still declare their runtime externs (agreeing duplicates of
-the interface): they become `use rt.*` once a seed carrying the step-4
-resolver rule is pinned, since the pinned seed refuses that import from
-`src/`.
+`src/` modules reach the runtime the same way (`use rt.rt_core`, and by
+role `use rt.platform`) and libc through `std.libc`; a new `extern fn` in
+`src/` is a regression unless it names a C symbol of our own bridge objects
+(the `wl_*`/`clang_*` LLVM and Clang bridges, the tool `main`s), never a
+runtime or libc function: an agreeing duplicate is a second declaration of
+one fact, and the one that disagreed (`exit` typed as returning) hid dead
+code (2026-10-25 sweep). A runtime fact crosses the seam typed:
+`with_system_info() -> SysInfo`, never a byte pointer with a layout comment.
+One constraint shapes the order of such changes: `src/` is compiled by the
+pinned seed against the seed's runtime interface and linked with the seed's
+runtime, so a new runtime API reaches `src/` only after a seed carrying it is
+pinned (`with_sysinfo`'s byte form stays, marked seed-bound, until then);
+`lib/std` is compiled by the tree's compiler and uses it at once.
 
 ---
 

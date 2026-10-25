@@ -23,7 +23,6 @@ type BlockId = distinct i32
 impl Copy for BlockId
 impl Copy for TermKind
 
-extern fn str_from_byte(b: i32) -> str
 
 fn lbrace -> str:
     str_from_byte(123)

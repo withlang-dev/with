@@ -5101,7 +5101,23 @@ pub fn with_sysinfo_hostname() -> str:
     buf[255] = 0
     with_str_from_cstr(buf_ptr as *const c_char)
 
-// rt_sysinfo wrapper — fills {cpu_cores: i32, memory_total: i64, page_size: i64}
+/// The machine as the platform reports it: logical cores, memory in bytes,
+/// the page size. A field the platform cannot say is 0.
+pub type SysInfo { pub cpu_cores: i32, pub memory_total: i64, pub page_size: i64 }
+
+/// The machine's information, by value. The platform's `rt_sysinfo` fills
+/// the record's bytes (its own `RtSysInfo` is this layout); that byte seam
+/// is the runtime's alone, every caller reads a typed record.
+pub fn with_system_info() -> SysInfo:
+    var info = SysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
+    rt_sysinfo(&info as *mut u8)
+    info
+
+/// Seed-bound: the compiler's own modules are compiled by the pinned seed
+/// against the seed's runtime interface, which has `with_sysinfo` in this
+/// byte form and no `SysInfo`, so two of them (BuildGraphRuntime,
+/// CodegenUnits) still read the bytes through it. Delete it, and their
+/// record copies, once a seed carrying `with_system_info` is pinned.
 pub fn with_sysinfo(out: *mut u8) -> i32:
     rt_sysinfo(out)
 

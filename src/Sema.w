@@ -25,8 +25,8 @@ use std.collections.HashMap
 use std.collections.HashSet
 use compiler.Runtime
 use rt.rt_core
+use std.libc.abort
 
-extern fn i64_to_string(n: i64) -> str
 
 // WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,
 // the same switch and format as the frontend's phase lines.
@@ -35,7 +35,6 @@ fn sema_profile_enabled() -> bool: with_getenv_str("WITH_PROFILE").len() > 0
 fn sema_profile_report(name: &str, t0: i64):
     let ns = with_clock_nanos() - t0
     with_eprint(f"[profile] sema.{name}  {ns / 1000000}.{(ns % 1000000) / 1000} ms")
-extern fn abort() -> Never
 
 fn sema_phase_bug(message: &str, origin_file: &str = __FILE__, origin_line: u32 = __LINE__, origin_fn: &str = __FN__):
     with_eprint(f"{message} [{origin_file}:{origin_line} {origin_fn}]")

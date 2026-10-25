@@ -9,7 +9,6 @@ use std.string.StringBuilder
 use rt.rt_core
 
 
-extern fn str_from_byte(b: i32) -> str
 
 fn render_module(pool: &AstPool, intern: &InternPool) -> str:
     var out = StringBuilder.new()

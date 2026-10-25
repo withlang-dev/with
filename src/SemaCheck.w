@@ -26,7 +26,6 @@ use TargetSpec
 
 use Overflow
 
-extern fn str_from_byte(b: i32) -> str
 
 // docs/completed/mut.md Rev 8 — P12 lockdown active. `&mut T` is rejected.
 const STRICT_NO_MUT_REF: i32 = 1

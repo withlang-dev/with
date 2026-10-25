@@ -673,7 +673,6 @@ fn ci_print_sizeof_type_text(text: &str) -> str:
 fn i32_to_string(n: i32) -> str:
     i64_to_string(n as i64)
 
-extern fn i64_to_string(n: i64) -> str
 
 // ── CiExpr printing ──────────────────────────────────────────
 //

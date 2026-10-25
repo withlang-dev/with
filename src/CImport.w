@@ -107,7 +107,6 @@ fn ci_no_methods_for_type(name: &str) -> bool:
     false
 
 
-extern fn i64_to_string(n: i64) -> str
 
 // CXCursorKind constants (old API — decl-level)
 pub let CK_STRUCT: i32 = 2

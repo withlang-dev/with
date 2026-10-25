@@ -2,8 +2,8 @@
 // modules should depend on these typed wrappers instead of redeclaring externs.
 
 use rt.rt_core
+use rt.platform
 use rt.compat_runtime
-extern fn rt_getcwd(buf: *mut u8, size: i64) -> i32
 
 fn runtime_eprint(s: &str):
     with_eprint(s)

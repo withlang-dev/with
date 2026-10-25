@@ -1,7 +1,6 @@
 // Archive -- pure-With static archive writer (BSD AR format with __.SYMDEF SORTED)
 
 use rt.rt_core
-extern fn str_from_byte(b: i32) -> str
 
 fn ar_u32_le(v: i32) -> str:
     str_from_byte(v & 0xFF) ++ str_from_byte((v >> 8) & 0xFF) ++ str_from_byte((v >> 16) & 0xFF) ++ str_from_byte((v >> 24) & 0xFF)
