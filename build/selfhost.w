@@ -4609,7 +4609,7 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_take\treceiver-mut:eng,out:1:i32\n", "contracts out-parameter beside a status")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, contracts, "eng_find\tunproved:0:read only,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
+    rc = bs_file_contains(ctx, contracts, "eng_find\treceiver:eng,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_bump_twice\treceiver-mut:eng,unproved:1:out-parameter read before the write\n", "contracts out-parameter read first")
     if rc != 0: return rc

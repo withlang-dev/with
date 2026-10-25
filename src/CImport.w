@@ -128,7 +128,13 @@ impl CiStmtPool:
             if i == out_index: continue
             exprs.add_extra(arg_ids[i])
             count = count + 1
-        let call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, count, 0)
+        var call = exprs.add(CiExprKind.CIE_CALL, callee as i32, args_start, count, 0)
+        // A view the method returns (inference c) is the raw pointer the C
+        // caller expects: `&T as *const T`, then the declared pointer type.
+        if parts[4] == "1":
+            let pointee = ci_extract_struct_name_from_ptr(parts[6])
+            let as_const = exprs.add(CiExprKind.CIE_CAST, types.named_type_from_text("*const " ++ pointee) as i32, call as i32, 0, 0)
+            call = exprs.add(CiExprKind.CIE_CAST, types.named_type_from_text(parts[6]) as i32, as_const as i32, 0, 0)
         if out_index < 0:
             return CiValueExprIR { setup_stmt: setup_in, value_expr: if in_unsafe: call else: exprs.unsafe_expr(call) }
         let target = exprs.add(CiExprKind.CIE_DEREF, arg_ids[out_index], 0, 0, 0)
