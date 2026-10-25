@@ -1475,6 +1475,16 @@ fn build_cache_graph_env_fingerprint(root: &str) -> str:
     var reads = ""
     for i in 0..lines.len():
         let line = lines[i]
+        // #2452: a directory build(ctx) listed, as it lists now: a source
+        // added or deleted there keys a different graph.
+        if line.starts_with("list\t"):
+            let dir = line.slice(5, line.len())
+            let names = build_cache_sorted_strings(build_cache_split_lines(build_graph_rt_list_files(dir)))
+            var listing = ""
+            for ni in 0..names.len():
+                listing = listing ++ names[ni] ++ "\n"
+            reads = reads ++ "list:" ++ dir ++ "=" ++ build_cache_sha256_text(listing) ++ "\n"
+            continue
         if not line.starts_with("env\t"):
             continue
         let fields = line.split("\t")
