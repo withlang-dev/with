@@ -5655,7 +5655,10 @@ fn interp_quote_source_backslash_count(raw_backslashes: isize) -> isize:
     raw_backslashes / 2
 
 impl Parser:
-    fn interp_normalize_expr_text(text: &str) -> str:
+    // #2270: `src[j]` is the hole offset output byte j came from, so the
+    // reparsed nodes map back to the file through the stripped layer.
+    fn interp_normalize_expr_text(text: &str) -> InterpNormalized:
+        var src: List[i32] = List.new()
         // Holes carry raw source text, and two nested-string spellings
         // coexist: a bare "..." keeps its bytes verbatim (its \t, \x41,
         // \" are ordinary string escapes for the re-lex), while the outer
@@ -5674,21 +5677,27 @@ impl Parser:
             if in_char:
                 if ch == 92 and i + 1 < len:
                     out = out ++ text.slice(i as i64, (i + 2) as i64)
+                    src.push(i)
+                    src.push(i + 1)
                     i = i + 2
                     continue
                 if ch == 39:
                     in_char = false
                 out = out ++ text.slice(i as i64, (i + 1) as i64)
+                src.push(i)
                 i = i + 1
                 continue
             if in_raw_string:
                 if ch == 92 and i + 1 < len:
                     out = out ++ text.slice(i as i64, (i + 2) as i64)
+                    src.push(i)
+                    src.push(i + 1)
                     i = i + 2
                     continue
                 if ch == 34:
                     in_raw_string = false
                 out = out ++ text.slice(i as i64, (i + 1) as i64)
+                src.push(i)
                 i = i + 1
                 continue
             if ch == 92:
@@ -5703,8 +5712,10 @@ impl Parser:
                     var k = 0
                     while k < src_bs:
                         out = out ++ interp_brace_char(92)
+                        src.push(bs_start + k)
                         k = k + 1
                     out = out ++ interp_brace_char(34)
+                    src.push(i)
                     if in_esc_string:
                         if src_bs % 2 == 0:
                             in_esc_string = false
@@ -5718,9 +5729,11 @@ impl Parser:
                     var e = 0
                     while e < n / 2:
                         out = out ++ interp_brace_char(92)
+                        src.push(bs_start + 2 * e + 1)
                         e = e + 1
                     if n % 2 == 1 and i < len:
                         out = out ++ text.slice(i as i64, (i + 1) as i64)
+                        src.push(i)
                         i = i + 1
                     continue
                 // Bare backslash run outside any nested literal: regex
@@ -5728,25 +5741,30 @@ impl Parser:
                 var b = 0
                 while b < n:
                     out = out ++ interp_brace_char(92)
+                    src.push(bs_start + b)
                     b = b + 1
                 continue
             if in_esc_string:
                 out = out ++ text.slice(i as i64, (i + 1) as i64)
+                src.push(i)
                 i = i + 1
                 continue
             if ch == 34:
                 in_raw_string = true
                 out = out ++ text.slice(i as i64, (i + 1) as i64)
+                src.push(i)
                 i = i + 1
                 continue
             if ch == 39:
                 in_char = true
                 out = out ++ text.slice(i as i64, (i + 1) as i64)
+                src.push(i)
                 i = i + 1
                 continue
             out = out ++ text.slice(i as i64, (i + 1) as i64)
+            src.push(i)
             i = i + 1
-        out
+        InterpNormalized { text: out, src }
 
     fn interp_clean_segment(content: &str, from: i32, to: i32) -> str:
         // Replace {{ → { and }} → } in literal segments (Python-style brace escaping).
@@ -5846,20 +5864,30 @@ fn fstring_spec_digit(ch: u8): ch >= '0' and ch <= '9'
 // §15.4.2 modes: d x X b o f e g s ?
 fn fstring_spec_mode(ch: u8): ch == 'd' or ch == 'x' or ch == 'X' or ch == 'b' or ch == 'o' or ch == 'f' or ch == 'e' or ch == 'g' or ch == 's' or ch == '?'
 
-fn offset_interpolated_expr_spans(pool: &AstPool, first_node: i32, delta: i32):
-    if delta == 0:
-        return
+type InterpNormalized:
+    text: str
+    src: List[i32]
+
+// A reparsed hole's nodes, from offsets in the normalized text to the file:
+// `src` maps each normalized byte to its hole offset (#2270), and the hole
+// starts at `base`. An end is exclusive, so it maps through its last byte.
+fn offset_interpolated_expr_spans(pool: &AstPool, first_node: i32, base: i32, src: &List[i32]):
+    // Past the text (an end at its length): one byte after its last byte.
+    let past = if src.len() > 0: src[src.len() - 1] + 1 else: 0
     var ni = first_node
     while ni < pool.node_count():
         let node = ni as NodeId
-        pool.set_start(node, pool.get_start(node) + delta)
-        pool.set_end(node, pool.get_end(node) + delta)
+        let s = pool.get_start(node)
+        let e = pool.get_end(node)
+        pool.set_start(node, base + (if s < src.len(): src[s] else: past))
+        pool.set_end(node, base + (if e > 0 and e <= src.len(): src[e - 1] + 1 else if e == 0: 0 else: past))
         ni = ni + 1
 
 impl Parser:
     mut fn parse_interpolated_expr_attempt(expr_text: &str, use_shared_diags: i32, base_start: i32) -> InterpolatedExprParseAttempt:
         // Re-lex and parse the expression text.
-        let source_text = self.interp_normalize_expr_text(expr_text)
+        let normalized = self.interp_normalize_expr_text(expr_text)
+        let source_text = normalized.text
         // The interpolated expression belongs to this parser's file: its
         // spans are offset into it below, and init_with_pool stamps the
         // shared pool's current file id, which stays in force for the rest of
@@ -5874,7 +5902,7 @@ impl Parser:
         sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
-        offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start)
+        offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start, &normalized.src)
         let consumed_all: i32 = if sub_parser.peek() == TokenKind.TK_EOF: 1 else: 0
         let had_errors: i32 = if use_shared_diags != 0: 0 else if sub_parser.diags.has_errors(): 1 else: 0
         InterpolatedExprParseAttempt {
