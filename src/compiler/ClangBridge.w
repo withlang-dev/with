@@ -5,8 +5,8 @@
 // No C headers needed — resolves at link time.
 
 use rt.rt_core
-extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
-extern fn rt_close(fd: i32) -> i32
+use rt.platform
+use std.libc.strtod
 
 // ── libSystem extern fns ────────────────────────────────────────
 // mkstemp and realpath are the runtime's with_libc_* seams (one body per
@@ -22,7 +22,6 @@ extern fn ci_unlink(path: *const u8) -> i32
 extern fn opendir(path: *const u8) -> *mut u8
 extern fn readdir(dirp: *mut u8) -> *mut u8
 extern fn closedir(dirp: *mut u8) -> i32
-extern fn strtod(str: *const u8, endptr: *mut *mut u8) -> f64
 
 // ── libclang types ──────────────────────────────────────────────
 // Struct layouts match the C ABI exactly.
@@ -3409,8 +3408,8 @@ fn with_cimport_hex_float_to_decimal(hex_str: &str) -> str:
     unsafe:
         let cstr = str_to_cstr(hex_str)
         if cstr as i64 == 0: return ""
-        var endptr: *mut u8 = 0 as *mut u8
-        let val = strtod(cstr as *const u8, &raw mut endptr)
+        var endptr: *mut c_char = 0 as *mut c_char
+        let val = strtod(cstr as *const c_char, &raw mut endptr)
         with_free(cstr)
         // Format as decimal — simple approach: use a fixed buffer
         var buf: [64]u8 = [0 as u8; 64]

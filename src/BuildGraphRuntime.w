@@ -112,23 +112,25 @@ fn build_graph_rt_chmod(path: &str, mode: i32) -> i32:
 fn build_graph_rt_getpid() -> i32:
     with_getpid()
 
-// Same out-param layout with_sysinfo fills for codegen units.
+// The seed-bound copy of rt_core's SysInfo: the compiler is compiled by the
+// pinned seed against the seed's runtime interface, which has `with_sysinfo`
+// in its byte form only; `with_system_info() -> SysInfo` replaces both of
+// these once a seed carrying it is pinned.
 type BuildGraphSysInfo {
     cpu_cores: i32,
     memory_total: i64,
     page_size: i64,
 }
 
-fn build_graph_rt_cpu_cores() -> i32:
+fn build_graph_rt_sysinfo() -> BuildGraphSysInfo:
     var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
     with_sysinfo(&info as *mut u8)
-    info.cpu_cores
+    info
+
+fn build_graph_rt_cpu_cores() -> i32: build_graph_rt_sysinfo().cpu_cores
 
 // The machine's memory in bytes; 0 when the host does not say.
-fn build_graph_rt_memory_total() -> i64:
-    var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
-    with_sysinfo(&info as *mut u8)
-    info.memory_total
+fn build_graph_rt_memory_total() -> i64: build_graph_rt_sysinfo().memory_total
 
 // The lane pool's width for a machine (#2603): one lane per core, bounded
 // by the memory at two gibibytes a lane (a stage2 compile peaks near 1.7

@@ -20,10 +20,8 @@
 use compiler.Runtime
 use std.string.StringBuilder
 use rt.rt_core
+use rt.platform
 
-extern fn rt_seek(fd: i32, offset: i64, whence: i32) -> i64
-extern fn rt_read(fd: i32, buf: *mut u8, len: i64) -> i64
-extern fn rt_close(fd: i32) -> i32
 
 type DscMapping { address: i64, size: i64, file_offset: i64, fd: i32 }
 type DscImage { address: i64, path: str }

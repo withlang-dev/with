@@ -6,12 +6,6 @@
 
 use rt.rt_core
 
-type SysInfo {
-    cpu_cores: i32,
-    memory_total: i64,
-    page_size: i64,
-}
-
 // ── Cached state ────────────────────────────────────────────────
 
 var _cached: bool = false
@@ -25,8 +19,7 @@ var _bw_sink: i64 = 0
 
 fn _ensure_init():
     if _cached: return
-    var info = SysInfo { cpu_cores: 1, memory_total: 0, page_size: 4096 }
-    let _ = with_sysinfo(&info as *mut u8)
+    let info = with_system_info()
     _cpu_count = if info.cpu_cores > 0: info.cpu_cores else: 1
     _total_memory = if info.memory_total > 0: info.memory_total as usize else: 0usize
     _page_size = if info.page_size > 0: info.page_size as usize else: 4096usize

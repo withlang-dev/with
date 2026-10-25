@@ -1,8 +1,8 @@
 use compiler.Compilation
 use rt.rt_core
+use std.libc.exit
 use rt.compat_runtime
 
-extern fn exit(code: i32) -> Unit
 
 fn cli_help_topic(argc: i32) -> str:
     if argc >= 3:

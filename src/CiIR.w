@@ -1,5 +1,6 @@
 use std.collections.HashMap
 use rt.rt_core
+use std.libc.abort
 // CiIR — IR for the C-to-With migrator (`with migrate`).
 //
 // Pipeline:
@@ -26,7 +27,6 @@ use rt.rt_core
 // Unsupported constructs fail by returning the null sentinel from
 // lowering, rather than escaping through verbatim raw-string nodes.
 
-extern fn abort() -> Never
 
 fn ci_ir_phase_bug(message: &str):
     with_eprint(message)

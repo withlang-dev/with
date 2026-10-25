@@ -7,10 +7,10 @@
 // No C headers needed — all LLVM-C functions declared as extern fn.
 // Enum constants hardcoded from LLVM 22 headers (stable C API contract).
 
-extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 use rt.rt_core
+use rt.platform
+use std.libc.abort
 extern fn pthread_self() -> i64
-extern fn abort() -> Never
 extern fn rt_sysinfo_os() -> str
 extern fn rt_sysinfo_arch() -> str
 
@@ -476,9 +476,8 @@ fn cstr_slot_for_current_thread() -> isize:
 fn to_cstr(s: &str) -> *const u8:
     let slot = cstr_slot_for_current_thread()
     if slot < 0:
-        let _ = rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
-        unsafe:
-            abort()
+        rt_write(2, "error: LLVM bridge exhausted thread-local cstr slots\n" as *const u8, 53)
+        abort()
     let idx = cstr_slot_indices[slot]
     let n = if s.len() < 4095: s.len() else: 4095
     let src = unsafe *(s as *const str as *const *const u8)

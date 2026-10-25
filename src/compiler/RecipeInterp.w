@@ -17,8 +17,8 @@
 
 use std.string.StringBuilder
 use compiler.Runtime
+use rt.rt_core
 
-extern fn str_from_byte(b: i32) -> str
 
 // ── Tokens ───────────────────────────────────────────────────────────
 

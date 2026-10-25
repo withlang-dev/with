@@ -26,9 +26,8 @@ use MirCore
 use SemaTypes
 use std.collections.HashMap
 use rt.rt_core
+use std.libc.exit
 
-extern fn exit(code: i32) -> Unit
-extern fn str_from_byte(b: i32) -> str
 
 // Atomic operations
 enum AtomicRmwOp: i32:

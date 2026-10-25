@@ -1,5 +1,5 @@
 use rt.rt_core
-extern fn exit(code: i32) -> Unit
+use std.libc.exit
 
 fn contains_delimiter(text: &str, hashes: &str) -> bool:
     let needle = "\"" ++ hashes

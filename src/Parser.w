@@ -12,7 +12,6 @@ use Diagnostic
 use TargetSpec
 use rt.rt_core
 
-extern fn str_from_byte(b: i32) -> str
 
 // Canonical active target architecture for @[target("arch")] guards.
 // Resolved from the driver-selected --target (§18.5); native builds

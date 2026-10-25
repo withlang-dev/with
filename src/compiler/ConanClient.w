@@ -19,7 +19,6 @@ use std.crypto.sha256
 use std.string.StringBuilder
 use CiMigrate
 use rt.rt_core
-extern fn str_from_byte(b: i32) -> str
 
 fn CONAN_CENTER_URL -> str: "https://center2.conan.io"
 fn CONAN_INDEX_RAW -> str: "https://raw.githubusercontent.com/conan-io/conan-center-index/master/recipes"

@@ -21,7 +21,6 @@ use SemaTypes
 use rt.rt_core
 use rt.compat_runtime
 
-extern fn str_from_byte(b: i32) -> str
 
 type COut {
     buf: *mut u8,

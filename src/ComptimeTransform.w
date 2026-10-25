@@ -11,7 +11,6 @@ use Span
 use SemaTypes
 use rt.rt_core
 
-extern fn str_from_byte(b: i32) -> str
 
 fn ct_new_list_str -> List[str]:
     let out: List[str] = List.new()

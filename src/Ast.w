@@ -11,9 +11,8 @@ use Token
 use InternPool
 use std.collections.HashMap
 use rt.rt_core
+use std.libc.abort
 
-extern fn str_from_byte(b: i32) -> str
-extern fn abort() -> Never
 
 fn ast_pool_phase_bug(message: &str):
     with_eprint(message)
