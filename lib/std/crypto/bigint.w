@@ -7,6 +7,12 @@
 //   Each limb value is in [0, 2^31 - 1]
 //   Word count = (x[0] + 30) / 31
 
+// The most words an i31 value here holds: the header and 133 limbs of a
+// 4096-bit modulus (rsa.w admits n_len up to 512 bytes), with room to
+// spare. Every fixed i31 temp is this size (#1052: i31_from_monty's were
+// 80 words, and any modulus above 2449 bits wrote past them).
+const I31_MAX_WORDS: i32 = 140
+
 fn i31_word_count(bitlen: u32) -> i32:
     let r = (bitlen + 30u32) / 31u32
     r as i32
@@ -212,11 +218,11 @@ unsafe fn i31_to_monty(x: *mut u32, m: *const u32):
 
 unsafe fn i31_from_monty(x: *mut u32, m: *const u32, m0i: u32):
     let mlen = i31_word_count(*(m + 0u64))
-    var one: [u32; 80] = [0u32; 80]
+    var one: [u32; I31_MAX_WORDS] = [0u32; I31_MAX_WORDS]
     let op = &raw mut one[0] as *mut u32
     *(op + 0u64) = *(m + 0u64)
     *(op + 1u64) = 1u32
-    var d: [u32; 80] = [0u32; 80]
+    var d: [u32; I31_MAX_WORDS] = [0u32; I31_MAX_WORDS]
     let dp = &raw mut d[0] as *mut u32
     i31_montmul(dp, x as *const u32, op as *const u32, m, m0i)
     var ci = 0
