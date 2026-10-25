@@ -371,6 +371,10 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     let said3 = r3.stdout ++ r3.stderr
     rc = sft_expect(ctx, "no-cache", said3.contains("could not fetch archive.bin (pinned sha256 " ++ pin ++ ") from its source") and said3.contains(down ++ ": no connection to 127.0.0.1:1"), "the failure does not name the archive, the pin and the source:\n" ++ said3)
     if rc != 0: return rc
+    // #2412: the connect probe retries before it gives up, as the download
+    // does; one refused connect is not a down host.
+    rc = sft_expect(ctx, "no-cache", said3.contains("no connection to 127.0.0.1:1 after 5 attempts"), "the connect probe gave up after one attempt:\n" ++ said3)
+    if rc != 0: return rc
 
     // 4. A cache entry that is not the pinned bytes is never served: it is
     //    dropped, the archive is fetched, and the entry is the pin again.
