@@ -91,7 +91,7 @@ impl[K, V] Drop for UnorderedMap[K, V]:
         var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
         while cursor.ref as i64 != 0:
             unsafe { stc_entry_release(unsafe { *cursor.ref } as *mut StcEntry[K, V]) }
-            unsafe { stc_slot_set_next(&raw mut cursor) }
+            cursor.next()
         unsafe { stc_slot_set_drop(&raw const self.set) }
 
 pub type UnorderedMapIter[K, V] ephemeral { cursor: stc_slot_set_iter }
@@ -100,5 +100,5 @@ impl[K, V] UnorderedMapIter[K, V]:
     pub mut fn next() -> Option[(&K, &V)]:
         if self.cursor.ref as i64 == 0: return None
         let entry = unsafe { *self.cursor.ref } as *const StcEntry[K, V]
-        unsafe { stc_slot_set_next(&raw mut self.cursor) }
+        self.cursor.next()
         Some((unsafe { &(*entry).key }, unsafe { &(*entry).value }))

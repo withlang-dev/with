@@ -46,13 +46,13 @@ impl[T] Deque[T]:
 
     pub mut fn push_back(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_deque_push_back(&raw mut self.words, stc_to_word(value)) }
+            self.words.push_back(stc_to_word(value))
         else:
             unsafe { stc_slot_deque_push_back(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
     pub mut fn push_front(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_deque_push_front(&raw mut self.words, stc_to_word(value)) }
+            self.words.push_front(stc_to_word(value))
         else:
             unsafe { stc_slot_deque_push_front(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
@@ -61,11 +61,11 @@ impl[T] Deque[T]:
         if self.len() == 0: return None
         comptime if stc_is_word[T]():
             let word = unsafe { *stc_word_deque_back(&raw const self.words) }
-            unsafe { stc_word_deque_pop_back(&raw mut self.words) }
+            self.words.pop_back()
             Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_deque_back(&raw const self.slots) } as *mut StcSlot[T]
-            unsafe { stc_slot_deque_pop_back(&raw mut self.slots) }
+            self.slots.pop_back()
             Some(unsafe { stc_slot_take(slot) })
 
     /// Transfers the first value out, or `None` when empty.
@@ -73,11 +73,11 @@ impl[T] Deque[T]:
         if self.len() == 0: return None
         comptime if stc_is_word[T]():
             let word = unsafe { *stc_word_deque_front(&raw const self.words) }
-            unsafe { stc_word_deque_pop_front(&raw mut self.words) }
+            self.words.pop_front()
             Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_deque_front(&raw const self.slots) } as *mut StcSlot[T]
-            unsafe { stc_slot_deque_pop_front(&raw mut self.slots) }
+            self.slots.pop_front()
             Some(unsafe { stc_slot_take(slot) })
 
     // The element's place in whichever ring holds it (D22: a word element

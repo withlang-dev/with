@@ -75,14 +75,14 @@ impl[T: Ord] PriorityQueue[T]:
             if self.descending:
                 self.push_slot(value)
             else:
-                unsafe { stc_word_pqueue_push(&raw mut self.words, stc_to_word(value) as i64) }
+                self.words.push(stc_to_word(value) as i64)
                 return
         else:
             self.push_slot(value)
 
     mut fn pop_slot() -> T:
         let slot = unsafe { *stc_slot_pqueue_top(&raw const self.queue) } as *mut StcSlot[T]
-        unsafe { stc_slot_pqueue_pop(&raw mut self.queue) }
+        self.queue.pop()
         unsafe { stc_slot_take(slot) }
 
     /// Transfers the top value out, or `None` when empty.
@@ -91,7 +91,7 @@ impl[T: Ord] PriorityQueue[T]:
         comptime if pqueue_word_capable[T]():
             if self.descending: return Some(self.pop_slot())
             let word = unsafe { *stc_word_pqueue_top(&raw const self.words) }
-            unsafe { stc_word_pqueue_pop(&raw mut self.words) }
+            self.words.pop()
             Some(stc_from_word(word as u64))
         else:
             Some(self.pop_slot())

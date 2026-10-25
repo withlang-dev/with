@@ -12,11 +12,13 @@ extern fn assert_pointers(__param_diag: i32, __param_cmp: *const c_char, __param
 extern fn assert_bool(__param_diag: i32, __param_exp: bool, __param_real: bool, __param_caller: *const c_char, __param_line: i32)
 extern fn assert_dbl_compare(__param_diag: i32, __param_cmp: *const c_char, __param_exp: f64, __param_real: f64, __param_tol: f64, __param_caller: *const c_char, __param_line: i32)
 extern fn assert_fail(__param_caller: *const c_char, __param_line: i32)
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
     return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
@@ -62,6 +64,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_b8: u64
 
@@ -87,6 +90,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
@@ -108,6 +112,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
@@ -145,6 +150,7 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
@@ -185,6 +191,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
+// contract: unproved:0:read only
 unsafe fn IList_drop(__param_cself: *const IList) {
     var __local_self_: *mut IList = ((__param_cself as *mut IList))
 
@@ -306,6 +313,7 @@ unsafe fn IList_erase_range(__param_self_: *mut IList, __param_it1: IList_iter, 
 
 }
 
+// contract: unproved:0:read only
 unsafe fn IList_find_in(__param_self_: *const IList, __param_it1: IList_iter, __param_it2: IList_iter, __param_val: i32) -> IList_iter {
 
     var __local_it_: IList_iter = __param_it1
@@ -321,7 +329,7 @@ unsafe fn IList_find_in(__param_self_: *const IList, __param_it1: IList_iter, __
         }
 
 
-        IList_next((&raw mut __local_it_ as *mut IList_iter))
+        (*(&raw mut __local_it_ as *mut IList_iter)).next()
 
     }
 
@@ -419,7 +427,7 @@ unsafe fn IList_sort(__param_self_: *mut IList) -> bool {
     }
 
     '__ci_bb_3 {
-        IList_next((&raw mut __local_i__goto_413_10 as *mut IList_iter))
+        (*(&raw mut __local_i__goto_413_10 as *mut IList_iter)).next()
         goto '__ci_bb_1
     }
 
@@ -480,7 +488,7 @@ unsafe fn IList_sort(__param_self_: *mut IList) -> bool {
     }
 
     '__ci_bb_12 {
-        IList_next((&raw mut __local_i__goto_426_10 as *mut IList_iter))
+        (*(&raw mut __local_i__goto_426_10 as *mut IList_iter)).next()
         goto '__ci_bb_10
     }
 
@@ -508,6 +516,7 @@ unsafe fn IList_reverse(__param_self_: *mut IList) -> Unit {
 
 }
 
+// contract: receiver-mut:IList,unproved:2:out-parameter read before the write
 unsafe fn IList_splice(__param_self_: *mut IList, __param_it_: IList_iter, __param_other: *mut IList) -> IList_iter {
     if ((if (*__param_self_).last == null: 1 else: 0) != 0) {
         ((*__param_self_).last = (*__param_other).last)
@@ -565,6 +574,7 @@ unsafe fn IList_split_off(__param_self_: *mut IList, __param_it1: IList_iter, __
 
 }
 
+// contract: receiver-mut:IList,stored-unknown:1
 unsafe fn IList_push_back_node(__param_self_: *mut IList, __param_node: *mut IList_node) -> *mut i32 {
     if ((*__param_self_).last != null) {
         ((*__param_node).next = (*(*__param_self_).last).next)
@@ -581,6 +591,7 @@ unsafe fn IList_push_back_node(__param_self_: *mut IList, __param_node: *mut ILi
 
 }
 
+// contract: receiver-mut:IList,unproved:1:out-parameter read before the write,stored-unknown:2
 unsafe fn IList_insert_after_node(__param_self_: *mut IList, __param_ref: *mut IList_node, __param_node: *mut IList_node) -> *mut i32 {
     if (__param_ref != null) {
         ((*__param_node).next = (*__param_ref).next)
@@ -599,6 +610,7 @@ unsafe fn IList_insert_after_node(__param_self_: *mut IList, __param_ref: *mut I
 
 }
 
+// contract: receiver-mut:IList,stored-unknown:1
 unsafe fn IList_unlink_after_node(__param_self_: *mut IList, __param_ref: *mut IList_node) -> *mut IList_node {
     var __local_node: *mut IList_node = (*__param_ref).next
 
@@ -619,6 +631,7 @@ unsafe fn IList_unlink_after_node(__param_self_: *mut IList, __param_ref: *mut I
 
 }
 
+// contract: receiver-mut:IList,stored-unknown:1
 unsafe fn IList_erase_after_node(__param_self_: *mut IList, __param_ref: *mut IList_node) {
     var __local_node: *mut IList_node = IList_unlink_after_node(__param_self_, __param_ref)
 
@@ -627,13 +640,9 @@ unsafe fn IList_erase_after_node(__param_self_: *mut IList, __param_ref: *mut IL
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_get_node(__param_pval: *mut i32) -> *mut IList_node {
     return (((if 1 != 0: __param_pval else: (null as *mut i32)) as *mut IList_node))
-
-}
-
-pub unsafe fn IList_unlink_front_node(__param_self_: *mut IList) -> *mut IList_node {
-    return ((IList_unlink_after_node(__param_self_, (*__param_self_).last) as *mut IList_node))
 
 }
 
@@ -651,7 +660,7 @@ fn IList_clone(__param_lst: IList) -> IList {
     while ((unsafe *(&raw const __local_it_ as *const IList_iter)).ref != null) {
         unsafe { IList_push_back((&raw mut __local_out as *mut IList), (*((*(&raw const __local_it_ as *const IList_iter)).ref))) }
 
-        unsafe { IList_next((&raw mut __local_it_ as *mut IList_iter)) }
+        unsafe { (*(&raw mut __local_it_ as *mut IList_iter)).next() }
 
     }
 
@@ -660,12 +669,14 @@ fn IList_clone(__param_lst: IList) -> IList {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_value_clone(__param_self_: *const IList, __param_val: i32) -> i32 {
 
     return __param_val
 
 }
 
+// contract: receiver-mut:IList,unproved:1:read only
 pub unsafe fn IList_copy(__param_self_: *mut IList, __param_other: *const IList) -> Unit {
     if ((if (*__param_self_).last == (*__param_other).last: 1 else: 0) != 0) {
         return
@@ -678,6 +689,7 @@ pub unsafe fn IList_copy(__param_self_: *mut IList, __param_other: *const IList)
 
 }
 
+// contract: receiver-mut:IList,unproved:1:read only
 pub unsafe fn IList_put_n(__param_self_: *mut IList, __param_raw: *const i32, __param_n: i64) {
     var __local_raw = __param_raw
     var __local_n = __param_n
@@ -703,6 +715,7 @@ pub fn IList_init() -> IList {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_from_n(__param_raw: *const i32, __param_n: i64) -> IList {
     var __local_cx: IList = IList.zeroed()
 
@@ -712,83 +725,61 @@ pub unsafe fn IList_from_n(__param_raw: *const i32, __param_n: i64) -> IList {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_reserve(__param_self_: *mut IList, __param_n: i64) -> bool {
 
     return ((true as bool))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_is_empty(__param_self_: *const IList) -> bool {
     return (((((*__param_self_).last == null)) as bool))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_clear(__param_self_: *mut IList) {
     IList_drop((__param_self_ as *const IList))
 
 }
 
-pub unsafe fn IList_push(__param_self_: *mut IList, __param_value: i32) -> *mut i32 {
-    return ((IList_push_back(__param_self_, __param_value) as *mut i32))
-
-}
-
-pub unsafe fn IList_pop_front(__param_self_: *mut IList) {
-    if (((if not ((if not IList_is_empty((__param_self_ as *const IList)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        __assert_rtn(c"IList_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!IList_is_empty(self)".ptr)
-    } else {
-        0
-    }
-
-    IList_erase_after_node(__param_self_, (*__param_self_).last)
-
-}
-
+// contract: unproved:0:read only
 pub unsafe fn IList_front(__param_self_: *const IList) -> *const i32 {
     return ((((&raw const (*(*(*__param_self_).last).next).value as *const i32) as *mut i32) as *const i32))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_front_mut(__param_self_: *mut IList) -> *mut i32 {
     return (((&raw const (*(*(*__param_self_).last).next).value as *const i32) as *mut i32))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_back(__param_self_: *const IList) -> *const i32 {
     return ((((&raw const (*(*__param_self_).last).value as *const i32) as *mut i32) as *const i32))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_back_mut(__param_self_: *mut IList) -> *mut i32 {
     return (((&raw const (*(*__param_self_).last).value as *const i32) as *mut i32))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_value_toraw(__param_pval: *const i32) -> i32 {
     return (*__param_pval)
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn IList_value_drop(__param_self_: *const IList, __param_pval: *mut i32) {
     return
 }
 
-pub unsafe fn IList_move(__param_self_: *mut IList) -> IList {
-    var __local_m: IList = (*__param_self_)
-
-    ((*__param_self_).last = ((null as *mut IList_node)))
-
-    return __local_m
-
-}
-
-pub unsafe fn IList_take(__param_self_: *mut IList, __param_unowned: IList) -> Unit {
-    IList_drop((__param_self_ as *const IList))
-
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[IList]())
-
-}
-
+// contract: unproved:0:read only
 pub unsafe fn IList_count(__param_self_: *const IList) -> i64 {
     var __local_n: i64 = ((1 as i64))
 
@@ -813,6 +804,7 @@ pub unsafe fn IList_count(__param_self_: *const IList) -> i64 {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_begin(__param_self_: *const IList) -> IList_iter {
     var __local_head: *mut i32 = (if (*__param_self_).last != null: ((&raw const (*(*(*__param_self_).last).next).value as *const i32) as *mut i32) else: (null as *mut i32))
 
@@ -820,19 +812,10 @@ pub unsafe fn IList_begin(__param_self_: *const IList) -> IList_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_end(__param_self_: *const IList) -> IList_iter {
 
     return ((IList_iter.zeroed() as IList_iter))
-
-}
-
-pub unsafe fn IList_next(__param_it_: *mut IList_iter) {
-    var __local_node: *mut IList_node = with 0 as __ci_expr_seq_5 {
-        ((*__param_it_).prev = (((if 1 != 0: (*__param_it_).ref else: (null as *mut i32)) as *mut IList_node)))
-        (*__param_it_).prev
-    }
-
-    ((*__param_it_).ref = (if (if __local_node == (*((*__param_it_)._last)): 1 else: 0) != 0: (null as *mut i32) else: ((&raw const (*(*__local_node).next).value as *const i32) as *mut i32)))
 
 }
 
@@ -853,7 +836,7 @@ pub fn IList_advance(__param_it_: IList_iter, __param_n: u64) -> IList_iter {
             break
         }
 
-        unsafe { IList_next((&raw mut __param_it_ as *mut IList_iter)) }
+        unsafe { (*(&raw mut __param_it_ as *mut IList_iter)).next() }
 
     }
 
@@ -861,6 +844,7 @@ pub fn IList_advance(__param_it_: IList_iter, __param_n: u64) -> IList_iter {
 
 }
 
+// contract: receiver-mut:IList,unproved:2:out-parameter read before the write
 pub unsafe fn IList_splice_range(__param_self_: *mut IList, __param_it_: IList_iter, __param_other: *mut IList, __param_it1: IList_iter, __param_it2: IList_iter) -> IList_iter {
     var __local_tmp: IList = IList_split_off(__param_other, __param_it1, __param_it2)
 
@@ -868,11 +852,13 @@ pub unsafe fn IList_splice_range(__param_self_: *mut IList, __param_it_: IList_i
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn IList_find(__param_self_: *const IList, __param_val: i32) -> IList_iter {
     return IList_find_in(__param_self_, IList_begin(__param_self_), IList_end(__param_self_), __param_val)
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn IList_eq(__param_self_: *const IList, __param_other: *const IList) -> bool {
     var __local_i: IList_iter = IList_begin(__param_self_)
 
@@ -898,9 +884,9 @@ pub unsafe fn IList_eq(__param_self_: *const IList, __param_other: *const IList)
             return ((false as bool))
         }
 
-        IList_next((&raw mut __local_i as *mut IList_iter))
+        (*(&raw mut __local_i as *mut IList_iter)).next()
 
-        IList_next((&raw mut __local_j as *mut IList_iter))
+        (*(&raw mut __local_j as *mut IList_iter)).next()
 
     }
 
@@ -1173,10 +1159,10 @@ fn ctest_list_erase_run() {
 
     var __local_it_: IList_iter = unsafe { IList_begin(((&raw mut __local_L as *mut IList) as *const IList)) }
 
-    unsafe { IList_next((&raw mut __local_it_ as *mut IList_iter)) }
+    unsafe { (*(&raw mut __local_it_ as *mut IList_iter)).next() }
 
-    let __ci_copy_45: IList_iter = unsafe { IList_erase_at((&raw mut __local_L as *mut IList), __local_it_) }
-    with_memcpy((&raw mut __local_it_ as *mut u8), (&raw const __ci_copy_45 as *const u8), sizeof[IList_iter]())
+    let __ci_copy_47: IList_iter = unsafe { IList_erase_at((&raw mut __local_L as *mut IList), __local_it_) }
+    with_memcpy((&raw mut __local_it_ as *mut u8), (&raw const __ci_copy_47 as *const u8), sizeof[IList_iter]())
 
     var __local_res1: IList = with 0 as __ci_expr_seq_13 {
         var __ci_expr_lit_1: [i32; 4] = [10, 30, 40, 50]
@@ -1185,10 +1171,10 @@ fn ctest_list_erase_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IList_eq(((&raw mut __local_res1 as *mut IList) as *const IList), ((&raw mut __local_L as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (44 as i32))
 
-    unsafe { IList_next((&raw mut __local_it_ as *mut IList_iter)) }
+    unsafe { (*(&raw mut __local_it_ as *mut IList_iter)).next() }
 
-    let __ci_copy_110: IList_iter = unsafe { IList_erase_range((&raw mut __local_L as *mut IList), __local_it_, unsafe { IList_end(((&raw mut __local_L as *mut IList) as *const IList)) }) }
-    with_memcpy((&raw mut __local_it_ as *mut u8), (&raw const __ci_copy_110 as *const u8), sizeof[IList_iter]())
+    let __ci_copy_114: IList_iter = unsafe { IList_erase_range((&raw mut __local_L as *mut IList), __local_it_, unsafe { IList_end(((&raw mut __local_L as *mut IList) as *const IList)) }) }
+    with_memcpy((&raw mut __local_it_ as *mut u8), (&raw const __ci_copy_114 as *const u8), sizeof[IList_iter]())
 
     var __local_res2: IList = with 0 as __ci_expr_seq_21 {
         var __ci_expr_lit_2: [i32; 2] = [10, 30]
@@ -1288,7 +1274,7 @@ fn ctest_list_misc_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IList_eq(((&raw mut __local_res3 as *mut IList) as *const IList), ((&raw mut __local_nums as *mut IList) as *const IList)) } as bool), c"list_test.c".ptr, (80 as i32))
 
-    unsafe { IList_pop_front((&raw mut __local_nums as *mut IList)) }
+    unsafe { (*(&raw mut __local_nums as *mut IList)).pop_front() }
 
     unsafe { IList_push_back((&raw mut __local_nums as *mut IList), (-99 as i32)) }
 
@@ -1326,6 +1312,65 @@ fn ctest_list_misc_run() {
         if not ((0 != 0)) {
             break
         }
+    }
+
+}
+
+impl IList {
+    pub mut fn unlink_front_node() -> *mut IList_node {
+        let __param_self_: *mut IList = self as *mut IList
+        return ((unsafe { IList_unlink_after_node(__param_self_, (*__param_self_).last) } as *mut IList_node))
+
+    }
+
+    pub mut fn push(__param_value: i32) -> *mut i32 {
+        let __param_self_: *mut IList = self as *mut IList
+        return ((unsafe { IList_push_back(__param_self_, __param_value) } as *mut i32))
+
+    }
+
+    pub mut fn pop_front() {
+        let __param_self_: *mut IList = self as *mut IList
+        if (((if not ((if not unsafe { IList_is_empty((__param_self_ as *const IList)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            __assert_rtn(c"IList_pop_front".ptr, c"list.h".ptr, (162 as i32), c"!IList_is_empty(self)".ptr)
+        } else {
+            0
+        }
+
+        unsafe { IList_erase_after_node(__param_self_, (*__param_self_).last) }
+
+    }
+
+    pub mut fn move_() -> IList {
+        let __param_self_: *mut IList = self as *mut IList
+        var __local_m: IList = (unsafe *__param_self_)
+
+        ((unsafe *__param_self_).last = ((null as *mut IList_node)))
+
+        return __local_m
+
+    }
+
+    pub mut fn take(__param_unowned: IList) -> Unit {
+        let __param_self_: *mut IList = self as *mut IList
+        unsafe { IList_drop((__param_self_ as *const IList)) }
+
+        with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __param_unowned as *const u8), sizeof[IList]())
+
+    }
+
+}
+
+impl IList_iter {
+    pub mut fn next() {
+        let __param_it_: *mut IList_iter = self as *mut IList_iter
+        var __local_node: *mut IList_node = with 0 as __ci_expr_seq_5 {
+            ((unsafe *__param_it_).prev = (((if 1 != 0: (unsafe *__param_it_).ref else: (null as *mut i32)) as *mut IList_node)))
+            (unsafe *__param_it_).prev
+        }
+
+        ((unsafe *__param_it_).ref = (if (if __local_node == (unsafe *((*__param_it_)._last)): 1 else: 0) != 0: (null as *mut i32) else: ((&raw const (unsafe *(*__local_node).next).value as *const i32) as *mut i32)))
+
     }
 
 }

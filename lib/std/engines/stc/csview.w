@@ -5,11 +5,13 @@ use std.engines.stc.cstr_utf8
 use std.engines.stc.ucd
 use std.libc
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn c_safe_memcpy(__param_dst: *mut c_void, __param_src: *const c_void, __param_size: i64) -> *mut c_void {
     return (((if __param_dst != null: with_memcpy((__param_dst as *mut u8), (__param_src as *const u8), ((__param_size as u64) as i64)) else: (null as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_len = __param_len
     var __local_msg: *const u8 = ((__param_key as *const u8))
@@ -55,6 +57,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_b8: u64
 
@@ -80,6 +83,7 @@ unsafe fn c_hash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
     var __local_msg: *const u8 = ((__param_str as *const u8))
 
@@ -101,6 +105,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
@@ -138,6 +143,7 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
@@ -178,11 +184,13 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_chr_size(__param_s: *const c_char) -> i32 {
     return ((((((4837428950035665169 as u64) >> (((((((*__param_s) as u8) as i32) >> (4 as u32)) as i32) << (2 as u32)) as u32)) as u64) & (15 as u64)) as i32))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_count(__param_s: *const c_char) -> i64 {
     var __local_s = __param_s
     var __local_size: i64 = ((0 as i64))
@@ -198,6 +206,7 @@ unsafe fn cutf8_count(__param_s: *const c_char) -> i64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
     var __local_s = __param_s
     var __local_nbytes = __param_nbytes
@@ -228,6 +237,7 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -248,6 +258,7 @@ unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_cha
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -287,11 +298,13 @@ unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_to_index(__param_s: *const c_char, __param_u8pos: i64) -> i64 {
     return ((((cutf8_at(__param_s, __param_u8pos) as usize) -% (__param_s as usize)) as i64) / (sizeof[c_char]() as i64))
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_subview(__param_s: *const c_char, __param_u8pos: i64, __param_u8len: i64) -> csview {
     var __local_span: csview
 
@@ -317,6 +330,7 @@ unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32
 
 }
 
+// contract: unproved:0:read only
 unsafe fn cutf8_peek_at(__param_s: *const c_char, __param_offset: i64) -> u32 {
     return cutf8_peek(cutf8_offset(__param_s, __param_offset))
 
@@ -332,6 +346,7 @@ fn cutf8_islower(__param_c: u32) -> bool {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn cutf8_icmp(__param_s1: *const c_char, __param_s2: *const c_char) -> i32 {
     return cutf8_icmp_sv((csview { buf: __param_s1, size: 9223372036854775807 } as csview), (csview { buf: __param_s2, size: 9223372036854775807 } as csview))
 
@@ -511,6 +526,7 @@ pub fn csview_subview_pro(__param_sv: csview, __param_pos: i64, __param_len: i64
 
 }
 
+// contract: unproved:1:read only,unproved:2:out-parameter written conditionally
 pub unsafe fn csview_split(__param_sv: csview, __param_sep: *const c_char, __param_pos: *mut i64) -> csview {
     if ((if (*__param_pos) >= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
         return ((csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as i64) - 1)) } as csview))
@@ -535,6 +551,7 @@ pub unsafe fn csview_split(__param_sv: csview, __param_sep: *const c_char, __par
 
 }
 
+// contract: unproved:1:read only,unproved:2:out-parameter written conditionally
 pub unsafe fn csview_strtok(__param_sv: csview, __param_delims: *const c_char, __param_pos: *mut i64) -> csview {
     if ((if (*__param_pos) >= (*(&raw const __param_sv as *const csview)).size: 1 else: 0) != 0) {
         return ((csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as i64) - 1)) } as csview))
@@ -573,7 +590,7 @@ pub unsafe fn csview_strtok(__param_sv: csview, __param_delims: *const c_char, _
 
 
 
-        csview_next((&raw mut __local_i as *mut csview_iter))
+        (*(&raw mut __local_i as *mut csview_iter)).next()
 
     }
 
@@ -667,19 +684,15 @@ pub fn csview_u8_at(__param_sv: csview, __param_u8pos: i64) -> csview_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_from(__param_str: *const c_char) -> csview {
     return ((csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_from_n(__param_str: *const c_char, __param_n: i64) -> csview {
     return ((csview { buf: __param_str, size: __param_n } as csview))
-
-}
-
-pub unsafe fn csview_clear(__param_self_: *mut csview) -> Unit {
-    let __ci_copy_20: csview = (csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as i64) - 1)) } as csview)
-    with_memcpy((&raw mut (*__param_self_) as *mut u8), (&raw const __ci_copy_20 as *const u8), sizeof[csview]())
 
 }
 
@@ -705,11 +718,13 @@ pub fn csview_equals_sv(__param_sv1: csview, __param_sv2: csview) -> bool {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_equals(__param_sv: csview, __param_str: *const c_char) -> bool {
     return csview_equals_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_hash(__param_self_: *const csview) -> u64 {
     return c_basehash_n(((*__param_self_).buf as *const c_void), (*__param_self_).size)
 
@@ -722,16 +737,19 @@ pub fn csview_find_sv(__param_sv: csview, __param_search: csview) -> i64 {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_find(__param_sv: csview, __param_str: *const c_char) -> i64 {
     return csview_find_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_contains(__param_sv: csview, __param_str: *const c_char) -> bool {
     return ((((csview_find(__param_sv, __param_str) != 9223372036854775807)) as bool))
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_starts_with(__param_sv: csview, __param_str: *const c_char) -> bool {
     var __local_n: i64 = ((strlen(__param_str) as i64))
 
@@ -746,6 +764,7 @@ pub unsafe fn csview_starts_with(__param_sv: csview, __param_str: *const c_char)
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_ends_with(__param_sv: csview, __param_str: *const c_char) -> bool {
     var __local_n: i64 = ((strlen(__param_str) as i64))
 
@@ -854,6 +873,7 @@ pub fn csview_tail(__param_sv: csview, __param_len: i64) -> csview {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_begin(__param_self_: *const csview) -> csview_iter {
     var __local_it_: csview_iter = csview_iter { u8: csview_iter_u8 { chr: csview { buf: (*__param_self_).buf }, end: ((*__param_self_).buf + (((*__param_self_).size as i64) as usize)), dec: cutf8_decode_t.zeroed() } }
 
@@ -867,6 +887,7 @@ pub unsafe fn csview_begin(__param_self_: *const csview) -> csview_iter {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_end(__param_self_: *const csview) -> csview_iter {
 
     var __local_it_: csview_iter = csview_iter.zeroed()
@@ -875,22 +896,13 @@ pub unsafe fn csview_end(__param_self_: *const csview) -> csview_iter {
 
 }
 
-pub unsafe fn csview_next(__param_it_: *mut csview_iter) -> Unit {
-    ((*__param_it_).ref = (*__param_it_).ref + (((*(&raw const (*__param_it_).chr as *const csview)).size as i64) as usize))
-
-    if ((if (*__param_it_).ref == (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
-        ((*__param_it_).ref = ((null as *mut c_char)))
-    } else {
-        ((*__param_it_).chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*__param_it_).ref as *const c_char), ((*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end as *const c_char)) as i64)))
-    }
-
-}
-
+// contract: unproved:0:read only
 pub unsafe fn csview_codepoint(__param_it_: *const csview_iter) -> u32 {
     return (*(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn csview_u8_from(__param_str: *const c_char, __param_u8pos: i64, __param_u8len: i64) -> csview {
     return cutf8_subview(__param_str, __param_u8pos, __param_u8len)
 
@@ -906,6 +918,7 @@ pub fn csview_u8_valid(__param_sv: csview) -> bool {
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn csview_cmp(__param_x: *const csview, __param_y: *const csview) -> i32 {
     var __local_n: i64 = (((if (if (*__param_x).size < (*__param_y).size: 1 else: 0) != 0: (*__param_x).size else: (*__param_y).size) as i64))
 
@@ -915,6 +928,7 @@ pub unsafe fn csview_cmp(__param_x: *const csview, __param_y: *const csview) -> 
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn csview_eq(__param_x: *const csview, __param_y: *const csview) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -939,21 +953,25 @@ pub fn csview_iequals_sv(__param_sv1: csview, __param_sv2: csview) -> bool {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_iequals(__param_sv: csview, __param_str: *const c_char) -> bool {
     return csview_iequals_sv(__param_sv, (csview { buf: __param_str, size: (strlen(__param_str) as i64) } as csview))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn csview_ieq(__param_x: *const csview, __param_y: *const csview) -> bool {
     return csview_iequals_sv((*__param_x), (*__param_y))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn csview_icmp(__param_x: *const csview, __param_y: *const csview) -> i32 {
     return cutf8_icmp_sv((*__param_x), (*__param_y))
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_istarts_with(__param_sv: csview, __param_str: *const c_char) -> bool {
     var __local_n: i64 = ((strlen(__param_str) as i64))
 
@@ -968,6 +986,7 @@ pub unsafe fn csview_istarts_with(__param_sv: csview, __param_str: *const c_char
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn csview_iends_with(__param_sv: csview, __param_str: *const c_char) -> bool {
     var __local_n: i64 = ((strlen(__param_str) as i64))
 
@@ -979,5 +998,30 @@ pub unsafe fn csview_iends_with(__param_sv: csview, __param_str: *const c_char) 
 
     return (((__ci_expr_logic_0 != 0) as bool))
 
+
+}
+
+impl csview {
+    pub mut fn clear() -> Unit {
+        let __param_self_: *mut csview = self as *mut csview
+        let __ci_copy_20: csview = (csview { buf: ("" as *mut c_char), size: ((((1 * (sizeof[c_char]() as usize)) as i64) - 1)) } as csview)
+        with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __ci_copy_20 as *const u8), sizeof[csview]())
+
+    }
+
+}
+
+impl csview_iter {
+    pub mut fn next() -> Unit {
+        let __param_it_: *mut csview_iter = self as *mut csview_iter
+        ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + (((unsafe *(&raw const (*__param_it_).chr as *const csview)).size as i64) as usize))
+
+        if ((if (unsafe *__param_it_).ref == (unsafe *(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
+            ((unsafe *__param_it_).ref = ((null as *mut c_char)))
+        } else {
+            ((unsafe *__param_it_).chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*__param_it_).ref as *const c_char), ((*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end as *const c_char)) } as i64)))
+        }
+
+    }
 
 }

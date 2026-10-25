@@ -41,7 +41,7 @@ impl[T] Queue[T]:
 
     pub mut fn push(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_queue_push(&raw mut self.words, stc_to_word(value)) }
+            self.words.push(stc_to_word(value))
         else:
             unsafe { stc_slot_queue_push(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
@@ -50,11 +50,11 @@ impl[T] Queue[T]:
         if self.len() == 0: return None
         comptime if stc_is_word[T]():
             let word = unsafe { *stc_word_queue_front(&raw const self.words) }
-            unsafe { stc_word_queue_pop(&raw mut self.words) }
+            self.words.pop()
             Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_queue_front(&raw const self.slots) } as *mut StcSlot[T]
-            unsafe { stc_slot_queue_pop(&raw mut self.slots) }
+            self.slots.pop()
             Some(unsafe { stc_slot_take(slot) })
 
     unsafe fn front_place() -> *const T:
@@ -97,7 +97,7 @@ impl[T] Drop for Queue[T]:
             var cursor = unsafe { stc_slot_queue_begin(&raw const self.slots) }
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-                unsafe { stc_slot_queue_next(&raw mut cursor) }
+                cursor.next()
             unsafe { stc_slot_queue_drop(&raw const self.slots) }
             unsafe { stc_word_queue_drop(&raw const self.words) }
 
@@ -108,10 +108,10 @@ impl[T] QueueIter[T]:
         comptime if stc_is_word[T]():
             if self.words.ref as i64 == 0: return None
             let place = self.words.ref as *const T
-            unsafe { stc_word_queue_next(&raw mut self.words) }
+            self.words.next()
             Some(unsafe { &*place })
         else:
             if self.slots.ref as i64 == 0: return None
             let slot = unsafe { *self.slots.ref } as *const StcSlot[T]
-            unsafe { stc_slot_queue_next(&raw mut self.slots) }
+            self.slots.next()
             Some(unsafe { stc_slot_view(slot) })

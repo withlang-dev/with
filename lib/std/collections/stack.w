@@ -42,7 +42,7 @@ impl[T] Stack[T]:
 
     pub mut fn push(value: T):
         comptime if stc_is_word[T]():
-            unsafe { stc_word_stack_push(&raw mut self.words, stc_to_word(value)) }
+            self.words.push(stc_to_word(value))
         else:
             unsafe { stc_slot_stack_push(&raw mut self.slots, stc_slot_new(value, stc_slot_unordered, stc_slot_unhashed)) }
 
@@ -51,11 +51,11 @@ impl[T] Stack[T]:
         if self.len() == 0: return None
         comptime if stc_is_word[T]():
             let word = unsafe { *stc_word_stack_top(&raw const self.words) }
-            unsafe { stc_word_stack_pop(&raw mut self.words) }
+            self.words.pop()
             Some(stc_from_word(word))
         else:
             let slot = unsafe { *stc_slot_stack_top(&raw const self.slots) } as *mut StcSlot[T]
-            unsafe { stc_slot_stack_pop(&raw mut self.slots) }
+            self.slots.pop()
             Some(unsafe { stc_slot_take(slot) })
 
     // The element's place in whichever array holds it (D22: a word element

@@ -66,7 +66,7 @@ impl[T: Key] UnorderedSet[T]:
     /// value is already present.
     pub mut fn insert(value: T) -> bool:
         comptime if stc_is_word[T]():
-            unsafe { stc_word_set_insert(&raw mut self.words, stc_to_word(value)) }.inserted
+            self.words.insert(stc_to_word(value)).inserted
         else:
             let slot = stc_slot_new(value, self.comparator(), self.hasher())
             let result = unsafe { stc_slot_set_insert(&raw mut self.set, slot) }
@@ -92,7 +92,7 @@ impl[T: Key] UnorderedSet[T]:
     pub mut fn remove(value: &T) -> Option[T]:
         comptime if stc_is_word[T]():
             let word = self.word(value)
-            if unsafe { stc_word_set_erase(&raw mut self.words, word) } == 0: None
+            if self.words.erase(word) == 0: None
             else: Some(stc_from_word(word))
         else:
             let slot = self.find_slot(value)
@@ -105,13 +105,13 @@ impl[T: Key] UnorderedSet[T]:
     /// Drops every value and empties the set.
     pub mut fn clear():
         comptime if stc_is_word[T]():
-            unsafe { stc_word_set_clear(&raw mut self.words) }
+            self.words.clear()
         else:
             var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-                unsafe { stc_slot_set_next(&raw mut cursor) }
-            unsafe { stc_slot_set_clear(&raw mut self.set) }
+                cursor.next()
+            self.set.clear()
 
     /// Views of the values, in no stated order (D44: traversal observes).
     pub fn iter() -> UnorderedSetIter[T]:
@@ -125,7 +125,7 @@ impl[T] Drop for UnorderedSet[T]:
         var cursor = unsafe { stc_slot_set_begin(&raw const self.set) }
         while cursor.ref as i64 != 0:
             unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
-            unsafe { stc_slot_set_next(&raw mut cursor) }
+            cursor.next()
         unsafe { stc_slot_set_drop(&raw const self.set) }
         unsafe { stc_word_set_drop(&raw const self.words) }
 
@@ -136,10 +136,10 @@ impl[T] UnorderedSetIter[T]:
         comptime if stc_is_word[T]():
             if self.words.ref as i64 == 0: return None
             let place = self.words.ref as *const T
-            unsafe { stc_word_set_next(&raw mut self.words) }
+            self.words.next()
             Some(unsafe { &*place })
         else:
             if self.cursor.ref as i64 == 0: return None
             let slot = unsafe { *self.cursor.ref } as *const StcSlot[T]
-            unsafe { stc_slot_set_next(&raw mut self.cursor) }
+            self.cursor.next()
             Some(unsafe { stc_slot_view(slot) })
