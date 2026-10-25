@@ -91,7 +91,7 @@ fn resource_prelude():
     "        if self.slot != null:\n" ++
     "            unsafe:\n" ++
     "                *self.slot = *self.slot + self.id\n" ++
-    "        free_mem(self.ptr)\n" ++
+    "        unsafe { free_mem(self.ptr) }\n" ++
     // A clone of a tracked record compares equal and counts nothing: an
     // engine that copies keys into its index (the B+tree's separators, D151)
     // clones them, and the audit measures the originals.

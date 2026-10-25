@@ -145,13 +145,13 @@ pub fn FrameArena.alloc(mut self: FrameArena, size: i32) -> *i8:
 pub fn Arena.alloc_zeroed(mut self: Arena, count: i32, size: i32) -> *i8:
     let total = if count > 0 and size > 0: count * size else: 1
     let ptr = self.alloc(total)
-    mem_set(ptr, 0, total)
+    unsafe { mem_set(ptr, 0, total) }
     ptr
 
 pub fn FrameArena.alloc_zeroed(mut self: FrameArena, count: i32, size: i32) -> *i8:
     let total = if count > 0 and size > 0: count * size else: 1
     let ptr = self.alloc(total)
-    mem_set(ptr, 0, total)
+    unsafe { mem_set(ptr, 0, total) }
     ptr
 
 pub fn Arena.mark(self: &Arena) -> i64:
@@ -173,7 +173,7 @@ pub fn Arena.reset_to(mut self: Arena, mark: i64) -> Unit:
             new_blocks.push(raw)
             new_sizes.push(size)
         else if raw != 0:
-            free_mem(raw as *i8)
+            unsafe { free_mem(raw as *i8) }
     self.blocks = new_blocks
     self.block_sizes = new_sizes
     if self.blocks.len() > 0:
@@ -200,7 +200,7 @@ pub fn FrameArena.reset(mut self: FrameArena) -> Unit:
     for i in 1..self.blocks.len():
         let raw = self.blocks[i]
         if raw != 0:
-            free_mem(raw as *i8)
+            unsafe { free_mem(raw as *i8) }
     let new_blocks: List[i64] = List.new()
     let new_sizes: List[i32] = List.new()
     new_blocks.push(first)
@@ -215,7 +215,7 @@ impl Drop for Arena:
     move fn drop() -> Unit:
         for raw in self.blocks:
             if raw != 0:
-                free_mem(raw as *i8)
+                unsafe { free_mem(raw as *i8) }
         self.blocks = List.new()
         self.block_sizes = List.new()
         self.current = 0 as *i8
@@ -226,7 +226,7 @@ impl Drop for FrameArena:
     move fn drop() -> Unit:
         for raw in self.blocks:
             if raw != 0:
-                free_mem(raw as *i8)
+                unsafe { free_mem(raw as *i8) }
         self.blocks = List.new()
         self.block_sizes = List.new()
         self.current = 0 as *i8
@@ -284,14 +284,14 @@ pub fn TempArena.reset(mut self: TempArena) -> Unit:
     var block = unsafe *self.head
     while block != 0:
         let next = unsafe *(block as *mut i64)
-        free_mem(block as *i8)
+        unsafe { free_mem(block as *i8) }
         block = next
     unsafe *self.head = 0
 
 impl Drop for TempArena:
     move fn drop() -> Unit:
         self.reset()
-        free_mem(self.head as *i8)
+        unsafe { free_mem(self.head as *i8) }
 
 fn pool_effective_item_size(size: i32) -> i32:
     let base = if size > 0: size else: 1
@@ -334,7 +334,7 @@ impl Drop for Pool:
     move fn drop() -> Unit:
         for raw in self.slabs:
             if raw != 0:
-                free_mem(raw as *i8)
+                unsafe { free_mem(raw as *i8) }
         self.slabs = List.new()
         self.free_list = List.new()
 
@@ -365,7 +365,7 @@ unsafe fn arena_list_grow[T](xs: *mut ArenaList[T]):
     let ptr = (*xs).ptr
     let len = (*xs).len_value
     if ptr as i64 != 0 and len > 0:
-        mem_copy(next as *i8, ptr as *i8, len * (sizeof[T]() as i32))
+        unsafe { mem_copy(next as *i8, ptr as *i8, len * (sizeof[T]() as i32)) }
     ((*xs).ptr = next)
     ((*xs).cap_value = new_cap)
 
@@ -374,7 +374,7 @@ pub unsafe fn arena_list_push[T](xs: *mut ArenaList[T], value: T):
         arena_list_grow(xs)
     let len = (*xs).len_value
     let dst = (*xs).ptr + (len as usize)
-    mem_copy(dst as *i8, &value as *const T as *i8, sizeof[T]() as i32)
+    unsafe { mem_copy(dst as *i8, &value as *const T as *i8, sizeof[T]() as i32) }
     (*xs).len_value = len + 1
 
 pub unsafe fn arena_list_get[T](xs: *const ArenaList[T], index: i32) -> T:
