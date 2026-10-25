@@ -558,6 +558,11 @@ unsafe fn tls_recv_server_handshake(
             let hs_len_b2 = rec_buf[rp + 2] as u32
             let hs_len_b3 = rec_buf[rp + 3] as u32
             let hs_len = ((hs_len_b1 << 16u32) | (hs_len_b2 << 8u32) | hs_len_b3) as i32
+            // #1062: the length is the server's word; the message must lie
+            // inside the record received, or the hash and every parse below
+            // read past the buffer. A message that does not fits nothing.
+            if hs_len > rec_len - rp - 4:
+                return -1
 
             // Update handshake hash (type + length + body)
             tls_hs_hash_update(conn, &rec_buf[rp] as *const u8, 4 + hs_len)
@@ -576,7 +581,7 @@ unsafe fn tls_recv_server_handshake(
                     let bv = *(body + ci as u64)
                     *(cert_buf + ci as u64) = bv
                     ci = ci + 1
-                *(cert_len + 0u64) = hs_len
+                *(cert_len + 0u64) = ci
 
                 // Parse first cert to get server's public key
                 if hs_len > 6:
@@ -584,6 +589,8 @@ unsafe fn tls_recv_server_handshake(
                     let fc_b2 = *(body + 4u64) as u32
                     let fc_b3 = *(body + 5u64) as u32
                     let first_cert_len = ((fc_b1 << 16u32) | (fc_b2 << 8u32) | fc_b3) as i32
+                    if first_cert_len > hs_len - 6:
+                        return -1
                     let first_cert_data = body + 6u64
                     var parsed_cert = X509Cert.new()
                     let parse_ok = x509_parse(&raw mut parsed_cert as *mut X509Cert, first_cert_data, first_cert_len)
