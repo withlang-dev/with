@@ -2321,7 +2321,7 @@ fn ci_migrate_method_shapes_for(project_active: bool, project: &CiProject) -> Ha
         if project.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or project.symbols[si].method_record.len() == 0: continue
         let ret = ci_unsafe_fn_ptr_type(ci_pointer_type_explicit_mut(project.symbols[si].ret_ty))
         let status = if ret.len() == 0 or ret == "Unit" or ret == "void": "0" else: "1"
-        shapes.insert(ci_migrate_c_function_name(project.symbols[si].name), project.symbols[si].method_record ++ "|" ++ project.symbols[si].method_name ++ f"|{project.symbols[si].method_out}|" ++ project.symbols[si].method_out_ty ++ f"|{project.symbols[si].method_view}|" ++ status ++ "|" ++ ret)
+        shapes.insert(ci_migrate_c_function_name(project.symbols[si].name), project.symbols[si].method_record ++ "|" ++ project.symbols[si].method_name ++ f"|{project.symbols[si].method_out}|" ++ project.symbols[si].method_out_ty ++ f"|{project.symbols[si].method_view}|" ++ status ++ "|" ++ ret ++ f"|{project.symbols[si].method_mut}")
     shapes
 
 fn ci_migrate_indent_lines(text: &str) -> str:
@@ -2347,8 +2347,13 @@ fn ci_migrate_push_method(method: &List[str], params: &str, self_name: &str, sel
     if view: ret_suffix = " -> &" ++ ci_extract_struct_name_from_ptr(ret_render) ++ " from self"
     else if has_out: ret_suffix = " -> " ++ (if status: "(" ++ ret_render ++ ", " ++ out_value_type ++ ")" else: out_value_type)
     let pad = "        "
-    var text = "    pub mut fn " ++ method[1] ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ (if migrate_prefer_brace(): " {\n" else: ":\n")
-    text = text ++ pad ++ "let " ++ self_name ++ ": " ++ self_type ++ " = self as " ++ self_type ++ "\n"
+    // Amendment 2: a receiver the body never writes through is `pub fn`; its
+    // raw pointer is taken `*const` and widened only in spelling, for a body
+    // whose C declared the parameter non-const yet never wrote.
+    let is_mut = method[7] == "1"
+    var text = "    " ++ (if is_mut: "pub mut fn " else: "pub fn ") ++ method[1] ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ (if migrate_prefer_brace(): " {\n" else: ":\n")
+    let receiver_cast = if is_mut or not self_type.starts_with("*mut "): "self as " ++ self_type else: "(self as *const " ++ method[0] ++ ") as " ++ self_type
+    text = text ++ pad ++ "let " ++ self_name ++ ": " ++ self_type ++ " = " ++ receiver_cast ++ "\n"
     if has_out:
         let default_text = ci_default_for_type(out_value_type)
         text = text ++ pad ++ "var __ci_out: " ++ out_value_type ++ " = " ++ (if default_text.len() > 0: default_text else: out_value_type ++ ".zeroed()") ++ "\n"
@@ -2367,8 +2372,11 @@ fn ci_migrate_contract_note(project_active: bool, project: &CiProject, name: &st
     let si = ci_migrate_project_fn_symbol(project_active, project, name)
     if si < 0: return ""
     let contract = project.symbols[si].contract
-    if not (contract.contains("unproved:") or contract.contains("stored-unknown:") or contract.contains("method-collision:")): return ""
-    "// contract: " ++ contract ++ "\n"
+    if not (contract.contains("unproved:") or contract.contains("stored-unknown:") or contract.contains("owned:") or contract.contains("method-collision:")): return ""
+    // Amendment 2 (B): a stored argument's ownership is a record-level
+    // design, not a parameter's; until it lands the function says so.
+    let stored = if contract.contains("stored-unknown:") or contract.contains("owned:"): " — stores an argument; ownership not modeled" else: ""
+    "// contract: " ++ contract ++ stored ++ "\n"
 
 fn ci_migrate_writes_mark(name: &str) -> str: "@@with-writes:" ++ name ++ "@@"
 

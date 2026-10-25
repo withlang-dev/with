@@ -75,6 +75,12 @@ fn ct_has_line(evidence: &str, line: &str) -> bool:
         if l == line: return true
     false
 
+// Functions outside the corpus that read their pointer arguments and write
+// nothing (Amendment 2): an explicit list, never a name's guess. `memset`
+// and `memcpy` write; `free` destroys; `printf` is not here either.
+fn ct_is_pure_reader(name: &str) -> bool:
+    name == "memcmp" or name == "memchr" or name == "strlen" or name == "strcmp" or name == "strncmp"
+
 // The method name for C function `c_name` on `record`: the C name less the
 // record's prefix (`stc_word_stack_push` on `stc_word_stack` is `push`,
 // `GHashTable`'s `g_hash_table_` prefix the same way), the whole C name
@@ -107,6 +113,11 @@ impl CiProject:
                 else if line.starts_with("arrayparam:"):
                     let pi = parse(line.slice(11, line.len()))
                     if pi >= 0 and pi < count: self.symbols[si].param_array[pi] = 1
+                else if line.starts_with("mutlocal:"):
+                    // Amendment 2: a write through a local that aliases a
+                    // parameter is a write through the parameter.
+                    let pi = self.fd_local_alias_param(si as i32, line.slice(9, line.len()))
+                    if pi >= 0 and pi < count: self.symbols[si].param_mutates[pi] = 1
         // Through the corpus callees: a parameter handed to a position a
         // callee writes through is written through; one handed to a
         // position a callee indexes is an array.
@@ -131,6 +142,78 @@ impl CiProject:
                         if self.symbols[si].param_array[pi] == 0 and index < self.symbols[callee].param_array.len() and self.symbols[callee].param_array[index] != 0:
                             self.symbols[si].param_array[pi] = 1
                             changed = true
+        // The read side (Amendment 2): a pointer parameter the body provably
+        // never writes through — not mutated (aliases and corpus callees
+        // included), not indexed, not stored, no part of it freed, not cast
+        // away from `const` — whose every sink is a corpus position proved
+        // read-only or a pure reader. A greatest fixed point: every
+        // candidate is read-only until one of its sinks says otherwise.
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+            while self.symbols[si].param_readonly.len() < self.symbols[si].param_ty.len(): self.symbols[si].param_readonly.push(0)
+            for pi in 0..self.symbols[si].param_ty.len():
+                self.symbols[si].param_readonly[pi] = if ct_is_pointer(self.symbols[si].param_ty[pi]) and self.ct_read_only_local(si as i32, pi).len() == 0: 1 else: 0
+        var shrinking = true
+        while shrinking:
+            shrinking = false
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
+                for pi in 0..self.symbols[si].param_readonly.len():
+                    if self.symbols[si].param_readonly[pi] != 0 and self.ct_sinks_refusal(si as i32, pi).len() > 0:
+                        self.symbols[si].param_readonly[pi] = 0
+                        shrinking = true
+
+    // Why parameter `pi` is not read-only by the body's own operations ("" when
+    // it is): the local half of Amendment 2's proof.
+    fn ct_read_only_local(si: i32, pi: isize) -> str:
+        if pi < self.symbols[si].param_mutates.len() and self.symbols[si].param_mutates[pi] != 0: return "written through"
+        if pi < self.symbols[si].param_array.len() and self.symbols[si].param_array[pi] != 0: return "indexed as an array"
+        if pi < self.symbols[si].param_stores.len() and self.symbols[si].param_stores[pi] != 0: return "stored"
+        let const_param = self.symbols[si].param_ty[pi].trim().starts_with("*const ")
+        for line in self.symbols[si].contract_evidence.split("\n"):
+            if line.starts_with(f"freesmember:{pi}:"): return "frees a part of it"
+            if const_param and line.starts_with(f"castaway:{pi}:*mut "): return "casts away const"
+        ""
+
+    // Why a sink of parameter `pi` may write through it ("" when none can):
+    // a corpus callee not proved read-only at that position, or a function
+    // outside the corpus that is not on the pure list. The callee half of
+    // Amendment 2's proof; the locals that alias the parameter count too.
+    fn ct_sinks_refusal(si: i32, pi: isize) -> str:
+        var sinks: List[str] = List.new()
+        for sink in self.symbols[si].param_sinks[pi].split(";"):
+            if sink.len() > 0: sinks.push(sink)
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if not line.starts_with("localsink:"): continue
+            let parts = line.split(":")
+            if parts.len() == 4 and self.fd_local_alias_param(si, parts[1]) == pi: sinks.push(parts[2] ++ ":" ++ parts[3])
+        for line in self.symbols[si].contract_evidence.split("\n"):
+            if not line.starts_with(f"memberarg:{pi}:"): continue
+            let parts = line.split(":")
+            if parts.len() == 5: sinks.push(parts[3] ++ ":" ++ parts[4])
+        for sink in sinks:
+            if not sink.contains(":"): return "stored"
+            let kv = sink.split(":")
+            let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+            if callee >= 0 and self.symbols[callee].has_definition != 0:
+                let index = parse(kv[1])
+                if index < self.symbols[callee].param_readonly.len() and self.symbols[callee].param_readonly[index] != 0: continue
+                return kv[0] ++ " may write through it"
+            if ct_is_pure_reader(kv[0]): continue
+            return kv[0] ++ " is outside the corpus and not a known pure reader"
+        ""
+
+    // Whether every `return` of the body hands back parameter `pi` itself or
+    // the address of one of its members (inference c, Amendment 2's tightening):
+    // the walker's `retaddr:` lines account for every return.
+    fn ct_ret_from(si: i32, pi: isize) -> bool:
+        var returns = 0
+        for line in self.symbols[si].own_evidence.split("\n"):
+            if line.starts_with("ret:"): returns = returns + 1
+        var parts = 0
+        for line in self.symbols[si].contract_evidence.split("\n"):
+            if line == f"retaddr:{pi}": parts = parts + 1
+        returns > 0 and parts == returns and not self.ct_returns_null(si)
 
     // Whether a corpus function frees field `member` of a `*mut record`
     // parameter: `free(p->member)` in its body, or `p->member` handed to a
@@ -162,7 +245,8 @@ impl CiProject:
             if not ct_is_pointer(ty): continue
             let record = ct_record_pointee(ty)
             let mutates = pi < self.symbols[si].param_mutates.len() and self.symbols[si].param_mutates[pi] != 0
-            if pi == 0 and record.len() > 0 and mutates:
+            let readonly = pi < self.symbols[si].param_readonly.len() and self.symbols[si].param_readonly[pi] != 0
+            if pi == 0 and record.len() > 0 and (mutates or readonly):
                 // A handle the body accepts as NULL, or a corpus caller
                 // passes NULL (D107's evidence), is a nullable argument, not
                 // a receiver: a method's `self` is never NULL.
@@ -176,9 +260,21 @@ impl CiProject:
                 if pi < self.symbols[si].param_array.len() and self.symbols[si].param_array[pi] != 0:
                     out.push("unproved:0:indexed as an array")
                     continue
-                out.push("receiver-mut:" ++ record)
-                // (c) beside (a1): the receiver is also what is returned.
-                if self.symbols[si].borrow_from == 0 and not self.ct_returns_null(si): out.push("ret-from:0")
+                // (c) beside the receiver: the return is the receiver itself
+                // or the address of one of its members.
+                let ret_part = ct_is_pointer(self.symbols[si].ret_ty) and self.ct_ret_from(si, 0)
+                if mutates:
+                    out.push("receiver-mut:" ++ record)
+                    if ret_part: out.push("ret-from:0")
+                    continue
+                // Amendment 2: the read receiver may not return a pointer
+                // derived from itself unless (c) carries the origin; the
+                // view would otherwise outlive the borrow.
+                if ct_is_pointer(self.symbols[si].ret_ty) and not ret_part:
+                    out.push("unproved:0:returns a pointer the receiver's view cannot carry")
+                    continue
+                out.push("receiver:" ++ record)
+                if ret_part: out.push("ret-from:0")
                 continue
             if pi > 0 and ct_has_line(evidence, f"outfull:{pi}"):
                 let pointee = ct_pointee(ty)
@@ -198,16 +294,25 @@ impl CiProject:
                     if owner_record.len() > 0 and self.ct_destroyer_frees_member(owner_record, parts[3]): owned = true
                 out.push(if owned: f"owned:{pi}" else: f"stored-unknown:{pi}")
                 continue
+            if ct_is_pointer(self.symbols[si].ret_ty) and self.ct_ret_from(si, pi):
+                out.push(f"ret-from:{pi}")
+                continue
             if self.symbols[si].borrow_from == pi:
-                // A NULL the body may also return is no part of the
-                // parameter: the ownership proof skips a NULL source (a NULL
-                // is nobody's to free), a view of one would be unsafety.
-                out.push(if self.ct_returns_null(si): f"unproved:{pi}:returns NULL on a path" else: f"ret-from:{pi}")
+                // The ownership proof's borrow is broader than a view: a
+                // pointer loaded from a field, arithmetic on one, or a NULL
+                // on some path (which that proof skips) is no part of the
+                // parameter for certain.
+                out.push(f"unproved:{pi}:returns a pointer loaded from the parameter")
                 continue
             // A pointer the body never writes through is read only; one it
             // writes through is named by how the out-parameter proof failed,
-            // or as a second mutated pointer.
+            // or as a second mutated pointer. A first parameter that failed
+            // the read receiver's proof names the failing condition.
             var reason = "read only"
+            if pi == 0 and record.len() > 0 and not mutates:
+                let local = self.ct_read_only_local(si, 0)
+                reason = if local.len() > 0: local else: self.ct_sinks_refusal(si, 0)
+                if reason.len() == 0: reason = "read only"
             if mutates:
                 reason = if pi == 0: "mutated through a pointer to no corpus record" else: "mutated through a second pointer"
                 let cond_prefix = f"outcond:{pi}:"
@@ -242,27 +347,25 @@ impl CiProject:
         let contract = self.symbols[si].contract
         if self.symbols[si].variadic != 0 or self.symbols[si].static_definition != 0 or contract == "plain" or contract == "unanalyzable": return ""
         var record = ""
+        var is_mut = 1
         var out = -1
         var out_ty = ""
         var view = 0
         for verdict in contract.split(","):
             if verdict.starts_with("receiver-mut:"): record = verdict.slice(13, verdict.len()).to_owned()
+            else if verdict.starts_with("receiver:"):
+                record = verdict.slice(9, verdict.len()).to_owned()
+                is_mut = 0
             else if verdict.starts_with("out:") or verdict.starts_with("out-record:"):
                 let parts = verdict.split(":")
                 if out >= 0 or parts.len() != 3: return ""
                 out = parse(parts[1])
                 out_ty = parts[2].to_owned()
-            else if verdict == "ret-from:0":
-                // Only `return self` is a part of the receiver for certain: a
-                // pointer loaded from one of its fields, or arithmetic on
-                // one, may be NULL or point anywhere.
-                for line in self.symbols[si].own_evidence.split("\n"):
-                    if line.starts_with("ret:") and line != "ret:param:0": return ""
-                view = 1
+            else if verdict == "ret-from:0": view = 1
             else: return ""
         if record.len() == 0 or not self.records.contains(record): return ""
         if view != 0 and ct_pointee(self.symbols[si].ret_ty).len() == 0: return ""
-        f"{record}|" ++ ct_method_name(self.symbols[si].name, record) ++ f"|{out}|{out_ty}|{view}"
+        f"{record}|" ++ ct_method_name(self.symbols[si].name, record) ++ f"|{out}|{out_ty}|{view}|{is_mut}"
 
     // D159 step 2: every proved function's shape, once. Two functions that
     // would share a method name both keep their raw signatures, and the
@@ -289,6 +392,7 @@ impl CiProject:
             self.symbols[si].method_out = parse(parts[2])
             self.symbols[si].method_out_ty = parts[3].to_owned()
             self.symbols[si].method_view = parse(parts[4])
+            self.symbols[si].method_mut = parse(parts[5])
 
     // The artifact: one line per defined function, sorted by name.
     fn contracts_tsv() -> str:
