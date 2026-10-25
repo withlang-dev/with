@@ -238,6 +238,23 @@ Inference (b)'s three rows (c-algorithms) keep `pub unsafe fn` with
 "stores an argument; ownership not modeled" in the generated comment; the
 owned-field design is its own proposal.
 
+*Step 5 status (2026-10-25, branch `migrator-contracts-5`):* landed as
+written; every corpus lane green on fresh migrations. Fresh counts: STC 179
+read receivers (121 `pub fn` methods beside 181 `pub mut fn`), pcre2 26,
+zlib 27, TommyDS 35, c-algorithms 30, M*LIB 34; refused for a pointer
+return without (c): STC 58, TommyDS 18, c-algorithms 29, M*LIB 20; refused
+for a callee that may write or is off the pure list: pcre2 14, STC 12. One
+more call-site rule the corpora forced: a corpus call to a method whose
+return became a view hands the C site the raw pointer it expects (`&T as
+*const T`, then the declared type). STC re-promoted under
+`migrator-pin:#2615`; the facades call the read methods (`self.words.size()`,
+`self.set.begin()`, `self.bits.test(i)`) and lost 34 more `unsafe` blocks
+(319 → 285). What stays `unsafe` in a facade now: the loaded-pointer reads
+(`at`, `top`, `front`, `back`, `get`, which need a non-NULL proof), the
+destroyers (`drop` frees a part of the record: consuming, not a receiver),
+the slot pushes and the keyed `insert`/`erase` (a second pointer parameter),
+and the slot-lifetime steps the facade owns.
+
 ## What is deliberately not inferred
 
 - A read-only first pointer that returns a loaded pointer (`front`, `at`):
