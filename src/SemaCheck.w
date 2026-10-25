@@ -27103,6 +27103,12 @@ impl Sema:
                         if user_collect_ret != 0:
                             self.typed_expr_types.insert(node, user_collect_ret)
                         return user_collect_ret
+                    // #2319: collect[C]() gathers an iterator. Over anything
+                    // else it resolved to nothing and said nothing, and MIR
+                    // met an unresolved generic call.
+                    if recv_ty2 != 0 and self.get_type_kind(self.resolve_alias(recv_ty2 as TypeId)) != TypeKind.TY_ERR and self.iterator_element_type(recv_ty2 as i32) == 0 and self.user_iter_element_type(recv_ty2 as i32) == 0 and not self.generator_state_yield_types.contains(self.resolve_alias(recv_ty2 as TypeId) as i32):
+                        self.emit_error(f"collect[C]() gathers an iterator, and `{self.type_name(recv_ty2 as i32)}` is not one: `.iter().collect[C]()` gathers its elements", node)
+                        return 0
                     let collect_ret = self.collect_target_type_from_callee(callee, recv_ty2 as i32, node)
                     if collect_ret != 0:
                         self.typed_expr_types.insert(node, collect_ret)
