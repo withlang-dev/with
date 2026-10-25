@@ -1354,6 +1354,11 @@ impl Sema:
                 let decision_index = self.contextual_join_decision_indices.get(context_key).copied() ?? -1
                 self.contextual_join_decisions[decision_index] = decision
             else if prior.final_type != final_type or prior.expected_type != expected:
+                // #2313: a demand poisoned by a reported user error (`<error>`)
+                // settles the join at its default on a re-check; that is a
+                // cascade of the reported error, not a conflicting decision.
+                if self.get_type_kind(self.resolve_alias(expected)) == TypeKind.TY_ERR or self.get_type_kind(self.resolve_alias(prior.expected_type)) == TypeKind.TY_ERR:
+                    return 0
                 self.emit_error(f"internal error: conflicting contextual join decisions for one expression (sig {self.current_fn_sig_idx}: first expected {self.type_name(prior.expected_type)} [{prior.expected_type}] final {self.type_name(prior.final_type)} [{prior.final_type}], now expected {self.type_name(expected)} [{expected}] final {self.type_name(final_type)} [{final_type}])", report_node)
                 return 0
         else:
