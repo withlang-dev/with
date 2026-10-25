@@ -408,6 +408,107 @@ impl JsonView:
             json_panic("missing JSON field: " ++ key)
         JsonView { source: self.source, tokens: self.tokens, index: value_idx }
 
+    // #961: the jq surface on the view. An array's elements and an object's
+    // members are reachable without the token-pointer helpers.
+
+    fn token_size() -> i32: unsafe (*(self.tokens + self.index as u64)).size
+
+    /// The number of elements of an array or members of an object.
+    pub fn len() -> isize:
+        let ty = self.token_type()
+        if ty != JSON_ARRAY and ty != JSON_OBJECT:
+            json_panic("expected JSON array or object")
+        self.token_size()
+
+    /// The element at `i` of an array (jq's `.[i]`); panics out of range.
+    pub fn at(i: isize) -> JsonView:
+        if self.token_type() != JSON_ARRAY:
+            json_panic("expected JSON array")
+        if i < 0 or i >= self.token_size():
+            json_panic(f"JSON array index {i} out of range ({self.token_size()} elements)")
+        var idx = self.index + 1
+        for _ in 0..i: idx = unsafe { json_skip(self.tokens, idx) }
+        JsonView { source: self.source, tokens: self.tokens, index: idx }
+
+    /// An array's elements in order (jq's `.[]`): `for v in xs.items()`.
+    @[iter_of_self]
+    pub fn items() -> JsonItems:
+        if self.token_type() != JSON_ARRAY:
+            json_panic("expected JSON array")
+        JsonItems { source: self.source, tokens: self.tokens, next_index: self.index + 1, remaining: self.token_size() }
+
+    /// An object's keys in document order (jq's `keys_unsorted`).
+    pub fn keys() -> List[str]:
+        if self.token_type() != JSON_OBJECT:
+            json_panic("expected JSON object")
+        var out: List[str] = List.new()
+        var idx = self.index + 1
+        for _ in 0..self.token_size():
+            out.push(json_unescape_string(json_str(self.source, self.tokens, idx)))
+            idx = unsafe { json_skip(self.tokens, idx + 1) }
+        out
+
+    pub fn is_null() -> bool: self.token_type() == JSON_PRIMITIVE and self.raw() == "null"
+    pub fn as_str() -> str: str.deserialize(self)
+    pub fn as_i64() -> i64: i64.deserialize(self)
+    pub fn as_bool() -> bool: bool.deserialize(self)
+    pub fn as_f64() -> f64:
+        if self.token_type() != JSON_PRIMITIVE:
+            json_panic("expected JSON number")
+        with_parse_float_ref(self.raw())
+
+    /// The value as compact JSON text (jq's `-c`).
+    pub fn compact() -> str: json_render(self.source, self.tokens, self.index, -1, 0).text
+
+    /// The value as JSON text indented by two spaces (jq's default output).
+    pub fn pretty() -> str: json_render(self.source, self.tokens, self.index, 2, 0).text
+
+/// `view.items()`: an array's elements in order. Borrows the document.
+pub type JsonItems ephemeral { source: &str, tokens: *const JsonToken, next_index: i32, remaining: i32 }
+
+impl Iter[JsonView] for JsonItems:
+    mut fn next() -> Option[JsonView]:
+        if self.remaining <= 0:
+            return None
+        let v = JsonView { source: self.source, tokens: self.tokens, index: self.next_index }
+        self.next_index = unsafe { json_skip(self.tokens, self.next_index) }
+        self.remaining -= 1
+        Some(v)
+
+type JsonRendered { text: str, next: i32 }
+
+fn json_indent(indent: i32, depth: i32) -> str:
+    var out = "\n"
+    for _ in 0..indent * depth: out = out ++ " "
+    out
+
+// The token at `idx` and everything under it as JSON text, and the index
+// after it. `indent` < 0 is compact; otherwise each member is on its own
+// line, `indent` spaces deeper than its container.
+fn json_render(js: &str, tokens: *const JsonToken, idx: i32, indent: i32, depth: i32) -> JsonRendered:
+    let ty = unsafe (*(tokens + idx as u64)).tok_type
+    let size = unsafe (*(tokens + idx as u64)).size
+    if ty == JSON_STRING:
+        return JsonRendered { text: json_quote(json_unescape_string(json_str(js, tokens, idx))), next: idx + 1 }
+    if ty != JSON_OBJECT and ty != JSON_ARRAY:
+        return JsonRendered { text: json_str(js, tokens, idx), next: idx + 1 }
+    let (open, close) = if ty == JSON_OBJECT: ("{", "}") else: ("[", "]")
+    if size == 0:
+        return JsonRendered { text: open ++ close, next: idx + 1 }
+    var out = open
+    var next = idx + 1
+    for i in 0..size:
+        if i > 0: out = out ++ ","
+        if indent >= 0: out = out ++ json_indent(indent, depth + 1)
+        if ty == JSON_OBJECT:
+            out = out ++ json_quote(json_unescape_string(json_str(js, tokens, next))) ++ (if indent >= 0: ": " else: ":")
+            next = next + 1
+        let member = json_render(js, tokens, next, indent, depth + 1)
+        out = out ++ member.text
+        next = member.next
+    if indent >= 0: out = out ++ json_indent(indent, depth)
+    JsonRendered { text: out ++ close, next }
+
 // ── Lookup helpers ──────────────────────────────────────────────
 
 /// Extract the text of a token from the source JSON string.
