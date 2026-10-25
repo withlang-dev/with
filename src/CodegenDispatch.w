@@ -17837,6 +17837,14 @@ impl Codegen:
         let closure_param_offset: i32 = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
         let fn_ty = closure_abi.llvm_ty
         let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
+        // A closure is reached only through the value its enclosing function
+        // builds, never by name from another unit: internal, like the thunks
+        // and the environment helpers. Left external, the multi-unit build
+        // (#681, unit_demote_foreign_definitions) stripped its body in every
+        // unit but the first, and a generic instance placed in unit 1 whose
+        // body returned a closure linked against an undefined `___closure`
+        // (#2618: `List[str].sort()` in a compiler module).
+        wl_set_linkage(closure_fn, wl_internal_linkage())
         let closure_sym = self.intern.intern(f"$closure_abi${self.closure_counter}")
         self.closure_counter = self.closure_counter + 1
         self.bind_fn_abi(closure_sym, closure_abi_index, closure_fn)
