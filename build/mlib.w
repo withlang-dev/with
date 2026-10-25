@@ -5,7 +5,7 @@ use build.corpus
 use build.wo
 
 // M*LIB (P-p-H-d/mlib), BSD-2-Clause (its LICENSE ships beside the
-// migration). Phase 4 of docs/proposals/stdlib_sourcing_plan.md: the
+// migration). Phase 4 of docs/completed/stdlib_sourcing_plan.md: the
 // B+tree (`m-bptree.h`) behind `BTreeMap` and `BTreeSet`. The generic
 // pipeline (build/corpora.w) fetches, migrates, checks, promotes and bundles
 // it; this module holds the facts, the staging hook and the corpus's lanes.
@@ -41,7 +41,7 @@ pub fn mlib_corpus() -> Corpus:
         verify_generated: corpus_no_verify, lanes: mlib_lanes,
     }
 
-// The facade shapes unit (docs/proposals/stdlib_sourcing_plan.md, Phase 4;
+// The facade shapes unit (docs/completed/stdlib_sourcing_plan.md, Phase 4;
 // D148): M*LIB's B+tree instantiated for the standard library's facades. An
 // arbitrary With key rides the slot shape: the engine orders pointers to
 // facade-owned slots whose head holds the C-ABI comparison that dispatches
@@ -53,7 +53,7 @@ pub fn mlib_corpus() -> Corpus:
 // never in migrated code.
 fn mlib_facade_shapes_source() -> str:
     "// The facade shapes: M*LIB's B+tree instantiated for the With standard\n" ++
-    "// library's facades (docs/proposals/stdlib_sourcing_plan.md, Phase 4). An\n" ++
+    "// library's facades (docs/completed/stdlib_sourcing_plan.md, Phase 4). An\n" ++
     "// arbitrary With key rides the slot shape: the engine orders pointers to\n" ++
     "// slots whose head holds the C-ABI callbacks. A B+tree copies keys into\n" ++
     "// its internal nodes as separators, so a stored slot is the engine's own\n" ++

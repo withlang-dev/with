@@ -6,7 +6,7 @@ bundle merged in #1103 after full build, fixpoint, tests, and both bundle
 drift lanes passed, including the SDK-macro and target-va_list fixes
 (#1107, #1108). Historical before/after
 descriptions below explain the transition. Ruled in direction by Eric
-(decisions.md D38, D39). Companions: `docs/proposals/stdlib_sourcing_plan.md`
+(decisions.md D38, D39). Companions: `docs/completed/stdlib_sourcing_plan.md`
 (the corpora), `docs/proposals/harden_migrate.md` (the migrator), decisions.md D30
 (runtime objects as a cache), #761 (the mixed-generation corruption
 class this design must never reintroduce).
@@ -96,7 +96,7 @@ compiler.
 
 ## How the compiler build uses `.wo`s
 
-1. `build.w` has, per corpus, the pipeline `docs/proposals/stdlib_sourcing_plan.md`
+1. `build.w` has, per corpus, the pipeline `docs/completed/stdlib_sourcing_plan.md`
    describes: pin, reference fetch, whole-corpus migrate, upstream tests.
    Its output is the bundle's `src/` and `tests/`.
 2. A `<corpus>-wo` target compiles `src/` to `obj/<sha>-<target>-abi<N>.o`
@@ -160,7 +160,7 @@ linked by G+k), so two checks replace it:
 
 (c-algorithms is the third bundle, 2026-09-13: `lib/std/engines/c_algorithms/`,
 package `std.engines.c_algorithms`, root `bundle.w`, harness `test_cpp.w`. See
-`docs/proposals/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
+`docs/completed/stdlib_sourcing_plan.md`, "Phase 1 status". TommyDS is the fourth,
 2026-09-14: `lib/std/engines/tommyds/`, package `std.engines.tommyds`, root `bundle.w`,
 harness `check_.w` (upstream's `check.c`; `check` collides with the
 prelude name), corpora lane `tommyds-test`. See "Phase 2 status" in the

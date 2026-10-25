@@ -3,7 +3,7 @@ module build.corpus
 use std.build
 use std.sysinfo
 
-// A migrated C corpus (docs/proposals/stdlib_sourcing_plan.md, docs/spec/toolchain/wo_bundles.md):
+// A migrated C corpus (docs/completed/stdlib_sourcing_plan.md, docs/spec/toolchain/wo_bundles.md):
 // the facts about one upstream library and the few hooks its pipeline
 // needs. Everything structurally shared — fetching, staging, migration,
 // the bundle root, the generated-tree checks, promotion, the .wo bundle,

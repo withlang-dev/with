@@ -1,5 +1,5 @@
 // std.collections.stc_slot — facade-owned storage for values the migrated
-// STC engines index (docs/proposals/stdlib_sourcing_plan.md, Phase 3, the
+// STC engines index (docs/completed/stdlib_sourcing_plan.md, Phase 3, the
 // generic-over-templates design item). STC's templates are instantiated
 // once per shape in the corpus's facade shapes unit
 // (std.engines.stc.facade_shapes); an arbitrary With value rides the slot

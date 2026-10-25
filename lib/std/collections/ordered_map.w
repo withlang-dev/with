@@ -1,5 +1,5 @@
 // std.collections.ordered_map — OrderedMap[K, V]: an ordered map over the
-// migrated STC `sset` (docs/proposals/stdlib_sourcing_plan.md, Phase 3; the
+// migrated STC `sset` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the
 // facade map's primary ordered engine, an AA-tree). Each entry is one
 // facade-owned slot holding the key and the value (std.collections.stc_slot's
 // `StcEntry`); the engine orders entry pointers through the facade's key

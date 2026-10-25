@@ -2,7 +2,7 @@
 
 **Laws:** 3 (the compiler owns what it already lowers), 9 (one spelling of one meaning); tested against 10.
 
-**Date:** 2026-10-24. **Status:** ruled by Eric on the brief posted after #2614. **Supersedes:** the `List`/`Vec` row of the facade map in `docs/proposals/stdlib_sourcing_plan.md` and `docs/spec/stdlib/stdlib_inventory.md` line 15 ("STC `vec` in Phase 3").
+**Date:** 2026-10-24. **Status:** ruled by Eric on the brief posted after #2614. **Supersedes:** the `List`/`Vec` row of the facade map in `docs/completed/stdlib_sourcing_plan.md` and `docs/spec/stdlib/stdlib_inventory.md` line 15 ("STC `vec` in Phase 3").
 
 ## The ruling
 
@@ -37,7 +37,7 @@ sources know `List`'s layout; the benchmark's `List push/index/pop
 
 ## What this changes
 
-- `docs/proposals/stdlib_sourcing_plan.md`: the `List` row reads "rt_core;
+- `docs/completed/stdlib_sourcing_plan.md`: the `List` row reads "rt_core;
   STC `vec` comparison"; "What remains" item 1 is closed by this ruling.
 - `docs/spec/stdlib/stdlib_inventory.md` line 15: the gap column reads
   "ruled D157: rt_core is the engine; STC `vec` is the comparison row in

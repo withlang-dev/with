@@ -1,5 +1,5 @@
 // std.collections.deque — Deque[T]: a double-ended queue over the migrated
-// STC `deque` (docs/proposals/stdlib_sourcing_plan.md, Phase 3; the facade
+// STC `deque` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the facade
 // map's primary engine, a ring buffer). Two shapes of the engine serve it
 // (D148, as ruled on its brief): an integer scalar — i8..i64, u8..u64,
 // isize, usize — is stored inline as one word in the engine's own ring

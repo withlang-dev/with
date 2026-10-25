@@ -6,7 +6,7 @@
 > collapsed to pointers. This is a *plan*, not a specification: since D48
 > (`db6f935e`) the language specification no longer catalogues `lib/std`,
 > and each landed module's own document (`docs/regex-spec.md`,
-> `docs/spec/stdlib/std-encoding-rfc4648.md`, `docs/proposals/stdlib_sourcing_plan.md`) is
+> `docs/spec/stdlib/std-encoding-rfc4648.md`, `docs/completed/stdlib_sourcing_plan.md`) is
 > authoritative for it.
 >
 > **Conformance note (D27, 2026-07-30):** the API sketches below predate the
@@ -101,7 +101,7 @@ tracks first steps).
 
 ## Sourced from corpora
 
-`docs/proposals/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
+`docs/completed/stdlib_sourcing_plan.md` (ruled 2026-09-12) settles which
 containers and algorithms are *facades over migrated corpora* rather
 than native modules, and the corpus registry (`build/corpus.w`,
 `build/corpora.w`) wires each corpus as a `.wo` bundle with its upstream
@@ -173,7 +173,7 @@ that touch the filesystem.
 
 #### 1.2 List sorting and search — methods on `collections.List`
 
-**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `List.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/proposals/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_list.SortedList[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
+**Resolved by the corpus sourcing plan (Phase 3, STC — pending).** `List.sort`, `sort_stable`, `is_sorted`, `binary_search`, `reverse`, `dedup` are the `std.algorithms` facade over STC's migrated algorithm layer (`docs/completed/stdlib_sourcing_plan.md`, facade map rows `sort`/`binary_search`/`lower_bound`/`reverse`/`shuffle`; #940). `stable_sort` is exposed only if upstream's stability contract holds. Already landed from Phase 1: `std.collections.sorted_list.SortedList[T]` and `std.collections.binary_heap.BinaryHeap[T]` (c-algorithms). Nothing native is written for this section.
 
 #### 1.3 `std.toml` — TOML parser
 
@@ -964,7 +964,7 @@ Refreshed order for the native remainder, by what it unblocks:
 | 17 | `std.debug` | Stack traces, panic hooks |
 | 18 | `std.semver` | Package management support |
 
-Sourced items follow `docs/proposals/stdlib_sourcing_plan.md`'s own phase order
+Sourced items follow `docs/completed/stdlib_sourcing_plan.md`'s own phase order
 (STC, then M\*LIB) and are not re-sequenced here.
 
 ---

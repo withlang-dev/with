@@ -2,7 +2,7 @@
 
 **Laws:** 9 (two spellings of one meaning are a defect), 1; tested against 10.
 
-**Date:** 2026-10-24. **Status:** ruled by Eric on the brief posted after #2614. **Supersedes:** the `Span[T]` row of the facade map in `docs/proposals/stdlib_sourcing_plan.md`.
+**Date:** 2026-10-24. **Status:** ruled by Eric on the brief posted after #2614. **Supersedes:** the `Span[T]` row of the facade map in `docs/completed/stdlib_sourcing_plan.md`.
 
 ## The ruling
 
@@ -32,7 +32,7 @@ design goal. No reference language sources a strided span from a library.
 ## What this changes
 
 - The facade map's `Span[T]` row and the `std.slice`/`std.span` grouping
-  are removed from `docs/proposals/stdlib_sourcing_plan.md`; "What remains"
+  are removed from `docs/completed/stdlib_sourcing_plan.md`; "What remains"
   item 2 is closed by this ruling.
 - `cspan` stays a migrated, tested engine under `std.engines.stc`.
 

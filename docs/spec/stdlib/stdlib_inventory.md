@@ -1,6 +1,6 @@
 # Algorithms and data structures inventory
 
-Phase 0 inventory for [the sourcing plan](stdlib_sourcing_plan.md). This records
+Phase 0 inventory for [the sourcing plan](../../completed/stdlib_sourcing_plan.md). This records
 implementation facts and the plan's complexity targets. Engine destinations
 follow Eric's 2026-09-12 facade map; detailed new signatures remain facade work.
 Costs exclude user comparators, hashing, cloning,

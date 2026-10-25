@@ -6,7 +6,7 @@ use build.par
 use build.wo
 
 // fragglet/c-algorithms, ISC (its COPYING ships beside the migration).
-// Phase 1 of docs/proposals/stdlib_sourcing_plan.md. The generic pipeline
+// Phase 1 of docs/completed/stdlib_sourcing_plan.md. The generic pipeline
 // (build/corpora.w) fetches, migrates, checks, promotes and bundles it;
 // this module holds the facts, the staging hook and the corpus's own
 // lanes: upstream's 17 test programs, each its own ALLOC_TESTING migration.
@@ -15,7 +15,7 @@ const CALG_REVISION = "23d453792ed89a28ed7d2c8d4311a4d9f7822edd"
 const CALG_SHA256 = "c2e9f3ba13d5373f79a70fa27d93730de98af314f2476190b156eee2a638a51b"
 
 // The checked-in ALLOC_TESTING migration of upstream's test programs
-// (docs/proposals/stdlib_sourcing_plan.md: a corpus's migrated tests live in the tree).
+// (docs/completed/stdlib_sourcing_plan.md: a corpus's migrated tests live in the tree).
 // engine/ holds the one engine + framework copy every program shares;
 // programs/<name>/ holds the program's own defs.w and test module. Generated
 // by c-algorithms-promote-tests, never hand-edited. The programs migrate
