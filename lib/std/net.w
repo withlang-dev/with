@@ -1,6 +1,10 @@
 // std.net — Networking primitives
 //
-// Provides TCP and UDP socket operations wrapping POSIX APIs.
+// Provides TCP and UDP socket operations wrapping POSIX APIs. A listener
+// (tcp_listen, udp_bind) is IPv4, on every local address; a connect
+// (tcp_connect, udp_connect) tries each address the host name resolves to,
+// IPv4 or IPv6. A failure that says -errno is the negated OS error number
+// (EBADF is -9), never just -1.
 
 use rt.platform
 
@@ -31,7 +35,8 @@ pub fn tcp_connect_timeout(host: &str, port: i32, timeout_ms: i32) -> i32:
 pub fn set_timeout(fd: i32, timeout_ms: i32) -> i32:
     with_net_set_timeout(fd, timeout_ms)
 
-/// Send data over a socket. Returns bytes sent, or -1 on error.
+/// Send data over a socket. Returns the bytes sent, which may be fewer than
+/// `data` holds, or -errno (#1011: never -1 alone; check `< 0`).
 pub fn send(fd: i32, data: &str) -> i64:
     with_net_send(fd, data)
 
@@ -39,7 +44,7 @@ pub fn send(fd: i32, data: &str) -> i64:
 pub fn recv(fd: i32, max_len: i64) -> str:
     with_net_recv(fd, max_len)
 
-/// Close a socket. Returns 0 on success.
+/// Close a socket. Returns 0, or -errno.
 pub fn socket_close(fd: i32) -> i32:
     with_net_close(fd)
 
