@@ -2,7 +2,7 @@
 // drawn once over the whole corpus and written as the contracts artifact
 // (`with migrate --emit-contracts FILE`, one line per defined function:
 // `name<TAB>verdict[,verdict…]`), and the shape each proved function is
-// printed in (docs/proposals/migrator-contracts-plan.md, steps 1 and 2).
+// printed in (migrator-contracts-plan.md, steps 1 and 2).
 //
 // The evidence is the body's (CImport.w ci_body_contract_evidence) joined
 // with D121's ownership proofs (CiFacadeDraft.w resolve_ownership:

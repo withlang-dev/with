@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// SortedList[T] over the c-algorithms sorted array (docs/proposals/stdlib_sourcing_plan.md
+// SortedList[T] over the c-algorithms sorted array (stdlib_sourcing_plan.md
 // Phase 1): ordered insertion, observing views, transfers, binary search,
 // and exactly-once drops of Drop-class values.
 

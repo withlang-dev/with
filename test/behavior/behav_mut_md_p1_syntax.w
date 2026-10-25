@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// docs/mut.md Rev 8 P1 syntax smoke test.
+// mut.md Rev 8 P1 syntax smoke test.
 // Exercises new surface accepted in P1 (additive; no semantic enforcement yet):
 //   - `global` (stable global place) and `global var` (rebindable global)
 //   - `mut self: Self` receiver-place mode tag

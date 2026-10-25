@@ -316,7 +316,7 @@ pub const GLOBAL_VALUE_DECL_EXTERN: i32 = 2
 // D39: storage a bundle interface declares; the bundle's object defines it.
 pub const GLOBAL_VALUE_DECL_INTERFACE: i32 = 3
 
-// docs/completed/mutability.md §5 — per-parameter effect bits.
+// mutability.md §5 — per-parameter effect bits.
 pub const EFF_READ: i32         = 1   // parameter is read
 pub const EFF_WRITE: i32        = 2   // parameter place is mutated (implies read)
 pub const EFF_CONSUME: i32      = 4   // parameter is moved/consumed in the body
@@ -720,7 +720,7 @@ type Sema {
     sig_lookup: HashMap[i32, i32],
     // An extern keeps its own signature when a curated wrapper takes its name.
     extern_decl_sigs: HashMap[i32, i32],
-    // docs/completed/mutability.md Phase 4 — per-parameter effect bitsets.
+    // mutability.md Phase 4 — per-parameter effect bitsets.
     // sig_param_effects[sig_param_eff_starts[si] + pi] = effect bits for param pi of sig si.
     // Effects: EFF_READ=1, EFF_WRITE=2, EFF_CONSUME=4,
     // EFF_ESCAPE_VALUE=8, EFF_ESCAPE_VIEW=16, EFF_RAW_PTR_VALIDITY=32.
@@ -799,7 +799,7 @@ type Sema {
     // Stride-8 records: [arg_node, callee_sig, callee_pi, file_id, root_sym,
     // use_seq, loop_depth, liveness] — liveness stamped at body end (0=unknown,
     // 1=last-use, 2=live-after); backs the `move-sites` analysis request
-    // (docs/spec/toolchain/deep-debugging-tools.md).
+    // (deep-debugging-tools.md).
     consume_call_sites: List[i32],
     // move-sites: use sequencing. ONE persistent map per key kind, one owner —
     // bodies are separated by an epoch packed into every value (epoch*2^32 +
@@ -1178,7 +1178,7 @@ type Sema {
     // returns (a generic one is demanded into iter_next_sigs/monos).
     for_iter_next_fns: HashMap[i32, i32],
     mutable_global_syms: HashMap[i32, i32],
-    // docs/completed/mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
+    // mut.md Rev 8 §12 / §15.12 — symbols declared via `global X = ...`
     // (stable) recorded here. Used by check_assign to emit a specific
     // diagnostic on rebind attempts. `global var X = ...` does NOT register
     // here — it's rebindable.
@@ -1411,7 +1411,7 @@ type Sema {
     label_kinds: List[i32],
     label_nodes: List[i32],
     label_break_value_types: List[i32],
-    // Loop move-state tracking (docs/completed/branch-merge-soundness.md §6.7 / #613):
+    // Loop move-state tracking (branch-merge-soundness.md §6.7 / #613):
     // per label frame: entry bind-count (outer/inner boundary), the offset of this
     // loop's break-flag region in loop_break_flat (-1 = none), and whether any
     // break to this frame was captured. loop_break_flat is a flat stack of
@@ -2063,7 +2063,7 @@ type Sema {
     symbols_frozen: i32,
     types_frozen: i32,
 
-    // docs/completed/mutability.md Phase 4 — per-function effect tracking during body analysis.
+    // mutability.md Phase 4 — per-function effect tracking during body analysis.
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
     current_fn_param_syms: List[i32],   // param name symbols for the function being checked
     current_fn_param_effs: List[i32],   // accumulated effect bits per param
@@ -2890,7 +2890,7 @@ fn sema_exact_type_hash(kind: i32, d0: i32, d1: i32, d2: i32) -> i64:
 fn sema_pair_hi(key: i64): (key / 4294967296) as i32
 fn sema_pair_lo(key: i64): (key % 4294967296) as i32
 
-// Effect-provenance packing (docs/spec/toolchain/deep-debugging-tools.md, explain:effect).
+// Effect-provenance packing (deep-debugging-tools.md, explain:effect).
 // Key = (sig, pi, bit_idx) with pi < 2^16, bit_idx < 2^8; value = (kind, a, b)
 // with a, b < 2^28. These fns are the only place the field widths appear;
 // encode and decode both live here so they cannot drift apart.
@@ -8026,7 +8026,7 @@ impl Sema:
                 slot.set(provenance)
 
     // Conservative union of move-state across two control-flow branches, for the
-    // MaybeUninitialized use-checking half (see docs/completed/branch-merge-soundness.md). A
+    // MaybeUninitialized use-checking half (see branch-merge-soundness.md). A
     // binding is MOVED after the construct iff it is MOVED on ANY non-diverging
     // branch (so a value moved on one path cannot be used after — use-after-move
     // soundness); divergent branches (TY_NEVER) contribute nothing. If both branches
@@ -8050,7 +8050,7 @@ impl Sema:
     // Pointwise union for accumulating a join over N branches/arms (e.g. match): a
     // binding is MOVED in the result iff MOVED in either input. Seed the accumulator
     // with the entry state (the implicit no-match/fallthrough path) and fold each
-    // non-diverging arm exit into it; see docs/completed/branch-merge-soundness.md.
+    // non-diverging arm exit into it; see branch-merge-soundness.md.
     fn union_move_states(base: &List[i32], other: &List[i32]) -> List[i32]:
         var out: List[i32] = List.new()
         let n = base.len()
@@ -8060,7 +8060,7 @@ impl Sema:
             out.push(if bv == VarState.MOVED or ov == VarState.MOVED: VarState.MOVED else: VarState.LIVE)
         out
 
-    // ── Loop move-state (#613, docs/completed/branch-merge-soundness.md §6.7) ──────────────
+    // ── Loop move-state (#613, branch-merge-soundness.md §6.7) ──────────────
 
     mut fn emit_loop_carried_move_error(bind_idx: i32, loop_node: i32):
         let sym = self.bind_names[bind_idx]
@@ -8111,7 +8111,7 @@ impl Sema:
     // (check_loop_continue_carried_move) — MUST call this; re-inlining the condition
     // per edge is exactly how #696 happened (the continue edge dropped the
     // entry==LIVE guard). `needs_drop` is passed in (callers already compute it) so
-    // this stays a pure predicate. See docs/meetings/README.md.
+    // this stays a pure predicate. See README.md.
     fn is_loop_carried_move(entry_state: i32, cur_state: i32, needs_drop: i32) -> i32:
         if entry_state == VarState.LIVE and cur_state == VarState.MOVED and needs_drop != 0: 1 else: 0
 
@@ -9107,7 +9107,7 @@ impl Sema:
         if self.mutable_global_syms.contains(sym): return 1
         0
 
-    // docs/completed/mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
+    // mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
     // Rebinding such a symbol is the §15.12 diagnostic.
     fn is_stable_global(sym: i32) -> i32:
         if self.stable_global_syms.contains(sym): return 1
@@ -9144,7 +9144,7 @@ impl Sema:
         self.sig_param_starts.push(param_start)
         self.sig_param_counts.push(param_count)
         self.sig_variadic.push(variadic)
-        // docs/completed/mutability.md Phase 4 — per-parameter effect storage.
+        // mutability.md Phase 4 — per-parameter effect storage.
         self.sig_param_eff_starts.push(self.sig_param_effects.len() as i32)
         for pi in 0..param_count:
             self.sig_param_effects.push(0)
@@ -9720,7 +9720,7 @@ impl Sema:
                 projection_only = projection_only + 1
         f"receiver-projection-audit: mismatches={mismatches} projection-only={projection_only} root-paths={root_paths}\n" ++ out
 
-    // D5 (superseded — docs/meetings/2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md): the effects-based share-place
+    // D5 (superseded — 2026-07-05-D5-historical-share-place-free-parameter-design-superseded.md): the effects-based share-place
     // classifier for FREE parameters is deleted. The signature states the
     // ownership mode: `&T` borrows, plain `T` consumes — a body edit can
     // never silently change a public calling convention again. Receiver

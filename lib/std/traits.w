@@ -171,7 +171,7 @@ pub trait Drop:
 
 /// Iterator protocol. Call `.next()` to advance the iterator and return
 /// `Option[T]` — `Some(val)` or `None`. The receiver is `mut self: Self`
-/// (docs/mut.md Rev 8 §11.1) — the iterator's place is mutated in-place
+/// (mut.md Rev 8 §11.1) — the iterator's place is mutated in-place
 /// without consuming it, so an iterator bound to a local can be reused
 /// across calls. During the bridge phase (P1..P11), `mut self: Self` and
 /// consuming `self` produce the same MIR; existing impls written either
@@ -387,14 +387,14 @@ pub trait MultiIndex[O]:
 pub trait MultiIndexMut[V]:
     mut fn multi_index_set(specs: &[IndexSpec], count: i32, value: V) -> Unit
 
-/// Single-axis read-only indexing (docs/mut.md Rev 8 §2.4).
+/// Single-axis read-only indexing (mut.md Rev 8 §2.4).
 /// `P[i]` on an `IndexGet`-only type returns a value, not a place — the
 /// expression cannot appear on the LHS of an assignment, take a `&raw mut`,
 /// or be a mutating-receiver target.
 pub trait IndexGet[I, V]:
     fn get(self: &Self, index: I) -> V
 
-/// Place-projection indexing (docs/mut.md Rev 8 §2.4).
+/// Place-projection indexing (mut.md Rev 8 §2.4).
 /// `IndexPlace` is a compiler-recognized syntax trait: implementations
 /// grant the compiler permission to treat `P[i]` as a place projection of
 /// `P`. The compiler lowers reads, writes, and scoped access directly on

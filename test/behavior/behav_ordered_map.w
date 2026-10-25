@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// OrderedMap[K, V] over the STC sset (docs/proposals/stdlib_sourcing_plan.md
+// OrderedMap[K, V] over the STC sset (stdlib_sourcing_plan.md
 // Phase 3): ordered keys, insert returns the replaced value, get observes,
 // remove transfers, in-order traversal, exactly-once drops of keys and
 // values.

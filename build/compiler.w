@@ -15,7 +15,7 @@ const COMPILER_FALLBACK_LLVM_PREFIX: str = "/usr/local/llvm"
 const COMPILER_VERSION_SENTINEL: str = "WITHVERSIONSTAMPv1"
 const COMPILER_VERSION_SLOT_WIDTH: i32 = 48
 const COMPILER_VERSION_SOURCE_SLOT: str = "WITHVERSIONSTAMPv1XXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"
-// D38 / docs/spec/toolchain/wo_bundles.md: the compiler bakes in the sha256 of
+// D38 / wo_bundles.md: the compiler bakes in the sha256 of
 // docs/with-abi.sha256 (the recorded hashes of the ABI-defining sources) the
 // same way it bakes in its version — a post-link byte patch of a sentinel
 // slot. `with version --abi-sha` prints it; .wo bundle keys and link-time
@@ -1332,7 +1332,7 @@ fn comp_internal_command(item: &str) -> bool:
 
 fn comp_internal_flag(item: &str) -> bool:
     // --link-object / --link-bundle / --emit-bundle-manifest are .wo bundle
-    // plumbing driven by build.w (docs/spec/toolchain/wo_bundles.md), never hand-written:
+    // plumbing driven by build.w (wo_bundles.md), never hand-written:
     // internal like --no-prelude. So are `version --generation` and
     // `--runtime-generation`, which the build reads to stamp and check a
     // runtime object set's producer (#1815). `migrate --c-target` and
@@ -1886,6 +1886,73 @@ pub fn run_check_runtime_domain_audit_action(ctx: ActionCtx) -> i32:
     if fs.write_text(output, record) != 0:
         return comp_fail(ctx, "could not write: " ++ output)
     0
+
+// `doc-path-check` (in the gate): source never names a document's path
+// (CLAUDE.md, Editing Protocol). A citation is a ruling (D-number), a spec
+// section (§) or a document's file name; a document's directory moves
+// (proposals/ becomes completed/), and a path to it made a document move a
+// source change and a battery (#2632). Every `docs/…md` in the source
+// trees is refused except the listed ones, each a file the program reads
+// or writes rather than a citation.
+fn comp_doc_path_allowed(path: &str, file: &str) -> bool:
+    // An input: the generated AGENTS.md/CLAUDE.md are checked against it,
+    // and `with init` templates are generated from it.
+    if path == "docs/spec/guide/with_for_ai.md": return true
+    // Corpus output: the promoted bundle roots carry this line; it changes
+    // only with every corpus's re-promotion (D112).
+    if file == "build/corpus.w" and path == "docs/spec/toolchain/wo_bundles.md": return true
+    // This list names them.
+    file == "build/compiler.w" and path == "docs/spec/toolchain/wo_bundles.md"
+
+fn comp_doc_path_file_exempt(file: &str) -> bool:
+    // Generated, never edited by hand (D112): the corpora and their tests.
+    if file.starts_with("lib/std/engines/") or file.starts_with("test/corpora/"): return true
+    // Its job is moving documents: the paths are its data.
+    if file == "tools/docs_restructure.w": return true
+    // Path classification data for the green identity (D49), not citations.
+    file == "test/behavior/behav_green_identity_keys_on_inputs.w"
+
+// The `docs/…md` paths in one line, in order.
+fn comp_doc_paths_in(line: &str) -> List[str]:
+    var found: List[str] = List.new()
+    var at = 0
+    while at + 5 <= line.len():
+        if line.slice(at, at + 5) != "docs/":
+            at = at + 1
+            continue
+        if at > 0 and (line[at - 1] == '_' or (line[at - 1] >= 'a' and line[at - 1] <= 'z') or (line[at - 1] >= 'A' and line[at - 1] <= 'Z') or (line[at - 1] >= '0' and line[at - 1] <= '9')):
+            at = at + 1
+            continue
+        var end = at + 5
+        while end < line.len() and (line[end] == '/' or line[end] == '_' or line[end] == '-' or line[end] == '.' or (line[end] >= 'a' and line[end] <= 'z') or (line[end] >= 'A' and line[end] <= 'Z') or (line[end] >= '0' and line[end] <= '9')):
+            end = end + 1
+        var path = line.slice(at, end).to_owned()
+        while path.ends_with("."): path = path.slice(0, path.len() - 1).to_owned()
+        if path.ends_with(".md"): found.push(path)
+        at = end
+    found
+
+pub fn run_doc_path_check_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    var files: List[str] = List.new()
+    files.push("build.w")
+    for dir in ["src", "build", "lib", "tools", "rt", "test"]:
+        for path in fs.list_files(dir):
+            if path.ends_with(".w"): files.push(path)
+    var errors = 0
+    var scanned = 0
+    for file in files:
+        if comp_doc_path_file_exempt(file): continue
+        scanned = scanned + 1
+        let lines = fs.read_text(file).split("\n")
+        for li in 0..lines.len():
+            for path in comp_doc_paths_in(lines[li]):
+                if comp_doc_path_allowed(path, file): continue
+                eprint(f"{file}:{li + 1}: names the document path `{path}`; cite the ruling (D-number), the spec section (§) or the file name alone — a document's directory moves")
+                errors = errors + 1
+    if errors > 0: return comp_fail(ctx, f"{errors} document path(s) in source (a document move must never change source)")
+    print(f"doc-path-check: {scanned} source files name no document path")
+    comp_write_ok_output(ctx)
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
@@ -2607,7 +2674,7 @@ pub fn run_patch_version_action(ctx: ActionCtx) -> i32:
     comp_patch_version_binary(ctx, unstamped, output_path, version, runtime_generation)
 
 // Whether an LLVM SDK's lib dir carries the WebAssembly backend the wasm32
-// target needs (docs/proposals/wasm-target.md). tools/build-static-llvm.sh builds it
+// target needs (wasm-target.md). tools/build-static-llvm.sh builds it
 // by default now; SDKs published before that were AArch64+X86 only.
 pub fn comp_sdk_has_wasm_backend(fs: &ToolFs, llvm_lib_dir: &str) -> bool:
     fs.host_exists(llvm_lib_dir ++ "/libLLVMWebAssemblyCodeGen.a") or fs.host_exists(llvm_lib_dir ++ "/LLVMWebAssemblyCodeGen.lib")
@@ -3138,7 +3205,7 @@ pub fn run_with_compiler_build_action(ctx: ActionCtx) -> i32:
         return comp_fail(ctx, "did not produce output: " ++ tmp_output)
     let _remove_old_dsym = comp_remove_tree_if_exists(fs, output_path ++ ".dSYM")
     if comp_output_is_stamped_compiler(ctx, output_path):
-        // D38 (docs/spec/toolchain/wo_bundles.md, batch C3): a stage binary carries the
+        // D38 (wo_bundles.md, batch C3): a stage binary carries the
         // version and ABI stamps exactly as the release binary does, so the
         // stage whose stamp equals a bundle key's abi-sha can build that
         // bundle and its manifest.

@@ -684,7 +684,7 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
         out.push_str(dump_drop_plan_body(&mir_mod.bodies[i], pool, sema))
     out.to_str()
 
-// Drop elaboration — the "Dead" arm (#614, docs/completed/drop-elaboration-soundness.md).
+// Drop elaboration — the "Dead" arm (#614, drop-elaboration-soundness.md).
 // A `StmtKind.Drop` whose place is statically `Moved` at that point is provably
 // dead: the value was moved out, so emitting the drop double-drops it. Rewrite it
 // to `StmtKind.Nop` (codegen already treats Nop as a no-op). This is the analogue

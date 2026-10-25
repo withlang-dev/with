@@ -7119,7 +7119,7 @@ fn ci_value_ir_plain(value_expr: CiExprId) -> CiValueExprIR:
 fn ci_value_ir_valid(lowered: CiValueExprIR) -> bool:
     lowered.value_expr != 0
 
-// docs/completed/mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` List
+// mut.md Rev 8 §5.1 — accumulator helper. Owned-by-value `out` List
 // is threaded through the recursion; the underlying buffer is shared by
 // reference but the {len, cap} triple is reassigned on push so we return
 // the updated List to avoid losing growth on the caller side.

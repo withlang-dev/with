@@ -3,7 +3,7 @@ module build.corpus
 use std.build
 use std.sysinfo
 
-// A migrated C corpus (docs/completed/stdlib_sourcing_plan.md, docs/spec/toolchain/wo_bundles.md):
+// A migrated C corpus (stdlib_sourcing_plan.md, wo_bundles.md):
 // the facts about one upstream library and the few hooks its pipeline
 // needs. Everything structurally shared — fetching, staging, migration,
 // the bundle root, the generated-tree checks, promotion, the .wo bundle,
@@ -345,7 +345,7 @@ pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOpt
         argv.push("--shared-fragment")
         argv.push(corpus_abs(ctx, options.shared_fragment))
     // D159: the contracts the bodies prove, beside the modules; promotion
-    // copies it and the drift lane diffs it (docs/proposals/migrator-contracts-plan.md).
+    // copies it and the drift lane diffs it (migrator-contracts-plan.md).
     argv.push("--emit-contracts")
     argv.push(corpus_abs(ctx, options.output_path) ++ "/contracts.tsv")
     argv
@@ -517,7 +517,7 @@ pub fn corpus_reject_foreign_symbols(ctx: &ActionCtx, corpus: &Corpus, generated
                 errors = errors + 1
     errors
 
-/// The .wo bundle root (docs/spec/toolchain/wo_bundles.md "Root"): one `use` per corpus
+/// The .wo bundle root (wo_bundles.md "Root"): one `use` per corpus
 /// module, bytewise by name, so the bundle build reaches every module. The
 /// text is a pure function of the module listing; <stem>-bundle-root-check
 /// checks the promoted root against it.

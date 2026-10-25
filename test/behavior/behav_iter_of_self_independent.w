@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// docs/mut.md Rev 8 §15.8 — the iter-of-self mechanism only triggers a
+// mut.md Rev 8 §15.8 — the iter-of-self mechanism only triggers a
 // borrow conflict when the iterator's receiver place overlaps with the
 // closure's mutable capture. Independent values (xs.len() returns i64 by
 // value, no retained access) leave the closure free to mutate xs.

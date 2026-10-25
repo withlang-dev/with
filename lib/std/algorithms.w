@@ -1,5 +1,5 @@
 // std.algorithms — generic sequence algorithms over the migrated STC
-// algorithm layer (docs/completed/stdlib_sourcing_plan.md, Phase 3; the facade
+// algorithm layer (stdlib_sourcing_plan.md, Phase 3; the facade
 // map's primary engine for sort and the searches). STC's `sort.h` is a
 // template; the corpus's facade shapes unit instantiates it for the slot
 // reference shape — `{comparator, pointer}` pairs ordered through the With

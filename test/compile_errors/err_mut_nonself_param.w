@@ -1,6 +1,6 @@
 //! expect-check-fail: `mut` is not a parameter modifier
 
-// #645 / docs/mutability.md: parameters are implicitly rebindable; there is no
+// #645 / mutability.md: parameters are implicitly rebindable; there is no
 // `mut x: T` parameter modifier. `mut self` is valid; `mut` on any other
 // parameter is rejected loudly instead of silently discarded.
 

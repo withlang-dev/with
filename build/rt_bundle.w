@@ -1,9 +1,9 @@
 module build.rt_bundle
 
-// The runtime bundle (D30 R3, docs/proposals/d30-implementation-plan.md
+// The runtime bundle (D30 R3, d30-implementation-plan.md
 // §10): the runtime compiled as its own unit, in full, into
 // <dir>/rt.{o,wi,manifest} — the artifact shape of a .wo bundle
-// (docs/spec/toolchain/wo_bundles.md), none of its store. A compiler embeds
+// (wo_bundles.md), none of its store. A compiler embeds
 // the bundle a compiler of its own generation built (stage2 embeds stage1's,
 // stage3 stage2's), and `rt-bundle-fixpoint` proves the two agree byte for
 // byte: the in-unit result is what the cache holds, by construction.

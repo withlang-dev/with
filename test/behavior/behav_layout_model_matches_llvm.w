@@ -76,7 +76,7 @@
 //! expect-stdout: (i8,V8) ok
 //! expect-stdout: (i8,(i8,V8)) ok
 
-// #1438 (docs/spec/abi/with-abi.md §1–§3): TypeLayout, the hashed ABI source
+// #1438 (with-abi.md §1–§3): TypeLayout, the hashed ABI source
 // that answers `comptime T.size()`/`T.align()` and sizes union members,
 // channel slots and map tuples, must measure exactly what codegen emits.
 // Each row prints the model's size/align, then LLVM's for the emitted type
