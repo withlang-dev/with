@@ -4520,6 +4520,82 @@ fn bs_check_migrate_char_pointer_is_c_char(ctx: &ActionCtx, compiler_path: &str,
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-char-pointer", check_args)
     checked.rc
 
+// D159 step 1 (docs/proposals/migrator-contracts-plan.md): the contracts
+// artifact names, per defined function, what its body proves about the
+// pointers it is handed — and names the unproved point otherwise. One small
+// corpus exercises every verdict and every refusal: a handle mutated
+// directly, through a corpus callee, and read only; an out-parameter
+// written whole on every path (scalar and record), one written after a
+// return, one read before the write; a stored pointer with and without a
+// corpus destroyer that frees the field; a returned parameter.
+fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src_dir = bs_join(case_dir, "src")
+    let header = "struct item { int v; struct item *next; };\nstruct pair { int a; int b; };\nstruct eng { int count; struct item *items; void *user; };\n" ++
+        "void eng_init(struct eng *e);\nvoid eng_push(struct eng *e, struct item *it);\nvoid eng_set_user(struct eng *e, void *user);\nint eng_count(const struct eng *e);\n" ++
+        "struct item *eng_first(struct eng *e);\nvoid eng_bump(struct eng *e, int *out);\nint eng_find(struct eng *e, int key, int *out);\nvoid eng_fill(struct eng *e, struct pair *out);\n" ++
+        "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n"
+    let unit = "#include <stdlib.h>\n#include \"eng.h\"\n" ++
+        "void eng_init(struct eng *e) { e->count = 0; e->items = 0; e->user = 0; }\n" ++
+        "void eng_push(struct eng *e, struct item *it) { it->next = e->items; e->items = it; e->count++; }\n" ++
+        "void eng_set_user(struct eng *e, void *user) { e->user = user; }\n" ++
+        "int eng_count(const struct eng *e) { return e->count; }\n" ++
+        "struct item *eng_first(struct eng *e) { return e->items; }\n" ++
+        "void eng_bump(struct eng *e, int *out) { *out = e->count + 1; }\n" ++
+        "int eng_find(struct eng *e, int key, int *out) { if (e->count == 0) return 0; *out = key; return 1; }\n" ++
+        "void eng_fill(struct eng *e, struct pair *out) { *out = (struct pair){ e->count, 1 }; }\n" ++
+        "void eng_bump_twice(struct eng *e, int *out) { eng_bump(e, out); *out = *out + 1; }\n" ++
+        "void eng_free(struct eng *e) { struct item *it = e->items; while (it) { struct item *n = it->next; free(it); it = n; } e->items = 0; }\n" ++
+        "void eng_drop_user(struct eng *e) { free(e->user); e->user = 0; }\n" ++
+        "void eng_via(struct eng *e) { eng_init(e); }\n"
+    var rc = bs_write_fixture(ctx, bs_join(src_dir, "eng.h"), header, "contracts header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(src_dir, "eng.c"), unit, "contracts unit")
+    if rc != 0: return rc
+    let contracts = bs_join(case_dir, "contracts.tsv")
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src_dir))
+    args |> push("-o")
+    args |> push(bs_abs(root, bs_join(case_dir, "out")))
+    args |> push("--no-c-export")
+    args |> push("--prefer-brace")
+    args |> push("-I")
+    args |> push(bs_abs(root, src_dir))
+    args |> push("--emit-contracts")
+    args |> push(bs_abs(root, contracts))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-contracts", args)
+    if result.rc != 0: return result.rc
+    // (a1) the handle mutated directly, through a callee, and the destroyer.
+    rc = bs_file_contains(ctx, contracts, "eng_init\treceiver-mut:eng\n", "contracts receiver mutated directly")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_via\treceiver-mut:eng\n", "contracts receiver mutated through a corpus callee")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_free\treceiver-mut:eng\n", "contracts destroyer is a mutating receiver")
+    if rc != 0: return rc
+    // A read-only handle is not in the ruling's list: unproved, said so.
+    rc = bs_file_contains(ctx, contracts, "eng_count\tunproved:0:read only\n", "contracts read-only receiver stays unproved")
+    if rc != 0: return rc
+    // (a2) out-parameters: written whole on every path, a scalar and a
+    // record; after a return; read (by a callee) before the write.
+    rc = bs_file_contains(ctx, contracts, "eng_bump\tunproved:0:read only,out:1:i32\n", "contracts scalar out-parameter")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_fill\tunproved:0:read only,out-record:1:pair\n", "contracts record out-parameter")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_find\tunproved:0:read only,unproved:2:out-parameter a return before the write\n", "contracts out-parameter after a return")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_bump_twice\tunproved:0:read only,unproved:1:out-parameter read before the write\n", "contracts out-parameter read first")
+    if rc != 0: return rc
+    // (b) a stored pointer: owned only when a corpus function frees the
+    // field it was stored into; an intrusive link freed through a local
+    // walk is not proved (stored, ownership unknown).
+    rc = bs_file_contains(ctx, contracts, "eng_set_user\treceiver-mut:eng,owned:1\n", "contracts stored and freed by the corpus is owned")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_push\treceiver-mut:eng,stored-unknown:1\n", "contracts stored without a proved destroyer stays unknown")
+    if rc != 0: return rc
+    // (c) a returned pointer that is a part of a parameter.
+    bs_file_contains(ctx, contracts, "eng_first\tret-from:0\n", "contracts returned parameter is a borrow")
+
 fn bs_check_migrate_zeroed_records(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "zeroed.c")
@@ -6143,6 +6219,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     var rc = bs_check_migrate_global_init_list(ctx, compiler_path, bs_join(output_dir, "global_init_list"))
     if rc != 0: return rc
     rc = bs_check_migrate_zeroed_records(ctx, compiler_path, bs_join(output_dir, "zeroed_records"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_contracts(ctx, compiler_path, bs_join(output_dir, "contracts"))
     if rc != 0: return rc
     rc = bs_check_migrate_char_pointer_is_c_char(ctx, compiler_path, bs_join(output_dir, "char_pointer_is_c_char"))
     if rc != 0: return rc

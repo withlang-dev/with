@@ -166,8 +166,9 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
     var copied = 0
     for path in fs.list_files(generated):
         let base = corpus_basename(path)
-        // The modules, the pin record and the license are the corpus.
-        if not path.ends_with(".w") and base != "UPSTREAM" and base != corpus.license: continue
+        // The modules, the pin record, the license and the contracts the
+        // bodies prove (D159, `contracts.tsv`) are the corpus.
+        if not path.ends_with(".w") and base != "UPSTREAM" and base != corpus.license and base != "contracts.tsv": continue
         if corpus_copy(ctx, path, destination ++ "/" ++ base) != 0: return 1
         if path.ends_with(".w"): copied = copied + 1
     if corpus_write_stamp(&ctx, corpus, trigger) != 0: return 1
@@ -311,6 +312,21 @@ fn corpus_drift_lines(ctx: &ActionCtx, corpus: &Corpus) -> List[str]:
             if now != next: lines.push("  would change: " ++ corpus.corpus_dir ++ "/" ++ name ++ f" ({now.len()} -> {next.len()} bytes)")
     for name in checked_in:
         if not fresh.contains(name): lines.push("  would remove: " ++ corpus.corpus_dir ++ "/" ++ name)
+    // D159: the inferred contracts are body-derived facts; a change is
+    // printed line by line, so a human sees which function's proof moved.
+    let promoted_contracts = corpus.corpus_dir ++ "/contracts.tsv"
+    let fresh_contracts = generated ++ "/contracts.tsv"
+    if fs.exists(fresh_contracts):
+        let now = if fs.exists(promoted_contracts): fs.read_text(promoted_contracts) else: ""
+        let next = fs.read_text(fresh_contracts)
+        if now != next:
+            lines.push("  contracts would change: " ++ promoted_contracts)
+            let before = now.split("\n")
+            for line in next.split("\n"):
+                if line.len() > 0 and not before.contains(line): lines.push("    + " ++ line)
+            let after = next.split("\n")
+            for line in before:
+                if line.len() > 0 and not after.contains(line): lines.push("    - " ++ line)
     lines
 
 /// `<stem>-drift-report` (nightly, never a gate): which modules a

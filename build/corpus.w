@@ -344,6 +344,10 @@ pub fn corpus_migrate_argv(ctx: &ActionCtx, compiler: &str, options: &MigrateOpt
     if options.shared_fragment.len() > 0:
         argv.push("--shared-fragment")
         argv.push(corpus_abs(ctx, options.shared_fragment))
+    // D159: the contracts the bodies prove, beside the modules; promotion
+    // copies it and the drift lane diffs it (docs/proposals/migrator-contracts-plan.md).
+    argv.push("--emit-contracts")
+    argv.push(corpus_abs(ctx, options.output_path) ++ "/contracts.tsv")
     argv
 
 fn corpus_run_migration_process(ctx: &ActionCtx, label: &str, compiler: &str, options: &MigrateOptions) -> i32:
