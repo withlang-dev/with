@@ -583,7 +583,11 @@ impl MirBuilder:
         let guard_place = self.place_for_local(guard_local)
         let guard_expected = if sig_idx >= 0 and self.sema.sig_get_param_count(sig_idx) > 0: self.sema.sig_param_type(sig_idx, 0) else: 0
         let args: List[i32] = List.new()
-        args.push(self.operand_for_place_arg(guard_place, guard_ty, guard_expected, 0))
+        // A `mut fn with_exit_mut` mutates the guard in place: its receiver is
+        // the guard's place, as at any `mut fn` call, never a move of it
+        // (the guard is dropped below, #978).
+        let recv_arg = if self.callee_has_mut_self(method_sym): self.body.new_operand(OperandKind.OK_COPY, guard_place) else: self.operand_for_place_arg(guard_place, guard_ty, guard_expected, 0)
+        args.push(recv_arg)
         if drop_kind == DropKind.DK_WITH_GUARD_MUT:
             let payload_ty = self.local_type(payload_local)
             let payload_place = self.place_for_local(payload_local)
@@ -605,6 +609,12 @@ impl MirBuilder:
         self.switch_to(next_bb)
         if payload_local > 0:
             self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, payload_local, 0, 0)
+        // #978: the guard is the `with`'s own value: once `with_exit` has run,
+        // it drops like any owned value at the end of its scope. Its storage
+        // ended with the value still live, so a guard whose Drop releases a
+        // lock never released it, and the next `with lock.enter()` spun.
+        if self.type_needs_value_drop(guard_ty) != 0:
+            self.emit_drop_stmt(guard_place, "with-guard", 0)
         self.body.push_stmt(self.cur_bb, StmtKind.StorageDead, guard_local, 0, 0)
 
     fn drop_kind_owns_value(drop_kind: i32) -> i32:
