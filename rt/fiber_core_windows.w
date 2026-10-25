@@ -5,6 +5,7 @@
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
+extern fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never
 use std.builtins.c_void
 extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
@@ -611,9 +612,10 @@ pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32, worker_cou
     fiber_pool_limit = next_pool
     0
 
+// #995: as fiber_core_darwin.w: a spawn past the live-task limit stops loudly.
 pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
     if live_fiber_count >= MAX_FIBERS:
-        return -1
+        with_panic_ref("spawn: as many tasks are running as one program holds at once (MAX_FIBERS); await some before spawning more", "", 0)
     let slot = allocate_fiber_slot()
     if slot < 0:
         return -1

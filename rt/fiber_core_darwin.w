@@ -10,6 +10,7 @@ extern fn with_free(ptr: *mut c_void)
 extern fn with_memcpy(dst: *mut u8, src: *const u8, len: i64) -> *mut u8
 extern fn with_memset(dst: *mut u8, val: i32, len: i64) -> *mut u8
 extern fn with_ewrite(s: &str)
+extern fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never
 @[link_name("mmap")]
 extern fn rt_libc_mmap(addr: *mut u8, len: u64, prot: i32, flags: i32, fd: i32, offset: i64) -> *mut u8
 @[link_name("mprotect")]
@@ -798,11 +799,14 @@ pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32, worker_cou
     configured_worker_count = next_workers
     0
 
+// #995: a spawn the runtime cannot hold is a loud stop. It returned -1,
+// which became a Task's fiber id with no check, and awaiting that Task
+// returned at once with a result no fiber wrote (zeros past task 1024).
 pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
     scheduler_lock()
     if live_fiber_count >= MAX_FIBERS:
         scheduler_unlock()
-        return -1
+        with_panic_ref("spawn: as many tasks are running as one program holds at once (MAX_FIBERS); await some before spawning more", "", 0)
     let slot = allocate_fiber_slot()
     if slot < 0:
         scheduler_unlock()
