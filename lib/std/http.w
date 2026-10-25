@@ -38,7 +38,24 @@ fn http_parse_url(url: &str) -> HttpUrl:
     host = url.slice(start as i64, host_end as i64)
     if host_end < url_len:
         path = url.slice(host_end as i64, url_len as i64)
-    HttpUrl { host, path, port }
+    // #2648: `host:port`, and `[v6]:port` (RFC 3986 authority); a port
+    // outside 1..65535 refuses the URL.
+    let colon = if host.starts_with("["): (if host.find("]:") >= 0: host.find("]:") + 1 else: -1) else: host.find(":")
+    if colon < 0:
+        return HttpUrl { host: http_unbracket(host), path, port }
+    let port_text = host.slice(colon + 1, host.len())
+    var explicit = 0
+    for i in 0..port_text.len():
+        let ch = port_text[i]
+        if ch < 48 or ch > 57 or explicit > 65535:
+            return HttpUrl { host: "", path, port }
+        explicit = explicit * 10 + (ch - 48) as i32
+    if port_text.len() == 0 or explicit < 1 or explicit > 65535:
+        return HttpUrl { host: "", path, port }
+    HttpUrl { host: http_unbracket(host.slice(0, colon)), path, port: explicit }
+
+fn http_unbracket(host: &str) -> str:
+    if host.starts_with("[") and host.ends_with("]"): host.slice(1, host.len() - 1) else: host.to_owned()
 
 fn http_build_get(host: &str, path: &str) -> str:
     "GET " ++ path ++ " HTTP/1.1\r\n" ++
