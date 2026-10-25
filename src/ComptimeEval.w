@@ -3246,6 +3246,47 @@ impl ComptimeEvaluator:
 
         self.fail(node, "List method is not comptime-evaluable yet")
 
+    // #2386 (D117): `first`, `last` and `rest` of a fixed array or slice are
+    // compiler-declared, with no std body for the evaluator to run (List's
+    // are std bodies). The arena is immutable, so `Some` names the element's
+    // own slot and `rest` is a view of the tail, as `pop` keeps a prefix.
+    mut fn eval_array_view_method_call(recv_value: &ComptimeValue, field: i32, arg_count: i32, node: i32) -> ComptimeControl:
+        let method = self.pool.resolve(field)
+        if arg_count != 0 or (method != "first" and method != "last" and method != "rest"):
+            return self.fail(node, "method '" ++ method ++ "' is not comptime-evaluable yet")
+        let count = recv_value.extra_count
+        if method == "rest":
+            // A const is evaluated before Sema types its expressions; the
+            // tail's length is its arena count whatever the call node says,
+            // and an untyped array's tail is typed from its element, so an
+            // empty tail still knows what first() yields.
+            var rest_tid = self.node_type_or(node, recv_value.type_id)
+            if rest_tid == 0 and count > 0:
+                let rest_elem = self.extra_value_at(recv_value.extra_start as i64).type_id
+                if rest_elem != 0:
+                    rest_tid = self.sema.ensure_exact_type(TypeKind.TY_ARRAY, rest_elem, count - 1, 0) as i32
+            if count == 0:
+                return comptime_control_value(comptime_value_array(rest_tid, recv_value.extra_start, 0))
+            return comptime_control_value(comptime_value_array(rest_tid, recv_value.extra_start + 1, count - 1))
+        let slot = if method == "first": recv_value.extra_start else: recv_value.extra_start + count - 1
+        // A const is evaluated before Sema types its expressions: the
+        // Option[&T] comes from the element's own type when the call node
+        // has none, and from the receiver's for an empty array.
+        var elem_tid = if count > 0: self.extra_value_at(slot as i64).type_id else: 0
+        if elem_tid == 0:
+            var recv_resolved = self.sema.resolve_alias(recv_value.type_id)
+            if self.sema.get_type_kind(recv_resolved) == TypeKind.TY_REF:
+                recv_resolved = self.sema.resolve_alias(self.sema.get_type_d0(recv_resolved) as TypeId)
+            let kind = self.sema.get_type_kind(recv_resolved)
+            if kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+                elem_tid = self.sema.get_type_d0(recv_resolved)
+        let result_tid = self.node_type_or(node, if elem_tid != 0: self.sema.ensure_option_ref_type_for(elem_tid) else: 0)
+        if result_tid == 0:
+            return self.fail(node, "array ." ++ method ++ "() has no resolved result type in comptime")
+        if count == 0:
+            return comptime_control_value(comptime_value_enum(result_tid, self.sema.syms.none, recv_value.extra_start, 0))
+        comptime_control_value(comptime_value_enum(result_tid, self.sema.syms.some, slot, 1))
+
     mut fn eval_map_method_call(recv_node: i32, recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         let method = self.pool.resolve(field)
 
@@ -7100,6 +7141,18 @@ impl ComptimeEvaluator:
                 return self.fail(node, "logical operators require bool or integer comptime values")
             return comptime_control_value(comptime_value_bool(rhs_truthy))
 
+        if op == BinaryOp.OP_DEFAULT:
+            // `opt ?? fallback` (#2386): the payload of a Some, else the
+            // fallback, evaluated only for a None.
+            var opt_signal = self.eval_expr(self.ast.get_data1(node))
+            if opt_signal.kind != ComptimeControlKind.CTL_VALUE:
+                return opt_signal
+            if opt_signal.value.kind != ComptimeValueKind.CV_ENUM or not self.is_option_enum_value(opt_signal.value):
+                return self.fail(node, "`??` needs an Option on its left in comptime")
+            if opt_signal.value.data0 as i32 == self.sema.syms.some:
+                return comptime_control_value(self.extra_value_at(opt_signal.value.extra_start as i64))
+            return self.eval_expr(self.ast.get_data2(node))
+
         if op == BinaryOp.OP_CONCAT:
             let parts = self.collect_left_comptime_concat_parts(node)
             if parts.len() > 2:
@@ -7919,6 +7972,8 @@ impl ComptimeEvaluator:
                 return self.eval_str_method_call(recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
             if recv_signal.value.kind == ComptimeValueKind.CV_ENUM and self.is_option_enum_value(recv_signal.value):
                 return self.eval_option_method_call(recv_signal.value, field, self.ast.get_data1(node), arg_count, node)
+            if recv_signal.value.kind == ComptimeValueKind.CV_ARRAY:
+                return self.eval_array_view_method_call(recv_signal.value, field, arg_count, node)
             return self.fail(node, "method '" ++ self.pool.resolve(field) ++ "' is not comptime-evaluable yet")
         let generic_fn_sym = self.generic_callee_symbol(callee)
         if generic_fn_sym != 0:
