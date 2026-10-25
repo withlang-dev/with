@@ -24,7 +24,9 @@ let ASN1_GENERALIZED_TIME: u8 = 0x18u8
 
 // Parse a DER tag+length at position pos in buf.
 // Returns: content_start (offset past tag+length), content_length.
-// On error returns content_start = -1.
+// On error returns content_start = -1: the header does not fit, or the
+// content it claims runs past buf_len (#1056: a truncated certificate gave
+// offsets past its buffer, and every reader of them read past it too).
 unsafe fn der_read_tl(buf: *const u8, buf_len: i32, pos: i32, out_tag: *mut u8, out_content_start: *mut i32, out_content_len: *mut i32):
     if pos >= buf_len:
         *(out_content_start + 0u64) = -1
@@ -42,6 +44,9 @@ unsafe fn der_read_tl(buf: *const u8, buf_len: i32, pos: i32, out_tag: *mut u8, 
 
     if (len_byte as u32 & 0x80u32) == 0u32:
         // Short form: length is len_byte itself
+        if len_byte as i32 > buf_len - p:
+            *(out_content_start + 0u64) = -1
+            return
         *(out_content_start + 0u64) = p
         *(out_content_len + 0u64) = len_byte as i32
     else:
@@ -57,6 +62,9 @@ unsafe fn der_read_tl(buf: *const u8, buf_len: i32, pos: i32, out_tag: *mut u8, 
             length = (length << 8) | (lb as i32)
             p = p + 1
             li = li + 1
+        if length < 0 or length > buf_len - p:
+            *(out_content_start + 0u64) = -1
+            return
         *(out_content_start + 0u64) = p
         *(out_content_len + 0u64) = length
 
