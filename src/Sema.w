@@ -2062,6 +2062,9 @@ type Sema {
     // When frozen, add_type and new semantic symbol interning will error.
     symbols_frozen: i32,
     types_frozen: i32,
+    // #992: how many generic bodies are being checked inside one another
+    // (check_fn_body_concrete).
+    generic_body_depth: i32,
 
     // mutability.md Phase 4 — per-function effect tracking during body analysis.
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
@@ -3905,6 +3908,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         assoc_type_bindings: sema_new_map_i32_i32(),
         symbols_frozen: 0,
         types_frozen: 0,
+        generic_body_depth: 0,
         current_fn_param_syms: List.new(),
         current_fn_param_effs: List.new(),
         current_fn_param_direct_effs: List.new(),

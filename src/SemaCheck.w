@@ -110,6 +110,8 @@ type SemaLexicalEnv {
     pending_soft_debug_nodes: List[i32],
 }
 
+const GENERIC_INSTANTIATION_LIMIT: i32 = 64
+
 type SemaTraitImplMethodContract {
     ok: i32,
     trait_sym: i32,
@@ -6898,7 +6900,21 @@ impl Sema:
         self.pending_soft_use_nodes = move env.pending_soft_use_nodes
         self.pending_soft_debug_nodes = move env.pending_soft_debug_nodes
 
+    // #992: a generic that calls itself at a type that grows each time
+    // (`grow(Some(x))` inside `grow[T]`) instantiates without end; each
+    // instance's body check nested inside the last until the compiler's
+    // stack ran out (SIGSEGV, no output). Past GENERIC_INSTANTIATION_LIMIT
+    // nested bodies the instance is refused by name.
     mut fn check_fn_body_concrete(fn_node: i32, tp_syms: &List[i32], tp_sema_tys: &List[i32], mono_sym: i32, param_concrete_tys: &List[i32]) -> i32:
+        if self.generic_body_depth >= GENERIC_INSTANTIATION_LIMIT:
+            self.emit_error(f"recursive generic instantiation: `{self.pool_resolve(self.ast.get_data0(fn_node))}` is instantiated {GENERIC_INSTANTIATION_LIMIT} deep, at a type that grows each time; a generic that calls itself must call itself at the same type parameters", fn_node)
+            return -1
+        self.generic_body_depth = self.generic_body_depth + 1
+        let sig = self.check_fn_body_concrete_inner(fn_node, tp_syms, tp_sema_tys, mono_sym, param_concrete_tys)
+        self.generic_body_depth = self.generic_body_depth - 1
+        sig
+
+    mut fn check_fn_body_concrete_inner(fn_node: i32, tp_syms: &List[i32], tp_sema_tys: &List[i32], mono_sym: i32, param_concrete_tys: &List[i32]) -> i32:
         let fn_name = self.ast.get_data0(fn_node)
         let body = self.ast.get_data1(fn_node)
         if self.ast.fn_decl_body_is_interface(fn_node):
