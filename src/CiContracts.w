@@ -82,6 +82,9 @@ fn ct_has_line(evidence: &str, line: &str) -> bool:
 fn ct_method_name(c_name: &str, record: &str) -> str:
     var method = ci_strip_snake_prefix(c_name, record ++ "_")
     if method.len() == 0: method = ci_strip_snake_prefix(c_name, ci_compute_snake_prefix(record))
+    // An iterator record's functions carry the collection's prefix
+    // (`stc_word_stack_next` on `stc_word_stack_iter`): `next`.
+    if method.len() == 0 and record.ends_with("_iter"): method = ci_strip_snake_prefix(c_name, record.slice(0, record.len() - 4))
     if method.len() == 0: method = c_name.to_owned()
     ci_escape_reserved(method)
 
@@ -95,11 +98,18 @@ impl CiProject:
         for si in 0..n:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             while self.symbols[si].param_mutates.len() < self.symbols[si].param_ty.len(): self.symbols[si].param_mutates.push(0)
+            while self.symbols[si].param_array.len() < self.symbols[si].param_ty.len(): self.symbols[si].param_array.push(0)
             let count = self.symbols[si].param_mutates.len()
             for line in self.symbols[si].contract_evidence.split("\n"):
-                if not line.starts_with("mutparam:"): continue
-                let pi = parse(line.slice(9, line.len()))
-                if pi >= 0 and pi < count: self.symbols[si].param_mutates[pi] = 1
+                if line.starts_with("mutparam:"):
+                    let pi = parse(line.slice(9, line.len()))
+                    if pi >= 0 and pi < count: self.symbols[si].param_mutates[pi] = 1
+                else if line.starts_with("arrayparam:"):
+                    let pi = parse(line.slice(11, line.len()))
+                    if pi >= 0 and pi < count: self.symbols[si].param_array[pi] = 1
+        // Through the corpus callees: a parameter handed to a position a
+        // callee writes through is written through; one handed to a
+        // position a callee indexes is an array.
         var changed = true
         while changed:
             changed = false
@@ -107,17 +117,20 @@ impl CiProject:
                 if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
                 let count = self.symbols[si].param_mutates.len()
                 for pi in 0..count:
-                    if self.symbols[si].param_mutates[pi] != 0 or not ct_is_pointer(self.symbols[si].param_ty[pi]): continue
+                    if not ct_is_pointer(self.symbols[si].param_ty[pi]): continue
+                    if self.symbols[si].param_mutates[pi] != 0 and self.symbols[si].param_array[pi] != 0: continue
                     for sink in self.symbols[si].param_sinks[pi].split(";"):
                         if not sink.contains(":"): continue
                         let kv = sink.split(":")
                         let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
                         if callee < 0 or self.symbols[callee].has_definition == 0: continue
                         let index = parse(kv[1])
-                        if index < self.symbols[callee].param_mutates.len() and self.symbols[callee].param_mutates[index] != 0:
+                        if self.symbols[si].param_mutates[pi] == 0 and index < self.symbols[callee].param_mutates.len() and self.symbols[callee].param_mutates[index] != 0:
                             self.symbols[si].param_mutates[pi] = 1
                             changed = true
-                            break
+                        if self.symbols[si].param_array[pi] == 0 and index < self.symbols[callee].param_array.len() and self.symbols[callee].param_array[index] != 0:
+                            self.symbols[si].param_array[pi] = 1
+                            changed = true
 
     // Whether a corpus function frees field `member` of a `*mut record`
     // parameter: `free(p->member)` in its body, or `p->member` handed to a
@@ -156,6 +169,12 @@ impl CiProject:
                 let nullable = (pi < self.symbols[si].param_tested.len() and self.symbols[si].param_tested[pi] != 0) or (pi < self.symbols[si].param_null_caller.len() and self.symbols[si].param_null_caller[pi].len() > 0)
                 if nullable:
                     out.push(f"unproved:{pi}:NULL is an accepted argument")
+                    continue
+                // A handle the body indexes or steps (`p[k]`, `p + k`), itself
+                // or through a corpus callee, is an array of records, not the
+                // one a `self` would be.
+                if pi < self.symbols[si].param_array.len() and self.symbols[si].param_array[pi] != 0:
+                    out.push("unproved:0:indexed as an array")
                     continue
                 out.push("receiver-mut:" ++ record)
                 // (c) beside (a1): the receiver is also what is returned.

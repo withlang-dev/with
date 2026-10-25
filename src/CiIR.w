@@ -1010,6 +1010,9 @@ type CiProjectSymbol {
     // parameter and the return, as the contracts artifact prints them.
     contract_evidence: str,
     param_mutates: List[i32],
+    // 1 when the body indexes or steps parameter i, itself or through a
+    // corpus callee (`arrayparam:` lines): an array, never a receiver.
+    param_array: List[i32],
     contract: str,
     // D159 step 2 (CiContracts.w resolve_method_shapes): how a proved
     // function is printed. `method_record` the record whose `impl` block
@@ -1066,6 +1069,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         attrs: "",
         contract_evidence: "",
         param_mutates: List.new(),
+        param_array: List.new(),
         contract: "",
         method_record: "",
         method_name: "",
@@ -1124,6 +1128,7 @@ impl CiProjectSymbol:
         while self.param_stores.len() < n: self.param_stores.push(0)
         while self.param_destroys.len() < n: self.param_destroys.push(0)
         while self.param_mutates.len() < n: self.param_mutates.push(0)
+        while self.param_array.len() < n: self.param_array.push(0)
 
 fn ci_project_symbol_key(kind: i32, name: &str) -> str:
     if kind == CiProjectSymbolKind.CIPS_VAR:
