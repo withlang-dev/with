@@ -107,6 +107,17 @@ fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) -> i32
     if target.output.len() == 0:
         build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' requires an output path")
         return 1
+    // #966: every argument is one process argument, so the shared rule
+    // refuses a NUL as it does for every other target, and a newline would
+    // split the line; both before anything is created. A NUL went into the
+    // file, where a consumer truncated the argument at it.
+    let arg_rc = build_graph_validate_process_args(target)
+    if arg_rc != 0:
+        return arg_rc
+    for ai in 0..target.args.len():
+        if not build_graph_response_arg_valid(target.args[ai]):
+            build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' contains an argument with a newline")
+            return 1
     let output_path = build_graph_resolve_project_path(root, target.output)
     let output_dir = build_graph_dirname(output_path)
     if build_graph_rt_mkdir_p(output_dir) != 0:
@@ -114,11 +125,7 @@ fn build_graph_write_response_file(root: &str, target: &BuildGraphTarget) -> i32
         return 1
     var text = ""
     for ai in 0..target.args.len():
-        let arg = target.args[ai]
-        if not build_graph_response_arg_valid(arg):
-            build_graph_rt_eprint("error: generate_response_file target '" ++ target.name ++ "' contains an argument with a newline")
-            return 1
-        text = text ++ build_graph_quote_response_arg(arg) ++ "\n"
+        text = text ++ build_graph_quote_response_arg(target.args[ai]) ++ "\n"
     if build_graph_rt_write_file(output_path, text) != 0:
         build_graph_rt_eprint("error: could not write response file for target '" ++ target.name ++ "': " ++ output_path)
         return 1
