@@ -85,6 +85,14 @@ fn target_spec_os() -> str:
         return "Wasi"
     with_sysinfo_os()
 
+// §16.1 / D155: whether C's `long double` is a double on `os`/`arch`
+// (macOS AArch64 and Windows). Elsewhere it is wider (x86_64 and AArch64
+// Linux, wasm), so `c_longdouble`, which is f64 everywhere, is not it there:
+// c_import omits a declaration that passes one, and an extern that names it
+// is refused (#977). One answer for both.
+fn c_long_double_is_double(os: &str, arch: &str) -> bool:
+    (os == "Macos" and arch == "aarch64") or os == "Windows"
+
 // §16.1 / D155: the fixed-width spelling of a C integer alias on the active
 // target, or "" for a name that is not one. One table for every reader:
 // Sema registers the builtins from it and the facade renderer compares a

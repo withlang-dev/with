@@ -10,6 +10,7 @@ use render
 use SemaCheck
 use std.collections.HashMap
 use compiler.BundleInterfaces
+use TargetSpec
 use SemaTypes
 use SemaVector
 use rt.rt_core
@@ -2292,6 +2293,17 @@ impl Sema:
         if self_type_id != 0:
             self.named_types.remove(self_sym)
 
+    // A type expression that is, or points or refers to, `c_longdouble`.
+    fn type_expr_names_c_longdouble(type_node: i32) -> bool:
+        if type_node <= 0:
+            return false
+        let kind = self.ast.kind(type_node)
+        if kind == NodeKind.NK_TYPE_NAMED:
+            return self.pool_resolve(self.ast.get_data0(type_node)) == "c_longdouble"
+        if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE:
+            return self.type_expr_names_c_longdouble(self.ast.get_data0(type_node))
+        false
+
     mut fn collect_extern_fn(node: i32, is_local: i32):
         let name = self.ast.get_data0(node)
         if is_local != 0:
@@ -2358,6 +2370,15 @@ impl Sema:
         let ret_node = self.ast.fn_meta_ret(meta)
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
+        // §16.1 (D155, #977): `c_longdouble` is f64, and "a With value never
+        // crosses to C as a wider `long double`". Where C's is wider, an
+        // extern that names it would pass a double for one.
+        if not c_long_double_is_double(target_spec_os(), target_spec_arch()):
+            for pi in 0..param_count:
+                if self.type_expr_names_c_longdouble(self.ast.fn_param_type(param_start, pi)):
+                    self.emit_error(f"`c_longdouble` is f64, and C's `long double` on {target_spec_os()} {target_spec_arch()} is wider: `{self.pool_resolve(name)}` would pass a double where C reads a long double (§16.1)", self.ast.fn_param_type(param_start, pi))
+            if ret_node != 0 and self.type_expr_names_c_longdouble(ret_node):
+                self.emit_error(f"`c_longdouble` is f64, and C's `long double` on {target_spec_os()} {target_spec_arch()} is wider: `{self.pool_resolve(name)}` would read a double where C returns a long double (§16.1)", ret_node)
 
         let sig_param_start = self.sig_params.len() as i32
         for pi in 0..param_count:

@@ -599,9 +599,7 @@ fn ci_record_omitted_symbol(name: &str, reason: &str):
 // D155: the aliases are the compiler's builtins (Sema registers them from
 // the target spec); no import or migration emits a concrete value for one.
 fn ci_c_long_double_representable(triple: &str) -> bool:
-    let os = ci_model_os(triple)
-    let arch = ci_model_arch(triple)
-    (os == "Macos" and arch == "aarch64") or os == "Windows"
+    c_long_double_is_double(ci_model_os(triple), ci_model_arch(triple))
 
 // The parsed C model's OS and architecture: the triple's when the parse
 // names one (`--c-target`), else the active target's.
