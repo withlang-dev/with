@@ -246,3 +246,12 @@ fn cc_windows_toolchain() -> CcToolchain:
         args.push("--ld-path=" ++ ld)
     args.push("--end-no-unused-arguments")
     CcToolchain { problem: "", args }
+
+// #1915, #2635: the migrator parses C as c_import does (compiler.Frontend):
+// on Windows for the windows-gnu target against the C runtime the link
+// reads. Without it no system header is found, every unit of a package
+// fails to parse, and `with get` writes an empty facade. `with migrate` and
+// the facade `with get` derives both call this before they parse.
+fn migrate_parse_c_as_c_import():
+    if link_stage_windows_c_target_uses_sdk_libc():
+        with_cimport_set_windows_target(link_stage_windows_c_target(), link_stage_windows_libc_root())
