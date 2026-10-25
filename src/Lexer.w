@@ -468,8 +468,10 @@ impl Lexer:
                 if src[(self.pos)] == CharCode.Backslash:
                     self.pos = self.pos + 1
                 self.pos = self.pos + 1
-            // Unterminated multi-line string — return STRING_LIT for parser recovery.
-            return TokenKind.TK_STRING_LIT
+            // #1005: unterminated; the token runs to the end of the source and
+            // the parser names it (Parser.parse_primary).
+            while self.pos < slen: self.pos = self.pos + 1
+            return TokenKind.TK_INVALID
 
         // Regular strings: no interpolation. Scan for closing `"`, handle `\` escapes.
         while self.pos < slen:
@@ -480,8 +482,9 @@ impl Lexer:
             if ch == CharCode.Backslash:
                 self.pos = self.pos + 1
             self.pos = self.pos + 1
-        // Unterminated — return STRING_LIT for parser recovery.
-        TokenKind.TK_STRING_LIT
+        // #1005: unterminated at the end of the source. It was a string token
+        // the parser accepted, so `let s = "abc` at EOF checked clean.
+        TokenKind.TK_INVALID
 
     mut fn lex_number() -> i32:
         let src = self.source
@@ -600,9 +603,9 @@ fn lex_fstring_quote_source_backslash_count(raw_backslashes: i32) -> i32:
     raw_backslashes / 2
 
 // The end of a raw string whose `r` ends just before `pos`: `#`* `"` ...
-// `"` `#`* with as many closing hashes; an unterminated one ends at the end
-// of the source (the string token still recovers). -1 when no `"` follows
-// the hashes: not a raw string.
+// `"` `#`* with as many closing hashes. -1 when no `"` follows the hashes:
+// not a raw string; one past the end of the source when it never closes
+// (#1005).
 fn lex_raw_string_end(src: &str, pos: i32) -> i32:
     let slen = src.len() as i32
     var p = pos
@@ -622,7 +625,7 @@ fn lex_raw_string_end(src: &str, pos: i32) -> i32:
             if ok:
                 return p + 1 + hash_count
         p = p + 1
-    slen
+    slen + 1
 
 impl Lexer:
     mut fn lex_ident() -> i32:
@@ -640,8 +643,9 @@ impl Lexer:
                 if src[(self.pos)] == CharCode.Backslash:
                     self.pos = self.pos + 1
                 self.pos = self.pos + 1
-            if self.pos < slen:
-                self.pos = self.pos + 1  // skip closing "
+            if self.pos >= slen:
+                return TokenKind.TK_INVALID  // #1005: unterminated
+            self.pos = self.pos + 1  // skip closing "
             return TokenKind.TK_C_STRING_LIT
 
         // r"..." / r#"..."# -> raw string literal (no escapes/interpolation).
@@ -650,6 +654,9 @@ impl Lexer:
         // outlive them (§21.1; #1722).
         if text == "r":
             let raw_end = lex_raw_string_end(src, self.pos)
+            if raw_end > slen:
+                self.pos = raw_end - 1  // #1005: unterminated
+                return TokenKind.TK_INVALID
             if raw_end >= 0:
                 self.pos = raw_end
                 return TokenKind.TK_STRING_LIT
@@ -744,7 +751,7 @@ impl Lexer:
                 if fch == CharCode.Backslash:
                     self.pos = self.pos + 1
                 self.pos = self.pos + 1
-            return TokenKind.TK_STRING_LIT
+            return TokenKind.TK_INVALID  // #1005: unterminated
 
         // b'...' -> byte literal (tokenized as char literal).
         if text == "b" and self.pos < slen and src[(self.pos)] == CharCode.Squote:
