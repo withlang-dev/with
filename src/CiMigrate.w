@@ -2144,7 +2144,13 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
         eprint("with get: could not write " ++ report_path)
         return ""
     let summary_end = report.find("\n")
-    if summary_end < 0: report else: report.slice(0, summary_end)
+    let summary = if summary_end < 0: report else: report.slice(0, summary_end)
+    // #2635: a unit that could not be read is said where `with get` prints,
+    // not only in the report: a facade from unreadable units was announced
+    // as `0 functions` and nothing else.
+    if project.unread.len() > 0:
+        return summary ++ f"; {project.unread.len()} unit(s) could not be read (the first: " ++ project.unread[0] ++ ")"
+    summary
 
 fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:
     let input_dir = ci_migrate_fs_path(input_dir_arg)

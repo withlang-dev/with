@@ -1954,6 +1954,7 @@ fn conan_write_facade(name: &str, version: &str, dep_dir: &str, source_dir: &str
     let registry = conan_registry_facts(name, dep_dir)
     if registry.note.len() > 0: runtime_eprint("  note: " ++ registry.note)
     let report_path = dep_dir ++ "/facade-report.txt"
+    migrate_parse_c_as_c_import()
     let summary = migrate_c_facade_for_package(corpus.units, corpus.include_paths, corpus.defines, source_dir, name, version, registry.path, import_dirs, link_lib, dep_dir ++ "/facade.w", report_path)
     if summary.len() == 0: return
     let q = "\x22"
