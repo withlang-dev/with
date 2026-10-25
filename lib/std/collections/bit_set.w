@@ -1,5 +1,5 @@
 // std.collections.bit_set — BitSet: a dynamic bitset over the migrated STC
-// `cbits` (docs/proposals/stdlib_sourcing_plan.md, Phase 3; the facade map's
+// `cbits` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the facade map's
 // primary engine). The simplest facade shape: an owning handle over engine
 // storage, the `Regex` anatomy.
 //

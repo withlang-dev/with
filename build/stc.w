@@ -6,7 +6,7 @@ use build.wo
 use build.par
 
 // STC (stclib/STC), MIT (its LICENSE ships beside the migration). Phase 3
-// of docs/proposals/stdlib_sourcing_plan.md: the macro-migrator campaign.
+// of docs/completed/stdlib_sourcing_plan.md: the macro-migrator campaign.
 // The generic pipeline (build/corpora.w) fetches, migrates, checks,
 // promotes and bundles it; this module holds the facts, the staging hook
 // and the corpus's own lanes: upstream's ctest programs, migrated whole in
@@ -86,7 +86,7 @@ fn stc_stage_headers(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
     0
 
 // The library units into `source`: the `src/` units and the staged ucd unit.
-// The facade shapes unit (docs/proposals/stdlib_sourcing_plan.md, Phase 3,
+// The facade shapes unit (docs/completed/stdlib_sourcing_plan.md, Phase 3,
 // the generic-over-templates design item): STC's templates instantiated for
 // the standard library's facades, one C unit staged beside upstream's. An
 // arbitrary With value rides the slot shape (the engine indexes pointers to
@@ -95,7 +95,7 @@ fn stc_stage_headers(ctx: &ActionCtx, reference: &str, source: &str) -> i32:
 // is extended here, never in migrated code.
 fn stc_facade_shapes_source() -> str:
     "// The facade shapes: STC's templates instantiated for the With standard\n" ++
-    "// library's facades (docs/proposals/stdlib_sourcing_plan.md, Phase 3). An\n" ++
+    "// library's facades (docs/completed/stdlib_sourcing_plan.md, Phase 3). An\n" ++
     "// arbitrary With value rides the slot shape — the engine indexes pointers to\n" ++
     "// facade-owned slots whose head holds the With callbacks — and the\n" ++
     "// word-sized shapes get direct instantiations.\n" ++

@@ -1,5 +1,5 @@
 // std.collections.unordered_map — UnorderedMap[K, V]: a hash map in no
-// stated order over the migrated STC `hset` (docs/proposals/stdlib_sourcing_plan.md,
+// stated order over the migrated STC `hset` (docs/completed/stdlib_sourcing_plan.md,
 // Phase 3; D149: `HashMap` keeps rt_core's insertion-ordered layout, this
 // is the unordered one for hot paths that need no order, the way Zig
 // ships both). Each entry is one facade-owned slot holding the key and

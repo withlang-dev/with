@@ -1,5 +1,5 @@
 // std.collections.stack — Stack[T]: a last-in-first-out stack over the
-// migrated STC `stack` (docs/proposals/stdlib_sourcing_plan.md, Phase 3; the
+// migrated STC `stack` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the
 // facade map's primary engine, a growable array without the vector's
 // insert-anywhere surface). Two shapes serve it (D148): an integer scalar
 // is stored inline as one word (`stc_word_stack`, no allocation per

@@ -1,5 +1,5 @@
 // std.collections.priority_queue — PriorityQueue[T]: an owning heap over the
-// migrated STC `pqueue` (docs/proposals/stdlib_sourcing_plan.md, Phase 3; the
+// migrated STC `pqueue` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the
 // facade map's primary engine). Two shapes serve it (D148): a max-queue of
 // an integer scalar up to 64 signed bits (i8..i64, u8..u32, isize) keeps
 // the values inline in the engine's own heap (`stc_word_pqueue`, ordered

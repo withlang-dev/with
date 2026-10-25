@@ -40,7 +40,6 @@ folder. A finished phase is archived in [docs/completed](../completed).
 - [COBOL → With Migration Plan](COBOL-migrate.md)
 - [Taming `with migrate`: a boring pipeline for 40 upstreams](harden_migrate.md)
 - [Hardening the whole project: wire the guardrails to where they bite](harden_plan.md)
-- [Stdlib sourcing: three migrated corpora, one facade](stdlib_sourcing_plan.md)
 - [Stdlib Migration Build System](stdlib_migration.md)
 - [Stdlib Issue: Build Action Environment Leakage](stdlib-action-env-leak.md)
 - [Stdlib Issue: `with_getenv_str` Lifetime](stdlib-getenv-lifetime.md)

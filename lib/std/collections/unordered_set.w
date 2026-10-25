@@ -1,5 +1,5 @@
 // std.collections.unordered_set — UnorderedSet[T]: a hash set in no stated
-// order over the migrated STC `hset` (docs/proposals/stdlib_sourcing_plan.md,
+// order over the migrated STC `hset` (docs/completed/stdlib_sourcing_plan.md,
 // Phase 3; D149: `HashSet` keeps rt_core's insertion-ordered layout, this
 // is the unordered one for hot paths that need no order, the way Zig
 // ships both). Two shapes serve it (D148): an integer scalar is the

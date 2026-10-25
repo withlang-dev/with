@@ -1,5 +1,5 @@
 // std.collections.linked_list — LinkedList[T]: a singly linked list over
-// the migrated STC `list` (docs/proposals/stdlib_sourcing_plan.md, Phase 3;
+// the migrated STC `list` (docs/completed/stdlib_sourcing_plan.md, Phase 3;
 // the facade map's primary engine for the linked list, a circular
 // singly-linked list that pushes at both ends and pops at the front). Two
 // shapes serve it (D148): an integer scalar is stored inline in the node

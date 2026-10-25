@@ -78,7 +78,7 @@ pub type HashSet[T]  {
 }
 
 /// Ordered key-value map over the migrated M*LIB B+tree
-/// (docs/proposals/stdlib_sourcing_plan.md, Phase 4; #937). Each entry is
+/// (docs/completed/stdlib_sourcing_plan.md, Phase 4; #937). Each entry is
 /// one facade-owned record holding the key and the value; the engine orders
 /// slots it owns (clones of the key, D151) that point back at the entry,
 /// through the key comparator (std.collections.mlib_slot). Keys are kept in

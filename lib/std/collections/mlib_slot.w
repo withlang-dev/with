@@ -1,5 +1,5 @@
 // std.collections.mlib_slot — facade-owned storage for keys the migrated
-// M*LIB B+tree orders (docs/proposals/stdlib_sourcing_plan.md, Phase 4; the
+// M*LIB B+tree orders (docs/completed/stdlib_sourcing_plan.md, Phase 4; the
 // engine_slot pattern of D148). The tree is instantiated once, over slot
 // pointers, in the corpus's facade shapes unit (std.engines.mlib.facade_shapes).
 // A B+tree copies keys into its internal nodes as separators, so the engine

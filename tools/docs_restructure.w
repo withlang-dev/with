@@ -150,7 +150,7 @@ fn move_table -> str:
     "docs/roadmap.md docs/proposals/roadmap.md\n" ++
     "docs/implementation_plan.md docs/proposals/implementation_plan.md\n" ++
     "docs/uat-plan.md docs/proposals/uat-plan.md\n" ++
-    "docs/stdlib_sourcing_plan.md docs/proposals/stdlib_sourcing_plan.md\n" ++
+    "docs/stdlib_sourcing_plan.md docs/completed/stdlib_sourcing_plan.md\n" ++
     "docs/storage-types-and-caller-places-spec.md docs/proposals/storage-types-and-caller-places-spec.md\n" ++
     "docs/build-perf-reference-study.md docs/proposals/build-perf-reference-study.md\n" ++
     "docs/with-get-release-investigation.md docs/proposals/with-get-release-investigation.md\n" ++

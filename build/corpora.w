@@ -11,7 +11,7 @@ use build.stc
 use build.mlib
 use std.crypto.sha256
 
-// The corpus registry (docs/spec/toolchain/wo_bundles.md, docs/proposals/stdlib_sourcing_plan.md):
+// The corpus registry (docs/spec/toolchain/wo_bundles.md, docs/completed/stdlib_sourcing_plan.md):
 // every migrated C corpus the tree carries, in bundle order. build.w, the
 // embedding, the exclusions, the stage/cross/release wiring and the lanes
 // all iterate it, so a corpus is present everywhere it must be by
