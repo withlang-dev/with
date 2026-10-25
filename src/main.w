@@ -6868,6 +6868,15 @@ fn run_get_command(argc: i32) -> i32:
         with_eprint("error: no with.toml found. Run 'with init' first.")
         return 1
     if options.spec.len() == 0:
+        // #2355: with.toml says what the project depends on; the lock records
+        // how. A pin the lock does not hold (an edited with.toml) is
+        // installed and locked first, so the lock never overrides it.
+        let pins = cli_manifest_c_deps(with_fs_read_file(root ++ "/with.toml"))
+        let lock = lock_load(root)
+        for pin in pins:
+            if lock_pin_is_exact(pin.constraint) and not lock_holds_pin(&lock, pin.name, pin.constraint):
+                let rc = get_install_c_dep(root, pin.name, pin.constraint, options.force_reinstall)
+                if rc != 0: return rc
         return lock_restore(root)
     let spec = options.spec
     if not spec.starts_with("c."):
@@ -6891,8 +6900,20 @@ fn run_get_command(argc: i32) -> i32:
         with_eprint("error: invalid package spec '" ++ spec ++ "'")
         get_command_usage()
         return 1
+    // #2355: a bare name installs what with.toml pins; it bumped the pin to
+    // the newest version and reported it as `added`. `c.<name>@<version>`
+    // still changes the pin.
+    if pkg_version.len() == 0:
+        for pin in cli_manifest_c_deps(with_fs_read_file(root ++ "/with.toml")):
+            if pin.name == pkg_name and pin.constraint.len() > 0:
+                pkg_version = pin.constraint
+                with_eprint("c." ++ pkg_name ++ " is pinned at " ++ pin.constraint ++ " in with.toml; `with get c." ++ pkg_name ++ "@<version>` changes the pin")
+    get_install_c_dep(root, pkg_name, pkg_version, options.force_reinstall)
 
-    let resolved_version = conan_install(pkg_name, pkg_version, root, options.force_reinstall)
+// Install `c.<pkg_name>` at `pkg_version` ("" for the newest), lock it and
+// pin it in with.toml.
+fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinstall: bool) -> i32:
+    let resolved_version = conan_install(pkg_name, pkg_version, root, force_reinstall)
     if resolved_version.len() == 0:
         return 1
     let loaded_lock = lock_load(root)
