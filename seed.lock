@@ -8,8 +8,16 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261024-local-4-0cca9aee2744
-with-darwin-aarch64=d2c92ad559a612df51759ef060b371ea6297030a75cc40d9381e60b4e9d9512d
+version=nightly-20261025-local-1-c88f3eeff0bc
+with-darwin-aarch64=dc299893912d2adf50502e034145583337b7b9897e1ded0b6ecb8a8ab8c5da0e
+# The four gating platforms are cut from main c88f3eeff (2026-10-25), each to a
+# stage2 == stage3 fixpoint with :release-checks green, by the joint local-4
+# seed (#2610): darwin on the laptop, linux-x86_64 on eric-5090, windows-x86_64
+# on win10 (published from the laptop), linux-aarch64 in
+# tools/docker/linux-aarch64. The first seeds whose runtime interface has
+# `with_system_info() -> SysInfo` (#2621) and whose codegen gives a closure
+# internal linkage in its codegen unit (#2618), so compiler sources may read
+# the record and sort a List[str]. The seeds before them:
 # The four gating platforms are cut from main 0cca9aee2 (2026-10-24), each to a
 # stage2 == stage3 fixpoint with :release-checks green, by the per-platform D155
 # seeds this joint cut retires (#2598, #2606, #2609): darwin on the laptop,
@@ -79,10 +87,10 @@ with-darwin-aarch64=d2c92ad559a612df51759ef060b371ea6297030a75cc40d9381e60b4e9d9
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64=b2b4fe8483e52e9e1ad286c750659d37b4f41cfd700fa2c26c3427710ebae763
+with-linux-x86_64=64e16393a2a1ef436d451f26f9f5efabea7d625e2836c96aea54b7169cca09f1
 # linux-aarch64: the D155 builtins make c_char the target's u8 there; the lane
 # pool in the 7.7 GiB container needs WITH_BUILD_JOBS=3 (#2603).
-with-linux-aarch64=e01e6c39eeb4cad4d5e84a4a21321c0f876f614cb4112ba39209370db472f89c
+with-linux-aarch64=236b5c2acb23212cf939c6d86a28f624946f77601342dc158d7ab9d9f8d1509a
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -93,6 +101,6 @@ with-linux-aarch64=e01e6c39eeb4cad4d5e84a4a21321c0f876f614cb4112ba39209370db472f
 # from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
 # 39288117180 against the windows-gnu SDK, an intermediate seed the native
 # windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe=b9a0fc46a7451f47226aa278c9b67a1cd24113c548ce0e80c0ea3205afd7a295
+with-windows-x86_64.exe=8249bc1d3defc97cf8025ca487ff266e9d3a07477faba9a3bfbe6de07e4b5e80
 with-windows-aarch64.exe.version=nightly-20261020-local-3-763d0e54c82a
 with-windows-aarch64.exe=d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
