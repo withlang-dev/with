@@ -318,11 +318,20 @@ fn build_graph_create_archive(root: &str, target: &BuildGraphTarget) -> i32:
             build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' has duplicate archive member name: " ++ member)
             return 1
         resolved_inputs.push(input_path)
-    let _remove_old_archive = build_graph_rt_remove_file(output_path)
-    let ar_rc = create_static_archive(output_path, resolved_inputs)
+    // #968: the archive is built beside its destination and renamed over it
+    // only once complete, so a failure (a member that cannot be read, a
+    // write that fails) leaves the last good archive. It was removed first.
+    let tmp_path = output_path ++ f".tmp.{build_graph_rt_pid()}"
+    let _stale_tmp = build_graph_rt_remove_file(tmp_path)
+    let ar_rc = create_static_archive(tmp_path, resolved_inputs)
     if ar_rc != 0:
+        let _failed_tmp = build_graph_rt_remove_file(tmp_path)
         build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' failed")
         return ar_rc
+    if build_graph_rt_rename_file(tmp_path, output_path) != 0:
+        let _unplaced_tmp = build_graph_rt_remove_file(tmp_path)
+        build_graph_rt_eprint("error: create_static_archive target '" ++ target.name ++ "' could not replace " ++ output_path)
+        return 1
     0
 
 fn build_graph_asm_quote_path(path: &str) -> str:
