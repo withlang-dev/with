@@ -379,6 +379,13 @@ pub fn JsonDocument.parse(js: str) -> JsonDocument:
         json_panic("invalid JSON")
     JsonDocument { source: js, tokens, count }
 
+// #979: the document owns its token buffer (JsonDocument.parse allocates
+// it); every parse leaked it.
+impl Drop for JsonDocument:
+    move fn drop():
+        if self.tokens != null:
+            with_free(self.tokens as *mut u8)
+
 impl JsonDocument:
     pub fn root():
         if self.count <= 0:
