@@ -136,6 +136,35 @@ a proved function needs no `unsafe`. Basic tests check the emitted text and
 `check` it; the corpus drift harness (`stc`'s `examples/strings/replace.c`,
 TommyDS's `check.c`, M*LIB's multimap example) runs with the new shapes.
 
+*Step 2 status (2026-10-25, branch `migrator-contracts-2`):* landed as
+written for (a1), (a2) and (c), with these refinements the corpora forced:
+the body is not rewritten to `self`; the method binds the C parameter name
+to `self` cast back to its raw type in a one-line prologue and prints the
+body unchanged in a safe context (every raw operation carries its own
+`unsafe`), an out-parameter is a raw pointer to the local `__ci_out` the
+method returns (`return __ci_out` is added where a C void body falls off its
+end), and (c) is emitted only for `return self` (a pointer loaded from a
+field, or arithmetic on one, may be NULL or point anywhere; the artifact
+also refuses `ret-from` when a NULL is returned on some path, which the
+ownership proof skipped). A method's `self` is never NULL, so a handle the
+body accepts as NULL (`if (ctx == NULL) return PCRE2_ERROR_NULL`) or that a
+corpus caller passes as NULL is `unproved: NULL is an accepted argument`.
+A unit's own `static` function, a header no single unit owns, a variadic
+function, a corpus keeping C linkage, and two functions that would share a
+method name (`method-collision:` in the artifact) keep the raw signature; a
+header-owned inline definition (STC's templates) is published and so is a
+method. Call sites print as `(*p).m(a)`; an out-argument is assigned from
+the return (`let r = (*p).m(a); *o = r.1; r.0` beside a status). (b) is not
+emitted: an owned parameter stored into a raw-pointer field needs the record
+to hold the owned value, a representation change for a brief. Fresh
+migrations, every corpus lane green: STC 176 methods in 36 `impl` blocks (of
+276 mutating receivers; `stc_word_stack` has `push`, `pop`, `reserve`),
+pcre2 15, zlib 19, TommyDS 19, c-algorithms 18, M*LIB 26. Found on the way:
+pointer arithmetic now carries its pointer type (a field through it printed
+without `unsafe`), and the pcre2 cohesive check and build lanes placed the
+fresh units under `lib/std/re`, where their imports fell back to the
+promoted corpus (fixed: the import path's layout).
+
 **Step 3 — generation bump and the first re-promotion.** The migrator
 generation (`--generation`, D112) moves; the promote guard's trigger is
 `migrator-pin:#2615` for a corpus that re-promotes to take contracts. Under
