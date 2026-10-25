@@ -381,15 +381,17 @@ cd ../with-release-$WITH_VERSION
 ```
 
 Noninteractive SSH shells on this host do not currently put `with` on `PATH`.
-Use the existing compiler from the main checkout as the first seed, and point
-the clean worktree at the **already-built** static LLVM SDK from the main
-checkout (the one bootstrap produced under `.deps` — we reuse it for linking,
-we do not rebuild it, and it is a build-time input only, never consulted at
-runtime):
+Use the existing compiler from the main checkout as the first seed, and link
+the clean worktree's `.deps` to the **already-built** static LLVM SDK from the
+main checkout (the one bootstrap produced under `.deps` — we reuse it for
+linking, we do not rebuild it, and it is a build-time input only, never
+consulted at runtime). The build reads only under the project root, so an
+`LLVM_PREFIX` outside the worktree is refused (#2353):
 
 ```sh
 export RELEASE_SEED=/home/quixi/with/out/bin/with
-export LLVM_PREFIX=/home/quixi/with/.deps/llvm-22.1.6-linux-x86_64
+mkdir -p .deps
+ln -s /home/quixi/with/.deps/llvm-22.1.6-linux-x86_64 .deps/
 export WITH=$RELEASE_SEED
 
 WITH_VERSION=$WITH_VERSION $RELEASE_SEED build

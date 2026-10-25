@@ -87,6 +87,24 @@ fn sdk_rel_path(root: &str, path: &str) -> str:
         return np.slice(prefix.len(), np.len())
     ""
 
+// #2353: the LLVM SDK the build's actions read, as a path under `root`:
+// `named` (LLVM_PREFIX) when a lane names one, else the pinned `.deps` SDK.
+// The build's file sandbox reads only under the project root, so a prefix
+// outside it gives "" and the action refuses it (sdk_llvm_prefix_outside).
+fn sdk_llvm_prefix_in_project(root: &str, named: &str) -> str:
+    if named.len() == 0:
+        return compiler_default_llvm_prefix()
+    if not sdk_is_abs(named):
+        return sdk_owned_text(named)
+    sdk_rel_path(root, named)
+
+fn sdk_llvm_prefix(ctx: &ActionCtx) -> str:
+    sdk_llvm_prefix_in_project(ctx.project_info().project_root(), ctx.env_input("LLVM_PREFIX"))
+
+fn sdk_llvm_prefix_outside(ctx: &ActionCtx) -> i32:
+    let named = ctx.env_input("LLVM_PREFIX")
+    sdk_fail(ctx, "LLVM_PREFIX names an SDK outside this checkout (" ++ named ++ "), and the build reads only under the project root: link it in with `ln -s " ++ named ++ " " ++ compiler_default_llvm_prefix() ++ "` and leave LLVM_PREFIX unset")
+
 fn sdk_has_slash(text: &str) -> bool:
     text.find("/") >= 0 or text.find("\\") >= 0
 
@@ -1207,6 +1225,14 @@ pub fn run_sdk_contract_tests_action(ctx: ActionCtx) -> i32:
             else:
                 assert(item.starts_with(sdk_cmake_data_prefix()))
     assert(sdk_host_tag_for_platform("windows-aarch64") == "windows-aarch64-msvc")
+    // #2353: every SDK reader takes one prefix: the named SDK under the
+    // root as a project path, the pinned one when none is named, and ""
+    // (refused) for one outside the root the sandbox cannot read.
+    assert(sdk_llvm_prefix_in_project("/w/tree", "") == compiler_default_llvm_prefix())
+    assert(sdk_llvm_prefix_in_project("/w/tree", "/w/tree/.deps/llvm-x") == ".deps/llvm-x")
+    assert(sdk_llvm_prefix_in_project("/w/tree", ".deps/llvm-x") == ".deps/llvm-x")
+    assert(sdk_llvm_prefix_in_project("/w/tree", "/w/main/.deps/llvm-x") == "")
+    assert(sdk_llvm_prefix_in_project("/w/tree", "/w/tree-b/.deps/llvm-x") == "")
     // Cross the input-buffer boundary and include every byte value, an
     // empty file, executable mode, USTAR prefix paths for CMake modules,
     // and (on Unix) a relative linker alias.
@@ -2253,7 +2279,9 @@ pub fn run_linux_sysroot_action(ctx: ActionCtx) -> i32:
     if not sdk_linux_arch_supported(a):
         return sdk_write_text(ctx, pack_path, "")
     let root = ctx.project_info().project_root()
-    let prefix = compiler_default_llvm_prefix()
+    let prefix = sdk_llvm_prefix(ctx)
+    if prefix.len() == 0:
+        return sdk_llvm_prefix_outside(ctx)
     // The SDK is the bootstrap's product (#2062): a Linux host's SDK that
     // carries its sysroot is where the build reads it, and nothing is
     // fetched or compiled. The generation below runs only for an SDK that
@@ -2473,9 +2501,9 @@ pub fn run_linux_link_pack_action(ctx: ActionCtx) -> i32:
     if not base.starts_with("WITH-SYSROOT 1\n"):
         return sdk_fail(ctx, "the linux sysroot pack " ++ sdk_linux_sysroot_pack_for(a) ++ " is missing or malformed")
     // The SDK the compiler links against: LLVM_PREFIX when a lane names one.
-    let named = ctx.env_input("LLVM_PREFIX")
-    let root = ctx.project_info().project_root()
-    let prefix = if cross: sdk_owned_text(args[1]) else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
+    let prefix = if cross: sdk_owned_text(args[1]) else: sdk_llvm_prefix(ctx)
+    if prefix.len() == 0:
+        return sdk_llvm_prefix_outside(ctx)
     // The unpacked copy a cross link reads (Link.w's cross sysroot).
     let unpack = if cross: sdk_owned_text(args[2]) else: ""
     if cross:
@@ -2698,12 +2726,10 @@ pub fn run_sdk_build_tools_pack_action(ctx: ActionCtx) -> i32:
     let cross_prefix = if ctx.args().len() > 0: sdk_owned_text(ctx.args()[0]) else: ""
     if cross_prefix.len() == 0 and os() != "Macos" and not (os() == "Linux" and sdk_linux_arch_supported(arch())):
         return sdk_write_text(ctx, pack_path, "")
-    // The in-project SDK path: the build's file sandbox reads under the
-    // project root (as build/clang_resource.w does).
     // LLVM_PREFIX when a lane names the SDK, as the compiler link reads it.
-    let named = ctx.env_input("LLVM_PREFIX")
-    let root = ctx.project_info().project_root()
-    let prefix = if cross_prefix.len() > 0: cross_prefix.clone() else if named.len() == 0: compiler_default_llvm_prefix() else if named.starts_with(root ++ "/"): sdk_rel_path(root, named) else: sdk_owned_text(named)
+    let prefix = if cross_prefix.len() > 0: cross_prefix.clone() else: sdk_llvm_prefix(ctx)
+    if prefix.len() == 0:
+        return sdk_llvm_prefix_outside(ctx)
     let share = sdk_join(prefix, sdk_cmake_data_prefix().slice(0, sdk_cmake_data_prefix().len() - 1))
     var pack = StringBuilder.with_capacity(48000000)
     pack.push_str("WITH-SYSROOT 1\n")
@@ -2757,7 +2783,9 @@ pub fn run_windows_sysroot_action(ctx: ActionCtx) -> i32:
         return sdk_fail(ctx, "requires an output path")
     if os() != "Windows" or arch() != "x86_64":
         return sdk_write_text(ctx, pack_path, "")
-    let prefix = compiler_default_llvm_prefix()
+    let prefix = sdk_llvm_prefix(ctx)
+    if prefix.len() == 0:
+        return sdk_llvm_prefix_outside(ctx)
     let arch_name = "x86_64"
     let required: List[str] = List.new()
     required.push(sdk_windows_libc_marker(prefix, arch_name))
