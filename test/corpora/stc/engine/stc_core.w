@@ -197,7 +197,7 @@ pub unsafe fn _cco_new_fiber(__param_task: *mut cco_task, __param_data: *mut c_v
 
 }
 
-// contract: receiver-mut:cco_task,stored-unknown:1,unproved:2:read only,unproved:3:out-parameter read before the write
+// contract: receiver-mut:cco_task,stored-unknown:1,unproved:2:read only,unproved:3:out-parameter read before the write — stores an argument; ownership not modeled
 pub unsafe fn _cco_spawn(__param_task: *mut cco_task, __param_grp: *mut cco_group, __param_data: *mut c_void, __param_fib: *mut cco_task_fiber) -> *mut cco_task_fiber {
     var __local_new_fb: *mut cco_task_fiber = with 0 as __ci_expr_seq_11 {
         var __ci_expr_ternary_1: *mut cco_task_fiber = null
@@ -229,7 +229,7 @@ pub unsafe fn _cco_spawn(__param_task: *mut cco_task, __param_grp: *mut cco_grou
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only,unproved:2:read only
+// contract: receiver:cco_task_fiber,unproved:1:read only,unproved:2:read only
 pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cco_group, __param_file: *const c_char, __param_line: i32) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -297,36 +297,14 @@ pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cc
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn _cco_throw(__param_caller: *mut cco_task, __param_err: cco_err_t) {
-    var __local_caller = __param_caller
-    var __local_fib: *mut cco_task_fiber = (*(&raw const (*__local_caller).base.state as *const cco_task_state)).fib
-
-    with_memcpy((&raw mut (*__local_fib).error_ as *mut u8), (&raw const __param_err as *const u8), sizeof[cco_err_t]())
-
-    with_memcpy((&raw mut (*__local_fib).recover_state as *mut u8), (&raw const (*__local_caller).base.state as *const u8), sizeof[cco_task_state]())
-
-    if ((*__local_fib).parent != null) {
-        with_memcpy((&raw mut (*(*__local_fib).parent).recover_state as *mut u8), (&raw const (*(*(*__local_fib).parent).task).base.state as *const u8), sizeof[cco_task_state]())
-
-        while ((*(&raw const (*__local_caller).base as *const cco_task_base)).awaiter != null) {
-            (__local_caller = (*(&raw const (*__local_caller).base as *const cco_task_base)).awaiter)
-        }
-
-        ((*__local_fib).failed_grp = (*(&raw const (*__local_caller).base.state as *const cco_task_state)).parent_grp)
-
-    }
-
-}
-
-// contract: stored-unknown:0
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn _cco_resume_task(__param_task: *mut cco_task) -> i32 {
     return (*(&raw const (*__param_task).base as *const cco_task_base)).func.unwrap()(__param_task)
 
 }
 
 pub unsafe fn _cco_cancel_task(__param_tsk: *mut cco_task, __param_err: cco_err_t) -> *mut cco_task {
-    (*((*(&raw const (*__param_tsk).base.state as *const cco_task_state)).fib))._cco_cancel_fiber(__param_err)
+    (((*((*(&raw const (*__param_tsk).base.state as *const cco_task_state)).fib))._cco_cancel_fiber(__param_err) as *const cco_task_fiber) as *mut cco_task_fiber)
 
     return __param_tsk
 
@@ -348,21 +326,28 @@ pub fn cco_make_timer(__param_sec: f64) -> cco_timer {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn cco_timer_elapsed(__param_tm: *mut cco_timer) -> f64 {
-    return (((cco_timer_ticks() - (*__param_tm).start_time) as f64) * (1.0 / (1000000 as f64)))
+impl cco_task {
+    pub fn _cco_throw(__param_err: cco_err_t) {
+        let __param_caller: *mut cco_task = (self as *const cco_task) as *mut cco_task
+        var __local_caller = __param_caller
+        var __local_fib: *mut cco_task_fiber = (unsafe *(&raw const (*__local_caller).base.state as *const cco_task_state)).fib
 
-}
+        with_memcpy((&raw mut (unsafe *__local_fib).error_ as *mut u8), (&raw const __param_err as *const u8), sizeof[cco_err_t]())
 
-// contract: unproved:0:read only
-pub unsafe fn cco_timer_expired(__param_tm: *mut cco_timer) -> bool {
-    return ((((cco_timer_elapsed(__param_tm) >= (*__param_tm).duration)) as bool))
+        with_memcpy((&raw mut (unsafe *__local_fib).recover_state as *mut u8), (&raw const (unsafe *__local_caller).base.state as *const u8), sizeof[cco_task_state]())
 
-}
+        if ((unsafe *__local_fib).parent != null) {
+            with_memcpy((&raw mut (unsafe *(*__local_fib).parent).recover_state as *mut u8), (&raw const (unsafe *(*(*__local_fib).parent).task).base.state as *const u8), sizeof[cco_task_state]())
 
-// contract: unproved:0:read only
-pub unsafe fn cco_timer_remaining(__param_tm: *mut cco_timer) -> f64 {
-    return ((*__param_tm).duration - cco_timer_elapsed(__param_tm))
+            while ((unsafe *(&raw const (*__local_caller).base as *const cco_task_base)).awaiter != null) {
+                (__local_caller = (unsafe *(&raw const (*__local_caller).base as *const cco_task_base)).awaiter)
+            }
+
+            ((unsafe *__local_fib).failed_grp = (unsafe *(&raw const (*__local_caller).base.state as *const cco_task_state)).parent_grp)
+
+        }
+
+    }
 
 }
 
@@ -604,6 +589,24 @@ impl cco_timer {
     pub mut fn cco_restart_timer() {
         let __param_tm: *mut cco_timer = self as *mut cco_timer
         ((unsafe *__param_tm).start_time = ((cco_timer_ticks() as i64)))
+
+    }
+
+    pub fn elapsed() -> f64 {
+        let __param_tm: *mut cco_timer = (self as *const cco_timer) as *mut cco_timer
+        return (((cco_timer_ticks() - (unsafe *__param_tm).start_time) as f64) * (1.0 / (1000000 as f64)))
+
+    }
+
+    pub fn expired() -> bool {
+        let __param_tm: *mut cco_timer = (self as *const cco_timer) as *mut cco_timer
+        return ((((unsafe { (*__param_tm).elapsed() } >= (unsafe *__param_tm).duration)) as bool))
+
+    }
+
+    pub fn remaining() -> f64 {
+        let __param_tm: *mut cco_timer = (self as *const cco_timer) as *mut cco_timer
+        return ((unsafe *__param_tm).duration - unsafe { (*__param_tm).elapsed() })
 
     }
 

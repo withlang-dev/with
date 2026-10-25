@@ -38,7 +38,7 @@ impl[K: Ord, V] OrderedMap[K, V]:
             let right = unsafe { &(*(b as *const StcSlot[K])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> isize: unsafe { stc_slot_sset_size(&raw const self.set) } as isize
+    pub fn len() -> isize: self.set.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     fn find_entry(key: &K) -> *mut StcEntry[K, V]:
@@ -90,11 +90,11 @@ impl[K: Ord, V] OrderedMap[K, V]:
 
     /// In-order views of the entries (D44: traversal observes).
     pub fn iter() -> OrderedMapIter[K, V]:
-        OrderedMapIter { cursor: unsafe { stc_slot_sset_begin(&raw const self.set) } }
+        OrderedMapIter { cursor: self.set.begin() }
 
 impl[K, V] Drop for OrderedMap[K, V]:
     move fn drop():
-        var cursor = unsafe { stc_slot_sset_begin(&raw const self.set) }
+        var cursor = self.set.begin()
         while cursor.ref as i64 != 0:
             unsafe { stc_entry_release(unsafe { *cursor.ref } as *mut StcEntry[K, V]) }
             cursor.next()

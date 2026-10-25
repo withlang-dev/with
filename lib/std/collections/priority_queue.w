@@ -63,8 +63,8 @@ impl[T: Ord] PriorityQueue[T]:
         else: false
 
     pub fn len() -> isize:
-        if self.in_words(): unsafe { stc_word_pqueue_size(&raw const self.words) } as isize
-        else: unsafe { stc_slot_pqueue_size(&raw const self.queue) } as isize
+        if self.in_words(): self.words.size() as isize
+        else: self.queue.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     mut fn push_slot(value: T):

@@ -232,7 +232,7 @@ unsafe fn IDeq_reserve(__param_self_: *mut IDeq, __param_cap: i64) -> bool {
 }
 
 unsafe fn IDeq_clear(__param_self_: *mut IDeq) {
-    var __local_i: IDeq_iter = IDeq_begin((((&raw const (*__param_self_) as *const IDeq) as *mut IDeq) as *const IDeq))
+    var __local_i: IDeq_iter = (*(((&raw const (*__param_self_) as *const IDeq) as *mut IDeq) as *const IDeq)).begin()
 
     while ((*(&raw const __local_i as *const IDeq_iter)).ref != null) {
 
@@ -249,7 +249,7 @@ unsafe fn IDeq_clear(__param_self_: *mut IDeq) {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 unsafe fn IDeq_drop(__param_cself: *const IDeq) {
     var __local_self_: *mut IDeq = ((__param_cself as *mut IDeq))
 
@@ -286,7 +286,7 @@ unsafe fn IDeq_push(__param_self_: *mut IDeq, __param_value: i32) -> *mut i32 {
 }
 
 unsafe fn IDeq_shrink_to_fit(__param_self_: *mut IDeq) {
-    var __local_sz: i64 = ((IDeq_size((__param_self_ as *const IDeq)) as i64))
+    var __local_sz: i64 = (((*(__param_self_ as *const IDeq)).size() as i64))
 
     var __local_newpow2: i64 = ((c_next_pow2(((__local_sz + 1) as i64)) as i64))
 
@@ -318,7 +318,7 @@ unsafe fn IDeq_shrink_to_fit(__param_self_: *mut IDeq) {
 }
 
 fn IDeq_advance(__param_it_: IDeq_iter, __param_n: i64) -> IDeq_iter {
-    var __local_len: i64 = ((unsafe { IDeq_size((*(&raw const __param_it_ as *const IDeq_iter))._s) } as i64))
+    var __local_len: i64 = ((unsafe { (*((*(&raw const __param_it_ as *const IDeq_iter))._s)).size() } as i64))
 
     var __local_pos: i64 = (unsafe *(&raw const __param_it_ as *const IDeq_iter)).pos
 
@@ -358,7 +358,7 @@ pub unsafe fn IDeq_put_n(__param_self_: *mut IDeq, __param_raw: *const i32, __pa
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:IDeq,unproved:1:read only
 pub unsafe fn IDeq_value_drop(__param_self_: *const IDeq, __param_val: *mut i32) {
     return
 }
@@ -415,15 +415,15 @@ pub unsafe fn IDeq_from_n(__param_raw: *const i32, __param_n: i64) -> IDeq {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:IDeq,unproved:1:read only
 unsafe fn IDeq_eq(__param_self_: *const IDeq, __param_other: *const IDeq) -> bool {
-    if ((if IDeq_size(__param_self_) != IDeq_size(__param_other): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size() != (*__param_other).size(): 1 else: 0) != 0) {
         return ((false as bool))
     }
 
-    var __local_i: IDeq_iter = IDeq_begin(__param_self_)
+    var __local_i: IDeq_iter = (*__param_self_).begin()
 
-    var __local_j: IDeq_iter = IDeq_begin(__param_other)
+    var __local_j: IDeq_iter = (*__param_other).begin()
 
 
     while ((*(&raw const __local_i as *const IDeq_iter)).ref != null) {
@@ -458,7 +458,7 @@ fn IDeq_clone(__param_q: IDeq) -> IDeq {
 
     (__local_out.start = ((0 as i64)))
 
-    (__local_out.end = ((unsafe { IDeq_size(((&raw mut __param_q as *mut IDeq) as *const IDeq)) } as i64)))
+    (__local_out.end = ((unsafe { (*((&raw mut __param_q as *mut IDeq) as *const IDeq)).size() } as i64)))
 
     (__local_out.capmask = (((c_next_pow2((((unsafe *(&raw const __local_out as *const IDeq)).end + 1) as i64)) - 1) as i64)))
 
@@ -467,7 +467,7 @@ fn IDeq_clone(__param_q: IDeq) -> IDeq {
     var __local_i: i64 = ((0 as i64))
 
     if ((unsafe *(&raw const __local_out as *const IDeq)).cbuf != null) {
-        var __local_it_: IDeq_iter = unsafe { IDeq_begin(((&raw mut __param_q as *mut IDeq) as *const IDeq)) }
+        var __local_it_: IDeq_iter = unsafe { (*((&raw mut __param_q as *mut IDeq) as *const IDeq)).begin() }
 
         while ((unsafe *(&raw const __local_it_ as *const IDeq_iter)).ref != null) {
             var __ci_expr_old_0: i64 = __local_i
@@ -487,13 +487,6 @@ fn IDeq_clone(__param_q: IDeq) -> IDeq {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn IDeq_value_clone(__param_self_: *const IDeq, __param_val: i32) -> i32 {
-
-    return __param_val
-
-}
-
 // contract: receiver-mut:IDeq,unproved:1:read only
 pub unsafe fn IDeq_copy(__param_self_: *mut IDeq, __param_other: *const IDeq) -> Unit {
     if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
@@ -508,84 +501,32 @@ pub unsafe fn IDeq_copy(__param_self_: *mut IDeq, __param_other: *const IDeq) ->
 }
 
 // contract: unproved:0:read only
-pub unsafe fn IDeq_size(__param_self_: *const IDeq) -> i64 {
-    return ((((*__param_self_).end - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_capacity(__param_self_: *const IDeq) -> i64 {
-    return (*__param_self_).capmask
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_is_empty(__param_self_: *const IDeq) -> bool {
-    return (((((*__param_self_).start == (*__param_self_).end)) as bool))
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn IDeq_value_toraw(__param_pval: *const i32) -> i32 {
     return (*__param_pval)
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_front(__param_self_: *const IDeq) -> *const i32 {
     return ((((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize)) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_front_mut(__param_self_: *mut IDeq) -> *mut i32 {
     return ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_back(__param_self_: *const IDeq) -> *const i32 {
     return ((((*__param_self_).cbuf + ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64) as usize)) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_back_mut(__param_self_: *mut IDeq) -> *mut i32 {
     return ((IDeq_back((__param_self_ as *const IDeq)) as *mut i32))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_begin(__param_self_: *const IDeq) -> IDeq_iter {
-    return ((IDeq_iter { ref: (if IDeq_is_empty(__param_self_): ((null) as *mut i32) else: ((*__param_self_).cbuf + (((*__param_self_).start as i64) as usize))), pos: (*__param_self_).start, _s: __param_self_ } as IDeq_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_rbegin(__param_self_: *const IDeq) -> IDeq_iter {
-    var __local_pos: i64 = ((((((*__param_self_).end - 1) as i64) & ((*__param_self_).capmask as i64)) as i64))
-
-    return ((IDeq_iter { ref: (if IDeq_is_empty(__param_self_): ((null) as *mut i32) else: ((*__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as IDeq_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_end(__param_self_: *const IDeq) -> IDeq_iter {
-
-    return ((IDeq_iter.zeroed() as IDeq_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_rend(__param_self_: *const IDeq) -> IDeq_iter {
-
-    return ((IDeq_iter.zeroed() as IDeq_iter))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_index(__param_self_: *const IDeq, __param_it_: IDeq_iter) -> i64 {
-    return ((((*(&raw const __param_it_ as *const IDeq_iter)).pos - (*__param_self_).start) as i64) & ((*__param_self_).capmask as i64))
 
 }
 
@@ -636,7 +577,7 @@ unsafe fn IDeq_insert_n(__param_self_: *mut IDeq, __param_idx: i64, __param_arr:
 }
 
 unsafe fn IDeq_insert_uninit(__param_self_: *mut IDeq, __param_idx: i64, __param_n: i64) -> IDeq_iter {
-    var __local_len: i64 = ((IDeq_size((__param_self_ as *const IDeq)) as i64))
+    var __local_len: i64 = (((*(__param_self_ as *const IDeq)).size() as i64))
 
     var __local_it_: IDeq_iter = IDeq_iter { _s: (__param_self_ as *const IDeq) }
 
@@ -677,7 +618,7 @@ unsafe fn IDeq_insert_uninit(__param_self_: *mut IDeq, __param_idx: i64, __param
 }
 
 unsafe fn IDeq_erase_n(__param_self_: *mut IDeq, __param_idx: i64, __param_n: i64) {
-    var __local_len: i64 = ((IDeq_size((__param_self_ as *const IDeq)) as i64))
+    var __local_len: i64 = (((*(__param_self_ as *const IDeq)).size() as i64))
 
     if (((if not ((if (__param_idx + __param_n) <= __local_len: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"IDeq_erase_n".ptr, c"deque.h".ptr, (149 as i32), c"idx + n <= len".ptr)
@@ -715,9 +656,9 @@ unsafe fn IDeq_erase_n(__param_self_: *mut IDeq, __param_idx: i64, __param_n: i6
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_at(__param_self_: *const IDeq, __param_idx: i64) -> *const i32 {
-    if (((if not ((if ((__param_idx as u64)) < ((IDeq_size(__param_self_) as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size() as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"IDeq_at".ptr, c"deque.h".ptr, (53 as i32), c"((size_t)(idx) < (size_t)(IDeq_size(self)))".ptr)
     } else {
         0
@@ -727,13 +668,12 @@ pub unsafe fn IDeq_at(__param_self_: *const IDeq, __param_idx: i64) -> *const i3
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IDeq_at_mut(__param_self_: *mut IDeq, __param_idx: i64) -> *mut i32 {
     return ((IDeq_at((__param_self_ as *const IDeq), __param_idx) as *mut i32))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn IDeq_find_in(__param_self_: *const IDeq, __param_i1: IDeq_iter, __param_i2: IDeq_iter, __param_raw: i32) -> IDeq_iter {
 
     while ((if (*(&raw const __param_i1 as *const IDeq_iter)).ref != (*(&raw const __param_i2 as *const IDeq_iter)).ref: 1 else: 0) != 0) {
@@ -752,18 +692,6 @@ unsafe fn IDeq_find_in(__param_self_: *const IDeq, __param_i1: IDeq_iter, __para
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn IDeq_find(__param_self_: *const IDeq, __param_raw: i32) -> IDeq_iter {
-    return IDeq_find_in(__param_self_, IDeq_begin(__param_self_), IDeq_end(__param_self_), __param_raw)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn IDeq_contains(__param_self_: *const IDeq, __param_raw: i32) -> bool {
-    return ((((IDeq_find(__param_self_, __param_raw).ref != null)) as bool))
-
-}
-
 @[repr(C)]
 pub type ctest_deque_basics_run__c_i2_anon { _ref: *const *mut IDeq = null, ref: *mut *mut IDeq = null, size: i32 = 0, index: i32 = 0 }
 impl Copy for ctest_deque_basics_run__c_i2_anon
@@ -773,7 +701,7 @@ fn ctest_deque_basics_run() {
         unsafe { IDeq_from_n((&__ci_expr_lit_0[0] as *mut i32), (12 as i64)) }
     }
 
-    assert_compare((1 as i32), c"==".ptr, (12 as i64), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as i64), c"deque_test.c".ptr, (9 as i32))
+    assert_compare((1 as i32), c"==".ptr, (12 as i64), (unsafe { (*((&raw mut __local_d as *mut IDeq) as *const IDeq)).size() } as i64), c"deque_test.c".ptr, (9 as i32))
 
     var __local__c_i1: i64 = ((0 as i64))
 
@@ -808,7 +736,7 @@ fn ctest_deque_basics_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res1 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"deque_test.c".ptr, (17 as i32))
 
-    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as i64), c"deque_test.c".ptr, (18 as i32))
+    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { (*((&raw mut __local_d as *mut IDeq) as *const IDeq)).size() } as i64), c"deque_test.c".ptr, (18 as i32))
 
     unsafe { IDeq_erase_n((&raw mut __local_d as *mut IDeq), (7 as i64), (4 as i64)) }
 
@@ -830,11 +758,11 @@ fn ctest_deque_basics_run() {
 
     assert_bool((1 as i32), (true as bool), (unsafe { IDeq_eq(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), ((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as bool), c"deque_test.c".ptr, (29 as i32))
 
-    assert_compare((1 as i32), c"==".ptr, ((unsafe *(unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (400 as i32)) }.ref)) as i64), (400 as i64), c"deque_test.c".ptr, (30 as i32))
+    assert_compare((1 as i32), c"==".ptr, ((unsafe *(unsafe { (*((&raw mut __local_res3 as *mut IDeq) as *const IDeq)).find((400 as i32)) }.ref)) as i64), (400 as i64), c"deque_test.c".ptr, (30 as i32))
 
-    assert_pointers((1 as i32), c"==".ptr, (null as *const c_void), (unsafe { IDeq_find(((&raw mut __local_res3 as *mut IDeq) as *const IDeq), (401 as i32)) }.ref as *const c_void), c"deque_test.c".ptr, (31 as i32))
+    assert_pointers((1 as i32), c"==".ptr, (null as *const c_void), (unsafe { (*((&raw mut __local_res3 as *mut IDeq) as *const IDeq)).find((401 as i32)) }.ref as *const c_void), c"deque_test.c".ptr, (31 as i32))
 
-    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { IDeq_size(((&raw mut __local_d as *mut IDeq) as *const IDeq)) } as i64), c"deque_test.c".ptr, (33 as i32))
+    assert_compare((1 as i32), c"==".ptr, (14 as i64), (unsafe { (*((&raw mut __local_d as *mut IDeq) as *const IDeq)).size() } as i64), c"deque_test.c".ptr, (33 as i32))
 
     assert_compare((1 as i32), c"==".ptr, (200 as i64), ((unsafe *unsafe { IDeq_at(((&raw mut __local_d as *mut IDeq) as *const IDeq), (7 as i64)) }) as i64), c"deque_test.c".ptr, (34 as i32))
 
@@ -868,6 +796,31 @@ fn ctest_deque_basics_run() {
 }
 
 impl IDeq {
+    pub fn value_clone(__param_val: i32) -> i32 {
+        let __param_self_: *const IDeq = self as *const IDeq
+
+        return __param_val
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return ((((unsafe *__param_self_).end - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return (unsafe *__param_self_).capmask
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return (((((unsafe *__param_self_).start == (unsafe *__param_self_).end)) as bool))
+
+    }
+
     pub mut fn move_() -> IDeq {
         let __param_self_: *mut IDeq = self as *mut IDeq
         var __local_m: IDeq = (unsafe *__param_self_)
@@ -895,7 +848,7 @@ impl IDeq {
 
     pub mut fn pop_front() {
         let __param_self_: *mut IDeq = self as *mut IDeq
-        if (((if not ((if not unsafe { IDeq_is_empty((__param_self_ as *const IDeq)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const IDeq)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"IDeq_pop_front".ptr, c"queue_prv.h".ptr, (133 as i32), c"!IDeq_is_empty(self)".ptr)
         } else {
             0
@@ -908,7 +861,7 @@ impl IDeq {
 
     pub mut fn pull_front() -> i32 {
         let __param_self_: *mut IDeq = self as *mut IDeq
-        if (((if not ((if not unsafe { IDeq_is_empty((__param_self_ as *const IDeq)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const IDeq)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"IDeq_pull_front".ptr, c"queue_prv.h".ptr, (139 as i32), c"!IDeq_is_empty(self)".ptr)
         } else {
             0
@@ -919,6 +872,40 @@ impl IDeq {
         ((unsafe *__param_self_).start = (((((__local_s + 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64)))
 
         return (unsafe (*__param_self_).cbuf[__local_s])
+
+    }
+
+    pub fn begin() -> IDeq_iter {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return ((IDeq_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut i32) else: ((unsafe *__param_self_).cbuf + (((unsafe *__param_self_).start as i64) as usize))), pos: (unsafe *__param_self_).start, _s: __param_self_ } as IDeq_iter))
+
+    }
+
+    pub fn rbegin() -> IDeq_iter {
+        let __param_self_: *const IDeq = self as *const IDeq
+        var __local_pos: i64 = ((((((unsafe *__param_self_).end - 1) as i64) & ((unsafe *__param_self_).capmask as i64)) as i64))
+
+        return ((IDeq_iter { ref: (if unsafe { (*__param_self_).is_empty() }: ((null) as *mut i32) else: ((unsafe *__param_self_).cbuf + ((__local_pos as i64) as usize))), pos: __local_pos, _s: __param_self_ } as IDeq_iter))
+
+    }
+
+    pub fn end() -> IDeq_iter {
+        let __param_self_: *const IDeq = self as *const IDeq
+
+        return ((IDeq_iter.zeroed() as IDeq_iter))
+
+    }
+
+    pub fn rend() -> IDeq_iter {
+        let __param_self_: *const IDeq = self as *const IDeq
+
+        return ((IDeq_iter.zeroed() as IDeq_iter))
+
+    }
+
+    pub fn index(__param_it_: IDeq_iter) -> i64 {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return ((((unsafe *(&raw const __param_it_ as *const IDeq_iter)).pos - (unsafe *__param_self_).start) as i64) & ((unsafe *__param_self_).capmask as i64))
 
     }
 
@@ -936,7 +923,7 @@ impl IDeq {
 
     pub mut fn pop_back() {
         let __param_self_: *mut IDeq = self as *mut IDeq
-        if (((if not ((if not unsafe { IDeq_is_empty((__param_self_ as *const IDeq)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const IDeq)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"IDeq_pop_back".ptr, c"deque.h".ptr, (67 as i32), c"!IDeq_is_empty(self)".ptr)
         } else {
             0
@@ -949,7 +936,7 @@ impl IDeq {
 
     pub mut fn pull_back() -> i32 {
         let __param_self_: *mut IDeq = self as *mut IDeq
-        if (((if not ((if not unsafe { IDeq_is_empty((__param_self_ as *const IDeq)) }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if (((if not ((if not unsafe { (*(__param_self_ as *const IDeq)).is_empty() }: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
             __assert_rtn(c"IDeq_pull_back".ptr, c"deque.h".ptr, (73 as i32), c"!IDeq_is_empty(self)".ptr)
         } else {
             0
@@ -994,6 +981,18 @@ impl IDeq {
         }
 
         return __param_it1
+
+    }
+
+    pub fn find(__param_raw: i32) -> IDeq_iter {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return unsafe { IDeq_find_in(__param_self_, unsafe { (*__param_self_).begin() }, unsafe { (*__param_self_).end() }, __param_raw) }
+
+    }
+
+    pub fn contains(__param_raw: i32) -> bool {
+        let __param_self_: *const IDeq = self as *const IDeq
+        return ((((unsafe { (*__param_self_).find(__param_raw) }.ref != null)) as bool))
 
     }
 

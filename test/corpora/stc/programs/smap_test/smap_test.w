@@ -251,7 +251,6 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -272,7 +271,6 @@ unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_cha
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -473,19 +471,16 @@ fn cutf8_isspace(__param_c: u32) -> bool {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_getbuf(__param_s: *mut cstr) -> cstr_buf {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (cstr_buf { data: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64), cap: (((~(*(&raw const (*__param_s).lon as *const cstr_lon)).ncap)) as i64) } as cstr_buf) else: (cstr_buf { data: (&raw const (*__param_s).sml.data[0] as *mut c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)), cap: 22 } as cstr_buf))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_zv(__param_s: *const cstr) -> zsview {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (zsview { str: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64) } as zsview) else: (zsview { str: (&raw const (*__param_s).sml.data[0] as *const c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)) } as zsview))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_sv(__param_s: *const cstr) -> csview {
     return (if (if (*(&raw const (*__param_s).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (csview { buf: (*(&raw const (*__param_s).lon as *const cstr_lon)).data, size: (((*(&raw const (__param_s).lon as *const cstr_lon)).size) as i64) } as csview) else: (csview { buf: (&raw const (*__param_s).sml.data[0] as *const c_char), size: (((*(&raw const (__param_s).sml as *const cstr_sml)).size as i64)) } as csview))
 
@@ -572,43 +567,39 @@ unsafe fn cstr_clear(__param_self_: *mut cstr) {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn cstr_data(__param_self_: *mut cstr) -> *mut c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: (*(&raw const (*__param_self_).lon as *const cstr_lon)).data else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *mut c_char)) as *mut c_char))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn cstr_str(__param_self_: *const cstr) -> *const c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).data as *const c_char) else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *const c_char)) as *const c_char))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn cstr_toraw(__param_self_: *const cstr) -> *const c_char {
     return (((if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).data as *const c_char) else: (&(*(&raw const (*__param_self_).sml as *const cstr_sml)).data[0] as *const c_char)) as *const c_char))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_size(__param_self_: *const cstr) -> i64 {
     return (if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((*(&raw const (*__param_self_).lon as *const cstr_lon)).size as i64) else: ((*(&raw const (*__param_self_).sml as *const cstr_sml)).size as i64))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_is_empty(__param_self_: *const cstr) -> bool {
     return ((((cstr_size(__param_self_) == 0)) as bool))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_capacity(__param_self_: *const cstr) -> i64 {
     return (if (if (*(&raw const (*__param_self_).sml as *const cstr_sml)).size >= 128: 1 else: 0) != 0: ((~(*(&raw const (*__param_self_).lon as *const cstr_lon)).ncap) as i64) else: (22 as i64))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_to_index(__param_self_: *const cstr, __param_it_: cstr_iter) -> i64 {
     return (((((*(&raw const __param_it_ as *const cstr_iter)).ref as usize) -% (cstr_str(__param_self_) as usize)) as i64) / (sizeof[c_char]() as i64))
 
@@ -619,7 +610,6 @@ fn cstr_from_s(__param_s: cstr, __param_pos: i64, __param_len: i64) -> cstr {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_subview(__param_self_: *const cstr, __param_pos: i64, __param_len: i64) -> csview {
     var __local_len = __param_len
     var __local_sv: csview = cstr_sv(__param_self_)
@@ -638,7 +628,6 @@ unsafe fn cstr_subview(__param_self_: *const cstr, __param_pos: i64, __param_len
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_tail(__param_self_: *const cstr, __param_len: i64) -> zsview {
     var __local_len = __param_len
     if (((if not ((if __local_len >= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
@@ -666,19 +655,16 @@ unsafe fn cstr_u8_from(__param_str: *const c_char, __param_u8pos: i64, __param_u
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_u8_size(__param_self_: *const cstr) -> i64 {
     return cutf8_count(cstr_str(__param_self_))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_u8_to_index(__param_self_: *const cstr, __param_u8pos: i64) -> i64 {
     return cutf8_to_index(cstr_str(__param_self_), __param_u8pos)
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_u8_tail(__param_self_: *const cstr, __param_u8len: i64) -> zsview {
     var __local_u8len = __param_u8len
     var __local_sv: csview = cstr_sv(__param_self_)
@@ -706,13 +692,11 @@ unsafe fn cstr_u8_tail(__param_self_: *const cstr, __param_u8len: i64) -> zsview
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_u8_subview(__param_self_: *const cstr, __param_u8pos: i64, __param_u8len: i64) -> csview {
     return cutf8_subview(cstr_str(__param_self_), __param_u8pos, __param_u8len)
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_u8_at(__param_self_: *const cstr, __param_u8pos: i64) -> cstr_iter {
     var __local_it_: cstr_iter = cstr_iter { u8: cstr_iter_u8 { chr: csview { buf: cutf8_at(cstr_str(__param_self_), __param_u8pos) }, dec: cutf8_decode_t.zeroed() } }
 
@@ -726,7 +710,6 @@ unsafe fn cstr_u8_at(__param_self_: *const cstr, __param_u8pos: i64) -> cstr_ite
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_begin(__param_self_: *const cstr) -> cstr_iter {
     var __local_it_: cstr_iter = cstr_iter { u8: cstr_iter_u8 { chr: csview { buf: cstr_str(__param_self_) }, dec: cutf8_decode_t.zeroed() } }
 
@@ -740,7 +723,6 @@ unsafe fn cstr_begin(__param_self_: *const cstr) -> cstr_iter {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_end(__param_self_: *const cstr) -> cstr_iter {
 
     var __local_it_: cstr_iter = cstr_iter.zeroed()
@@ -773,7 +755,6 @@ fn cstr_advance(__param_it_: cstr_iter, __param_u8pos: i64) -> cstr_iter {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_codepoint(__param_it_: *const cstr_iter) -> u32 {
     return (*(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
 
@@ -807,16 +788,16 @@ unsafe fn cstr_toupper(__param_str: *const c_char) -> cstr {
 }
 
 unsafe fn cstr_lowercase(__param_self_: *mut cstr) -> Unit {
-    (*__param_self_).take(cstr_tolower_sv(cstr_sv((__param_self_ as *const cstr))))
+    (((*__param_self_).take(cstr_tolower_sv(cstr_sv((__param_self_ as *const cstr)))) as *const cstr) as *mut cstr)
 
 }
 
 unsafe fn cstr_uppercase(__param_self_: *mut cstr) -> Unit {
-    (*__param_self_).take(cstr_toupper_sv(cstr_sv((__param_self_ as *const cstr))))
+    (((*__param_self_).take(cstr_toupper_sv(cstr_sv((__param_self_ as *const cstr)))) as *const cstr) as *mut cstr)
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_istarts_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -836,7 +817,7 @@ unsafe fn cstr_istarts_with(__param_self_: *const cstr, __param_sub: *const c_ch
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_iends_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -853,13 +834,13 @@ unsafe fn cstr_iends_with(__param_self_: *const cstr, __param_sub: *const c_char
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_icmp(__param_s1: *const cstr, __param_s2: *const cstr) -> i32 {
     return cutf8_icmp(cstr_str(__param_s1), cstr_str(__param_s2))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_ieq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
     var __local_x: csview = cstr_sv(__param_s1)
 
@@ -877,19 +858,19 @@ unsafe fn cstr_ieq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_iequals(__param_self_: *const cstr, __param_str: *const c_char) -> bool {
     return ((((not (cutf8_icmp(cstr_str(__param_self_), __param_str) != 0))) as bool))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_cmp(__param_s1: *const cstr, __param_s2: *const cstr) -> i32 {
     return strcmp(cstr_str(__param_s1), cstr_str(__param_s2))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_eq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
     var __local_x: csview = cstr_sv(__param_s1)
 
@@ -907,13 +888,12 @@ unsafe fn cstr_eq(__param_s1: *const cstr, __param_s2: *const cstr) -> bool {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_equals(__param_self_: *const cstr, __param_str: *const c_char) -> bool {
     return ((((not (strcmp(cstr_str(__param_self_), __param_str) != 0))) as bool))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_equals_sv(__param_self_: *const cstr, __param_sv: csview) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -926,7 +906,7 @@ unsafe fn cstr_equals_sv(__param_self_: *const cstr, __param_sv: csview) -> bool
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_find(__param_self_: *const cstr, __param_search: *const c_char) -> i64 {
     var __local_str: *const c_char = cstr_str(__param_self_)
 
@@ -937,19 +917,17 @@ unsafe fn cstr_find(__param_self_: *const cstr, __param_search: *const c_char) -
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_contains(__param_self_: *const cstr, __param_search: *const c_char) -> bool {
     return ((((strstr(((cstr_str(__param_self_) as *mut c_char) as *const c_char), __param_search) != null)) as bool))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_contains_sv(__param_self_: *const cstr, __param_search: csview) -> bool {
-    return ((((cstr_find_sv(__param_self_, __param_search) != 9223372036854775807)) as bool))
+    return (((((*__param_self_).find_sv(__param_search) != 9223372036854775807)) as bool))
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_starts_with_sv(__param_self_: *const cstr, __param_sub: csview) -> bool {
     if ((if (*(&raw const __param_sub as *const csview)).size > cstr_size(__param_self_): 1 else: 0) != 0) {
         return ((false as bool))
@@ -959,7 +937,7 @@ unsafe fn cstr_starts_with_sv(__param_self_: *const cstr, __param_sub: csview) -
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_starts_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     var __local_sub = __param_sub
     var __local_str: *const c_char = cstr_str(__param_self_)
@@ -985,7 +963,6 @@ unsafe fn cstr_starts_with(__param_self_: *const cstr, __param_sub: *const c_cha
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cstr_ends_with_sv(__param_self_: *const cstr, __param_sub: csview) -> bool {
     var __local_sv: csview = cstr_sv(__param_self_)
 
@@ -997,7 +974,7 @@ unsafe fn cstr_ends_with_sv(__param_self_: *const cstr, __param_sub: csview) -> 
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:cstr,unproved:1:read only
 unsafe fn cstr_ends_with(__param_self_: *const cstr, __param_sub: *const c_char) -> bool {
     return cstr_ends_with_sv(__param_self_, (csview { buf: __param_sub, size: (strlen(__param_sub) as i64) } as csview))
 
@@ -1061,7 +1038,7 @@ unsafe fn cstr_append_s(__param_self_: *mut cstr, __param_s: cstr) -> *mut c_cha
 
 }
 
-// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only
+// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only — stores an argument; ownership not modeled
 unsafe fn cstr_join_array(__param_self_: *mut cstr, __param_sep: *const c_char, __param_arr: *mut *const c_char, __param_n: i64) {
     var __local_arr = __param_arr
     var __local_n = __param_n
@@ -1090,7 +1067,7 @@ unsafe fn cstr_join_array(__param_self_: *mut cstr, __param_sep: *const c_char, 
 
 }
 
-// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only
+// contract: receiver-mut:cstr,stored-unknown:1,unproved:2:read only — stores an argument; ownership not modeled
 unsafe fn cstr_join_array_s(__param_self_: *mut cstr, __param_sep: *const c_char, __param_arr: *mut cstr, __param_n: i64) {
     var __local_arr = __param_arr
     var __local_n = __param_n
@@ -1120,7 +1097,7 @@ unsafe fn cstr_join_array_s(__param_self_: *mut cstr, __param_sep: *const c_char
 }
 
 unsafe fn cstr_replace_sv(__param_self_: *mut cstr, __param_search: csview, __param_repl: csview, __param_count: i32) -> Unit {
-    (*__param_self_).take(cstr_from_replace(cstr_sv((__param_self_ as *const cstr)), __param_search, __param_repl, __param_count))
+    (((*__param_self_).take(cstr_from_replace(cstr_sv((__param_self_ as *const cstr)), __param_search, __param_repl, __param_count)) as *const cstr) as *mut cstr)
 
 }
 
@@ -1176,7 +1153,7 @@ unsafe fn cstr_u8_insert(__param_self_: *mut cstr, __param_u8pos: i64, __param_s
 
 }
 
-// contract: receiver-mut:cstr,stored-unknown:1
+// contract: receiver-mut:cstr,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn cstr_getline(__param_self_: *mut cstr, __param_fp: *mut c_void) -> bool {
     return cstr_getdelim(__param_self_, (10 as i32), __param_fp)
 
@@ -1222,7 +1199,7 @@ fn Mymap_clone(__param_tree: Mymap) -> Mymap {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 unsafe fn Mymap_drop(__param_cself: *const Mymap) {
     var __local_self_: *mut Mymap = ((__param_cself as *mut Mymap))
 
@@ -1257,7 +1234,7 @@ unsafe fn Mymap_reserve(__param_self_: *mut Mymap, __param_cap: i64) -> bool {
 
 }
 
-// contract: unproved:0:read only,unproved:2:out-parameter read before the write
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:2:out-parameter read before the write
 unsafe fn Mymap_find_it(__param_self_: *const Mymap, __param_rkey: i32, __param_out: *mut Mymap_iter) -> *mut Mymap_value {
     var __local_tn: i32 = (*__param_self_).root
 
@@ -1309,7 +1286,6 @@ unsafe fn Mymap_find_it(__param_self_: *const Mymap, __param_rkey: i32, __param_
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Mymap_lower_bound(__param_self_: *const Mymap, __param_rkey: i32) -> Mymap_iter {
     var __local_it_: Mymap_iter
 
@@ -1338,6 +1314,7 @@ unsafe fn Mymap_lower_bound(__param_self_: *const Mymap, __param_rkey: i32) -> M
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn Mymap_front(__param_self_: *const Mymap) -> *mut Mymap_value {
     var __local_d: *mut Mymap_node = (*__param_self_).nodes
 
@@ -1351,6 +1328,7 @@ unsafe fn Mymap_front(__param_self_: *const Mymap) -> *mut Mymap_value {
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn Mymap_back(__param_self_: *const Mymap) -> *mut Mymap_value {
     var __local_d: *mut Mymap_node = (*__param_self_).nodes
 
@@ -1439,7 +1417,6 @@ unsafe fn Mymap_erase_range(__param_self_: *mut Mymap, __param_it1: Mymap_iter, 
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Mymap_begin(__param_self_: *const Mymap) -> Mymap_iter {
     var __local_it_: Mymap_iter
 
@@ -1500,43 +1477,7 @@ unsafe fn Mymap_next(__param_it_: *mut Mymap_iter) -> Unit {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Mymap_is_empty(__param_self_: *const Mymap) -> bool {
-    return (((((*__param_self_).size == 0)) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_size(__param_self_: *const Mymap) -> i64 {
-    return (((*__param_self_).size as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_capacity(__param_self_: *const Mymap) -> i64 {
-    return (((*__param_self_).capacity as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_find(__param_self_: *const Mymap, __param_rkey: i32) -> Mymap_iter {
-    var __local_it_: Mymap_iter
-
-    Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter))
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_contains(__param_self_: *const Mymap, __param_rkey: i32) -> bool {
-    var __local_it_: Mymap_iter
-
-    return ((((Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) != null)) as bool))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Mymap_get(__param_self_: *const Mymap, __param_rkey: i32) -> *const Mymap_value {
     var __local_it_: Mymap_iter
 
@@ -1544,7 +1485,7 @@ pub unsafe fn Mymap_get(__param_self_: *const Mymap, __param_rkey: i32) -> *cons
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Mymap_get_mut(__param_self_: *mut Mymap, __param_rkey: i32) -> *mut Mymap_value {
     var __local_it_: Mymap_iter
 
@@ -1552,29 +1493,11 @@ pub unsafe fn Mymap_get_mut(__param_self_: *mut Mymap, __param_rkey: i32) -> *mu
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Mymap_value_toraw(__param_val: *const Mymap_value) -> Mymap_raw {
-    return ((Mymap_raw { first: ((*(&raw const (*__param_val).first as *const i32))), second: cstr_toraw((&raw const (*__param_val).second as *const cstr)) } as Mymap_raw))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Mymap,unproved:1:read only
 pub unsafe fn Mymap_value_drop(__param_self_: *const Mymap, __param_val: *mut Mymap_value) {
 
 
     cstr_drop((((&raw const (*__param_val).second as *const cstr) as *mut cstr) as *const cstr))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_value_clone(__param_self_: *const Mymap, __param__val: Mymap_value) -> Mymap_value {
-
-    ((*((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const i32) as *mut i32)) = (*((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const i32) as *mut i32)))
-
-    let __ci_copy_22: cstr = cstr_clone((*(&raw const __param__val as *const Mymap_value)).second)
-    with_memcpy((&raw mut __param__val.second as *mut u8), (&raw const __ci_copy_22 as *const u8), sizeof[cstr]())
-
-    return __param__val
 
 }
 
@@ -1645,7 +1568,7 @@ unsafe fn Mymap_emplace_or_assign(__param_self_: *mut Mymap, __param_rkey: i32, 
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Mymap_at(__param_self_: *const Mymap, __param_rkey: i32) -> *const cstr {
     var __local_it_: Mymap_iter
 
@@ -1653,27 +1576,11 @@ pub unsafe fn Mymap_at(__param_self_: *const Mymap, __param_rkey: i32) -> *const
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Mymap_at_mut(__param_self_: *mut Mymap, __param_rkey: i32) -> *mut cstr {
     var __local_it_: Mymap_iter
 
     return (((&raw const Mymap_find_it((__param_self_ as *const Mymap), __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)).second as *const cstr) as *mut cstr))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Mymap_end(__param_self_: *const Mymap) -> Mymap_iter {
-    var __local_it_: Mymap_iter
-
-
-    (__local_it_.ref = ((null as *mut Mymap_value)))
-
-    (__local_it_._top = ((0 as i32)))
-
-    (__local_it_._tn = ((0 as i32)))
-
-
-    return __local_it_
 
 }
 
@@ -1702,9 +1609,9 @@ pub fn Mymap_advance(__param_it_: Mymap_iter, __param_n: u64) -> Mymap_iter {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Mymap,unproved:1:read only
 pub unsafe fn Mymap_eq(__param_self_: *const Mymap, __param_other: *const Mymap) -> bool {
-    if ((if Mymap_size(__param_self_) != Mymap_size(__param_other): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size() != (*__param_other).size(): 1 else: 0) != 0) {
         return ((false as bool))
     }
 
@@ -1769,7 +1676,7 @@ pub fn Mymap_init() -> Mymap {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:Mymap_put_n may write through it
 pub unsafe fn Mymap_from_n(__param_raw: *const Mymap_raw, __param_n: i64) -> Mymap {
     var __local_cx: Mymap = Mymap.zeroed()
 
@@ -2065,8 +1972,8 @@ unsafe fn Mymap_clone_r_(__param_self_: *mut Mymap, __param_src: *mut Mymap_node
     var __local_tn: i32 = ((Mymap_new_node_(__param_self_, ((__param_src[__param_sn]).level as i32)) as i32))
 
 
-    let __ci_copy_31: Mymap_value = Mymap_value_clone((__param_self_ as *const Mymap), (__param_src[__param_sn]).value)
-    with_memcpy((&raw mut ((*__param_self_).nodes[__local_tn]).value as *mut u8), (&raw const __ci_copy_31 as *const u8), sizeof[Mymap_value]())
+    let __ci_copy_33: Mymap_value = (*(__param_self_ as *const Mymap)).value_clone((__param_src[__param_sn]).value)
+    with_memcpy((&raw mut ((*__param_self_).nodes[__local_tn]).value as *mut u8), (&raw const __ci_copy_33 as *const u8), sizeof[Mymap_value]())
 
     (__local_tx = ((Mymap_clone_r_(__param_self_, __param_src, ((__param_src[__param_sn]).link[0] as i32)) as i32)))
 
@@ -2080,7 +1987,6 @@ unsafe fn Mymap_clone_r_(__param_self_: *mut Mymap, __param_src: *mut Mymap_node
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Mymap_drop_r_(__param_s: *mut Mymap, __param_tn: i32) -> Unit {
     if ((if __param_tn != 0: 1 else: 0) != 0) {
         Mymap_drop_r_(__param_s, (((*__param_s).nodes[__param_tn]).link[0] as i32))
@@ -2134,7 +2040,7 @@ fn ctest_sortedmap_erase_run() {
 
     var __local_it1: Mymap_iter = Mymap_advance(unsafe { Mymap_begin(((&raw mut __local_m2 as *mut Mymap) as *const Mymap)) }, (1 as u64))
 
-    var __local_it2: Mymap_iter = unsafe { Mymap_find(((&raw mut __local_m2 as *mut Mymap) as *const Mymap), unsafe { Mymap_back(((&raw mut __local_m2 as *mut Mymap) as *const Mymap)) }.first) }
+    var __local_it2: Mymap_iter = unsafe { (*((&raw mut __local_m2 as *mut Mymap) as *const Mymap)).find(unsafe { Mymap_back(((&raw mut __local_m2 as *mut Mymap) as *const Mymap)) }.first) }
 
     unsafe { Mymap_erase_range((&raw mut __local_m2 as *mut Mymap), __local_it1, __local_it2) }
 
@@ -2232,7 +2138,7 @@ fn Intmap_clone(__param_tree: Intmap) -> Intmap {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 unsafe fn Intmap_drop(__param_cself: *const Intmap) {
     var __local_self_: *mut Intmap = ((__param_cself as *mut Intmap))
 
@@ -2267,7 +2173,7 @@ unsafe fn Intmap_reserve(__param_self_: *mut Intmap, __param_cap: i64) -> bool {
 
 }
 
-// contract: unproved:0:read only,unproved:2:out-parameter read before the write
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,unproved:2:out-parameter read before the write
 unsafe fn Intmap_find_it(__param_self_: *const Intmap, __param_rkey: i32, __param_out: *mut Intmap_iter) -> *mut Intmap_value {
     var __local_tn: i32 = (*__param_self_).root
 
@@ -2319,7 +2225,6 @@ unsafe fn Intmap_find_it(__param_self_: *const Intmap, __param_rkey: i32, __para
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Intmap_lower_bound(__param_self_: *const Intmap, __param_rkey: i32) -> Intmap_iter {
     var __local_it_: Intmap_iter
 
@@ -2348,6 +2253,7 @@ unsafe fn Intmap_lower_bound(__param_self_: *const Intmap, __param_rkey: i32) ->
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn Intmap_front(__param_self_: *const Intmap) -> *mut Intmap_value {
     var __local_d: *mut Intmap_node = (*__param_self_).nodes
 
@@ -2361,6 +2267,7 @@ unsafe fn Intmap_front(__param_self_: *const Intmap) -> *mut Intmap_value {
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn Intmap_back(__param_self_: *const Intmap) -> *mut Intmap_value {
     var __local_d: *mut Intmap_node = (*__param_self_).nodes
 
@@ -2449,7 +2356,6 @@ unsafe fn Intmap_erase_range(__param_self_: *mut Intmap, __param_it1: Intmap_ite
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Intmap_begin(__param_self_: *const Intmap) -> Intmap_iter {
     var __local_it_: Intmap_iter
 
@@ -2510,43 +2416,7 @@ unsafe fn Intmap_next(__param_it_: *mut Intmap_iter) -> Unit {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Intmap_is_empty(__param_self_: *const Intmap) -> bool {
-    return (((((*__param_self_).size == 0)) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_size(__param_self_: *const Intmap) -> i64 {
-    return (((*__param_self_).size as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_capacity(__param_self_: *const Intmap) -> i64 {
-    return (((*__param_self_).capacity as i64))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_find(__param_self_: *const Intmap, __param_rkey: i32) -> Intmap_iter {
-    var __local_it_: Intmap_iter
-
-    Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter))
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_contains(__param_self_: *const Intmap, __param_rkey: i32) -> bool {
-    var __local_it_: Intmap_iter
-
-    return ((((Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) != null)) as bool))
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: i32) -> *const Intmap_value {
     var __local_it_: Intmap_iter
 
@@ -2554,7 +2424,7 @@ pub unsafe fn Intmap_get(__param_self_: *const Intmap, __param_rkey: i32) -> *co
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: i32) -> *mut Intmap_value {
     var __local_it_: Intmap_iter
 
@@ -2562,26 +2432,9 @@ pub unsafe fn Intmap_get_mut(__param_self_: *mut Intmap, __param_rkey: i32) -> *
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Intmap_value_toraw(__param_val: *const Intmap_value) -> Intmap_raw {
-    return ((Intmap_raw { first: ((*(&raw const (*__param_val).first as *const i32))), second: ((*(&raw const (*__param_val).second as *const i32))) } as Intmap_raw))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Intmap,unproved:1:read only
 pub unsafe fn Intmap_value_drop(__param_self_: *const Intmap, __param_val: *mut Intmap_value) {
     return
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_value_clone(__param_self_: *const Intmap, __param__val: Intmap_value) -> Intmap_value {
-
-    ((*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)) = (*((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)))
-
-    (__param__val.second = (*(&raw const __param__val as *const Intmap_value)).second)
-
-    return __param__val
-
 }
 
 // contract: receiver-mut:Intmap,unproved:1:read only
@@ -2628,7 +2481,7 @@ unsafe fn Intmap_insert_or_assign(__param_self_: *mut Intmap, __param__key: i32,
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: i32) -> *const i32 {
     var __local_it_: Intmap_iter
 
@@ -2636,27 +2489,11 @@ pub unsafe fn Intmap_at(__param_self_: *const Intmap, __param_rkey: i32) -> *con
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Intmap_at_mut(__param_self_: *mut Intmap, __param_rkey: i32) -> *mut i32 {
     var __local_it_: Intmap_iter
 
     return (((&raw const Intmap_find_it((__param_self_ as *const Intmap), __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)).second as *const i32) as *mut i32))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Intmap_end(__param_self_: *const Intmap) -> Intmap_iter {
-    var __local_it_: Intmap_iter
-
-
-    (__local_it_.ref = ((null as *mut Intmap_value)))
-
-    (__local_it_._top = ((0 as i32)))
-
-    (__local_it_._tn = ((0 as i32)))
-
-
-    return __local_it_
 
 }
 
@@ -2685,9 +2522,9 @@ pub fn Intmap_advance(__param_it_: Intmap_iter, __param_n: u64) -> Intmap_iter {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Intmap,unproved:1:read only
 pub unsafe fn Intmap_eq(__param_self_: *const Intmap, __param_other: *const Intmap) -> bool {
-    if ((if Intmap_size(__param_self_) != Intmap_size(__param_other): 1 else: 0) != 0) {
+    if ((if (*__param_self_).size() != (*__param_other).size(): 1 else: 0) != 0) {
         return ((false as bool))
     }
 
@@ -2746,7 +2583,7 @@ pub fn Intmap_init() -> Intmap {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:Intmap_put_n may write through it
 pub unsafe fn Intmap_from_n(__param_raw: *const Intmap_raw, __param_n: i64) -> Intmap {
     var __local_cx: Intmap = Intmap.zeroed()
 
@@ -3042,8 +2879,8 @@ unsafe fn Intmap_clone_r_(__param_self_: *mut Intmap, __param_src: *mut Intmap_n
     var __local_tn: i32 = ((Intmap_new_node_(__param_self_, ((__param_src[__param_sn]).level as i32)) as i32))
 
 
-    let __ci_copy_31: Intmap_value = Intmap_value_clone((__param_self_ as *const Intmap), (__param_src[__param_sn]).value)
-    with_memcpy((&raw mut ((*__param_self_).nodes[__local_tn]).value as *mut u8), (&raw const __ci_copy_31 as *const u8), sizeof[Intmap_value]())
+    let __ci_copy_33: Intmap_value = (*(__param_self_ as *const Intmap)).value_clone((__param_src[__param_sn]).value)
+    with_memcpy((&raw mut ((*__param_self_).nodes[__local_tn]).value as *mut u8), (&raw const __ci_copy_33 as *const u8), sizeof[Intmap_value]())
 
     (__local_tx = ((Intmap_clone_r_(__param_self_, __param_src, ((__param_src[__param_sn]).link[0] as i32)) as i32)))
 
@@ -3057,7 +2894,6 @@ unsafe fn Intmap_clone_r_(__param_self_: *mut Intmap, __param_src: *mut Intmap_n
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Intmap_drop_r_(__param_s: *mut Intmap, __param_tn: i32) -> Unit {
     if ((if __param_tn != 0: 1 else: 0) != 0) {
         Intmap_drop_r_(__param_s, (((*__param_s).nodes[__param_tn]).link[0] as i32))
@@ -3070,7 +2906,7 @@ unsafe fn Intmap_drop_r_(__param_s: *mut Intmap, __param_tn: i32) -> Unit {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 unsafe fn Pairvec_drop(__param_cself: *const Pairvec) {
     var __local_self_: *mut Pairvec = ((__param_cself as *mut Pairvec))
 
@@ -3193,7 +3029,7 @@ unsafe fn Pairvec_erase_n(__param_self_: *mut Pairvec, __param_idx: i64, __param
 unsafe fn Pairvec_insert_uninit(__param_self_: *mut Pairvec, __param_idx: i64, __param_n: i64) -> Pairvec_iter {
     if ((if ((*__param_self_).size + __param_n) >= (*__param_self_).capacity: 1 else: 0) != 0) {
         if ((if not Pairvec_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + __param_n) as i64)): 1 else: 0) != 0) {
-            return Pairvec_end((__param_self_ as *const Pairvec))
+            return (*(__param_self_ as *const Pairvec)).end()
         }
     }
 
@@ -3207,7 +3043,7 @@ unsafe fn Pairvec_insert_uninit(__param_self_: *mut Pairvec, __param_idx: i64, _
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Pairvec,unproved:1:read only
 pub unsafe fn Pairvec_value_drop(__param_self_: *const Pairvec, __param_val: *mut Intmap_raw) {
     return
 }
@@ -3324,59 +3160,27 @@ fn Pairvec_clone(__param_vec: Pairvec) -> Pairvec {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_value_clone(__param_self_: *const Pairvec, __param_val: Intmap_raw) -> Intmap_raw {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_size(__param_self_: *const Pairvec) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_capacity(__param_self_: *const Pairvec) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_is_empty(__param_self_: *const Pairvec) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_value_toraw(__param_val: *const Intmap_raw) -> Intmap_raw {
-    return (*__param_val)
-
-}
-
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_front(__param_self_: *const Pairvec) -> *const Intmap_raw {
     return (((*__param_self_).data as *const Intmap_raw))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_front_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
     return (*__param_self_).data
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_back(__param_self_: *const Pairvec) -> *const Intmap_raw {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Intmap_raw) as *mut Intmap_raw) as *const Intmap_raw))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_back_mut(__param_self_: *mut Pairvec) -> *mut Intmap_raw {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Intmap_raw) as *mut Intmap_raw))
-
-}
-
-pub unsafe fn Pairvec_push_back(__param_self_: *mut Pairvec, __param_value: Intmap_raw) -> *mut Intmap_raw {
-    return (((*__param_self_).push(__param_value) as *mut Intmap_raw))
 
 }
 
@@ -3414,16 +3218,6 @@ pub fn Pairvec_with_size(__param_size: i64, __param_default_raw: Intmap_raw) -> 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_from_n(__param_raw: *const Intmap_raw, __param_n: i64) -> Pairvec {
-    var __local_out: Pairvec = Pairvec_with_capacity(__param_n)
-
-    Pairvec_put_n((&raw mut __local_out as *mut Pairvec), __param_raw, __param_n)
-
-    return __local_out
-
-}
-
 // contract: receiver-mut:Pairvec,unproved:2:read only
 pub unsafe fn Pairvec_insert_n(__param_self_: *mut Pairvec, __param_idx: i64, __param_arr: *mut Intmap_raw, __param_n: i64) -> Pairvec_iter {
     var __local_it_: Pairvec_iter = Pairvec_insert_uninit(__param_self_, __param_idx, __param_n)
@@ -3436,6 +3230,7 @@ pub unsafe fn Pairvec_insert_n(__param_self_: *mut Pairvec, __param_idx: i64, __
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_at(__param_self_: *const Pairvec, __param_idx: i64) -> *const Intmap_raw {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Pairvec_at".ptr, c"vec.h".ptr, (206 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -3447,6 +3242,7 @@ pub unsafe fn Pairvec_at(__param_self_: *const Pairvec, __param_idx: i64) -> *co
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Pairvec_at_mut(__param_self_: *mut Pairvec, __param_idx: i64) -> *mut Intmap_raw {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Pairvec_at_mut".ptr, c"vec.h".ptr, (210 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -3455,55 +3251,6 @@ pub unsafe fn Pairvec_at_mut(__param_self_: *mut Pairvec, __param_idx: i64) -> *
     }
 
     return ((*__param_self_).data + ((__param_idx as i64) as usize))
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_begin(__param_self_: *const Pairvec) -> Pairvec_iter {
-    var __local_it_: Pairvec_iter = Pairvec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const Pairvec_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut Intmap_raw)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_rbegin(__param_self_: *const Pairvec) -> Pairvec_iter {
-    var __local_it_: Pairvec_iter = Pairvec_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const Pairvec_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const Pairvec_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut Intmap_raw)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_end(__param_self_: *const Pairvec) -> Pairvec_iter {
-
-    var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_rend(__param_self_: *const Pairvec) -> Pairvec_iter {
-
-    var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
-
-    return __local_it_
 
 }
 
@@ -3516,12 +3263,6 @@ pub fn Pairvec_advance(__param_it_: Pairvec_iter, __param_n: u64) -> Pairvec_ite
 
 
     return __param_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Pairvec_index(__param_self_: *const Pairvec, __param_it_: Pairvec_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const Pairvec_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[Intmap_raw]() as i64))
 
 }
 
@@ -3577,7 +3318,7 @@ fn ctest_sortedmap_insert_run() {
 
     unsafe { (*(&raw mut __local_v as *mut Pairvec)).push((Intmap_raw { first: 44, second: 311 } as Intmap_raw)) }
 
-    unsafe { Intmap_put_n((&raw mut __local_m2 as *mut Intmap), ((*(&raw const __local_v as *const Pairvec)).data as *const Intmap_raw), (unsafe { Pairvec_size(((&raw mut __local_v as *mut Pairvec) as *const Pairvec)) } as i64)) }
+    unsafe { Intmap_put_n((&raw mut __local_m2 as *mut Intmap), ((*(&raw const __local_v as *const Pairvec)).data as *const Intmap_raw), (unsafe { (*((&raw mut __local_v as *mut Pairvec) as *const Pairvec)).size() } as i64)) }
 
     var __ci_expr_lit_2: [Intmap_raw; 5] = [Intmap_raw { first: 41, second: 262 }, Intmap_raw { first: 42, second: 277 }, Intmap_raw { first: 43, second: 294 }, Intmap_raw { first: 44, second: 311 }, Intmap_raw { first: 45, second: 330 }]
 
@@ -3697,6 +3438,42 @@ fn ctest_sortedmap_insert_run() {
 }
 
 impl Intmap {
+    pub fn is_empty() -> bool {
+        let __param_self_: *const Intmap = self as *const Intmap
+        return (((((unsafe *__param_self_).size == 0)) as bool))
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const Intmap = self as *const Intmap
+        return (((unsafe *__param_self_).size as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const Intmap = self as *const Intmap
+        return (((unsafe *__param_self_).capacity as i64))
+
+    }
+
+    pub fn find(__param_rkey: i32) -> Intmap_iter {
+        let __param_self_: *const Intmap = self as *const Intmap
+        var __local_it_: Intmap_iter
+
+        unsafe { Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) }
+
+        return __local_it_
+
+    }
+
+    pub fn contains(__param_rkey: i32) -> bool {
+        let __param_self_: *const Intmap = self as *const Intmap
+        var __local_it_: Intmap_iter
+
+        return ((((unsafe { Intmap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Intmap_iter)) } != null)) as bool))
+
+    }
+
     pub mut fn move_() -> Intmap {
         let __param_self_: *mut Intmap = self as *mut Intmap
         var __local_m: Intmap = (unsafe *__param_self_)
@@ -3734,6 +3511,17 @@ impl Intmap {
 
     }
 
+    pub fn value_clone(__param__val: Intmap_value) -> Intmap_value {
+        let __param_self_: *const Intmap = self as *const Intmap
+
+        ((unsafe *((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)) = (unsafe *((&raw const (*(&raw mut __param__val as *mut Intmap_value)).first as *const i32) as *mut i32)))
+
+        (__param__val.second = (unsafe *(&raw const __param__val as *const Intmap_value)).second)
+
+        return __param__val
+
+    }
+
     pub mut fn shrink_to_fit() -> Unit {
         let __param_self_: *mut Intmap = self as *mut Intmap
         if ((if (unsafe *__param_self_).size == (unsafe *__param_self_).capacity: 1 else: 0) != 0) {
@@ -3745,6 +3533,22 @@ impl Intmap {
         unsafe { Intmap_drop((__param_self_ as *const Intmap)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __local_tmp as *const u8), sizeof[Intmap]())
+
+    }
+
+    pub fn end() -> Intmap_iter {
+        let __param_self_: *const Intmap = self as *const Intmap
+        var __local_it_: Intmap_iter
+
+
+        (__local_it_.ref = ((null as *mut Intmap_value)))
+
+        (__local_it_._top = ((0 as i32)))
+
+        (__local_it_._tn = ((0 as i32)))
+
+
+        return __local_it_
 
     }
 
@@ -3788,7 +3592,71 @@ impl Intmap {
 
 }
 
+impl Intmap_raw {
+    pub fn Pairvec_value_toraw() -> Intmap_raw {
+        let __param_val: *const Intmap_raw = self as *const Intmap_raw
+        return (unsafe *__param_val)
+
+    }
+
+    pub fn Pairvec_from_n(__param_n: i64) -> Pairvec {
+        let __param_raw: *const Intmap_raw = self as *const Intmap_raw
+        var __local_out: Pairvec = Pairvec_with_capacity(__param_n)
+
+        unsafe { Pairvec_put_n((&raw mut __local_out as *mut Pairvec), __param_raw, __param_n) }
+
+        return __local_out
+
+    }
+
+}
+
+impl Intmap_value {
+    pub fn toraw() -> Intmap_raw {
+        let __param_val: *const Intmap_value = self as *const Intmap_value
+        return ((Intmap_raw { first: ((unsafe *(&raw const (*__param_val).first as *const i32))), second: ((unsafe *(&raw const (*__param_val).second as *const i32))) } as Intmap_raw))
+
+    }
+
+}
+
 impl Mymap {
+    pub fn is_empty() -> bool {
+        let __param_self_: *const Mymap = self as *const Mymap
+        return (((((unsafe *__param_self_).size == 0)) as bool))
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const Mymap = self as *const Mymap
+        return (((unsafe *__param_self_).size as i64))
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const Mymap = self as *const Mymap
+        return (((unsafe *__param_self_).capacity as i64))
+
+    }
+
+    pub fn find(__param_rkey: i32) -> Mymap_iter {
+        let __param_self_: *const Mymap = self as *const Mymap
+        var __local_it_: Mymap_iter
+
+        unsafe { Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) }
+
+        return __local_it_
+
+    }
+
+    pub fn contains(__param_rkey: i32) -> bool {
+        let __param_self_: *const Mymap = self as *const Mymap
+        var __local_it_: Mymap_iter
+
+        return ((((unsafe { Mymap_find_it(__param_self_, __param_rkey, (&raw mut __local_it_ as *mut Mymap_iter)) } != null)) as bool))
+
+    }
+
     pub mut fn move_() -> Mymap {
         let __param_self_: *mut Mymap = self as *mut Mymap
         var __local_m: Mymap = (unsafe *__param_self_)
@@ -3826,6 +3694,18 @@ impl Mymap {
 
     }
 
+    pub fn value_clone(__param__val: Mymap_value) -> Mymap_value {
+        let __param_self_: *const Mymap = self as *const Mymap
+
+        ((unsafe *((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const i32) as *mut i32)) = (unsafe *((&raw const (*(&raw mut __param__val as *mut Mymap_value)).first as *const i32) as *mut i32)))
+
+        let __ci_copy_22: cstr = cstr_clone((unsafe *(&raw const __param__val as *const Mymap_value)).second)
+        with_memcpy((&raw mut __param__val.second as *mut u8), (&raw const __ci_copy_22 as *const u8), sizeof[cstr]())
+
+        return __param__val
+
+    }
+
     pub mut fn shrink_to_fit() -> Unit {
         let __param_self_: *mut Mymap = self as *mut Mymap
         if ((if (unsafe *__param_self_).size == (unsafe *__param_self_).capacity: 1 else: 0) != 0) {
@@ -3837,6 +3717,22 @@ impl Mymap {
         unsafe { Mymap_drop((__param_self_ as *const Mymap)) }
 
         with_memcpy((&raw mut (unsafe *__param_self_) as *mut u8), (&raw const __local_tmp as *const u8), sizeof[Mymap]())
+
+    }
+
+    pub fn end() -> Mymap_iter {
+        let __param_self_: *const Mymap = self as *const Mymap
+        var __local_it_: Mymap_iter
+
+
+        (__local_it_.ref = ((null as *mut Mymap_value)))
+
+        (__local_it_._top = ((0 as i32)))
+
+        (__local_it_._tn = ((0 as i32)))
+
+
+        return __local_it_
 
     }
 
@@ -3870,6 +3766,15 @@ impl Mymap {
         with_memcpy((&raw mut (unsafe *((*(&raw const __local__res as *const Mymap_result)).ref)) as *mut u8), (&raw const __param__val as *const u8), sizeof[Mymap_value]())
 
         return (unsafe *(&raw const __local__res as *const Mymap_result)).ref
+
+    }
+
+}
+
+impl Mymap_value {
+    pub fn toraw() -> Mymap_raw {
+        let __param_val: *const Mymap_value = self as *const Mymap_value
+        return ((Mymap_raw { first: ((unsafe *(&raw const (*__param_val).first as *const i32))), second: unsafe { cstr_toraw((&raw const (*__param_val).second as *const cstr)) } } as Mymap_raw))
 
     }
 
@@ -3919,6 +3824,31 @@ impl Pairvec {
 
     }
 
+    pub fn value_clone(__param_val: Intmap_raw) -> Intmap_raw {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+
+        return __param_val
+
+    }
+
+    pub fn size() -> i64 {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        return (unsafe *__param_self_).capacity
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+
+    }
+
     pub mut fn pop() {
         let __param_self_: *mut Pairvec = self as *mut Pairvec
         if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
@@ -3947,6 +3877,12 @@ impl Pairvec {
 
         return (unsafe (*__param_self_).data[(*__param_self_).size])
 
+
+    }
+
+    pub mut fn push_back(__param_value: Intmap_raw) -> *mut Intmap_raw {
+        let __param_self_: *mut Pairvec = self as *mut Pairvec
+        return ((unsafe { (*__param_self_).push(__param_value) } as *mut Intmap_raw))
 
     }
 
@@ -3992,6 +3928,61 @@ impl Pairvec {
 
         return unsafe { Pairvec_erase_n(__param_self_, ((((((*(&raw const __param_i1 as *const Pairvec_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[Intmap_raw]() as i64)) as i64), (((((__ci_expr_ternary_1 as usize) -% ((*(&raw const __param_i1 as *const Pairvec_iter)).ref as usize)) as i64) / (sizeof[Intmap_raw]() as i64)) as i64)) }
 
+
+    }
+
+    pub fn begin() -> Pairvec_iter {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        var __local_it_: Pairvec_iter = Pairvec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Pairvec_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut Intmap_raw)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> Pairvec_iter {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        var __local_it_: Pairvec_iter = Pairvec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const Pairvec_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Pairvec_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut Intmap_raw)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> Pairvec_iter {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+
+        var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> Pairvec_iter {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+
+        var __local_it_: Pairvec_iter = Pairvec_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: Pairvec_iter) -> i64 {
+        let __param_self_: *const Pairvec = self as *const Pairvec
+        return (((((unsafe *(&raw const __param_it_ as *const Pairvec_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[Intmap_raw]() as i64))
 
     }
 

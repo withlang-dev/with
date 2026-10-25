@@ -100,9 +100,9 @@ impl[T] LinkedList[T]:
     /// Views of the values, front to back (D44: traversal observes).
     pub fn iter() -> LinkedListIter[T]:
         comptime if stc_is_word[T]():
-            LinkedListIter { words: unsafe { stc_word_list_begin(&raw const self.words) }, slots: stc_slot_list_iter.zeroed() }
+            LinkedListIter { words: self.words.begin(), slots: stc_slot_list_iter.zeroed() }
         else:
-            LinkedListIter { words: stc_word_list_iter.zeroed(), slots: unsafe { stc_slot_list_begin(&raw const self.slots) } }
+            LinkedListIter { words: stc_word_list_iter.zeroed(), slots: self.slots.begin() }
 
 impl[T: Ord] LinkedList[T]:
     fn comparator() -> fn(*const u8, *const u8) -> i32:
@@ -115,7 +115,7 @@ impl[T: Ord] LinkedList[T]:
     // signed sort, so the order is the value's; the nodes keep the raw
     // bits otherwise, which the views read in place.
     unsafe fn flip_sign_bits():
-        var cursor = stc_word_list_begin(&raw const self.words)
+        var cursor = self.words.begin()
         while cursor.ref as i64 != 0:
             *cursor.ref = ((*cursor.ref as u64) ^ 9223372036854775808) as i64
             cursor.next()
@@ -132,7 +132,7 @@ impl[T: Ord] LinkedList[T]:
         else if stc_is_word[T]():
             self.words.sort()
         else:
-            var cursor = unsafe { stc_slot_list_begin(&raw const self.slots) }
+            var cursor = self.slots.begin()
             while cursor.ref as i64 != 0:
                 let prefix = unsafe { *cursor.ref } as *mut StcSlotPrefix
                 unsafe { (*prefix).compare = self.comparator() }
@@ -145,7 +145,7 @@ impl[T] Drop for LinkedList[T]:
             unsafe { stc_word_list_drop(&raw const self.words) }
             unsafe { stc_slot_list_drop(&raw const self.slots) }
         else:
-            var cursor = unsafe { stc_slot_list_begin(&raw const self.slots) }
+            var cursor = self.slots.begin()
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
                 cursor.next()

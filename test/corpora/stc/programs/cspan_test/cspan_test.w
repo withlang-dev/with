@@ -211,7 +211,6 @@ unsafe fn Span_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_stri
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span_begin(__param_self_: *const Span) -> Span_iter {
     var __ci_expr_ternary_1: *mut i32 = null
 
@@ -232,7 +231,6 @@ unsafe fn Span_begin(__param_self_: *const Span) -> Span_iter {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span_end(__param_self_: *const Span) -> Span_iter {
 
     return ((Span_iter.zeroed() as Span_iter))
@@ -255,7 +253,7 @@ unsafe fn Span_next(__param_it_: *mut Span_iter) -> Unit {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:_cspan_size may write through it
 unsafe fn Span_size(__param_self_: *const Span) -> i64 {
     return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (1 as i32))
 
@@ -275,7 +273,7 @@ fn Span_swapped_axes(__param_sp: Span, __param_ax1: i32, __param_ax2: i32) -> Sp
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Span,unproved:1:read only
 unsafe fn Span_eq(__param_x: *const Span, __param_y: *const Span) -> bool {
     if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((1 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
         return ((false as bool))
@@ -333,7 +331,6 @@ unsafe fn Span2_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_str
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span2_begin(__param_self_: *const Span2) -> Span2_iter {
     var __ci_expr_ternary_1: *mut i32 = null
 
@@ -354,7 +351,6 @@ unsafe fn Span2_begin(__param_self_: *const Span2) -> Span2_iter {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span2_end(__param_self_: *const Span2) -> Span2_iter {
 
     return ((Span2_iter.zeroed() as Span2_iter))
@@ -384,7 +380,7 @@ unsafe fn Span2_next(__param_it_: *mut Span2_iter) -> Unit {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:_cspan_size may write through it
 unsafe fn Span2_size(__param_self_: *const Span2) -> i64 {
     return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (2 as i32))
 
@@ -404,7 +400,7 @@ fn Span2_swapped_axes(__param_sp: Span2, __param_ax1: i32, __param_ax2: i32) -> 
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Span2,unproved:1:read only
 unsafe fn Span2_eq(__param_x: *const Span2, __param_y: *const Span2) -> bool {
     if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((2 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
         return ((false as bool))
@@ -456,7 +452,6 @@ unsafe fn Span3_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_str
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span3_begin(__param_self_: *const Span3) -> Span3_iter {
     var __ci_expr_ternary_1: *mut i32 = null
 
@@ -477,7 +472,6 @@ unsafe fn Span3_begin(__param_self_: *const Span3) -> Span3_iter {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn Span3_end(__param_self_: *const Span3) -> Span3_iter {
 
     return ((Span3_iter.zeroed() as Span3_iter))
@@ -514,7 +508,7 @@ unsafe fn Span3_next(__param_it_: *mut Span3_iter) -> Unit {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:_cspan_size may write through it
 unsafe fn Span3_size(__param_self_: *const Span3) -> i64 {
     return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (3 as i32))
 
@@ -534,7 +528,7 @@ fn Span3_swapped_axes(__param_sp: Span3, __param_ax1: i32, __param_ax2: i32) -> 
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Span3,unproved:1:read only
 unsafe fn Span3_eq(__param_x: *const Span3, __param_y: *const Span3) -> bool {
     if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((3 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
         return ((false as bool))
@@ -776,13 +770,7 @@ fn ctest_cspan_slice_run() {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Stack_capacity(__param_self_: *const Stack) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn Stack_drop(__param_cself: *const Stack) {
     var __local_self_: *mut Stack = ((__param_cself as *mut Stack))
 
@@ -796,54 +784,42 @@ pub unsafe fn Stack_drop(__param_cself: *const Stack) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Stack_size(__param_self_: *const Stack) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_is_empty(__param_self_: *const Stack) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Stack,unproved:1:read only
 pub unsafe fn Stack_value_drop(__param_self_: *const Stack, __param_val: *mut i32) {
     return
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_front(__param_self_: *const Stack) -> *const i32 {
     return ((((&raw const ((*__param_self_).data[0]) as *const i32) as *mut i32) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_front_mut(__param_self_: *mut Stack) -> *mut i32 {
     return (((&raw const ((*__param_self_).data[0]) as *const i32) as *mut i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_back(__param_self_: *const Stack) -> *const i32 {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const i32) as *mut i32) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_back_mut(__param_self_: *mut Stack) -> *mut i32 {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const i32) as *mut i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_top(__param_self_: *const Stack) -> *const i32 {
     return ((Stack_back(__param_self_) as *const i32))
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_top_mut(__param_self_: *mut Stack) -> *mut i32 {
     return ((Stack_back_mut(__param_self_) as *mut i32))
 
@@ -916,7 +892,7 @@ pub unsafe fn Stack_from_n(__param_raw: *const i32, __param_n: i64) -> Stack {
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: i64) -> *const i32 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -928,7 +904,7 @@ pub unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: i64) -> *const 
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_at_mut(__param_self_: *mut Stack, __param_idx: i64) -> *mut i32 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -1006,64 +982,8 @@ pub unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack)
 }
 
 // contract: unproved:0:read only
-pub unsafe fn Stack_value_clone(__param_self_: *const Stack, __param_val: i32) -> i32 {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn Stack_value_toraw(__param_val: *const i32) -> i32 {
     return (*__param_val)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_begin(__param_self_: *const Stack) -> Stack_iter {
-    var __local_it_: Stack_iter = Stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const Stack_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut i32)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_rbegin(__param_self_: *const Stack) -> Stack_iter {
-    var __local_it_: Stack_iter = Stack_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const Stack_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const Stack_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut i32)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_end(__param_self_: *const Stack) -> Stack_iter {
-
-    var __local_it_: Stack_iter = Stack_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_rend(__param_self_: *const Stack) -> Stack_iter {
-
-    var __local_it_: Stack_iter = Stack_iter.zeroed()
-
-    return __local_it_
 
 }
 
@@ -1076,12 +996,6 @@ pub fn Stack_advance(__param_it_: Stack_iter, __param_n: u64) -> Stack_iter {
 
 
     return __param_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Stack_index(__param_self_: *const Stack, __param_it_: Stack_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const Stack_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[i32]() as i64))
 
 }
 
@@ -1287,13 +1201,7 @@ fn ctest_cspan_equality_run() {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Tiles_capacity(__param_self_: *const Tiles) -> i64 {
-    return (*__param_self_).capacity
-
-}
-
-// contract: unproved:0:read only
+// contract: unproved:0:casts away const
 pub unsafe fn Tiles_drop(__param_cself: *const Tiles) {
     var __local_self_: *mut Tiles = ((__param_cself as *mut Tiles))
 
@@ -1307,48 +1215,42 @@ pub unsafe fn Tiles_drop(__param_cself: *const Tiles) {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Tiles_size(__param_self_: *const Tiles) -> i64 {
-    return (*__param_self_).size
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_is_empty(__param_self_: *const Tiles) -> bool {
-    return ((((not ((*__param_self_).size != 0))) as bool))
-
-}
-
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:Tiles,unproved:1:read only
 pub unsafe fn Tiles_value_drop(__param_self_: *const Tiles, __param_val: *mut Span3) {
     return
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_front(__param_self_: *const Tiles) -> *const Span3 {
     return ((((&raw const ((*__param_self_).data[0]) as *const Span3) as *mut Span3) as *const Span3))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_front_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return (((&raw const ((*__param_self_).data[0]) as *const Span3) as *mut Span3))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_back(__param_self_: *const Tiles) -> *const Span3 {
     return ((((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Span3) as *mut Span3) as *const Span3))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_back_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return (((&raw const ((*__param_self_).data[((*__param_self_).size - 1)]) as *const Span3) as *mut Span3))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_top(__param_self_: *const Tiles) -> *const Span3 {
     return ((Tiles_back(__param_self_) as *const Span3))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_top_mut(__param_self_: *mut Tiles) -> *mut Span3 {
     return ((Tiles_back_mut(__param_self_) as *mut Span3))
 
@@ -1411,16 +1313,7 @@ pub fn Tiles_with_size(__param_size: i64, __param_default_raw: Span3) -> Tiles {
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Tiles_from_n(__param_raw: *const Span3, __param_n: i64) -> Tiles {
-    var __local_out: Tiles = Tiles_with_capacity(__param_n)
-
-    Tiles_put_n((&raw mut __local_out as *mut Tiles), __param_raw, __param_n)
-
-    return __local_out
-
-}
-
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: i64) -> *const Span3 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Tiles_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -1432,6 +1325,7 @@ pub unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: i64) -> *const 
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_at_mut(__param_self_: *mut Tiles, __param_idx: i64) -> *mut Span3 {
     if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
         __assert_rtn(c"Tiles_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
@@ -1508,68 +1402,6 @@ pub unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles)
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn Tiles_value_clone(__param_self_: *const Tiles, __param_val: Span3) -> Span3 {
-
-    return __param_val
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_value_toraw(__param_val: *const Span3) -> Span3 {
-    return (*__param_val)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_begin(__param_self_: *const Tiles) -> Tiles_iter {
-    var __local_it_: Tiles_iter = Tiles_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.end = (*(&raw const __local_it_ as *const Tiles_iter)).end + (((*__param_self_).size as i64) as usize))
-    } else {
-        (__local_it_.ref = ((null as *mut Span3)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_rbegin(__param_self_: *const Tiles) -> Tiles_iter {
-    var __local_it_: Tiles_iter = Tiles_iter { ref: (*__param_self_).data, end: (*__param_self_).data }
-
-    if ((*__param_self_).size != 0) {
-        (__local_it_.ref = (*(&raw const __local_it_ as *const Tiles_iter)).ref + ((((*__param_self_).size - 1) as i64) as usize))
-
-        (__local_it_.end = (*(&raw const __local_it_ as *const Tiles_iter)).end - ((1 as i64) as usize))
-
-    } else {
-        (__local_it_.ref = ((null as *mut Span3)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_end(__param_self_: *const Tiles) -> Tiles_iter {
-
-    var __local_it_: Tiles_iter = Tiles_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_rend(__param_self_: *const Tiles) -> Tiles_iter {
-
-    var __local_it_: Tiles_iter = Tiles_iter.zeroed()
-
-    return __local_it_
-
-}
-
 pub fn Tiles_advance(__param_it_: Tiles_iter, __param_n: u64) -> Tiles_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref + (__param_n as usize))
 
@@ -1579,12 +1411,6 @@ pub fn Tiles_advance(__param_it_: Tiles_iter, __param_n: u64) -> Tiles_iter {
 
 
     return __param_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn Tiles_index(__param_self_: *const Tiles, __param_it_: Tiles_iter) -> i64 {
-    return (((((*(&raw const __param_it_ as *const Tiles_iter)).ref as usize) -% ((*__param_self_).data as usize)) as i64) / (sizeof[Span3]() as i64))
 
 }
 
@@ -1674,7 +1500,6 @@ unsafe fn ctest_cspan_cube_setup(__param_fixt: *mut ctest_cspan_cube_data) {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn ctest_cspan_cube_teardown(__param_fixt: *mut ctest_cspan_cube_data) {
     Stack_drop((((&raw const (*__param_fixt).stack as *const Stack) as *mut Stack) as *const Stack))
 
@@ -1682,13 +1507,12 @@ unsafe fn ctest_cspan_cube_teardown(__param_fixt: *mut ctest_cspan_cube_data) {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn ctest_cspan_cube_slice3_run(__param_fixt: *mut ctest_cspan_cube_data) {
-    var __local_n: i64 = ((Stack_size((((&raw const (*__param_fixt).stack as *const Stack) as *mut Stack) as *const Stack)) as i64))
+    var __local_n: i64 = (((*(((&raw const (*__param_fixt).stack as *const Stack) as *mut Stack) as *const Stack)).size() as i64))
 
     var __local_sum: i64 = ((0 as i64))
 
-    var __local_tile: Tiles_iter = Tiles_begin((((&raw const (*__param_fixt).tiles as *const Tiles) as *mut Tiles) as *const Tiles))
+    var __local_tile: Tiles_iter = (*(((&raw const (*__param_fixt).tiles as *const Tiles) as *mut Tiles) as *const Tiles)).begin()
 
     while ((*(&raw const __local_tile as *const Tiles_iter)).ref != null) {
         var __local_i: Span3_iter = Span3_begin((((&raw const (*((*(&raw const __local_tile as *const Tiles_iter)).ref)) as *const Span3) as *mut Span3) as *const Span3))
@@ -1710,6 +1534,25 @@ unsafe fn ctest_cspan_cube_slice3_run(__param_fixt: *mut ctest_cspan_cube_data) 
 
 }
 
+impl Span3 {
+    pub fn Tiles_from_n(__param_n: i64) -> Tiles {
+        let __param_raw: *const Span3 = self as *const Span3
+        var __local_out: Tiles = Tiles_with_capacity(__param_n)
+
+        unsafe { Tiles_put_n((&raw mut __local_out as *mut Tiles), __param_raw, __param_n) }
+
+        return __local_out
+
+    }
+
+    pub fn Tiles_value_toraw() -> Span3 {
+        let __param_val: *const Span3 = self as *const Span3
+        return (unsafe *__param_val)
+
+    }
+
+}
+
 impl Stack {
     pub mut fn move_() -> Stack {
         let __param_self_: *mut Stack = self as *mut Stack
@@ -1723,6 +1566,12 @@ impl Stack {
         ((unsafe *__param_self_).data = ((null as *mut i32)))
 
         return __local_m
+
+    }
+
+    pub fn capacity() -> i64 {
+        let __param_self_: *const Stack = self as *const Stack
+        return (unsafe *__param_self_).capacity
 
     }
 
@@ -1774,11 +1623,23 @@ impl Stack {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const Stack = self as *const Stack
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const Stack = self as *const Stack
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+
+    }
+
     pub mut fn append_uninit(__param_n: i64) -> *mut i32 {
         let __param_self_: *mut Stack = self as *mut Stack
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { Stack_capacity((__param_self_ as *const Stack)) }: 1 else: 0) != 0) {
+        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Stack)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut i32))
             }
@@ -1798,7 +1659,7 @@ impl Stack {
 
     pub mut fn push(__param_val: i32) -> *mut i32 {
         let __param_self_: *mut Stack = self as *mut Stack
-        if ((if (unsafe *__param_self_).size == unsafe { Stack_capacity((__param_self_ as *const Stack)) }: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Stack)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut i32))
             }
@@ -1844,6 +1705,68 @@ impl Stack {
 
         return (unsafe (*__param_self_).data[(*__param_self_).size])
 
+
+    }
+
+    pub fn value_clone(__param_val: i32) -> i32 {
+        let __param_self_: *const Stack = self as *const Stack
+
+        return __param_val
+
+    }
+
+    pub fn begin() -> Stack_iter {
+        let __param_self_: *const Stack = self as *const Stack
+        var __local_it_: Stack_iter = Stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Stack_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut i32)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> Stack_iter {
+        let __param_self_: *const Stack = self as *const Stack
+        var __local_it_: Stack_iter = Stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const Stack_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Stack_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut i32)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> Stack_iter {
+        let __param_self_: *const Stack = self as *const Stack
+
+        var __local_it_: Stack_iter = Stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> Stack_iter {
+        let __param_self_: *const Stack = self as *const Stack
+
+        var __local_it_: Stack_iter = Stack_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: Stack_iter) -> i64 {
+        let __param_self_: *const Stack = self as *const Stack
+        return (((((unsafe *(&raw const __param_it_ as *const Stack_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[i32]() as i64))
 
     }
 
@@ -1896,6 +1819,12 @@ impl Tiles {
 
     }
 
+    pub fn capacity() -> i64 {
+        let __param_self_: *const Tiles = self as *const Tiles
+        return (unsafe *__param_self_).capacity
+
+    }
+
     pub mut fn reserve(__param_cap: i64) -> bool {
         let __param_self_: *mut Tiles = self as *mut Tiles
         var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param_self_).size else: __param_cap) as i64))
@@ -1944,11 +1873,23 @@ impl Tiles {
 
     }
 
+    pub fn size() -> i64 {
+        let __param_self_: *const Tiles = self as *const Tiles
+        return (unsafe *__param_self_).size
+
+    }
+
+    pub fn is_empty() -> bool {
+        let __param_self_: *const Tiles = self as *const Tiles
+        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+
+    }
+
     pub mut fn append_uninit(__param_n: i64) -> *mut Span3 {
         let __param_self_: *mut Tiles = self as *mut Tiles
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { Tiles_capacity((__param_self_ as *const Tiles)) }: 1 else: 0) != 0) {
+        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Tiles)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut Span3))
             }
@@ -1968,7 +1909,7 @@ impl Tiles {
 
     pub mut fn push(__param_val: Span3) -> *mut Span3 {
         let __param_self_: *mut Tiles = self as *mut Tiles
-        if ((if (unsafe *__param_self_).size == unsafe { Tiles_capacity((__param_self_ as *const Tiles)) }: 1 else: 0) != 0) {
+        if ((if (unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Tiles)).capacity() }: 1 else: 0) != 0) {
             if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }: 1 else: 0) != 0) {
                 return ((null as *mut Span3))
             }
@@ -2014,6 +1955,68 @@ impl Tiles {
 
         return (unsafe (*__param_self_).data[(*__param_self_).size])
 
+
+    }
+
+    pub fn value_clone(__param_val: Span3) -> Span3 {
+        let __param_self_: *const Tiles = self as *const Tiles
+
+        return __param_val
+
+    }
+
+    pub fn begin() -> Tiles_iter {
+        let __param_self_: *const Tiles = self as *const Tiles
+        var __local_it_: Tiles_iter = Tiles_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
+        } else {
+            (__local_it_.ref = ((null as *mut Span3)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn rbegin() -> Tiles_iter {
+        let __param_self_: *const Tiles = self as *const Tiles
+        var __local_it_: Tiles_iter = Tiles_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
+
+        if ((unsafe *__param_self_).size != 0) {
+            (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
+
+            (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).end - ((1 as i64) as usize))
+
+        } else {
+            (__local_it_.ref = ((null as *mut Span3)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> Tiles_iter {
+        let __param_self_: *const Tiles = self as *const Tiles
+
+        var __local_it_: Tiles_iter = Tiles_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn rend() -> Tiles_iter {
+        let __param_self_: *const Tiles = self as *const Tiles
+
+        var __local_it_: Tiles_iter = Tiles_iter.zeroed()
+
+        return __local_it_
+
+    }
+
+    pub fn index(__param_it_: Tiles_iter) -> i64 {
+        let __param_self_: *const Tiles = self as *const Tiles
+        return (((((unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref as usize) -% ((unsafe *__param_self_).data as usize)) as i64) / (sizeof[Span3]() as i64))
 
     }
 

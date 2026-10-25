@@ -237,7 +237,6 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -258,7 +257,6 @@ unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_cha
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -561,7 +559,7 @@ pub unsafe fn csview_strtok(__param_sv: csview, __param_delims: *const c_char, _
 
     var __local_in_: csview = csview { buf: ((*(&raw const __param_sv as *const csview)).buf + (((*__param_pos) as i64) as usize)), size: ((*(&raw const __param_sv as *const csview)).size - (*__param_pos)) }
 
-    var __local_i: csview_iter = csview_begin(((&raw mut __local_in_ as *mut csview) as *const csview))
+    var __local_i: csview_iter = (*((&raw mut __local_in_ as *mut csview) as *const csview)).begin()
 
     while ((*(&raw const __local_i as *const csview_iter)).ref != null) {
         var __local_m: *const c_char = __param_delims
@@ -724,7 +722,7 @@ pub unsafe fn csview_equals(__param_sv: csview, __param_str: *const c_char) -> b
 
 }
 
-// contract: unproved:0:read only
+// contract: unproved:0:c_basehash_n may write through it
 pub unsafe fn csview_hash(__param_self_: *const csview) -> u64 {
     return c_basehash_n(((*__param_self_).buf as *const c_void), (*__param_self_).size)
 
@@ -874,35 +872,6 @@ pub fn csview_tail(__param_sv: csview, __param_len: i64) -> csview {
 }
 
 // contract: unproved:0:read only
-pub unsafe fn csview_begin(__param_self_: *const csview) -> csview_iter {
-    var __local_it_: csview_iter = csview_iter { u8: csview_iter_u8 { chr: csview { buf: (*__param_self_).buf }, end: ((*__param_self_).buf + (((*__param_self_).size as i64) as usize)), dec: cutf8_decode_t.zeroed() } }
-
-    if ((if (*(&raw const __local_it_ as *const csview_iter)).ref == (*(&raw const __local_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
-        (__local_it_.ref = ((null as *mut c_char)))
-    } else {
-        (__local_it_.u8.chr.size = ((cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const c_char), ((*(&raw const __local_it_.u8 as *const csview_iter_u8)).end as *const c_char)) as i64)))
-    }
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn csview_end(__param_self_: *const csview) -> csview_iter {
-
-    var __local_it_: csview_iter = csview_iter.zeroed()
-
-    return __local_it_
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn csview_codepoint(__param_it_: *const csview_iter) -> u32 {
-    return (*(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
-
-}
-
-// contract: unproved:0:read only
 pub unsafe fn csview_u8_from(__param_str: *const c_char, __param_u8pos: i64, __param_u8len: i64) -> csview {
     return cutf8_subview(__param_str, __param_u8pos, __param_u8len)
 
@@ -918,7 +887,7 @@ pub fn csview_u8_valid(__param_sv: csview) -> bool {
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:csview,unproved:1:read only
 pub unsafe fn csview_cmp(__param_x: *const csview, __param_y: *const csview) -> i32 {
     var __local_n: i64 = (((if (if (*__param_x).size < (*__param_y).size: 1 else: 0) != 0: (*__param_x).size else: (*__param_y).size) as i64))
 
@@ -928,7 +897,7 @@ pub unsafe fn csview_cmp(__param_x: *const csview, __param_y: *const csview) -> 
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:csview,unproved:1:read only
 pub unsafe fn csview_eq(__param_x: *const csview, __param_y: *const csview) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
@@ -959,13 +928,13 @@ pub unsafe fn csview_iequals(__param_sv: csview, __param_str: *const c_char) -> 
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:csview,unproved:1:read only
 pub unsafe fn csview_ieq(__param_x: *const csview, __param_y: *const csview) -> bool {
     return csview_iequals_sv((*__param_x), (*__param_y))
 
 }
 
-// contract: unproved:0:read only,unproved:1:read only
+// contract: receiver:csview,unproved:1:read only
 pub unsafe fn csview_icmp(__param_x: *const csview, __param_y: *const csview) -> i32 {
     return cutf8_icmp_sv((*__param_x), (*__param_y))
 
@@ -1009,6 +978,29 @@ impl csview {
 
     }
 
+    pub fn begin() -> csview_iter {
+        let __param_self_: *const csview = self as *const csview
+        var __local_it_: csview_iter = csview_iter { u8: csview_iter_u8 { chr: csview { buf: (unsafe *__param_self_).buf }, end: ((unsafe *__param_self_).buf + (((unsafe *__param_self_).size as i64) as usize)), dec: cutf8_decode_t.zeroed() } }
+
+        if ((if (unsafe *(&raw const __local_it_ as *const csview_iter)).ref == (unsafe *(&raw const __local_it_.u8 as *const csview_iter_u8)).end: 1 else: 0) != 0) {
+            (__local_it_.ref = ((null as *mut c_char)))
+        } else {
+            (__local_it_.u8.chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*(&raw const __local_it_ as *const csview_iter)).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*(&raw const __local_it_ as *const csview_iter)).ref as *const c_char), ((*(&raw const __local_it_.u8 as *const csview_iter_u8)).end as *const c_char)) } as i64)))
+        }
+
+        return __local_it_
+
+    }
+
+    pub fn end() -> csview_iter {
+        let __param_self_: *const csview = self as *const csview
+
+        var __local_it_: csview_iter = csview_iter.zeroed()
+
+        return __local_it_
+
+    }
+
 }
 
 impl csview_iter {
@@ -1021,6 +1013,12 @@ impl csview_iter {
         } else {
             ((unsafe *__param_it_).chr.size = ((unsafe { cutf8_decode_codepoint(((&raw const (*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).dec as *const cutf8_decode_t) as *mut cutf8_decode_t), ((*__param_it_).ref as *const c_char), ((*(&raw const (*__param_it_).u8 as *const csview_iter_u8)).end as *const c_char)) } as i64)))
         }
+
+    }
+
+    pub fn codepoint() -> u32 {
+        let __param_it_: *const csview_iter = self as *const csview_iter
+        return (unsafe *(&raw const (*__param_it_).u8.dec as *const cutf8_decode_t)).codep
 
     }
 

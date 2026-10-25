@@ -1,19 +1,19 @@
 _cbits_count	unproved:0:read only
 _cbits_disjoint	unproved:0:read only,unproved:1:read only
 _cbits_subset_of	unproved:0:read only,unproved:1:read only
-_cbits_to_str	unproved:0:read only,unproved:2:out-parameter read before the write
-_cco_cancel	unproved:0:read only,unproved:1:read only,unproved:2:read only
+_cbits_to_str	unproved:0:read only,ret-from:2
+_cco_cancel	receiver:cco_task_fiber,unproved:1:read only,unproved:2:read only
 _cco_cancel_fiber	receiver-mut:cco_task_fiber,ret-from:0
 _cco_cancel_task	ret-from:0
 _cco_new_fiber	receiver-mut:cco_task,unproved:1:read only
 _cco_resume_task	stored-unknown:0
 _cco_spawn	receiver-mut:cco_task,stored-unknown:1,unproved:2:read only,unproved:3:out-parameter read before the write
-_cco_throw	unproved:0:read only
+_cco_throw	receiver:cco_task
 _cspan_index	unproved:0:read only,unproved:1:read only,unproved:2:read only
 _cspan_is_layout	unproved:1:read only,unproved:2:read only
 _cspan_nextN	unproved:0:out-parameter read before the write,unproved:1:read only,unproved:2:read only,unproved:4:out-parameter read before the write
 _cspan_print_assist	unproved:0:read only,unproved:1:read only,unproved:3:read only,unproved:4:out-parameter read before the write
-_cspan_shape2stride	unproved:1:out-parameter read before the write
+_cspan_shape2stride	ret-from:1
 _cspan_size	unproved:0:read only
 _cspan_slice	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write,out:2:i32,unproved:3:read only,unproved:4:read only,unproved:5:read only
 _cspan_swap_axes	unproved:0:read only,unproved:1:read only
@@ -34,12 +34,12 @@ c_next_pow2	plain
 c_popcount	plain
 c_safe_memcpy	unproved:0:read only,unproved:1:read only
 c_strnstrn	unproved:0:read only,unproved:2:read only
-cbits_at	unproved:0:read only
+cbits_at	receiver:cbits
 cbits_clone	plain
-cbits_copy	receiver-mut:cbits,ret-from:0,unproved:1:read only
-cbits_count	unproved:0:read only
-cbits_disjoint	unproved:0:read only,unproved:1:read only
-cbits_drop	unproved:0:read only
+cbits_copy	receiver-mut:cbits,unproved:1:read only
+cbits_count	unproved:0:_cbits_count may write through it
+cbits_disjoint	unproved:0:_cbits_disjoint may write through it,unproved:1:read only
+cbits_drop	unproved:0:frees a part of it
 cbits_flip	receiver-mut:cbits
 cbits_flip_all	receiver-mut:cbits
 cbits_from	unproved:0:read only
@@ -48,14 +48,14 @@ cbits_move	receiver-mut:cbits
 cbits_reset	receiver-mut:cbits
 cbits_resize	receiver-mut:cbits
 cbits_set	receiver-mut:cbits
-cbits_set_all	unproved:0:read only
+cbits_set_all	unproved:0:memset is outside the corpus and not a known pure reader
 cbits_set_pattern	receiver-mut:cbits
 cbits_set_value	receiver-mut:cbits
-cbits_size	unproved:0:read only
-cbits_subset_of	unproved:0:read only,unproved:1:read only
+cbits_size	receiver:cbits
+cbits_subset_of	unproved:0:_cbits_subset_of may write through it,unproved:1:read only
 cbits_take	receiver-mut:cbits,ret-from:0
-cbits_test	unproved:0:read only
-cbits_to_str	unproved:0:read only,unproved:1:out-parameter written conditionally
+cbits_test	receiver:cbits
+cbits_to_str	unproved:0:_cbits_to_str may write through it,unproved:1:out-parameter written conditionally
 cbits_union	receiver-mut:cbits,unproved:1:read only
 cbits_with_pattern	plain
 cbits_with_size	plain
@@ -65,32 +65,32 @@ cco_execute_next	receiver-mut:cco_task_fiber
 cco_make_timer	plain
 cco_restart_timer	receiver-mut:cco_timer
 cco_start_timer	receiver-mut:cco_timer
-cco_timer_elapsed	unproved:0:read only
-cco_timer_expired	unproved:0:read only
-cco_timer_remaining	unproved:0:read only
+cco_timer_elapsed	receiver:cco_timer
+cco_timer_expired	receiver:cco_timer
+cco_timer_remaining	receiver:cco_timer
 cco_timer_ticks	plain
 crand32_from	plain
 crand32_make_uniform	plain
 crand32_real	plain
-crand32_real_r	unproved:0:read only
+crand32_real_r	receiver:crand32
 crand32_seed	plain
-crand32_seed_r	unproved:0:read only
+crand32_seed_r	receiver:crand32
 crand32_uint	plain
-crand32_uint_r	unproved:0:read only
-crand32_uniform	unproved:0:read only
-crand32_uniform_r	unproved:0:read only,unproved:2:read only
+crand32_uint_r	receiver:crand32
+crand32_uniform	receiver:crand32_uniform_dist
+crand32_uniform_r	receiver:crand32,unproved:2:read only
 crand64_from	plain
 crand64_make_uniform	plain
 crand64_normal	receiver-mut:crand64_normal_dist
-crand64_normal_r	unproved:0:read only,unproved:2:out-parameter written conditionally
+crand64_normal_r	receiver:crand64,unproved:2:out-parameter written conditionally
 crand64_real	plain
-crand64_real_r	unproved:0:read only
+crand64_real_r	receiver:crand64
 crand64_seed	plain
-crand64_seed_r	unproved:0:read only
+crand64_seed_r	receiver:crand64
 crand64_uint	plain
-crand64_uint_r	unproved:0:read only
-crand64_uniform	unproved:0:read only
-crand64_uniform_r	unproved:0:read only,unproved:2:read only
+crand64_uint_r	receiver:crand64
+crand64_uniform	receiver:crand64_uniform_dist
+crand64_uniform_r	receiver:crand64,unproved:2:read only
 cstr_advance	plain
 cstr_append	receiver-mut:cstr,unproved:1:read only
 cstr_append_fmt	receiver-mut:cstr,stored-unknown:1,variadic
@@ -101,28 +101,28 @@ cstr_append_uninit	receiver-mut:cstr
 cstr_assign	receiver-mut:cstr,unproved:1:read only
 cstr_assign_n	receiver-mut:cstr,unproved:1:read only
 cstr_assign_sv	receiver-mut:cstr
-cstr_begin	unproved:0:read only
-cstr_capacity	unproved:0:read only
+cstr_begin	receiver:cstr
+cstr_capacity	receiver:cstr
 cstr_casefold_sv	plain
 cstr_clear	receiver-mut:cstr
 cstr_clone	plain
-cstr_cmp	unproved:0:read only,unproved:1:read only
-cstr_codepoint	unproved:0:read only
-cstr_contains	unproved:0:read only,unproved:1:read only
-cstr_contains_sv	unproved:0:read only
+cstr_cmp	receiver:cstr,unproved:1:read only
+cstr_codepoint	receiver:cstr_iter
+cstr_contains	receiver:cstr,unproved:1:read only
+cstr_contains_sv	receiver:cstr
 cstr_copy	receiver-mut:cstr
-cstr_data	unproved:0:read only
-cstr_drop	unproved:0:read only
-cstr_end	unproved:0:read only
-cstr_ends_with	unproved:0:read only,unproved:1:read only
-cstr_ends_with_sv	unproved:0:read only
-cstr_eq	unproved:0:read only,unproved:1:read only
-cstr_equals	unproved:0:read only,unproved:1:read only
-cstr_equals_sv	unproved:0:read only
+cstr_data	unproved:0:returns a pointer the receiver's view cannot carry
+cstr_drop	unproved:0:frees a part of it
+cstr_end	receiver:cstr
+cstr_ends_with	receiver:cstr,unproved:1:read only
+cstr_ends_with_sv	receiver:cstr
+cstr_eq	receiver:cstr,unproved:1:read only
+cstr_equals	receiver:cstr,unproved:1:read only
+cstr_equals_sv	receiver:cstr
 cstr_erase	receiver-mut:cstr
-cstr_find	unproved:0:read only,unproved:1:read only
-cstr_find_at	unproved:0:read only,unproved:2:read only
-cstr_find_sv	unproved:0:read only
+cstr_find	receiver:cstr,unproved:1:read only
+cstr_find_at	receiver:cstr,unproved:2:read only
+cstr_find_sv	receiver:cstr
 cstr_from	unproved:0:read only
 cstr_from_file	unproved:0:read only
 cstr_from_fmt	stored-unknown:0,variadic
@@ -131,18 +131,18 @@ cstr_from_replace	plain
 cstr_from_s	plain
 cstr_from_sv	plain
 cstr_from_zv	plain
-cstr_getbuf	unproved:0:read only
+cstr_getbuf	receiver:cstr
 cstr_getdelim	receiver-mut:cstr,stored-unknown:2
 cstr_getline	receiver-mut:cstr,stored-unknown:1
-cstr_hash	unproved:0:read only
-cstr_icmp	unproved:0:read only,unproved:1:read only
-cstr_iends_with	unproved:0:read only,unproved:1:read only
-cstr_ieq	unproved:0:read only,unproved:1:read only
-cstr_iequals	unproved:0:read only,unproved:1:read only
+cstr_hash	receiver:cstr
+cstr_icmp	receiver:cstr,unproved:1:read only
+cstr_iends_with	receiver:cstr,unproved:1:read only
+cstr_ieq	receiver:cstr,unproved:1:read only
+cstr_iequals	receiver:cstr,unproved:1:read only
 cstr_insert	receiver-mut:cstr,unproved:2:read only
 cstr_insert_sv	receiver-mut:cstr
-cstr_is_empty	unproved:0:read only
-cstr_istarts_with	unproved:0:read only,unproved:1:read only
+cstr_is_empty	receiver:cstr
+cstr_istarts_with	receiver:cstr,unproved:1:read only
 cstr_join_array	receiver-mut:cstr,stored-unknown:1,unproved:2:read only
 cstr_join_array_s	receiver-mut:cstr,stored-unknown:1,unproved:2:read only
 cstr_lowercase	receiver-mut:cstr
@@ -159,55 +159,55 @@ cstr_replace_sv	receiver-mut:cstr
 cstr_reserve	receiver-mut:cstr
 cstr_resize	receiver-mut:cstr
 cstr_shrink_to_fit	receiver-mut:cstr
-cstr_size	unproved:0:read only
-cstr_starts_with	unproved:0:read only,unproved:1:read only
-cstr_starts_with_sv	unproved:0:read only
-cstr_str	unproved:0:read only
-cstr_subview	unproved:0:read only
-cstr_sv	unproved:0:read only
-cstr_tail	unproved:0:read only
+cstr_size	receiver:cstr
+cstr_starts_with	receiver:cstr,unproved:1:read only
+cstr_starts_with_sv	receiver:cstr
+cstr_str	unproved:0:returns a pointer the receiver's view cannot carry
+cstr_subview	receiver:cstr
+cstr_sv	receiver:cstr
+cstr_tail	receiver:cstr
 cstr_take	receiver-mut:cstr,ret-from:0
-cstr_to_index	unproved:0:read only
+cstr_to_index	receiver:cstr
 cstr_tocase_sv	plain
 cstr_tolower	unproved:0:read only
 cstr_tolower_sv	plain
-cstr_toraw	unproved:0:read only
+cstr_toraw	unproved:0:returns a pointer the receiver's view cannot carry
 cstr_toupper	unproved:0:read only
 cstr_toupper_sv	plain
-cstr_u8_at	unproved:0:read only
+cstr_u8_at	receiver:cstr
 cstr_u8_erase	receiver-mut:cstr
 cstr_u8_from	unproved:0:read only
 cstr_u8_insert	receiver-mut:cstr,unproved:2:read only
 cstr_u8_replace	receiver-mut:cstr,unproved:3:read only
-cstr_u8_size	unproved:0:read only
-cstr_u8_subview	unproved:0:read only
-cstr_u8_tail	unproved:0:read only
-cstr_u8_to_index	unproved:0:read only
-cstr_u8_valid	unproved:0:read only
+cstr_u8_size	receiver:cstr
+cstr_u8_subview	receiver:cstr
+cstr_u8_tail	receiver:cstr
+cstr_u8_to_index	receiver:cstr
+cstr_u8_valid	receiver:cstr
 cstr_uppercase	receiver-mut:cstr
 cstr_vfmt	receiver-mut:cstr,unproved:2:read only
 cstr_with_capacity	plain
 cstr_with_size	plain
-cstr_zv	unproved:0:read only
+cstr_zv	receiver:cstr
 csview_advance	plain
-csview_begin	unproved:0:read only
+csview_begin	receiver:csview
 csview_clear	receiver-mut:csview
-csview_cmp	unproved:0:read only,unproved:1:read only
-csview_codepoint	unproved:0:read only
+csview_cmp	receiver:csview,unproved:1:read only
+csview_codepoint	receiver:csview_iter
 csview_contains	unproved:1:read only
-csview_end	unproved:0:read only
+csview_end	receiver:csview
 csview_ends_with	unproved:1:read only
-csview_eq	unproved:0:read only,unproved:1:read only
+csview_eq	receiver:csview,unproved:1:read only
 csview_equals	unproved:1:read only
 csview_equals_sv	plain
 csview_find	unproved:1:read only
 csview_find_sv	plain
 csview_from	unproved:0:read only
 csview_from_n	unproved:0:read only
-csview_hash	unproved:0:read only
-csview_icmp	unproved:0:read only,unproved:1:read only
+csview_hash	unproved:0:c_basehash_n may write through it
+csview_icmp	receiver:csview,unproved:1:read only
 csview_iends_with	unproved:1:read only
-csview_ieq	unproved:0:read only,unproved:1:read only
+csview_ieq	receiver:csview,unproved:1:read only
 csview_iequals	unproved:1:read only
 csview_iequals_sv	plain
 csview_is_empty	plain
@@ -230,7 +230,7 @@ csview_u8_size	plain
 csview_u8_subview	plain
 csview_u8_tail	plain
 csview_u8_valid	plain
-cutf8_at	unproved:0:read only
+cutf8_at	ret-from:0
 cutf8_casefold	plain
 cutf8_chr_size	unproved:0:read only
 cutf8_count	unproved:0:read only
@@ -250,7 +250,7 @@ cutf8_islower	plain
 cutf8_isspace	plain
 cutf8_isupper	plain
 cutf8_isword	plain
-cutf8_offset	unproved:0:read only
+cutf8_offset	ret-from:0
 cutf8_peek	unproved:0:read only
 cutf8_peek_at	unproved:0:read only
 cutf8_subview	unproved:0:read only
@@ -259,7 +259,7 @@ cutf8_tolower	plain
 cutf8_toupper	plain
 cutf8_valid	unproved:0:read only
 cutf8_valid_n	unproved:0:read only
-fmt_close	unproved:0:read only
+fmt_close	unproved:0:frees a part of it
 main	plain
 stc_f64s_binary_search	unproved:0:read only
 stc_f64s_binary_search_range	unproved:0:read only
@@ -277,69 +277,69 @@ stc_i64s_sort	unproved:0:out-parameter read before the write
 stc_i64s_sort_lowhigh	unproved:0:out-parameter read before the write
 stc_slot_deque_adjust_end_	receiver-mut:stc_slot_deque
 stc_slot_deque_advance	plain
-stc_slot_deque_at	unproved:0:read only
-stc_slot_deque_at_mut	unproved:0:read only
-stc_slot_deque_back	unproved:0:read only
-stc_slot_deque_back_mut	unproved:0:read only
-stc_slot_deque_begin	unproved:0:read only
-stc_slot_deque_capacity	unproved:0:read only
+stc_slot_deque_at	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_at_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_begin	receiver:stc_slot_deque
+stc_slot_deque_capacity	receiver:stc_slot_deque
 stc_slot_deque_clear	receiver-mut:stc_slot_deque
-stc_slot_deque_drop	unproved:0:read only
-stc_slot_deque_end	unproved:0:read only
+stc_slot_deque_drop	unproved:0:casts away const
+stc_slot_deque_end	receiver:stc_slot_deque
 stc_slot_deque_erase_at	receiver-mut:stc_slot_deque
 stc_slot_deque_erase_n	receiver-mut:stc_slot_deque
 stc_slot_deque_erase_range	receiver-mut:stc_slot_deque
 stc_slot_deque_from_n	unproved:0:read only
-stc_slot_deque_front	unproved:0:read only
-stc_slot_deque_front_mut	unproved:0:read only
-stc_slot_deque_index	unproved:0:read only
+stc_slot_deque_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_deque_index	receiver:stc_slot_deque
 stc_slot_deque_init	plain
 stc_slot_deque_insert_at	receiver-mut:stc_slot_deque,unproved:2:read only
 stc_slot_deque_insert_n	receiver-mut:stc_slot_deque,unproved:2:read only
 stc_slot_deque_insert_uninit	receiver-mut:stc_slot_deque
-stc_slot_deque_is_empty	unproved:0:read only
+stc_slot_deque_is_empty	receiver:stc_slot_deque
 stc_slot_deque_move	receiver-mut:stc_slot_deque
 stc_slot_deque_next	receiver-mut:stc_slot_deque_iter
 stc_slot_deque_pop_back	receiver-mut:stc_slot_deque
 stc_slot_deque_pop_front	receiver-mut:stc_slot_deque
-stc_slot_deque_pull_back	receiver-mut:stc_slot_deque,ret-from:0
-stc_slot_deque_pull_front	receiver-mut:stc_slot_deque,ret-from:0
+stc_slot_deque_pull_back	receiver-mut:stc_slot_deque
+stc_slot_deque_pull_front	receiver-mut:stc_slot_deque
 stc_slot_deque_push	receiver-mut:stc_slot_deque,stored-unknown:1
 stc_slot_deque_push_back	receiver-mut:stc_slot_deque,stored-unknown:1
 stc_slot_deque_push_front	receiver-mut:stc_slot_deque,stored-unknown:1
 stc_slot_deque_put_n	receiver-mut:stc_slot_deque,unproved:1:read only
-stc_slot_deque_rbegin	unproved:0:read only
-stc_slot_deque_rend	unproved:0:read only
+stc_slot_deque_rbegin	receiver:stc_slot_deque
+stc_slot_deque_rend	receiver:stc_slot_deque
 stc_slot_deque_reserve	receiver-mut:stc_slot_deque
 stc_slot_deque_rnext	receiver-mut:stc_slot_deque_iter
 stc_slot_deque_shrink_to_fit	receiver-mut:stc_slot_deque
-stc_slot_deque_size	unproved:0:read only
+stc_slot_deque_size	receiver:stc_slot_deque
 stc_slot_deque_take	receiver-mut:stc_slot_deque
-stc_slot_deque_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_deque_value_toraw	ret-from:0
+stc_slot_deque_value_drop	receiver:stc_slot_deque,unproved:1:read only
+stc_slot_deque_value_toraw	unproved:0:returns a pointer loaded from the parameter
 stc_slot_deque_with_capacity	plain
 stc_slot_deque_with_size	stored-unknown:1
 stc_slot_deque_with_size_uninit	plain
 stc_slot_list_advance	plain
-stc_slot_list_back	unproved:0:read only
-stc_slot_list_back_mut	unproved:0:read only
-stc_slot_list_begin	unproved:0:read only
-stc_slot_list_clear	unproved:0:read only
-stc_slot_list_count	unproved:0:read only
-stc_slot_list_drop	unproved:0:read only
-stc_slot_list_end	unproved:0:read only
+stc_slot_list_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_list_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_list_begin	receiver:stc_slot_list
+stc_slot_list_clear	unproved:0:stc_slot_list_drop may write through it
+stc_slot_list_count	receiver:stc_slot_list
+stc_slot_list_drop	unproved:0:casts away const
+stc_slot_list_end	receiver:stc_slot_list
 stc_slot_list_erase_after_node	receiver-mut:stc_slot_list,stored-unknown:1
 stc_slot_list_erase_at	receiver-mut:stc_slot_list
 stc_slot_list_erase_range	receiver-mut:stc_slot_list
 stc_slot_list_from_n	unproved:0:read only
-stc_slot_list_front	unproved:0:read only
-stc_slot_list_front_mut	unproved:0:read only
+stc_slot_list_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_list_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
 stc_slot_list_get_node	unproved:0:read only
 stc_slot_list_init	plain
 stc_slot_list_insert_after_node	receiver-mut:stc_slot_list,unproved:1:out-parameter read before the write,stored-unknown:2
 stc_slot_list_insert_at	receiver-mut:stc_slot_list,stored-unknown:2
 stc_slot_list_insertsort_lowhigh	receiver-mut:stc_slot_list
-stc_slot_list_is_empty	unproved:0:read only
+stc_slot_list_is_empty	receiver:stc_slot_list
 stc_slot_list_move	receiver-mut:stc_slot_list
 stc_slot_list_next	receiver-mut:stc_slot_list_iter
 stc_slot_list_pop_front	receiver-mut:stc_slot_list
@@ -348,7 +348,7 @@ stc_slot_list_push_back	receiver-mut:stc_slot_list,stored-unknown:1
 stc_slot_list_push_back_node	receiver-mut:stc_slot_list,stored-unknown:1
 stc_slot_list_push_front	receiver-mut:stc_slot_list,stored-unknown:1
 stc_slot_list_put_n	receiver-mut:stc_slot_list,unproved:1:read only
-stc_slot_list_reserve	unproved:0:read only
+stc_slot_list_reserve	unproved:0:indexed as an array
 stc_slot_list_reverse	receiver-mut:stc_slot_list
 stc_slot_list_sort	receiver-mut:stc_slot_list
 stc_slot_list_sort_lowhigh	receiver-mut:stc_slot_list
@@ -358,179 +358,179 @@ stc_slot_list_split_off	receiver-mut:stc_slot_list
 stc_slot_list_take	receiver-mut:stc_slot_list
 stc_slot_list_unlink_after_node	receiver-mut:stc_slot_list,stored-unknown:1
 stc_slot_list_unlink_front_node	receiver-mut:stc_slot_list
-stc_slot_list_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_list_value_toraw	ret-from:0
-stc_slot_pqueue_capacity	unproved:0:read only
+stc_slot_list_value_drop	receiver:stc_slot_list,unproved:1:read only
+stc_slot_list_value_toraw	unproved:0:returns a pointer loaded from the parameter
+stc_slot_pqueue_capacity	receiver:stc_slot_pqueue
 stc_slot_pqueue_clear	receiver-mut:stc_slot_pqueue
-stc_slot_pqueue_drop	unproved:0:read only
+stc_slot_pqueue_drop	unproved:0:casts away const
 stc_slot_pqueue_erase_at	receiver-mut:stc_slot_pqueue
-stc_slot_pqueue_exchange	unproved:0:read only,ret-from:1
+stc_slot_pqueue_exchange	unproved:0:stc_slot_pqueue_sift_down_ may write through it,ret-from:1
 stc_slot_pqueue_from_n	unproved:0:read only
 stc_slot_pqueue_init	plain
-stc_slot_pqueue_is_empty	unproved:0:read only
-stc_slot_pqueue_make_heap	unproved:0:read only
+stc_slot_pqueue_is_empty	receiver:stc_slot_pqueue
+stc_slot_pqueue_make_heap	receiver:stc_slot_pqueue
 stc_slot_pqueue_move	receiver-mut:stc_slot_pqueue
 stc_slot_pqueue_pop	receiver-mut:stc_slot_pqueue
-stc_slot_pqueue_pull	receiver-mut:stc_slot_pqueue,ret-from:0
+stc_slot_pqueue_pull	receiver-mut:stc_slot_pqueue
 stc_slot_pqueue_push	receiver-mut:stc_slot_pqueue,stored-unknown:1
-stc_slot_pqueue_pushpull	unproved:0:read only,ret-from:1
+stc_slot_pqueue_pushpull	unproved:0:stc_slot_pqueue_sift_down_ may write through it,ret-from:1
 stc_slot_pqueue_put_n	receiver-mut:stc_slot_pqueue,unproved:1:read only
 stc_slot_pqueue_reserve	receiver-mut:stc_slot_pqueue
 stc_slot_pqueue_shrink_to_fit	receiver-mut:stc_slot_pqueue
-stc_slot_pqueue_sift_down_	unproved:0:read only
-stc_slot_pqueue_size	unproved:0:read only
+stc_slot_pqueue_sift_down_	receiver:stc_slot_pqueue
+stc_slot_pqueue_size	receiver:stc_slot_pqueue
 stc_slot_pqueue_take	receiver-mut:stc_slot_pqueue
-stc_slot_pqueue_top	unproved:0:read only
+stc_slot_pqueue_top	unproved:0:returns a pointer the receiver's view cannot carry
 stc_slot_pqueue_with_capacity	plain
 stc_slot_queue_adjust_end_	receiver-mut:stc_slot_queue
 stc_slot_queue_advance	plain
-stc_slot_queue_back	unproved:0:read only
-stc_slot_queue_back_mut	unproved:0:read only
-stc_slot_queue_begin	unproved:0:read only
-stc_slot_queue_capacity	unproved:0:read only
+stc_slot_queue_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_queue_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_queue_begin	receiver:stc_slot_queue
+stc_slot_queue_capacity	receiver:stc_slot_queue
 stc_slot_queue_clear	receiver-mut:stc_slot_queue
-stc_slot_queue_drop	unproved:0:read only
-stc_slot_queue_end	unproved:0:read only
+stc_slot_queue_drop	unproved:0:casts away const
+stc_slot_queue_end	receiver:stc_slot_queue
 stc_slot_queue_from_n	unproved:0:read only
-stc_slot_queue_front	unproved:0:read only
-stc_slot_queue_front_mut	unproved:0:read only
-stc_slot_queue_index	unproved:0:read only
+stc_slot_queue_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_queue_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_queue_index	receiver:stc_slot_queue
 stc_slot_queue_init	plain
-stc_slot_queue_is_empty	unproved:0:read only
+stc_slot_queue_is_empty	receiver:stc_slot_queue
 stc_slot_queue_move	receiver-mut:stc_slot_queue
 stc_slot_queue_next	receiver-mut:stc_slot_queue_iter
 stc_slot_queue_pop	receiver-mut:stc_slot_queue
-stc_slot_queue_pull	receiver-mut:stc_slot_queue,ret-from:0
+stc_slot_queue_pull	receiver-mut:stc_slot_queue
 stc_slot_queue_push	receiver-mut:stc_slot_queue,stored-unknown:1
 stc_slot_queue_put_n	receiver-mut:stc_slot_queue,unproved:1:read only
-stc_slot_queue_rbegin	unproved:0:read only
-stc_slot_queue_rend	unproved:0:read only
+stc_slot_queue_rbegin	receiver:stc_slot_queue
+stc_slot_queue_rend	receiver:stc_slot_queue
 stc_slot_queue_reserve	receiver-mut:stc_slot_queue
 stc_slot_queue_rnext	receiver-mut:stc_slot_queue_iter
 stc_slot_queue_shrink_to_fit	receiver-mut:stc_slot_queue
-stc_slot_queue_size	unproved:0:read only
+stc_slot_queue_size	receiver:stc_slot_queue
 stc_slot_queue_take	receiver-mut:stc_slot_queue
-stc_slot_queue_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_queue_value_toraw	ret-from:0
+stc_slot_queue_value_drop	receiver:stc_slot_queue,unproved:1:read only
+stc_slot_queue_value_toraw	unproved:0:returns a pointer loaded from the parameter
 stc_slot_queue_with_capacity	plain
 stc_slot_queue_with_size	stored-unknown:1
 stc_slot_queue_with_size_uninit	plain
 stc_slot_set_advance	plain
-stc_slot_set_begin	unproved:0:read only
-stc_slot_set_bucket_count	unproved:0:read only
+stc_slot_set_begin	receiver:stc_slot_set
+stc_slot_set_bucket_count	receiver:stc_slot_set
 stc_slot_set_bucket_insert_	receiver-mut:stc_slot_set,unproved:1:read only
-stc_slot_set_bucket_lookup_	unproved:0:read only,unproved:1:read only
-stc_slot_set_capacity	unproved:0:read only
+stc_slot_set_bucket_lookup_	receiver:stc_slot_set,unproved:1:read only
+stc_slot_set_capacity	receiver:stc_slot_set
 stc_slot_set_clear	receiver-mut:stc_slot_set
-stc_slot_set_contains	unproved:0:read only,unproved:1:read only
-stc_slot_set_drop	unproved:0:read only
-stc_slot_set_end	unproved:0:read only
-stc_slot_set_eq	unproved:0:read only,unproved:1:read only
+stc_slot_set_contains	receiver:stc_slot_set,unproved:1:read only
+stc_slot_set_drop	unproved:0:casts away const
+stc_slot_set_end	receiver:stc_slot_set
+stc_slot_set_eq	receiver:stc_slot_set,unproved:1:read only
 stc_slot_set_erase	receiver-mut:stc_slot_set,unproved:1:read only
 stc_slot_set_erase_at	receiver-mut:stc_slot_set
 stc_slot_set_erase_entry	receiver-mut:stc_slot_set,unproved:1:read only
-stc_slot_set_find	unproved:0:read only,unproved:1:read only
+stc_slot_set_find	receiver:stc_slot_set,unproved:1:read only
 stc_slot_set_from_n	unproved:0:read only
-stc_slot_set_get	unproved:0:read only,unproved:1:read only
-stc_slot_set_get_mut	unproved:0:read only,unproved:1:read only
+stc_slot_set_get	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
+stc_slot_set_get_mut	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 stc_slot_set_init	plain
 stc_slot_set_insert	receiver-mut:stc_slot_set,stored-unknown:1
 stc_slot_set_insert_entry_	receiver-mut:stc_slot_set,unproved:1:read only
-stc_slot_set_is_empty	unproved:0:read only
-stc_slot_set_max_load_factor	unproved:0:read only
+stc_slot_set_is_empty	receiver:stc_slot_set
+stc_slot_set_max_load_factor	receiver:stc_slot_set
 stc_slot_set_move	receiver-mut:stc_slot_set
 stc_slot_set_next	receiver-mut:stc_slot_set_iter
 stc_slot_set_push	receiver-mut:stc_slot_set,stored-unknown:1
 stc_slot_set_put_n	receiver-mut:stc_slot_set,unproved:1:read only
-stc_slot_set_reserve	unproved:0:read only
-stc_slot_set_shrink_to_fit	unproved:0:read only
-stc_slot_set_size	unproved:0:read only
+stc_slot_set_reserve	receiver-mut:stc_slot_set
+stc_slot_set_shrink_to_fit	receiver-mut:stc_slot_set
+stc_slot_set_size	receiver:stc_slot_set
 stc_slot_set_take	receiver-mut:stc_slot_set
-stc_slot_set_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_set_value_toraw	ret-from:0
-stc_slot_set_wipe_	unproved:0:read only
+stc_slot_set_value_drop	receiver:stc_slot_set,unproved:1:read only
+stc_slot_set_value_toraw	unproved:0:returns a pointer loaded from the parameter
+stc_slot_set_wipe_	receiver:stc_slot_set
 stc_slot_set_with_capacity	plain
 stc_slot_sset_advance	plain
-stc_slot_sset_back	unproved:0:read only
-stc_slot_sset_begin	unproved:0:read only
-stc_slot_sset_capacity	unproved:0:read only
+stc_slot_sset_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_sset_begin	receiver:stc_slot_sset
+stc_slot_sset_capacity	receiver:stc_slot_sset
 stc_slot_sset_clear	receiver-mut:stc_slot_sset
-stc_slot_sset_contains	unproved:0:read only,unproved:1:read only
-stc_slot_sset_drop	unproved:0:read only
-stc_slot_sset_drop_r_	unproved:0:read only
-stc_slot_sset_end	unproved:0:read only
+stc_slot_sset_contains	receiver:stc_slot_sset,unproved:1:read only
+stc_slot_sset_drop	unproved:0:casts away const
+stc_slot_sset_drop_r_	receiver:stc_slot_sset
+stc_slot_sset_end	receiver:stc_slot_sset
 stc_slot_sset_erase	receiver-mut:stc_slot_sset,unproved:1:read only
 stc_slot_sset_erase_at	receiver-mut:stc_slot_sset
 stc_slot_sset_erase_r_	receiver-mut:stc_slot_sset,unproved:2:read only,unproved:3:out-parameter a return before the write
 stc_slot_sset_erase_range	receiver-mut:stc_slot_sset
-stc_slot_sset_find	unproved:0:read only,unproved:1:read only
-stc_slot_sset_find_it	unproved:0:read only,unproved:1:read only,unproved:2:out-parameter read before the write
+stc_slot_sset_find	receiver:stc_slot_sset,unproved:1:read only
+stc_slot_sset_find_it	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only,unproved:2:out-parameter read before the write
 stc_slot_sset_from_n	unproved:0:read only
-stc_slot_sset_front	unproved:0:read only
-stc_slot_sset_get	unproved:0:read only,unproved:1:read only
-stc_slot_sset_get_mut	unproved:0:read only,unproved:1:read only
+stc_slot_sset_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_sset_get	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
+stc_slot_sset_get_mut	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
 stc_slot_sset_init	plain
 stc_slot_sset_insert	receiver-mut:stc_slot_sset,stored-unknown:1
 stc_slot_sset_insert_entry_	receiver-mut:stc_slot_sset,unproved:1:read only
 stc_slot_sset_insert_entry_i_	receiver-mut:stc_slot_sset,unproved:2:read only,unproved:3:out-parameter written conditionally
-stc_slot_sset_is_empty	unproved:0:read only
-stc_slot_sset_lower_bound	unproved:0:read only,unproved:1:read only
+stc_slot_sset_is_empty	receiver:stc_slot_sset
+stc_slot_sset_lower_bound	receiver:stc_slot_sset,unproved:1:read only
 stc_slot_sset_move	receiver-mut:stc_slot_sset
 stc_slot_sset_new_node_	receiver-mut:stc_slot_sset
 stc_slot_sset_next	receiver-mut:stc_slot_sset_iter
 stc_slot_sset_push	receiver-mut:stc_slot_sset,stored-unknown:1
 stc_slot_sset_put_n	receiver-mut:stc_slot_sset,unproved:1:read only
 stc_slot_sset_reserve	receiver-mut:stc_slot_sset
-stc_slot_sset_size	unproved:0:read only
+stc_slot_sset_size	receiver:stc_slot_sset
 stc_slot_sset_skew_	unproved:0:indexed as an array
 stc_slot_sset_split_	unproved:0:indexed as an array
 stc_slot_sset_take	receiver-mut:stc_slot_sset
-stc_slot_sset_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_sset_value_toraw	ret-from:0
+stc_slot_sset_value_drop	receiver:stc_slot_sset,unproved:1:read only
+stc_slot_sset_value_toraw	unproved:0:returns a pointer loaded from the parameter
 stc_slot_sset_with_capacity	plain
 stc_slot_stack_adjust_end_	receiver-mut:stc_slot_stack
 stc_slot_stack_advance	plain
 stc_slot_stack_append_uninit	receiver-mut:stc_slot_stack
-stc_slot_stack_at	unproved:0:read only
-stc_slot_stack_at_mut	unproved:0:read only
-stc_slot_stack_back	unproved:0:read only
-stc_slot_stack_back_mut	unproved:0:read only
-stc_slot_stack_begin	unproved:0:read only
-stc_slot_stack_capacity	unproved:0:read only
+stc_slot_stack_at	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_at_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_begin	receiver:stc_slot_stack
+stc_slot_stack_capacity	receiver:stc_slot_stack
 stc_slot_stack_clear	receiver-mut:stc_slot_stack
-stc_slot_stack_drop	unproved:0:read only
-stc_slot_stack_end	unproved:0:read only
+stc_slot_stack_drop	unproved:0:casts away const
+stc_slot_stack_end	receiver:stc_slot_stack
 stc_slot_stack_from_n	unproved:0:read only
-stc_slot_stack_front	unproved:0:read only
-stc_slot_stack_front_mut	unproved:0:read only
-stc_slot_stack_index	unproved:0:read only
+stc_slot_stack_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_index	receiver:stc_slot_stack
 stc_slot_stack_init	plain
-stc_slot_stack_is_empty	unproved:0:read only
+stc_slot_stack_is_empty	receiver:stc_slot_stack
 stc_slot_stack_move	receiver-mut:stc_slot_stack
 stc_slot_stack_next	receiver-mut:stc_slot_stack_iter
 stc_slot_stack_pop	receiver-mut:stc_slot_stack
-stc_slot_stack_pull	receiver-mut:stc_slot_stack,ret-from:0
+stc_slot_stack_pull	receiver-mut:stc_slot_stack
 stc_slot_stack_push	receiver-mut:stc_slot_stack,stored-unknown:1
 stc_slot_stack_put_n	receiver-mut:stc_slot_stack,unproved:1:read only
-stc_slot_stack_rbegin	unproved:0:read only
-stc_slot_stack_rend	unproved:0:read only
+stc_slot_stack_rbegin	receiver:stc_slot_stack
+stc_slot_stack_rend	receiver:stc_slot_stack
 stc_slot_stack_reserve	receiver-mut:stc_slot_stack
 stc_slot_stack_rnext	receiver-mut:stc_slot_stack_iter
 stc_slot_stack_shrink_to_fit	receiver-mut:stc_slot_stack
-stc_slot_stack_size	unproved:0:read only
+stc_slot_stack_size	receiver:stc_slot_stack
 stc_slot_stack_take	receiver-mut:stc_slot_stack
-stc_slot_stack_top	unproved:0:read only
-stc_slot_stack_top_mut	unproved:0:read only
-stc_slot_stack_value_drop	unproved:0:read only,unproved:1:read only
-stc_slot_stack_value_toraw	ret-from:0
+stc_slot_stack_top	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_top_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_slot_stack_value_drop	receiver:stc_slot_stack,unproved:1:read only
+stc_slot_stack_value_toraw	unproved:0:returns a pointer loaded from the parameter
 stc_slot_stack_with_capacity	plain
 stc_slot_stack_with_size	stored-unknown:1
 stc_slot_stack_with_size_uninit	plain
-stc_slotrefs_binary_search	unproved:0:read only
-stc_slotrefs_binary_search_range	unproved:0:read only
+stc_slotrefs_binary_search	unproved:0:indexed as an array
+stc_slotrefs_binary_search_range	unproved:0:indexed as an array
 stc_slotrefs_insertsort_lowhigh	unproved:0:indexed as an array
-stc_slotrefs_lower_bound	unproved:0:read only
-stc_slotrefs_lower_bound_range	unproved:0:read only
+stc_slotrefs_lower_bound	unproved:0:indexed as an array
+stc_slotrefs_lower_bound_range	unproved:0:indexed as an array
 stc_slotrefs_sort	unproved:0:indexed as an array
 stc_slotrefs_sort_lowhigh	unproved:0:indexed as an array
 stc_u64s_binary_search	unproved:0:read only
@@ -542,29 +542,29 @@ stc_u64s_sort	unproved:0:out-parameter read before the write
 stc_u64s_sort_lowhigh	unproved:0:out-parameter read before the write
 stc_word_deque_adjust_end_	receiver-mut:stc_word_deque
 stc_word_deque_advance	plain
-stc_word_deque_at	unproved:0:read only
-stc_word_deque_at_mut	unproved:0:read only
-stc_word_deque_back	unproved:0:read only
-stc_word_deque_back_mut	unproved:0:read only
-stc_word_deque_begin	unproved:0:read only
-stc_word_deque_capacity	unproved:0:read only
+stc_word_deque_at	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_at_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_begin	receiver:stc_word_deque
+stc_word_deque_capacity	receiver:stc_word_deque
 stc_word_deque_clear	receiver-mut:stc_word_deque
 stc_word_deque_clone	plain
 stc_word_deque_copy	receiver-mut:stc_word_deque,unproved:1:read only
-stc_word_deque_drop	unproved:0:read only
-stc_word_deque_end	unproved:0:read only
+stc_word_deque_drop	unproved:0:casts away const
+stc_word_deque_end	receiver:stc_word_deque
 stc_word_deque_erase_at	receiver-mut:stc_word_deque
 stc_word_deque_erase_n	receiver-mut:stc_word_deque
 stc_word_deque_erase_range	receiver-mut:stc_word_deque
 stc_word_deque_from_n	unproved:0:read only
-stc_word_deque_front	unproved:0:read only
-stc_word_deque_front_mut	unproved:0:read only
-stc_word_deque_index	unproved:0:read only
+stc_word_deque_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_deque_index	receiver:stc_word_deque
 stc_word_deque_init	plain
 stc_word_deque_insert_at	receiver-mut:stc_word_deque
 stc_word_deque_insert_n	receiver-mut:stc_word_deque,unproved:2:read only
 stc_word_deque_insert_uninit	receiver-mut:stc_word_deque
-stc_word_deque_is_empty	unproved:0:read only
+stc_word_deque_is_empty	receiver:stc_word_deque
 stc_word_deque_move	receiver-mut:stc_word_deque
 stc_word_deque_next	receiver-mut:stc_word_deque_iter
 stc_word_deque_pop_back	receiver-mut:stc_word_deque
@@ -575,41 +575,41 @@ stc_word_deque_push	receiver-mut:stc_word_deque
 stc_word_deque_push_back	receiver-mut:stc_word_deque
 stc_word_deque_push_front	receiver-mut:stc_word_deque
 stc_word_deque_put_n	receiver-mut:stc_word_deque,unproved:1:read only
-stc_word_deque_rbegin	unproved:0:read only
-stc_word_deque_rend	unproved:0:read only
+stc_word_deque_rbegin	receiver:stc_word_deque
+stc_word_deque_rend	receiver:stc_word_deque
 stc_word_deque_reserve	receiver-mut:stc_word_deque
 stc_word_deque_rnext	receiver-mut:stc_word_deque_iter
 stc_word_deque_shrink_to_fit	receiver-mut:stc_word_deque
-stc_word_deque_size	unproved:0:read only
+stc_word_deque_size	receiver:stc_word_deque
 stc_word_deque_take	receiver-mut:stc_word_deque
-stc_word_deque_value_clone	unproved:0:read only
-stc_word_deque_value_drop	unproved:0:read only,unproved:1:read only
+stc_word_deque_value_clone	receiver:stc_word_deque
+stc_word_deque_value_drop	receiver:stc_word_deque,unproved:1:read only
 stc_word_deque_value_toraw	unproved:0:read only
 stc_word_deque_with_capacity	plain
 stc_word_deque_with_size	plain
 stc_word_deque_with_size_uninit	plain
 stc_word_list_advance	plain
-stc_word_list_back	unproved:0:read only
-stc_word_list_back_mut	unproved:0:read only
-stc_word_list_begin	unproved:0:read only
-stc_word_list_clear	unproved:0:read only
+stc_word_list_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_list_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_list_begin	receiver:stc_word_list
+stc_word_list_clear	unproved:0:stc_word_list_drop may write through it
 stc_word_list_clone	plain
 stc_word_list_copy	receiver-mut:stc_word_list,unproved:1:read only
-stc_word_list_count	unproved:0:read only
-stc_word_list_drop	unproved:0:read only
-stc_word_list_end	unproved:0:read only
+stc_word_list_count	receiver:stc_word_list
+stc_word_list_drop	unproved:0:casts away const
+stc_word_list_end	receiver:stc_word_list
 stc_word_list_erase_after_node	receiver-mut:stc_word_list,stored-unknown:1
 stc_word_list_erase_at	receiver-mut:stc_word_list
 stc_word_list_erase_range	receiver-mut:stc_word_list
 stc_word_list_from_n	unproved:0:read only
-stc_word_list_front	unproved:0:read only
-stc_word_list_front_mut	unproved:0:read only
+stc_word_list_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_list_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
 stc_word_list_get_node	unproved:0:read only
 stc_word_list_init	plain
 stc_word_list_insert_after_node	receiver-mut:stc_word_list,unproved:1:out-parameter read before the write,stored-unknown:2
 stc_word_list_insert_at	receiver-mut:stc_word_list
 stc_word_list_insertsort_lowhigh	receiver-mut:stc_word_list
-stc_word_list_is_empty	unproved:0:read only
+stc_word_list_is_empty	receiver:stc_word_list
 stc_word_list_move	receiver-mut:stc_word_list
 stc_word_list_next	receiver-mut:stc_word_list_iter
 stc_word_list_pop_front	receiver-mut:stc_word_list
@@ -618,7 +618,7 @@ stc_word_list_push_back	receiver-mut:stc_word_list
 stc_word_list_push_back_node	receiver-mut:stc_word_list,stored-unknown:1
 stc_word_list_push_front	receiver-mut:stc_word_list
 stc_word_list_put_n	receiver-mut:stc_word_list,unproved:1:read only
-stc_word_list_reserve	unproved:0:read only
+stc_word_list_reserve	unproved:0:indexed as an array
 stc_word_list_reverse	receiver-mut:stc_word_list
 stc_word_list_sort	receiver-mut:stc_word_list
 stc_word_list_sort_lowhigh	receiver-mut:stc_word_list
@@ -628,145 +628,145 @@ stc_word_list_split_off	receiver-mut:stc_word_list
 stc_word_list_take	receiver-mut:stc_word_list
 stc_word_list_unlink_after_node	receiver-mut:stc_word_list,stored-unknown:1
 stc_word_list_unlink_front_node	receiver-mut:stc_word_list
-stc_word_list_value_clone	unproved:0:read only
-stc_word_list_value_drop	unproved:0:read only,unproved:1:read only
+stc_word_list_value_clone	receiver:stc_word_list
+stc_word_list_value_drop	receiver:stc_word_list,unproved:1:read only
 stc_word_list_value_toraw	unproved:0:read only
-stc_word_pqueue_capacity	unproved:0:read only
+stc_word_pqueue_capacity	receiver:stc_word_pqueue
 stc_word_pqueue_clear	receiver-mut:stc_word_pqueue
 stc_word_pqueue_clone	plain
 stc_word_pqueue_copy	receiver-mut:stc_word_pqueue,unproved:1:read only
-stc_word_pqueue_drop	unproved:0:read only
+stc_word_pqueue_drop	unproved:0:casts away const
 stc_word_pqueue_erase_at	receiver-mut:stc_word_pqueue
-stc_word_pqueue_exchange	unproved:0:read only
+stc_word_pqueue_exchange	unproved:0:stc_word_pqueue_sift_down_ may write through it
 stc_word_pqueue_from_n	unproved:0:read only
 stc_word_pqueue_init	plain
-stc_word_pqueue_is_empty	unproved:0:read only
-stc_word_pqueue_make_heap	unproved:0:read only
+stc_word_pqueue_is_empty	receiver:stc_word_pqueue
+stc_word_pqueue_make_heap	receiver:stc_word_pqueue
 stc_word_pqueue_move	receiver-mut:stc_word_pqueue
 stc_word_pqueue_pop	receiver-mut:stc_word_pqueue
 stc_word_pqueue_pull	receiver-mut:stc_word_pqueue
 stc_word_pqueue_push	receiver-mut:stc_word_pqueue
-stc_word_pqueue_pushpull	unproved:0:read only
+stc_word_pqueue_pushpull	unproved:0:stc_word_pqueue_sift_down_ may write through it
 stc_word_pqueue_put_n	receiver-mut:stc_word_pqueue,unproved:1:read only
 stc_word_pqueue_reserve	receiver-mut:stc_word_pqueue
 stc_word_pqueue_shrink_to_fit	receiver-mut:stc_word_pqueue
-stc_word_pqueue_sift_down_	unproved:0:read only
-stc_word_pqueue_size	unproved:0:read only
+stc_word_pqueue_sift_down_	receiver:stc_word_pqueue
+stc_word_pqueue_size	receiver:stc_word_pqueue
 stc_word_pqueue_take	receiver-mut:stc_word_pqueue
-stc_word_pqueue_top	unproved:0:read only
-stc_word_pqueue_value_clone	unproved:0:read only
+stc_word_pqueue_top	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_pqueue_value_clone	receiver:stc_word_pqueue
 stc_word_pqueue_with_capacity	plain
 stc_word_queue_adjust_end_	receiver-mut:stc_word_queue
 stc_word_queue_advance	plain
-stc_word_queue_back	unproved:0:read only
-stc_word_queue_back_mut	unproved:0:read only
-stc_word_queue_begin	unproved:0:read only
-stc_word_queue_capacity	unproved:0:read only
+stc_word_queue_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_queue_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_queue_begin	receiver:stc_word_queue
+stc_word_queue_capacity	receiver:stc_word_queue
 stc_word_queue_clear	receiver-mut:stc_word_queue
 stc_word_queue_clone	plain
 stc_word_queue_copy	receiver-mut:stc_word_queue,unproved:1:read only
-stc_word_queue_drop	unproved:0:read only
-stc_word_queue_end	unproved:0:read only
+stc_word_queue_drop	unproved:0:casts away const
+stc_word_queue_end	receiver:stc_word_queue
 stc_word_queue_from_n	unproved:0:read only
-stc_word_queue_front	unproved:0:read only
-stc_word_queue_front_mut	unproved:0:read only
-stc_word_queue_index	unproved:0:read only
+stc_word_queue_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_queue_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_queue_index	receiver:stc_word_queue
 stc_word_queue_init	plain
-stc_word_queue_is_empty	unproved:0:read only
+stc_word_queue_is_empty	receiver:stc_word_queue
 stc_word_queue_move	receiver-mut:stc_word_queue
 stc_word_queue_next	receiver-mut:stc_word_queue_iter
 stc_word_queue_pop	receiver-mut:stc_word_queue
 stc_word_queue_pull	receiver-mut:stc_word_queue
 stc_word_queue_push	receiver-mut:stc_word_queue
 stc_word_queue_put_n	receiver-mut:stc_word_queue,unproved:1:read only
-stc_word_queue_rbegin	unproved:0:read only
-stc_word_queue_rend	unproved:0:read only
+stc_word_queue_rbegin	receiver:stc_word_queue
+stc_word_queue_rend	receiver:stc_word_queue
 stc_word_queue_reserve	receiver-mut:stc_word_queue
 stc_word_queue_rnext	receiver-mut:stc_word_queue_iter
 stc_word_queue_shrink_to_fit	receiver-mut:stc_word_queue
-stc_word_queue_size	unproved:0:read only
+stc_word_queue_size	receiver:stc_word_queue
 stc_word_queue_take	receiver-mut:stc_word_queue
-stc_word_queue_value_clone	unproved:0:read only
-stc_word_queue_value_drop	unproved:0:read only,unproved:1:read only
+stc_word_queue_value_clone	receiver:stc_word_queue
+stc_word_queue_value_drop	receiver:stc_word_queue,unproved:1:read only
 stc_word_queue_value_toraw	unproved:0:read only
 stc_word_queue_with_capacity	plain
 stc_word_queue_with_size	plain
 stc_word_queue_with_size_uninit	plain
 stc_word_set_advance	plain
-stc_word_set_begin	unproved:0:read only
-stc_word_set_bucket_count	unproved:0:read only
+stc_word_set_begin	receiver:stc_word_set
+stc_word_set_bucket_count	receiver:stc_word_set
 stc_word_set_bucket_insert_	receiver-mut:stc_word_set,unproved:1:read only
-stc_word_set_bucket_lookup_	unproved:0:read only,unproved:1:read only
-stc_word_set_capacity	unproved:0:read only
+stc_word_set_bucket_lookup_	receiver:stc_word_set,unproved:1:read only
+stc_word_set_capacity	receiver:stc_word_set
 stc_word_set_clear	receiver-mut:stc_word_set
 stc_word_set_clone	plain
-stc_word_set_contains	unproved:0:read only
+stc_word_set_contains	receiver:stc_word_set
 stc_word_set_copy	receiver-mut:stc_word_set,unproved:1:read only
-stc_word_set_drop	unproved:0:read only
-stc_word_set_end	unproved:0:read only
-stc_word_set_eq	unproved:0:read only,unproved:1:read only
+stc_word_set_drop	unproved:0:casts away const
+stc_word_set_end	receiver:stc_word_set
+stc_word_set_eq	receiver:stc_word_set,unproved:1:read only
 stc_word_set_erase	receiver-mut:stc_word_set
 stc_word_set_erase_at	receiver-mut:stc_word_set
 stc_word_set_erase_entry	receiver-mut:stc_word_set,unproved:1:read only
-stc_word_set_find	unproved:0:read only
+stc_word_set_find	receiver:stc_word_set
 stc_word_set_from_n	unproved:0:read only
-stc_word_set_get	unproved:0:read only
-stc_word_set_get_mut	unproved:0:read only
+stc_word_set_get	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_set_get_mut	unproved:0:returns a pointer the receiver's view cannot carry
 stc_word_set_init	plain
 stc_word_set_insert	receiver-mut:stc_word_set
 stc_word_set_insert_entry_	receiver-mut:stc_word_set
-stc_word_set_is_empty	unproved:0:read only
-stc_word_set_max_load_factor	unproved:0:read only
+stc_word_set_is_empty	receiver:stc_word_set
+stc_word_set_max_load_factor	receiver:stc_word_set
 stc_word_set_move	receiver-mut:stc_word_set
 stc_word_set_next	receiver-mut:stc_word_set_iter
 stc_word_set_push	receiver-mut:stc_word_set
 stc_word_set_put_n	receiver-mut:stc_word_set,unproved:1:read only
-stc_word_set_reserve	unproved:0:read only
-stc_word_set_shrink_to_fit	unproved:0:read only
-stc_word_set_size	unproved:0:read only
+stc_word_set_reserve	receiver-mut:stc_word_set
+stc_word_set_shrink_to_fit	receiver-mut:stc_word_set
+stc_word_set_size	receiver:stc_word_set
 stc_word_set_take	receiver-mut:stc_word_set
-stc_word_set_value_clone	unproved:0:read only
-stc_word_set_value_drop	unproved:0:read only,unproved:1:read only
+stc_word_set_value_clone	receiver:stc_word_set
+stc_word_set_value_drop	receiver:stc_word_set,unproved:1:read only
 stc_word_set_value_toraw	unproved:0:read only
-stc_word_set_wipe_	unproved:0:read only
+stc_word_set_wipe_	receiver:stc_word_set
 stc_word_set_with_capacity	plain
 stc_word_stack_adjust_end_	receiver-mut:stc_word_stack
 stc_word_stack_advance	plain
 stc_word_stack_append_uninit	receiver-mut:stc_word_stack
-stc_word_stack_at	unproved:0:read only
-stc_word_stack_at_mut	unproved:0:read only
-stc_word_stack_back	unproved:0:read only
-stc_word_stack_back_mut	unproved:0:read only
-stc_word_stack_begin	unproved:0:read only
-stc_word_stack_capacity	unproved:0:read only
+stc_word_stack_at	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_at_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_back	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_back_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_begin	receiver:stc_word_stack
+stc_word_stack_capacity	receiver:stc_word_stack
 stc_word_stack_clear	receiver-mut:stc_word_stack
 stc_word_stack_clone	plain
 stc_word_stack_copy	receiver-mut:stc_word_stack,unproved:1:read only
-stc_word_stack_drop	unproved:0:read only
-stc_word_stack_end	unproved:0:read only
+stc_word_stack_drop	unproved:0:casts away const
+stc_word_stack_end	receiver:stc_word_stack
 stc_word_stack_from_n	unproved:0:read only
-stc_word_stack_front	unproved:0:read only
-stc_word_stack_front_mut	unproved:0:read only
-stc_word_stack_index	unproved:0:read only
+stc_word_stack_front	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_front_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_index	receiver:stc_word_stack
 stc_word_stack_init	plain
-stc_word_stack_is_empty	unproved:0:read only
+stc_word_stack_is_empty	receiver:stc_word_stack
 stc_word_stack_move	receiver-mut:stc_word_stack
 stc_word_stack_next	receiver-mut:stc_word_stack_iter
 stc_word_stack_pop	receiver-mut:stc_word_stack
 stc_word_stack_pull	receiver-mut:stc_word_stack
 stc_word_stack_push	receiver-mut:stc_word_stack
 stc_word_stack_put_n	receiver-mut:stc_word_stack,unproved:1:read only
-stc_word_stack_rbegin	unproved:0:read only
-stc_word_stack_rend	unproved:0:read only
+stc_word_stack_rbegin	receiver:stc_word_stack
+stc_word_stack_rend	receiver:stc_word_stack
 stc_word_stack_reserve	receiver-mut:stc_word_stack
 stc_word_stack_rnext	receiver-mut:stc_word_stack_iter
 stc_word_stack_shrink_to_fit	receiver-mut:stc_word_stack
-stc_word_stack_size	unproved:0:read only
+stc_word_stack_size	receiver:stc_word_stack
 stc_word_stack_take	receiver-mut:stc_word_stack
-stc_word_stack_top	unproved:0:read only
-stc_word_stack_top_mut	unproved:0:read only
-stc_word_stack_value_clone	unproved:0:read only
-stc_word_stack_value_drop	unproved:0:read only,unproved:1:read only
+stc_word_stack_top	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_top_mut	unproved:0:returns a pointer the receiver's view cannot carry
+stc_word_stack_value_clone	receiver:stc_word_stack
+stc_word_stack_value_drop	receiver:stc_word_stack,unproved:1:read only
 stc_word_stack_value_toraw	unproved:0:read only
 stc_word_stack_with_capacity	plain
 stc_word_stack_with_size	plain

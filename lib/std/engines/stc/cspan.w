@@ -536,7 +536,6 @@ pub unsafe fn _cspan_slice(__param_oshape: *mut i32, __param_ostride: *mut i32, 
 
 }
 
-// contract: unproved:1:out-parameter read before the write
 pub unsafe fn _cspan_shape2stride(__param_layout: i32, __param_shpstri: *mut i32, __param_rank: i32) -> *mut i32 {
     var __local_rank = __param_rank
     var __local_i: i32

@@ -180,7 +180,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
 }
 
-// contract: unproved:0:read only,unproved:2:out-parameter written conditionally
+// contract: receiver:crand64,unproved:2:out-parameter written conditionally
 pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, __param_d: *mut crand64_normal_dist) -> f64 {
     var __local_v1: f64
 
@@ -201,9 +201,9 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
 
     loop {
-        (__local_v1 = ((((((crand64_uint_r(__param_rng, __param_stream) as i64) >> (11 as u32)) as f64) * 2.2204460492503131e-16) as f64)))
+        (__local_v1 = (((((((*__param_rng).uint_r(__param_stream) as i64) >> (11 as u32)) as f64) * 2.2204460492503131e-16) as f64)))
 
-        (__local_v2 = ((((((crand64_uint_r(__param_rng, __param_stream) as i64) >> (11 as u32)) as f64) * 2.2204460492503131e-16) as f64)))
+        (__local_v2 = (((((((*__param_rng).uint_r(__param_stream) as i64) >> (11 as u32)) as f64) * 2.2204460492503131e-16) as f64)))
 
         (__local_sq = ((((__local_v1 * __local_v1) + (__local_v2 * __local_v2)) as f64)))
 
@@ -228,51 +228,6 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn crand64_seed_r(__param_rng: *mut crand64, __param_seed: u64) {
-    var __local_s: *mut u64 = ((&raw const (*__param_rng).data[0] as *mut u64))
-
-    ((__local_s[0]) = ((((__param_seed as u64) *% (((0 as u64) -% 7046029254386353131) as u64)) as u64)))
-
-    ((__local_s[0]) = ((__local_s[0]) as u64) ^ ((((__local_s[0]) as u64) >> (30 as u32)) as u64))
-
-    ((__local_s[1]) = (((((__local_s[0]) as u64) *% (((0 as u64) -% 4658895280553007687) as u64)) as u64)))
-
-    ((__local_s[1]) = ((__local_s[1]) as u64) ^ ((((__local_s[1]) as u64) >> (27 as u32)) as u64))
-
-    ((__local_s[2]) = (((((__local_s[1]) as u64) *% (((0 as u64) -% 7723592293110705685) as u64)) as u64)))
-
-    ((__local_s[2]) = ((__local_s[2]) as u64) ^ ((((__local_s[2]) as u64) >> (31 as u32)) as u64))
-
-    ((__local_s[3]) = __param_seed)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn crand64_uint_r(__param_rng: *mut crand64, __param_stream: u64) -> u64 {
-    var __local_s: *mut u64 = ((&raw const (*__param_rng).data[0] as *mut u64))
-
-    var __local_result: u64 = with 0 as __ci_expr_seq_6 {
-        ((__local_s[3]) = ((__local_s[3]) +% __param_stream))
-        ((((((__local_s[0]) as u64) ^ ((__local_s[3]) as u64)) as u64) +% ((__local_s[1]) as u64)) as u64)
-    }
-
-    ((__local_s[0]) = (((((__local_s[1]) as u64) ^ ((((__local_s[1]) as u64) >> (11 as u32)) as u64)) as u64)))
-
-    ((__local_s[1]) = (((((__local_s[2]) as u64) +% ((((__local_s[2]) as u64) << (3 as u32)) as u64)) as u64)))
-
-    ((__local_s[2]) = (((((((((__local_s[2]) as u64) << (24 as u32)) as u64) | ((((__local_s[2]) as u64) >> (40 as u32)) as u64)) as u64) +% (__local_result as u64)) as u64)))
-
-    return __local_result
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn crand64_real_r(__param_rng: *mut crand64, __param_stream: u64) -> f64 {
-    return ((((crand64_uint_r(__param_rng, __param_stream) as u64) >> (11 as u32)) as f64) * 1.1102230246251565e-16)
-
-}
-
 pub fn _stc64() -> *mut crand64 {
     var __local_rng: crand64 = crand64 { data: [(-7046029247804630288 as u64), 8027708214854509594, (-2152535657050944081 as u64), 1] }
 
@@ -281,26 +236,26 @@ pub fn _stc64() -> *mut crand64 {
 }
 
 pub fn crand64_seed(__param_seed: u64) {
-    unsafe { crand64_seed_r(_stc64(), __param_seed) }
+    unsafe { (*(_stc64())).seed_r(__param_seed) }
 
 }
 
 pub fn crand64_from(__param_seed: u64) -> crand64 {
     var __local_rng: crand64
 
-    unsafe { crand64_seed_r((&raw mut __local_rng as *mut crand64), __param_seed) }
+    unsafe { (*(&raw mut __local_rng as *mut crand64)).seed_r(__param_seed) }
 
     return __local_rng
 
 }
 
 pub fn crand64_uint() -> u64 {
-    return unsafe { crand64_uint_r(_stc64(), (1 as u64)) }
+    return unsafe { (*(_stc64())).uint_r((1 as u64)) }
 
 }
 
 pub fn crand64_real() -> f64 {
-    return unsafe { crand64_real_r(_stc64(), (1 as u64)) }
+    return unsafe { (*(_stc64())).real_r((1 as u64)) }
 
 }
 
@@ -313,7 +268,7 @@ pub fn crand64_make_uniform(__param_low: i64, __param_high: i64) -> crand64_unif
 
 }
 
-// contract: unproved:0:read only,unproved:2:read only
+// contract: receiver:crand64,unproved:2:read only
 pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, __param_d: *mut crand64_uniform_dist) -> i64 {
     var __local_lo: u64
 
@@ -322,7 +277,7 @@ pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, 
 
     loop {
         loop {
-            var __local__z: u128 = ((crand64_uint_r(__param_rng, __param_stream) as u128) *% ((*__param_d).range as u128))
+            var __local__z: u128 = (((*__param_rng).uint_r(__param_stream) as u128) *% ((*__param_d).range as u128))
 
             ((*(&raw mut __local_lo as *mut u64)) = ((__local__z as u64)))
 
@@ -343,57 +298,6 @@ pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn crand64_uniform(__param_d: *mut crand64_uniform_dist) -> i64 {
-    return crand64_uniform_r(_stc64(), (1 as u64), __param_d)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn crand32_seed_r(__param_rng: *mut crand32, __param_seed: u32) {
-    var __local_s: *mut u32 = ((&raw const (*__param_rng).data[0] as *mut u32))
-
-    ((__local_s[0]) = ((((__param_seed as u32) *% (2654435769 as u32)) as u32)))
-
-    ((__local_s[0]) = ((__local_s[0]) as u32) ^ ((((__local_s[0]) as u32) >> (16 as u32)) as u32))
-
-    ((__local_s[1]) = (((((__local_s[0]) as u32) *% (569420461 as u32)) as u32)))
-
-    ((__local_s[1]) = ((__local_s[1]) as u32) ^ ((((__local_s[1]) as u32) >> (15 as u32)) as u32))
-
-    ((__local_s[2]) = (((((__local_s[1]) as u32) *% (1935289751 as u32)) as u32)))
-
-    ((__local_s[2]) = ((__local_s[2]) as u32) ^ ((((__local_s[2]) as u32) >> (15 as u32)) as u32))
-
-    ((__local_s[3]) = __param_seed)
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn crand32_uint_r(__param_rng: *mut crand32, __param_stream: u32) -> u32 {
-    var __local_s: *mut u32 = ((&raw const (*__param_rng).data[0] as *mut u32))
-
-    var __local_result: u32 = with 0 as __ci_expr_seq_6 {
-        ((__local_s[3]) = ((__local_s[3]) +% __param_stream))
-        ((((((__local_s[0]) as u32) ^ ((__local_s[3]) as u32)) as u32) +% ((__local_s[1]) as u32)) as u32)
-    }
-
-    ((__local_s[0]) = (((((__local_s[1]) as u32) ^ ((((__local_s[1]) as u32) >> (9 as u32)) as u32)) as u32)))
-
-    ((__local_s[1]) = (((((__local_s[2]) as u32) +% ((((__local_s[2]) as u32) << (3 as u32)) as u32)) as u32)))
-
-    ((__local_s[2]) = (((((((((__local_s[2]) as u32) << (21 as u32)) as u32) | ((((__local_s[2]) as u32) >> (11 as u32)) as u32)) as u32) +% (__local_result as u32)) as u32)))
-
-    return __local_result
-
-}
-
-// contract: unproved:0:read only
-pub unsafe fn crand32_real_r(__param_rng: *mut crand32, __param_stream: u32) -> f64 {
-    return ((crand32_uint_r(__param_rng, __param_stream) as f64) * 2.3283064365386963e-10)
-
-}
-
 pub fn _stc32() -> *mut crand32 {
     var __local_rng: crand32 = crand32 { data: [2654463886, 1856707489, 1684164658, 1] }
 
@@ -402,26 +306,26 @@ pub fn _stc32() -> *mut crand32 {
 }
 
 pub fn crand32_seed(__param_seed: u32) {
-    unsafe { crand32_seed_r(_stc32(), __param_seed) }
+    unsafe { (*(_stc32())).seed_r(__param_seed) }
 
 }
 
 pub fn crand32_from(__param_seed: u32) -> crand32 {
     var __local_rng: crand32
 
-    unsafe { crand32_seed_r((&raw mut __local_rng as *mut crand32), __param_seed) }
+    unsafe { (*(&raw mut __local_rng as *mut crand32)).seed_r(__param_seed) }
 
     return __local_rng
 
 }
 
 pub fn crand32_uint() -> u32 {
-    return unsafe { crand32_uint_r(_stc32(), (1 as u32)) }
+    return unsafe { (*(_stc32())).uint_r((1 as u32)) }
 
 }
 
 pub fn crand32_real() -> f64 {
-    return unsafe { crand32_real_r(_stc32(), (1 as u32)) }
+    return unsafe { (*(_stc32())).real_r((1 as u32)) }
 
 }
 
@@ -434,12 +338,12 @@ pub fn crand32_make_uniform(__param_low: i32, __param_high: i32) -> crand32_unif
 
 }
 
-// contract: unproved:0:read only,unproved:2:read only
+// contract: receiver:crand32,unproved:2:read only
 pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: u32, __param_d: *mut crand32_uniform_dist) -> i32 {
     var __local_r: u64
 
     loop {
-        (__local_r = ((((crand32_uint_r(__param_rng, __param_stream) as u64) *% ((*__param_d).range as u64)) as u64)))
+        (__local_r = (((((*__param_rng).uint_r(__param_stream) as u64) *% ((*__param_d).range as u64)) as u64)))
 
         if not (((if ((__local_r as u32)) < (*__param_d).threshold: 1 else: 0) != 0)) {
             break
@@ -450,9 +354,108 @@ pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: u32, 
 
 }
 
-// contract: unproved:0:read only
-pub unsafe fn crand32_uniform(__param_d: *mut crand32_uniform_dist) -> i64 {
-    return ((crand32_uniform_r(_stc32(), (1 as u32), __param_d) as i64))
+impl crand32 {
+    pub fn seed_r(__param_seed: u32) {
+        let __param_rng: *mut crand32 = (self as *const crand32) as *mut crand32
+        var __local_s: *mut u32 = ((&raw const (unsafe *__param_rng).data[0] as *mut u32))
+
+        ((unsafe __local_s[0]) = ((((__param_seed as u32) *% (2654435769 as u32)) as u32)))
+
+        ((unsafe __local_s[0]) = ((unsafe __local_s[0]) as u32) ^ ((((unsafe __local_s[0]) as u32) >> (16 as u32)) as u32))
+
+        ((unsafe __local_s[1]) = (((((unsafe __local_s[0]) as u32) *% (569420461 as u32)) as u32)))
+
+        ((unsafe __local_s[1]) = ((unsafe __local_s[1]) as u32) ^ ((((unsafe __local_s[1]) as u32) >> (15 as u32)) as u32))
+
+        ((unsafe __local_s[2]) = (((((unsafe __local_s[1]) as u32) *% (1935289751 as u32)) as u32)))
+
+        ((unsafe __local_s[2]) = ((unsafe __local_s[2]) as u32) ^ ((((unsafe __local_s[2]) as u32) >> (15 as u32)) as u32))
+
+        ((unsafe __local_s[3]) = __param_seed)
+
+    }
+
+    pub fn uint_r(__param_stream: u32) -> u32 {
+        let __param_rng: *mut crand32 = (self as *const crand32) as *mut crand32
+        var __local_s: *mut u32 = ((&raw const (unsafe *__param_rng).data[0] as *mut u32))
+
+        var __local_result: u32 = with 0 as __ci_expr_seq_6 {
+            ((unsafe __local_s[3]) = ((unsafe __local_s[3]) +% __param_stream))
+            ((((((unsafe __local_s[0]) as u32) ^ ((unsafe __local_s[3]) as u32)) as u32) +% ((unsafe __local_s[1]) as u32)) as u32)
+        }
+
+        ((unsafe __local_s[0]) = (((((unsafe __local_s[1]) as u32) ^ ((((unsafe __local_s[1]) as u32) >> (9 as u32)) as u32)) as u32)))
+
+        ((unsafe __local_s[1]) = (((((unsafe __local_s[2]) as u32) +% ((((unsafe __local_s[2]) as u32) << (3 as u32)) as u32)) as u32)))
+
+        ((unsafe __local_s[2]) = (((((((((unsafe __local_s[2]) as u32) << (21 as u32)) as u32) | ((((unsafe __local_s[2]) as u32) >> (11 as u32)) as u32)) as u32) +% (__local_result as u32)) as u32)))
+
+        return __local_result
+
+    }
+
+    pub fn real_r(__param_stream: u32) -> f64 {
+        let __param_rng: *mut crand32 = (self as *const crand32) as *mut crand32
+        return ((unsafe { (*__param_rng).uint_r(__param_stream) } as f64) * 2.3283064365386963e-10)
+
+    }
+
+}
+
+impl crand32_uniform_dist {
+    pub fn crand32_uniform() -> i64 {
+        let __param_d: *mut crand32_uniform_dist = (self as *const crand32_uniform_dist) as *mut crand32_uniform_dist
+        return ((unsafe { crand32_uniform_r(_stc32(), (1 as u32), __param_d) } as i64))
+
+    }
+
+}
+
+impl crand64 {
+    pub fn seed_r(__param_seed: u64) {
+        let __param_rng: *mut crand64 = (self as *const crand64) as *mut crand64
+        var __local_s: *mut u64 = ((&raw const (unsafe *__param_rng).data[0] as *mut u64))
+
+        ((unsafe __local_s[0]) = ((((__param_seed as u64) *% (((0 as u64) -% 7046029254386353131) as u64)) as u64)))
+
+        ((unsafe __local_s[0]) = ((unsafe __local_s[0]) as u64) ^ ((((unsafe __local_s[0]) as u64) >> (30 as u32)) as u64))
+
+        ((unsafe __local_s[1]) = (((((unsafe __local_s[0]) as u64) *% (((0 as u64) -% 4658895280553007687) as u64)) as u64)))
+
+        ((unsafe __local_s[1]) = ((unsafe __local_s[1]) as u64) ^ ((((unsafe __local_s[1]) as u64) >> (27 as u32)) as u64))
+
+        ((unsafe __local_s[2]) = (((((unsafe __local_s[1]) as u64) *% (((0 as u64) -% 7723592293110705685) as u64)) as u64)))
+
+        ((unsafe __local_s[2]) = ((unsafe __local_s[2]) as u64) ^ ((((unsafe __local_s[2]) as u64) >> (31 as u32)) as u64))
+
+        ((unsafe __local_s[3]) = __param_seed)
+
+    }
+
+    pub fn uint_r(__param_stream: u64) -> u64 {
+        let __param_rng: *mut crand64 = (self as *const crand64) as *mut crand64
+        var __local_s: *mut u64 = ((&raw const (unsafe *__param_rng).data[0] as *mut u64))
+
+        var __local_result: u64 = with 0 as __ci_expr_seq_6 {
+            ((unsafe __local_s[3]) = ((unsafe __local_s[3]) +% __param_stream))
+            ((((((unsafe __local_s[0]) as u64) ^ ((unsafe __local_s[3]) as u64)) as u64) +% ((unsafe __local_s[1]) as u64)) as u64)
+        }
+
+        ((unsafe __local_s[0]) = (((((unsafe __local_s[1]) as u64) ^ ((((unsafe __local_s[1]) as u64) >> (11 as u32)) as u64)) as u64)))
+
+        ((unsafe __local_s[1]) = (((((unsafe __local_s[2]) as u64) +% ((((unsafe __local_s[2]) as u64) << (3 as u32)) as u64)) as u64)))
+
+        ((unsafe __local_s[2]) = (((((((((unsafe __local_s[2]) as u64) << (24 as u32)) as u64) | ((((unsafe __local_s[2]) as u64) >> (40 as u32)) as u64)) as u64) +% (__local_result as u64)) as u64)))
+
+        return __local_result
+
+    }
+
+    pub fn real_r(__param_stream: u64) -> f64 {
+        let __param_rng: *mut crand64 = (self as *const crand64) as *mut crand64
+        return ((((unsafe { (*__param_rng).uint_r(__param_stream) } as u64) >> (11 as u32)) as f64) * 1.1102230246251565e-16)
+
+    }
 
 }
 
@@ -460,6 +463,15 @@ impl crand64_normal_dist {
     pub mut fn crand64_normal() -> f64 {
         let __param_d: *mut crand64_normal_dist = self as *mut crand64_normal_dist
         return unsafe { crand64_normal_r(_stc64(), (1 as u64), __param_d) }
+
+    }
+
+}
+
+impl crand64_uniform_dist {
+    pub fn crand64_uniform() -> i64 {
+        let __param_d: *mut crand64_uniform_dist = (self as *const crand64_uniform_dist) as *mut crand64_uniform_dist
+        return unsafe { crand64_uniform_r(_stc64(), (1 as u64), __param_d) }
 
     }
 

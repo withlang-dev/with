@@ -36,8 +36,8 @@ pub fn Stack.new[T]() -> Stack[T]:
 
 impl[T] Stack[T]:
     pub fn len() -> isize:
-        comptime if stc_is_word[T](): unsafe { stc_word_stack_size(&raw const self.words) } as isize
-        else: unsafe { stc_slot_stack_size(&raw const self.slots) } as isize
+        comptime if stc_is_word[T](): self.words.size() as isize
+        else: self.slots.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T):

@@ -35,8 +35,8 @@ pub fn Queue.new[T]() -> Queue[T]:
 
 impl[T] Queue[T]:
     pub fn len() -> isize:
-        comptime if stc_is_word[T](): unsafe { stc_word_queue_size(&raw const self.words) } as isize
-        else: unsafe { stc_slot_queue_size(&raw const self.slots) } as isize
+        comptime if stc_is_word[T](): self.words.size() as isize
+        else: self.slots.size() as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T):
@@ -84,9 +84,9 @@ impl[T] Queue[T]:
     /// Views of the values, front to back (D44: traversal observes).
     pub fn iter() -> QueueIter[T]:
         comptime if stc_is_word[T]():
-            QueueIter { words: unsafe { stc_word_queue_begin(&raw const self.words) }, slots: stc_slot_queue_iter.zeroed() }
+            QueueIter { words: self.words.begin(), slots: stc_slot_queue_iter.zeroed() }
         else:
-            QueueIter { words: stc_word_queue_iter.zeroed(), slots: unsafe { stc_slot_queue_begin(&raw const self.slots) } }
+            QueueIter { words: stc_word_queue_iter.zeroed(), slots: self.slots.begin() }
 
 impl[T] Drop for Queue[T]:
     move fn drop():
@@ -94,7 +94,7 @@ impl[T] Drop for Queue[T]:
             unsafe { stc_word_queue_drop(&raw const self.words) }
             unsafe { stc_slot_queue_drop(&raw const self.slots) }
         else:
-            var cursor = unsafe { stc_slot_queue_begin(&raw const self.slots) }
+            var cursor = self.slots.begin()
             while cursor.ref as i64 != 0:
                 unsafe { stc_slot_release(unsafe { *cursor.ref } as *mut StcSlot[T]) }
                 cursor.next()

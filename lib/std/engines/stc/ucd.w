@@ -237,7 +237,6 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
@@ -258,7 +257,6 @@ unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_cha
 
 }
 
-// contract: unproved:0:read only
 unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
