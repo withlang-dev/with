@@ -33,15 +33,17 @@ fn main:
     assert(migrated_unit.contains("__param_v: *mut i32"))
     assert(not migrated_unit.contains("__param_v[0]"))
     var main_text = "use da.unit\nuse da.defs\nfn main:\n"
+    // `field` only reads through its `struct holder *`: a `&self` method
+    // (D159 Amendment 2), called safely; nothing here needs `unsafe`.
+    assert(migrated_unit.contains("    pub fn field() -> i32"))
     main_text = main_text ++ "    var held = holder { f: [10 as c_char; 4] }\n"
-    main_text = main_text ++ "    unsafe:\n"
-    main_text = main_text ++ "        assert(plain() == 7)\n"
-    main_text = main_text ++ "        assert(paren() == 8)\n"
-    main_text = main_text ++ "        assert(through_macro() == 9)\n"
-    main_text = main_text ++ "        assert(field(&raw mut held) == 10)\n"
-    main_text = main_text ++ "        assert(twice() == 11)\n"
-    main_text = main_text ++ "        assert(stores() == 12)\n"
-    main_text = main_text ++ "        assert(calls() == 13)\n"
+    main_text = main_text ++ "    assert(plain() == 7)\n"
+    main_text = main_text ++ "    assert(paren() == 8)\n"
+    main_text = main_text ++ "    assert(through_macro() == 9)\n"
+    main_text = main_text ++ "    assert(held.field() == 10)\n"
+    main_text = main_text ++ "    assert(twice() == 11)\n"
+    main_text = main_text ++ "    assert(stores() == 12)\n"
+    main_text = main_text ++ "    assert(calls() == 13)\n"
     p7_write(case_dir, "src/main.w", main_text)
     let executed = p7_run(case_dir, "deref_of_array_run", "run\0src/main.w\0")
     p7_assert_success(executed, "run the migrated dereferences")
