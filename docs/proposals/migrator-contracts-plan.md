@@ -197,6 +197,22 @@ the engine never frees (`stored-unknown`: the facade's slot lifetime).
 rewrites the file; the lane compares the promoted file against the fresh
 migration's, exactly as it compares the modules).
 
+*Step 4 status (2026-10-25, branch `migrator-contracts-4`):* the gate is the
+promotion itself, which D112 already makes a deliberate, human act with a
+stated trigger: the promoted `contracts.tsv` is in git, so the PR shows every
+proof that moved, and the promote now prints those lines (`+`/`-` per
+function) before it copies, beside the trigger. The artifact is under the
+stamped modules hash (`corpus_dir_listing`), so a hand edit of it fails the
+corpus's integrity check exactly as an edited module does; the integrity
+target takes it as an input. The drift report prints the same diff for a
+fresh migration against the promoted artifact (it never gates, D112: a
+migrator change alone never re-promotes a corpus, so a red there would be
+permanent). Corpora promoted before the artifact existed carry none and
+hash as before; STC was re-stamped under the rule. The two follow-ups the
+ruling left open are briefs: a `&self` receiver for the read-only surface
+(427 STC rows, the facades' `size`/`top`/`at`), and an owned parameter
+stored into a record ((b) emission: the record would hold the owned value).
+
 ## What is deliberately not inferred
 
 - A read-only first pointer (no `&self` receiver): not in the ruling.

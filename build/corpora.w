@@ -161,6 +161,16 @@ pub fn run_corpus_promote_action(ctx: ActionCtx) -> i32:
     let destination = ctx.output()
     if corpus_check_generated(ctx, corpus, generated, ctx.inputs()[1]) != 0: return 1
     if fs.mkdir_all(destination) != 0: return corpus_fail(ctx, "cannot create " ++ destination)
+    // D159 step 4: the proofs this promotion moves, named before the copy,
+    // so the reviewer of the promotion reads them with the trigger.
+    let promoted_contracts = destination ++ "/contracts.tsv"
+    let fresh_contracts = generated ++ "/contracts.tsv"
+    if fs.exists(fresh_contracts):
+        let now = if fs.exists(promoted_contracts): fs.read_text(promoted_contracts) else: ""
+        let moved = corpus_contract_diff_lines(now, fs.read_text(fresh_contracts))
+        if moved.len() > 0:
+            print(corpus.name ++ f": {moved.len()} contract line(s) move with this promotion (" ++ promoted_contracts ++ "):")
+            for line in moved: print(line)
     for path in fs.list_files(destination):
         if path.ends_with(".w") and fs.remove_file(path) != 0: return corpus_fail(ctx, "cannot remove " ++ path)
     var copied = 0
@@ -250,12 +260,27 @@ fn corpus_migrator_generation(ctx: &ActionCtx) -> str:
     for path in corpus_migrator_sources(): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
     corpus_sha256_text(listing)
 
-/// One directory's modules, by path and content.
+/// One directory's modules, by path and content; the contracts the bodies
+/// prove (D159 step 4, `contracts.tsv`) with them, so the artifact is what
+/// promotion wrote too, never a hand's.
 fn corpus_dir_listing(ctx: &ActionCtx, dir: &str) -> str:
     var listing = ""
     for path in corpus_sorted(ctx.fs().list_files(dir)):
-        if path.ends_with(".w"): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
+        if path.ends_with(".w") or path.ends_with("/contracts.tsv"): listing = listing ++ path ++ "\t" ++ ctx.fs().sha256_file(path) ++ "\n"
     listing
+
+/// D159 step 4: the contract lines a migration adds and removes against a
+/// promoted artifact, one per function whose proof moved, so a human sees
+/// them at the promotion and in the drift report.
+fn corpus_contract_diff_lines(now: &str, next: &str) -> List[str]:
+    var lines: List[str] = List.new()
+    let before = now.split("\n")
+    let after = next.split("\n")
+    for line in after:
+        if line.len() > 0 and not before.contains(line): lines.push("    + " ++ line)
+    for line in before:
+        if line.len() > 0 and not after.contains(line): lines.push("    - " ++ line)
+    lines
 
 /// Every module in the corpus's generated directories.
 fn corpus_modules_hash(ctx: &ActionCtx, corpus: &Corpus) -> str:
@@ -321,12 +346,7 @@ fn corpus_drift_lines(ctx: &ActionCtx, corpus: &Corpus) -> List[str]:
         let next = fs.read_text(fresh_contracts)
         if now != next:
             lines.push("  contracts would change: " ++ promoted_contracts)
-            let before = now.split("\n")
-            for line in next.split("\n"):
-                if line.len() > 0 and not before.contains(line): lines.push("    + " ++ line)
-            let after = next.split("\n")
-            for line in before:
-                if line.len() > 0 and not after.contains(line): lines.push("    - " ++ line)
+            for line in corpus_contract_diff_lines(now, next): lines.push(line)
     lines
 
 /// `<stem>-drift-report` (nightly, never a gate): which modules a
@@ -369,7 +389,7 @@ fn corpus_target(kind: BuildKind, corpus: &Corpus, suffix: &str, output: &str) -
 fn target_with_corpus_module_inputs(target: Target, ctx: &BuildCtx, corpus: &Corpus) -> Target:
     var out = target
     for path in ctx.fs().list_files(corpus.corpus_dir):
-        if path.ends_with(".w") and not path.ends_with("/bundle.w"): out = out.input(path.clone())
+        if (path.ends_with(".w") and not path.ends_with("/bundle.w")) or path.ends_with("/contracts.tsv"): out = out.input(path.clone())
     out
 
 /// The generic pipeline: fetch, extract, prepare, migrate, check, promote,
