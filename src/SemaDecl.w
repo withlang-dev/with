@@ -2741,6 +2741,22 @@ impl Sema:
         self.generic_subst_type_ids = saved_subst_tys
         resolved
 
+    // #1002: an impl defines every method its trait declares without a
+    // default body. One left out was accepted, and a call through `&dyn`
+    // reached the vtable's empty slot and trapped with no diagnostic.
+    mut fn check_trait_impl_complete(trait_sym: i32, impl_node: i32):
+        if not self.trait_lookup.contains(trait_sym) or self.ast.get_data0(impl_node) == 0:
+            return
+        let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
+        let mt_start: i32 = self.trait_method_starts[trait_idx]
+        for mi in 0..self.trait_method_counts[trait_idx]:
+            let mt_idx = mt_start + mi
+            if self.trait_method_default_bodies[mt_idx] != 0:
+                continue
+            let method_sym: i32 = self.trait_method_names[mt_idx]
+            if self.impl_decl_has_method(impl_node, method_sym) == 0:
+                self.emit_error(f"impl of `{self.pool_resolve(trait_sym)}` for `{self.pool_resolve(self.ast.get_data0(impl_node))}` does not define `{self.pool_resolve(method_sym)}`, which the trait declares with no default body", impl_node)
+
     mut fn register_trait_default_method_for_impl(trait_sym: i32, impl_node: i32):
         if not self.trait_lookup.contains(trait_sym):
             return
@@ -3307,6 +3323,7 @@ impl Sema:
                 self.sealed_impl_counts.insert(trait_sym, 1)
                 self.sealed_impl_types.push(type_name)
 
+        self.check_trait_impl_complete(trait_sym, node)
         self.register_trait_default_method_for_impl(trait_sym, node)
 
 fn sema_trait_method_flag_generic -> i32: 4

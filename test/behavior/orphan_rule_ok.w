@@ -12,7 +12,7 @@ impl Describable for i32:
 type Point { x: i32, y: i32 }
 
 impl Debug for Point:
-    fn debug(self: &Self) -> str:
+    fn debug_str(self: &Self) -> str:
         "Point"
 
 fn main:
