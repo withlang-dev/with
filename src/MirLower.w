@@ -9289,11 +9289,7 @@ impl MirBuilder:
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
-        let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
-        let one_op = self.int_const_operand(1, elem_ty)
-        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.lower_range_step(counter_place, end_place, elem_ty, inclusive, header_bb, exit_bb, self.ast.get_start(iter_expr))
 
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
@@ -9344,11 +9340,7 @@ impl MirBuilder:
         self.lower_comprehension_body(comp_node, clause_index, out_place, out_elem_ty, inc_bb)
 
         self.switch_to(inc_bb)
-        let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
-        let one_op = self.int_const_operand(1, elem_ty)
-        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(range_node))
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.lower_range_step(counter_place, end_place, elem_ty, inclusive, header_bb, exit_bb, self.ast.get_start(range_node))
 
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
@@ -9784,16 +9776,27 @@ impl MirBuilder:
 
         // Increment
         self.switch_to(inc_bb)
-        let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
-        let one_op = self.int_const_operand(1, elem_ty)
-        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(iter_expr))
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.lower_range_step(counter_place, end_place, elem_ty, inclusive, header_bb, exit_bb, self.ast.get_start(iter_expr))
 
         self.pop_control_target()
         self.switch_to(exit_bb)
         self.forget_string_flow_facts()
         self.unit_operand()
+
+    // #923: a range loop's step. The last value of `a..=b` is b, and stepping
+    // past it overflows when b is the type's maximum (`250..=255` over u8
+    // panicked "u8 addition out of range" after its sixth pass), so an
+    // inclusive loop leaves at b instead of stepping.
+    mut fn lower_range_step(counter_place: i32, end_place: i32, elem_ty: i32, inclusive: i32, header_bb: BlockId, exit_bb: BlockId, span: i32):
+        if inclusive != 0:
+            let step_bb = self.new_block()
+            self.lower_debug_counter_test(counter_place, end_place, BinaryOp.OP_EQ, exit_bb, step_bb)
+            self.switch_to(step_bb)
+        let cur_op = self.body.new_operand(OperandKind.OK_COPY, counter_place)
+        let one_op = self.int_const_operand(1, elem_ty)
+        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op, one_op)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, span)
+        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
 
     mut fn lower_for_range(for_node: i32, pat_or_sym: i32, range_node: i32, body_expr: i32) -> i32:
         // for i in start..end  →  counter = start; while counter < end: body; counter += 1
@@ -9865,11 +9868,7 @@ impl MirBuilder:
 
         // Increment: counter = counter + 1, goto header
         self.switch_to(inc_bb)
-        let cur_op2 = self.body.new_operand(OperandKind.OK_COPY, counter_place)
-        let one_op = self.int_const_operand(1, elem_ty)
-        let add_rv = self.body.new_rvalue(RvalueKind.RK_BIN_OP, BinaryOp.OP_ADD, cur_op2, one_op)
-        self.body.push_stmt(self.cur_bb, StmtKind.Assign, counter_place, add_rv, self.ast.get_start(range_node))
-        self.terminate(TermKind.TK_GOTO, header_bb, 0, 0, 0)
+        self.lower_range_step(counter_place, end_place, elem_ty, inclusive, header_bb, exit_bb, self.ast.get_start(range_node))
 
         self.pop_control_target()
         self.switch_to(exit_bb)
