@@ -141,6 +141,11 @@ install/update targets from Path A.
 
 There are two valid bootstrap paths.
 
+In both, `LLVM_PREFIX` names an SDK inside the checkout: the build reads only
+under the project root and refuses a prefix outside it (#2353). An SDK built
+or unpacked elsewhere is linked in (`ln -s /path/to/llvm-static-sdk .deps/`)
+and named by its `.deps` path.
+
 ### Path A: Existing With Seed
 
 Use this when a working With seed already exists for the host.
