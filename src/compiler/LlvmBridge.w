@@ -1406,10 +1406,14 @@ fn wl_get_fn_param_type(fn_ty: i64, index: i32) -> i64:
     unsafe:
         let count = LLVMCountParamTypes(fn_ty as *mut u8)
         if index as u32 >= count: return 0
-        var params: [128]i64 = [0 as i64; 128]
-        let actual_count = if count > 128: 128 else: count
-        LLVMGetParamTypes(fn_ty as *mut u8, &params as *mut *mut u8)
-        params[index]
+        // #1026: LLVMGetParamTypes writes every parameter's type, so the
+        // buffer is as long as the function type says; a fixed 128 slots
+        // overran for a wider function. (The bridge builds without std.)
+        let params = with_alloc(count as i64 * 8) as *mut i64
+        LLVMGetParamTypes(fn_ty as *mut u8, params as *mut *mut u8)
+        let ty = *((params as i64 + index as i64 * 8) as *mut i64)
+        with_free(params as *mut u8)
+        ty
 
 // ── Module verification / emission ──────────────────────────────
 
