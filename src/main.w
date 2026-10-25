@@ -2205,13 +2205,11 @@ fn build_pool_width() -> i32:
     if parsed > 0:
         if parsed > 32: return 32
         return parsed
-    // The pool is as wide as the machine: a lane divides its inner test
-    // window by the width (build_pool_spawn), so lanes multiply across
-    // cores rather than into oversubscription.
-    let cores = build_graph_rt_cpu_cores()
-    if cores < 2:
-        return 1
-    if cores > 32: 32 else: cores
+    // The pool is as wide as the machine, bounded by its memory (#2603: an
+    // 18-core container with 7.7 GiB ran 18 lanes and was killed): a lane
+    // divides its inner test window by the width (build_pool_spawn), so
+    // lanes multiply across cores rather than into oversubscription.
+    build_graph_pool_width_for(build_graph_rt_cpu_cores(), build_graph_rt_memory_total())
 
 // Spawn an allow_parallel action target's worker without blocking; the env
 // dance mirrors run_build_test_worker_process (single-threaded driver, so

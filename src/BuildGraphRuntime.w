@@ -121,8 +121,26 @@ type BuildGraphSysInfo {
 
 fn build_graph_rt_cpu_cores() -> i32:
     var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
-    let _ = with_sysinfo(&info as *mut u8)
+    with_sysinfo(&info as *mut u8)
     info.cpu_cores
+
+// The machine's memory in bytes; 0 when the host does not say.
+fn build_graph_rt_memory_total() -> i64:
+    var info = BuildGraphSysInfo { cpu_cores: 0, memory_total: 0, page_size: 0 }
+    with_sysinfo(&info as *mut u8)
+    info.memory_total
+
+// The lane pool's width for a machine (#2603): one lane per core, bounded
+// by the memory at two gibibytes a lane (a stage2 compile peaks near 1.7
+// GiB), never below one lane and never above 32; an unknown memory total
+// (0) does not bound it.
+fn build_graph_pool_width_for(cores: i32, memory_total: i64) -> i32:
+    var width = if cores < 2: 1 else: if cores > 32: 32 else: cores
+    if memory_total > 0:
+        let by_memory = memory_total / (2 * 1024 * 1024 * 1024)
+        let lanes = if by_memory < 1: 1 else: if by_memory > 32: 32 else: by_memory as i32
+        if lanes < width: width = lanes
+    width
 
 fn build_graph_rt_clock_nanos() -> i64:
     with_clock_nanos()

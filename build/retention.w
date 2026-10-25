@@ -757,7 +757,10 @@ fn ret_driver_ancestry_verdict(ctx: &ActionCtx, expected: &str, version: &str) -
     let probe: List[str] = List.new()
     probe.push("sh")
     probe.push("-c")
-    probe.push("p=$PPID; n=0; while [ \"$p\" -gt 1 ] && [ $n -lt 8 ]; do e=$(readlink /proc/$p/exe 2>/dev/null || ps -o comm= -p $p 2>/dev/null); echo \"$e\"; p=$(ps -o ppid= -p $p 2>/dev/null | tr -d ' '); [ -n \"$p\" ] || break; n=$((n+1)); done")
+    // The walk includes pid 1: in a container the driver itself is pid 1
+    // (#2604), and skipping it left the identity unverified; the parent of
+    // pid 1 is 0, where the walk stops.
+    probe.push("p=$PPID; n=0; while [ \"$p\" -gt 0 ] && [ $n -lt 8 ]; do e=$(readlink /proc/$p/exe 2>/dev/null || ps -o comm= -p $p 2>/dev/null); echo \"$e\"; p=$(ps -o ppid= -p $p 2>/dev/null | tr -d ' '); [ -n \"$p\" ] || break; n=$((n+1)); done")
     let ancestors = ret_run_lines(ctx, "driver-ancestry", probe, 30000)
     var seen: List[str] = List.new()
     for i in 0..ancestors.len():
