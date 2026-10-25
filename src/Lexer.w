@@ -359,13 +359,15 @@ impl Lexer:
                     if self.emit_comments != 0:
                         return TokenKind.TK_COMMENT
                     return self.next_token()
-                if c2 == CharCode.Eq:  // /=
-                    self.pos = self.pos + 2
-                    return TokenKind.TK_SLASH_EQ
             // #2233: first on its line outside every bracket, `/` opens a
             // statement; the previous line's last token says nothing.
+            // #2525: decided before `/=`: where a regex can start, `/=` has no
+            // left operand to divide, so `/=> x/` is a regex beginning with `=`.
             if (self.line_start != 0 and self.bracket_depth == 0) or lexer_slash_starts_regex(self.last_sig_tag) != 0:
                 return self.lex_regex()
+            if self.pos + 1 < slen and src[(self.pos + 1)] == CharCode.Eq:  // /=
+                self.pos = self.pos + 2
+                return TokenKind.TK_SLASH_EQ
             self.pos = self.pos + 1
             return TokenKind.TK_SLASH
 
