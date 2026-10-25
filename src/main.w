@@ -782,7 +782,13 @@ fn cli_one_liner_bin_path -> str:
     // extensionless relative binary the compiler launches, so `with -e`
     // and `-p` exited silently on native Windows (#1081).
     let suffix = if with_sysinfo_os() == "Windows": ".exe" else: ""
-    f"out/tmp/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}" ++ suffix
+    cli_one_liner_out_dir() ++ f"/with-cli-one-liner-{with_getpid()}-{with_clock_nanos()}" ++ suffix
+
+// #2354: a one-liner is a grep or a sed; it leaves nothing in the directory
+// it runs in. Its binary and every link artifact (WITH_OUT_DIR, which
+// link_stage_artifact_root reads) go under the user's cache, not `out/`.
+fn cli_one_liner_out_dir -> str:
+    with_user_cache_dir() ++ "/with/one-liners"
 
 fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
     let _ = argc
@@ -800,6 +806,10 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
     let source = synthetic.source
     let source_name = cli_one_liner_source_name(one.mode, one.code_parts.len() as i32)
     let bin_path = cli_one_liner_bin_path()
+    let _out_dir = build_graph_rt_mkdir_p(cli_one_liner_out_dir())
+    let saved_out_dir = build_graph_rt_getenv("WITH_OUT_DIR") ++ ""
+    if saved_out_dir.len() == 0:
+        let _set_out_dir = build_graph_rt_setenv("WITH_OUT_DIR", cli_one_liner_out_dir())
     var comp = Compilation.init()
     comp.configure(one.opt_level, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
@@ -813,6 +823,7 @@ fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode:
             synthetic.source_texts[mi],
         )
     let built = comp.build_entry_binary_from_source_to_path(source_name, source, bin_path)
+    let _restore_out_dir = build_graph_rt_setenv("WITH_OUT_DIR", saved_out_dir)
     if built == "":
         return 1
     comp.print_warnings()
