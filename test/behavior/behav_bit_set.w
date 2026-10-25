@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// BitSet over the STC cbits (docs/proposals/stdlib_sourcing_plan.md Phase
+// BitSet over the STC cbits (stdlib_sourcing_plan.md Phase
 // 3): set, clear, flip and test, count, resize, and the set-bit traversal.
 
 use std.collections.bit_set.BitSet

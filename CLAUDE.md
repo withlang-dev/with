@@ -700,6 +700,21 @@ Read the relevant source. Confirm AST layouts and naming conventions. When you
 can't find something, grep `examples/`, `src/` and `docs/spec/README.md`
 before assuming it doesn't exist. Never rely on memory.
 
+### Source never names a document's path
+
+Code cites a ruling by its D-number, the spec by its section (§), and any
+other document by its file name alone (`wo_bundles.md`, never
+`docs/spec/toolchain/wo_bundles.md`). A document's directory moves
+(`proposals/` becomes `completed/`); a path to it made moving one proposal
+change 31 source files and cost a battery (#2632). `doc-path-check` (in the
+gate) refuses a `docs/…md` path in `src/`, `build/`, `lib/`, `tools/`,
+`rt/` and `test/`, except a file the program itself reads or writes.
+
+Moving, renaming or archiving a document is a docs-only change: it touches
+`docs/` and nothing else, takes `spec-inventory-check` only, and never a
+battery. The battery agrees: it exits GREEN without running when the
+committed sources already have a published green (`:sources-green`).
+
 ### Code style — write the least ceremony
 
 Match the surrounding code and the mission at the character level:

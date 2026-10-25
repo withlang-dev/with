@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// PriorityQueue[T] over the STC pqueue (docs/proposals/stdlib_sourcing_plan.md
+// PriorityQueue[T] over the STC pqueue (stdlib_sourcing_plan.md
 // Phase 3): max and min ordering, peek observes, pop transfers, and
 // exactly-once drops of Drop-class values left in a dropped queue.
 

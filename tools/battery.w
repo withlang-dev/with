@@ -5,6 +5,9 @@
 // Run it from a worktree's root with the pinned seed at src/main (`with build
 // :seed` once per seed.lock bump). It
 //   1. refuses a dirty tree: a battery blesses committed sources (D49);
+//   1a. exits GREEN without running when these sources already have a
+//      published green (`:sources-green`): a docs-only change never costs a
+//      battery;
 //   2. takes one of two machine-wide battery slots, so a third battery cannot
 //      start by accident (a slot whose owner died is reclaimed);
 //   3. runs ONE `src/main build :battery` (the gate, battery-uat and
@@ -245,6 +248,20 @@ if not tree_is_clean():
 clear_runtime_dirs_on_seed_change()
 assert(sh("git rev-parse --short HEAD > out/battery/head.txt") == 0)
 let head = first_line("out/battery/head.txt")
+// Sources a battery already passed have nothing to bless: the green is keyed
+// on the committed inputs without docs/ and top-level *.md (D49), so a change
+// confined to documents finds its parent's green and costs no run. Asked
+// before a slot is taken; it builds nothing.
+assert(sh("git rev-parse HEAD > out/battery/head-full.txt") == 0)
+let green_ask = "WITH=$PWD/src/main WITH_DRIVER_SHA256=" ++ sha256_of_file("src/main") ++ " WITH_SOURCES_COMMIT=" ++ first_line("out/battery/head-full.txt") ++ " src/main build :sources-green > out/battery/sources-green.log 2>&1"
+if sh(green_ask) == 0:
+    let said = read_file("out/battery/sources-green.log") ?? ""
+    var recorded = ""
+    for line in said.split("\n"):
+        if line.contains("these sources are green"): recorded = line.to_owned()
+    assert(write_file("out/battery/status.txt", f"{head} {env(\"PWD\")}\n" ++ recorded ++ "\nGREEN\nBATTERY_DONE\n") == 0)
+    print(f"battery: {head} — these sources are already green; nothing to run ({recorded.trim()})")
+    exit_code(0)
 let cwd = env("PWD")
 let slot = take_slot(f"{pid()}\t{cwd}\t{head}\n")
 if slot.len() == 0:

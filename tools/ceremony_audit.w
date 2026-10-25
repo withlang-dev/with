@@ -1,7 +1,7 @@
 // with run tools/ceremony_audit.w [--with <compiler>] [--scratch <dir>] [--fix] <file.w | file.md>...
 //
 // Reports what a With source spells that the compiler already decides
-// (#2140; docs/mission.md: "every character the program has already
+// (#2140; mission.md: "every character the program has already
 // determined is a compiler failure if the programmer still writes it"):
 //
 //   return-type   `fn f(...) -> T:` where the body decides T

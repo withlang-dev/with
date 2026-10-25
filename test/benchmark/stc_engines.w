@@ -1,4 +1,4 @@
-// STC engine benchmark (docs/proposals/stdlib_sourcing_plan.md, Phase 3: the
+// STC engine benchmark (stdlib_sourcing_plan.md, Phase 3: the
 // facade map's primary engines against the comparison engines, under one
 // compilation). Each facade owns its values and reaches the engine through
 // slot pointers, so the comparison measures the whole facade. Prints

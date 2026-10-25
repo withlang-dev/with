@@ -1008,16 +1008,35 @@ pub fn run_last_green_action(ctx: ActionCtx) -> i32:
 fn ret_green_by_identity(ctx: &ActionCtx) -> bool:
     let fs = ctx.fs()
     let seed_input = if fs.exists("out/.build-state/seed-input.json"): fs.read_text("out/.build-state/seed-input.json") else: ""
-    let seeded_by = ret_json_field(seed_input, "sha256")
-    // the chain here was seeded by a compiler seed.lock pins
-    if seeded_by.len() != 64 or not seed_lock_read(fs).contains(seeded_by): return false
-    let identity = ret_source_identity(ctx, seeded_by)
+    ret_green_commit(ctx, ret_json_field(seed_input, "sha256")).len() > 0
+
+/// The commit a published green for this clean tree driven by `driver_sha`
+/// was recorded at, or "": the one lookup behind `:install-user`,
+/// `require-last-green` and `sources-green`.
+fn ret_green_commit(ctx: &ActionCtx, driver_sha: &str) -> str:
+    let fs = ctx.fs()
+    // the chain is driven by a compiler seed.lock pins
+    if driver_sha.len() != 64 or not seed_lock_read(fs).contains(driver_sha): return ""
+    let identity = ret_source_identity(ctx, driver_sha)
     let line = ret_green_store_line(fs.host_read_text(ret_green_store_path()), identity)
-    if line.len() == 0: return false
+    if line.len() == 0: return ""
     let fields = line.split("\t")
-    let commit = if fields.len() > 1: fields[1].clone() else: ""
+    let commit = if fields.len() > 1: fields[1].clone() else: "unknown"
     print("[" ++ ctx.target_name() ++ "] these sources are green: recorded at commit " ++ commit ++ " (" ++ ret_green_store_path() ++ ")")
-    true
+    commit
+
+/// `sources-green`: exit 0 when the committed sources at HEAD, driven by
+/// the pinned seed, already have a published green. tools/battery.w passes
+/// the seed's digest and the full HEAD commit (both keyed, so a cached
+/// answer is never another commit's) and skips the run on 0. A green is
+/// keyed on the inputs without docs/ and top-level *.md (D49), so a change
+/// confined to documents finds its parent's green.
+pub fn run_sources_green_action(ctx: ActionCtx) -> i32:
+    let driver = ctx.env_input("WITH_DRIVER_SHA256")
+    let head = ctx.env_input("WITH_SOURCES_COMMIT")
+    if head.len() < 40: return ret_fail(ctx, "WITH_SOURCES_COMMIT names no commit")
+    if ret_green_commit(ctx, driver).len() == 0: return ret_fail(ctx, "these sources have no published green")
+    ret_write_output_stamp(ctx)
 
 pub fn run_require_last_green_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()

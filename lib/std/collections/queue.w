@@ -1,5 +1,5 @@
 // std.collections.queue — Queue[T]: a first-in-first-out queue over the
-// migrated STC `queue` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the
+// migrated STC `queue` (stdlib_sourcing_plan.md, Phase 3; the
 // facade map's primary engine, a ring buffer that grows). Two shapes serve
 // it (D148): an integer scalar is stored inline as one word
 // (`stc_word_queue`, no allocation per element); any other `T` rides the

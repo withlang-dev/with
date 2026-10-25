@@ -589,7 +589,7 @@ fn emitc_compile_runtime_args(root: &str, argv: List[str]) -> List[str]:
 // mixed-world class). `--bundle-corpus std/engines/pcre2` compiles the pcre2 corpus
 // in-unit from its source: the emit-C lane links no .wo bundle, so the
 // prelude's std.regex reaches the engine as C in the same file
-// (docs/spec/toolchain/wo_bundles.md "Retiring the shim", #955).
+// (wo_bundles.md "Retiring the shim", #955).
 fn emitc_build_compiler_c(ctx: &ActionCtx, compiler_path: &str, main_c: &str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: List[str] = List.new()

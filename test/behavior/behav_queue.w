@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Queue[T] over the STC queue (docs/proposals/stdlib_sourcing_plan.md Phase
+// Queue[T] over the STC queue (stdlib_sourcing_plan.md Phase
 // 3): push at the back, pop at the front, front/back observe, traversal
 // front to back across the ring's wrap, the word shape for integer
 // scalars, exactly-once drops of values left in a dropped queue.

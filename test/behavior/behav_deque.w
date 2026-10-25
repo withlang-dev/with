@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Deque[T] over the STC deque (docs/proposals/stdlib_sourcing_plan.md Phase
+// Deque[T] over the STC deque (stdlib_sourcing_plan.md Phase
 // 3): both ends push and pop, front/back and get observe,
 // traversal, exactly-once drops of values left in a dropped deque.
 

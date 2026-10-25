@@ -1,6 +1,6 @@
 //! expect-error: argument retains access to `m` which is mutably captured by a closure in the same call (§15.7)
 
-// docs/mut.md Rev 8 §15.8 — verifies the mechanism is *not* hardcoded to
+// mut.md Rev 8 §15.8 — verifies the mechanism is *not* hardcoded to
 // the method name "iter": HashMap.keys is also marked @[iter_of_self]
 // (its std.collections declaration, D44).
 

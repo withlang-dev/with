@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// LinkedList[T] over the STC list (docs/proposals/stdlib_sourcing_plan.md
+// LinkedList[T] over the STC list (stdlib_sourcing_plan.md
 // Phase 3): push at both ends, pop at the front, front/back observe,
 // traversal, reverse and sort, the word shape for integer scalars (the
 // unsigned 64-bit order kept through the engine's signed sort),

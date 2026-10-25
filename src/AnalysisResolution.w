@@ -27,7 +27,7 @@
 // hands its value to the conversion Sema recorded (MIR knows nothing about
 // facades: a C name's bridge, case or presented view reaches MIR only as
 // those records). Phase 2 (codegen mode provenance) is
-// audit:codegen's; the plan is docs/spec/implementation/mir-sema-hardening.md.
+// audit:codegen's; the plan is mir-sema-hardening.md.
 
 use AnalysisTypes
 use Ast

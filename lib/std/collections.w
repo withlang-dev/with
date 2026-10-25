@@ -78,7 +78,7 @@ pub type HashSet[T]  {
 }
 
 /// Ordered key-value map over the migrated M*LIB B+tree
-/// (docs/completed/stdlib_sourcing_plan.md, Phase 4; #937). Each entry is
+/// (stdlib_sourcing_plan.md, Phase 4; #937). Each entry is
 /// one facade-owned record holding the key and the value; the engine orders
 /// slots it owns (clones of the key, D151) that point back at the entry,
 /// through the key comparator (std.collections.mlib_slot). Keys are kept in
@@ -707,7 +707,7 @@ pub type Atomic[T]  {
 
 // ── Scoped access ────────────────────────────────────────────────
 
-/// Scoped handle to a single List element (docs/mut.md Rev 8 §10).
+/// Scoped handle to a single List element (mut.md Rev 8 §10).
 /// Obtain via `vec.slot(index)`. Use with `with`:
 ///   with xs.slot(i) as mut s:
 ///       let v = s.get()
@@ -718,7 +718,7 @@ pub type ListSlot[T] ephemeral { data_ptr: i64, index: i64 }
 /// Obtain via `vec.iter_place()`. Each `.next()` returns `Option[ListSlot[T]]`.
 pub type ListIterPlace[T] ephemeral { data_ptr: i64, len: i64, idx: i64 }
 
-/// Scoped handle to a HashMap entry (docs/mut.md Rev 8 §10).
+/// Scoped handle to a HashMap entry (mut.md Rev 8 §10).
 /// Obtain via `map.entry(key)`. Use with `with`:
 ///   with map.entry(k) as mut e:
 ///       e.or_insert(default)

@@ -1496,7 +1496,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_expect_cli_success_exact(ctx, compiler_path, "implicit-run-forwards-driver-flags", args, "-n\n5")
     if rc != 0: return rc
 
-    // sed/awk/coreutils/jq parity (docs/spec/toolchain/improve_oneliners.md, 2026-09-03):
+    // sed/awk/coreutils/jq parity (improve_oneliners.md, 2026-09-03):
     // every idiom that works today stays working. The rows that do not
     // are #957–#961; each joins here when its gap closes.
     let parity_in = "alpha 10 x\nbeta  20 y\ngamma 30 x\nSTART\ndelta 40 y\nEND\nalpha 10 x\n"
@@ -4520,7 +4520,7 @@ fn bs_check_migrate_char_pointer_is_c_char(ctx: &ActionCtx, compiler_path: &str,
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-char-pointer", check_args)
     checked.rc
 
-// D159 step 1 (docs/proposals/migrator-contracts-plan.md): the contracts
+// D159 step 1 (migrator-contracts-plan.md): the contracts
 // artifact names, per defined function, what its body proves about the
 // pointers it is handed — and names the unproved point otherwise. One small
 // corpus exercises every verdict and every refusal: a handle mutated
@@ -9970,7 +9970,7 @@ fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, 
         if rc != 0: return rc
     0
 
-// ── D39 bundle interfaces (docs/spec/toolchain/wo_bundles.md, decisions.md D39) ──────────
+// ── D39 bundle interfaces (wo_bundles.md, decisions.md D39) ──────────
 // The `.wi` flavor, `--link-bundle`, declared (never body-inferred) callable
 // semantics, and declaration-only codegen for a bundle-provided module.
 // Fixtures: test/bundle_interface/. The bundle object is built from the demo

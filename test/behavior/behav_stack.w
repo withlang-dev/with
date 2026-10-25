@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// Stack[T] over the STC stack (docs/proposals/stdlib_sourcing_plan.md Phase
+// Stack[T] over the STC stack (stdlib_sourcing_plan.md Phase
 // 3): push and pop, peek and get observe, traversal bottom to top, the
 // word shape for integer scalars, exactly-once drops of values left in a
 // dropped stack.

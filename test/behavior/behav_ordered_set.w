@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// OrderedSet[T] over the STC sset (docs/proposals/stdlib_sourcing_plan.md
+// OrderedSet[T] over the STC sset (stdlib_sourcing_plan.md
 // Phase 3): ordered insertion, duplicates refused, get observes, remove
 // transfers, in-order traversal, exactly-once drops.
 

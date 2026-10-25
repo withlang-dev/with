@@ -157,7 +157,7 @@ fn btree_set_work(n: i32, descending: bool):
     assert(entries.len() == n / 2)
     n
 
-// Phase 1 facades over the c-algorithms corpus (docs/proposals/stdlib_sourcing_plan.md).
+// Phase 1 facades over the c-algorithms corpus (stdlib_sourcing_plan.md).
 // SortedList: ascending insertion appends (no shifting), lookups are binary
 // searches; a descending fill is O(n) per insert by contract and is not
 // measured here.
@@ -180,7 +180,7 @@ fn binary_heap_work(n: i32):
     assert(heap.is_empty())
     n
 
-// Phase 3 facades over the STC engines (docs/proposals/stdlib_sourcing_plan.md):
+// Phase 3 facades over the STC engines (stdlib_sourcing_plan.md):
 // the contracts their rows pin are O(log n) push/pop, O(log n) ordered
 // insert/lookup/remove, O(1) deque ends, O(n log n) sort.
 fn priority_queue_work(n: i32):

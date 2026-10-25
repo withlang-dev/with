@@ -195,7 +195,7 @@ impl Zcu:
         if self.last_mir_module.body_count() == 0:
             runtime_eprint("error: missing MIR input for LLVM backend")
             return false
-        // D17/#697: take-and-return (docs/spec/implementation/memory-model.md
+        // D17/#697: take-and-return (memory-model.md
         // seam rule) — sema moved in, handed back on every exit; the pools are
         // further holders (#2449).
         let sema_decls = self.last_sema.ast.decl_count()

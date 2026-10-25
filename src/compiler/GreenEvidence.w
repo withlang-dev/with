@@ -1,4 +1,4 @@
-// A green belongs to the sources (docs/meetings/2026-09-20-D49-green-evidence-is-keyed-on-what-was-tested-git-tree-pinned.md D49). `:last-green`
+// A green belongs to the sources (2026-09-20-D49-green-evidence-is-keyed-on-what-was-tested-git-tree-pinned.md D49). `:last-green`
 // publishes, keyed on what a battery tested — the git tree, the pinned seed
 // that seeded the stage chain, the host — one line per identity in
 // $WITH_GREEN_DIR, else ~/.local/with-green/green.tsv (build/retention.w
@@ -79,7 +79,7 @@ fn green_inputs_identity(root: &str) -> str:
 /// A `git status --porcelain` line that names no build input: a document —
 /// `docs/`, `benchmarks/goose/` and top-level `*.md` are outside the
 /// identity (green_identity_inputs), so one that is untracked, modified or
-/// deleted cannot dirty it (a modified docs/handoff.md refused main's
+/// deleted cannot dirty it (a modified handoff.md refused main's
 /// install 2026-10-04; an untracked benchmarks/goose/ refused its reseed
 /// 2026-10-13) — or a user's own untracked program under examples/. A
 /// rename is judged an input: its line names two paths.

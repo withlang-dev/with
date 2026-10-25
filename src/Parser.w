@@ -300,10 +300,10 @@ impl Parser:
     // D39 interface mode: the body slot of a declaration. A body in a `.wi`
     // is an error (the object holds the code); the recovery still parses it
     // so the rest of the file is diagnosed. Generic, async, gen and comptime
-    // functions cannot cross a bundle boundary (Level 0, docs/spec/abi/abi_roadmap.md).
+    // functions cannot cross a bundle boundary (Level 0, abi_roadmap.md).
     mut fn parse_interface_body(tp_count: i32, is_async: i32, is_gen: i32, is_comptime: i32) -> NodeId:
         if tp_count > 0:
-            self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, docs/spec/abi/abi_roadmap.md)")
+            self.emit_error("interface declarations cannot be generic (D39: a bundle boundary is Level 0, abi_roadmap.md)")
         if is_async != 0 or is_gen != 0 or is_comptime != 0:
             self.emit_error("interface declarations cannot be async, gen, or comptime functions (D39)")
         if self.peek() == TokenKind.TK_COLON or self.peek() == TokenKind.TK_L_BRACE:
@@ -3148,7 +3148,7 @@ impl Parser:
     // ── let decl ─────────────────────────────────────────────────────
 
     mut fn parse_top_level_let(is_pub: i32, start: i32) -> NodeId:
-        // docs/completed/mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
+        // mut.md Rev 8 §12 — `global` (stable) and `global var` (rebindable)
         // are module-level place declarations. The GLOBAL / GLOBAL_VAR markers
         // are stored in NK_LET_DECL.d2 bits 2 and 3 (see Ast.w LET_FLAG_GLOBAL /
         // LET_FLAG_GLOBAL_VAR). Plain top-level `let`/`var` (without `global`)
@@ -6792,7 +6792,7 @@ impl Parser:
         let start = self.current_start()
         self.advance()
         var op = UnaryOp.UOP_REF
-        // docs/completed/mut.md Rev 8 §13.2 — `&raw const P` / `&raw mut P`.
+        // mut.md Rev 8 §13.2 — `&raw const P` / `&raw mut P`.
         // `raw` is contextual: only treated as the raw-address-of marker when it
         // immediately follows `&` AND the next token after it is `const` or `mut`.
         // The two-token lookahead avoids stealing `&raw` where `raw` is an
@@ -9532,10 +9532,10 @@ impl Parser:
 
             var type_node: NodeId = 0 as NodeId
             var extra_flags: i32 = 0
-            // docs/completed/mut.md Rev 8 §5.1 / docs/completed/mutability.md — receiver-place modes.
+            // mut.md Rev 8 §5.1 / mutability.md — receiver-place modes.
             // Tag the param so later sema phases can enforce receiver constraints.
             let is_self_param = name != 0 and self.intern.resolve(name) == "self"
-            // #645 / docs/completed/mutability.md: parameters are implicitly rebindable; there
+            // #645 / mutability.md: parameters are implicitly rebindable; there
             // is NO `mut x: T` parameter modifier (`mut self` is the only place `mut`
             // is meaningful). Reject `mut` on a non-self parameter loudly instead of
             // silently discarding it.

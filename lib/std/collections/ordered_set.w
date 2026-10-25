@@ -1,5 +1,5 @@
 // std.collections.ordered_set — OrderedSet[T]: an ordered set over the
-// migrated STC `sset` (docs/completed/stdlib_sourcing_plan.md, Phase 3; the
+// migrated STC `sset` (stdlib_sourcing_plan.md, Phase 3; the
 // facade map's primary engine, an AA-tree). The engine orders slot pointers
 // through the facade's comparator (std.collections.stc_slot); the facade
 // owns every value.

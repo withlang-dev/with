@@ -1,4 +1,4 @@
-// D120 copy-on-write value-list microbenchmarks (docs/proposals/d120-implementation-plan.md):
+// D120 copy-on-write value-list microbenchmarks (d120-implementation-plan.md):
 //   1. Push loop through a struct field (`self.items.push(i)`).
 //   2. Element-write loop through a parameter (`xs[i] = v`).
 //   3. Share-then-mutate (`var b = a; b.push(i)`), forcing the CoW copy.

@@ -909,7 +909,7 @@ fn target_with_wo_blobs_as(target: Target, plan: &WoBundle, symbol: &str) -> Tar
 
 // `--link-bundle out/wo/<name>` for a stage compile: the interface,
 // declarations-only codegen and the object, exactly what a compiler that
-// embeds the bundle provides (docs/spec/toolchain/wo_bundles.md "Bootstrap chain").
+// embeds the bundle provides (wo_bundles.md "Bootstrap chain").
 fn target_with_link_bundle(target: Target, ctx: &BuildCtx, plan: &WoBundle) -> Target:
     var out = target
     out = out.arg("--link-bundle")
@@ -1061,7 +1061,7 @@ fn gate_fixed_targets() -> List[str]:
     // Built by push: the pinned seed evaluating build.w cannot take .len() of a
     // collection literal (the #1122 class).
     var fixed: List[str] = List.new()
-    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check corpus-promote-guard-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
+    for name in "build selfcheck reseed-check-build-w abi-hash-check unit-return-review spec-inventory-check doc-path-check sema-order-check examples-tests benchmarks-check c-migrator-basic-tests deep-debug-tool-tests user-programs-safe no-host-toolchain every-target-check source-fetch-tests source-cache-tests corpus-integrity-check corpus-promote-guard-check ceremony-check ceremony-census".split(" "): fixed.push(name.clone())
     fixed
 
 fn gate_times_ledger_path() -> str: "out/.build-state/battery-times.tsv"
@@ -1960,7 +1960,7 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
 
 // Debug-allocator fixture lane: build tools/debug_drop.w, then run it in `check`
 // mode over test/debug_alloc/*.w. Gives the floor eyes for the over/under-drop
-// blind spot it is structurally unable to see. See docs/spec/toolchain/debug-allocator.md.
+// blind spot it is structurally unable to see. See debug-allocator.md.
 // #2011: the async/cancel/defer corpus under every MIR validator. These
 // programs run green while their MIR can still drop a moved place or read a
 // released task handle; only `check --validate-all` sees that, and no lane
@@ -2545,7 +2545,7 @@ fn run_stdlib_complexity_action(ctx: ActionCtx) -> i32:
     let binary = build_project_abs(root, build_project_join(output, host_bin("stdlib-complexity")))
     let stdout_rel = build_project_join(output, "compile.stdout")
     let stderr_rel = build_project_join(output, "compile.stderr")
-    // Build-layer code is compiled by the SEED (docs/meetings/2026-07-17-D14-verification-tiering-iterate-on-one-stage-battery-gates.md D14; the
+    // Build-layer code is compiled by the SEED (2026-07-17-D14-verification-tiering-iterate-on-one-stage-battery-gates.md D14; the
     // seed-gated build-layer rule): a collection literal with moved element
     // temporaries is #1122 under seeds before 9ccd1e2d, so argv is pushed.
     var compile_args: List[str] = List.new()
@@ -3165,7 +3165,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(sdk_group_target())
     out = out.add_target(sdk_package_target(ctx))
 
-    // D38 .wo bundles (docs/spec/toolchain/wo_bundles.md, build/wo.w): one per registered
+    // D38 .wo bundles (wo_bundles.md, build/wo.w): one per registered
     // corpus (build/corpora.w), in registry order. stage1 is the first
     // compiler carrying the tree's ABI stamp, so it builds a bundle when the
     // store lacks its corpus; every later stage compiles with --link-bundle
@@ -3353,6 +3353,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     sdk_host_link_check = sdk_host_link_check.write_scope("out/command/sdk-host-link-check")
     sdk_host_link_check = sdk_host_link_check.input("build/compiler.w")
     out = out.add_target(sdk_host_link_check)
+
+    // Source never names a document's path (build/compiler.w run_doc_path_check_action).
+    var doc_path_check = target_new(.Action, "doc-path-check", "").output("out/.build-state/doc-path-check.txt")
+    doc_path_check.action = run_doc_path_check_action
+    doc_path_check = doc_path_check.write_scope("out/.build-state")
+    for dir in ["build.w", "src", "build", "lib", "tools", "rt", "test"]: doc_path_check = doc_path_check.input(dir)
+    out = out.add_target(doc_path_check)
 
     var spec_inventory = target_new(.Action, "spec-inventory-check", "").output("out/.build-state/spec-inventory-check.txt")
     spec_inventory.action = run_check_spec_inventory_action
@@ -4131,7 +4138,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(behavior_tests)
 
     // Debug-allocator fixture lane (custom //! expect-debug-alloc directive; run
-    // via tools/debug_drop.w, not the built-in test runner). See docs/spec/toolchain/debug-allocator.md.
+    // via tools/debug_drop.w, not the built-in test runner). See debug-allocator.md.
     var debug_alloc_tests = target_new(.Action, "debug-alloc-tests", "").output("out/debug-alloc-tests")
     debug_alloc_tests = debug_alloc_tests.allow_parallel()
     debug_alloc_tests.action = run_debug_alloc_tests_action
@@ -4307,7 +4314,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(uat_tests)
 
     // D38: the ABI-defining sources' recorded hash must match — an ABI change
-    // without a WITH_ABI_VERSION bump fails the battery (docs/spec/abi/with-abi.md §7).
+    // without a WITH_ABI_VERSION bump fails the battery (with-abi.md §7).
     var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
     abi_hash_check = abi_hash_check.allow_parallel()
     abi_hash_check.action = run_abi_hash_check_action
@@ -4342,7 +4349,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     comptime_diff_tests = comptime_diff_tests.dep("build")
     out = out.add_target(comptime_diff_tests)
 
-    // The wasm32 lane (docs/proposals/wasm-target.md): each fixture is compiled for
+    // The wasm32 lane (wasm-target.md): each fixture is compiled for
     // wasm32 against out/lib/cross/wasm32/ and run through its emitted JS
     // host under node. `with build :wasm-tests`; not in the standing
     // battery because it needs node on PATH.
@@ -4791,7 +4798,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     release_checks = release_checks.dep("invariance-check")
     release_checks = release_checks.dep("c-migrator-tests")
     release_checks = release_checks.dep("wo-drift")
-    // The corpora lane (docs/proposals/stdlib_sourcing_plan.md): every migrated
+    // The corpora lane (stdlib_sourcing_plan.md): every migrated
     // container corpus runs its upstream test programs under With.
     release_checks = corpora_test_deps(move release_checks)
     // D112: a migrator change is gated on every corpus migrated afresh and
@@ -4805,6 +4812,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     require_last_green = require_last_green.write_scope("out/command/require-last-green")
     require_last_green = require_last_green.dep("with-sha256")
     out = out.add_target(require_last_green)
+
+    // tools/battery.w asks first whether these committed sources already
+    // have a published green (build/retention.w run_sources_green_action):
+    // the green keys on the inputs without docs/ and top-level *.md, so a
+    // docs-only change never costs a battery. It builds nothing.
+    var sources_green = target_new(.Action, "sources-green", "").output("out/command/sources-green/ok")
+    sources_green.action = run_sources_green_action
+    sources_green = sources_green.write_scope("out/command/sources-green")
+    out = out.add_target(sources_green)
 
     if release_platform_asset_is_distinct():
         var release_platform_asset = target_new(.Action, "release-platform-asset", "").output(release_platform_asset_bin())

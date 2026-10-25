@@ -1,6 +1,6 @@
 //! expect-stdout: ok
 
-// std.algorithms over the STC sort (docs/proposals/stdlib_sourcing_plan.md
+// std.algorithms over the STC sort (stdlib_sourcing_plan.md
 // Phase 3, #940): `sort` for the word shapes (i64, u64, f64, in place
 // through the engine's own instantiation) and for any other `T` (through
 // slot references, every element moved exactly once), `sort_by`, the
