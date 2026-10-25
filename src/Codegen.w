@@ -553,6 +553,8 @@ type Codegen {
 
     // Debug info (DWARF)
     debug_info: i32,
+    // `--release` (§4.3a): the one fact that leaves bounds unchecked (#2268).
+    release: bool,
     di_builder: i64,
     di_compile_unit: i64,
     // The root's DIFile (the compile unit's file). A function's own file is
@@ -1332,6 +1334,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         mir_bb_values: List.new(),
         mir_default_unreachable_bbs: List.new(),
         debug_info: 1,
+        release: false,
         di_builder: 0,
         di_compile_unit: 0,
         di_file: 0,
