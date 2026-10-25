@@ -1,8 +1,13 @@
 # Stdlib sourcing: three migrated corpora, one facade
 
 Status: PLAN (2026-09-01), engine selections ruled 2026-09-12; **all four
-phases implemented** (2026-10-23). The facade map's unfilled rows are listed
-under "What remains" at the end.
+phases implemented** (2026-10-23); **complete against its own gates**
+(2026-10-25: every phase gate met, every issue it set out to retire closed,
+the engine-boundary `unsafe` ruled and landed). What "What remains" still
+lists is out of scope by ruling or by a reopen condition, not unfinished
+work: `List` stays rt_core (D157), `Span` is the language's (D158), `cstr`
+and the internal engines wait on a use, and the facades' last `unsafe` is
+the claims proposal's and the owned-field proposal's.
 
 **Implementation status (2026-10-24, main `a768dd65e`).** Phase 0 landed
 (#1129: complexity lane, SlotMap free list). Phase 1 c-algorithms landed
@@ -790,22 +795,27 @@ the tree does not have:
    only when a facade needs them (open question 3).
 5. **Generic heap utilities** (`heapify`, `push_heap` over a `List`): no
    use case beyond `PriorityQueue`/`BinaryHeap`; stays unexposed until one.
-6. **The engine boundary's `unsafe` — ruled, D159 (2026-10-24); a new
-   migrator stage, non-compliant until it lands.** The migrator emits a
-   safe signature where the function's body proves the contract: (a) a
-   `mut self` receiver when the engine handle is the first parameter, or
-   an out-parameter the body writes on every returning path presented as
-   a returned `Copy` value (`T` or `(status, T)`; written conditionally
-   stays `unsafe`; no new parameter mode), (b) a stored argument that a
-   destroyer in the same corpus frees along the same path (store alone is
-   "stored, ownership unknown" and stays `unsafe`), (c) a returned
-   pointer's origin; an unproved point keeps `pub unsafe fn` with the
-   point named in the generated comment; the drift lane diffs the
-   inferred contracts and a change is red until a human looks; a migrator
-   generation bump, so promoted corpora keep compiling raw until their pin
-   or a ruling moves them (D112). The campaign issue is filed with the
-   ruling; the STC facades drop their engine-call `unsafe` at the corpus's
-   next re-promotion.
+6. **The engine boundary's `unsafe` — ruled, D159 (2026-10-24), landed
+   2026-10-25** (`docs/proposals/migrator-contracts-plan.md`, steps 1–5;
+   #2615 closed). The migrator emits a safe signature where the function's
+   body proves the contract: a `mut self` receiver when the handle is the
+   first parameter and the body writes through it, a `&self` receiver when
+   it provably never does (Amendment 2), an out-parameter written on every
+   returning path returned as a `Copy` value, a returned pointer that is
+   the receiver or the address of one of its members as `-> &R from self`;
+   an unproved point keeps `pub unsafe fn` with the point named above it;
+   the contracts artifact is under the corpus integrity hash and a
+   promotion prints the proofs it moves. STC was re-promoted under
+   `migrator-pin:#2615` (121 `pub fn` and 181 `pub mut fn` methods), and
+   the facades call the methods: their `unsafe` fell from 370 to 285.
+   What stays `unsafe` in a facade: the loaded-pointer reads (`at`, `top`,
+   `front`, `back`, `get`: `self->data + k`, which no body proves non-null
+   or inside the buffer), the destroyers (consuming, not a receiver), the
+   slot pushes and keyed `insert`/`erase` (a second pointer parameter),
+   and the slot-lifetime steps the facade owns. The loaded-pointer reads
+   are `docs/proposals/claims.md` tier 1 (a cited facts line per shape),
+   proposed, not ruled; the stored arguments wait on the owned-field
+   proposal (Amendment 2, B).
 7. **The compiler defects the facades found are closed** (2026-10-24):
    #2560 (`IndexPlace`/`IndexGet` on a generic user type; `Deque` and
    `Stack` spell `d[i]`), #2565 (a tuple type argument at a static call),
