@@ -40,6 +40,7 @@ use compiler.DsymutilDriver
 use compiler.GreenEvidence
 use compiler.DriverOptions
 use compiler.AbiStamp
+use Overflow
 use compiler.Runtime
 use compiler.WasmHost
 use Analysis
@@ -4854,11 +4855,24 @@ fn test_effective_opt_level(default_opt: i32, args: &str) -> i32:
     if test_extra_arg_present(args, "-O3"): return 3
     default_opt
 
+// #1048: the flags a fixture's `//! args:` may give a test that runs
+// in-process (no check or build directive): the ones this path applies.
+fn test_run_path_applies(token: &str) -> bool:
+    token == "-O0" or token == "-O1" or token == "-O2" or token == "-O3" or token == "--no-std" or token == "--freestanding" or token == "--no-runtime" or token == "--alloc" or token == "--no-prelude" or token == "--prelude=none" or token == "--prelude=core" or token == "--prelude=alloc" or token == "--prelude=full" or token.starts_with("--overflow=")
+
+// The `--overflow=<mode>` a fixture names, -1 for none.
+fn test_effective_overflow_mode(args: &str) -> i32:
+    for token in args.split(" "):
+        if token.starts_with("--overflow="): return overflow_mode_parse(token.slice(11, token.len()))
+    -1
+
 fn test_effective_prelude_mode(default_mode: i32, args: &str) -> i32:
     if test_extra_arg_present(args, "--no-prelude") or test_extra_arg_present(args, "--prelude=none"):
         return PreludeMode.NoneMode as i32
     if test_extra_arg_present(args, "--prelude=core"):
         return PreludeMode.CoreMode as i32
+    if test_extra_arg_present(args, "--prelude=alloc"):
+        return PRELUDE_ALLOC() as i32
     if test_extra_arg_present(args, "--prelude=full"):
         return PreludeMode.FullMode as i32
     default_mode
@@ -5171,6 +5185,13 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
             else:
                 print_test_summary(target, 0, 1, quiet)
         return directive_rc
+    // #1048: this path compiles in-process; a header arg it does not apply
+    // left the fixture passing without testing what it names.
+    for token in directives.extra_args.split(" "):
+        let flag = token.trim()
+        if flag.len() > 0 and not test_run_path_applies(flag):
+            emit_test_stage_error(f"//! args: `{flag}` has no effect on a test run in-process; a check-only, expect-check-stdout or expect-build-fail fixture passes it to the compiler", target, "build", "")
+            return 1
     let discovery = discover_tests_for_target(target)
     let effective_opt_level = test_effective_opt_level(opt_level, directives.extra_args)
     let effective_no_std = no_std or test_extra_arg_present(directives.extra_args, "--no-std") or test_extra_arg_present(directives.extra_args, "--freestanding")
@@ -5180,6 +5201,8 @@ fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_m
     var comp = Compilation.init()
     comp.configure(effective_opt_level, effective_no_std, effective_alloc_mode, effective_runtime_available)
     comp.set_prelude_mode(effective_prelude_mode)
+    let effective_overflow_mode = test_effective_overflow_mode(directives.extra_args)
+    if overflow_mode_valid(effective_overflow_mode): comp.set_overflow_mode(effective_overflow_mode)
     comp.set_debug_info(debug_info)
     comp.set_release(cli_release_flag())
     comp.set_target_kind(cli_platform_target_kind)
