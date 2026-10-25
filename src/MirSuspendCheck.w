@@ -554,6 +554,14 @@ fn suspend_prov_origins_from_rvalue(bits: SuspendBits, body: &MirBody, guard_loc
         return suspend_prov_origins_from_operand(bits, body, guard_count, d0)
     if kind == RvalueKind.RK_CAST:
         return suspend_prov_origins_from_operand(bits, body, guard_count, d0)
+    // #999: an aggregate carries every field's origins, as the liveness
+    // twin (suspend_gen_rvalue) reads every field: a guarded view wrapped
+    // in a tuple or struct lost its guard and crossed a suspension unseen.
+    if kind == RvalueKind.RK_AGGREGATE and d1 >= 0 and d1 < body.agg_field_starts.len():
+        let start = body.agg_field_starts[d1]
+        for fi in 0..body.agg_field_counts[d1]:
+            suspend_prov_or_origins(origins, suspend_prov_origins_from_operand(bits, body, guard_count, body.agg_field_operands[(start + fi)]), guard_count)
+        return origins
     origins
 
 fn suspend_sig_for_callee(sema: &Sema, body: &MirBody, callee_operand: i32) -> i32:
