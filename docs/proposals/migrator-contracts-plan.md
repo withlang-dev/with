@@ -97,6 +97,17 @@ every promoted corpus produces a `contracts.tsv` in a fresh migration
 STC/M*LIB/TommyDS shapes (`stc_slot_stack_push` → `receiver mut, owned 1`
 once (b) proves the destroyer; `tommy_list_insert_tail` → `stored-unknown`).
 
+*Step 1 status (2026-10-24, branch `migrator-contracts`):* landed as the
+`--emit-contracts` artifact, the `contracts.tsv` beside each promoted
+corpus, the drift report's line diff and `bs_check_migrate_contracts`. A
+fresh STC migration (775 defined functions) proves 277 mutating receivers,
+1 out-parameter and 9 borrowed returns; every slot `push`/`insert` is
+`stored-unknown` (STC's `i_keydrop` is a no-op: the facade owns the slot,
+exactly as D148 built it); 0 `owned`; the 427 unproved rows are mostly
+read-only handles (`_at`, `_top`, `_get`, `_size`, the destroyers), which
+the ruling left out and which a follow-up brief can take up (a `&self`
+receiver, a consumed receiver for a destroyer). #2618 filed on the way.
+
 **Step 2 — emission.** With the artifact green and reviewed, the printer
 reads the verdicts:
 
