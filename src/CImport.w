@@ -96,7 +96,7 @@ fn ci_migrate_set_unsafe_function_body_context(enabled: bool) -> Unit:
 // method call (lower_method_call_ir).
 var g_ci_migrate_method_shapes: HashMap[str, str] = HashMap.new()
 
-fn ci_migrate_set_method_shapes(shapes: HashMap[str, str]) -> Unit:
+fn ci_migrate_set_method_shapes(shapes: HashMap[str, str]):
     g_ci_migrate_method_shapes = shapes
 
 fn ci_migrate_method_shape(name: &str) -> str:

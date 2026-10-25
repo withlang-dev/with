@@ -17,7 +17,10 @@ fn main:
     p7_assert_success(migrated, "migrate an anonymous union member update")
     let tree = read_file(p7_join(case_dir, "lib/tr/tree.w")).unwrap()
     assert(not tree.contains("as *const c_void)).freq"))
-    p7_write(case_dir, "src/main.w", "use tr.tree\nuse tr.defs\nfn main:\n    var s = state_s { tree: [ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 0 } }; 4], total: 0 }\n    unsafe { bump(&raw mut s, 2) }\n    unsafe { bump(&raw mut s, 2) }\n    assert(s.total == 3)\n")
+    // D159 step 2: `bump` writes through its `state *` and nothing else, so
+    // it is a method of the record, safe to call.
+    assert(tree.contains("    pub mut fn bump(__param_i: i32)"))
+    p7_write(case_dir, "src/main.w", "use tr.tree\nuse tr.defs\nfn main:\n    var s = state_s { tree: [ct_data_s { fc: ct_data_s_fc { freq: 0 }, dl: ct_data_s_dl { dad: 0 } }; 4], total: 0 }\n    s.bump(2)\n    s.bump(2)\n    assert(s.total == 3)\n")
     let executed = p7_run(case_dir, "anon_union_run", "run\0src/main.w\0")
     p7_assert_success(executed, "bump the union member twice")
     print("ok")

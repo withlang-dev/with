@@ -588,7 +588,7 @@ var g_ci_print_return_out: str = ""
 var g_ci_print_return_status: bool = false
 var g_ci_print_return_view: bool = false
 
-fn ci_print_set_return_shape(out_local: &str, status: bool, view: bool) -> Unit:
+fn ci_print_set_return_shape(out_local: &str, status: bool, view: bool):
     g_ci_print_return_out = out_local.to_owned()
     g_ci_print_return_status = status
     g_ci_print_return_view = view
