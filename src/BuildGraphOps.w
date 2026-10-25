@@ -689,8 +689,12 @@ fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
     if build_graph_rt_file_exists(source_path) == 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' missing source: " ++ source_path)
         return 1
+    let unset = build_graph_install_prefix_unset(target.output)
+    if unset.len() > 0:
+        build_graph_rt_eprint("error: install target '" ++ target.name ++ "' installs under " ++ unset ++ ", which is not set: " ++ target.output)
+        return 1
     let dest_path = build_graph_expand_install_path(root, target.output)
-    if dest_path.len() == 0 or dest_path == target.output and dest_path.starts_with("$HOME/"):
+    if dest_path.len() == 0:
         build_graph_rt_eprint("error: install target '" ++ target.name ++ "' could not resolve destination: " ++ target.output)
         return 1
     let mode = if target.args.len() == 0: 0o644 else: build_graph_parse_octal_mode(target.args[0])
