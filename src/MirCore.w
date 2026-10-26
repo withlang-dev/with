@@ -362,6 +362,9 @@ type MirModule {
     // statement or a drop terminator): a place need not be moved for a
     // drop of it on a path where it holds no value to free garbage.
     sema_dropped_types: HashMap[i32, i32],
+    // #2702: the drop-glue types of every local whose storage a body ends:
+    // a whole local still Init at its StorageDead is a value nobody freed.
+    sema_storage_dead_drop_types: HashMap[i32, i32],
     // #1814 (§2.3): the element types of every `array_fill` that are not
     // Copy. A fill evaluates its operand once and copies it N times, so a
     // non-Copy element is N owners of one value: invalid MIR.
@@ -420,6 +423,7 @@ fn MirModule.init -> MirModule:
         sema_scoped_task_sym: 0,
         sema_moved_drop_types: HashMap.new(),
         sema_dropped_types: HashMap.new(),
+        sema_storage_dead_drop_types: HashMap.new(),
         sema_non_copy_fill_types: HashMap.new(),
         sema_uninstantiated_generic_types: HashMap.new(),
         sema_callable_syms: HashMap.new(),
@@ -2819,6 +2823,14 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
         owned_local.push(0)
     for li in body.owned_cleanup_locals:
         owned_local[li] = 1
+    // #2702: each local's whole-place key, for the StorageDead leak rule.
+    var whole_key_place: List[i32] = List.new()
+    for _ in 0..body.local_type_ids.len():
+        whole_key_place.push(-1)
+    for k in 0..key_places.len():
+        let kp: i32 = key_places[k]
+        if kp >= 0 and body.place_proj_counts[kp] == 0:
+            whole_key_place[body.place_locals[kp]] = kp
     for bb in 0..body.block_count():
         let stmt_start = body.bb_stmt_starts[bb]
         let stmt_count = body.bb_stmt_counts[bb]
@@ -2880,6 +2892,15 @@ fn validate_ownership_body(mir_mod: &MirModule, body: &MirBody) -> str:
                 // judgment the leak-at-return rule below makes (#2049).
                 if mir_rvalue_is_zero_fill(body, body.stmt_data1(stmt_id)) != 0 and state.place(blocks.keys, d0) == MirDropState.Init and mir_mod.sema_moved_drop_types.contains(mir_validate_place_type(mir_mod, body, d0)) and not mir_local_partially_vacated(body, blocks.keys, state, d0):
                     return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: reset of {mir_place_text(body, d0)} on a path where it was never moved: the value it holds is lost (§2.5.1)"
+            // #2702 (§2.5): a local whose storage ends while it still holds a
+            // value with drop glue, with no drop and no move on this path, is
+            // a leak. Owned cleanup storage stays tracked past its marker (a
+            // block tail may move it after, #1944) and is judged at return; a
+            // caller's place, a capture and a global are another owner's.
+            if kind == StmtKind.StorageDead and blocks.computed[bb] != 0 and d0 > body.anonymous_capture_count and d0 < whole_key_place.len() and owned_local[d0] == 0 and body.local_is_global[d0] == 0 and body.local_is_caller_place[d0] == 0 and mir_mod.sema_storage_dead_drop_types.contains(body.local_type_ids[d0]):
+                let whole = whole_key_place[d0]
+                if whole >= 0 and state.place(blocks.keys, whole) == MirDropState.Init and not mir_local_partially_vacated(body, blocks.keys, state, whole):
+                    return f"fn sym{body.fn_sym} stmt{stmt_id} span={span}: storage of {mir_place_text(body, whole)} ends while it holds a value no path dropped or moved (a leak, §2.5)"
             state.transfer_stmt(blocks.keys, body, stmt_id)
         if body.term_kind(bb) == TermKind.TK_CALL and blocks.computed[bb] != 0:
             let twice = mir_move_of_moved_place(mir_mod, body, blocks.keys, state, mir_term_operands(body, bb))
