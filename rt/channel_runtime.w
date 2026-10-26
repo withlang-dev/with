@@ -34,7 +34,8 @@ type ChannelDropFn = *const fn(*mut u8) -> Unit
 //   40 drop_fn
 //   48 i32 senders
 //   52 i32 receivers
-// Total size rounded to 56 bytes for 8-byte alignment.
+//   56 i32 lock (#991)
+// Total size rounded to 64 bytes for 8-byte alignment.
 let CHAN_OFF_BUFFER: i64 = 0
 let CHAN_OFF_ELEM_SIZE: i64 = 8
 let CHAN_OFF_HEAD: i64 = 12
@@ -46,7 +47,8 @@ let CHAN_OFF_CLOSED: i64 = 32
 let CHAN_OFF_DROP_FN: i64 = 40
 let CHAN_OFF_SENDERS: i64 = 48
 let CHAN_OFF_RECEIVERS: i64 = 52
-let CHAN_SIZE: i64 = 56
+let CHAN_OFF_LOCK: i64 = 56
+let CHAN_SIZE: i64 = 64
 
 fn chan_field_i32(ch: i64, offset: i64) -> i32:
     unsafe:
@@ -71,6 +73,23 @@ fn chan_drop_fn(ch: i64) -> ChannelDropFn:
 fn chan_set_drop_fn(ch: i64, value: ChannelDropFn):
     unsafe:
         *((ch + CHAN_OFF_DROP_FN) as *mut ChannelDropFn) = value
+
+// #991: every read or write of a channel's queue, counts and flags holds
+// its lock; with several workers (fiber_worker_count > 1) two of them ran
+// send and recv at once on plain i32 fields and lost messages. A wait never
+// holds it: the lock is released before the fiber yields or the scheduler
+// steps, and taken again after. Critical sections are a few loads and one
+// memcpy, so a contender spins.
+fn chan_lock(ch: i64):
+    let word = (ch + CHAN_OFF_LOCK) as *mut Atomic[i32]
+    unsafe:
+        while (*word).swap(1, .Acquire) != 0:
+            ()
+
+fn chan_unlock(ch: i64):
+    let word = (ch + CHAN_OFF_LOCK) as *mut Atomic[i32]
+    unsafe:
+        (*word).store(0, .Release)
 
 fn channel_drop_queued(handle: i64):
     let drop_fn = chan_drop_fn(handle)
@@ -99,9 +118,9 @@ fn channel_free(handle: i64):
         chan_set_buffer(handle, null)
     with_free(handle as *mut u8)
 
-fn channel_release_if_unreferenced(handle: i64):
-    if chan_field_i32(handle, CHAN_OFF_SENDERS) <= 0 and chan_field_i32(handle, CHAN_OFF_RECEIVERS) <= 0:
-        channel_free(handle)
+// The last sender and the last receiver are gone; read under the lock.
+fn channel_unreferenced(handle: i64) -> bool:
+    chan_field_i32(handle, CHAN_OFF_SENDERS) <= 0 and chan_field_i32(handle, CHAN_OFF_RECEIVERS) <= 0
 
 fn channel_grow(handle: i64) -> i32:
     if handle == 0:
@@ -185,10 +204,13 @@ pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
     if buffer as i64 == 0:
         return
 
+    chan_lock(ch_handle)
     while chan_field_i32(ch_handle, CHAN_OFF_COUNT) >= chan_field_i32(ch_handle, CHAN_OFF_CAPACITY):
         if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
+            chan_unlock(ch_handle)
             return
         if channel_wait_cut_short():
+            chan_unlock(ch_handle)
             // The value was moved into this call and never entered the
             // channel: destroy it here, the way the queue drops its payloads.
             let drop_fn = chan_drop_fn(ch_handle)
@@ -198,14 +220,18 @@ pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
         if chan_field_i32(ch_handle, CHAN_OFF_BOUNDED_CAPACITY) == 0:
             if channel_grow(ch_handle) != 0:
                 break
+        chan_unlock(ch_handle)
         channel_block_until_progress()
+        chan_lock(ch_handle)
         // #1000: outside a fiber, with no fiber left to receive, the wait
         // §14.7 says suspends would never end. Returning dropped the value
         // without a word; a deadlock says so.
         if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) >= chan_field_i32(ch_handle, CHAN_OFF_CAPACITY):
+            chan_unlock(ch_handle)
             with_panic_ref("deadlock: send on a full channel, and no task is left that could receive from it", "", 0)
 
     if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
+        chan_unlock(ch_handle)
         return
     let elem_size = chan_field_i32(ch_handle, CHAN_OFF_ELEM_SIZE)
     let tail = chan_field_i32(ch_handle, CHAN_OFF_TAIL)
@@ -214,6 +240,7 @@ pub fn with_channel_send(ch_handle: i64, value_ptr: *const u8):
     with_memcpy(dst, value_ptr, elem_size as i64)
     chan_set_i32(ch_handle, CHAN_OFF_TAIL, (tail + 1) % cap)
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) + 1)
+    chan_unlock(ch_handle)
 
 pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     if ch_handle == 0:
@@ -222,15 +249,20 @@ pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     if buffer as i64 == 0:
         return -1
 
+    chan_lock(ch_handle)
     while chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:
         if chan_field_i32(ch_handle, CHAN_OFF_CLOSED) != 0:
+            chan_unlock(ch_handle)
             return -1
+        chan_unlock(ch_handle)
         if channel_wait_cut_short():
             return -1
         channel_block_until_progress()
+        chan_lock(ch_handle)
         // #1000: None means closed and drained (channels.md); an open, empty
         // channel with no task left to send to it is a deadlock, not None.
-        if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:
+        if with_fiber_in_fiber() == 0 and with_runtime_has_fibers() == 0 and chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0 and chan_field_i32(ch_handle, CHAN_OFF_CLOSED) == 0:
+            chan_unlock(ch_handle)
             with_panic_ref("deadlock: recv on an empty, open channel, and no task is left that could send to it", "", 0)
 
     let elem_size = chan_field_i32(ch_handle, CHAN_OFF_ELEM_SIZE)
@@ -240,6 +272,7 @@ pub fn with_channel_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     with_memcpy(out_ptr, src, elem_size as i64)
     chan_set_i32(ch_handle, CHAN_OFF_HEAD, (head + 1) % cap)
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
+    chan_unlock(ch_handle)
     0
 
 pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
@@ -248,7 +281,9 @@ pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     let buffer = chan_buffer(ch_handle)
     if buffer as i64 == 0:
         return 0
+    chan_lock(ch_handle)
     if chan_field_i32(ch_handle, CHAN_OFF_COUNT) == 0:
+        chan_unlock(ch_handle)
         return 0
     let elem_size = chan_field_i32(ch_handle, CHAN_OFF_ELEM_SIZE)
     let head = chan_field_i32(ch_handle, CHAN_OFF_HEAD)
@@ -257,12 +292,15 @@ pub fn with_channel_try_recv(ch_handle: i64, out_ptr: *mut u8) -> i32:
     with_memcpy(out_ptr, src, elem_size as i64)
     chan_set_i32(ch_handle, CHAN_OFF_HEAD, (head + 1) % cap)
     chan_set_i32(ch_handle, CHAN_OFF_COUNT, chan_field_i32(ch_handle, CHAN_OFF_COUNT) - 1)
+    chan_unlock(ch_handle)
     1
 
 pub fn with_channel_close(ch_handle: i64):
     if ch_handle == 0:
         return
+    chan_lock(ch_handle)
     chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
+    chan_unlock(ch_handle)
 
 pub fn with_channel_destroy(ch_handle: i64):
     if ch_handle == 0:
@@ -273,25 +311,33 @@ pub fn with_channel_destroy(ch_handle: i64):
 pub fn with_channel_retain_sender(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
+    chan_lock(ch_handle)
     chan_set_i32(ch_handle, CHAN_OFF_SENDERS, chan_field_i32(ch_handle, CHAN_OFF_SENDERS) + 1)
+    chan_unlock(ch_handle)
 
 // The channel closes when the LAST sender drops, not the first.
 pub fn with_channel_release_sender(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
+    chan_lock(ch_handle)
     let senders = chan_field_i32(ch_handle, CHAN_OFF_SENDERS)
     if senders > 0:
         chan_set_i32(ch_handle, CHAN_OFF_SENDERS, senders - 1)
     if chan_field_i32(ch_handle, CHAN_OFF_SENDERS) <= 0:
         chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
-    channel_release_if_unreferenced(ch_handle)
+    let unreferenced = channel_unreferenced(ch_handle)
+    chan_unlock(ch_handle)
+    if unreferenced: channel_free(ch_handle)
 
 pub fn with_channel_release_receiver(ch_handle: i64) -> Unit:
     if ch_handle == 0:
         return
+    chan_lock(ch_handle)
     let receivers = chan_field_i32(ch_handle, CHAN_OFF_RECEIVERS)
     if receivers > 0:
         chan_set_i32(ch_handle, CHAN_OFF_RECEIVERS, receivers - 1)
     if chan_field_i32(ch_handle, CHAN_OFF_RECEIVERS) <= 0:
         chan_set_i32(ch_handle, CHAN_OFF_CLOSED, 1)
-    channel_release_if_unreferenced(ch_handle)
+    let unreferenced = channel_unreferenced(ch_handle)
+    chan_unlock(ch_handle)
+    if unreferenced: channel_free(ch_handle)
