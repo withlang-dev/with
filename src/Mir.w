@@ -116,6 +116,18 @@ impl MirModule:
             let ty = dropped[i]
             if ty > 0 and not self.sema_dropped_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
                 self.sema_dropped_types.insert(ty, 1)
+        // #2702: every local whose storage ends, by its type with drop glue.
+        var dead: List[i32] = List.new()
+        for bi in 0..self.bodies.len():
+            let body = &self.bodies[bi]
+            for si in 0..body.stmt_kinds.len():
+                let local = body.stmt_d0[si]
+                if body.stmt_kinds[si] == StmtKind.StorageDead and local > 0 and local < body.local_type_ids.len():
+                    dead.push(body.local_type_ids[local])
+        for i in 0..dead.len():
+            let ty = dead[i]
+            if ty > 0 and not self.sema_storage_dead_drop_types.contains(ty) and sema.type_needs_drop_frozen(ty) != 0:
+                self.sema_storage_dead_drop_types.insert(ty, 1)
         // #1814: every non-Copy element type an `array_fill` copies.
         var filled: List[i32] = List.new()
         for bi in 0..self.bodies.len():

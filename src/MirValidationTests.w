@@ -1235,6 +1235,47 @@ fn omitted_cleanup_verdict(cleanup: i32, dead: bool, owner: i32) -> str:
     body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
     validate_ownership_body(mir_mod, body)
 
+// #2702: a local that is not owned cleanup storage and whose storage ends
+// while Init, its type with drop glue, leaked: validate-ownership said ok
+// over a `with` guard nobody dropped. cleanup: 0 none, 1 drop, 2 move out;
+// owner: 0 ordinary, 3 a caller place.
+fn storage_dead_leak_verdict(cleanup: i32, owner: i32, glue: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_STRUCT]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    if glue: mir_mod.sema_storage_dead_drop_types.insert(1, 1)
+    var body = MirBody.init_for_fn(1)
+    body.local_type_ids[0] = 1
+    let local = body.new_temp(1)
+    if owner == 3: body.mark_caller_place_local(local)
+    let place = body.new_place(local)
+    let entry = body.new_block()
+    let fields: List[i32] = List.new()
+    let table = body.new_agg_fields(&fields, &fields)
+    let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, table, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, local, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, place, init, 0)
+    if cleanup == 1:
+        body.push_stmt(entry, StmtKind.Drop, place, 0, 0)
+    if cleanup == 2:
+        let return_place = body.new_place(0)
+        let taken = body.new_operand(OperandKind.OK_MOVE, place)
+        let moved = body.new_rvalue(RvalueKind.RK_USE, taken, 0, 0)
+        body.push_stmt(entry, StmtKind.Assign, return_place, moved, 0)
+    body.push_stmt(entry, StmtKind.StorageDead, local, 0, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    validate_ownership_body(mir_mod, body)
+
+pub fn mir_test_storage_dead_leak:
+    assert(storage_dead_leak_verdict(0, 0, true).contains("ends while it holds a value no path dropped or moved"))
+    assert(storage_dead_leak_verdict(1, 0, true) == "")
+    assert(storage_dead_leak_verdict(2, 0, true) == "")
+    assert(storage_dead_leak_verdict(0, 0, false) == "")
+    assert(storage_dead_leak_verdict(0, 3, true) == "")
+
 pub fn mir_test_omitted_cleanup:
     assert(omitted_cleanup_verdict(0, true, 1).contains("still Init at return"))
     assert(omitted_cleanup_verdict(0, false, 1).contains("still Init at return"))
