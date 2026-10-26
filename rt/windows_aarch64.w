@@ -386,7 +386,14 @@ pub fn rt_store_args(argc_val: i32, argv_val: *const *const u8) -> Unit:
     // PWD is the runtime's on Windows (#1082; see windows_x86_64.w).
     var cwd: [4096]u8 = [0 as u8; 4096]
     if rt_getcwd(&raw mut cwd as *mut [4096]u8 as *mut u8, 4096) == 0:
-        let _pwd = win_setenv("PWD", with_str_from_cstr(&cwd as *const [4096]u8 as *const c_char))
+        // #2722: from stack buffers, as the realpath above converts: a
+        // startup that allocates counts against every program (Windows
+        // reported three allocations, `allocations=3` for a program that
+        // makes none, where macOS and Linux report 0).
+        var wcwd: [4096]u16 = [0 as u16; 4096]
+        if win_utf8_to_utf16_buf(&cwd as *const [4096]u8 as *const c_char, &raw mut wcwd as *mut [4096]u16 as *mut u16, 4096) == 0:
+            let wpwd: [4]u16 = [80 as u16, 87 as u16, 68 as u16, 0 as u16]
+            let _pwd = SetEnvironmentVariableW(&wpwd as *const [4]u16 as *const u16, &wcwd as *const [4096]u16 as *const u16)
 
 pub fn rt_args() -> (*const *const u8, i32):
     (rt_argv_raw as *const *const u8, rt_argc)
