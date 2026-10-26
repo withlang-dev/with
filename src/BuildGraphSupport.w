@@ -303,6 +303,32 @@ fn build_graph_exec_argv(target: &BuildGraphTarget, operation_name: &str, argv_b
         return rc
     0
 
+// A target's declared environment (`with_env`), set around a child it runs
+// and put back after: returns the NAME=old pairs to restore. Every target
+// kind that runs a child reads it (actions in main.w; #965: command and
+// corpus targets, which dropped it).
+fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
+    var saved: List[str] = List.new()
+    for i in 0..target.env.len():
+        let entry = target.env[i]
+        let eq = entry.find("=")
+        if eq <= 0: continue
+        let name = entry.slice(0, eq)
+        saved.push(name ++ "=" ++ with_getenv_str(name))
+        let _set = with_setenv_str(name, entry.slice(eq + 1, entry.len()))
+    saved
+
+fn build_graph_restore_target_env(saved: &List[str]):
+    var i = saved.len() - 1
+    while i >= 0:
+        let entry = saved[i]
+        let eq = entry.find("=")
+        let _set = with_setenv_str(entry.slice(0, eq), entry.slice(eq + 1, entry.len()))
+        i = i - 1
+
+// #965: the timeout a target declares (`timeout`), else five minutes.
+fn build_graph_target_timeout_ms(target: &BuildGraphTarget) -> i32: if target.timeout_ms > 0: target.timeout_ms else: 300000
+
 fn build_graph_validate_process_args(target: &BuildGraphTarget) -> i32:
     if not build_graph_process_arg_valid(target.entry):
         build_graph_rt_eprint("error: target '" ++ target.name ++ "' field 'entry' contains a NUL byte: " ++ target.entry)

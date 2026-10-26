@@ -591,18 +591,47 @@ fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32:
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])
-    let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
     for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
     build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
-    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    let rc = build_graph_exec_target_capture(root, target, argv, stdout_path, stderr_path)
     if rc == 124:
-        build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' timed out after {build_graph_target_timeout_ms(target)}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return rc
+    for extra in target.extra_outputs:
+        if build_graph_rt_file_exists(build_graph_resolve_project_path(root, extra)) == 0:
+            build_graph_rt_eprint("error: run_corpus_test target '" ++ target.name ++ "' did not produce declared extra output: " ++ extra)
+            return 1
+    0
+
+// #965: a command or corpus target runs its child as the target declares
+// it: its timeout, its working directory (`working_dir`) and its
+// environment (`with_env`); all three were dropped (a 300 s timeout, the
+// project root, the parent's environment).
+fn build_graph_exec_target_capture(root: &str, target: &BuildGraphTarget, argv: &str, stdout_path: &str, stderr_path: &str) -> i32:
+    let timeout_ms = build_graph_target_timeout_ms(target)
+    let saved_env = build_graph_apply_target_env(target)
+    let rc = if target.cwd.len() > 0: build_graph_rt_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, build_graph_resolve_project_path(root, target.cwd)) else: build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    build_graph_restore_target_env(&saved_env)
+    rc
+
+// #965: every output a target declares exists once it succeeds: its output
+// and each extra output. A command target checked only the first.
+fn build_graph_check_declared_outputs(root: &str, target: &BuildGraphTarget, kind_name: &str) -> i32:
+    if target.output.len() > 0:
+        let output_path = build_graph_resolve_project_path(root, target.output)
+        if build_graph_rt_file_exists(output_path) == 0:
+            build_graph_rt_eprint("error: " ++ kind_name ++ " target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
+            return 1
+    for extra in target.extra_outputs:
+        let extra_path = build_graph_resolve_project_path(root, extra)
+        if build_graph_rt_file_exists(extra_path) == 0:
+            build_graph_rt_eprint("error: " ++ kind_name ++ " target '" ++ target.name ++ "' did not produce declared extra output: " ++ extra_path)
+            return 1
     0
 
 fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
@@ -637,24 +666,18 @@ fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])
-    let timeout_ms: i32 = 300000
     // Compile provenance (#2249): the binary a corpus test ran, in the log.
     var prov_args = ""
     for pai in 0..target.args.len(): prov_args = prov_args ++ " " ++ target.args[pai]
     build_graph_rt_eprint("[compile] " ++ target.name ++ " ran " ++ runner_path ++ prov_args)
-    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
+    let rc = build_graph_exec_target_capture(root, target, argv, stdout_path, stderr_path)
     if rc == 124:
-        build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' timed out after {timeout_ms}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
+        build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' timed out after {build_graph_target_timeout_ms(target)}ms; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return 124
     if rc != 0:
         build_graph_rt_eprint("error: command target '" ++ target.name ++ f"' failed with exit code {rc}; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return rc
-    if target.output.len() > 0:
-        let output_path = build_graph_resolve_project_path(root, target.output)
-        if build_graph_rt_file_exists(output_path) == 0:
-            build_graph_rt_eprint("error: command target '" ++ target.name ++ "' did not produce declared output: " ++ output_path)
-            return 1
-    0
+    build_graph_check_declared_outputs(root, target, "command")
 
 fn build_graph_copy_file_to_path(source_path: &str, dest_path: &str, mode: i32) -> i32:
     if build_graph_rt_file_exists(source_path) == 0:

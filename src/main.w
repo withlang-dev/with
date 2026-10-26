@@ -3561,24 +3561,6 @@ fn build_command_validate_target(options: &BuildCommandOptions, cfg: &ProjectCon
 // with what was there put back after. Returns the NAME=old pairs to restore.
 // (The driver once dropped it for in-process compiles, so with-sha256's debug
 // map named the worktree its WITH_FILE_PREFIX_MAP was declared to hide.)
-fn build_graph_apply_target_env(target: &BuildGraphTarget) -> List[str]:
-    var saved: List[str] = List.new()
-    for i in 0..target.env.len():
-        let entry = target.env[i]
-        let eq = entry.find("=")
-        if eq <= 0: continue
-        let name = entry.slice(0, eq)
-        saved.push(name ++ "=" ++ with_getenv_str(name))
-        let _set = with_setenv_str(name, entry.slice(eq + 1, entry.len()))
-    saved
-
-fn build_graph_restore_target_env(saved: &List[str]):
-    var i = saved.len() - 1
-    while i >= 0:
-        let entry = saved[i]
-        let eq = entry.find("=")
-        let _set = with_setenv_str(entry.slice(0, eq), entry.slice(eq + 1, entry.len()))
-        i = i - 1
 
 // Always-on wall-clock report: every top-level `with build <target>` prints how
 // long it took, unconditionally (worker re-entries — WITH_BUILD_*_WORKER — stay
