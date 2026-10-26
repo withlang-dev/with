@@ -20,6 +20,7 @@
 // tools/debug_drop_sites.lldb and tools/debug_drop_fields.lldb.
 
 use std.fs
+use std.os
 use std.process
 use std.time.now_ns
 
@@ -81,6 +82,54 @@ fn stdout_mismatch(expected: &List[str], stdout: &str) -> str:
         return f"stdout has {actual.len()} line(s), expected {expected.len()}; first unlisted: '" ++ actual[expected.len()] ++ "'"
     ""
 
+// #807: the platform gates `with test` reads (`//! skip-on: <value>
+// <reason>`, `//! only-on: <value>`), so a fixture that needs a host's
+// program or headers says so instead of failing every other host. A value
+// is an OS (windows, linux, darwin), an ISA (aarch64, x86_64) or an os-arch
+// pair; an unknown one fails the fixture, never runs it everywhere.
+fn gate_os_matches(value: &str) -> bool:
+    let host = os()
+    if value == "windows": return host == "Windows"
+    if value == "linux": return host == "Linux"
+    if value == "darwin": return host == "Macos"
+    false
+
+fn gate_is_os(value: &str) -> bool: value == "windows" or value == "linux" or value == "darwin"
+
+fn gate_is_arch(value: &str) -> bool: value == "aarch64" or value == "x86_64"
+
+fn gate_arch_matches(value: &str) -> bool:
+    let host = arch()
+    if value == "aarch64": return host == "aarch64" or host == "arm64"
+    host == "x86_64" or host == "amd64"
+
+// 1 the host matches, 0 it does not, -1 the value is unknown.
+fn gate_matches(value: &str) -> i32:
+    if gate_is_os(value): return if gate_os_matches(value): 1 else: 0
+    if gate_is_arch(value): return if gate_arch_matches(value): 1 else: 0
+    let dash = value.find("-")
+    if dash > 0:
+        let os_part = value.slice(0, dash)
+        let arch_part = value.slice(dash + 1, value.len())
+        if gate_is_os(os_part) and gate_is_arch(arch_part):
+            return if gate_os_matches(os_part) and gate_arch_matches(arch_part): 1 else: 0
+    -1
+
+// "" to run the fixture here, "skip" to skip it, or why the gate is bad.
+fn fixture_gate(source: &str) -> str:
+    for line in source.split("\n"):
+        if line.starts_with("//! skip-on: "):
+            let value = line.slice(13, line.len()).split(" ")[0].to_owned()
+            let m = gate_matches(value)
+            if m < 0: return f"skip-on: unknown platform value '{value}'"
+            if m == 1: return "skip"
+        if line.starts_with("//! only-on: "):
+            let value = line.slice(13, line.len()).trim().to_owned()
+            let m = gate_matches(value)
+            if m < 0: return f"only-on: unknown platform value '{value}'"
+            if m == 0: return "skip"
+    ""
+
 fn main:
     let a = args()
     if a.len() < 4:
@@ -125,6 +174,14 @@ fn main:
         for i in 3..a.len():
             let fx = a[i]
             let source = read_file(fx) ?? ""
+            let gate = fixture_gate(source)
+            if gate == "skip":
+                print("SKIP " ++ fx)
+                continue
+            if gate.len() > 0:
+                print("FAIL " ++ fx ++ "  (" ++ gate ++ ")")
+                failed = failed + 1
+                continue
             let want = line_after_prefix(source, "expect-debug-alloc:")
             let filter = line_after_prefix(source, "debug-alloc-filter:")
             print("START " ++ fx)
