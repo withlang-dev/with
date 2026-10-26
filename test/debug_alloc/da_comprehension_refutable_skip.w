@@ -15,7 +15,7 @@ impl Drop for W:
     move fn drop():
         unsafe:
             *self.drops = *self.drops + self.n
-        free_mem(self.ptr)
+        unsafe { free_mem(self.ptr) }
 
 fn w(drops: *mut i32, n: i32): W { ptr: alloc(24), drops, n }
 
