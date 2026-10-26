@@ -286,6 +286,19 @@ impl str:
                 out.push(self.slice(start, i))
         out
 
+    /// The characters in reverse order, as `rev` prints a line (#960). A
+    /// UTF-8 sequence stays whole: `"héllo".reverse()` is `"olléh"`.
+    pub fn reverse() -> str:
+        var out = StringBuilder.with_capacity(self.len())
+        var end = self.len()
+        while end > 0:
+            var start = end - 1
+            while start > 0 and (self[start] & 0xC0) == 0x80:
+                start -= 1
+            out.push_str(self.slice(start, end))
+            end = start
+        out.to_str()
+
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]
     pub fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }

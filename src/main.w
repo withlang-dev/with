@@ -717,6 +717,8 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
     source.push_str("use std.regex\n")
     source.push_str("use std.math\n")
     source.push_str("use std.collections\n")
+    // #960: `sort` and `stable_sort` on a List (coreutils sort).
+    source.push_str("use std.algorithms\n")
     // D29 (#750): one-liners are synthesized programs; their generated header
     // imports the ambient vocabulary explicitly now that the prelude closure
     // is import-gated (scripting ergonomics until the D fallback tier lands).
