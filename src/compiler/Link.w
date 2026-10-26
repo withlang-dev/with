@@ -2276,7 +2276,11 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
         let cross_path = root ++ "/cross/" ++ target_spec_name() ++ "/" ++ name
         if runtime_read_file(cross_path).len() > 0:
             return cross_path
-        with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (run `with build :cross-rt-wasm` first, or use a release compiler, which carries it)")
+        // #2703: say what is true. A release carries every target's runtime
+        // bundle and engine bundles (a cross check works anywhere), but a
+        // cross link also needs the target's own objects and C runtime, which
+        // only a source checkout's cross runtime provides today (#1915).
+        with_eprint("error: missing " ++ target_spec_name() ++ " runtime object: " ++ cross_path ++ " (a " ++ target_spec_name() ++ " link needs the target's runtime objects: build them in a source checkout with `with build :cross-rt` for linux_x86_64, `:cross-rt-arm`, `:cross-rt-windows` or `:cross-rt-wasm`; a compiler does not carry them yet, #1915)")
         return ""
     let p = root ++ "/" ++ name
     // The fallback root (compiler_dir/runtime) was not a candidate that
