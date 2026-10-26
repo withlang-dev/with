@@ -655,6 +655,10 @@ fn build_graph_copy_file(root: &str, target: &BuildGraphTarget) -> i32:
     let dest_path = build_graph_resolve_project_path(root, target.output)
     build_graph_copy_file_to_path(source_path, dest_path, mode)
 
+// A file mode in octal: permission bits and setuid/setgid/sticky, at most
+// 0o7777; -1 for anything else. #971: `10000` parsed to 0o10000, which the
+// host masked to 0000 and installed an unreadable file; a long run of digits
+// overflowed.
 fn build_graph_parse_octal_mode(text: &str) -> i32:
     if text.len() == 0:
         return -1
@@ -664,6 +668,8 @@ fn build_graph_parse_octal_mode(text: &str) -> i32:
         if ch < 48 or ch > 55:
             return -1
         mode = mode * 8 + (ch - 48)
+        if mode > 0o7777:
+            return -1
     mode
 
 fn build_graph_install_file(root: &str, target: &BuildGraphTarget) -> i32:
