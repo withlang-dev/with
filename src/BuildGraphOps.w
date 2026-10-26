@@ -163,6 +163,12 @@ fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
     if target.entry.len() == 0 or target.output.len() == 0:
         build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' requires source and output paths")
         return 1
+    // #969: no argument assembles for the host; one `triple=<llvm-triple>`
+    // for that target. Anything else was ignored and assembled for the host:
+    // an unknown option, an empty `triple=`, a second argument.
+    if target.args.len() > 1 or (target.args.len() == 1 and (not target.args[0].starts_with("triple=") or target.args[0].len() == 7)):
+        build_graph_rt_eprint("error: compile_asm_object target '" ++ target.name ++ "' takes no argument (the host) or one `triple=<llvm-triple>`; it has " ++ f"{target.args.len()}, the first `{target.args[0]}`")
+        return 1
     let source_path = build_graph_resolve_project_path(root, target.entry)
     let output_path = build_graph_resolve_project_path(root, target.output)
     if build_graph_rt_file_exists(source_path) == 0:
