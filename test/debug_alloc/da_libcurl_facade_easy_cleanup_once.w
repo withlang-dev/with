@@ -1,4 +1,5 @@
 //! expect-debug-alloc: leak count=0
+//! skip-on: windows the fixture c_imports the system's curl/curl.h, which a Windows host does not carry
 // D66 under the debug allocator, against the real library: an easy handle
 // is cleaned up once — by its Drop at scope end, on an early return, and
 // when a List of handles drops — and the call-scoped C string a `str` case

@@ -5,10 +5,13 @@
 // callee epilogue (the `with run` bin_path UAF): a fresh argv blob was freed
 // twice, and borrowed name/value buffers were freed while live. Arguments
 // must remain intact and owned by the caller after the call.
+use std.os
 use std.process
 
 fn main:
-    let program = "/usr/bin/true".to_owned()
+    // A program every host has that exits 0 (#807: this ran /usr/bin/true
+    // only, so the Windows lane could not run it).
+    let program = (if os() == "Windows": "C:/Windows/System32/hostname.exe" else: "/usr/bin/true").to_owned()
     let argv: List[str] = List.new()
     argv.push(program.slice(0, program.len()))
     let rc = run(&argv)

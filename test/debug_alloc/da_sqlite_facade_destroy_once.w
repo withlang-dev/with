@@ -1,4 +1,5 @@
 //! expect-debug-alloc: leak count=0
+//! skip-on: windows the fixture c_imports the system's sqlite3.h, which a Windows host does not carry
 // D51 stage 12 (ruling §24, §66) under the debug allocator, against the
 // real library: application data consumed by sqlite3_create_function_v2
 // is boxed by the rendered method and destroyed by SQLite through xDestroy
