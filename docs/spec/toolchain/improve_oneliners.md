@@ -346,7 +346,7 @@ Affected one-liners (12):
 with -e 'let n=7;var p=n>1;for d in 2..n{if n%d==0:p=false};if p:print(f"{n} is prime")'
 
 # Shuffle fields on every line
-with -e 'use std.random;for line in stdin.lines(){var a=line.split("\t");var i=a.len32();while i>1{i-=1;let j=range_i32(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};print(a.join("\t"))}' <example.txt
+with -e 'use std.random;for line in stdin.lines(){var a=line.split("\t");var i=a.len32();while i>1{i-=1;let j=range(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};print(a.join("\t"))}' <example.txt
 
 # Calculate 5 factorial
 with -e 'var n=1;for i in 1..=5{n*=i};print_i32(n)'
@@ -361,7 +361,7 @@ with -e 'var a=20;var b=35;while b!=0{let t=b;b=a%b;a=t};print_i32(a)'
 with -e 'var a=20;var b=35;while b!=0{let t=b;b=a%b;a=t};print_i32(20*35/a)'
 
 # Generate ten random numbers in 5..<15
-with -e 'use std.random;for _ in 0..10:print_i32(range_i32(5,15))'
+with -e 'use std.random;for _ in 0..10:print_i32(range(5,15))'
 
 # Print every permutation of 12345
 with -e 'fn p(s:str,r:str){if r=="":print(s);for i in 0..r.len32(){p(s++r.slice(i,i+1),r.slice(0,i)++r.slice(i+1,r.len32()))}};p("","12345")'
@@ -370,13 +370,13 @@ with -e 'fn p(s:str,r:str){if r=="":print(s);for i in 0..r.len32(){p(s++r.slice(
 with -e 'for m in 0..8{var s="";for i in 0..3{if m&(1<<i as u32)!=0:s=s++f"{i+1}"};print(s)}'
 
 # Generate a random ten-character lowercase string
-with -e 'use std.random;var s=FixedString[10].new();for _ in 0..10:s.push_byte(range_i32(97,123) as u8);write(s.as_view())'
+with -e 'use std.random;var s=FixedString[10].new();for _ in 0..10:s.push_byte(range(97,123));write(s.as_view())'
 
 # Generate a random fifteen-character ASCII password
-with -e 'use std.random;var s=FixedString[15].new();for _ in 0..15:s.push_byte(range_i32(48,123) as u8);write(s.as_view())'
+with -e 'use std.random;var s=FixedString[15].new();for _ in 0..15:s.push_byte(range(48,123));write(s.as_view())'
 
 # Pick five random words from every line
-with -e 'use std.random;for line in stdin.lines(){var a=/\s+/.split(line);var i=a.len32();while i>1{i-=1;let j=range_i32(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};let p=[a[j] for j in 0..min(5,a.len32())];print(p.join(" "))}' <example.txt
+with -e 'use std.random;for line in stdin.lines(){var a=/\s+/.split(line);var i=a.len32();while i>1{i-=1;let j=range(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};let p=[a[j] for j in 0..min(5,a.len32())];print(p.join(" "))}' <example.txt
 ```
 
 Potential design changes:
