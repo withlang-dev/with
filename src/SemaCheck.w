@@ -10925,8 +10925,19 @@ impl Sema:
             return with_str_clone_ref(self.current_module_path)
         self.fn_symbol_source_path(fn_sym)
 
+    // #806: a name is an extern here only when the declaration it resolves
+    // to is one. Function names are one flat symbol, so the Windows
+    // runtime's `extern fn accept` and a program's own `fn accept(g: &dyn
+    // Greet)` share it, and the program's function was judged by the
+    // extern's rule: "manual extern function call requires unsafe context".
+    // A module's own extern declaration is the one its calls use (#1695).
+    fn resolves_to_extern(fn_sym: i32) -> bool:
+        if self.module_declares_extern(fn_sym): return true
+        let sig_idx = self.get_sig(fn_sym)
+        sig_idx < 0 or self.extern_sig_modules.contains(sig_idx)
+
     fn fn_symbol_is_manual_extern(fn_sym: i32) -> i32:
-        if not self.extern_fn_names.contains(fn_sym):
+        if not self.extern_fn_names.contains(fn_sym) or not self.resolves_to_extern(fn_sym):
             return 0
         if self.ci_syms.contains(fn_sym):
             return 0
@@ -10940,7 +10951,7 @@ impl Sema:
         1
 
     fn fn_symbol_is_manual_extern_value_abi(fn_sym: i32) -> i32:
-        if not self.extern_fn_names.contains(fn_sym):
+        if not self.extern_fn_names.contains(fn_sym) or not self.resolves_to_extern(fn_sym):
             return 0
         if self.ci_syms.contains(fn_sym):
             return 0
