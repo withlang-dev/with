@@ -14601,6 +14601,13 @@ impl Sema:
                 self.note_inferred_field_demand(rhs_ty, lhs_ty, node)
         result
 
+    // A `??`, through parentheses.
+    fn expr_is_coalesce(node: i32) -> bool:
+        var n = node
+        while n != 0 and self.ast.kind(n) == NodeKind.NK_GROUPED:
+            n = self.ast.get_data0(n)
+        n != 0 and self.ast.kind(n) == NodeKind.NK_BINARY and self.ast.get_data0(n) == BinaryOp.OP_DEFAULT
+
     mut fn check_binary_operator(node: i32) -> i32:
         let op = self.ast.get_data0(node)
         let lhs_node = self.ast.get_data1(node)
@@ -14624,7 +14631,13 @@ impl Sema:
         var lhs: TypeId = 0 as TypeId
         var rhs: TypeId = 0 as TypeId
         if op == BinaryOp.OP_DEFAULT:
-            lhs = self.check_expr_value_context(lhs_node)
+            // #959: the demand on a `??` names its carrier's payload, so a call
+            // on the left takes `Option[E]` as a hint (D103: a hint, never an
+            // Option demand: the operand is not wrapped). A generic result
+            // typed by its use (`let n: i64 = s.parse() ?? 0`) infers as it
+            // does under a typed binding.
+            let carrier_hint = if self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void and self.ast.kind(lhs_node) == NodeKind.NK_CALL: self.ensure_option_type_for(self.expected_expr_type as i32) else: 0
+            lhs = if carrier_hint != 0: self.check_expr_with_expected(lhs_node, carrier_hint as TypeId) else: self.check_expr_value_context(lhs_node)
             if lhs == 0:
                 return 0
             // D22 §21.1: `??` is transparent to a view of the carrier
@@ -14792,7 +14805,7 @@ impl Sema:
                 lhs = if context != 0: self.check_expr_with_expected(lhs_node, context) else: self.check_expr_value_context(lhs_node)
                 rhs = if context != 0: self.check_expr_with_expected(rhs_node, context) else: self.check_expr_value_context(rhs_node)
             else:
-                if lhs_is_num_lit:
+                if lhs_is_num_lit or (self.expr_is_coalesce(lhs_node) and not self.expr_is_coalesce(rhs_node) and not rhs_is_num_lit):
                     rhs = self.check_expr_value_context(rhs_node)
                     let rhs_peer = self.literal_peer_type(rhs as i32)
                     if self.is_numeric_type(rhs_peer):
@@ -14803,7 +14816,10 @@ impl Sema:
                     lhs = self.check_expr_value_context(lhs_node)
                 if rhs == 0:
                     let lhs_peer = self.literal_peer_type(lhs as i32)
-                    if rhs_is_num_lit and self.is_numeric_type(lhs_peer):
+                    // #2724 (D103): a `??` operand takes the peer's numeric type as
+                    // a hint, which reaches a call in its carrier (`total +
+                    // (make() ?? 0)` infers make's T as a typed binding would).
+                    if (rhs_is_num_lit or self.expr_is_coalesce(rhs_node)) and self.is_numeric_type(lhs_peer):
                         rhs = self.check_expr_with_expected(rhs_node, lhs_peer as TypeId)
                     else:
                         rhs = self.check_expr_value_context(rhs_node)
