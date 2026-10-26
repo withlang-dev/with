@@ -92,6 +92,9 @@ type Parser {
     pending_iter_of_self: i32,
     saw_implicit_it: i32,
     implicit_it_depth: i32,
+    // #2326: call arguments holding an implicit `it` closure whose
+    // enclosing argument is not parsed yet.
+    it_args_unparented: List[i32],
     last_param_pattern_start: i32,
     last_param_pattern_count: i32,
     last_param_required_count: i32,
@@ -205,6 +208,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         pending_iter_of_self: 0,
         saw_implicit_it: 0,
         implicit_it_depth: 0,
+        it_args_unparented: [],
         last_param_pattern_start: 0,
         last_param_pattern_count: 0,
         last_param_required_count: 0,
@@ -6239,6 +6243,7 @@ impl Parser:
         self.skip_newlines()
         var args: List[i32] = List.new()
         var arg_names: List[i32] = List.new()  // 0 = positional, sym = named
+        var it_args: List[i32] = []
         var has_named = 0
         var seen_named = 0
         if self.peek() != TokenKind.TK_R_PAREN:
@@ -6263,12 +6268,20 @@ impl Parser:
                 let outer_it: i32 = self.saw_implicit_it
                 let outer_depth: i32 = self.implicit_it_depth
                 self.saw_implicit_it = 0
+                let it_mark = self.it_args_unparented.len()
                 var arg = self.parse_expr()
-                if self.saw_implicit_it == 1:
+                let wrapped = self.saw_implicit_it == 1
+                if wrapped:
                     self.implicit_it_depth = self.implicit_it_depth - 1
                     arg = self.maybe_wrap_implicit_it(arg)
                 self.saw_implicit_it = outer_it
                 self.implicit_it_depth = outer_depth
+                // #2326: this argument is the parent of the `it`-holding
+                // arguments inside it; it waits for its own.
+                if wrapped or self.it_args_unparented.len() > it_mark:
+                    while self.it_args_unparented.len() > it_mark:
+                        self.pool.set_implicit_it_parent(self.it_args_unparented.pop().unwrap(), arg as i32)
+                    it_args.push(arg as i32)
                 args.push(arg as i32)
                 self.skip_newlines()
                 if self.peek() != TokenKind.TK_COMMA:
@@ -6303,6 +6316,10 @@ impl Parser:
                     self.pool.add_extra(pnode)
                     continue
             self.pool.add_extra(arg as i32)
+        for ai in 0..arg_count:
+            if not it_args.contains(args[ai]): continue
+            self.pool.set_implicit_it_slot(args[ai], extra_start + ai)
+            self.it_args_unparented.push(args[ai])
         let call_node = self.pool.add_node(NodeKind.NK_CALL, self.pool.get_start(callee), self.prev_end(), callee, extra_start, arg_count)
 
         // Store named argument info if any

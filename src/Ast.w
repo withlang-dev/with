@@ -767,6 +767,12 @@ type AstPoolState {
     compiler_hook_phase_map: HashMap[i32, i32],
     global_allocator_decl_set: HashMap[i32, i32],
     call_named_args: HashMap[i32, i32],
+    // §9.3.1 (#2326): a call argument that is or holds an implicit `it`
+    // closure → its extra slot, and → the enclosing call argument holding
+    // it. Sema walks them to give the closure to the nearest argument whose
+    // parameter takes a one-parameter function.
+    implicit_it_slots: HashMap[i32, i32],
+    implicit_it_parents: HashMap[i32, i32],
     fn_stack_sizes: HashMap[i32, i32],
     fn_weak_flags: HashMap[i32, i32],
     extern_var_link_names: HashMap[i32, i32],  // NK_EXTERN_VAR node → @[link_name("sym")] symbol (#858)
@@ -934,6 +940,8 @@ fn AstPool.new -> AstPool:
             compiler_hook_phase_map: HashMap.new(),
             global_allocator_decl_set: HashMap.new(),
             call_named_args: HashMap.new(),
+            implicit_it_slots: [:],
+            implicit_it_parents: [:],
             fn_stack_sizes: HashMap.new(),
             fn_weak_flags: HashMap.new(),
             extern_var_link_names: HashMap.new(),
@@ -1690,6 +1698,12 @@ impl AstPool:
     fn set_end(idx: NodeId, val: i32):
         let st = self.state
         st.ends[(idx as i32)] = val
+
+    fn set_implicit_it_slot(node: i32, slot: i32): self.state.implicit_it_slots.insert(node, slot)
+    fn set_implicit_it_parent(node: i32, parent: i32): self.state.implicit_it_parents.insert(node, parent)
+    // -1 when `node` is no call argument holding an implicit `it` closure.
+    fn implicit_it_slot(node: i32): self.state.implicit_it_slots.get(node) ?? -1
+    fn implicit_it_parent(node: i32): self.state.implicit_it_parents.get(node) ?? 0
 
     // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
     fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):

@@ -2332,6 +2332,17 @@ type Sema {
     int_local_decisions: HashMap[i32, i64],
     int_local_rechecking: i32,
     pub int_local_rechecks: i32,
+    // §9.3.1 (#2326): an implicit `it` closure belongs to the nearest
+    // enclosing argument whose parameter takes a one-parameter function.
+    // While such an argument is checked its demand is here; a closure that
+    // met no function demand asks for that argument (closure, argument
+    // pairs), the pass loop moves it there and checks the body again, and
+    // the argument suppresses errors until then. Only inside that loop.
+    it_arg_demands: HashMap[i32, i32],
+    it_closure_moves: List[i32],
+    it_moves_suppressing: HashMap[i32, i32],
+    it_moves_allowed: i32,
+    it_closure_depth: i32,
     pub int_local_recheck_names: List[str],
     // D128: the `for` whose literal range binds each loop variable in scope
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
@@ -4025,6 +4036,11 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         int_local_decisions: HashMap.new(),
         int_local_rechecking: 0,
         int_local_rechecks: 0,
+        it_arg_demands: [:],
+        it_closure_moves: [],
+        it_moves_suppressing: [:],
+        it_moves_allowed: 0,
+        it_closure_depth: 0,
         int_local_recheck_names: List.new(),
         int_local_for_decls: HashMap.new(),
         iter_literal_lets: HashMap.new(),

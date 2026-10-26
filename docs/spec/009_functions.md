@@ -410,6 +410,14 @@ items |> sort_by(it.score)       // equivalent to x => x.score
 `it` is a reserved keyword. It may only appear in expression positions
 where the surrounding call site expects a single-parameter function type.
 The compiler infers `it`'s type from the expected function parameter type.
+The closure is the nearest enclosing call argument whose parameter takes a
+single-parameter function; a call in between whose parameter takes a value
+is part of the closure's body (D161):
+
+```
+names |> any(s.contains(it))      // n => s.contains(n): `contains` takes a &str
+nums |> map(plus(twice(it), 1))   // n => plus(twice(n), 1)
+```
 
 **Nested `it` is forbidden:** If an `it`-expression appears inside
 another `it`-expression, the inner closure must use explicit `param => expr`

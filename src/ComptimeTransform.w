@@ -214,6 +214,12 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
         let node = ni as NodeId
         if src.has_call_named_args(node) != 0:
             out.set_call_named_args(node, src.state.call_named_args.get(ni).unwrap())
+        // §9.3.1 (#2326): node ids and extra slots are kept, so the `it`
+        // argument links copy as they are.
+        let it_slot = src.implicit_it_slot(ni)
+        if it_slot >= 0: out.set_implicit_it_slot(ni, it_slot)
+        let it_parent = src.implicit_it_parent(ni)
+        if it_parent != 0: out.set_implicit_it_parent(ni, it_parent)
         if src.state.fn_stack_sizes.contains(ni):
             out.state.fn_stack_sizes.insert(ni, src.state.fn_stack_sizes.get(ni).unwrap())
         if src.state.fn_weak_flags.contains(ni):
