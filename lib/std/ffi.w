@@ -30,10 +30,9 @@ use rt.rt_core
 /// from `value`.
 ///
 /// `T` must be an owned (non-ephemeral) type: the value outlives the call, so
-/// boxing a borrow-holding ephemeral would let the borrow escape. This is not
-/// yet rejected at compile time (the type-erased copy hides the escape — the
-/// same gap as `Box.new[T]`); the recovery helpers are `unsafe`, so the
-/// caller's liveness assertion is the backstop.
+/// boxing a borrow-holding ephemeral would let the borrow escape. The compiler
+/// refuses it (§5.1: "an ephemeral value cannot be stored on the heap"), as it
+/// refuses `Box.new` of one (#987).
 pub fn box_ctx[T](value: T) -> *mut c_void:
     Box.new(move value) as *mut c_void
 
