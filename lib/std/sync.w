@@ -152,28 +152,20 @@ pub fn Mutex.enter_mut[T](self: &Self) -> MutexGuardMut[T]:
 /// Release the read guard, returning a Copy snapshot of the current value.
 pub fn MutexGuard.exit[T: Copy](move self: Self) -> T:
     let state = self.ptr as *mut MutexState
-    let value = unsafe { *((*state).value as *mut T) }
-    let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
-    (unsafe *locked).store(0, .Release)
-    value
+    unsafe { *((*state).value as *mut T) }
 
 /// Release the write guard, returning a Copy snapshot of the current value.
 pub fn MutexGuardMut.exit[T: Copy](move self: Self) -> T:
     let state = self.ptr as *mut MutexState
-    let value = unsafe { *((*state).value as *mut T) }
-    let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
-    (unsafe *locked).store(0, .Release)
-    value
+    unsafe { *((*state).value as *mut T) }
 
 impl[T] Scoped[&T] for MutexGuard[T]:
     fn with_enter(self: &Self) -> &T:
         let state = self.ptr as *mut MutexState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self) -> Unit:
-        let state = self.ptr as *mut MutexState
-        let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
-        (unsafe *locked).store(0, .Release)
+    // The guard's Drop releases the lock when the `with` ends.
+    fn with_exit(self: &Self) -> Unit: ()
 
 impl[T] ScopedMut[T] for MutexGuardMut[T]:
     fn with_enter_mut(self: &Self) -> T:
@@ -184,6 +176,20 @@ impl[T] ScopedMut[T] for MutexGuardMut[T]:
         let state = self.ptr as *mut MutexState
         let value_ptr = (unsafe *state).value as *mut T
         unsafe { *value_ptr = value }
+
+// #978: a guard releases its lock when it is dropped: at `exit`, at the end
+// of a `with`, at a panic's cleanup, or wherever its owner's scope ends. The
+// guards had no Drop, so a guard dropped without `exit` held the lock
+// forever, and the next `enter` spun.
+impl[T] Drop for MutexGuard[T]:
+    move fn drop():
+        let state = self.ptr as *mut MutexState
+        let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
+        (unsafe *locked).store(0, .Release)
+
+impl[T] Drop for MutexGuardMut[T]:
+    move fn drop():
+        let state = self.ptr as *mut MutexState
         let locked = (&raw mut (unsafe *state).locked as *mut i32) as *mut Atomic[i32]
         (unsafe *locked).store(0, .Release)
 
@@ -253,28 +259,20 @@ pub fn RwLock.enter_mut[T](self: &Self) -> RwWriteGuard[T]:
 /// Release read guard, returning a Copy snapshot of the current value.
 pub fn RwReadGuard.exit[T: Copy](move self: Self) -> T:
     let state = self.ptr as *mut RwLockState
-    let value = unsafe { *((*state).value as *mut T) }
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    let _ = (unsafe *word).fetch_sub(1, .Release)
-    value
+    unsafe { *((*state).value as *mut T) }
 
 /// Release write guard, returning a Copy snapshot of the current value.
 pub fn RwWriteGuard.exit[T: Copy](move self: Self) -> T:
     let state = self.ptr as *mut RwLockState
-    let value = unsafe { *((*state).value as *mut T) }
-    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-    (unsafe *word).store(0, .Release)
-    value
+    unsafe { *((*state).value as *mut T) }
 
 impl[T] Scoped[&T] for RwReadGuard[T]:
     fn with_enter(self: &Self) -> &T:
         let state = self.ptr as *mut RwLockState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self) -> Unit:
-        let state = self.ptr as *mut RwLockState
-        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-        let _ = (unsafe *word).fetch_sub(1, .Release)
+    // The guard's Drop releases the lock when the `with` ends.
+    fn with_exit(self: &Self) -> Unit: ()
 
 impl[T] ScopedMut[T] for RwWriteGuard[T]:
     fn with_enter_mut(self: &Self) -> T:
@@ -285,6 +283,16 @@ impl[T] ScopedMut[T] for RwWriteGuard[T]:
         let state = self.ptr as *mut RwLockState
         let value_ptr = (unsafe *state).value as *mut T
         unsafe { *value_ptr = value }
+
+impl[T] Drop for RwReadGuard[T]:
+    move fn drop():
+        let state = self.ptr as *mut RwLockState
+        let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+        let _ = (unsafe *word).fetch_sub(1, .Release)
+
+impl[T] Drop for RwWriteGuard[T]:
+    move fn drop():
+        let state = self.ptr as *mut RwLockState
         let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
         (unsafe *word).store(0, .Release)
 
