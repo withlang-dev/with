@@ -72,7 +72,7 @@ document does not redefine them; each module's header comment does.
 | `process` | args, env, set_env, exit_code, pid, run, Command |
 | `sys`, `sysinfo`, `os` | cpu_count, total_memory, page_size; os, arch, hostname; Layer-1 wrapper (os_kind, arch_kind, env, set_env, has_env, path_exists, posix_*) |
 | `signal` | sigint, sigterm, sigkill, raise_signal |
-| `random` | xorshift64 PRNG — seed, seed_now, next_i32, range_i32, chance |
+| `random` | xorshift64 PRNG — seed, seed_now, `next()` and `range(lo, hi)` drawing the demanded type through the `Random` trait (D162), chance |
 | `time` | Duration, now, now_ns, sleep_secs, async sleep |
 | `thread` | JoinHandle, spawn_os, join |
 | `sync` | Mutex, RwLock, AtomicI64 |

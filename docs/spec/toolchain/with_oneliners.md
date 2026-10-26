@@ -139,7 +139,7 @@ Print the sum of all tab-separated fields on all lines
 
 Shuffle all tab-separated fields on each line
 
-    with -e 'use std.random;for line in stdin.lines(){var a=line.split("\t");var i=a.len32();while i>1{i-=1;let j=range_i32(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};print(a.join("\t"))}' <example.txt
+    with -e 'use std.random;for line in stdin.lines(){var a=line.split("\t");var i=a.len32();while i>1{i-=1;let j=range(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};print(a.join("\t"))}' <example.txt
     POSSIBLE_IMPROVE
 
 Find the lexically minimum element on each line
@@ -297,7 +297,7 @@ Calculate the least common multiple of 20 and 35
 
 Generate 10 random numbers between 5 and 15, excluding 15
 
-    with -e 'use std.random;for _ in 0..10:print_i32(range_i32(5,15))'
+    with -e 'use std.random;for _ in 0..10:print_i32(range(5,15))'
     POSSIBLE_IMPROVE
 
 Find and print all permutations of `1 2 3 4 5`
@@ -346,12 +346,12 @@ Percent encode an integer
 
 Generate a random 10-character lowercase ASCII string
 
-    with -e 'use std.random;var s=FixedString[10].new();for _ in 0..10:s.push_byte(range_i32(97,123) as u8);write(s.as_view())'
+    with -e 'use std.random;var s=FixedString[10].new();for _ in 0..10:s.push_byte(range(97,123));write(s.as_view())'
     POSSIBLE_IMPROVE
 
 Generate a random 15-character ASCII password
 
-    with -e 'use std.random;var s=FixedString[15].new();for _ in 0..15:s.push_byte(range_i32(48,123) as u8);write(s.as_view())'
+    with -e 'use std.random;var s=FixedString[15].new();for _ in 0..15:s.push_byte(range(48,123));write(s.as_view())'
     POSSIBLE_IMPROVE
 
 Create a string of a specific length
@@ -472,7 +472,7 @@ Convert a file to a JSON array of lines
 
 Pick five random words from each line
 
-    with -e 'use std.random;for line in stdin.lines(){var a=/\s+/.split(line);var i=a.len32();while i>1{i-=1;let j=range_i32(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};let p=[a[j] for j in 0..min(5,a.len32())];print(p.join(" "))}' <example.txt
+    with -e 'use std.random;for line in stdin.lines(){var a=/\s+/.split(line);var i=a.len32();while i>1{i-=1;let j=range(0,i+1);let x=a[i];a[i]=a[j];a[j]=x};let p=[a[j] for j in 0..min(5,a.len32())];print(p.join(" "))}' <example.txt
     POSSIBLE_IMPROVE
 
 ## Text Analysis

@@ -25,7 +25,7 @@ use std.option
 use std.traits
 use std.engines.stc.defs
 use std.engines.stc.facade_shapes
-use std.random.range_isize
+use std.random
 use rt.rt_core
 
 /// The slot reference the engine orders, laid out as the shapes unit's
@@ -205,7 +205,7 @@ impl[T] List[T]:
         let tmp = with_alloc(size)
         var i = n - 1
         while i > 0:
-            let j = range_isize(0, i + 1)
+            let j = range(0, i + 1)
             if j != i:
                 let a = (base + i as i64 * size) as *mut u8
                 let b = (base + j as i64 * size) as *mut u8
