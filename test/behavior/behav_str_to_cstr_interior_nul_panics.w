@@ -1,4 +1,4 @@
-//! expect-exit: 1
+//! expect-exit: 134
 //! expect-stderr: interior NUL
 
 // §16.3c: a dynamically-built str carrying an interior NUL fails loudly at the
