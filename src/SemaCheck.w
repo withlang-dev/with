@@ -17603,9 +17603,15 @@ impl Sema:
         // owns storage: it is freed when this statement ends, so the view has
         // no origin that outlives the statement. Remember it; a binding or a
         // return of this view is rejected, a use inside the statement is fine.
-        if self.typed_expr_types.contains(receiver_node):
-            let recv_ty: i32 = self.typed_expr_types.get(receiver_node).unwrap()
-            if recv_ty != 0 and unpack_place_kind(self.classify_place(receiver_node)) == PlaceKind.PK_NotPlace and self.type_needs_drop(recv_ty) != 0:
+        // #2659: a parenthesized receiver is the expression inside: grouping
+        // has no type of its own, so `(read_file(p) ?? "").trim()` and
+        // `(f().unwrap()).trim()` were accepted and read freed memory.
+        var recv = receiver_node
+        while recv != 0 and self.ast.kind(recv) == NodeKind.NK_GROUPED:
+            recv = self.ast.get_data0(recv)
+        if self.typed_expr_types.contains(recv):
+            let recv_ty: i32 = self.typed_expr_types.get(recv).unwrap()
+            if recv_ty != 0 and unpack_place_kind(self.classify_place(recv)) == PlaceKind.PK_NotPlace and self.type_needs_drop(recv_ty) != 0:
                 self.expr_view_into_temporary.insert(result_node, recv_ty)
 
     mut fn record_view_binding_from_expr(sym: i32, expr_node: i32):
@@ -18195,9 +18201,17 @@ impl Sema:
                     // it and a binding of it read freed memory in the
                     // compiler itself), or a carrier of one. Remember it:
                     // a binding or a return of this result is rejected.
-                    if views_storage and self.typed_expr_types.contains(origin_arg):
-                        let arg_ty: i32 = self.typed_expr_types.get(origin_arg).unwrap()
-                        if arg_ty != 0 and self.ast.kind(origin_arg) == NodeKind.NK_CALL and unpack_place_kind(self.classify_place(origin_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0 and self.type_is_ephemeral_value(arg_ty) == 0:
+                    // #2659: through parentheses, and a `??` that yields an
+                    // owned value (`(read_file(p) ?? "").trim()`), the
+                    // argument is the same statement temporary.
+                    var temp_arg = origin_arg
+                    while temp_arg != 0 and self.ast.kind(temp_arg) == NodeKind.NK_GROUPED:
+                        temp_arg = self.ast.get_data0(temp_arg)
+                    let temp_kind = self.ast.kind(temp_arg)
+                    let owning_expr = temp_kind == NodeKind.NK_CALL or (temp_kind == NodeKind.NK_BINARY and self.ast.get_data0(temp_arg) == BinaryOp.OP_DEFAULT)
+                    if views_storage and owning_expr and self.typed_expr_types.contains(temp_arg):
+                        let arg_ty: i32 = self.typed_expr_types.get(temp_arg).unwrap()
+                        if arg_ty != 0 and unpack_place_kind(self.classify_place(temp_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0 and self.type_is_ephemeral_value(arg_ty) == 0:
                             self.expr_view_into_temporary.insert(call_node, arg_ty)
                     let carried_temp = self.view_into_temporary_type(origin_arg)
                     if carried_temp != 0:

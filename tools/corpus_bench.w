@@ -96,7 +96,8 @@ fn copy_w_files(src_dir: &str, dst_dir: &str):
 fn run_in(cwd: &str, argv: &List[str], log: &str) -> str:
     let finished = run_to_files_in(cwd, argv, log ++ ".stdout", log ++ ".stderr")
     if finished.code == 0: return ""
-    let stderr = (read_file(log ++ ".stderr") ?? "").trim()
+    let text = read_file(log ++ ".stderr") ?? ""
+    let stderr = text.trim()
     f"exit code {finished.code}: " ++ stderr.slice(0, if stderr.len() < 800: stderr.len() else: 800)
 
 fn cc(cwd: &str, args: &List[str], output: &str):
@@ -126,7 +127,8 @@ fn time_runs(cwd: &str, argv: &List[str], log: &str, runs: i32) -> f64:
         let finished = run_to_files_in(cwd, argv, log ++ ".stdout", log ++ ".stderr")
         let wall = seconds(now_ns() - started)
         if finished.code != 0:
-            let stderr = (read_file(log ++ ".stderr") ?? "").trim()
+            let text = read_file(log ++ ".stderr") ?? ""
+            let stderr = text.trim()
             fail(f"run {r} of " ++ argv[0] ++ f" exited {finished.code}: " ++ stderr.slice(0, if stderr.len() < 400: stderr.len() else: 400))
         walls.push(wall)
     median(walls)
