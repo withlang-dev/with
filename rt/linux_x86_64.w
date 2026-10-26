@@ -1222,6 +1222,20 @@ fn posix_child_common(mask_rc: i32, prev_mask: *const PosixSigset):
     posix_restore_default_signal_handler(POSIX_SIGHUP)
     posix_restore_default_signal_handler(POSIX_SIGQUIT)
 
+// #2725: a child that cannot start says why on its stderr before exiting
+// 127. A silent 127 read as the command's own status: a capture path that
+// was a directory looked like a program that failed with no output.
+fn posix_cstr_len(s: *const c_char) -> i64:
+    var n: i64 = 0
+    while unsafe *((s as i64 + n) as *const u8) != 0: n += 1
+    n
+
+fn posix_child_fail(what: *const c_char, path: *const c_char) -> Never:
+    rt_write(2, what as *const u8, posix_cstr_len(what))
+    rt_write(2, path as *const u8, posix_cstr_len(path))
+    rt_write(2, c"'\n".ptr as *const u8, 2)
+    rt_libc_exit(127)
+
 fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_path: *const c_char, stdin_path: *const c_char, cwd: *const c_char, timeout_ms: i32, wait: bool) -> i32:
     let argc = posix_argv_blob_count(blob, len)
     if argc <= 0:
@@ -1240,18 +1254,18 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
     if pid == 0:
         posix_child_common(mask_rc, &prev_mask as *const PosixSigset)
         if stdin_path as i64 != 0 and posix_redirect_fd_from_path(stdin_path, 0) != 0:
-            rt_libc_exit(127)
+            posix_child_fail(c"error: could not open a command's standard input '".ptr, stdin_path)
         if stdout_path as i64 != 0 and posix_redirect_fd_to_path(stdout_path, 1) != 0:
-            rt_libc_exit(127)
+            posix_child_fail(c"error: could not open a command's standard output '".ptr, stdout_path)
         if stderr_path as i64 != 0 and posix_redirect_fd_to_path(stderr_path, 2) != 0:
-            rt_libc_exit(127)
+            posix_child_fail(c"error: could not open a command's standard error '".ptr, stderr_path)
         if cwd as i64 != 0:
             if rt_libc_chdir(cwd) != 0:
-                rt_libc_exit(127)
+                posix_child_fail(c"error: could not change to a command's directory '".ptr, cwd)
             let _ = rt_libc_setenv(c"PWD".ptr, cwd, 1)
         let _argc2 = posix_fill_argv(blob, len, table)
         let _ = rt_libc_execvp(unsafe *table, table as *const *const u8)
-        rt_libc_exit(127)
+        posix_child_fail(c"error: could not run '".ptr, unsafe *table as *const c_char)
     rt_munmap(table as *mut u8, table_bytes)
     if pid < 0:
         if mask_rc == 0:

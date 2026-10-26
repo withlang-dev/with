@@ -1532,10 +1532,11 @@ fn win_make_security_attrs(out: *mut u8):
     unsafe *((out as i64 + 8) as *mut i64) = 0
     unsafe *((out as i64 + 16) as *mut i32) = 1
 
-// Opens a redirect target into `handle`: INVALID_HANDLE_VALUE when
-// CreateFileW fails, as the child has always been given. A path that cannot
-// be converted is an error instead, returned as a negative errno: it names no
-// file, and opening a different one would redirect the child somewhere else.
+// Opens a redirect target into `handle`. A path that cannot be converted,
+// or that CreateFileW cannot open (#2725: a directory, a missing parent), is
+// an error returned as a negative errno, said on stderr with the path: the
+// child used to start with INVALID_HANDLE_VALUE and its output was lost
+// without a word.
 fn win_open_redirect(path: &str, write_mode: bool, handle: *mut i64) -> i32:
     var wpath: [4096]u16 = [0; 4096]
     let rc = win_str_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
@@ -1546,6 +1547,11 @@ fn win_open_redirect(path: &str, write_mode: bool, handle: *mut i64) -> i32:
     let access = if write_mode: GENERIC_WRITE else: GENERIC_READ
     let creation = if write_mode: CREATE_ALWAYS else: OPEN_EXISTING
     unsafe *handle = CreateFileW(&wpath as *const [4096]u16 as *const u16, access, FILE_SHARE_ALL, &raw mut sec as *mut [24]u8 as *mut u8, creation, FILE_ATTRIBUTE_NORMAL, 0)
+    if unsafe *handle == INVALID_HANDLE_VALUE:
+        rt_write(2, c"error: could not open a command's redirect file '".ptr as *const u8, 49)
+        rt_write(2, win_str_data(path), path.len())
+        rt_write(2, c"'\n".ptr as *const u8, 2)
+        return -2
     0
 
 fn win_close_redirect(opened: bool, handle: i64):
