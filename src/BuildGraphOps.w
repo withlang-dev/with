@@ -472,22 +472,27 @@ fn build_graph_copy_manifest_files(root: &str, target: &BuildGraphTarget, operat
         return 1
     let source_dir = build_graph_resolve_project_path(root, target.entry)
     let output_dir = build_graph_resolve_project_path(root, target.output)
+    // #967: every input is checked and read before the first write, so a
+    // missing or unreadable one leaves the destination as it was; one at a
+    // time, a failure left part of the tree new and part old.
+    let contents_of: List[str] = List.new()
     for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' has invalid relative input path: " ++ rel)
             return 1
         let source_path = resolve_join(source_dir, rel)
-        let dest_path = resolve_join(output_dir, rel)
         if build_graph_rt_file_exists(source_path) == 0:
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' missing input: " ++ source_path)
             return 1
+        contents_of.push(build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", source_path) ?? return 1)
+    for ii in 0..target.inputs.len():
+        let dest_path = resolve_join(output_dir, target.inputs[ii])
         let dest_dir = build_graph_dirname(dest_path)
         if build_graph_rt_mkdir_p(dest_dir) != 0:
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir)
             return 1
-        let contents = build_graph_read_input(operation_name ++ " target '" ++ target.name ++ "'", source_path) ?? return 1
-        if build_graph_rt_write_file(dest_path, contents) != 0:
+        if build_graph_rt_write_file(dest_path, contents_of[ii]) != 0:
             build_graph_rt_eprint("error: " ++ operation_name ++ " target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
             return 1
     0
@@ -501,8 +506,13 @@ fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarget) -
         return 1
     let source_dir = build_graph_resolve_project_path(root, target.entry)
     let output_dir = build_graph_resolve_project_path(root, target.output)
+    // #967: every entry is checked, read and compared before the first
+    // write; a missing input after a stale one left a mixed tree that a
+    // later run consumed.
     var stale_count = 0
     var fresh_count = 0
+    let stale_dest: List[str] = List.new()
+    let stale_contents: List[str] = List.new()
     for ii in 0..target.inputs.len():
         let rel = target.inputs[ii]
         if not build_graph_manifest_relative_path_valid(rel):
@@ -528,11 +538,15 @@ fn build_graph_promote_tree_if_verified(root: &str, target: &BuildGraphTarget) -
                     fresh_count = fresh_count + 1
                     continue
         stale_count = stale_count + 1
+        stale_dest.push(dest_path)
+        stale_contents.push(source_contents)
+    for si in 0..stale_dest.len():
+        let dest_path = stale_dest[si]
         let dest_dir_path = build_graph_dirname(dest_path)
         if build_graph_rt_mkdir_p(dest_dir_path) != 0:
             build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not create destination directory: " ++ dest_dir_path)
             return 1
-        if build_graph_rt_write_file(dest_path, source_contents) != 0:
+        if build_graph_rt_write_file(dest_path, stale_contents[si]) != 0:
             build_graph_rt_eprint("error: promote_tree_if_verified target '" ++ target.name ++ "' could not write destination: " ++ dest_path)
             return 1
     if stale_count > 0:
