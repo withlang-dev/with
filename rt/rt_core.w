@@ -1936,7 +1936,7 @@ fn str_has_interior_nul(s: &str) -> bool:
 fn str_to_cstr(s: &str) -> *const c_char:
     if str_has_interior_nul(s):
         let empty = ""
-        with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
+        with_panic_ref("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
     let buf = rt_alloc(slen + 1)
     rt_memcpy(buf, str_data(s), slen)
@@ -1995,7 +1995,7 @@ fn cstr_lend_map(size: i64) -> *mut u8:
 pub fn with_cstr_lend(s: &str) -> *mut u8:
     if str_has_interior_nul(s):
         let empty = ""
-        with_panic_core("str to C string conversion: interior NUL byte", empty, 0)
+        with_panic_ref("str to C string conversion: interior NUL byte", empty, 0)
     let slen = str_length(s)
     // payload = text + its terminator + the guard byte at the block's end
     let class = cstr_lend_class_for(CSTR_LEND_HEADER + slen + 2)
@@ -2167,6 +2167,11 @@ pub fn with_eprint(s: &str):
 
 // ── Panic / assert ─────────────────────────────────────────────────
 
+// #2669: the allocator's own panics (an invalid free, a debug-alloc trap, a
+// corrupt header) print without allocating; every other panic goes through
+// with_panic_ref, which a fiber captures for its awaiting task. Both exit
+// 134, the panic status every `expect-exit: 134` fixture holds; this one
+// exited 1, so a List index out of range read as an ordinary failure.
 fn with_panic_core(msg: str, file: str, line: i32):
     write_all(2, "panic: " as *const u8, 7)
     let mp = str_data(msg)
@@ -2185,7 +2190,7 @@ fn with_panic_core(msg: str, file: str, line: i32):
             write_all(2, &buf as *const u8, len)
     let _ = rt_write(2, "\n" as *const u8, 1)
     rt_backtrace_print()
-    rt_exit(1)
+    rt_exit(134)
 
 // ── Integer formatting ─────────────────────────────────────────────
 
@@ -3328,7 +3333,7 @@ fn list_grow_es(v: *mut u8, es: i64):
 pub fn with_vec_take_front_es(v: *mut u8, es: i64):
     let vlen = list_get_len(v)
     if vlen <= 0:
-        with_panic_core("List index out of bounds", "", 0)
+        with_panic_ref("List index out of bounds", "", 0)
     list_set_ptr_field(v, (list_get_ptr_field(v) as i64 + es) as *mut u8)
     list_set_start(v, list_get_start(v) + 1)
     list_set_len(v, vlen - 1)
@@ -3423,7 +3428,7 @@ pub fn with_vec_take_into_es(v: *mut u8, src: *mut u8, es: i64):
 pub fn with_vec_get_ptr_es(v: *mut u8, idx: i64, es: i64) -> *mut u8:
     let vlen = list_get_len(v)
     if idx < 0 or idx >= vlen:
-        with_panic_core("List index out of bounds", "", 0)
+        with_panic_ref("List index out of bounds", "", 0)
     (list_get_ptr_field(v) as i64 + idx * es) as *mut u8
 
 pub fn with_vec_len(v: *mut u8) -> i64:
@@ -3771,7 +3776,7 @@ fn sm_grow(m: i64):
     // have retired slots. Length alone cannot decide whether growth is needed.
     let old_cap = sm_cap(m)
     if old_cap >= SM_OCCUPIED:
-        with_panic_core("SlotMap exhausted its handle indices", "", 0)
+        with_panic_ref("SlotMap exhausted its handle indices", "", 0)
     var new_cap = if old_cap < 8: 8 else: old_cap * 2
     if new_cap > SM_OCCUPIED: new_cap = SM_OCCUPIED
     let es = sm_elem_size(m)
