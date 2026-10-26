@@ -531,6 +531,12 @@ pub fn BuildCtx.process_runner(self: &Self) -> &ProcessRunner:
     tool_capability_require(self.token, "ProcessRunner")
     self.process_runner
 
+/// The environment variable `name` ("" when unset), read as a declared
+/// input of the build graph (§17.1a): the value is recorded, and a later
+/// build whose value differs builds the graph again. A build file reads the
+/// environment only this way; `env()` and a raw read are refused at comptime.
+///
+///     let jobs = ctx.env_input("MY_JOBS")
 pub fn BuildCtx.env_input(self: &Self, name: &str) -> str:
     tool_capability_require(self.token, "BuildCtx")
     tool_effect_record_env("", name)
@@ -2216,6 +2222,12 @@ pub fn ActionCtx.network(self: &Self) -> bool:
     tool_capability_require(self.token, "ActionCtx")
     self.network_value
 
+/// The environment variable `name` ("" when unset), read as a declared
+/// input of this action's target (§17.1a): the value is recorded with the
+/// target, and a run whose value differs reruns the target instead of
+/// reusing its cached output.
+///
+///     if ctx.env_input("WITH_TEST_NETWORK") == "1": run_network_case(ctx)
 pub fn ActionCtx.env_input(self: &Self, name: &str) -> str:
     tool_capability_require(self.token, "ActionCtx")
     tool_effect_record_env(self.target_name_value, name)
