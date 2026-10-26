@@ -15052,7 +15052,10 @@ impl Sema:
                 return 0
             let rhs_numeric = self.numeric_operand_type(rhs as i32)
             let rhs_resolved = self.resolve_alias(rhs_numeric as TypeId)
-            if self.get_type_kind(rhs_resolved) != TypeKind.TY_INT or self.get_type_d1(rhs_resolved) != 0:
+            // D128: a signed count read from literal-typed locals demands
+            // §4.2.1's `u32` of them, as an untyped literal count is.
+            let count_unsigned = self.get_type_kind(rhs_resolved) == TypeKind.TY_INT and self.get_type_d1(rhs_resolved) == 0
+            if not count_unsigned and not (self.get_type_kind(rhs_resolved) == TypeKind.TY_INT and self.note_int_local_demand(rhs_node, self.ty_u32 as i32)):
                 self.emit_error("shift count must be unsigned integer", node)
                 return 0
             // #765: record the result type (= lhs type) like the bitwise arm
@@ -28723,6 +28726,20 @@ impl Sema:
         self.int_local_demands.push(arg_node)
         true
 
+    // D128: a demand of `expected` on the undecided literal-typed locals
+    // `node` reads, recorded for the body's next check. True when recorded.
+    mut fn note_int_local_demand(node: i32, expected: i32) -> bool:
+        var noted = false
+        for d in self.literal_binding_lets_in(node):
+            if not self.int_local_undecided(d, expected, node): continue
+            let demand = self.int_local_demand_type(d, expected, node)
+            if demand == 0: continue
+            self.int_local_demands.push(d)
+            self.int_local_demands.push(demand)
+            self.int_local_demands.push(node)
+            noted = true
+        noted
+
     // §4.9: a number where a `Result[T, E]` is demanded is wrapped in `Ok`,
     // so the demand on the number is `T` (§4.2.6 then applies to it).
     fn implicit_ok_payload_demand(expected: i32, actual: i32) -> i32:
@@ -28767,20 +28784,13 @@ impl Sema:
             // demand the body's second check honors, not a mistake, until
             // two demands disagree.
             if true:
-                let lets = self.literal_binding_lets_in(node)
                 var undecided = false
-                for d in lets:
+                for d in self.literal_binding_lets_in(node):
                     if self.int_local_undecided(d, expected, node): undecided = true
                 if self.note_index_literal_demands(node, expected) > 0 and self.literal_decisions.len() == 0:
                     return false
                 if undecided:
-                    for d in lets:
-                        if not self.int_local_undecided(d, expected, node): continue
-                        let demand = self.int_local_demand_type(d, expected, node)
-                        if demand == 0: continue
-                        self.int_local_demands.push(d)
-                        self.int_local_demands.push(demand)
-                        self.int_local_demands.push(node)
+                    self.note_int_local_demand(node, expected)
                     return false
             if literal_let != 0 and self.int_local_decisions.contains(literal_let):
                 let decided = self.int_local_decisions.get(literal_let).unwrap()
