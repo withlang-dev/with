@@ -197,6 +197,16 @@ fn build_graph_home_dir() -> str:
         return home
     build_graph_rt_getenv("USERPROFILE").replace("\\", "/")
 
+// #970: the install variable a destination starts with whose value is empty
+// ("$HOME", "$INSTALL_BINDIR" or "$INSTALL_LIBDIR"), else "". An install
+// refuses such a destination: expansion falls back to a project path, and
+// with HOME unset `$HOME/x` was installed into ./$HOME/x.
+fn build_graph_install_prefix_unset(path: &str) -> str:
+    if path.starts_with("$HOME/") and build_graph_home_dir().len() == 0: return "$HOME"
+    if path.starts_with("$INSTALL_BINDIR/") and build_graph_install_bindir().len() == 0: return "$INSTALL_BINDIR"
+    if path.starts_with("$INSTALL_LIBDIR/") and build_graph_install_libdir().len() == 0: return "$INSTALL_LIBDIR"
+    ""
+
 fn build_graph_expand_install_path(root: &str, path: &str) -> str:
     if path.starts_with("$HOME/"):
         let home = build_graph_home_dir()
