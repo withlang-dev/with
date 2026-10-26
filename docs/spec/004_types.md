@@ -90,7 +90,8 @@ host's (D114).
 **Locals typed by their uses (D128).** A binding with no annotation whose
 initializer is an untyped integer literal expression has the type its
 demanding uses in its own function agree on: a parameter, a return, an `Ok`
-payload, a typed place, reached by the name or through arithmetic on it.
+payload, a typed place, a shift count (`u32`, as an untyped count is; D160),
+reached by the name or through arithmetic on it.
 Where no use demands a type narrower than `isize`, the binding is `isize`.
 Uses that demand two different types are an error at the second, naming
 both. The rule never changes the type of a binding in a program that
