@@ -7444,8 +7444,14 @@ impl Sema:
         if self.binding_is_unseen_global(idx, sym):
             self.shadow_unseen_global(sym, idx, tid, is_mut)
             return 1
-        let current_start = if self.scope_starts.len() > 0: self.scope_starts[(self.scope_starts.len() - 1)] else: 0
-        if idx < current_start or self.bind_states[idx] != VarState.MOVED:
+        let depth = self.scope_starts.len()
+        let current_start = if depth > 0: self.scope_starts[(depth - 1)] else: 0
+        // #899 (§29.8): a parameter is a local of its function's body, so the
+        // body's own scope may consume-rebind it (`var state = move state`).
+        // The parameters sit one scope below the body's, which kept the
+        // exception from ever reaching them.
+        let rebinds_param = depth >= 2 and self.scope_starts[(depth - 2)] == self.current_fn_bind_start and idx >= self.current_fn_bind_start
+        if (idx < current_start and not rebinds_param) or self.bind_states[idx] != VarState.MOVED:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("shadowing is not allowed for '" ++ name ++ "'" ++ self.shadowed_binding_origin_note(sym, if existing.is_some(): existing.unwrap() else: -1), node)
             return 0
