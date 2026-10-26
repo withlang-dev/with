@@ -727,13 +727,30 @@ fn ci_record_untranslated_macro(name: &str):
     ci_record_untranslated_macro_always(name)
 
 fn ci_record_untranslated_macro_always(name: &str):
+    ci_record_untranslated_macro_reason(name, "untranslated macro")
+
+// #582: a function-like macro of the program's own header is reported when a
+// program names it, as its object macros are, with the construct that kept it
+// from translating; a system header's stays recorded only for an inline spec.
+fn ci_record_untranslated_fn_macro(session: i64, index: i32, name: &str, reason: &str):
+    if with_cimport_macro_is_system(session, index) != 0 and g_cimport_report_untranslated_macros == 0:
+        return
+    ci_record_untranslated_macro_reason(name, reason)
+
+// What kept a function-like macro's body from translating, by its text.
+fn ci_untranslated_fn_macro_reason(body: &str) -> str:
+    if ci_str_contains(body, "##"): return "untranslated macro: token pasting (`##`)"
+    if ci_str_contains(body, "({"): return "untranslated macro: a statement expression (`({ ... })`)"
+    "untranslated macro: a body that is not an expression With translates"
+
+fn ci_record_untranslated_macro_reason(name: &str, reason: &str):
     if name.len() == 0:
         return
     let needle = "|" ++ name ++ "|"
     if ci_str_contains(g_cimport_untranslated_macros, needle):
         return
     g_cimport_untranslated_macros = g_cimport_untranslated_macros ++ needle
-    ci_record_omitted_symbol(name, "untranslated macro")
+    ci_record_omitted_symbol(name, reason)
     return
 
 fn ci_should_report_untranslated_macros(header_spec: &str) -> i32:
@@ -4127,11 +4144,11 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                             is_variadic_macro = true
                         vpi = vpi + 1
                     if is_variadic_macro:
-                        ci_record_untranslated_macro(name)
+                        ci_record_untranslated_fn_macro(session, i, name, "untranslated macro: variadic (`...`)")
                         continue
                     // Detect cleanup attribute macros
                     if ci_str_contains(value, "__attribute__((cleanup"):
-                        ci_record_untranslated_macro(name)
+                        ci_record_untranslated_fn_macro(session, i, name, "untranslated macro: a cleanup attribute")
                         continue
                     // A parameter is a binding (§9.7): an uppercase-initial C
                     // parameter (winnt.h's DEFINE_ENUM_FLAG_OPERATORS(ENUMTYPE),
@@ -4222,7 +4239,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                                 if not ci_migrate_shared_decl_add("fn", safe_name, r):
                                     output = output ++ r ++ "\n"
                                 continue
-                        ci_record_untranslated_macro(name)
+                        ci_record_untranslated_fn_macro(session, i, name, "untranslated macro: stringification (`#param`)")
                         continue
                     // Token paste (##) translation
                     if translated.len() == 0 and ci_str_contains(work_value, "##"):
@@ -4257,10 +4274,10 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                         else:
                             inferred_ret = ci_infer_macro_return_type_from_expr(type_session, translated, known_macro_returns, ret_type)
                         if ci_strip_parens(ci_trim(translated)) == "NULL" and ci_infer_cast_return_type(translated).len() == 0:
-                            ci_record_untranslated_macro(name)
+                            ci_record_untranslated_fn_macro(session, i, name, "untranslated macro: a bare NULL with no pointer type")
                             continue
                         if ci_starts_with(inferred_ret, "extern \"C\" fn(") or ci_starts_with(inferred_ret, "fn("):
-                            ci_record_untranslated_macro(name)
+                            ci_record_untranslated_fn_macro(session, i, name, "untranslated macro: it yields a function pointer")
                             continue
                         let fn_kw = if ci_translation_calls_raw_function(translated): "unsafe fn " else: "fn "
                         // A macro emitted as `unsafe fn` is itself a raw
@@ -4275,7 +4292,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                             output = output ++ r ++ "\n"
                         known_macro_returns = known_macro_returns ++ safe_name ++ "=" ++ inferred_ret ++ "|"
                     else:
-                        ci_record_untranslated_macro(name)
+                        ci_record_untranslated_fn_macro(session, i, name, ci_untranslated_fn_macro_reason(work_value))
             continue
 
         // Skip empty macros (flag defines) and track as blank
