@@ -2075,11 +2075,15 @@ impl Codegen:
 
         val
 
-    mut fn gen_fn_to_fat_ptr_thunk(fn_val: i64, fat_ty: i64) -> i64:
+    // `spawn_sym` names an async fn (§24.1: `fn(T) -> Task[U]`), whose value
+    // spawns its body as a direct call does; `task_ty` is that Task.
+    mut fn gen_fn_to_fat_ptr_thunk(fn_val: i64, fat_ty: i64, spawn_sym: i32, task_ty: i64) -> i64:
         let abi = self.fn_abi_values.get(fn_val) ?? -1
         if abi < 0:
             sema_phase_bug("BUG: function-value adapter has no FnAbi descriptor")
-        self.gen_fn_abi_thunk(fn_val, fat_ty, abi)
+        if (spawn_sym != 0) != (self.fn_abis[abi].convention == FN_ABI_ASYNC):
+            sema_phase_bug("BUG: a function value's async-ness disagrees with its FnAbi convention (§24.1)")
+        self.gen_fn_abi_thunk(fn_val, fat_ty, abi, spawn_sym, task_ty)
 
     fn coerce_struct_value(val: i64, target_ty: i64) -> i64:
         if val == 0 or target_ty == 0:
@@ -6075,7 +6079,7 @@ impl Codegen:
         self.fn_abi_cache.insert(key, index)
         index
 
-    mut fn gen_fn_abi_thunk(fn_val: i64, fat_ty: i64, target_index: i32) -> i64:
+    mut fn gen_fn_abi_thunk(fn_val: i64, fat_ty: i64, target_index: i32, spawn_sym: i32, task_ty: i64) -> i64:
         let target: FnAbi = self.fn_abis[target_index]
         let sources: List[i64] = List.new()
         let places: List[i32] = List.new()
@@ -6083,7 +6087,8 @@ impl Codegen:
             let arg = self.fn_abi_arg(target_index, pi)
             sources.push(arg.source_ty)
             places.push((if arg.pass == PM_INDIRECT_PLACE: 1 else: 0) | (if arg.reference: 2 else: 0) | (if arg.owned_place: 4 else: 0))
-        let thunk_index = self.compute_fn_abi(target.ret.source_ty, sources, places, FN_ABI_CLOSURE, 0)
+        let thunk_ret = if spawn_sym != 0: task_ty else: target.ret.source_ty
+        let thunk_index = self.compute_fn_abi(thunk_ret, sources, places, FN_ABI_CLOSURE, 0)
         let thunk_abi: FnAbi = self.fn_abis[thunk_index]
         let name = f"__fn_thunk_{self.closure_counter}"
         self.closure_counter = self.closure_counter + 1
@@ -6108,18 +6113,22 @@ impl Codegen:
             if incoming.pass == PM_INDIRECT:
                 value = wl_build_load(self.builder, incoming.source_ty, value)
             args.push(self.push_call_arg(target_index, pi, value, if outgoing.pass == PM_INDIRECT_PLACE: value else: 0))
-        let call = wl_build_call(self.builder, target.llvm_ty, fn_val, list_data_i64(&args), args.len())
-        let target_byval = self.fn_abi_byval_attr_types(target_index)
-        self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
-        if target.ret.pass == PM_IGNORE:
-            wl_build_ret_void(self.builder)
+        if spawn_sym != 0:
+            // The body runs on its own fiber; the value is its Task (§24.1).
+            wl_build_ret(self.builder, self.emit_async_fn_spawn_task_value(spawn_sym, fn_val, target.llvm_ty, &args, task_ty))
         else:
-            var result = call
-            if has_sret != 0:
-                result = wl_build_load(self.builder, target.ret.source_ty, result_buf)
-            else if target.ret.llvm_ty != target.ret.source_ty:
-                result = self.c_abi_unpack_direct_value(call, target.ret.source_ty)
-            wl_build_ret(self.builder, result)
+            let call = wl_build_call(self.builder, target.llvm_ty, fn_val, list_data_i64(&args), args.len())
+            let target_byval = self.fn_abi_byval_attr_types(target_index)
+            self.apply_c_abi_call_attrs(call, has_sret, target.ret.source_ty, target_byval, target.arg_count, 0)
+            if target.ret.pass == PM_IGNORE:
+                wl_build_ret_void(self.builder)
+            else:
+                var result = call
+                if has_sret != 0:
+                    result = wl_build_load(self.builder, target.ret.source_ty, result_buf)
+                else if target.ret.llvm_ty != target.ret.source_ty:
+                    result = self.c_abi_unpack_direct_value(call, target.ret.source_ty)
+                wl_build_ret(self.builder, result)
         self.current_function = saved_fn
         wl_position_at_end(self.builder, saved_bb)
         var fat = wl_get_undef(fat_ty)

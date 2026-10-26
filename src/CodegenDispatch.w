@@ -1941,6 +1941,9 @@ impl Codegen:
             // function a With callable value; its form is the FnAbi adapter.
             let callable_value = body.const_d1[const_id] == 1
             let callable_ty = if callable_value: self.mir_sema_type_to_llvm(body.const_types[const_id]) else: 0
+            // §24.1: an async fn's value is `fn(T) -> Task[U]`; it spawns.
+            let spawn_sym = if callable_value and self.sema.task_fns.contains(fn_sym): translated_sym else: 0
+            let task_ty = if spawn_sym != 0: self.mir_sema_type_to_llvm(self.sema.get_type_d2(self.sema.resolve_alias(body.const_types[const_id] as TypeId)) as i32) else: 0
             let fv_opt = self.fn_values.get(translated_sym)
             if fv_opt.is_some():
                 if self.debug_mir_codegen_enabled():
@@ -1948,7 +1951,7 @@ impl Codegen:
                     with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name}")
                 let fn_val = fv_opt.unwrap() as i64
                 if callable_value:
-                    return self.gen_fn_to_fat_ptr_thunk(fn_val, callable_ty)
+                    return self.gen_fn_to_fat_ptr_thunk(fn_val, callable_ty, spawn_sym, task_ty)
                 return fn_val
             let fn_name = self.function_link_name_for_sym(translated_sym)
             let found = wl_get_named_function(self.llmod, fn_name)
@@ -1956,7 +1959,7 @@ impl Codegen:
                 if self.debug_mir_codegen_enabled():
                     with_eprint(f"[ck-fn] sym={fn_sym} -> {fn_name} (llmod)")
                 if callable_value:
-                    return self.gen_fn_to_fat_ptr_thunk(found, callable_ty)
+                    return self.gen_fn_to_fat_ptr_thunk(found, callable_ty, spawn_sym, task_ty)
                 return found
             // #1857: a generic function named as a value is its instance at
             // the expected callable type (Sema's specialization, recorded on
@@ -1967,7 +1970,7 @@ impl Codegen:
                 let spec = self.ensure_concrete_mir_function(0, spec_sig, fn_sym, 0, "function value")
                 if spec.sym != 0 and spec.value != 0:
                     if callable_value:
-                        return self.gen_fn_to_fat_ptr_thunk(spec.value, callable_ty)
+                        return self.gen_fn_to_fat_ptr_thunk(spec.value, callable_ty, spawn_sym, task_ty)
                     return spec.value
             // #1859: a function constant with no function behind it is a
             // compiler defect — Sema resolved the name, MirLower emitted the
