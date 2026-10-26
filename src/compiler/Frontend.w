@@ -31,6 +31,7 @@ use compiler.Runtime
 use compiler.TrackedInputs
 use compiler.Zcu
 use compiler.Link
+use compiler.AbiStamp
 use InternPool
 use std.string.StringBuilder
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
@@ -148,11 +149,19 @@ fn frontend_resolve_executable_path(argv0: &str) -> str:
         i = i + 1
     ""
 
+// The compiler a cached translation belongs to (#1047): its stamped self id
+// (#2649: no read of the 100+ MB image), else a hash of the running image.
+// "" when it can name itself neither way; c_import then neither reads nor
+// writes the cache (c_import_fs_cache_dir), since an entry keyed on no
+// compiler would be shared by every compiler in the same state.
 fn frontend_cimport_compiler_fingerprint_line() -> str:
     if frontend_cimport_compiler_fingerprint_ready != 0:
         // #761 instance 2: independent copy, never the global's own header.
         return frontend_cimport_compiler_fingerprint ++ ""
     frontend_cimport_compiler_fingerprint_ready = 1
+    if compiler_self_id_is_stamped():
+        frontend_cimport_compiler_fingerprint = frontend_owned_text("\n#compiler-id:" ++ compiler_self_id())
+        return frontend_cimport_compiler_fingerprint ++ ""
     let compiler_path = frontend_resolve_executable_path(runtime_arg_at(0))
     if compiler_path.len() == 0:
         return ""
@@ -955,6 +964,8 @@ fn c_import_header_content_fingerprint_line(header_spec: &str) -> str:
     "\n#header-path:" ++ path ++ "\n#header-len:" ++ f"{text.len()}" ++ "\n#header-hash:" ++ f"{runtime_str_hash(text)}"
 
 fn c_import_fs_cache_dir() -> str:
+    if frontend_cimport_compiler_fingerprint_line().len() == 0:
+        return ""
     let home = runtime_getenv("HOME")
     if home.len() == 0:
         return ""
