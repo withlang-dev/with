@@ -155,8 +155,10 @@ fn version(key: &str, scratch: &str) -> str:
     let out = scratch ++ "/version.stdout"
     let err = scratch ++ "/version.stderr"
     let _ = run_to_files(&argv, out, err, 60000)
-    let stdout = (read_file(out) ?? "").trim()
-    let text = if stdout.len() > 0: stdout else: (read_file(err) ?? "").trim()
+    let out_text = read_file(out) ?? ""
+    let err_text = read_file(err) ?? ""
+    let stdout = out_text.trim()
+    let text = if stdout.len() > 0: stdout else: err_text.trim()
     let first = text.split("\n")[0].clone()
     if first.len() > 0: first else: compiler(key)
 
@@ -169,7 +171,8 @@ fn host(scratch: &str) -> str:
     for a in "sysctl -n machdep.cpu.brand_string".split(" "): argv.push(a.clone())
     let path = scratch ++ "/cpu.stdout"
     let finished = run_to_files(&argv, path, "/dev/null", 60000)
-    let cpu = (read_file(path) ?? "").trim()
+    let cpu_text = read_file(path) ?? ""
+    let cpu = cpu_text.trim()
     if finished.code == 0 and cpu.len() > 0: out = out ++ ", " ++ cpu
     out
 
@@ -338,7 +341,8 @@ fn compile_once(key: &str, level: &str, source: &str, work: &str) -> Compiled:
     let finished = run_to_files_in(work, &argv, work ++ ".compile.stdout", work ++ ".compile.stderr")
     let elapsed = seconds(now_ns() - started)
     if finished.code != 0 or not file_exists(output):
-        let stderr = (read_file(work ++ ".compile.stderr") ?? "").trim()
+        let stderr_text = read_file(work ++ ".compile.stderr") ?? ""
+        let stderr = stderr_text.trim()
         let message = if stderr.len() > 0: stderr else: (read_file(work ++ ".compile.stdout") ?? "").trim()
         return Compiled { binary: "", elapsed_s: elapsed, message }
     Compiled { binary: output, elapsed_s: elapsed, message: "" }
