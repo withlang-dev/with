@@ -4579,6 +4579,20 @@ impl Sema:
     mut fn check_trait_impl_method_signature_contract(node: i32, sig_idx: i32, contract: &SemaTraitImplMethodContract, has_ret_annotation: bool):
         if contract.ok == 0 or sig_idx < 0:
             return
+        // #988 (D140): the impl method takes the trait's parameters, as many
+        // as it declares; the receiver (`self`) is D7's on both sides and is
+        // not counted. An extra or missing parameter surfaced only at a call.
+        let meta = self.ast.find_fn_meta(node)
+        if meta >= 0:
+            var impl_count = 0
+            for k in 0..self.ast.fn_meta_param_count(meta):
+                if self.pool_resolve(self.ast.fn_param_name(self.ast.fn_meta_param_start(meta), k)) != "self": impl_count += 1
+            var trait_count = 0
+            for k in 0..contract.param_count:
+                if self.pool_resolve(self.ast.fn_param_name(contract.param_start, k)) != "self": trait_count += 1
+            if impl_count != trait_count:
+                self.emit_error(f"impl method `{self.pool_resolve(contract.method_sym)}` takes {impl_count} parameter(s), and trait `{self.pool_resolve(contract.trait_sym)}` declares {trait_count} (D140)", node)
+                return
         // Only compare the impl method's return type against the trait when the
         // impl method carries its own return annotation. Without one, the
         // signature still holds the placeholder `ty_void` at contract-check
