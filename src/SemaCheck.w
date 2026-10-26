@@ -15987,7 +15987,13 @@ impl Sema:
         0
 
     mut fn drop_body_field_observation(value: i32, is_mut: i32, ann_type: TypeId) -> i32:
-        if is_mut != 0 or ann_type != 0 or self.current_drop_type_sym == 0:
+        if is_mut != 0 or self.current_drop_type_sym == 0:
+            return 0
+        // #768: an annotation demands what it says. `let taken: Inner =
+        // self.inner` consumes the field as the unannotated binding does;
+        // refusing every annotation here left MirLower aliasing a field the
+        // glue then skipped, so nobody dropped it. A `&` annotation observes.
+        if ann_type != 0 and self.get_type_kind(self.resolve_alias(ann_type)) == TypeKind.TY_REF:
             return 0
         var expr = value
         while expr != 0 and self.ast.kind(expr) == NodeKind.NK_GROUPED:
