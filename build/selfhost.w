@@ -2880,8 +2880,9 @@ pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
     // #623/#624: the get-zlib case downloads zlib over the LIVE network (conan)
     // and flakes the otherwise-offline gate — SKIPPED. To exercise the real
     // network resolution, re-enable the call below or run get-zlib manually.
-    // (The build action is comptime-evaluated, so a raw getenv opt-in gate is
-    // not available here — hence an unconditional skip.)
+    // (An opt-in reads a declared input, `ctx.env_input("WITH_TEST_NETWORK")`,
+    // never a raw getenv, which comptime refuses; until the gate takes one,
+    // the case stays off.)
     // rc = bs_check_get_zlib_versions(ctx, compiler_path, bs_join(output_dir, "get_zlib_versions_case"))
     // if rc != 0: return rc
     rc = bs_check_build_cache_tracks_compiler(ctx, compiler_path, bs_join(output_dir, "build_cache_compiler_case"))

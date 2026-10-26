@@ -112,6 +112,10 @@ type SemaLexicalEnv {
 
 const GENERIC_INSTANTIATION_LIMIT: i32 = 64
 
+// #649 (§17.1a): a build file reads the environment as a declared input,
+// recorded so that changing the variable reruns what read it.
+const COMPTIME_ENV_HELP: str = "read the variable with `ctx.env_input(\"NAME\")`: it is recorded as a build input, and changing it reruns what read it"
+
 type SemaTraitImplMethodContract {
     ok: i32,
     trait_sym: i32,
@@ -11508,7 +11512,10 @@ impl Sema:
 
         if kind == NodeKind.NK_UNSAFE_BLOCK:
             if self.in_comptime_fn != 0:
-                self.emit_error("unsafe is not allowed in comptime", node)
+                if self.unsafe_block_reads_env(node):
+                    self.emit_error_with_help("unsafe is not allowed in comptime", node, COMPTIME_ENV_HELP)
+                else:
+                    self.emit_error("unsafe is not allowed in comptime", node)
             let is_prefix = self.ast.get_data1(node) == UNSAFE_KIND_PREFIX
             let is_fn_body = self.ast.get_data2(node) == UNSAFE_ORIGIN_FN_BODY
             let tracks_use = if is_prefix or is_fn_body: 0 else: 1
@@ -16981,9 +16988,23 @@ impl Sema:
             let chain = self.comptime_callable_chain(fn_sym)
             if chain.len() > 0:
                 let cc_name: str = self.pool_resolve(fn_sym)
-                self.emit_error(f"'{cc_name}' is not comptime-callable: it reaches " ++ chain ++ " (§17.1); a comptime fn may call only what runs at compile time", node)
+                let cc_msg = f"'{cc_name}' is not comptime-callable: it reaches " ++ chain ++ " (§17.1); a comptime fn may call only what runs at compile time"
+                if chain.contains("with_getenv"):
+                    self.emit_error_with_help(cc_msg, node, COMPTIME_ENV_HELP)
+                else:
+                    self.emit_error(cc_msg, node)
                 return 1
         0
+
+    // #649 (§17.1a): an `unsafe { with_getenv_str(..) }` in a build file is
+    // an environment read; its refusal names the declared-input API.
+    fn unsafe_block_reads_env(node: i32) -> bool:
+        var inner = self.ast.get_data0(node)
+        while inner != 0 and self.ast.kind(inner) == NodeKind.NK_GROUPED:
+            inner = self.ast.get_data0(inner)
+        if inner == 0 or self.ast.kind(inner) != NodeKind.NK_CALL: return false
+        let callee = self.ast.get_data0(inner)
+        callee != 0 and self.ast.kind(callee) == NodeKind.NK_IDENT and self.pool_resolve(self.ast.get_data0(callee)).contains("getenv")
 
     mut fn check_comptime_method_restriction(method_sym: i32, node: i32) -> i32:
         if self.in_comptime_fn == 0 or method_sym == 0:
