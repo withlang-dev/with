@@ -14624,7 +14624,13 @@ impl Sema:
         var lhs: TypeId = 0 as TypeId
         var rhs: TypeId = 0 as TypeId
         if op == BinaryOp.OP_DEFAULT:
-            lhs = self.check_expr_value_context(lhs_node)
+            // #959: the demand on a `??` names its carrier's payload, so a call
+            // on the left takes `Option[E]` as a hint (D103: a hint, never an
+            // Option demand: the operand is not wrapped). A generic result
+            // typed by its use (`let n: i64 = s.parse() ?? 0`) infers as it
+            // does under a typed binding.
+            let carrier_hint = if self.has_expected_type != 0 and self.expected_expr_type != 0 and self.expected_expr_type != self.ty_void and self.ast.kind(lhs_node) == NodeKind.NK_CALL: self.ensure_option_type_for(self.expected_expr_type as i32) else: 0
+            lhs = if carrier_hint != 0: self.check_expr_with_expected(lhs_node, carrier_hint as TypeId) else: self.check_expr_value_context(lhs_node)
             if lhs == 0:
                 return 0
             // D22 §21.1: `??` is transparent to a view of the carrier
@@ -31477,11 +31483,12 @@ impl Sema:
             return 0
         if self.check_comptime_method_restriction(method_fn_sym, node) != 0:
             return 0
-        if not self.type_decl_nodes.contains(owner_sym):
-            return 0
-        let td_node: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
-        let owner_tp_start = self.type_decl_tp_start(td_node)
-        let owner_tp_count = self.type_decl_tp_count(td_node)
+        // #959: a builtin owner (`impl str: fn parse[T: Parse]()`) has no
+        // type declaration and no type parameters of its own; its generic
+        // methods are checked here like any other, not left uninstantiated.
+        let td_node: i32 = self.type_decl_nodes.get(owner_sym) ?? 0
+        let owner_tp_start = if td_node != 0: self.type_decl_tp_start(td_node) else: 0
+        let owner_tp_count = if td_node != 0: self.type_decl_tp_count(td_node) else: 0
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
         let fn_tp_start = self.ast.fn_meta_tp_start(meta)
@@ -31527,6 +31534,13 @@ impl Sema:
             // D66 (#1652): a callback-only pair setter's `U` comes from the
             // callback's own signature (SemaFacade.w).
             self.facade_bind_pair_callback_u(fn_node, arg_types, arg_count, fn_tp_start, fn_tp_count, node)
+            // #959: a type parameter no argument mentions takes the demand on
+            // the result (`let n: Option[i64] = s.parse()`), as a free generic
+            // function's does.
+            let saved_result_root: i32 = self.current_value_expr_root
+            self.current_value_expr_root = node
+            self.bind_unbound_type_params_from_result(self.ast.fn_meta_ret(meta), fn_tp_start, fn_tp_count, node)
+            self.current_value_expr_root = saved_result_root
         // #600 (§5.1): generic-METHOD calls (Box.new / Rc.new / Arc.new on generic
         // owners) are a fourth checker lane that never reached the ephemeral arg
         // gates. Route each ephemeral arg through the same escape check.
