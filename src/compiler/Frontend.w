@@ -32,6 +32,7 @@ use compiler.TrackedInputs
 use compiler.Zcu
 use compiler.Link
 use compiler.AbiStamp
+use compiler.LldDriver
 use InternPool
 use std.string.StringBuilder
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
@@ -123,37 +124,6 @@ fn frontend_str_contains_byte(text: &str, target: i32) -> bool:
             return true
     false
 
-fn frontend_resolve_executable_path(argv0: &str) -> str:
-    if argv0.len() == 0:
-        return ""
-    if runtime_read_file(argv0).len() > 0:
-        return with_str_clone_ref(argv0)
-    if frontend_str_contains_byte(argv0, 47):
-        return ""
-
-    let search_path = runtime_getenv("PATH")
-    if search_path.len() == 0:
-        return ""
-
-    var segment_start = 0
-    var i = 0
-    while i <= search_path.len():
-        let at_end = i == search_path.len()
-        let ch = if at_end: 58 else: search_path[i]
-        if ch == 58:
-            let dir = search_path.slice(segment_start as i64, i as i64)
-            let candidate = if dir.len() == 0: "./" ++ argv0 else: dir ++ "/" ++ argv0
-            if runtime_read_file(candidate).len() > 0:
-                return candidate
-            segment_start = i + 1
-        i = i + 1
-    ""
-
-// The compiler a cached translation belongs to (#1047): its stamped self id
-// (#2649: no read of the 100+ MB image), else a hash of the running image.
-// "" when it can name itself neither way; c_import then neither reads nor
-// writes the cache (c_import_fs_cache_dir), since an entry keyed on no
-// compiler would be shared by every compiler in the same state.
 fn frontend_cimport_compiler_fingerprint_line() -> str:
     if frontend_cimport_compiler_fingerprint_ready != 0:
         // #761 instance 2: independent copy, never the global's own header.
@@ -162,7 +132,7 @@ fn frontend_cimport_compiler_fingerprint_line() -> str:
     if compiler_self_id_is_stamped():
         frontend_cimport_compiler_fingerprint = frontend_owned_text("\n#compiler-id:" ++ compiler_self_id())
         return frontend_cimport_compiler_fingerprint ++ ""
-    let compiler_path = frontend_resolve_executable_path(runtime_arg_at(0))
+    let compiler_path = with_self_exe()
     if compiler_path.len() == 0:
         return ""
     let compiler_image = runtime_read_file(compiler_path)
