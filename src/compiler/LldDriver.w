@@ -114,12 +114,21 @@ fn with_ld_main() -> i32:
     for i in 0..rest.len(): args.push(rest[i])
     lld_link(flavor, &args)
 
-// This executable, to run `with __ld` as a child: argv[0] when it names a
-// path, else argv[0] found on PATH.
+// This executable, to run `with __ld` (and every other self-invocation) as a
+// child: argv[0] when it names a path; on Windows a bare name is first the
+// current directory's, as cmd runs it (#2647: a bare `with.exe` resolved
+// through PATH re-invoked an older with.exe there, "unknown command
+// '__ld'"); else argv[0] found on PATH. The one owner of the answer
+// (Frontend's c_import key reads it too). SEED-BOUND: the OS's own answer
+// (GetModuleFileNameW, _NSGetExecutablePath, /proc/self/exe) needs a runtime
+// function src/ can call only once a seed carrying it is pinned.
 fn with_self_exe() -> str:
     let argv0 = with_arg_at(0)
     if argv0.contains("/") or argv0.contains("\\"): return argv0
     let windows = runtime_sysinfo_os() == "Windows"
+    if windows:
+        let here = runtime_cwd() ++ "\\" ++ argv0 ++ (if argv0.ends_with(".exe"): "" else: ".exe")
+        if runtime_file_exists(here) != 0: return here
     for dir in runtime_getenv("PATH").split(if windows: ";" else: ":"):
         if dir.len() == 0: continue
         let candidate = dir ++ "/" ++ argv0 ++ (if windows and not argv0.ends_with(".exe"): ".exe" else: "")
