@@ -4686,9 +4686,28 @@ impl Sema:
         // demands of `i`), so the body is checked until no undecided local is
         // demanded; each pass decides at least one, so it ends.
         var passes = 0
+        // The `it` moves are this body's: a generic instance checked inside
+        // it (`map`'s std body) settles its own and leaves these alone.
+        let outer_it_moves = move self.it_closure_moves
+        self.it_closure_moves = []
         while true:
             let errors_start = self.diags.count_by_severity(DiagSeverity.Error)
+            self.it_moves_allowed += 1
             self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
+            self.it_moves_allowed -= 1
+            // §9.3.1 (#2326): an `it` closure moved to its argument; the body
+            // is checked again over the moved tree, its suppressed pass dropped.
+            if self.it_closure_moves.len() > 0 and passes < 64:
+                self.apply_it_closure_moves()
+                while self.int_local_demands.len() > demands_start: self.int_local_demands.pop()
+                while self.diags.items.len() > diags_start: self.diags.items.pop()
+                passes += 1
+                self.int_local_rechecking += 1
+                continue
+            if self.it_closure_moves.len() > 0:
+                self.it_closure_moves.clear()
+                self.emit_error("BUG: the implicit `it` closures of this body did not settle in 64 checks (§9.3.1)", node)
+                break
             if self.int_local_demands.len() == demands_start: break
             // A pass with an error of its own rejects the program whatever the
             // locals' types; its diagnostics stand and it is not checked again
@@ -4714,6 +4733,7 @@ impl Sema:
         while passes > 0:
             self.int_local_rechecking -= 1
             passes -= 1
+        self.it_closure_moves = outer_it_moves
 
     mut fn check_fn_body_with_sig_once(node: i32, sig_idx: i32, decl_index: i32):
         let fn_name = self.fn_decl_semantic_symbol_at(node, self.ast.get_data0(node), decl_index)
@@ -24677,7 +24697,73 @@ impl Sema:
                 self.emit_error("returned closure captures `" ++ cap_name ++ "` by place and may outlive it (§12.2, §12.4); a returned closure owns its environment: `move () => ...`", report_node)
                 return
 
+    fn is_implicit_it_closure(node: i32) -> bool:
+        node > 0 and self.ast.kind(node) == NodeKind.NK_CLOSURE and self.ast.get_data2(node) == 1 and self.pool_resolve(self.ast.get_extra(self.ast.get_data1(node))) == "__it"
+
+    // §9.3.1 (#2326): the enclosing argument an `it` closure belongs to: the
+    // nearest one being checked against a one-parameter function. An
+    // explicit closure in between, or an `it` closure that is not such an
+    // argument, owns the `it` itself: 0.
+    fn it_closure_host(closure: i32) -> i32:
+        var inner = closure
+        for _ in 0..64:
+            let arg = self.ast.implicit_it_parent(inner)
+            if arg == 0: return 0
+            let demand = self.it_arg_demands.get(arg) ?? 0
+            let demand_fn = if demand != 0: self.callable_any_fn_type(demand) else: 0
+            let takes_one = demand_fn != 0 and self.get_type_d1(demand_fn) == 1
+            if self.ast.kind(arg) == NodeKind.NK_CLOSURE:
+                return if self.is_implicit_it_closure(arg) and takes_one: arg else: 0
+            if takes_one: return arg
+            inner = arg
+        0
+
+    // The pass loop's half of #2326: each recorded closure leaves its slot
+    // to its body and becomes the closure around its host argument (an
+    // `it` closure host already is one). Nodes are relinked, never added.
+    mut fn apply_it_closure_moves():
+        var i = 0
+        while i + 1 < self.it_closure_moves.len():
+            let closure = self.it_closure_moves[i]
+            let host = self.it_closure_moves[i + 1]
+            i += 2
+            let inner_slot = self.ast.implicit_it_slot(closure)
+            let host_slot = self.ast.implicit_it_slot(host)
+            if inner_slot < 0 or host_slot < 0 or self.ast.get_extra(inner_slot) != closure or self.ast.get_extra(host_slot) != host: continue
+            self.ast.set_extra(inner_slot, self.ast.get_data0(closure))
+            if self.ast.kind(host) == NodeKind.NK_CLOSURE: continue
+            self.ast.set_data0(closure as NodeId, host)
+            self.ast.set_start(closure as NodeId, self.ast.get_start(host))
+            self.ast.set_end(closure as NodeId, self.ast.get_end(host))
+            self.ast.set_extra(host_slot, closure)
+            self.ast.set_implicit_it_slot(closure, host_slot)
+            self.ast.set_implicit_it_parent(closure, self.ast.implicit_it_parent(host))
+        self.it_closure_moves.clear()
+
     mut fn check_closure(node: i32) -> i32:
+        if not self.is_implicit_it_closure(node): return self.check_closure_body(node)
+        // §9.3.1 (#2326): an `it` closure where no function is demanded
+        // belongs to the nearest enclosing argument that demands one.
+        if self.it_moves_allowed > 0:
+            let demand_fn = if self.has_expected_type != 0 and self.expected_expr_type != 0: self.callable_any_fn_type(self.expected_expr_type) else: 0
+            let host = if demand_fn == 0: self.it_closure_host(node) else: 0
+            if host != 0:
+                self.it_closure_moves.push(node)
+                self.it_closure_moves.push(host)
+                if not self.it_moves_suppressing.contains(host):
+                    self.it_moves_suppressing.insert(host, 1)
+                    self.suppress_errors += 1
+                return if self.has_expected_type != 0 and self.expected_expr_type != 0: self.expected_expr_type else: self.ty_i32 as i32
+        // Nested `it` is forbidden; the parser sees it written, this sees
+        // the nesting a moved closure makes (`map(f(it, g.map(it)))`).
+        if self.it_closure_depth > 0:
+            self.emit_error_code("nested implicit closure is ambiguous; use explicit parameter for inner closure", node, "E0951")
+        self.it_closure_depth += 1
+        let ty = self.check_closure_body(node)
+        self.it_closure_depth -= 1
+        ty
+
+    mut fn check_closure_body(node: i32) -> i32:
         let body = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
         let param_count = self.ast.get_data2(node)
@@ -25098,9 +25184,13 @@ impl Sema:
     // function, is typed from the parameter it lands in once the other
     // arguments have bound what they bind: `map(g, it * 2)` over a Gen[i32]
     // types `it` as i32, and U then binds from the closure's result.
-    fn closure_has_untyped_param(node: i32) -> bool:
-        if node <= 0 or self.ast.kind(node) != NodeKind.NK_CLOSURE:
-            return false
+    // An argument checked only once the call's other arguments have typed its
+    // parameter: a closure with an untyped parameter, or an expression holding
+    // an implicit `it` closure that may belong to it (§9.3.1, #2326).
+    fn arg_waits_for_fn_demand(node: i32) -> bool:
+        if node <= 0: return false
+        if self.ast.kind(node) != NodeKind.NK_CLOSURE:
+            return self.it_moves_allowed > 0 and self.ast.implicit_it_slot(node) >= 0
         let extra_start = self.ast.get_data1(node)
         for pi in 0..self.ast.get_data2(node):
             if self.ast.get_extra(extra_start + pi * 2 + 1) <= 0:
@@ -25153,7 +25243,7 @@ impl Sema:
         expected
 
     // Check the closure arguments deferred until the rest of a generic call's
-    // arguments were typed (closure_has_untyped_param).
+    // arguments were typed (arg_waits_for_fn_demand).
     mut fn check_deferred_generic_closure_args(fn_node: i32, fn_sym: i32, deferred: &List[i32], arg_types: List[i32], arg_nodes: &List[i32], call_node: i32) -> List[i32]:
         var types = arg_types
         for di in 0..deferred.len():
@@ -25312,7 +25402,7 @@ impl Sema:
         for ai in 0..arg_count:
             let arg_node = self.ast.get_extra(extra_start + ai)
             arg_nodes.push(arg_node)
-            if self.closure_has_untyped_param(arg_node):
+            if self.arg_waits_for_fn_demand(arg_node):
                 deferred.push(ai + 1)
                 arg_types.push(0)
             else:
@@ -25388,7 +25478,7 @@ impl Sema:
             arg_nodes.push(arg_node)
             if pipe_hint_meta >= 0 and ai + 1 < self.ast.fn_meta_param_count(pipe_hint_meta):
                 self.hint_collection_literal(arg_node, self.ast.fn_param_type(self.ast.fn_meta_param_start(pipe_hint_meta), ai + 1))
-            if self.closure_has_untyped_param(arg_node):
+            if self.arg_waits_for_fn_demand(arg_node):
                 deferred.push(ai + 1)
                 arg_types.push(0)
             else:
@@ -27516,7 +27606,7 @@ impl Sema:
                 let bind_sym = 0 - arg_node
                 arg_types.push(self.scope_lookup(bind_sym))
                 continue
-            if defer_generic_closures and expected_ty == 0 and self.closure_has_untyped_param(arg_node):
+            if defer_generic_closures and expected_ty == 0 and self.arg_waits_for_fn_demand(arg_node):
                 deferred_closure_args.push(ai)
                 arg_types.push(0)
                 continue
@@ -28215,7 +28305,16 @@ impl Sema:
             self.current_value_expr_root = node
             self.match_in_stmt_pos = 0
             self.stmt_pos_depth = 0
+        let it_arg = expected != 0 and self.it_moves_allowed > 0 and self.ast.implicit_it_slot(node) >= 0
+        if it_arg: self.it_arg_demands.insert(node, expected as i32)
         var out = self.check_expr(node)
+        if it_arg:
+            self.it_arg_demands.remove(node)
+            // An `it` closure inside moves here before the next check; until
+            // then this argument types as its demand.
+            if self.it_moves_suppressing.remove(node).is_some():
+                self.suppress_errors -= 1
+                out = expected
         out = self.value_to_option_at_demand(node, expected, out)
         // D93: every demand on a literal's binding counts, the ones its
         // default (a List, D113) already meets too, so two that disagree are
