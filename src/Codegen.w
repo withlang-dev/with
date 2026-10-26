@@ -7032,7 +7032,9 @@ impl Codegen:
             self.had_error = 1
             return
         let name_str = self.intern.resolve(name_sym)
-        let link_name = self.canonical_extern_name(name_str)
+        var link_name = self.canonical_extern_name(name_str)
+        let link_sym = self.pool.state.extern_var_link_names.get(node) ?? 0
+        if link_sym != 0: link_name = self.intern.resolve(link_sym)
 
         let existing = wl_get_named_global(self.llmod, link_name)
         var gv = existing

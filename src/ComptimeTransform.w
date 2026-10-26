@@ -218,6 +218,8 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
             out.state.fn_stack_sizes.insert(ni, src.state.fn_stack_sizes.get(ni).unwrap())
         if src.state.fn_weak_flags.contains(ni):
             out.state.fn_weak_flags.insert(ni, src.state.fn_weak_flags.get(ni).unwrap())
+        if src.state.extern_var_link_names.contains(ni):
+            out.state.extern_var_link_names.insert(ni, src.state.extern_var_link_names.get(ni).unwrap())
         if src.state.unsafe_fn_type_nodes.contains(ni):
             out.state.unsafe_fn_type_nodes.insert(ni, 1)
         if src.state.variadic_fn_type_nodes.contains(ni):

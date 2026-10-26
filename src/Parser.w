@@ -1825,7 +1825,19 @@ impl Parser:
                 self.emit_error("effect attribute can only be used on functions and extern functions")
                 self.pending_effect_params = List.new()
                 self.pending_effect_bits = List.new()
-            return self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
+            let ev_node = self.pool.add_node(NodeKind.NK_EXTERN_VAR, start, self.prev_end(), ev_name, ev_type, is_mut)
+            // #858: @[link_name("sym")] names the C symbol the variable links
+            // against, as on an extern fn; it was dropped here, so the object
+            // referenced the With name. Every other callconv-carried attribute
+            // is a function's.
+            if self.pending_callconv != 0:
+                let cc = self.intern.resolve(self.pending_callconv)
+                if cc.starts_with("link_name:"):
+                    self.pool.state.extern_var_link_names.insert(ev_node as i32, self.intern.intern(cc.slice(10, cc.len())))
+                else:
+                    self.emit_error_span("an extern var takes @[link_name(\"symbol\")] only; this attribute applies to functions", start, self.prev_end())
+                self.pending_callconv = 0
+            return ev_node
         if self.expect(TokenKind.TK_KW_FN) == 0:
             return self.poisoned_expr()
         let name = self.expect_ident()
