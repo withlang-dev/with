@@ -3134,7 +3134,12 @@ impl Codegen:
             let named = self.resolve_defined_named_type(sym)
             if named != 0:
                 return named
-            let sema_tid = self.sema.resolve_type_expr_frozen(type_node)
+            // #2699: an identifier in a type-level argument (`sizeof[c_char]()`)
+            // names an alias the type-expression path does not resolve; the
+            // level-argument resolution, as for an NK_INDEX below, does.
+            var sema_tid = self.sema.resolve_type_expr_frozen(type_node)
+            if sema_tid <= 0:
+                sema_tid = self.sema.resolve_type_level_arg_expr_frozen(type_node)
             if sema_tid > 0:
                 let sema_ty = self.sema_type_to_llvm(sema_tid)
                 if sema_ty != 0:
