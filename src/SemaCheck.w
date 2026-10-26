@@ -27313,6 +27313,14 @@ impl Sema:
             else if sig_idx_raw >= 0 and self.is_ci_visible(fn_sym) == 0: -1
             else if math_extern_yields: -1
             else: sig_idx_raw
+        // D65 (#2723): the signature resolved here, in the calling module, is
+        // the call's. MirLower read it back by name (call_sig_for_sym ->
+        // get_sig), outside the caller's module context, and on Windows a
+        // program's own `fn accept(value: G)` lowered against the runtime's
+        // Winsock `extern fn accept(s: i64, ...)`: the argument became a copy
+        // the caller dropped again after the callee had dropped it.
+        if sig_idx >= 0 and node != 0:
+            self.resolved_call_sigs.insert(node, sig_idx)
         let variant_expected_ty = if self.variant_lookup.contains(fn_sym) and self.is_ci_visible(fn_sym) != 0: self.expected_variant_constructor_type(fn_sym) else: 0
         let imported_variant_owner_for_call = if self.imported_variant_owners.contains(fn_sym): self.imported_variant_owners.get(fn_sym).unwrap() else: 0
         let variant_payload_owner = if variant_expected_ty != 0:
@@ -39027,6 +39035,12 @@ impl Sema:
     // move the checker never modeled, every later read saw an empty str).
     fn extern_param_is_bit_copy(fn_sym: i32, sig_idx: i32, param_i: i32) -> i32:
         if self.extern_fn_names.contains(fn_sym) == 0 and self.ci_syms.contains(fn_sym) == 0:
+            return 0
+        // #2723: the call's own signature decides, not the name: a program's
+        // `fn accept(value: G)` shares its symbol with the Windows runtime's
+        // Winsock extern, and its argument was re-issued as a copy the caller
+        // dropped again after `accept` had dropped it.
+        if sig_idx >= 0 and not self.extern_sig_modules.contains(sig_idx):
             return 0
         if sig_idx >= 0 and (self.sig_param_effect(sig_idx, param_i) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0:
             return 0
