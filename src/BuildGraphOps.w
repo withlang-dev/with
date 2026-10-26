@@ -64,13 +64,27 @@ fn build_graph_compare_files(root: &str, target: &BuildGraphTarget, operation_na
         return 1
     0
 
+// #964: a path clean may remove is a strict descendant of the project root:
+// relative, and every segment a name (not empty, `.` or `..`). `.` passed
+// the old filter (empty, absolute, `..`), resolved to the root itself, and
+// clean removed the whole project before failing on the root.
+fn build_graph_clean_path_is_descendant(rel: &str) -> bool:
+    if rel.len() == 0 or runtime_path_is_absolute(rel):
+        return false
+    for segment in rel.replace("\\", "/").split("/"):
+        if segment.len() == 0 or segment == "." or segment == "..":
+            return false
+    true
+
 fn build_graph_run_clean(root: &str, target: &BuildGraphTarget) -> i32:
     var removed = 0
+    // Every path is checked before the first removal.
+    for rel in target.args:
+        if not build_graph_clean_path_is_descendant(rel):
+            build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel ++ " (clean removes paths inside the project, named segment by segment)")
+            return 1
     for ai in 0..target.args.len():
         let rel = target.args[ai]
-        if rel.len() == 0 or runtime_path_is_absolute(rel) or rel.contains(".."):
-            build_graph_rt_eprint("error: clean target '" ++ target.name ++ "' has unsafe path: " ++ rel)
-            return 1
         let path = build_graph_resolve_project_path(root, rel)
         if build_graph_rt_is_dir(path) != 0:
             let rc = build_graph_rt_remove_tree(path)
