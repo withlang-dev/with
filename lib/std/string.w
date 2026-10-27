@@ -299,6 +299,12 @@ impl str:
             end = start
         out.to_str()
 
+    /// The text as a number of the type its use demands (#959): `let n: i64
+    /// = s.parse() ?? 0`. None unless the whole text is one value of that
+    /// type: an optional sign and decimal digits for an integer, in range;
+    /// digits with an optional fraction and exponent for a float.
+    pub fn parse[T: Parse]() -> Option[T]: T.parse_text(self)
+
     /// The bytes, one at a time (#2206): `for b in s.bytes()`.
     @[iter_of_self]
     pub fn bytes() -> ByteIter: ByteIter { bytes: self.as_bytes(), at: 0 }
@@ -485,6 +491,100 @@ pub fn parse_i128(s: &str) -> i128:
 pub fn parse_u128(s: &str) -> u128:
     if s.len() == 0: return 0
     parse_u128_magnitude(s, if s[0] == 43: 1 else: 0)
+
+/// A type `str.parse()` produces (#959): `parse_text` is the value the
+/// whole of `text` spells, or None.
+pub trait Parse:
+    fn parse_text(text: &str) -> Option[Self]
+
+// The sign and magnitude of `text` when the whole of it is a decimal
+// integer: an optional sign, then one or more digits. None past u128.
+fn parse_integer_parts(text: &str) -> Option[(bool, u128)]:
+    if text.len() == 0: return None
+    let neg = text[0] == 45
+    var i = if neg or text[0] == 43: 1 else: 0
+    if i == text.len(): return None
+    var mag: u128 = 0
+    while i < text.len():
+        let c = text[i]
+        if c < 48 or c > 57: return None
+        let digit = (c - 48) as u128
+        if mag > (340282366920938463463374607431768211455 - digit) / 10: return None
+        mag = mag * 10 + digit
+        i += 1
+    (neg, mag)
+
+// A signed integer of `bits` bits, or None out of its range.
+fn parse_signed(text: &str, bits: u32) -> Option[i128]:
+    let (neg, mag) = parse_integer_parts(text)?
+    let limit = (1 as u128) << (bits - 1)
+    if neg:
+        if mag > limit: return None
+        if mag == 0: return 0
+        return 0 - ((mag - 1) as i128) - 1
+    if mag >= limit: return None
+    mag as i128
+
+// An unsigned integer of `bits` bits ("-0" is 0), or None out of its range.
+fn parse_unsigned(text: &str, bits: u32) -> Option[u128]:
+    let (neg, mag) = parse_integer_parts(text)?
+    if neg and mag != 0: return None
+    if bits < 128 and mag >= (1 as u128) << bits: return None
+    mag
+
+// Whether the whole of `text` is a decimal float: an optional sign, digits
+// with an optional fraction (at least one digit in all), and an optional
+// exponent with at least one digit.
+fn float_text_is_number(text: &str) -> bool:
+    var i = if text.len() > 0 and (text[0] == 45 or text[0] == 43): 1 else: 0
+    var digits = 0
+    while i < text.len() and text[i] >= 48 and text[i] <= 57:
+        i += 1
+        digits += 1
+    if i < text.len() and text[i] == 46:
+        i += 1
+        while i < text.len() and text[i] >= 48 and text[i] <= 57:
+            i += 1
+            digits += 1
+    if digits == 0: return false
+    if i < text.len() and (text[i] == 101 or text[i] == 69):
+        i += 1
+        if i < text.len() and (text[i] == 45 or text[i] == 43): i += 1
+        var exp_digits = 0
+        while i < text.len() and text[i] >= 48 and text[i] <= 57:
+            i += 1
+            exp_digits += 1
+        if exp_digits == 0: return false
+    i == text.len()
+
+impl Parse for i8:
+    fn parse_text(text: &str) -> Option[i8]: parse_signed(text, 8)? as i8
+impl Parse for i16:
+    fn parse_text(text: &str) -> Option[i16]: parse_signed(text, 16)? as i16
+impl Parse for i32:
+    fn parse_text(text: &str) -> Option[i32]: parse_signed(text, 32)? as i32
+impl Parse for i64:
+    fn parse_text(text: &str) -> Option[i64]: parse_signed(text, 64)? as i64
+impl Parse for isize:
+    fn parse_text(text: &str) -> Option[isize]: parse_signed(text, sizeof[isize]() as u32 * 8)? as isize
+impl Parse for u8:
+    fn parse_text(text: &str) -> Option[u8]: parse_unsigned(text, 8)? as u8
+impl Parse for u16:
+    fn parse_text(text: &str) -> Option[u16]: parse_unsigned(text, 16)? as u16
+impl Parse for u32:
+    fn parse_text(text: &str) -> Option[u32]: parse_unsigned(text, 32)? as u32
+impl Parse for u64:
+    fn parse_text(text: &str) -> Option[u64]: parse_unsigned(text, 64)? as u64
+impl Parse for usize:
+    fn parse_text(text: &str) -> Option[usize]: parse_unsigned(text, sizeof[usize]() as u32 * 8)? as usize
+
+// The correctly rounded double of a validated text, strtod's (#2176).
+impl Parse for f64:
+    fn parse_text(text: &str) -> Option[f64]:
+        if not float_text_is_number(text): return None
+        match text.to_cstring():
+            Ok(c) => with_libc_strtold(c.as_cstr().ptr(), null)
+            Err(_) => None
 
 /// `it.collect[String]()` over bytes (§13.3): the bytes in order, one str.
 pub fn iter_collect_string[I: Iter[u8]](iter: I) -> str:
