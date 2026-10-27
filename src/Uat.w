@@ -306,6 +306,46 @@ fn uat_host_platform() -> str:
     if name == "Windows": return "windows"
     name.clone()
 
+// #1166: a `platforms:` entry is an OS (darwin, linux, windows), an
+// architecture (aarch64, x86_64), or an os-arch pair (linux-x86_64) —
+// the test gates' forms (#795), so a scenario can say the one host
+// combination it cannot run on without giving up the OS everywhere.
+// 1 = host matches, 0 = host does not match, -1 = unknown value.
+fn uat_platform_is_os(value: &str) -> bool:
+    value == "windows" or value == "linux" or value == "darwin"
+
+fn uat_platform_is_arch(value: &str) -> bool:
+    value == "aarch64" or value == "arm64" or value == "x86_64" or value == "amd64" or value == "x64"
+
+fn uat_platform_arch_matches(required: &str, host: &str) -> bool:
+    let req_arm = required == "aarch64" or required == "arm64"
+    let host_arm = host == "aarch64" or host == "arm64"
+    if req_arm or host_arm: return req_arm and host_arm
+    let req_x64 = required == "x86_64" or required == "amd64" or required == "x64"
+    let host_x64 = host == "x86_64" or host == "amd64" or host == "x64"
+    if req_x64 or host_x64: return req_x64 and host_x64
+    required == host
+
+fn uat_platform_matches(value: &str) -> i32:
+    if uat_platform_is_os(value):
+        return if uat_host_platform() == value: 1 else: 0
+    if uat_platform_is_arch(value):
+        return if uat_platform_arch_matches(value, target_spec_arch()): 1 else: 0
+    var dash = -1
+    var i = 0
+    while i < value.len():
+        if value[i] == 45:
+            dash = i
+            break
+        i = i + 1
+    if dash > 0:
+        let os_part = value.slice(0, dash as i64)
+        let arch_part = value.slice((dash + 1) as i64, value.len())
+        if uat_platform_is_os(os_part) and uat_platform_is_arch(arch_part):
+            let m = uat_host_platform() == os_part and uat_platform_arch_matches(arch_part, target_spec_arch())
+            return if m: 1 else: 0
+    -1
+
 fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
     let _ = with_fs_mkdir_p(scratch)
     with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
@@ -362,10 +402,12 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
 
 fn uat_skip_reason(sc: &UatScenario, scratch: &str) -> str:
     if sc.platforms.len() > 0:
-        let host = uat_host_platform()
+        let host = uat_host_platform() ++ "-" ++ target_spec_arch()
         var listed = false
         for i in 0..sc.platforms.len():
-            if sc.platforms[i] == host: listed = true
+            let m = uat_platform_matches(sc.platforms[i])
+            if m < 0: return "platforms: unknown platform value '" ++ sc.platforms[i] ++ "' (expected windows|linux|darwin, aarch64|x86_64, or an os-arch pair)"
+            if m == 1: listed = true
         if not listed: return "platforms: " ++ host ++ " not listed"
     for i in 0..sc.requires.len():
         let why = uat_unmet(sc.requires[i], scratch)

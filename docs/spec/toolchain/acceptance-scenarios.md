@@ -14,4 +14,8 @@ init` writes `uat/hello.uat` and `uat/README.md`. In a checkout that holds
 the package registry (`registry/README.md`, §16.2b.15), a scenario's `with
 get` reads that checkout's facts (`WITH_REGISTRY=file://<root>`, set by
 the runner unless the caller set it): the battery proves the tree, its
-facts included, before they reach the repository's `main`.
+facts included, before they reach the repository's `main`. A
+`platforms:` entry is an OS (`darwin`, `linux`, `windows`), an
+architecture (`aarch64`, `x86_64`), or an os-arch pair
+(`linux-x86_64`) — the test gates' forms; an unknown value skips the
+scenario with that reason rather than running it everywhere.

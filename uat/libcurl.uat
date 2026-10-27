@@ -1,5 +1,6 @@
 scenario: libcurl from a fresh project
 requires: network
+platforms: darwin, windows, linux-x86_64
 
 new directory
 run: with init .
