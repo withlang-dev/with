@@ -2823,15 +2823,13 @@ impl Sema:
                             if fn_name_str[gsm_i] == 46:
                                 let owner_name = fn_name_str.slice(0, gsm_i as i64)
                                 let owner_sym = self.pool_intern(owner_name)
-                                if self.type_decl_nodes.contains(owner_sym):
-                                    let td_node = self.type_decl_nodes.get(owner_sym).unwrap()
-                                    if self.type_decl_tp_count(td_node) > 0:
-                                        let gsm_p_start = self.ast.fn_meta_param_start(meta)
-                                        let gsm_p_count = self.ast.fn_meta_param_count(meta)
-                                        if gsm_p_count > 0:
-                                            let p0_tn = self.ast.fn_param_type(gsm_p_start, 0)
-                                            if p0_tn != 0 and self.ast.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
-                                                is_generic_struct_method = true
+                                if self.type_decl_type_param_count(owner_sym) > 0:
+                                    let gsm_p_start = self.ast.fn_meta_param_start(meta)
+                                    let gsm_p_count = self.ast.fn_meta_param_count(meta)
+                                    if gsm_p_count > 0:
+                                        let p0_tn = self.ast.fn_param_type(gsm_p_start, 0)
+                                        if p0_tn != 0 and self.ast.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
+                                            is_generic_struct_method = true
                                 break
                         if not is_generic_struct_method:
                             self.update_module_context(di)
@@ -4555,7 +4553,7 @@ impl Sema:
             if sig_idx < 0 or not self.method_impl_nodes.contains(fn_name):
                 continue
             let owner_sym = self.method_decl_owner_symbol(decl, self.ast.get_data0(decl))
-            if owner_sym != 0 and self.type_decl_nodes.contains(owner_sym) and self.type_decl_tp_count(self.type_decl_nodes.get(owner_sym).unwrap()) != 0:
+            if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) != 0:
                 continue
             self.update_decl_source_context(di)
             let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
@@ -7468,9 +7466,9 @@ impl Sema:
         let fn_node = self.generic_fn_node_for_symbol(method_fn)
         if fn_node == 0:
             return self.get_sig(method_fn)
-        if not self.type_decl_nodes.contains(owner_sym):
+        let owner_decl: i32 = self.owner_decl_node_for_type(owner_sym, owner_type)
+        if owner_decl == 0:
             return -1
-        let owner_decl: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
         let owner_tp_start = self.type_decl_tp_start(owner_decl)
         let owner_tp_count = self.type_decl_tp_count(owner_decl)
         let meta = self.ast.find_fn_meta(fn_node)
@@ -14153,7 +14151,7 @@ impl Sema:
             let elem = self.resolve_alias(self.type_extra[start + ei] as TypeId) as i32
             let kind = self.get_type_kind(elem as TypeId)
             if kind == TypeKind.TY_TUPLE and self.tuple_has_open_generic(elem): return true
-            if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_decl_type_param_count(self.get_type_d0(elem as TypeId)) > 0: return true
+            if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_tid_decl_tp_count(elem) > 0: return true
         false
 
     // D124 (§4.2.1 rule 7): an untyped integer constant expression under a
@@ -31713,7 +31711,7 @@ impl Sema:
         // #959: a builtin owner (`impl str: fn parse[T: Parse]()`) has no
         // type declaration and no type parameters of its own; its generic
         // methods are checked here like any other, not left uninstantiated.
-        let td_node: i32 = self.type_decl_nodes.get(owner_sym) ?? 0
+        let td_node: i32 = self.owner_decl_node_for_type(owner_sym, owner_type)
         let owner_tp_start = if td_node != 0: self.type_decl_tp_start(td_node) else: 0
         let owner_tp_count = if td_node != 0: self.type_decl_tp_count(td_node) else: 0
         let param_start = self.ast.fn_meta_param_start(meta)

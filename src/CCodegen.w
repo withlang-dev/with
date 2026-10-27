@@ -9865,7 +9865,7 @@ impl CCodegen:
                     out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
                     field_names.push(field_name)
                 // D72 (§2.5.1): the template's hidden liveness byte.
-                if self.sema.struct_liveness_byte_frozen(self.sema.get_type_d0(resolved)) != 0:
+                if self.sema.struct_liveness_byte_frozen_tid(self.sema.get_type_d0(resolved), resolved as i32) != 0:
                     out = out ++ "    uint8_t __with_live;\n"
                 out = out ++ cc_rbrace() ++ ";\n"
                 out = out ++ self.layout_static_asserts(resolved as i32, name, &field_names) ++ "\n"
@@ -9897,7 +9897,7 @@ impl CCodegen:
                 out = out ++ "    " ++ align_text ++ self.c_decl(field_tid, field_name) ++ ";\n"
                 field_names.push(field_name)
             // D72 (§2.5.1): the hidden liveness byte after the last field.
-            if self.sema.struct_liveness_byte_frozen(name_sym) != 0:
+            if self.sema.struct_liveness_byte_frozen_tid(name_sym, resolved) != 0:
                 out = out ++ "    uint8_t __with_live;\n"
             out = out ++ cc_rbrace() ++ ";\n"
             out = out ++ self.layout_static_asserts(resolved, name, &field_names) ++ "\n"
