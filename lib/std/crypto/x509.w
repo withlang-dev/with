@@ -706,13 +706,16 @@ fn x509_valid_at(cert: &X509Cert, now: i64) -> i32:
         return 0
     1
 
-// Verify a presented chain (leaf first) against trust anchors. Every
-// presented certificate must be in its validity window, each link's
-// signature must verify under its issuer, every non-anchor issuer must
-// be a CA (basicConstraints), and the top must anchor in a root whose
-// subject names the top's issuer. Only the signature algorithms
-// x509_verify_signature knows verify; anything else fails the chain —
-// a refusal, never a silent accept.
+// Verify a presented chain (leaf first) against trust anchors. Each
+// certificate on the built path must be in its validity window, each
+// link's signature must verify under its issuer, and every non-anchor
+// issuer must be a CA (basicConstraints). The path anchors as soon as
+// a root in the store names the current certificate's issuer and its
+// key verifies the signature — servers routinely present cross-signed
+// certificates above the anchor point (an old root's cross-sign of a
+// newer root the store holds directly), and those are not on the path.
+// Only the signature algorithms x509_verify_signature knows verify;
+// anything else fails the chain — a refusal, never a silent accept.
 unsafe fn x509_verify_chain_at(
     chain_buf: *const u8, chain_starts: *const i32, chain_lens: *const i32, chain_count: i32,
     roots_buf: *const u8, roots_starts: *const i32, roots_lens: *const i32, roots_count: i32,
@@ -731,34 +734,31 @@ unsafe fn x509_verify_chain_at(
         if x509_valid_at(&cert, now) == 0:
             return 0
         let cert_buf_at = chain_buf + start as u64
-        if idx + 1 < chain_count:
-            let istart = *(chain_starts + (idx + 1) as u64)
-            let ilen = *(chain_lens + (idx + 1) as u64)
-            if x509_parse(&raw mut issuer as *mut X509Cert, chain_buf + istart as u64, ilen) == 0:
-                return 0
-            if issuer.bc_ca != 1:
-                return 0
-            if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, chain_buf + istart as u64, issuer.subject_start, issuer.subject_len) == 0:
-                return 0
-            if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, chain_buf + istart as u64, &issuer as *const X509Cert) == 0:
-                return 0
-        else:
-            // Top of the presented chain: anchor in a root by name.
-            var anchored = 0
-            var r = 0
-            while r < roots_count:
-                let rstart = *(roots_starts + r as u64)
-                let rlen = *(roots_lens + r as u64)
-                if x509_parse(&raw mut issuer as *mut X509Cert, roots_buf + rstart as u64, rlen) != 0:
-                    if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, roots_buf + rstart as u64, issuer.subject_start, issuer.subject_len) != 0:
-                        if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, roots_buf + rstart as u64, &issuer as *const X509Cert) != 0:
-                            anchored = 1
-                            break
-                r = r + 1
-            if anchored == 0:
-                return 0
+        // Anchor here if a stored root issued this certificate.
+        var r = 0
+        while r < roots_count:
+            let rstart = *(roots_starts + r as u64)
+            let rlen = *(roots_lens + r as u64)
+            if x509_parse(&raw mut issuer as *mut X509Cert, roots_buf + rstart as u64, rlen) != 0:
+                if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, roots_buf + rstart as u64, issuer.subject_start, issuer.subject_len) != 0:
+                    if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, roots_buf + rstart as u64, &issuer as *const X509Cert) != 0:
+                        return 1
+            r = r + 1
+        // Otherwise the next presented certificate must issue this one.
+        if idx + 1 >= chain_count:
+            return 0
+        let istart = *(chain_starts + (idx + 1) as u64)
+        let ilen = *(chain_lens + (idx + 1) as u64)
+        if x509_parse(&raw mut issuer as *mut X509Cert, chain_buf + istart as u64, ilen) == 0:
+            return 0
+        if issuer.bc_ca != 1:
+            return 0
+        if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, chain_buf + istart as u64, issuer.subject_start, issuer.subject_len) == 0:
+            return 0
+        if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, chain_buf + istart as u64, &issuer as *const X509Cert) == 0:
+            return 0
         idx = idx + 1
-    1
+    0
 
 // Case-insensitive equality of a SAN dNSName against the host, with
 // one left-most wildcard label ("*.example.com" matches

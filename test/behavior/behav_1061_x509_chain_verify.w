@@ -25,6 +25,11 @@ fn main:
     assert(x509_verify_chain_pem(leaf_rsa ++ inter, root, "LOCALHOST", now))
     // EC leaf directly under the RSA root.
     assert(x509_verify_chain_pem(leaf_ec, root, "localhost", now))
+    // Cross-sign shape: junk presented above the anchor point is not on
+    // the path (Debian lacks the AAA root example.com's chain tops out
+    // in, but holds the ECC root below it directly).
+    assert(x509_verify_chain_pem(leaf_rsa ++ inter ++ wrong, root, "localhost", now))
+    assert(x509_verify_chain_pem(leaf_ec ++ selfsigned, root, "localhost", now))
     // Wrong host, wrong SAN, untrusted, missing link, wrong anchor, expired.
     assert(not x509_verify_chain_pem(leaf_rsa ++ inter, root, "example.com", now))
     assert(not x509_verify_chain_pem(wrong, root, "localhost", now))

@@ -13,6 +13,7 @@ use std.net
 use std.process
 use std.string
 use std.sync
+use std.time
 
 fn cert(name: str) -> str:
     "test/behavior/tls1061/" ++ name
@@ -27,14 +28,16 @@ fn stop_server(port: i32):
     let _ = run(&["pkill", "-f", f"s_server -accept {port}"])
 
 // Wait until the server accepts TCP (the probe connection is dropped).
+// The budget is wall time, not tries: a refused loopback connect returns
+// instantly, so a try count can expire before the server has even exec'd
+// (observed on Linux: 30 tries in under a millisecond).
 fn wait_ready(port: i32) -> bool:
-    var tries = 0
-    while tries < 100:
+    let deadline = now_ns() + 5000000000
+    while now_ns() < deadline:
         let fd = tcp_connect_timeout("127.0.0.1", port, 100)
         if fd >= 0:
             let _ = socket_close(fd)
             return true
-        tries = tries + 1
     false
 
 fn fetch(port: i32) -> i32:
