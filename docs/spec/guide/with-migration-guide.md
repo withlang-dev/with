@@ -2095,12 +2095,13 @@ let users: Vec<User> = futures::future::join_all(
 // With
 let (user, posts) = (fetch_user(id), fetch_posts(id)).await
 let users = ids |> map(fetch_user) |> await_all
-let users_limited = ids |> map(fetch_user) |> with_concurrency(10) |> await_all
+let users_limited = ids |> with_concurrency(10, fetch_user)
 ```
 
 `tokio::join!` maps to tuple `.await`. `join_all` maps to
 `await_all`. `FuturesUnordered` + bounded parallelism maps to
-`with_concurrency(n) |> await_all`.
+`with_concurrency(n, f)`, which starts the work itself — a task handed
+to a limiter is already running — and returns the results in order.
 
 ## ARC → Ownership
 

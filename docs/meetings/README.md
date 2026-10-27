@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D164 — `with_concurrency` starts the work itself: `(inputs, n, f) -> List[T]` with at most `n` of its tasks running at once; a task-taking limiter can bound nothing, because a `Task` is already running (delegated)](2026-10-26-D164-with-concurrency-starts-the-work-itself.md)
 - [D163 — A match arm is `pattern [if guard] => body`, the body in the three forms after `=>`; §9.7, §29.13, §30.4 and §30.8 now state the rule the compiler enforces (delegated)](2026-10-26-D163-a-match-arm-is-pattern-guard-arrow-body.md)
 - [D162 — `std.random` draws the type its use demands: `next()` and `range(lo, hi)` over a `Random` trait (delegated)](2026-10-26-D162-std-random-draws-the-type-its-use-demands.md)
 - [D161 — An implicit `it` closure is the nearest enclosing argument whose parameter takes a single-parameter function (delegated)](2026-10-26-D161-an-it-closure-is-the-nearest-argument-that-takes-a-function.md)

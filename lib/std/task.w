@@ -224,10 +224,56 @@ pub fn await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Res
         settled.push(pending.remove(0).await)
     settled
 
-/// Limit concurrent execution to at most `n` tasks at a time.
-pub fn with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIter[Task[T]]:
-    let _ = n
-    tasks
+/// Run `f` over `inputs` with at most `n` of the tasks it starts running
+/// at once, returning their results in input order (D164). The limiter
+/// starts the work itself because a `Task` is already running (§24.1):
+/// `f(input)` is called — and spawns — only when a slot frees.
+/// `ids |> with_concurrency(10, fetch_user)`.
+pub fn with_concurrency[I, T](inputs: impl IntoIter[I], n: isize, f: fn(I) -> Task[T]) -> List[T]:
+    if n < 1:
+        todo("with_concurrency: limit must be at least 1")
+    var source = inputs.into_iter()
+    let pending: List[Task[T]] = []
+    // Each pending task's input position, and a slot per input for its result.
+    let order: List[isize] = []
+    let values: List[Option[T]] = []
+    let finished: List[i32] = []
+    var cleanup_i = 0
+    defer:
+        // Awaited tasks were removed, so everything live is un-awaited.
+        while cleanup_i < pending.len():
+            pending[cleanup_i].join_cleanup()
+            cleanup_i = cleanup_i + 1
+
+    var exhausted = false
+    while true:
+        while not exhausted and pending.len() < n:
+            match source.next():
+                Some(input) =>
+                    pending.push(f(input))
+                    finished.push(0)
+                    order.push(values.len())
+                    let empty: Option[T] = None
+                    values.push(empty)
+                None => exhausted = true
+        if pending.len() == 0: break
+        let ready = task_first_completed(&pending, &finished)
+        if ready < 0:
+            task_wait_for_progress()
+            if with_fiber_is_cancelled() != 0:
+                task_cancel_point().await
+            continue
+        // D27/D33: remove transfers — await needs the owned Task.
+        let slot_index = order.remove(ready)
+        finished.remove(ready)
+        let value = pending.remove(ready).await
+        with values.slot(slot_index) as mut slot:
+            slot.set(Some(value))
+
+    let ordered: List[T] = []
+    while values.len() > 0:
+        ordered.push(values.remove(0).unwrap())
+    ordered
 
 // ── Pulling a generator (§13.4) ───────────────────────────────────────────
 // `g.pull()` runs the generator on its own coroutine: a fiber stack from the
