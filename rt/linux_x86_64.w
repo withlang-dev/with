@@ -1036,6 +1036,10 @@ pub fn rt_sysinfo_os() -> str:
 pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr(c"x86_64".ptr)
 
+// std reads the CA bundle file itself on this platform (#1061).
+pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
+    -1
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32: rt_libc_gethostname(name, len)
 
 pub fn rt_getenv(name: *const c_char) -> *const c_char:

@@ -1252,6 +1252,42 @@ pub fn rt_sysinfo_os() -> str:
 pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr(c"x86_64".ptr)
 
+// The ROOT system store via crypt32 (#1061): each CERT_CONTEXT's encoded
+// bytes are one DER certificate. Layout (64-bit): encoding type at 0,
+// pbCertEncoded at 8, cbCertEncoded at 16.
+extern fn CertOpenSystemStoreA(hProv: i64, szSubsystemProtocol: *const u8) -> *mut u8
+extern fn CertEnumCertificatesInStore(hCertStore: *mut u8, pPrevCertContext: *mut u8) -> *mut u8
+extern fn CertCloseStore(hCertStore: *mut u8, dwFlags: u32) -> i32
+
+pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
+    unsafe:
+        let store = CertOpenSystemStoreA(0, c"ROOT".ptr as *const u8)
+        if store == null:
+            return -1
+        var count = 0
+        var used = 0
+        var ctx: *mut u8 = null
+        while true:
+            ctx = CertEnumCertificatesInStore(store, ctx)
+            if ctx == null:
+                break
+            if count >= max_roots:
+                break
+            let der = *((ctx + 8u64) as *const *mut u8)
+            let der_len = *((ctx + 16u64) as *const u32) as i32
+            if der == null or der_len <= 0 or used + der_len > buf_cap:
+                continue
+            *(starts + count as u64) = used
+            *(lens + count as u64) = der_len
+            var i = 0
+            while i < der_len:
+                *(buf + (used + i) as u64) = *(der + i as u64)
+                i = i + 1
+            used = used + der_len
+            count = count + 1
+        let _closed = CertCloseStore(store, 0 as u32)
+        if count > 0: count else: -1
+
 pub fn rt_getenv(name: *const c_char) -> *const c_char:
     var wname: [1024]u16 = [0; 1024]
     var wvalue: [16384]u16 = [0; 16384]

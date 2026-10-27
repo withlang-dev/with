@@ -5,6 +5,7 @@
 //   TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256  (0xC02B)
 
 use std.crypto.sha256
+use std.crypto.sha512
 use std.crypto.hmac
 use std.crypto.aes
 use std.crypto.gcm
@@ -13,6 +14,8 @@ use std.crypto.ecdsa
 use std.crypto.x509
 use std.crypto.endian
 use std.net
+use std.fs
+use std.process
 use std.internal.str_abi
 use rt.rt_core
 
@@ -30,6 +33,7 @@ let HS_SERVER_KEY_EXCHANGE: u8 = 12u8
 let HS_SERVER_HELLO_DONE: u8 = 14u8
 let HS_CLIENT_KEY_EXCHANGE: u8 = 16u8
 let HS_FINISHED: u8 = 20u8
+let HS_NEW_SESSION_TICKET: u8 = 4u8
 
 let SUITE_ECDHE_RSA_AES128_GCM: u16 = 0xC02Fu16
 let SUITE_ECDHE_ECDSA_AES128_GCM: u16 = 0xC02Bu16
@@ -187,6 +191,8 @@ type TlsConn  {
     cipher_active: i32,
     // Handshake hash (SHA-256 of all handshake messages)
     hs_hash_ctx: Sha256,
+    // Master secret, kept for the Finished verify_data checks (#1061)
+    master_secret: [u8; 48],
     // Chosen cipher suite
     cipher_suite: u16,
     // Error flag
@@ -206,6 +212,7 @@ fn TlsConn.new(fd: i32) -> TlsConn:
         server_seq: 0u64,
         cipher_active: 0,
         hs_hash_ctx: Sha256.new(),
+        master_secret: [0u8; 48],
         cipher_suite: 0u16,
         err_flag: 0,
     }
@@ -412,19 +419,23 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     let ext_len_pos = pos
     pos = pos + 2  // extensions length placeholder
 
-    // Extension: supported_groups (0x000A)
+    // Extension: supported_groups (0x000A). In TLS 1.2 this list also
+    // bounds the curves a server certificate may use (RFC 4492): both
+    // curves we verify and do ECDHE on are offered, P-256 first.
     buf[pos] = 0x00u8
     buf[pos + 1] = 0x0Au8
     pos = pos + 2
     buf[pos] = 0x00u8
-    buf[pos + 1] = 0x04u8  // ext data length
+    buf[pos + 1] = 0x06u8  // ext data length
     pos = pos + 2
     buf[pos] = 0x00u8
-    buf[pos + 1] = 0x02u8  // named curve list length
+    buf[pos + 1] = 0x04u8  // named curve list length
     pos = pos + 2
     buf[pos] = 0x00u8
     buf[pos + 1] = 0x17u8  // secp256r1
-    pos = pos + 2
+    buf[pos + 2] = 0x00u8
+    buf[pos + 3] = 0x18u8  // secp384r1
+    pos = pos + 4
 
     // Extension: ec_point_formats (0x000B)
     buf[pos] = 0x00u8
@@ -442,19 +453,27 @@ unsafe fn tls_send_client_hello(conn: *mut TlsConn, hostname: *const u8, hostnam
     buf[pos + 1] = 0x0Du8
     pos = pos + 2
     buf[pos] = 0x00u8
-    buf[pos + 1] = 0x06u8  // ext data length
+    buf[pos + 1] = 0x0Eu8  // ext data length
     pos = pos + 2
     buf[pos] = 0x00u8
-    buf[pos + 1] = 0x04u8  // sig alg list length
+    buf[pos + 1] = 0x0Cu8  // sig alg list length
     pos = pos + 2
-    // RSA PKCS1 SHA256 (0x0401)
+    // RSA PKCS1 SHA256 (0x0401), ECDSA SHA256 (0x0403),
+    // RSA PKCS1 SHA384 (0x0501), ECDSA SHA384 (0x0503),
+    // RSA PKCS1 SHA512 (0x0601), ECDSA SHA512 (0x0603)
     buf[pos] = 0x04u8
     buf[pos + 1] = 0x01u8
-    pos = pos + 2
-    // ECDSA SHA256 (0x0403)
-    buf[pos] = 0x04u8
-    buf[pos + 1] = 0x03u8
-    pos = pos + 2
+    buf[pos + 2] = 0x04u8
+    buf[pos + 3] = 0x03u8
+    buf[pos + 4] = 0x05u8
+    buf[pos + 5] = 0x01u8
+    buf[pos + 6] = 0x05u8
+    buf[pos + 7] = 0x03u8
+    buf[pos + 8] = 0x06u8
+    buf[pos + 9] = 0x01u8
+    buf[pos + 10] = 0x06u8
+    buf[pos + 11] = 0x03u8
+    pos = pos + 12
 
     // Extension: server_name (SNI) (0x0000)
     if hostname_len > 0:
@@ -529,6 +548,34 @@ unsafe fn tls_parse_server_hello(conn: *mut TlsConn, data: *const u8, len: i32) 
 
     0
 
+// What tls_recv_server_handshake extracts for peer verification (#1061):
+// the presented chain as slices of cert_buf, the parsed leaf, and the
+// ServerKeyExchange parameters and signature as received.
+type TlsPeerEvidence {
+    chain_starts: [i32; 8],
+    chain_lens: [i32; 8],
+    chain_count: i32,
+    leaf_start: i32,
+    leaf: X509Cert,
+    ske_params: [u8; 101],
+    ske_params_len: i32,
+    // The ECDHE named group the server chose: 23 (P-256) or 24 (P-384).
+    ske_curve: i32,
+    ske_hash_alg: i32,
+    ske_sig_alg: i32,
+    ske_sig: [u8; 528],
+    ske_sig_len: i32,
+}
+
+fn TlsPeerEvidence.new() -> TlsPeerEvidence:
+    TlsPeerEvidence {
+        chain_starts: [0; 8], chain_lens: [0; 8], chain_count: 0,
+        leaf_start: 0, leaf: X509Cert.new(),
+        ske_params: [0u8; 101], ske_params_len: 0, ske_curve: 0,
+        ske_hash_alg: 0, ske_sig_alg: 0,
+        ske_sig: [0u8; 528], ske_sig_len: 0,
+    }
+
 // Receive and process all server handshake messages until ServerHelloDone.
 // Extracts certificate chain and ECDHE parameters.
 // Returns 0 on success, -1 on error.
@@ -537,6 +584,7 @@ unsafe fn tls_recv_server_handshake(
     server_pub_x: *mut u8, server_pub_y: *mut u8,
     server_ecdh_pub: *mut u8,
     cert_buf: *mut u8, cert_len: *mut i32,
+    evidence: *mut TlsPeerEvidence,
 ) -> i32:
     var done = 0
     while done == 0:
@@ -575,48 +623,97 @@ unsafe fn tls_recv_server_handshake(
                     return -1
 
             if hs_type == HS_CERTIFICATE:
-                // Copy raw certificate data
+                // Copy the whole Certificate message; a chain that does
+                // not fit is refused, never truncated into a partial one.
+                if hs_len > 16384 or hs_len < 3:
+                    return -1
                 var ci = 0
-                while ci < hs_len and ci < 8192:
+                while ci < hs_len:
                     let bv = *(body + ci as u64)
                     *(cert_buf + ci as u64) = bv
                     ci = ci + 1
                 *(cert_len + 0u64) = ci
 
-                // Parse first cert to get server's public key
-                if hs_len > 6:
-                    let fc_b1 = *(body + 3u64) as u32
-                    let fc_b2 = *(body + 4u64) as u32
-                    let fc_b3 = *(body + 5u64) as u32
-                    let first_cert_len = ((fc_b1 << 16u32) | (fc_b2 << 8u32) | fc_b3) as i32
-                    if first_cert_len > hs_len - 6:
+                // Walk the certificate list: total length (3), then per
+                // certificate a 3-byte length and the DER.
+                let list_len = (((*(body + 0u64) as u32) << 16u32) | ((*(body + 1u64) as u32) << 8u32) | (*(body + 2u64) as u32)) as i32
+                if list_len != hs_len - 3:
+                    return -1
+                var cp = 3
+                var count = 0
+                while cp < hs_len:
+                    if cp + 3 > hs_len or count >= 8:
                         return -1
-                    let first_cert_data = body + 6u64
-                    var parsed_cert = X509Cert.new()
-                    let parse_ok = x509_parse(&raw mut parsed_cert as *mut X509Cert, first_cert_data, first_cert_len)
-                    if parse_ok != 0:
-                        if parsed_cert.key_type == 2:
-                            let pt_start = parsed_cert.key_point_start
-                            if parsed_cert.key_point_len == 65:
-                                var pi = 0
-                                while pi < 32:
-                                    let vx = *(first_cert_data + (pt_start + 1 + pi) as u64)
-                                    *(server_pub_x + pi as u64) = vx
-                                    let vy = *(first_cert_data + (pt_start + 33 + pi) as u64)
-                                    *(server_pub_y + pi as u64) = vy
-                                    pi = pi + 1
+                    let one_len = (((*(body + cp as u64) as u32) << 16u32) | ((*(body + (cp + 1) as u64) as u32) << 8u32) | (*(body + (cp + 2) as u64) as u32)) as i32
+                    if one_len <= 0 or one_len > hs_len - cp - 3:
+                        return -1
+                    evidence.chain_starts[count] = cp + 3
+                    evidence.chain_lens[count] = one_len
+                    count = count + 1
+                    cp = cp + 3 + one_len
+                if count == 0:
+                    return -1
+                evidence.chain_count = count
+                evidence.leaf_start = evidence.chain_starts[0]
+
+                // Parse the leaf for its public key and for verification.
+                let first_cert_data = cert_buf + evidence.leaf_start as u64
+                if x509_parse(&raw mut evidence.leaf as *mut X509Cert, first_cert_data, evidence.chain_lens[0]) == 0:
+                    return -1
+                if evidence.leaf.key_type == 2:
+                    let pt_start = evidence.leaf.key_point_start
+                    if evidence.leaf.key_point_len == 65:
+                        var pi = 0
+                        while pi < 32:
+                            let vx = *(first_cert_data + (pt_start + 1 + pi) as u64)
+                            *(server_pub_x + pi as u64) = vx
+                            let vy = *(first_cert_data + (pt_start + 33 + pi) as u64)
+                            *(server_pub_y + pi as u64) = vy
+                            pi = pi + 1
 
             if hs_type == HS_SERVER_KEY_EXCHANGE:
-                // Parse ECDHE parameters
-                if hs_len >= 69:
-                    let pt_len_v = *(body + 3u64)
-                    let pt_len = pt_len_v as i32
-                    if pt_len == 65:
-                        var pi = 0
-                        while pi < 65:
-                            let ev = *(body + (4 + pi) as u64)
-                            *(server_ecdh_pub + pi as u64) = ev
-                            pi = pi + 1
+                // ECDHE parameters, then the signature over them. Only
+                // the named-curve forms ClientHello offered are accepted
+                // (P-256, P-384); the parameters and signature are kept
+                // verbatim for verification against the leaf key.
+                if hs_len < 4 + 2 + 2:
+                    return -1
+                if *(body + 0u64) != 3u8 or *(body + 1u64) != 0u8:
+                    return -1
+                let curve_id = *(body + 2u64) as i32
+                let pt_len = *(body + 3u64) as i32
+                if curve_id == 23:
+                    if pt_len != 65:
+                        return -1
+                else if curve_id == 24:
+                    if pt_len != 97:
+                        return -1
+                else:
+                    return -1
+                evidence.ske_curve = curve_id
+                let params_len = 4 + pt_len
+                if hs_len < params_len + 4:
+                    return -1
+                var pi = 0
+                while pi < pt_len:
+                    let ev = *(body + (4 + pi) as u64)
+                    *(server_ecdh_pub + pi as u64) = ev
+                    pi = pi + 1
+                pi = 0
+                while pi < params_len:
+                    evidence.ske_params[pi] = *(body + pi as u64)
+                    pi = pi + 1
+                evidence.ske_params_len = params_len
+                evidence.ske_hash_alg = *(body + params_len as u64) as i32
+                evidence.ske_sig_alg = *(body + (params_len + 1) as u64) as i32
+                let sig_len = (((*(body + (params_len + 2) as u64) as u32) << 8u32) | (*(body + (params_len + 3) as u64) as u32)) as i32
+                if sig_len <= 0 or sig_len > 528 or params_len + 4 + sig_len > hs_len:
+                    return -1
+                evidence.ske_sig_len = sig_len
+                pi = 0
+                while pi < sig_len:
+                    evidence.ske_sig[pi] = *(body + (params_len + 4 + pi) as u64)
+                    pi = pi + 1
 
             if hs_type == HS_SERVER_HELLO_DONE:
                 done = 1
@@ -663,45 +760,54 @@ unsafe fn tls_derive_keys(conn: *mut TlsConn, premaster: *const u8, premaster_le
         conn.server_write_iv[si] = key_block[36 + si]
         si = si + 1
 
-    // Save master secret for Finished messages (reuse seed buffer)
-    // We need it later, store in server_random temporarily... actually let's
-    // compute the Finished verify_data here and store it.
-    // Actually we need the master secret stored. Let's extend TlsConn or
-    // just pass it around. For simplicity, recompute when needed.
-    // Store master_secret in first 48 bytes of a buffer we pass around.
-    ()
+    // Keep the master secret for both Finished verify_data computations.
+    si = 0
+    while si < 48:
+        conn.master_secret[si] = master_secret[si]
+        si = si + 1
 
-// Send ClientKeyExchange + ChangeCipherSpec + Finished
-unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8) -> i32:
-    // Generate ECDHE key pair
-    var ecdh_priv: [u8; 32] = [0u8; 32]
-    fill_random(&raw mut ecdh_priv[0] as *mut u8, 32)
+// Send ClientKeyExchange + ChangeCipherSpec + Finished.
+// `curve_id` is the ECDHE group the server chose (23 or 24).
+unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8, curve_id: i32) -> i32:
+    var width = 32
+    if curve_id == 24:
+        width = 48
+    else if curve_id != 23:
+        return -1
+    let point_len = 1 + 2 * width
 
-    var ecdh_pub: [u8; 65] = [0u8; 65]
-    p256_compute_public(&ecdh_priv[0] as *const u8, &raw mut ecdh_pub[0] as *mut u8)
+    // Generate ECDHE key pair on the negotiated curve
+    var ecdh_priv: [u8; 48] = [0u8; 48]
+    fill_random(&raw mut ecdh_priv[0] as *mut u8, width)
 
-    // Compute shared secret
-    var shared_secret: [u8; 32] = [0u8; 32]
-    p256_ecdh(&ecdh_priv[0] as *const u8, server_ecdh_pub, &raw mut shared_secret[0] as *mut u8)
+    var ecdh_pub: [u8; 97] = [0u8; 97]
+    var shared_secret: [u8; 48] = [0u8; 48]
+    if width == 48:
+        p384_compute_public(&ecdh_priv[0] as *const u8, &raw mut ecdh_pub[0] as *mut u8)
+        p384_ecdh(&ecdh_priv[0] as *const u8, server_ecdh_pub, &raw mut shared_secret[0] as *mut u8)
+    else:
+        p256_compute_public(&ecdh_priv[0] as *const u8, &raw mut ecdh_pub[0] as *mut u8)
+        p256_ecdh(&ecdh_priv[0] as *const u8, server_ecdh_pub, &raw mut shared_secret[0] as *mut u8)
 
     // Send ClientKeyExchange
-    var cke: [u8; 70] = [0u8; 70]
+    var cke: [u8; 102] = [0u8; 102]
     cke[0] = HS_CLIENT_KEY_EXCHANGE
     cke[1] = 0u8
     cke[2] = 0u8
-    cke[3] = 66u8  // length = 1 + 65
-    cke[4] = 65u8  // point length
+    cke[3] = (1 + point_len) as u8  // length = 1 + point
+    cke[4] = point_len as u8  // point length
     var ci = 0
-    while ci < 65:
+    while ci < point_len:
         cke[5 + ci] = ecdh_pub[ci]
         ci = ci + 1
-    tls_hs_hash_update(conn, &cke[0] as *const u8, 70)
-    let r1 = tls_send_record(conn.fd, TLS_HANDSHAKE, &cke[0] as *const u8, 70)
+    let cke_len = 5 + point_len
+    tls_hs_hash_update(conn, &cke[0] as *const u8, cke_len)
+    let r1 = tls_send_record(conn.fd, TLS_HANDSHAKE, &cke[0] as *const u8, cke_len)
     if r1 < 0:
         return -1
 
     // Derive keys
-    tls_derive_keys(conn, &shared_secret[0] as *const u8, 32)
+    tls_derive_keys(conn, &shared_secret[0] as *const u8, width)
 
     // Send ChangeCipherSpec
     var ccs: [u8; 1] = [1u8]
@@ -714,23 +820,12 @@ unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8)
 
     // Compute Finished verify_data
     // verify_data = PRF(master_secret, "client finished", Hash(handshake_messages))[0..12]
-    // We need master_secret. Recompute it.
-    var ms_seed: [u8; 64] = [0u8; 64]
-    ci = 0
-    while ci < 32:
-        ms_seed[ci] = conn.client_random[ci]
-        ms_seed[32 + ci] = conn.server_random[ci]
-        ci = ci + 1
-    var master_secret: [u8; 48] = [0u8; 48]
-    var label_ms: [u8; 13] = [0x6Du8, 0x61u8, 0x73u8, 0x74u8, 0x65u8, 0x72u8, 0x20u8, 0x73u8, 0x65u8, 0x63u8, 0x72u8, 0x65u8, 0x74u8]
-    tls_prf_sha256(&shared_secret[0] as *const u8, 32, &label_ms[0] as *const u8, 13, &ms_seed[0] as *const u8, 64, &raw mut master_secret[0] as *mut u8, 48)
-
     var hs_hash: [u8; 32] = [0u8; 32]
     tls_hs_hash_current(conn, &raw mut hs_hash[0] as *mut u8)
 
     var verify_data: [u8; 12] = [0u8; 12]
     var label_cf: [u8; 15] = [0x63u8, 0x6Cu8, 0x69u8, 0x65u8, 0x6Eu8, 0x74u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
-    tls_prf_sha256(&master_secret[0] as *const u8, 48, &label_cf[0] as *const u8, 15, &hs_hash[0] as *const u8, 32, &raw mut verify_data[0] as *mut u8, 12)
+    tls_prf_sha256(&conn.master_secret[0] as *const u8, 48, &label_cf[0] as *const u8, 15, &hs_hash[0] as *const u8, 32, &raw mut verify_data[0] as *mut u8, 12)
 
     // Build Finished message: type(1) + length(3) + verify_data(12) = 16
     var fin: [u8; 16] = [0u8; 16]
@@ -749,7 +844,10 @@ unsafe fn tls_send_client_finish(conn: *mut TlsConn, server_ecdh_pub: *const u8)
     // Send encrypted Finished
     tls_send_encrypted(conn, TLS_HANDSHAKE, &fin[0] as *const u8, 16)
 
-// Receive server's ChangeCipherSpec and Finished.
+// Receive server's ChangeCipherSpec and Finished, verifying the
+// Finished verify_data against the handshake transcript (#1061): a
+// peer that cannot produce it does not hold the master secret for the
+// handshake as exchanged. A NewSessionTicket may precede Finished.
 unsafe fn tls_recv_server_finish(conn: *mut TlsConn) -> i32:
     // Receive ChangeCipherSpec
     var ct: u8 = 0u8
@@ -758,26 +856,132 @@ unsafe fn tls_recv_server_finish(conn: *mut TlsConn) -> i32:
     if rec_len < 0 or ct != TLS_CHANGE_CIPHER_SPEC:
         return -1
 
-    // Now server sends encrypted
-    // Receive encrypted Finished
-    rec_len = tls_recv_record(conn.fd, &raw mut ct as *mut u8, &raw mut rec_buf[0] as *mut u8, 16640)
-    if rec_len < 0 or ct != TLS_HANDSHAKE:
-        return -1
-
-    // Decrypt
-    var plain: [u8; 256] = [0u8; 256]
-    let plain_len = tls_decrypt_record(conn, ct, &rec_buf[0] as *const u8, rec_len, &raw mut plain[0] as *mut u8)
-    if plain_len < 0:
-        return -1
-
-    // Verify it's a Finished message (type 20, length 12)
-    if plain_len < 16:
-        return -1
-    if plain[0] != HS_FINISHED:
-        return -1
-
-    // Could verify server's verify_data here, but for MVP just accept
+    var plain: [u8; 16640] = [0u8; 16640]
+    while true:
+        rec_len = tls_recv_record(conn.fd, &raw mut ct as *mut u8, &raw mut rec_buf[0] as *mut u8, 16640)
+        if rec_len < 0 or ct != TLS_HANDSHAKE:
+            return -1
+        let plain_len = tls_decrypt_record(conn, ct, &rec_buf[0] as *const u8, rec_len, &raw mut plain[0] as *mut u8)
+        if plain_len < 4:
+            return -1
+        if plain[0] == HS_NEW_SESSION_TICKET:
+            tls_hs_hash_update(conn, &plain[0] as *const u8, plain_len)
+            continue
+        if plain[0] != HS_FINISHED or plain_len != 16:
+            return -1
+        if plain[1] != 0u8 or plain[2] != 0u8 or plain[3] != 12u8:
+            return -1
+        var hs_hash: [u8; 32] = [0u8; 32]
+        tls_hs_hash_current(conn, &raw mut hs_hash[0] as *mut u8)
+        var expected: [u8; 12] = [0u8; 12]
+        var label_sf: [u8; 15] = [0x73u8, 0x65u8, 0x72u8, 0x76u8, 0x65u8, 0x72u8, 0x20u8, 0x66u8, 0x69u8, 0x6Eu8, 0x69u8, 0x73u8, 0x68u8, 0x65u8, 0x64u8]
+        tls_prf_sha256(&conn.master_secret[0] as *const u8, 48, &label_sf[0] as *const u8, 15, &hs_hash[0] as *const u8, 32, &raw mut expected[0] as *mut u8, 12)
+        var diff: u32 = 0
+        var vi = 0
+        while vi < 12:
+            diff = diff | ((expected[vi] ^ plain[4 + vi]) as u32)
+            vi = vi + 1
+        if diff != 0:
+            return -1
+        return 0
     0
+
+// ── Peer verification (#1061) ──────────────────────────────────────
+
+// The OS trust store as PEM text, read in With from the platform's
+// bundle file; on Windows the runtime enumerates the ROOT store to
+// DER directly (tls_load_windows_roots). Empty means no store found.
+// SSL_CERT_FILE, when set, names the bundle instead — the convention
+// curl, OpenSSL and Go share. A set-but-unreadable override yields no
+// roots and the peer is refused; it never falls back silently.
+fn tls_roots_override_path() -> str:
+    env("SSL_CERT_FILE")
+
+fn tls_system_roots_pem() -> str:
+    let os = with_sysinfo_os()
+    if os == "Macos":
+        return read_file("/etc/ssl/cert.pem") ?? ""
+    if os == "Linux":
+        let debian = read_file("/etc/ssl/certs/ca-certificates.crt") ?? ""
+        if debian.len() > 0:
+            return debian
+        let rhel = read_file("/etc/pki/tls/certs/ca-bundle.crt") ?? ""
+        if rhel.len() > 0:
+            return rhel
+        return read_file("/etc/ssl/cert.pem") ?? ""
+    ""
+
+// Verify the peer: chain to the OS trust store, hostname, and the
+// ServerKeyExchange signature under the leaf key. 0 on success.
+unsafe fn tls_verify_peer(
+    conn: *mut TlsConn,
+    hostname: *const u8, hostname_len: i32,
+    cert_buf: *const u8,
+    evidence: *mut TlsPeerEvidence,
+) -> i32:
+    if evidence.chain_count <= 0 or evidence.ske_params_len <= 0 or evidence.ske_sig_len <= 0:
+        return -1
+    let roots_buf = with_alloc(1048576)
+    var roots_starts: [i32; 512] = [0; 512]
+    var roots_lens: [i32; 512] = [0; 512]
+    var roots_count = -1
+    let override_path = tls_roots_override_path()
+    if override_path.len() == 0 and with_sysinfo_os() == "Windows":
+        roots_count = with_tls_load_windows_roots(roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+    else:
+        let pem = if override_path.len() > 0: (read_file(override_path) ?? "") else: tls_system_roots_pem()
+        if pem.len() > 0 and pem.len() <= 4194304:
+            let pem_bytes = str_copy_bytes(pem)
+            roots_count = x509_pem_parse_certs(pem_bytes, pem.len(), roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+            str_free_bytes(pem_bytes)
+    var ok = 0
+    if roots_count > 0:
+        if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()) != 0:
+            let leaf_buf = cert_buf + evidence.leaf_start as u64
+            if x509_verify_hostname(leaf_buf, &evidence.leaf as *const X509Cert, hostname, hostname_len) != 0:
+                ok = 1
+    with_free(roots_buf)
+    if ok == 0:
+        return -1
+
+    // ServerKeyExchange signature over client_random | server_random | params.
+    // Only the hashes ClientHello offered verify (4=SHA-256, 5=SHA-384,
+    // 6=SHA-512); anything else is a refusal.
+    let hash_alg = evidence.ske_hash_alg
+    if hash_alg != 4 and hash_alg != 5 and hash_alg != 6:
+        return -1
+    var signed: [u8; 165] = [0u8; 165]
+    var si = 0
+    while si < 32:
+        signed[si] = conn.client_random[si]
+        signed[32 + si] = conn.server_random[si]
+        si = si + 1
+    si = 0
+    while si < evidence.ske_params_len:
+        signed[64 + si] = evidence.ske_params[si]
+        si = si + 1
+    var digest: [u8; 64] = [0u8; 64]
+    let signed_len = 64 + evidence.ske_params_len
+    var digest_len = 32
+    if hash_alg == 4:
+        sha256_hash(&signed[0] as *const u8, signed_len, &raw mut digest[0] as *mut u8)
+    else if hash_alg == 5:
+        sha384_hash(&signed[0] as *const u8, signed_len, &raw mut digest[0] as *mut u8)
+        digest_len = 48
+    else:
+        sha512_hash(&signed[0] as *const u8, signed_len, &raw mut digest[0] as *mut u8)
+        digest_len = 64
+    let leaf = &evidence.leaf as *const X509Cert
+    let leaf_buf2 = cert_buf + evidence.leaf_start as u64
+    if conn.cipher_suite == SUITE_ECDHE_RSA_AES128_GCM:
+        if evidence.ske_sig_alg != 1 or leaf.key_type != 1:
+            return -1
+        return if rsa_pkcs1_verify(leaf_buf2 + leaf.key_n_start as u64, leaf.key_n_len, leaf_buf2 + leaf.key_e_start as u64, leaf.key_e_len, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len) != 0: 0 else: -1
+    if conn.cipher_suite == SUITE_ECDHE_ECDSA_AES128_GCM:
+        if evidence.ske_sig_alg != 3 or leaf.key_type != 2:
+            return -1
+        return if x509_ecdsa_verify_der_bytes(leaf_buf2 + leaf.key_point_start as u64, leaf.key_point_len, leaf.key_curve, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len) != 0: 0 else: -1
+    -1
 
 // ── Public API: TLS connect ────────────────────────────────────────
 
@@ -798,9 +1002,10 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
     // Receive server handshake messages
     var server_pub_x: [u8; 32] = [0u8; 32]
     var server_pub_y: [u8; 32] = [0u8; 32]
-    var server_ecdh_pub: [u8; 65] = [0u8; 65]
-    var cert_buf: [u8; 8192] = [0u8; 8192]
+    var server_ecdh_pub: [u8; 97] = [0u8; 97]
+    var cert_buf: [u8; 16384] = [0u8; 16384]
     var cert_len: i32 = 0
+    var evidence = TlsPeerEvidence.new()
     let r2 = tls_recv_server_handshake(
         conn,
         &raw mut server_pub_x[0] as *mut u8,
@@ -808,12 +1013,21 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
         &raw mut server_ecdh_pub[0] as *mut u8,
         &raw mut cert_buf[0] as *mut u8,
         &raw mut cert_len as *mut i32,
+        &raw mut evidence as *mut TlsPeerEvidence,
     )
     if r2 < 0:
         return -1
 
+    // Authenticate the peer before sending anything under the new keys:
+    // chain to the OS trust store, hostname, SKE signature (#1061).
+    let host_bytes2 = str_copy_bytes(hostname)
+    let rv = tls_verify_peer(conn, host_bytes2 as *const u8, hl, &cert_buf[0] as *const u8, &raw mut evidence as *mut TlsPeerEvidence)
+    str_free_bytes(host_bytes2)
+    if rv < 0:
+        return -1
+
     // Send ClientKeyExchange + ChangeCipherSpec + Finished
-    let r3 = tls_send_client_finish(conn, &server_ecdh_pub[0] as *const u8)
+    let r3 = tls_send_client_finish(conn, &server_ecdh_pub[0] as *const u8, evidence.ske_curve)
     if r3 < 0:
         return -1
 

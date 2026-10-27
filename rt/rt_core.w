@@ -5074,6 +5074,16 @@ pub fn with_sysinfo_os() -> str:
 pub fn with_sysinfo_arch() -> str:
     rt_sysinfo_arch()
 
+// ── TLS trust store (Windows) ──────────────────────────────────────
+// Fill `buf` with the ROOT store's DER certificates concatenated,
+// recording each start/length. Returns the count, or -1 where the
+// store is unavailable (every non-Windows backend: std reads the
+// platform PEM bundle itself). #1061.
+extern fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32
+
+pub fn with_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
+    rt_tls_load_windows_roots(buf, buf_cap, starts, lens, max_roots)
+
 pub fn with_sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
     let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8
