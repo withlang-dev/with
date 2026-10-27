@@ -196,8 +196,10 @@ Most constructs that introduce a statement or expression body support
 three interchangeable body forms. The choice is purely stylistic; all
 three produce identical AST and compiled output. The three-form rule
 applies to `fn`, `while`, `for`, `loop`, `with`, `defer`, `errdefer`,
-`comptime`, labeled blocks, match arms, and any future block-introducing
-construct unless that construct states a narrower syntax.
+`comptime`, labeled blocks, and any future block-introducing
+construct unless that construct states a narrower syntax. A match arm
+takes the same three forms after its own introducer, `=>` (§9.7): inline,
+indented, or braced.
 
 `unsafe` is the deliberate exception: `unsafe:` is always a newline
 block, `unsafe { ... }` is the inline block expression form, and
@@ -255,9 +257,11 @@ by newlines or semicolons. Empty brace body `{}` is legal (returns
 
 **After a construct's header, a body introducer is required.** For all
 constructs, including `if`, `else if`, and `else`, the introducer must be
-`:` or `{`; omitting it is a parse error. The one exception is the `else`
-of `let ... else` (§9.7), which may instead take a single diverging
-expression on the same line. `then` is not a body introducer.
+`:` or `{`; omitting it is a parse error. A match arm's introducer is
+`=>`, not `:` (§9.7); the three forms above then follow it. The one
+further exception is the `else` of `let ... else` (§9.7), which may
+instead take a single diverging expression on the same line. `then` is
+not a body introducer.
 
 **Illegal combinations:**
 
