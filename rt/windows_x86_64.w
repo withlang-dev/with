@@ -2142,6 +2142,9 @@ c facade win32:
     fn GetTempPathW
     fn GetTempFileNameW
     fn GetFullPathNameW
+    fn CertOpenSystemStoreA
+    fn CertEnumCertificatesInStore
+    fn CertCloseStore
     fn __acrt_iob_func
         preserves domain environ
         preserves domain locale
