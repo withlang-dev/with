@@ -4402,9 +4402,29 @@ impl Sema:
                 candidate_index as i32,
             )
 
+    // Whether the flat entry for `sym` is a generic template declaration.
+    fn named_type_entry_is_generic(sym: i32) -> bool:
+        if not self.named_types.contains(sym):
+            return false
+        let prev_tid = self.named_types.get(sym).unwrap()
+        if not self.type_decl_nodes_by_tid.contains(prev_tid):
+            return false
+        self.type_decl_tp_count(self.type_decl_nodes_by_tid.get(prev_tid).unwrap()) > 0
+
     // `decl_node` is the declaring type declaration, 0 for a builtin.
     mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32, decl_node: i32) -> Unit:
-        self.named_types.insert(sym, tid)
+        // #750: downstream stages read this flat map as the generic-
+        // template registry (the template behind a TY_GENERIC_INST's
+        // base symbol) until #751 carries identity through
+        // instantiation. A non-generic declaration of the same name in
+        // another module must not displace the generic template: a
+        // user's `type Option = i32` otherwise becomes the template
+        // every stage finds for std's Option. Name resolution for
+        // source references goes through the candidate lists below,
+        // which still record every declaration.
+        let new_is_generic = decl_node == 0 or self.type_decl_tp_count(decl_node) > 0
+        if new_is_generic or not self.named_type_entry_is_generic(sym):
+            self.named_types.insert(sym, tid)
         // #1457: the declaration an identity symbol names, for the stages
         // that receive a method symbol and need its owner's type.
         if decl_node != 0 and self.colliding_type_names.contains(sym):

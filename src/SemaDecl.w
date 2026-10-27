@@ -1083,7 +1083,14 @@ impl Sema:
         let name = self.ast.get_data0(node)
         if is_local != 0:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
-        self.type_decl_nodes.insert(name, node)
+        // #750: same rule as record_named_type_with_pub for the flat
+        // decl-node map downstream template lookups still consult: a
+        // non-generic declaration never displaces a generic template.
+        var displaces_generic = false
+        if self.type_decl_tp_count(node) == 0 and self.type_decl_nodes.contains(name):
+            displaces_generic = self.type_decl_tp_count(self.type_decl_nodes.get(name).unwrap()) > 0
+        if not displaces_generic:
+            self.type_decl_nodes.insert(name, node)
         // Generic decls stay OUT of the shadow tier mask: a tiered lookup
         // returning the other tier's generic base would mint fresh generic
         // insts after freeze (is_copy_frozen misses). Generic name reuse

@@ -146,13 +146,19 @@ impl MirModule:
             if ty > 0 and not self.sema_non_copy_fill_types.contains(ty) and (sema.is_copy_frozen(ty) == 0 or sema.type_needs_drop_frozen(ty) != 0):
                 self.sema_non_copy_fill_types.insert(ty, 1)
         // #2108: every local typed as a generic declaration itself.
+        // Judged by the type's own declaration (#750), not by its name:
+        // a user's non-generic `type Option` shares std Option's name,
+        // and the flat name map answers with std's generic template.
         for bi in 0..self.bodies.len():
             let body = &self.bodies[bi]
             for li in 0..body.local_type_ids.len():
                 let ty = sema.resolve_alias(body.local_type_ids[li] as TypeId) as i32
                 if ty <= 0 or self.sema_uninstantiated_generic_types.contains(ty): continue
                 let kind = sema.get_type_kind(ty as TypeId)
-                if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and sema.type_decl_type_param_count(sema.get_type_d0(ty as TypeId)) > 0:
+                var decl_tp_count = 0
+                if sema.type_decl_nodes_by_tid.contains(ty):
+                    decl_tp_count = sema.type_decl_tp_count(sema.type_decl_nodes_by_tid.get(ty).unwrap())
+                if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and decl_tp_count > 0:
                     self.sema_uninstantiated_generic_types.insert(ty, 1)
 
 
