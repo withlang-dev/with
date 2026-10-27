@@ -9377,7 +9377,22 @@ impl Codegen:
         let owner_name = self.intern.resolve(owner_sym)
         let method_name = if is_set != 0: "multi_index_set" else: "multi_index"
         let qualified = owner_name ++ "." ++ method_name
-        let fn_sym = self.intern.intern(qualified)
+        // #2520 (D65): the callee is Sema's fact, not text to recompose —
+        // a trait impl's method symbol carries its trait
+        // (`Matrix.MultiIndex.multi_index`), which `Owner.method`
+        // composition cannot name. Ask Sema's method registry by the
+        // receiver's owner key; the composed text remains only for a
+        // receiver Sema has no registry row for.
+        var fn_sym = 0
+        let sema_method_sym = self.sema.pool_lookup_symbol(method_name)
+        if sema_method_sym != 0 and base_sema > 0:
+            let sema_owner_key = self.sema.method_owner_symbol_for_type(base_sema)
+            if sema_owner_key != 0:
+                let sema_fn_sym = self.sema.lookup_method_fn(sema_owner_key, sema_method_sym)
+                if sema_fn_sym != 0:
+                    fn_sym = self.sema_sym_to_codegen_sym(sema_fn_sym)
+        if fn_sym == 0:
+            fn_sym = self.intern.intern(qualified)
         let fn_val_opt = self.fn_values.get(fn_sym)
         let fn_ty_opt = self.fn_fn_types.get(fn_sym)
         if not fn_val_opt.is_some() or not fn_ty_opt.is_some():
