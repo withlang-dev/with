@@ -39796,6 +39796,15 @@ impl Sema:
         self.drop_owner_for_fn_symbol(fn_sym) != 0
 
     fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
+        // #2520: owner and method come from the registration maps, not a
+        // text split — a trait impl's symbol is `Owner.Drop.drop`, whose
+        // first-dot split reads the method as "Drop.drop".
+        let registered_owner: i32 = self.method_owner_keys.get(fn_sym) ?? 0
+        let registered_method: i32 = self.method_name_syms.get(fn_sym) ?? 0
+        if registered_owner != 0 and registered_method != 0 and registered_method == self.pool_lookup_symbol("drop"):
+            if self.has_drop_method(registered_owner) != 0:
+                return registered_owner
+            return 0
         let text = self.pool_resolve(fn_sym)
         if text.len() == 0:
             return 0

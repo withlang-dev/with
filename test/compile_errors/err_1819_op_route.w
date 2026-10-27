@@ -1,4 +1,4 @@
-//! expect-check-fail: call to `P.add` mutates global `G` while `r` is a live view into it
+//! expect-check-fail: call to `P.Add.add` mutates global `G` while `r` is a live view into it
 
 // #1819 (§9.1c: globals are places; §21.1 rule 1): an operator is a call of its method (§11.7), and `add`
 // writes G while an element view of G is live.
