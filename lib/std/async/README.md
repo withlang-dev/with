@@ -8,11 +8,14 @@ Collection await combinators for `Task[...]` values.
 - `await_first[T](tasks: impl IntoIter[Task[T]]) -> T`
 - `await_any[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[T, List[E]]`
 - `await_settled[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> List[Result[T, E]]`
-- `with_concurrency[T](tasks: impl IntoIter[Task[T]], n: i32) -> impl IntoIter[Task[T]]`
+- `with_concurrency[I, T](inputs: impl IntoIter[I], n: isize, f: fn(I) -> Task[T]) -> List[T]`
 
 ## Guarantees
 - Ordering:
-  `await_all` and `await_settled` return results in input order.
+  `await_all`, `await_settled` and `with_concurrency` return results in input order.
+- In-flight limit:
+  `with_concurrency(inputs, n, f)` runs `f` over the inputs with at most `n`
+  of the tasks it starts running at once; `n` must be at least 1.
 - Empty input:
   `await_first([])` panics with message `await_first: empty input`.
   `await_any([])` returns `Err(List.new())`.
@@ -30,5 +33,7 @@ Collection await combinators for `Task[...]` values.
   target's cancellation state into the cleanup path.
 
 ## Iterator consumption
-- Inputs are consumed exactly once and materialized into an internal `List` before awaiting.
+- The await combinators consume their inputs exactly once and materialize them into an internal `List` before awaiting.
 - This is eager consumption (not streaming); memory is `O(n)` in number of tasks.
+- `with_concurrency` instead pulls its inputs one at a time as slots free,
+  so the tasks it starts have not started before their pull.
