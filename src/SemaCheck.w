@@ -25574,6 +25574,70 @@ impl Sema:
             return self.ast.get_data0(self.ast.get_data0(callee))
         0
 
+    // #959 (§9.6): whether a visible free function bears a pipeline stage's
+    // bare name, resolved as the stage's own fallthrough resolves it.
+    mut fn pipeline_stage_free_fn_exists(sym: i32, ident_node: i32) -> bool:
+        let fn_sym = self.resolve_displaced_fn_ident(sym, ident_node)
+        if self.is_ci_visible(fn_sym) == 0 or self.symbol_visible_from_current(fn_sym) == 0:
+            return false
+        self.generic_fn_node_for_symbol(fn_sym) != 0 or self.get_visible_sig(fn_sym) >= 0
+
+    // Whether the demand on this stage's result binds `tp_name` of a generic
+    // method, asked speculatively: the substitution is restored untouched
+    // (bind_unbound_type_params_from_result is itself snapshot-clean).
+    mut fn method_tp_binds_from_result_demand(meta: i32, tp_start: i32, tp_count: i32, tp_name: i32, node: i32) -> bool:
+        if self.has_expected_type == 0 or self.expected_expr_type == 0 or self.expected_expr_type == self.ty_void:
+            return false
+        let saved_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
+        let saved_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
+        let saved_root = self.current_value_expr_root
+        self.clear_generic_substitution()
+        self.current_value_expr_root = node
+        self.bind_unbound_type_params_from_result(self.ast.fn_meta_ret(meta), tp_start, tp_count, node)
+        let bound = self.lookup_generic_subst(tp_name) != 0
+        self.generic_subst_param_syms = saved_syms
+        self.generic_subst_type_ids = saved_tys
+        self.current_value_expr_root = saved_root
+        bound
+
+    // #959 (§9.6): a generic method is applicable at a pipeline stage only
+    // when the stage can instantiate it — every type parameter is named by
+    // a parameter type (the receiver's included), so the piped value or the
+    // stage's arguments bind it, or the demand on the stage's result binds
+    // it. `str.parse[T]` at a bare `|> parse` stage has neither; a
+    // non-generic or unresolved candidate keeps the existing route.
+    mut fn pipeline_method_stage_instantiable(lhs_ty: i32, method: i32, node: i32) -> bool:
+        let resolved_recv = self.auto_deref_method_type_frozen(lhs_ty as TypeId, method)
+        let owner = self.method_owner_symbol_for_type(resolved_recv as i32)
+        if owner == 0:
+            return true
+        let method_fn_sym = self.lookup_generic_method_fn(owner, method)
+        if method_fn_sym == 0:
+            return true
+        let fn_node = self.generic_fn_node_for_symbol(method_fn_sym)
+        if fn_node == 0:
+            return true
+        let meta = self.ast.find_fn_meta(fn_node)
+        if meta < 0:
+            return true
+        let fn_tp_start = self.ast.fn_meta_tp_start(meta)
+        let fn_tp_count = self.ast.fn_meta_tp_count(meta)
+        if fn_tp_count == 0:
+            return true
+        let param_start = self.ast.fn_meta_param_start(meta)
+        let param_count = self.ast.fn_meta_param_count(meta)
+        var pos = fn_tp_start
+        for _ in 0..fn_tp_count:
+            let tp_name = self.ast.get_extra(pos)
+            var mentioned = false
+            for pi in 0..param_count:
+                if self.type_node_mentions_sym(self.ast.fn_param_type(param_start, pi), tp_name):
+                    mentioned = true
+            if not mentioned and not self.method_tp_binds_from_result_demand(meta, fn_tp_start, fn_tp_count, tp_name, node):
+                return false
+            pos = pos + 2 + self.ast.get_extra(pos + 1)
+        true
+
     mut fn check_pipeline(node: i32) -> i32:
         let lhs = self.ast.get_data0(node)
         let rhs = self.ast.get_data1(node)
@@ -25609,7 +25673,11 @@ impl Sema:
                         rhs_method = self.ast.get_data0(indexed_base)
                 if rhs_method != 0:
                     let method = rhs_method
-                    if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
+                    // #959 (§9.6): a bare-named stage the method cannot be
+                    // instantiated at falls to a same-named free function.
+                    let bare_stage = self.ast.kind(rhs_callee) == NodeKind.NK_IDENT
+                    let use_method = not bare_stage or self.pipeline_method_stage_instantiable(lhs_ty as i32, method, node) or not self.pipeline_stage_free_fn_exists(method, rhs_callee)
+                    if use_method and self.pipeline_method_exists(lhs_ty as i32, method) != 0:
                         var ret: i32 = 0
                         if method == self.syms.collect and self.ast.kind(rhs_callee) == NodeKind.NK_INDEX and self.user_iter_adapter_fn(lhs_ty as i32, method) != 0:
                             // `it |> collect[List]()` over an Iter[T] implementor:
@@ -25630,7 +25698,9 @@ impl Sema:
                         return 0
             else if self.ast.kind(rhs) == NodeKind.NK_IDENT:
                 let method = self.ast.get_data0(rhs)
-                if self.pipeline_method_exists(lhs_ty as i32, method) != 0:
+                // #959 (§9.6): as the call stage above.
+                let use_method2 = self.pipeline_method_stage_instantiable(lhs_ty as i32, method, node) or not self.pipeline_stage_free_fn_exists(method, rhs)
+                if use_method2 and self.pipeline_method_exists(lhs_ty as i32, method) != 0:
                     let ret2 = self.check_method_call_parts(lhs, method, -1, 0, node, lhs_ty as i32)
                     if ret2 != 0:
                         return self.finish_pipeline_method(node, lhs_ty as i32, method, ret2)
@@ -31624,11 +31694,12 @@ impl Sema:
             return 0
         if self.check_comptime_method_restriction(method_fn_sym, node) != 0:
             return 0
-        if not self.type_decl_nodes.contains(owner_sym):
-            return 0
-        let td_node: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
-        let owner_tp_start = self.type_decl_tp_start(td_node)
-        let owner_tp_count = self.type_decl_tp_count(td_node)
+        // #959: a builtin owner (`impl str: fn parse[T: Parse]()`) has no
+        // type declaration and no type parameters of its own; its generic
+        // methods are checked here like any other, not left uninstantiated.
+        let td_node: i32 = self.type_decl_nodes.get(owner_sym) ?? 0
+        let owner_tp_start = if td_node != 0: self.type_decl_tp_start(td_node) else: 0
+        let owner_tp_count = if td_node != 0: self.type_decl_tp_count(td_node) else: 0
         let param_start = self.ast.fn_meta_param_start(meta)
         let param_count = self.ast.fn_meta_param_count(meta)
         let fn_tp_start = self.ast.fn_meta_tp_start(meta)
@@ -31674,6 +31745,13 @@ impl Sema:
             // D66 (#1652): a callback-only pair setter's `U` comes from the
             // callback's own signature (SemaFacade.w).
             self.facade_bind_pair_callback_u(fn_node, arg_types, arg_count, fn_tp_start, fn_tp_count, node)
+            // #959: a type parameter no argument mentions takes the demand on
+            // the result (`let n: Option[i64] = s.parse()`), as a free generic
+            // function's does.
+            let saved_result_root = self.current_value_expr_root
+            self.current_value_expr_root = node
+            self.bind_unbound_type_params_from_result(self.ast.fn_meta_ret(meta), fn_tp_start, fn_tp_count, node)
+            self.current_value_expr_root = saved_result_root
         // #600 (§5.1): generic-METHOD calls (Box.new / Rc.new / Arc.new on generic
         // owners) are a fourth checker lane that never reached the ephemeral arg
         // gates. Route each ephemeral arg through the same escape check.

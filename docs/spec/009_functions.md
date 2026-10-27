@@ -628,6 +628,17 @@ extension method named `f` exists, so `x |> f(a)` resolves as `x.f(a)`; that
 method takes precedence over a same-named free function. If no applicable
 method exists, the stage uses the ordinary free-function form `f(x, a)`.
 
+A generic method is applicable at a stage only when the stage can
+instantiate it: every type parameter is determined by the piped value,
+the stage's arguments, explicit type arguments, or the demand on the
+stage's result. A method the stage cannot instantiate does not take
+precedence: with a program `fn parse(text: str) -> Result[Ast, str]` in
+scope, `input |> parse` is that function, not `str.parse[T]`, whose `T`
+nothing at the stage determines; under a demand that determines it
+(`let n: Option[i64] = text |> parse`) the method applies. With no
+same-named free function, the uninstantiable method is the stage's
+meaning and the refusal names the missing type, as at any call.
+
 **A stage that resolves to a `mut fn` whose resolved concrete return type is
 `Unit` performs the ordinary mutating call and continues with the same receiver
 place.** Resolution includes return-type inference, overload resolution, and
