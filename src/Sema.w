@@ -305,7 +305,25 @@ type SemaBuiltinSymbols {
 type SemaMethodLookup {
     sig_lookup: HashMap[i64, i32],
     fn_lookup: HashMap[i64, i32],
+    // #2520: trait-qualified rows, keyed sema_trait_method_key(owner,
+    // trait_idx, method); the bare tables above keep one winner per
+    // (owner, method) and amb_* records when that winner is contested
+    // by a second trait (inherent wins silently, trait-vs-trait is the
+    // §11.4 ambiguity error at a bare call).
+    trait_sig_lookup: HashMap[i64, i32],
+    trait_fn_lookup: HashMap[i64, i32],
+    generic_fn_lookup: HashMap[i64, i32],
+    amb_heads: HashMap[i64, i32],
+    amb_next_fn: HashMap[i32, i32],
 }
+
+// #2520: (owner, trait_idx + 2, method) in one key; trait_idx -1 encodes
+// the inherent row, matching sema_exact_type_hash's FNV fold.
+fn sema_trait_method_key(owner: i32, trait_idx: i32, method: i32) -> i64:
+    var h: u64 = 14695981039346656037
+    h = (h ^ owner as u64) *% 1099511628211
+    h = (h ^ (trait_idx + 2) as u64) *% 1099511628211
+    ((h ^ method as u64) *% 1099511628211) as i64
 
 // Identity bits of a callable type beyond its signature (§16.11, #1832).
 pub const CALLABLE_UNSAFE: i32 = 1
@@ -1005,6 +1023,15 @@ type Sema {
     trait_method_default_bodies: List[i32],
     trait_name_syms: List[i32],
     trait_lookup: HashMap[i32, i32],
+    // #2520: trait identity is (module, name). Candidates chain by trait
+    // index behind trait_candidate_heads (sym -> trait index), resolved
+    // with the same visibility rules as named types; trait_decl_paths is
+    // the declaring module per trait index.
+    trait_candidate_heads: HashMap[i32, i32],
+    trait_candidate_paths: List[str],
+    trait_candidate_pubs: List[i32],
+    trait_candidate_nexts: List[i32],
+    trait_decl_paths: List[str],
     // Trait type params: flat vec of type param name syms per trait
     trait_tp_starts: List[i32],
     trait_tp_counts: List[i32],
@@ -2491,6 +2518,12 @@ type Sema {
     // (compute_method_origins) so the declaring side and the lookup side
     // read one answer.
     colliding_type_names: HashMap[i32, i32],   // name symbol -> 1
+    // #2520: the trait mirror of the type-identity tables above — a trait
+    // name declared in more than one file keys its impl methods by
+    // `Trait$m$<path hash>`; trait_identity_first is sym -> first identity.
+    colliding_trait_names: HashMap[i32, i32],
+    trait_identity_syms: HashMap[i64, i32],
+    trait_identity_first: HashMap[i32, i32],
     type_identity_syms: HashMap[i64, i32],     // pair(name symbol, path symbol) -> identity symbol
     type_identity_tids: HashMap[i32, i32],     // identity symbol -> the declaration's TypeId
     type_identity_names: HashMap[i32, i32],    // identity symbol -> the declared name symbol
@@ -3123,6 +3156,11 @@ fn sema_method_lookup_new -> SemaMethodLookup:
     SemaMethodLookup {
         sig_lookup: sema_new_map_i64_i32(),
         fn_lookup: sema_new_map_i64_i32(),
+        trait_sig_lookup: sema_new_map_i64_i32(),
+        trait_fn_lookup: sema_new_map_i64_i32(),
+        generic_fn_lookup: sema_new_map_i64_i32(),
+        amb_heads: sema_new_map_i64_i32(),
+        amb_next_fn: sema_new_map_i32_i32(),
     }
 
 fn sema_visibility_cache_key(from_path: &str, to_path: &str) -> str:
@@ -3157,6 +3195,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let disc_repr_types = sema_new_map_i32_i32()
     let disc_has_payload = sema_new_map_i32_i32()
     let trait_lookup = sema_new_map_i32_i32()
+    let trait_candidate_heads = sema_new_map_i32_i32()
     let impl_lookup = sema_new_map_i32_i32()
     let selection_cache = sema_new_map_i64_i32()
     let local_trait_names = sema_new_map_i32_i32()
@@ -3400,6 +3439,11 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         trait_method_default_bodies: List.new(),
         trait_name_syms: List.new(),
         trait_lookup,
+        trait_candidate_heads,
+        trait_candidate_paths: List.new(),
+        trait_candidate_pubs: List.new(),
+        trait_candidate_nexts: List.new(),
+        trait_decl_paths: List.new(),
         trait_tp_starts: List.new(),
         trait_tp_counts: List.new(),
         trait_tp_syms: List.new(),
@@ -4125,6 +4169,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         named_type_candidate_heads: sema_new_map_i32_i32(),
         named_type_candidate_next: List.new(),
         colliding_type_names: sema_new_map_i32_i32(),
+        colliding_trait_names: sema_new_map_i32_i32(),
+        trait_identity_syms: sema_new_map_i64_i32(),
+        trait_identity_first: sema_new_map_i32_i32(),
         type_identity_syms: sema_new_map_i64_i32(),
         type_identity_tids: sema_new_map_i32_i32(),
         type_identity_names: sema_new_map_i32_i32(),
@@ -5410,6 +5457,74 @@ impl Sema:
                     return self.named_type_candidate_tids[i]
             i = self.named_type_candidate_next[i]
         if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
+
+    // #2520: trait resolution by (module, name), mirroring named types.
+    // The flat trait_lookup (last registration wins) made a user's
+    // `trait One` and std's One one trait, whichever collected last.
+    fn trait_candidate_head(sym: i32) -> i32:
+        if self.trait_candidate_heads.contains(sym):
+            return self.trait_candidate_heads.get(sym).unwrap()
+        -1
+
+    fn trait_name_known(sym: i32) -> bool:
+        self.trait_candidate_head(sym) >= 0 or self.trait_lookup.contains(sym)
+
+    // The trait index `sym` names from the current module, or -1.
+    fn lookup_trait_visible(sym: i32) -> i32:
+        var i = self.trait_candidate_head(sym)
+        if i < 0:
+            if self.trait_lookup.contains(sym): return self.trait_lookup.get(sym).unwrap() else: return -1
+        while i >= 0:
+            let candidate_path: str = with_str_clone_ref(self.trait_candidate_paths[i])
+            if self.decl_visible_from_current_gated(candidate_path, self.trait_candidate_pubs[i], sym) != 0:
+                return i
+            i = self.trait_candidate_nexts[i]
+        -1
+
+    // The trait index of `sym` in one tier (std or user), for the
+    // compiler's own demands in another module's context.
+    fn lookup_trait_for_tier(sym: i32, want_std: i32) -> i32:
+        var i = self.trait_candidate_head(sym)
+        while i >= 0:
+            let path = self.trait_candidate_paths[i]
+            if path.len() > 0:
+                let cand_std = if sema_tier_path_is_std_implementation(path) != 0: 1 else: 0
+                if cand_std == want_std:
+                    return i
+            i = self.trait_candidate_nexts[i]
+        if self.trait_lookup.contains(sym): self.trait_lookup.get(sym).unwrap() else: -1
+
+    fn trait_decl_path_of_idx(trait_idx: i32) -> str:
+        if trait_idx >= 0 and trait_idx < self.trait_decl_paths.len():
+            return with_str_clone_ref(self.trait_decl_paths[trait_idx])
+        ""
+
+    // The trait an impl names, resolved from the impl's own module: the
+    // declaration in that module wins; a trait declared elsewhere keeps
+    // the pre-#2520 most-recent-registration answer.
+    // Read-only node_module_path: walks the declaration source tables
+    // without building the cache, for callers that hold &Sema.
+    fn node_module_path_view(node: i32) -> str:
+        let file = self.ast.file(node as NodeId) as i32
+        for di in 0..self.decl_source_file_ids.len():
+            if self.decl_source_file_ids[di] == file and di < self.decl_source_paths.len():
+                return with_str_clone_ref(self.decl_source_paths[di])
+        ""
+
+    fn trait_idx_for_impl(impl_node: i32) -> i32:
+        let trait_sym = self.ast.get_data2(impl_node as NodeId)
+        if trait_sym == 0:
+            return -1
+        var i = self.trait_candidate_head(trait_sym)
+        if i < 0:
+            if self.trait_lookup.contains(trait_sym): return self.trait_lookup.get(trait_sym).unwrap() else: return -1
+        let impl_path: str = self.node_module_path_view(impl_node)
+        var j = i
+        while j >= 0:
+            if self.trait_candidate_paths[j] == impl_path:
+                return j
+            j = self.trait_candidate_nexts[j]
+        i
 
     // The scoped-binding tier of type-name lookup. `named_types` has two
     // kinds of writer: record_named_type_with_pub, which also records a
@@ -9692,10 +9807,11 @@ impl Sema:
     // is not a trait method or the trait itself has no explicit receiver mode.
     fn receiver_trait_contract_effect_for_decl(decl_index: i32, node: i32) -> i32:
         if not self.method_decl_impl_nodes.contains(decl_index): return -1
-        let impl_node = self.method_decl_impl_nodes.get(decl_index).unwrap()
-        let trait_sym = self.ast.get_data2(impl_node as NodeId)
-        if trait_sym == 0 or not self.trait_lookup.contains(trait_sym): return -1
-        let trait_index = self.trait_lookup.get(trait_sym).unwrap()
+        let impl_node_id: i32 = self.method_decl_impl_nodes.get(decl_index).unwrap()
+        let trait_sym = self.ast.get_data2(impl_node_id as NodeId)
+        if trait_sym == 0: return -1
+        let trait_index = self.trait_idx_for_impl(impl_node_id)
+        if trait_index < 0: return -1
         let method_name = self.extract_decl_name_after(node, "fn")
         let start = self.trait_method_starts[trait_index]
         let count = self.trait_method_counts[trait_index]

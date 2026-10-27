@@ -103,6 +103,64 @@ impl Sema:
                 let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
                 self.type_identity_syms.insert(key, identity)
 
+    // #2520: the trait-name mirror — trait identity is (module, name), so
+    // a trait name declared in more than one file mints its impl methods
+    // under `Trait$m$<path hash>`. Same discipline as the type scan: AST
+    // only, before any registration, so every pass mints alike.
+    mut fn compute_colliding_trait_names():
+        self.colliding_trait_names = sema_new_map_i32_i32()
+        self.trait_identity_syms = sema_new_map_i64_i32()
+        self.trait_identity_first = sema_new_map_i32_i32()
+        let first_paths: HashMap[i32, i32] = HashMap.new()
+        let dc = self.ast.decl_count()
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TRAIT_DECL:
+                continue
+            let name = self.ast.get_data0(decl)
+            let path_sym = self.pool_intern(self.decl_source_path_for_index(di))
+            if first_paths.contains(name):
+                if first_paths.get(name).unwrap() != path_sym:
+                    self.colliding_trait_names.insert(name, 1)
+            else:
+                first_paths.insert(name, path_sym)
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TRAIT_DECL:
+                continue
+            let name = self.ast.get_data0(decl)
+            if not self.colliding_trait_names.contains(name):
+                continue
+            let path: str = self.decl_source_path_for_index(di)
+            let key = sema_pair_key(name, self.pool_intern(path))
+            if not self.trait_identity_syms.contains(key):
+                let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
+                self.trait_identity_syms.insert(key, identity)
+                if not self.trait_identity_first.contains(name):
+                    self.trait_identity_first.insert(name, identity)
+
+    // The trait segment of an impl method's symbol: "" for an inherent
+    // impl, the trait's name (or its identity when the name collides
+    // across files) for a trait impl.
+    fn method_decl_trait_segment(decl: i32) -> str:
+        let impl_node = self.impl_node_for_method_decl(decl)
+        if impl_node == 0:
+            return ""
+        let trait_sym = self.ast.get_data2(impl_node as NodeId)
+        if trait_sym == 0:
+            return ""
+        if not self.colliding_trait_names.contains(trait_sym):
+            return with_str_clone_ref(self.pool_resolve(trait_sym))
+        let path: str = self.decl_source_path_for_index(self.find_decl_index(impl_node))
+        let path_sym = self.pool_lookup_symbol(path)
+        if path_sym != 0:
+            let key = sema_pair_key(trait_sym, path_sym)
+            if self.trait_identity_syms.contains(key):
+                return with_str_clone_ref(self.pool_resolve(self.trait_identity_syms.get(key).unwrap()))
+        if self.trait_identity_first.contains(trait_sym):
+            return with_str_clone_ref(self.pool_resolve(self.trait_identity_first.get(trait_sym).unwrap()))
+        with_str_clone_ref(self.pool_resolve(trait_sym))
+
     // The symbol a method table keys a declaration of `name_sym` in module
     // `path` under: the name itself unless the name is declared in more than
     // one file, then that declaration's identity symbol.
@@ -237,6 +295,7 @@ impl Sema:
 
     mut fn compute_method_origins():
         self.compute_colliding_type_names()
+        self.compute_colliding_trait_names()
         self.report_duplicate_type_declarations()
         let dc = self.ast.decl_count()
         for di in 0..dc:
@@ -302,8 +361,14 @@ impl Sema:
         if self.method_decl_origins.contains(decl_idx):
             let origin = self.method_decl_origins.get(decl_idx).unwrap()
             if origin == 1:
-                if self.method_has_inherent.contains(semantic):
-                    return 1
+                // #2520: the inherent twin's symbol is `Owner.method`, not
+                // this trait-qualified one — ask for it by that spelling.
+                let key = self.method_decl_owner_key_symbol(decl, fn_sym)
+                let method = self.method_decl_name_symbol(fn_sym)
+                if key != 0 and method != 0:
+                    let inherent = self.pool_lookup_symbol(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
+                    if inherent != 0 and self.method_has_inherent.contains(inherent):
+                        return 1
         0
 
     // ── D39 lazy interface collection ────────────────────────────────
@@ -2125,6 +2190,7 @@ impl Sema:
                     self.register_generic_fn_node(fn_name, node)
                     self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
                     let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                    self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                     for pi in 0..param_count:
                         self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi), self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
                     self.validate_type_expr_with_impl_type_params(ret_node, self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
@@ -2135,6 +2201,7 @@ impl Sema:
                 self.register_generic_fn_node(fn_name, node)
                 self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
                 let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                 for pi2 in 0..param_count:
                     self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi2), 0, 0, bi_impl)
                 self.validate_type_expr_with_impl_type_params(ret_node, 0, 0, bi_impl)
@@ -2163,6 +2230,7 @@ impl Sema:
                         self.register_generic_fn_node(fn_name, node)
                         self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
                         let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                        self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                         self.named_types.remove(self_sym)
                         return
                     break
@@ -2176,6 +2244,7 @@ impl Sema:
             self.register_generic_fn_node(fn_name, node)
             self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
             let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+            self.register_generic_method_fn(node, fn_name, parsed_fn_name)
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
                 self.refuse_dyn_by_value_params(p_type_node, true)
@@ -2489,6 +2558,9 @@ impl Sema:
     // A method's base symbol: `Owner.method` for an impl method, the parsed
     // `Owner.method` for the dotted form, and `Owner$m$<path>.method` for
     // either when the owner's name is declared in more than one file (#1457).
+    // A trait impl's method carries the trait: `Owner.Trait.method`
+    // (#2520) — two traits giving one type the same method name previously
+    // minted one symbol and collided in the body map.
     // The two spellings below differ only in whether the text is interned.
     fn method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
         let in_impl = self.impl_owner_type_sym_for_decl(decl) != 0
@@ -2499,6 +2571,9 @@ impl Sema:
         let method = self.method_decl_name_symbol(parsed_fn_sym)
         if key == 0 or method == 0:
             return 0
+        let segment = self.method_decl_trait_segment(decl)
+        if segment.len() > 0:
+            return self.pool_lookup_symbol(self.pool_resolve(key) ++ "." ++ segment ++ "." ++ self.pool_resolve(method))
         self.pool_lookup_symbol(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
 
     mut fn intern_method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
@@ -2510,6 +2585,9 @@ impl Sema:
         let method = self.method_decl_name_symbol(parsed_fn_sym)
         if key == 0 or method == 0:
             return 0
+        let segment = self.method_decl_trait_segment(decl)
+        if segment.len() > 0:
+            return self.pool_intern(self.pool_resolve(key) ++ "." ++ segment ++ "." ++ self.pool_resolve(method))
         self.pool_intern(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
 
     fn impl_node_for_method_decl(decl: i32) -> i32:
@@ -2616,9 +2694,59 @@ impl Sema:
         let method_sym = self.method_decl_name_symbol(parsed_fn_sym)
         if owner_sym == 0 or method_sym == 0:
             return
+        self.register_method_slot(node, fn_sym, parsed_fn_sym, sig_idx, 0)
+        self.method_symbol_flags.insert(fn_sym, 1)
+
+    // #2520: the (owner, trait, method) row and the bare (owner, method)
+    // slot for one method. The bare slot holds the inherent method when
+    // there is one, else the first trait's, with amb_* naming every
+    // trait candidate once a second trait contests the name. A generic
+    // method has no signature yet: its bare slot is generic_fn_lookup.
+    mut fn register_method_slot(node: i32, fn_sym: i32, parsed_fn_sym: i32, sig_idx: i32, is_generic: i32):
+        let owner_sym = self.method_decl_owner_key_symbol(node, parsed_fn_sym)
+        let method_sym = self.method_decl_name_symbol(parsed_fn_sym)
+        if owner_sym == 0 or method_sym == 0:
+            return
+        let impl_node = self.impl_node_for_method_decl(node)
+        var trait_idx: i32 = -1
+        if impl_node != 0 and self.ast.get_data2(impl_node as NodeId) != 0:
+            trait_idx = self.trait_idx_for_impl(impl_node)
+        let tkey = sema_trait_method_key(owner_sym, trait_idx, method_sym)
+        if sig_idx >= 0:
+            self.method_lookup.trait_sig_lookup.insert(tkey, sig_idx)
+        self.method_lookup.trait_fn_lookup.insert(tkey, fn_sym)
         let key = sema_pair_key(owner_sym, method_sym)
-        self.method_lookup.sig_lookup.insert(key, sig_idx)
-        self.method_lookup.fn_lookup.insert(key, fn_sym)
+        if trait_idx < 0:
+            if is_generic != 0:
+                self.method_lookup.generic_fn_lookup.insert(key, fn_sym)
+            else:
+                self.method_lookup.sig_lookup.insert(key, sig_idx)
+                self.method_lookup.fn_lookup.insert(key, fn_sym)
+            if self.method_lookup.amb_heads.contains(key):
+                self.method_lookup.amb_heads.remove(key)
+            return
+        var existing_fn: i32 = self.method_lookup.fn_lookup.get(key) ?? 0
+        if existing_fn == 0:
+            existing_fn = self.method_lookup.generic_fn_lookup.get(key) ?? 0
+        if existing_fn == 0:
+            if is_generic != 0:
+                self.method_lookup.generic_fn_lookup.insert(key, fn_sym)
+            else:
+                self.method_lookup.sig_lookup.insert(key, sig_idx)
+                self.method_lookup.fn_lookup.insert(key, fn_sym)
+        else if existing_fn != fn_sym and not self.method_lookup.amb_heads.contains(key):
+            let inherent_fn: i32 = self.method_lookup.trait_fn_lookup.get(sema_trait_method_key(owner_sym, -1, method_sym)) ?? 0
+            if inherent_fn == 0:
+                self.method_lookup.amb_heads.insert(key, existing_fn)
+                self.method_lookup.amb_next_fn.insert(existing_fn, fn_sym)
+
+    // A generic method's registration: same rows, no signature. Called
+    // beside register_generic_fn_node; extension candidates keep their
+    // own registry and are skipped by the caller's candidate call.
+    mut fn register_generic_method_fn(node: i32, fn_sym: i32, parsed_fn_sym: i32):
+        if self.method_decl_is_extension(node) != 0:
+            return
+        self.register_method_slot(node, fn_sym, parsed_fn_sym, -1, 1)
         self.method_symbol_flags.insert(fn_sym, 1)
 
     fn type_decl_source_path(type_sym: i32) -> str:
@@ -2676,9 +2804,11 @@ impl Sema:
         0
 
     mut fn install_trait_default_type_args(trait_sym: i32, impl_node: i32):
-        if trait_sym == 0 or impl_node == 0 or not self.trait_lookup.contains(trait_sym):
+        if trait_sym == 0 or impl_node == 0:
             return
-        let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
+        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        if trait_idx < 0:
+            return
         let tp_count: i32 = self.trait_tp_counts[trait_idx]
         if tp_count <= 0:
             return
@@ -2773,9 +2903,11 @@ impl Sema:
     // default body. One left out was accepted, and a call through `&dyn`
     // reached the vtable's empty slot and trapped with no diagnostic.
     mut fn check_trait_impl_complete(trait_sym: i32, impl_node: i32):
-        if not self.trait_lookup.contains(trait_sym) or self.ast.get_data0(impl_node) == 0:
+        if self.ast.get_data0(impl_node) == 0:
             return
-        let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
+        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        if trait_idx < 0:
+            return
         let mt_start: i32 = self.trait_method_starts[trait_idx]
         for mi in 0..self.trait_method_counts[trait_idx]:
             let mt_idx = mt_start + mi
@@ -2786,12 +2918,12 @@ impl Sema:
                 self.emit_error(f"impl of `{self.pool_resolve(trait_sym)}` for `{self.pool_resolve(self.ast.get_data0(impl_node))}` does not define `{self.pool_resolve(method_sym)}`, which the trait declares with no default body", impl_node)
 
     mut fn register_trait_default_method_for_impl(trait_sym: i32, impl_node: i32):
-        if not self.trait_lookup.contains(trait_sym):
+        let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
+        if trait_idx < 0:
             return
         let impl_type_sym = self.ast.get_data0(impl_node)
         if impl_type_sym == 0:
             return
-        let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
         let mt_start: i32 = self.trait_method_starts[trait_idx]
         let mt_count = self.trait_method_counts[trait_idx]
         let impl_type_tid = self.lookup_named_type_visible(impl_type_sym)
@@ -2976,6 +3108,15 @@ impl Sema:
             pos = pos + TRAIT_METHOD_STRIDE
         self.trait_method_counts.push(method_count)
         self.trait_lookup.insert(name, trait_idx)
+        // #2520: record the (module, name) candidate the trait resolvers
+        // walk; trait_lookup above stays the flat last-wins cache only
+        // for existence questions that predate identity.
+        let trait_is_pub: i32 = if self.ast.get_data2(node) == Visibility.Public: 1 else: 0
+        self.trait_candidate_nexts.push(if self.trait_candidate_heads.contains(name): self.trait_candidate_heads.get(name).unwrap() else: -1)
+        self.trait_candidate_heads.insert(name, trait_idx)
+        self.trait_candidate_paths.push(with_str_clone_ref(self.current_module_path))
+        self.trait_candidate_pubs.push(trait_is_pub)
+        self.trait_decl_paths.push(with_str_clone_ref(self.current_module_path))
         if self.ast.is_sealed_trait_node(node) != 0:
             self.sealed_traits.insert(name, 1)
         if is_local != 0:
@@ -3101,7 +3242,7 @@ impl Sema:
 
         let trait_name = self.pool_resolve(trait_sym).clone()
         let is_lang_trait = self.lang_trait_syms.contains(trait_sym)
-        if not is_lang_trait and not self.trait_lookup.contains(trait_sym):
+        if not is_lang_trait and not self.trait_name_known(trait_sym):
             self.emit_error("unknown trait", node)
             return
 
@@ -3177,8 +3318,8 @@ impl Sema:
                 return
 
         // Validate associated types: impl must provide all required (no-default) associated types
-        if not is_lang_trait and self.trait_lookup.contains(trait_sym):
-            let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
+        if not is_lang_trait and self.trait_idx_for_impl(node) >= 0:
+            let trait_idx: i32 = self.trait_idx_for_impl(node)
             let at_start = self.trait_assoc_starts[trait_idx]
             let at_count = self.trait_assoc_counts[trait_idx]
             if at_count > 0:
@@ -3617,7 +3758,7 @@ impl Sema:
 
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             let trait_sym = self.ast.get_data0(node)
-            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
                 self.emit_error("unknown trait", node)
                 return
             if self.ast.get_data1(node) != TYPE_TRAIT_OBJECT_IMPL:
@@ -3644,7 +3785,7 @@ impl Sema:
                 let trait_name: str = with_str_clone_ref(self.pool_resolve(trait_sym))
                 if trait_name == "type":
                     continue
-                if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+                if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
                     self.emit_error("where clause references unknown trait '" ++ trait_name ++ "'", fn_node)
             pos = pos + 2 + bound_count
 

@@ -2078,7 +2078,7 @@ impl Sema:
 
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
             let trait_sym = self.ast.get_data0(node)
-            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
                 self.emit_error("unknown trait", node)
                 return 0 as TypeId
             if self.ast.get_data1(node) != TYPE_TRAIT_OBJECT_IMPL and self.ensure_trait_object_safe(trait_sym, node) == 0:
@@ -4499,12 +4499,12 @@ impl Sema:
             return sema_trait_impl_method_contract_missing()
         let impl_node: i32 = self.method_impl_nodes.get(fn_name).unwrap()
         let trait_sym = self.ast.get_data2(impl_node)
-        if trait_sym == 0 or not self.trait_lookup.contains(trait_sym):
+        let trait_idx: i32 = if trait_sym != 0: self.trait_idx_for_impl(impl_node) else: -1
+        if trait_idx < 0:
             return sema_trait_impl_method_contract_missing()
         let method_name = self.impl_method_bare_name(node, fn_name)
         if method_name.len() == 0:
             return sema_trait_impl_method_contract_missing()
-        let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
         let mt_start = self.trait_method_starts[trait_idx]
         let mt_count = self.trait_method_counts[trait_idx]
         for mi in 0..mt_count:
@@ -5633,9 +5633,9 @@ impl Sema:
             if self.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
                 continue
             let trait_sym = self.ast.get_data2(impl_node)
-            if trait_sym == 0 or not self.trait_lookup.contains(trait_sym):
+            let trait_idx: i32 = if trait_sym != 0: self.trait_idx_for_impl(impl_node) else: -1
+            if trait_idx < 0:
                 continue
-            let trait_idx: i32 = self.trait_lookup.get(trait_sym).unwrap()
             let mt_start: i32 = self.trait_method_starts[trait_idx]
             let mt_count = self.trait_method_counts[trait_idx]
             for mi in 0..mt_count:
@@ -25830,7 +25830,7 @@ impl Sema:
                             self.emit_error("type.implements() requires a trait name", trait_node)
                             return -1
                         let trait_sym = self.ast.get_data0(trait_node)
-                        if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+                        if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
                             self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
                             return -1
                         return self.type_implements_trait(recv_type, trait_sym)
@@ -30996,6 +30996,19 @@ impl Sema:
         let existing = self.lookup_method_fn(owner_sym, method_sym)
         if existing != 0 and self.generic_fn_node_for_symbol(existing) != 0:
             return existing
+        // #2520: a trait impl's generic method is registered under its
+        // trait-qualified symbol; the registry answers where composing
+        // `Owner.method` text cannot.
+        if self.ambiguous_trait_method_head(owner_sym, method_sym) != 0:
+            let bound_tidx = self.bound_trait_idx_for_method(owner_sym, method_sym)
+            if bound_tidx >= 0:
+                let bound_fn = self.lookup_trait_method_fn(owner_sym, bound_tidx, method_sym)
+                if bound_fn != 0 and self.generic_fn_node_for_symbol(bound_fn) != 0:
+                    return bound_fn
+        let generic_key = sema_pair_key(owner_sym, method_sym)
+        let generic_fn: i32 = self.method_lookup.generic_fn_lookup.get(generic_key) ?? 0
+        if generic_fn != 0 and self.generic_fn_node_for_symbol(generic_fn) != 0:
+            return generic_fn
         let owner_name = self.pool_resolve(owner_sym)
         let method_name = self.pool_resolve(method_sym)
         if owner_name.len() == 0 or method_name.len() == 0:
@@ -35102,6 +35115,11 @@ impl Sema:
         let mc_sig_idx_for_effect = if mc_owner_sym_for_effect != 0: self.lookup_method_sig(mc_owner_sym_for_effect, field) else: -1
         let mc_method_fn_for_resolution = if mc_owner_sym_for_effect != 0: self.lookup_method_fn(mc_owner_sym_for_effect, field) else: 0
         self.trace_method_resolution(node, obj_type as i32, mc_owner_sym_for_effect, field, mc_sig_idx_for_effect, mc_method_fn_for_resolution)
+        // #2520 (§11.4): two traits answer this bare call and no bound of
+        // the receiver's type parameter names one of them.
+        if mc_owner_sym_for_effect != 0 and self.ambiguous_trait_method_head(mc_owner_sym_for_effect, field) != 0 and self.bound_trait_idx_for_method(mc_owner_sym_for_effect, field) < 0 and self.lookup_trait_method_fn(mc_owner_sym_for_effect, -1, field) == 0:
+            self.emit_ambiguous_trait_method_error(mc_owner_sym_for_effect, field, node)
+            return 0
         if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
         let arg_types: List[i32] = List.new()
         // mut.md Rev 8 §15.8 — see check_call.
@@ -37123,7 +37141,7 @@ impl Sema:
                 self.emit_error("type.implements() requires a trait name", trait_node)
                 return -1
             let trait_sym = self.ast.get_data0(trait_node)
-            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_lookup.contains(trait_sym):
+            if not self.lang_trait_syms.contains(trait_sym) and not self.trait_name_known(trait_sym):
                 self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
                 return -1
             self.typed_expr_types.insert(node, self.ty_bool as i32)
@@ -39811,9 +39829,79 @@ impl Sema:
             resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
         self.method_owner_symbol_for_type(resolved as i32)
 
+    // #2520 (§11.4): whether two traits give `type_sym` a method of this
+    // name with no inherent method over them — a bare call is ambiguous
+    // unless a bound of the receiver's type parameter names the trait.
+    // The first candidate's fn symbol, or 0 when the name is uncontested.
+    fn ambiguous_trait_method_head(type_sym: i32, method_sym: i32) -> i32:
+        let key = sema_pair_key(type_sym, method_sym)
+        if self.method_lookup.amb_heads.contains(key): self.method_lookup.amb_heads.get(key).unwrap() else: 0
+
+    fn trait_declares_method_name(trait_idx: i32, method_sym: i32) -> bool:
+        let start: i32 = self.trait_method_starts[trait_idx]
+        for mi in 0..self.trait_method_counts[trait_idx]:
+            if self.trait_method_names[(start + mi)] == method_sym:
+                return true
+        false
+
+    // The trait index a bound of the type parameter instantiated as
+    // `type_sym` names for `method_sym`, when exactly one bound trait
+    // both declares and implements it for the type; -1 otherwise.
+    fn bound_trait_idx_for_method(type_sym: i32, method_sym: i32) -> i32:
+        if self.current_fn_sig_idx < 0:
+            return -1
+        var template = self.sig_specialization_template_node(self.current_fn_sig_idx)
+        if template == 0:
+            template = self.current_fn_decl_node
+        if template == 0:
+            return -1
+        let meta = self.ast.find_fn_meta(template)
+        if meta < 0:
+            return -1
+        var found: i32 = -1
+        var found_count: i32 = 0
+        var pos: i32 = self.ast.fn_meta_tp_start(meta)
+        for ti in 0..self.ast.fn_meta_tp_count(meta):
+            let tp_name = self.ast.get_extra(pos)
+            let bound_count = self.ast.get_extra(pos + 1)
+            let subst = self.lookup_generic_subst(tp_name)
+            if subst != 0 and self.method_owner_symbol_for_type(subst) == type_sym:
+                for bi in 0..bound_count:
+                    let bound_sym = self.ast.get_extra(pos + 2 + bi)
+                    // A bound names its trait as written in this module;
+                    // the impl row for this type is the discriminator when
+                    // several same-named traits exist, so walk every
+                    // candidate the name has (visibility alone refused
+                    // std traits the prelude gate does not enumerate).
+                    var ci = self.trait_candidate_head(bound_sym)
+                    while ci >= 0:
+                        let tidx = ci
+                        if self.trait_declares_method_name(tidx, method_sym):
+                            let tkey = sema_trait_method_key(type_sym, tidx, method_sym)
+                            if self.method_lookup.trait_fn_lookup.contains(tkey):
+                                found = tidx
+                                found_count = found_count + 1
+                        ci = self.trait_candidate_nexts[ci]
+            pos = pos + 2 + bound_count
+        if found_count == 1: found else: -1
+
+    fn lookup_trait_method_fn(type_sym: i32, trait_idx: i32, method_sym: i32) -> i32:
+        let tkey = sema_trait_method_key(type_sym, trait_idx, method_sym)
+        if self.method_lookup.trait_fn_lookup.contains(tkey): self.method_lookup.trait_fn_lookup.get(tkey).unwrap() else: 0
+
+    fn lookup_trait_method_sig(type_sym: i32, trait_idx: i32, method_sym: i32) -> i32:
+        let tkey = sema_trait_method_key(type_sym, trait_idx, method_sym)
+        if self.method_lookup.trait_sig_lookup.contains(tkey): self.method_lookup.trait_sig_lookup.get(tkey).unwrap() else: -1
+
     fn lookup_method_sig(type_sym: i32, method_sym: i32) -> i32:
         if type_sym <= 0 or method_sym <= 0:
             return -1
+        if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
+            let bound_tidx = self.bound_trait_idx_for_method(type_sym, method_sym)
+            if bound_tidx >= 0:
+                let bound_sig = self.lookup_trait_method_sig(type_sym, bound_tidx, method_sym)
+                if bound_sig >= 0:
+                    return bound_sig
         let key = sema_pair_key(type_sym, method_sym)
         if self.method_lookup.sig_lookup.contains(key):
             return self.method_lookup.sig_lookup.get(key).unwrap()
@@ -39886,6 +39974,12 @@ impl Sema:
     fn lookup_method_fn(type_sym: i32, method_sym: i32) -> i32:
         if type_sym <= 0 or method_sym <= 0:
             return 0
+        if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
+            let bound_tidx = self.bound_trait_idx_for_method(type_sym, method_sym)
+            if bound_tidx >= 0:
+                let bound_fn = self.lookup_trait_method_fn(type_sym, bound_tidx, method_sym)
+                if bound_fn != 0:
+                    return bound_fn
         let key = sema_pair_key(type_sym, method_sym)
         if self.method_lookup.fn_lookup.contains(key):
             return self.method_lookup.fn_lookup.get(key).unwrap()
@@ -40050,6 +40144,21 @@ impl Sema:
             if self.extension_method_owner_syms[i] == owner_sym and self.extension_method_syms[i] == method_sym and sema_extension_module_path_matches(self.extension_method_paths[i], module_path, alias) != 0:
                 return self.extension_method_sig_idxs[i]
         -1
+
+    // #2520 (§11.4): a bare call two traits answer is ambiguous; the
+    // programmer names the trait through a bound.
+    mut fn emit_ambiguous_trait_method_error(owner_sym: i32, method_sym: i32, node: i32):
+        let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
+        var candidates = ""
+        var count = 0
+        var cand_fn = self.ambiguous_trait_method_head(owner_sym, method_sym)
+        while cand_fn != 0:
+            if count > 0:
+                candidates = candidates ++ ", "
+            candidates = candidates ++ with_str_clone_ref(self.pool_resolve(cand_fn))
+            count = count + 1
+            cand_fn = self.method_lookup.amb_next_fn.get(cand_fn) ?? 0
+        self.emit_error("ambiguous trait method '" ++ method_name ++ "' for type '" ++ with_str_clone_ref(self.pool_resolve(owner_sym)) ++ "'; candidates: " ++ candidates ++ "; name the trait through a bound (§11.4)", node)
 
     mut fn emit_ambiguous_extension_method_error(owner_sym: i32, method_sym: i32, node: i32):
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))

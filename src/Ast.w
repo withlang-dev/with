@@ -1839,12 +1839,23 @@ impl AstPool:
             if trait_sym == 0:
                 continue
 
+            // #2520: trait identity is (module, name) — the trait declared
+            // in the impl's own file is the one the impl names; only a
+            // trait declared elsewhere falls back to first match. Taking
+            // the first same-named trait made a user's `trait One` impl
+            // inherit std One's (absent) receiver.
             var trait_node: NodeId = 0 as NodeId
+            var fallback_node: NodeId = 0 as NodeId
             for trait_di in 0..self.decl_count():
                 let candidate = self.get_decl(trait_di)
                 if self.kind(candidate) == NodeKind.NK_TRAIT_DECL and self.get_data0(candidate) == trait_sym:
-                    trait_node = candidate
-                    break
+                    if fallback_node == 0:
+                        fallback_node = candidate
+                    if self.file(candidate) == self.file(impl_node):
+                        trait_node = candidate
+                        break
+            if trait_node == 0:
+                trait_node = fallback_node
             if trait_node == 0:
                 continue
 
