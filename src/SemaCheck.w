@@ -3711,7 +3711,7 @@ impl Sema:
                     continue
                 let method_node = self.impl_decl_method_node(decl, b)
                 if method_node != 0:
-                    out = self.push_fn_bodies(move out, self.ast.get_data0(method_node), method_node)
+                    out = self.push_fn_bodies(move out, self.fn_decl_semantic_symbol(method_node, self.ast.get_data0(method_node)), method_node)
                 else:
                     // The trait's default body, checked as this impl's
                     // method (check_trait_default_method_body_for_impl).

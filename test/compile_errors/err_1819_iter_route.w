@@ -1,4 +1,4 @@
-//! expect-check-fail: call to `Count.next` mutates global `G` while `r` is a live view into it
+//! expect-check-fail: call to `Count.Iter.next` mutates global `G` while `r` is a live view into it
 
 // #1819 (§9.1c: globals are places; §21.1 rule 1): a `for` over an Iter[T] calls its `next()` each time
 // round (§13.5), and `next` writes G while an element view of G is live.

@@ -7938,7 +7938,7 @@ impl Codegen:
                 else if is_sema_generic:
                     continue
                 else if (flags / FnFlags.ASYNC) % 2 == 1:
-                    self.declare_async_function(decl)
+                    self.declare_async_function(decl, i)
                 else:
                     self.declare_function_at(decl, i)
         self.declare_generator_functions()

@@ -18343,10 +18343,13 @@ impl Codegen:
 
     // ── Async function declaration ────────────────────────────────────
 
-    mut fn declare_async_function(fn_node: i32):
+    mut fn declare_async_function(fn_node: i32, decl_index: i32):
         self.ensure_async_runtime_declared()
 
-        let name_sym = self.pool.get_data0(fn_node)
+        // Sema's semantic symbol, as declare_function_at_inner takes
+        // (#2520): a trait impl method's signature lives under
+        // Owner.Trait.method, never the raw Owner.method spelling.
+        let name_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         if name_sym == 0: return
 
         let meta = self.pool.find_fn_meta(fn_node)
