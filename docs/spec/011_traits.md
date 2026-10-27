@@ -537,33 +537,32 @@ if user.name in whitelist:
     grant_access()
 ```
 
-**Operator desugaring:** For user-defined types, operator resolution
-searches the full `(lhs_type, rhs_type)` pair:
+**Operator desugaring:** For user-defined types, an operator method
+serves only its own side: resolution selects the implementation whose
+`Self` is the left operand type and whose right-hand-side parameter
+matches the right operand type. A method is never run with the
+operands swapped — a plain `fn sub(self, rhs: f64)` on `V` defines
+`V - f64` and says nothing about `f64 - V`, so the author who wants
+the other order writes that implementation, with the order spelled
+in its `Self` and parameters. When both orders exist as distinct
+implementations, each serves its own expression; there is no
+ambiguity.
 
-1. Try an implementation whose `Self` is the left operand type and
-   whose right-hand-side parameter matches the right operand type.
-2. If none exists, try an implementation whose `Self` is the right
-   operand type and whose right-hand-side parameter matches the left
-   operand type.
-3. Exactly one implementation must match. If both sides provide
-   distinct applicable implementations, the expression is ambiguous
-   and rejected.
+The one exception is `==` and `!=`: `Eq` is symmetric by contract,
+so when the left operand's type provides no applicable `eq`, the
+right operand type's implementation answers, called with the
+operands exchanged. If both sides provide distinct applicable `eq`
+implementations, the expression is ambiguous and rejected.
 
-The selected operation then desugars to a method call with
+The selected operation desugars to a method call with
 auto-referencing:
 
 ```
-a + b      →  Add.add(&a, &b)       // left-side dispatch
-1.0 + arr  →  Add.add(&arr, &1.0)   // right-side dispatch
+a + b      →  Add.add(&a, &b)
 a @ b      →  MatMul.matmul(&a, &b)
 -a         →  Neg.neg(&a)
-a == b     →  Eq.eq(&a, &b)
+a == b     →  Eq.eq(&a, &b)         // or Eq.eq(&b, &a) when only b's type defines eq
 ```
-
-When right-side dispatch is selected, the implementation still
-represents the original source expression order. An implementation of
-`Sub[f64, Array] for Array` therefore defines `f64 - Array`, not
-`Array - f64`.
 
 **Operator traits should take `&Self`, not `Self`.** If `add` takes
 `Self` by value, then `a + b` moves both operands and `a + b + c`

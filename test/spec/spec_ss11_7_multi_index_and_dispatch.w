@@ -99,8 +99,8 @@ impl MultiIndexMut[i32] for SpecProbe:
 type Offset { value: i32 }
 
 impl Offset:
-    fn add(self: &Self, lhs: i32) -> Offset:
-        Offset { value: self.value + lhs * 10 }
+    fn add(self: &Self, rhs: i32) -> Offset:
+        Offset { value: self.value + rhs * 10 }
 
 type Mat2 { a: i32, b: i32, c: i32, d: i32 }
 
@@ -129,8 +129,10 @@ fn test_multi_index_slice_assignment:
     probe[2:5, :, newaxis, ...] = 80
     assert(probe.marker == 84)
 
-fn test_right_side_dispatch:
-    let shifted = 3 + Offset { value: 4 }
+fn test_own_side_dispatch:
+    // §11.7 (#2611, D166): Offset.add serves `Offset + i32` only;
+    // `3 + Offset{...}` no longer dispatches to it reversed.
+    let shifted = Offset { value: 4 } + 3
     assert(shifted.value == 34)
 
 fn test_matmul_dispatch:
@@ -146,6 +148,6 @@ fn main:
     test_multi_index_read_write()
     test_multi_index_specs()
     test_multi_index_slice_assignment()
-    test_right_side_dispatch()
+    test_own_side_dispatch()
     test_matmul_dispatch()
     print("ok")

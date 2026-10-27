@@ -13878,9 +13878,16 @@ impl Sema:
         // `*mut cstr != null`.
         if self.get_type_kind(self.resolve_alias(lhs as TypeId)) == TypeKind.TY_PTR or self.get_type_kind(self.resolve_alias(rhs as TypeId)) == TypeKind.TY_PTR:
             return 0
+        // §11.7 (#2611): an operator method serves only its own side — the
+        // implementation whose Self is the left operand. Dispatching from
+        // the right operand would run that method with the operands
+        // swapped, and a plain `fn sub(self, rhs: f64)` does not say that
+        // `2.0 - a` means `a - 2.0`. The one exception is ==/!=: Eq is
+        // symmetric by contract, so either side's implementation answers.
+        let may_swap = op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ
         var method_sym = self.pool_intern(method_name)
         var lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
-        var rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+        var rhs_candidate = if may_swap: self.operator_candidate_for(rhs, lhs, method_sym) else: sema_operator_candidate_none()
         var derived = 0
         let primitive_name = sema_operator_primitive_name(op)
         if lhs_candidate.sig < 0 and rhs_candidate.sig < 0 and primitive_name.len() > 0 and self.type_has_operator_method(lhs, method_sym) == 0 and self.type_has_operator_method(rhs, method_sym) == 0:
@@ -13888,7 +13895,7 @@ impl Sema:
             // comparison from the family's primitive.
             method_sym = self.pool_intern(primitive_name)
             lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
-            rhs_candidate = self.operator_candidate_for(rhs, lhs, method_sym)
+            rhs_candidate = if may_swap: self.operator_candidate_for(rhs, lhs, method_sym) else: sema_operator_candidate_none()
             derived = 1
         let lhs_ok = if lhs_candidate.sig >= 0: 1 else: 0
         let rhs_ok = if rhs_candidate.sig >= 0: 1 else: 0
