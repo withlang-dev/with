@@ -182,6 +182,7 @@ fn emitc_push_system_libs(argv: List[str]) -> List[str]:
         argv |> push(emitc_windows_sdk_um_lib("kernel32.lib"))
         argv |> push(emitc_windows_sdk_um_lib("advapi32.lib"))
         argv |> push(emitc_windows_sdk_um_lib("bcrypt.lib"))
+        argv |> push(emitc_windows_sdk_um_lib("crypt32.lib"))
         argv |> push(emitc_windows_sdk_um_lib("shell32.lib"))
         argv |> push(emitc_windows_sdk_um_lib("user32.lib"))
         argv |> push(emitc_windows_sdk_um_lib("ole32.lib"))
