@@ -1179,6 +1179,12 @@ impl Zcu:
         // target input and the remedies (never a host tool — none is used).
         if with_cimport_macos_sdk_missing() != 0:
             full_msg = full_msg ++ "; no macOS SDK for target headers: this compiler carries no darwin sysroot (#1915) — set WITH_SDKROOT or SDKROOT, or configure [c_import] sdk_path in with.toml"
+        // #2530: a header outside the embedded (libc-only) sysroot reads as
+        // a bare "file not found"; name what was searched and both ways out.
+        else if ci_darwin_sdk_is_embedded():
+            let missing = ci_missing_header_name(detail)
+            if missing.len() > 0:
+                full_msg = full_msg ++ "; the embedded macOS sysroot this compiler carries (#1915) holds libc only, and '" ++ missing ++ "' is not in it — name an SDK that has it (WITH_SDKROOT, SDKROOT, or [c_import] sdk_path in with.toml), or take the library through `with get`"
         // #1915: a Windows c_import parses the SDK's libc headers only.
         if with_cimport_windows_libc_missing() != 0:
             full_msg = full_msg ++ "; the LLVM SDK carries no Windows C runtime (libc/windows) — install an SDK built with `with build :sdk-windows-libc`, or name one with WITH_WINDOWS_LIBC_DIR"

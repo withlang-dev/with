@@ -270,6 +270,16 @@ fn darwin_sdk_root() -> str:
         return with_str_clone_ref(g_darwin_configured_sdk)
     embedded_darwin_sysroot_dir()
 
+// Whether the macOS SDK c_import reads is the embedded sysroot: no SDK is
+// named (WITH_SDKROOT, SDKROOT, [c_import] sdk_path) and this binary
+// carries one. #2530's diagnostic names it, since it holds libc only.
+fn darwin_sdk_is_embedded() -> bool:
+    if runtime_sysinfo_os() != "Macos": return false
+    if runtime_getenv("WITH_SDKROOT").len() > 0: return false
+    if runtime_getenv("SDKROOT").len() > 0: return false
+    if g_darwin_configured_sdk.len() > 0: return false
+    embedded_darwin_sysroot_dir().len() > 0
+
 // darwin_sdk_root() on a macOS host, "" elsewhere (c_import on another host
 // reads that host's headers; a cross target names its own).
 fn host_darwin_sdk_root() -> str:

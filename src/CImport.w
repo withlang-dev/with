@@ -353,6 +353,20 @@ fn ci_add_windows_system_includes():
 fn ci_set_sdk_path(path: &str):
     darwin_sdk_set_configured(path)
 
+fn ci_darwin_sdk_is_embedded() -> bool:
+    darwin_sdk_is_embedded()
+
+// The header a clang "file not found" detail names (`'sqlite3.h' file not
+// found`), or "" when the detail names none.
+fn ci_missing_header_name(detail: &str) -> str:
+    let at = detail.find("' file not found")
+    if at < 0: return ""
+    var open = at - 1
+    while open >= 0 and detail[open] != 39:
+        open -= 1
+    if open < 0: return ""
+    detail.slice(open + 1, at)
+
 fn ci_build_define_prefix(defines: &List[str]) -> str:
     var out = StringBuilder.new()
     for i in 0..defines.len():
