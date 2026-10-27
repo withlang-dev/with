@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D163 — A match arm is `pattern [if guard] => body`, the body in the three forms after `=>`; §9.7, §29.13, §30.4 and §30.8 now state the rule the compiler enforces (delegated)](2026-10-26-D163-a-match-arm-is-pattern-guard-arrow-body.md)
 - [D162 — `std.random` draws the type its use demands: `next()` and `range(lo, hi)` over a `Random` trait (delegated)](2026-10-26-D162-std-random-draws-the-type-its-use-demands.md)
 - [D161 — An implicit `it` closure is the nearest enclosing argument whose parameter takes a single-parameter function (delegated)](2026-10-26-D161-an-it-closure-is-the-nearest-argument-that-takes-a-function.md)
 - [D160 — A shift count is a demand on the literal-typed local it reads: `u32`, as an untyped count is (delegated; extends D128)](2026-10-26-D160-a-shift-count-is-a-demand-on-a-literal-typed-local.md)

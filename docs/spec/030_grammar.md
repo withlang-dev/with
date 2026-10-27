@@ -142,7 +142,8 @@ LABEL_STMT  := LABEL ( STMT | COLON_BODY | BRACE_BODY )
 IF_STMT     := 'if' EXPR BODY { 'else' 'if' EXPR BODY } [ 'else' BODY ]
               | 'if' 'let' PATTERN '=' EXPR BODY [ 'else' BODY ]
 MATCH_STMT  := 'match' EXPR BODY_ARMS
-MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' EXPR
+MATCH_ARM   := PATTERN [ 'if' EXPR ] '=>' ARM_BODY
+ARM_BODY    := EXPR | NEWLINE INDENT STMT { NEWLINE STMT } DEDENT | BRACE_BODY
 FOR_STMT    := 'for' PATTERN 'in' EXPR BODY
 WHILE_STMT  := 'while' EXPR BODY
 DO_WHILE_STMT := 'do' BODY 'while' EXPR
@@ -236,7 +237,9 @@ BRACE_BODY    := '{' [ STMT { ( NEWLINE | ';' ) STMT } ] '}'
 
 All three forms are interchangeable for every block-introducing
 construct: `fn`, `if`, `else if`, `else`, `while`, `for`, `loop`, `with`,
-`defer`, `errdefer`, `comptime`, `unsafe`, labeled blocks, and match arms.
+`defer`, `errdefer`, `comptime`, `unsafe`, and labeled blocks. A match
+arm takes the same three forms after `=>` (`ARM_BODY`, §30.4); its
+introducer is never `:`.
 `then EXPR` is not a body form. Missing body introducers are parse errors.
 
 ### 30.9 Reserved Keywords

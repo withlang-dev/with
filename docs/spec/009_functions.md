@@ -755,6 +755,25 @@ matching. `match` has two forms:
 
 Semicolons are not valid match arm separators.
 
+**An arm is `pattern [if guard] => body`.** In a match arm, `=>` takes
+the role `:` plays for every other construct: it introduces the arm's
+body. The body takes the same three forms as any other body (§29.13):
+inline on the same line after `=>`, an indented block on the lines below
+`=>`, or a braced block after `=>`. The colon forms never introduce an
+arm body: `Some(x):` is a parse error ("expected '=>'").
+
+```
+match value:
+    Some(v) => v + 1
+    Some(v) if v > 10 =>
+        log(v)
+        v
+    None => {
+        log("empty")
+        0
+    }
+```
+
 **Patterns and `Drop`.** A struct or enum pattern applied to a value whose
 type implements `Drop` is a compile-time error — in `let`, in a `match` arm
 and in `if let` alike — with fix-its to keep the value whole (`let t = r`)
