@@ -731,7 +731,7 @@ unsafe fn x509_verify_chain_at(
         let len = *(chain_lens + idx as u64)
         if x509_parse(&raw mut cert as *mut X509Cert, chain_buf + start as u64, len) == 0:
             return 0
-        if x509_valid_at(&cert, now) == 0:
+        if x509_valid_at(cert, now) == 0:
             return 0
         let cert_buf_at = chain_buf + start as u64
         // Anchor here if a stored root issued this certificate.

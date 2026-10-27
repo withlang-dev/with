@@ -150,28 +150,28 @@ unsafe fn sha512_finish(ctx: *mut Sha512, out: *mut u8):
         u64_to_be(out, i * 8, ctx.state[i])
 
 // Convenience: hash a byte buffer, 64-byte digest
-pub fn sha512_hash(data: *const u8, len: i32, out: *mut u8) -> Unit:
+pub fn sha512_hash(data: *const u8, len: i32, out: *mut u8):
     var ctx = Sha512.new()
     let p = &raw mut ctx as *mut Sha512
     unsafe { sha512_update(p, data, len) }
     unsafe { sha512_finish(p, out) }
 
 // Convenience: hash a byte buffer, 48-byte SHA-384 digest
-pub fn sha384_hash(data: *const u8, len: i32, out: *mut u8) -> Unit:
+pub fn sha384_hash(data: *const u8, len: i32, out: *mut u8):
     var ctx = Sha512.new384()
     let p = &raw mut ctx as *mut Sha512
     unsafe { sha512_update(p, data, len) }
     unsafe { sha512_finish(p, out) }
 
 // Convenience: hash a string (observer — reads, never retains; D5)
-pub fn sha512_hash_str(s: &str, out: *mut u8) -> Unit:
+pub fn sha512_hash_str(s: &str, out: *mut u8):
     unsafe:
         let bytes = str_copy_bytes(s)
         let n = s.len()
         sha512_hash(bytes as *const u8, n as i32, out)
         str_free_bytes(bytes)
 
-pub fn sha384_hash_str(s: &str, out: *mut u8) -> Unit:
+pub fn sha384_hash_str(s: &str, out: *mut u8):
     unsafe:
         let bytes = str_copy_bytes(s)
         let n = s.len()
