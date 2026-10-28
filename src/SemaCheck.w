@@ -2823,15 +2823,13 @@ impl Sema:
                             if fn_name_str[gsm_i] == 46:
                                 let owner_name = fn_name_str.slice(0, gsm_i as i64)
                                 let owner_sym = self.pool_intern(owner_name)
-                                if self.type_decl_nodes.contains(owner_sym):
-                                    let td_node = self.type_decl_nodes.get(owner_sym).unwrap()
-                                    if self.type_decl_tp_count(td_node) > 0:
-                                        let gsm_p_start = self.ast.fn_meta_param_start(meta)
-                                        let gsm_p_count = self.ast.fn_meta_param_count(meta)
-                                        if gsm_p_count > 0:
-                                            let p0_tn = self.ast.fn_param_type(gsm_p_start, 0)
-                                            if p0_tn != 0 and self.ast.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
-                                                is_generic_struct_method = true
+                                if self.type_decl_type_param_count(owner_sym) > 0:
+                                    let gsm_p_start = self.ast.fn_meta_param_start(meta)
+                                    let gsm_p_count = self.ast.fn_meta_param_count(meta)
+                                    if gsm_p_count > 0:
+                                        let p0_tn = self.ast.fn_param_type(gsm_p_start, 0)
+                                        if p0_tn != 0 and self.ast.kind(p0_tn) == NodeKind.NK_TYPE_GENERIC:
+                                            is_generic_struct_method = true
                                 break
                         if not is_generic_struct_method:
                             self.update_module_context(di)
@@ -4555,7 +4553,7 @@ impl Sema:
             if sig_idx < 0 or not self.method_impl_nodes.contains(fn_name):
                 continue
             let owner_sym = self.method_decl_owner_symbol(decl, self.ast.get_data0(decl))
-            if owner_sym != 0 and self.type_decl_nodes.contains(owner_sym) and self.type_decl_tp_count(self.type_decl_nodes.get(owner_sym).unwrap()) != 0:
+            if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) != 0:
                 continue
             self.update_decl_source_context(di)
             let saved_self = if self.named_types.contains(self.syms.self_type): self.named_types.get(self.syms.self_type).unwrap() else: 0
@@ -7468,9 +7466,9 @@ impl Sema:
         let fn_node = self.generic_fn_node_for_symbol(method_fn)
         if fn_node == 0:
             return self.get_sig(method_fn)
-        if not self.type_decl_nodes.contains(owner_sym):
+        let owner_decl: i32 = self.owner_decl_node_for_type(owner_sym, owner_type)
+        if owner_decl == 0:
             return -1
-        let owner_decl: i32 = self.type_decl_nodes.get(owner_sym).unwrap()
         let owner_tp_start = self.type_decl_tp_start(owner_decl)
         let owner_tp_count = self.type_decl_tp_count(owner_decl)
         let meta = self.ast.find_fn_meta(fn_node)
@@ -14153,7 +14151,7 @@ impl Sema:
             let elem = self.resolve_alias(self.type_extra[start + ei] as TypeId) as i32
             let kind = self.get_type_kind(elem as TypeId)
             if kind == TypeKind.TY_TUPLE and self.tuple_has_open_generic(elem): return true
-            if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_decl_type_param_count(self.get_type_d0(elem as TypeId)) > 0: return true
+            if (kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM) and self.type_tid_decl_tp_count(elem) > 0: return true
         false
 
     // D124 (§4.2.1 rule 7): an untyped integer constant expression under a
@@ -16397,7 +16395,12 @@ impl Sema:
         let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
         if base == self.syms.list or base == self.syms.hashset or base == self.syms.btreeset or base == self.syms.hashmap or base == self.syms.btreemap:
             return base
-        if self.type_decl_nodes.contains(base) and self.type_decl_tp_count(self.type_decl_nodes.get(base).unwrap()) > 0:
+        // The declaration this module's annotation names (#750): the
+        // flat decl-node map holds the generic template of that name,
+        // which is std's Option even in a module whose own `type
+        // Option = i32` is what the annotation means.
+        let named_tid = self.lookup_named_type_visible(base)
+        if named_tid != 0 and self.type_decl_nodes_by_tid.contains(named_tid) and self.type_decl_tp_count(self.type_decl_nodes_by_tid.get(named_tid).unwrap()) > 0:
             return base
         0
 
@@ -23012,9 +23015,16 @@ impl Sema:
         if self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
             return 0
         let base_sym = self.get_type_d0(enum_tid)
-        if base_sym == 0 or not self.type_decl_nodes.contains(base_sym):
+        if base_sym == 0:
             return 0
-        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
+        // The enum's own declaration, by identity (#750), not bare name.
+        var td_node: i32 = 0
+        if self.type_decl_nodes_by_tid.contains(enum_tid):
+            td_node = self.type_decl_nodes_by_tid.get(enum_tid).unwrap()
+        else if self.type_decl_nodes.contains(base_sym):
+            td_node = self.type_decl_nodes.get(base_sym).unwrap()
+        if td_node == 0:
+            return 0
         let tp_count = self.type_decl_tp_count(td_node)
         if tp_count <= 0:
             return 0
@@ -23071,7 +23081,12 @@ impl Sema:
     // Walks the AST type declaration with type param substitution active.
     mut fn resolve_generic_enum_payload(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> List[i32]:
         var result: List[i32] = List.new()
-        if not self.type_decl_nodes.contains(base_sym):
+        // The instance's own template declaration, by identity (#750):
+        // a bare-name fetch finds whatever same-named declaration
+        // registered last — a user's `type Option = i32` displacing
+        // std's enum made every `?` inside std fail.
+        let td_node = self.generic_inst_decl_node(gi_tid)
+        if td_node == 0:
             return result
         let saved_payload_subst_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
         let saved_payload_subst_tys = sema_clone_i32_list(&self.generic_subst_type_ids)
@@ -23080,7 +23095,6 @@ impl Sema:
             self.generic_subst_type_ids = saved_payload_subst_tys
             return result
         // Walk AST type decl to find variant and re-resolve payload type nodes
-        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
         let td_extra_start = self.ast.get_data1(td_node)
         let td_sub_kind = type_decl_sub_kind(self.ast.get_data2(td_node))
         if not type_decl_is_enum(td_sub_kind):
@@ -30717,10 +30731,10 @@ impl Sema:
 
     mut fn type_generic_inst_decl_satisfies_thread_trait(tid: i32, trait_sym: i32) -> i32:
         let resolved = self.resolve_alias(tid)
-        let base_sym = self.get_generic_inst_base(resolved as i32)
-        if not self.type_decl_nodes.contains(base_sym):
+        // The instance's own template declaration, by identity (#750).
+        let decl = self.generic_inst_decl_node(resolved as i32)
+        if decl == 0:
             return 0
-        let decl: i32 = self.type_decl_nodes.get(base_sym).unwrap()
         let base_tid = self.generic_inst_template_tid(resolved as i32)
         if base_tid == 0:
             return 0
@@ -31697,7 +31711,7 @@ impl Sema:
         // #959: a builtin owner (`impl str: fn parse[T: Parse]()`) has no
         // type declaration and no type parameters of its own; its generic
         // methods are checked here like any other, not left uninstantiated.
-        let td_node: i32 = self.type_decl_nodes.get(owner_sym) ?? 0
+        let td_node: i32 = self.owner_decl_node_for_type(owner_sym, owner_type)
         let owner_tp_start = if td_node != 0: self.type_decl_tp_start(td_node) else: 0
         let owner_tp_count = if td_node != 0: self.type_decl_tp_count(td_node) else: 0
         let param_start = self.ast.fn_meta_param_start(meta)
@@ -31912,9 +31926,18 @@ impl Sema:
     // The type-parameter index payload `payload_index` of `variant_sym`
     // fixes, or -1 when the payload type is not a bare type parameter.
     fn pending_enum_payload_param_index(base_sym: i32, variant_sym: i32, payload_index: i32) -> i32:
-        if not self.type_decl_nodes.contains(base_sym):
+        // The variant's own enum declaration, by identity (#750): the
+        // bare name finds whatever same-named declaration registered
+        // last, which need not be this variant's enum.
+        var td_node: i32 = 0
+        if self.variant_type_ids.contains(variant_sym):
+            let owner_tid = self.variant_type_ids.get(variant_sym).unwrap()
+            if self.type_decl_nodes_by_tid.contains(owner_tid):
+                td_node = self.type_decl_nodes_by_tid.get(owner_tid).unwrap()
+        if td_node == 0 and self.type_decl_nodes.contains(base_sym):
+            td_node = self.type_decl_nodes.get(base_sym).unwrap()
+        if td_node == 0:
             return -1
-        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
         let tp_count = self.type_decl_tp_count(td_node)
         if tp_count <= 0:
             return -1
@@ -31962,13 +31985,20 @@ impl Sema:
     fn pending_enum_base_of(val_type: i32) -> i32:
         let resolved = self.resolve_alias(val_type as TypeId) as i32
         var base = 0
+        var td_node: i32 = 0
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             base = self.get_generic_inst_base(resolved)
+            td_node = self.generic_inst_decl_node(resolved)
         else if self.get_type_kind(resolved) == TypeKind.TY_ENUM:
             base = self.get_type_d0(resolved)
-        if base == 0 or not self.type_decl_nodes.contains(base):
+            if self.type_decl_nodes_by_tid.contains(resolved):
+                td_node = self.type_decl_nodes_by_tid.get(resolved).unwrap()
+        if base == 0:
             return 0
-        let td_node: i32 = self.type_decl_nodes.get(base).unwrap()
+        if td_node == 0 and self.type_decl_nodes.contains(base):
+            td_node = self.type_decl_nodes.get(base).unwrap()
+        if td_node == 0:
+            return 0
         if self.type_decl_tp_count(td_node) <= 0:
             return 0
         if not type_decl_is_enum(type_decl_sub_kind(self.ast.get_data2(td_node))):
@@ -32079,7 +32109,15 @@ impl Sema:
         let variant_sym = self.ast.get_data0(callee)
         if not self.variant_type_ids.contains(variant_sym):
             return 0
-        let td_node: i32 = self.type_decl_nodes.get(base_sym).unwrap()
+        // The variant's own enum declaration, by identity (#750).
+        var td_node: i32 = 0
+        let owner_tid = self.variant_type_ids.get(variant_sym).unwrap()
+        if self.type_decl_nodes_by_tid.contains(owner_tid):
+            td_node = self.type_decl_nodes_by_tid.get(owner_tid).unwrap()
+        if td_node == 0 and self.type_decl_nodes.contains(base_sym):
+            td_node = self.type_decl_nodes.get(base_sym).unwrap()
+        if td_node == 0:
+            return 0
         let tp_count = self.type_decl_tp_count(td_node)
         let args: List[i32] = List.new()
         for _ in 0..tp_count:

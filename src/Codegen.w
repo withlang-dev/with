@@ -4957,7 +4957,7 @@ impl Codegen:
             // D72: a Drop struct whose zero storage is a live value gets the
             // hidden liveness byte appended (Sema decided; the source field
             // indices are unchanged).
-            if self.sema.struct_liveness_byte_frozen(self.codegen_sema_sym_for(name_sym)) != 0:
+            if self.sema.struct_liveness_byte_frozen_decl(type_node) != 0:
                 ft_list.push(wl_i8_type(self.context))
                 self.liveness_byte_indices.insert(st_type, field_count)
             wl_struct_set_body(st_type, list_data_i64(&ft_list), ft_list.len() as i32, is_packed)
@@ -7489,7 +7489,7 @@ impl Codegen:
             ft_list.push(f_ty)
         if invalid_layout == 0:
             // D72: decided per declaration, so every instance agrees.
-            if self.sema.struct_liveness_byte_frozen(self.codegen_sema_sym_for(cg_base_sym)) != 0:
+            if self.sema.struct_liveness_byte_frozen_decl(type_node) != 0:
                 ft_list.push(wl_i8_type(self.context))
                 self.liveness_byte_indices.insert(mono_ty, field_count)
             wl_struct_set_body(mono_ty, list_data_i64(&ft_list), ft_list.len() as i32, 0)

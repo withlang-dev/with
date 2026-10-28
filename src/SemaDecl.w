@@ -1083,7 +1083,14 @@ impl Sema:
         let name = self.ast.get_data0(node)
         if is_local != 0:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
-        self.type_decl_nodes.insert(name, node)
+        // #750: same rule as record_named_type_with_pub for the flat
+        // decl-node map downstream template lookups still consult: a
+        // non-generic declaration never displaces a generic template.
+        var displaces_generic = false
+        if self.type_decl_tp_count(node) == 0 and self.type_decl_nodes.contains(name):
+            displaces_generic = self.type_decl_tp_count(self.type_decl_nodes.get(name).unwrap()) > 0
+        if not displaces_generic:
+            self.type_decl_nodes.insert(name, node)
         // Generic decls stay OUT of the shadow tier mask: a tiered lookup
         // returning the other tier's generic base would mint fresh generic
         // insts after freeze (is_copy_frozen misses). Generic name reuse
@@ -2148,16 +2155,16 @@ impl Sema:
                             concrete_inst_impl_method = true
             for cfi in 0..fn_name_str.len():
                 if fn_name_str[cfi] == 46:
-                    let cf_owner = fn_name_str.slice(0, cfi as i64)
-                    let cf_owner_sym = self.pool_intern(cf_owner)
-                    if concrete_inst_impl_method == 0 and self.type_decl_nodes.contains(cf_owner_sym):
-                        let cf_td: i32 = self.type_decl_nodes.get(cf_owner_sym).unwrap()
-                        if self.type_decl_tp_count(cf_td) > 0:
-                            self.register_generic_fn_node(fn_name, node)
-                            self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
-                            self.named_types.remove(self_sym)
-                            return
+                    // The owner's generic-ness is Self's own declaration
+                    // (#750 follow-up), not the flat decl-node map: std's
+                    // generic `Handle[T]` keeps that entry, which made a
+                    // user's `Handle` methods generic templates.
+                    if concrete_inst_impl_method == 0 and self.type_tid_decl_tp_count(self_type_id) > 0:
+                        self.register_generic_fn_node(fn_name, node)
+                        self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
+                        let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                        self.named_types.remove(self_sym)
+                        return
                     break
 
         // D75 (§16.2b.5): a `...` definition has the C calling convention —
@@ -2974,7 +2981,25 @@ impl Sema:
         if is_local != 0:
             self.local_trait_names.insert(name, 1)
 
+    // The type-parameter count of the declaration `tid` itself denotes,
+    // by identity — never the flat name map's answer, which after #750
+    // keeps a generic template a same-named non-generic declaration
+    // shadows for its own module.
+    fn type_tid_decl_tp_count(tid: i32) -> i32:
+        if tid <= 0:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if not self.type_decl_nodes_by_tid.contains(resolved):
+            return 0
+        self.type_decl_tp_count(self.type_decl_nodes_by_tid.get(resolved).unwrap())
+
+    // The type-parameter count of the declaration `type_name` denotes
+    // from the current module; the flat map only when no candidate is
+    // visible (a builtin recorded before any module existed).
     fn type_decl_type_param_count(type_name: i32) -> i32:
+        let visible = self.lookup_named_type_visible(type_name)
+        if visible != 0 and self.type_decl_nodes_by_tid.contains(self.resolve_alias(visible as TypeId) as i32):
+            return self.type_tid_decl_tp_count(visible)
         if not self.type_decl_nodes.contains(type_name):
             return 0
         self.type_decl_tp_count(self.type_decl_nodes.get(type_name).unwrap())

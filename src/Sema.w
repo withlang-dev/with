@@ -1337,6 +1337,11 @@ type Sema {
     // D72 (§2.5.1, #1431): struct name sym -> 1 when the struct carries the
     // hidden liveness byte (struct_needs_liveness_byte), 0 otherwise.
     liveness_byte_cache: HashMap[i32, i32],
+    // The same verdict keyed by declaration node (#750 follow-up): two
+    // same-named structs (std's generic Handle[T], a user's Handle) are
+    // two layouts, and the name key let the first one laid out answer
+    // for both.
+    liveness_byte_decl_cache: HashMap[i32, i32],
     // is_copy cycle guard — HashSet (heap handle) so is_copy can be `&Self` and
     // mutate it through a copied handle (D7 interior-mutability recipe).
     copy_visit_stack: HashSet[i32],
@@ -3219,6 +3224,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
     let drop_method_cache = sema_new_map_i32_i32()
     let liveness_byte_cache = sema_new_map_i32_i32()
+    let liveness_byte_decl_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
     let call_callable_types = sema_new_map_i32_i32()
@@ -3547,6 +3553,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         method_lookup,
         drop_method_cache,
         liveness_byte_cache,
+        liveness_byte_decl_cache,
         copy_visit_stack: HashSet.new(),
         struct_copy_cache: HashMap.new(),
         copy_walk_incomplete: 0,
@@ -4402,9 +4409,29 @@ impl Sema:
                 candidate_index as i32,
             )
 
+    // Whether the flat entry for `sym` is a generic template declaration.
+    fn named_type_entry_is_generic(sym: i32) -> bool:
+        if not self.named_types.contains(sym):
+            return false
+        let prev_tid = self.named_types.get(sym).unwrap()
+        if not self.type_decl_nodes_by_tid.contains(prev_tid):
+            return false
+        self.type_decl_tp_count(self.type_decl_nodes_by_tid.get(prev_tid).unwrap()) > 0
+
     // `decl_node` is the declaring type declaration, 0 for a builtin.
     mut fn record_named_type_with_pub(sym: i32, tid: i32, is_pub: i32, decl_node: i32) -> Unit:
-        self.named_types.insert(sym, tid)
+        // #750: downstream stages read this flat map as the generic-
+        // template registry (the template behind a TY_GENERIC_INST's
+        // base symbol) until #751 carries identity through
+        // instantiation. A non-generic declaration of the same name in
+        // another module must not displace the generic template: a
+        // user's `type Option = i32` otherwise becomes the template
+        // every stage finds for std's Option. Name resolution for
+        // source references goes through the candidate lists below,
+        // which still record every declaration.
+        let new_is_generic = decl_node == 0 or self.type_decl_tp_count(decl_node) > 0
+        if new_is_generic or not self.named_type_entry_is_generic(sym):
+            self.named_types.insert(sym, tid)
         // #1457: the declaration an identity symbol names, for the stages
         // that receive a method symbol and need its owner's type.
         if decl_node != 0 and self.colliding_type_names.contains(sym):
@@ -6791,6 +6818,22 @@ impl Sema:
                 base_sym = canonical
         if self.type_decl_nodes.contains(base_sym): self.type_decl_nodes.get(base_sym).unwrap() else: 0
 
+    // The declaring node of the type `owner_type` denotes, by identity
+    // (#750 follow-up): the flat symbol-keyed map keeps std's generic
+    // `Handle[T]`, whose T a facade Handle's generic method call then
+    // tried to infer. The flat map only for an owner with no type
+    // (a builtin owner, #959).
+    fn owner_decl_node_for_type(owner_sym: i32, owner_type: i32) -> i32:
+        if owner_type != 0:
+            let resolved = self.resolve_alias(owner_type as TypeId) as i32
+            if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
+                let inst_decl = self.generic_inst_decl_node(resolved)
+                if inst_decl != 0:
+                    return inst_decl
+            if self.type_decl_nodes_by_tid.contains(resolved):
+                return self.type_decl_nodes_by_tid.get(resolved).unwrap()
+        if self.type_decl_nodes.contains(owner_sym): self.type_decl_nodes.get(owner_sym).unwrap() else: 0
+
     fn get_generic_inst_arg_count(tid: i32) -> i32:
         if self.get_type_kind(tid as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -8612,29 +8655,65 @@ impl Sema:
     // (packed, bitpacked, repr(C), aligned fields), unions, distinct types
     // and facade resources (whose `live` field is this byte, D51) are never
     // changed.
-    mut fn struct_needs_liveness_byte(name_sym: i32) -> i32:
+    // The declaration node whose fields decide tid's liveness byte: the
+    // laid-out type's own, by identity (see liveness_byte_decl_cache).
+    fn struct_decl_node_for_liveness(name_sym: i32, tid: i32) -> i32:
+        var decl = if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_GENERIC_INST: self.generic_inst_decl_node(tid) else: 0
+        if decl == 0 and self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
+            decl = self.type_decl_nodes_by_tid.get(self.resolve_alias(tid as TypeId) as i32).unwrap()
+        if decl == 0 and self.type_decl_nodes.contains(name_sym):
+            decl = self.type_decl_nodes.get(name_sym).unwrap()
+        decl
+
+    mut fn struct_needs_liveness_byte(name_sym: i32, tid: i32) -> i32:
         if name_sym == 0:
             return 0
-        let cached = self.liveness_byte_cache.get(name_sym)
-        if cached.is_some():
-            return cached.unwrap()
+        let decl = self.struct_decl_node_for_liveness(name_sym, tid)
+        if decl != 0:
+            let by_decl = self.liveness_byte_decl_cache.get(decl)
+            if by_decl.is_some():
+                return by_decl.unwrap()
+        let cached_value = self.liveness_byte_cache.get(name_sym) ?? -1
+        if cached_value >= 0 and decl == 0:
+            return cached_value
         // Recorded before the walk: a self-referential field reads as 0.
-        self.liveness_byte_cache.insert(name_sym, 0)
-        let result = self.struct_decl_needs_liveness_byte(name_sym)
-        self.liveness_byte_cache.insert(name_sym, result)
+        if decl != 0:
+            self.liveness_byte_decl_cache.insert(decl, 0)
+        if cached_value < 0:
+            self.liveness_byte_cache.insert(name_sym, 0)
+        let result = self.struct_decl_needs_liveness_byte(name_sym, tid, decl)
+        if decl != 0:
+            self.liveness_byte_decl_cache.insert(decl, result)
+        if cached_value < 0:
+            self.liveness_byte_cache.insert(name_sym, result)
         result
 
     fn struct_liveness_byte_frozen(name_sym: i32) -> i32:
         self.liveness_byte_cache.get(name_sym) ?? 0
 
-    mut fn struct_decl_needs_liveness_byte(name_sym: i32) -> i32:
-        if not self.type_decl_nodes.contains(name_sym) or self.distinct_type_names.contains(name_sym) or self.facade_resource_index.contains(name_sym):
+    fn struct_liveness_byte_frozen_decl(decl: i32) -> i32:
+        if decl == 0:
             return 0
-        let decl: i32 = self.type_decl_nodes.get(name_sym).unwrap()
+        self.liveness_byte_decl_cache.get(decl) ?? 0
+
+    // The frozen verdict for the type `tid` itself denotes: its own
+    // declaration's row, the name row only when no declaration row was
+    // recorded (a builtin recorded before any module existed).
+    fn struct_liveness_byte_frozen_tid(name_sym: i32, tid: i32) -> i32:
+        let decl = self.struct_decl_node_for_liveness(name_sym, tid)
+        if decl != 0 and self.liveness_byte_decl_cache.contains(decl):
+            return self.liveness_byte_decl_cache.get(decl).unwrap()
+        self.struct_liveness_byte_frozen(name_sym)
+
+    mut fn struct_decl_needs_liveness_byte(name_sym: i32, tid: i32, decl: i32) -> i32:
+        if self.distinct_type_names.contains(name_sym) or self.facade_resource_index.contains(name_sym):
+            return 0
+        if decl == 0:
+            return 0
         let packed = self.ast.get_data2(decl)
         if type_decl_sub_kind(packed) != TypeDeclKind.Struct or type_decl_is_packed(packed) != 0 or type_decl_is_bitpacked(packed) != 0 or type_decl_is_repr_c(packed) != 0:
             return 0
-        if not self.named_types.contains(name_sym) or self.type_has_drop_impl(self.named_types.get(name_sym).unwrap()) == 0:
+        if self.type_has_drop_impl(tid) == 0:
             return 0
         let extra_start = self.ast.get_data1(decl)
         let field_count = self.ast.get_extra(extra_start)
@@ -9970,6 +10049,18 @@ impl Sema:
                 if impl_tp_count > 0:
                     return 1
 
+        // The owner's generic-ness is the impl target type's own
+        // declaration (#750 follow-up): splitting the symbol text and
+        // reading the flat decl-node map made a user's non-generic
+        // `Handle` a generic template owner because std's `Handle[T]`
+        // keeps the flat entry.
+        var owner_impl = impl_direct
+        if owner_impl == 0 and effective != 0 and self.method_impl_nodes.contains(effective):
+            owner_impl = self.method_impl_nodes.get(effective).unwrap()
+        if owner_impl != 0:
+            let target_tid = self.impl_decl_target_types.get(owner_impl) ?? 0
+            if target_tid != 0:
+                return if self.type_tid_decl_tp_count(target_tid) > 0: 1 else: 0
         var fn_name = self.extract_decl_name_after(node, "fn")
         if fn_name.len() == 0:
             fn_name = with_str_clone_ref(self.pool_resolve_symbol(parsed))
@@ -9977,10 +10068,8 @@ impl Sema:
             if fn_name[ci] == 46:
                 let owner_name = fn_name.slice(0, ci as i64)
                 let owner_sym = self.pool_lookup_symbol(owner_name)
-                if owner_sym != 0 and self.type_decl_nodes.contains(owner_sym):
-                    let type_node = self.type_decl_nodes.get(owner_sym).unwrap()
-                    if self.type_decl_tp_count(type_node) > 0:
-                        return 1
+                if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) > 0:
+                    return 1
                 return 0
         0
 

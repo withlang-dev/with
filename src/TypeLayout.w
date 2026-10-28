@@ -320,7 +320,7 @@ impl Sema:
                 let field_ty = self.type_layout_generic_struct_field_type(resolved as i32, fi)
                 offset = offset + self.type_layout_size_of(field_ty)
             // D72 (§2.5.1): the hidden liveness byte follows the fields.
-            offset = offset + self.struct_needs_liveness_byte(base_sym)
+            offset = offset + self.struct_needs_liveness_byte(base_sym, resolved as i32)
             return type_layout_align_up(offset, max_align)
         if tk != TypeKind.TY_STRUCT:
             return 0
@@ -355,7 +355,7 @@ impl Sema:
             let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             offset = offset + self.type_layout_size_of(field_tid)
         // D72 (§2.5.1): the hidden liveness byte follows the fields.
-        offset = offset + self.struct_needs_liveness_byte(name_sym)
+        offset = offset + self.struct_needs_liveness_byte(name_sym, resolved as i32)
         type_layout_align_up(offset, self.type_layout_struct_align_of(resolved as i32))
 
     // The payload area of an enum (§2): the largest variant's fields laid
