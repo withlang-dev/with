@@ -4925,7 +4925,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     install = install.dep("install-llvm-ld")
     out = out.add_target(install)
 
-    var seed = target_new(.Action, "seed", "").output("src/main")
+    var seed = target_new(.Action, "seed", "").output("src/main" ++ host_exe_suffix())
     seed.action = run_seed_download_action
     seed = seed.input("build/https_fetch.w")
     // The lock is what the download is made from: without it as an input a

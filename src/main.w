@@ -3779,6 +3779,16 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
             // and copy; no graph evaluation.
             if graph_options.selected_target == "install-user" and graph_options.selected_targets.len() <= 1:
                 return cli_fast_install_blessed(root, graph_options.selected_target)
+            // The driver names itself (#2759): an action resolving "the
+            // seed/compiler" through WITH, then PATH, then src/main got a
+            // different compiler than the one invoked whenever PATH held
+            // one — on win10 a plain `src\main.exe build :dev` handed the
+            // bootstrap bridges to an old PATH with.exe. An explicit WITH
+            // still wins (the battery pins the seed that way).
+            if with_getenv_str("WITH").len() == 0:
+                let self_exe = with_self_exe()
+                if self_exe.len() > 0:
+                    let _named = with_setenv_str("WITH", self_exe)
             var load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
             let graph = load_result.graph
             if not graph.ok:
@@ -4908,9 +4918,14 @@ fn test_capture_suffix(test_name: &str) -> str:
         return "." ++ test_name
     ".run"
 
-// This compiler's path as a child process can run it: argv[0], made
-// absolute when it names a path (a bare name stays for PATH to resolve).
+// This compiler's path as a child process can run it: with_self_exe is
+// the one owner of that answer (a bare name a child in another
+// directory cannot resolve stayed bare here, and on Windows the child
+// then could not name itself either — #2759's test on win10).
 fn test_running_compiler_path() -> str:
+    let self_exe = with_self_exe()
+    if self_exe.len() > 0:
+        return self_exe
     let self_arg = with_arg_at(0)
     if not self_arg.contains("/") or runtime_path_is_absolute(self_arg):
         return self_arg
