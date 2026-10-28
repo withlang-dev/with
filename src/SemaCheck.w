@@ -2720,15 +2720,20 @@ impl Sema:
             let meta = self.ast.find_fn_meta(decl)
             if meta < 0 or self.ast.fn_meta_tp_count(meta) != 0 or self.fn_decl_is_entry_point(decl) != 0: continue
             if self.ast.fn_meta_ret(meta) != 0 and not self.decl_returns_view(decl, di) and not self.decl_may_store_view_into_receiver(decl, di): continue
-            // A call names it by its bare name: `later(x)`, `self.later()`.
-            let parsed = self.ast.get_data0(decl)
-            let text: str = with_str_clone_ref(self.pool_resolve(parsed))
-            var bare = parsed
-            for ci in 0..text.len():
-                if text[ci] == '.': bare = self.pool_intern(text.slice(ci + 1, text.len()))
+            let bare = self.decl_call_name(self.ast.get_data0(decl))
             let earlier: i32 = self.body_typed_decls.get(bare) ?? -1
             self.body_typed_next[di] = earlier
             self.body_typed_decls.insert(bare, di)
+
+    // The name a call spells a declaration by: a method's parsed name is
+    // `Owner.m`, called as `self.m()` or `Owner.m()`; a function's is
+    // its own (`later(x)`).
+    mut fn decl_call_name(parsed: i32) -> i32:
+        let text: str = with_str_clone_ref(self.pool_resolve(parsed))
+        var bare = parsed
+        for ci in 0..text.len():
+            if text[ci] == '.': bare = self.pool_intern(text.slice(ci + 1, text.len()))
+        bare
 
     // D43 (§4.10): a function written without a return type has the type
     // its body gives it, so a use of it — a call, or the function as a
@@ -4625,16 +4630,30 @@ impl Sema:
     // rule changes type. Every body, plain or instantiated, comes through here.
     // D143: whether this function's body calls the function itself, by name
     // (the declaration's nodes precede it, as prepare_body_order walks them).
-    fn body_calls_itself(node: i32, decl_index: i32) -> bool:
+    // A method or a function of a type (parsed `Owner.m`) calls itself
+    // through its receiver or its type: `self.m(…)`, `Self.m(…)`,
+    // `Owner.m(…)`; a bare `m(…)` there is another function.
+    mut fn body_calls_itself(node: i32, decl_index: i32) -> bool:
         if decl_index < 0 or decl_index >= self.body_order_lower.len():
             return false
         let fn_name = self.ast.get_data0(node)
+        let call_name = self.decl_call_name(fn_name)
+        let of_type = call_name != fn_name
+        let text: str = with_str_clone_ref(self.pool_resolve(fn_name))
+        let owner = if of_type: self.pool_intern(text.slice(0, text.len() - self.pool_resolve(call_name).len() - 1)) else: 0
         var n: i32 = self.body_order_lower[decl_index] + 1
         while n < node:
             if self.ast.kind(n) == NodeKind.NK_CALL:
                 let callee = self.ast.get_data0(n)
-                if self.ast.kind(callee) == NodeKind.NK_IDENT and self.ast.get_data0(callee) == fn_name:
+                let callee_kind = self.ast.kind(callee)
+                if not of_type and callee_kind == NodeKind.NK_IDENT and self.ast.get_data0(callee) == fn_name:
                     return true
+                if of_type and callee_kind == NodeKind.NK_FIELD_ACCESS and self.ast.get_data1(callee) == call_name:
+                    let receiver = self.ast.get_data0(callee)
+                    if self.ast.kind(receiver) == NodeKind.NK_IDENT:
+                        let r = self.ast.get_data0(receiver)
+                        if self.sym_is_self_value(r) or r == self.syms.self_type or r == owner:
+                            return true
             n = n + 1
         false
 
@@ -4655,6 +4674,9 @@ impl Sema:
                 return
             self.recursion_open_sym = fn_name
             self.recursion_pass1_mismatch = 0
+            // The open result is the signature's: every call of this
+            // function, free or method, reads `Never` until the pass decides.
+            self.set_sig_return_type(sig_idx, self.ty_never as i32)
             self.suppress_errors = self.suppress_errors + 1
             self.check_fn_body_with_sig_once(node, sig_idx, decl_index)
             self.suppress_errors = self.suppress_errors - 1
@@ -27916,14 +27938,12 @@ impl Sema:
                 self.note_allocation_site(node, AllocConstructKind.EXPLICIT_API, 0, 0)
             self.note_allocating_callee(node, fn_sym)
             self.ensure_body_typed(fn_sym, sig_idx)
+            // D143: in the first pass over an unannotated body that calls
+            // itself, its signature returns the open result, `Never`: every
+            // join and operator takes the other side's type, and the other
+            // paths decide the function's; the second pass reads the decided
+            // type (check_fn_body_with_sig_at).
             var ret = self.sig_return_type(sig_idx) as i32
-            // D143: in the first pass over an unannotated body, a call of the
-            // function itself is the open result, `Never`: every join and
-            // operator takes the other side's type, and the other paths
-            // decide the function's; the second pass reads the decided type.
-            if fn_sym != 0 and fn_sym == self.recursion_open_sym:
-                self.recursion_self_calls.insert(node, 1)
-                ret = self.ty_never as i32
             // D51 stage 7 (spec §16.2b.8): a presented text-view return —
             // `returns borrow CStr …` / `returns static CStr` on a function
             // that is no resource's method — is `Option[CStr]` at the call,
