@@ -83,17 +83,39 @@ fn bs_with_string_literal(value: &str) -> str:
 fn bs_capture_path(root: &str, output_dir: &str, label: &str, suffix: &str) -> str:
     bs_abs(root, bs_join(output_dir, label ++ "." ++ suffix))
 
-fn bs_c_compiler() -> str:
+// The host C compiler for emitted-C checks, resolved as build/emit_c.w
+// resolves it (the one owner of the choice): explicit env, then the
+// pinned SDK's clang++, then the host default — clang++.exe on Windows,
+// where no `cc` exists (#811: every emit-C case failed to spawn).
+fn bs_c_compiler(ctx: &ActionCtx) -> str:
     let explicit = env("WITH_EMIT_C_CC")
     if explicit.len() > 0:
         return explicit
     let cc = env("CC")
     if cc.len() > 0:
         return cc
+    let llvm_prefix = env("LLVM_PREFIX")
+    if llvm_prefix.len() > 0:
+        if os() == "Windows":
+            return llvm_prefix ++ "/bin/clang++.exe"
+        return llvm_prefix ++ "/bin/clang++"
+    let sdk_clang =
+        if os() == "Windows":
+            ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
+        else if os() == "Linux":
+            ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
+        else if os() == "Macos":
+            ".deps/llvm-22.1.6-darwin-arm64/bin/clang++"
+        else:
+            ""
+    if sdk_clang.len() > 0 and ctx.fs().exists(sdk_clang):
+        return sdk_clang
+    if os() == "Windows":
+        return "clang++.exe"
     "cc"
 
-fn bs_push_c_compiler(argv: List[str]) -> List[str]:
-    argv.push(bs_c_compiler())
+fn bs_push_c_compiler(ctx: &ActionCtx, argv: List[str]) -> List[str]:
+    argv.push(bs_c_compiler(ctx))
     argv
 
 fn bs_host_target_triple() -> str:
@@ -3470,15 +3492,17 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
         if line.contains("with_fiber_") or line.contains("with_channel_"): return true
     false
 
-fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
+fn bs_emit_c_cc_args(ctx: &ActionCtx, root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
     var cc_args: List[str] = List.new()
-    cc_args.push(bs_c_compiler())
+    cc_args.push(bs_c_compiler(ctx))
     cc_args.push("-O1")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
     if os() == "Linux":
         cc_args.push("-no-pie")
         cc_args.push("-Wl,--gc-sections")
+    else if os() == "Windows":
+        cc_args.push("-Wl,/OPT:REF")
     else:
         cc_args.push("-Wl,-dead_strip")
     cc_args.push("-o")
@@ -3499,7 +3523,7 @@ fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &s
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3689,7 +3713,7 @@ fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
 
 fn ec_c_path(c: &EcCase): bs_join(c.dir, "program.c")
 
-fn ec_bin(c: &EcCase): bs_join(c.dir, "program")
+fn ec_bin(c: &EcCase): bs_join(c.dir, "program" ++ bs_exe_suffix())
 
 fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or("")
 
@@ -3759,7 +3783,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
         // case is 19 MB of C and takes 112 s on the release host with this
         // target running alone; at 120 s it timed out (exit 124) in every
         // battery that ran the other test targets beside it.
-        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
+        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len():
@@ -3914,7 +3938,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let cc_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stdout")
     let cc_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stderr")
     var cc_args: List[str] = List.new()
-    cc_args = bs_push_c_compiler(move cc_args)
+    cc_args = bs_push_c_compiler(ctx, move cc_args)
     cc_args |> push("-c")
     cc_args |> push(bs_abs(root, helper_c))
     cc_args |> push("-o")
@@ -3926,7 +3950,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
     let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
     var link_args: List[str] = List.new()
-    link_args = bs_push_c_compiler(move link_args)
+    link_args = bs_push_c_compiler(ctx, move link_args)
     link_args |> push("-o")
     link_args |> push(bs_abs(root, bin))
     link_args |> push(bs_abs(root, with_obj))
