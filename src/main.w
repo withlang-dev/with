@@ -4918,9 +4918,14 @@ fn test_capture_suffix(test_name: &str) -> str:
         return "." ++ test_name
     ".run"
 
-// This compiler's path as a child process can run it: argv[0], made
-// absolute when it names a path (a bare name stays for PATH to resolve).
+// This compiler's path as a child process can run it: with_self_exe is
+// the one owner of that answer (a bare name a child in another
+// directory cannot resolve stayed bare here, and on Windows the child
+// then could not name itself either — #2759's test on win10).
 fn test_running_compiler_path() -> str:
+    let self_exe = with_self_exe()
+    if self_exe.len() > 0:
+        return self_exe
     let self_arg = with_arg_at(0)
     if not self_arg.contains("/") or runtime_path_is_absolute(self_arg):
         return self_arg
