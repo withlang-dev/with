@@ -213,6 +213,12 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
     let root_dir = resolve_dirname(root_path)
     state.root_source_dir = if import_root.len() > 0: import_root else: root_dir
     let root_module = state.reserve_module(root_path, root_dir, root_file_id)
+    // The root keeps the spelling it was given (`sub/./x.w`, Windows
+    // `tools\battery.w`): its declarations carry that spelling, `__FILE__`
+    // and panic sites print it byte for byte (#1953), and every lookup keyed
+    // by a declaration's path must find this module under it (#809).
+    // Identity stays the canonical key (#592).
+    state.module_paths[root_module] = resolve_owned_text(root_path)
 
     var work: i32 = 0
     while work < state.module_paths.len():
@@ -315,7 +321,8 @@ impl ResolveState:
         let canon = resolve_normalize_path(path)
         // Identity is keyed on the fully-canonical form so different spellings of
         // the same file (root vs import-resolved, ./-prefixed, absolute) collapse
-        // to one module (#592). The stored path keeps the first-seen spelling.
+        // to one module (#592). The stored path is the normalized spelling
+        // (the root's is the one it was given, resolve_from_root_pool_with_prefix).
         let canon_key = resolve_canonical_module_key(canon)
         let existing = self.module_map.get(canon_key)
         if existing.is_some():
