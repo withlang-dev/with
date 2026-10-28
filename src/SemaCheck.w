@@ -8681,9 +8681,6 @@ impl Sema:
             if method_name == "split_at": return MirIntrinsic.SPLIT_AT
             if method_name == "split_at_mut": return MirIntrinsic.SPLIT_AT_MUT
             if method_name == "iter_place": return MirIntrinsic.LIST_ITER_PLACE
-            if method_name == "map": return MirIntrinsic.LIST_MAP
-            if method_name == "filter": return MirIntrinsic.LIST_FILTER
-            if method_name == "fold": return MirIntrinsic.LIST_FOLD
             if method_name == "contains": return MirIntrinsic.LIST_CONTAINS
             if method_name == "join": return MirIntrinsic.LIST_JOIN
             return MirIntrinsic.NONE
@@ -25710,7 +25707,19 @@ impl Sema:
             let stage_meta = if stage_fn != 0: self.ast.find_fn_meta(stage_fn) else: -1
             if stage_meta >= 0 and self.ast.fn_meta_param_count(stage_meta) > 0:
                 self.hint_collection_literal(lhs, self.ast.fn_param_type(self.ast.fn_meta_param_start(stage_meta), 0))
-        var lhs_ty = self.check_expr(lhs)
+        // D93, D142: `[3, 2, 1] |> map(quick)` iterates the literal, and the
+        // named function the adapter applies is its elements' use: the
+        // literal is a List of that function's parameter type.
+        var literal_expected: TypeId = 0
+        if rhs != 0 and self.ast.kind(lhs) == NodeKind.NK_ARRAY_LIT and self.ast.kind(rhs) == NodeKind.NK_CALL and self.ast.kind(self.ast.get_data0(rhs)) == NodeKind.NK_IDENT and self.ast.get_data2(rhs) >= 1 and sema_iter_adapter_name(self.pool_resolve(self.ast.get_data0(self.ast.get_data0(rhs)))):
+            let applied = self.ast.get_extra(self.ast.get_data1(rhs))
+            if self.ast.kind(applied) == NodeKind.NK_IDENT:
+                let applied_sig = self.get_visible_sig(self.ast.get_data0(applied))
+                if applied_sig >= 0 and self.sig_get_param_count(applied_sig) >= 1:
+                    let elem_args: List[i32] = List.new()
+                    elem_args.push(self.auto_deref_ref_ptr_type(self.resolve_alias(self.sig_param_type(applied_sig, 0) as TypeId)) as i32)
+                    literal_expected = self.ensure_generic_inst_type(self.syms.list, elem_args, 1)
+        var lhs_ty = if literal_expected != 0: self.check_expr_with_expected(lhs, literal_expected) else: self.check_expr(lhs)
         // D142 (§13.5): a sequence on the left of `|>` iterates by the rule
         // `for` uses: when the stage is no method of the value but is one of
         // the iterator its `.iter()` returns, the stage sees `lhs.iter()`.
@@ -25927,7 +25936,7 @@ impl Sema:
                 return 1
             if field == self.syms.range_method or field == self.syms.split_at or field == self.syms.split_at_mut or field == self.syms.iter_ref or field == self.syms.iter_place:
                 return 1
-            if field == self.syms.filter or field == self.syms.map or field == self.syms.fold or field == self.syms.sequence or field == self.syms.traverse:
+            if field == self.syms.sequence or field == self.syms.traverse:
                 return 1
         if owner_sym == self.syms.hashmap:
             if field == self.syms.insert or field == self.syms.clear:
@@ -33592,18 +33601,12 @@ impl Sema:
             // element instead of defaulting to i32 (#306). The closure return is
             // left to inference (ret = 0), so the mapped element type comes from the
             // closure body, not the input element.
-            if (field == self.syms.map or field == self.syms.traverse) and arg_index == 0:
+            if field == self.syms.traverse and arg_index == 0:
                 let map_elem = self.get_generic_inst_arg(resolved as i32, 0)
                 if map_elem != 0:
                     let map_params: List[i32] = List.new()
                     map_params.push(map_elem)
                     return self.ensure_fn_type(map_params, 1, 0 as TypeId) as i32
-            if field == self.syms.filter and arg_index == 0:
-                let filter_elem = self.get_generic_inst_arg(resolved as i32, 0)
-                if filter_elem != 0:
-                    let filter_params: List[i32] = List.new()
-                    filter_params.push(filter_elem)
-                    return self.ensure_fn_type(filter_params, 1, self.ty_bool) as i32
         if owner_sym == self.syms.hashset:
             if (field == self.syms.insert or field == self.syms.contains or field == self.syms.remove) and arg_index == 0:
                 return self.get_generic_inst_arg(resolved as i32, 0)
@@ -35253,14 +35256,7 @@ impl Sema:
                     let spawn_params: List[i32] = List.new()
                     mc_expected = self.ensure_fn_type(spawn_params, 0, self.ty_i32) as i32
             if mc_expected == 0 and field == self.syms.fold and ai == 1 and arg_types.len() > 0:
-                let fold_elem = if self.iterator_element_type(obj_type as i32) != 0:
-                    self.iterator_element_type(obj_type as i32)
-                else:
-                    let fold_resolved = self.resolve_alias(obj_type)
-                    if self.get_type_kind(fold_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(fold_resolved as i32) == self.syms.list:
-                        self.get_generic_inst_arg(fold_resolved as i32, 0)
-                    else:
-                        0
+                let fold_elem = self.iterator_element_type(obj_type as i32)
                 let fold_acc = arg_types[0]
                 if fold_elem != 0 and fold_acc != 0:
                     let fold_params: List[i32] = List.new()
@@ -36113,24 +36109,6 @@ impl Sema:
                     let ip_args: List[i32] = List.new()
                     ip_args.push(ip_elem_ty)
                     return self.ensure_generic_inst_type(self.syms.listiterplace, ip_args, 1) as i32
-                if field == self.syms.filter:
-                    return recv_type as i32
-                if field == self.syms.map:
-                    if arg_count >= 1:
-                        let mapper_ty = self.resolve_alias(arg_types[0] as TypeId)
-                        if self.get_type_kind(mapper_ty) == TypeKind.TY_FN:
-                            let mapped_elem_ty = self.get_type_d2(mapper_ty)
-                            let mapped_tid = self.find_generic_inst(self.syms.list, mapped_elem_ty)
-                            if mapped_tid != 0:
-                                return mapped_tid
-                            let mapped_args: List[i32] = List.new()
-                            mapped_args.push(mapped_elem_ty)
-                            return self.ensure_generic_inst_type(self.syms.list, mapped_args, 1) as i32
-                    return recv_type as i32
-                if field == self.syms.fold:
-                    if arg_count >= 1:
-                        return arg_types[0]
-                    return self.get_generic_inst_arg(recv_type, 0)
                 if field == self.syms.sequence:
                     return self.list_sequence_return_type(recv_type, mc_resolved_arg_count, node)
                 if field == self.syms.traverse:
@@ -36451,6 +36429,12 @@ impl Sema:
                 if first_arg_ty == 0: first_arg_ty = self.check_expr(first_arg) as i32
             let weak_push = arg_count >= 1 and extra_start >= 0 and self.expr_is_untyped_literal_arith(self.ast.get_extra(extra_start))
             self.note_literal_method_demand(expr, obj_type as i32, field, first_arg_ty, if weak_push: -node else: node)
+        // D142: a sequence's adapters are its iterator's; a pipeline reaches
+        // them without spelling `.iter()`.
+        let seq_resolved = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type)))
+        if sema_iter_adapter_name(method_name) and self.get_type_kind(seq_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(seq_resolved as i32) == self.syms.list:
+            self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "': a List's adapters are its iterator's, and a pipeline iterates it — `xs |> " ++ method_name ++ "(…)` (§13.5, D142)", node)
+            return 0
         self.emit_error("unknown method '" ++ method_name ++ "' for type '" ++ receiver_name ++ "'", node)
         0
 

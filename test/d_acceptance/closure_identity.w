@@ -7,6 +7,6 @@ fn main:
     var items: List[i32] = List.new()
     items.push(10)
     items.push(20)
-    let r1 = items.map(double)
+    let r1 = items |> map(double)
     for v in r1:
         print(int_to_string(v))

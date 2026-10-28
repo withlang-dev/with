@@ -505,8 +505,6 @@ type Codegen {
     comptime_error_msg: str,
     codegen_error_detail: str,
     had_error: i32,
-    // #2019: 1 while emitting an intrinsic call MIR marked may-cancel.
-    iter_cancel_checks: i32,
 
     // Monomorphization context (for duck-typing error messages)
     mono_inst_name: i32 = 0,
@@ -1293,7 +1291,6 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         comptime_error_msg: "",
         codegen_error_detail: "",
         had_error: 0,
-        iter_cancel_checks: 0,
         gen_state_ptr: 0,
         gen_state_type: 0,
         gen_field_indices: HashMap.new(),

@@ -14,9 +14,9 @@ fn main:
     assert(shared.len() == 3)
     assert(shared.contains(2))
     assert(shared[1] == 2)
-    let doubled = shared.map(x => x * 2)
+    let doubled: List[i32] = shared |> map(x => x * 2) |> collect[List]()
     assert(doubled[0] == 2)
-    let evens = shared.filter(x => x % 2 == 0)
+    let evens: List[i32] = shared |> filter(x => x % 2 == 0) |> collect[List]()
     assert(evens.len() == 1)
     assert(evens[0] == 2)
 

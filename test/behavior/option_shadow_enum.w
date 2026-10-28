@@ -14,7 +14,7 @@ fn main:
     var items: List[i32] = List.new()
     items.push(5)
     items.push(10)
-    let doubled = items.map(double)
+    let doubled: List[i32] = items |> map(double) |> collect[List]()
     assert(doubled.len() == 2)
 
     // Also test user enum directly

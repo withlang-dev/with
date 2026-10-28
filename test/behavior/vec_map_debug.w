@@ -13,7 +13,7 @@ fn main:
     items.push(20)
     items.push(30)
     print(int_to_string(items.len()))
-    let doubled = items.map(double)
+    let doubled: List[i32] = items |> map(double) |> collect[List]()
     print(int_to_string(doubled.len()))
     for v in doubled:
         print(int_to_string(v))

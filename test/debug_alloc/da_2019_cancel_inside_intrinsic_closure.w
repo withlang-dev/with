@@ -1,12 +1,11 @@
 //! expect-debug-alloc: leak count=0
 //! expect-stdout: resumed=0 item_drops=0 live=0
-// #2019 (§14.3, §14.7): `xs.map(f)` and `xs.fold(init, f)` are codegen
-// intrinsics that call the closure once per element. When the fiber is
-// cancelled while the closure is suspended in an await, the closure leaves
-// by its cancellation unwind with no value; the intrinsic must stop there
-// and its caller must unwind too, releasing what was built. Before, the loop
-// went on, pushed the never-written values, and the caller resumed past the
-// call with them.
+// #2019 (§14.3, §14.7): `xs |> map(f)` and `xs |> fold(init, f)` call the
+// closure once per element (a List's adapters are its iterator's, D142;
+// the eager List intrinsics this test was written against are gone, #2772).
+// When the fiber is cancelled while the closure is suspended in an await,
+// the closure leaves by its cancellation unwind with no value; the adapter
+// must stop there and its caller must unwind too, releasing what was built.
 use std.task.Task
 use std.collections.Atomic
 extern fn with_fiber_live_fibers() -> i32
@@ -34,13 +33,13 @@ async fn forever_value(n: i32) -> i32:
 
 async fn map_parent -> i32:
     let xs: List[i32] = [1, 2, 3]
-    let items = xs.map(n => forever_item(n).await)
+    let items: List[Item] = xs |> map(n => forever_item(n).await) |> collect[List]()
     resumed.fetch_add(1, .SeqCst)
     items.len() as i32
 
 async fn fold_parent -> i32:
     let xs: List[i32] = [1, 2, 3]
-    let total = xs.fold(0i32, (acc, n) => acc + forever_value(n).await)
+    let total = xs |> fold(0i32, (acc, n) => acc + forever_value(n).await)
     resumed.fetch_add(1, .SeqCst)
     total
 

@@ -5,6 +5,6 @@ fn main:
     items.push(1)
     items.push(2)
     items.push(3)
-    let tripled = items.map(it * 3)
+    let tripled = items |> map(it * 3)
     for v in tripled:
         write(int_to_string(v))
