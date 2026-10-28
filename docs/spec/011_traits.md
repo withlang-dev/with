@@ -542,11 +542,21 @@ serves only its own side: resolution selects the implementation whose
 `Self` is the left operand type and whose right-hand-side parameter
 matches the right operand type. A method is never run with the
 operands swapped — a plain `fn sub(self, rhs: f64)` on `V` defines
-`V - f64` and says nothing about `f64 - V`, so the author who wants
-the other order writes that implementation, with the order spelled
-in its `Self` and parameters. When both orders exist as distinct
-implementations, each serves its own expression; there is no
-ambiguity.
+`V - f64` and says nothing about `f64 - V`. The other order is the
+left operand's operator, so it is written on the left operand's type;
+a scalar's is an extension method (§9.5), as in Scala (D167):
+
+```
+extend f64:
+    fn mul(self: &Self, v: &V) -> V: V { x: *self * v.x }
+
+let w = 2.0 * v    // f64's mul: Self is the left operand
+```
+
+A primitive's operator methods answer only beside an operand of a
+user-defined type; two primitives use the builtin operator. When both
+orders exist as distinct implementations, each serves its own
+expression; there is no ambiguity.
 
 The one exception is `==` and `!=`: `Eq` is symmetric by contract,
 so when the left operand's type provides no applicable `eq`, the
