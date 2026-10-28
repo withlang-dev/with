@@ -20,6 +20,10 @@ pub fn exit_code(code: i32) -> Never:
 pub fn pid -> i32:
     with_getpid()
 
+/// Whether a process with this ID is running (and visible to this one).
+pub fn process_alive(id: i32) -> bool:
+    with_process_alive(id) != 0
+
 /// Get command-line arguments as a List of strings.
 pub fn args -> List[str]:
     let n = with_arg_count()
