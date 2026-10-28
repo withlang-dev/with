@@ -1,3 +1,4 @@
+//! skip-on: windows the host C sysroot is not selectable on Windows (host_c_sysroot is empty): the key has one sysroot to name
 //! expect-stdout: ok
 // #2530: the c_import cache keyed an import by the header's spelling, not by
 // the sysroot it was read from. `sqlite3.h` under SDKROOT (the Xcode SDK
@@ -14,7 +15,9 @@ fn temp_root() -> str:
     "/tmp"
 
 fn check_with(compiler: &str, base: &str, sysroot: &str, program: &str) -> bool:
+    // Each host reads its own: the SDK root on macOS, the sysroot on Linux.
     set_env("WITH_SDKROOT", base ++ "/" ++ sysroot)
+    set_env("WITH_LINUX_SYSROOT", base ++ "/" ++ sysroot)
     let ran = run_to_files(&[compiler, "check", base ++ "/" ++ program], base ++ "/out", base ++ "/err", 120000)
     if ran.code != 0:
         print(f"{program} under {sysroot}: code {ran.code} err [{read_file(base ++ "/err") ?? ""}]")
