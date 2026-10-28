@@ -372,8 +372,10 @@ pub fn run_source_cache_tests_action(ctx: ActionCtx) -> i32:
     rc = sft_expect(ctx, "no-cache", said3.contains("could not fetch archive.bin (pinned sha256 " ++ pin ++ ") from its source") and said3.contains(down ++ ": no connection to 127.0.0.1:1"), "the failure does not name the archive, the pin and the source:\n" ++ said3)
     if rc != 0: return rc
     // #2412: the connect probe retries before it gives up, as the download
-    // does; one refused connect is not a down host.
-    rc = sft_expect(ctx, "no-cache", said3.contains("no connection to 127.0.0.1:1 after 5 attempts"), "the connect probe gave up after one attempt:\n" ++ said3)
+    // does; one refused connect is not a down host. How many retries fit
+    // the 20 s deadline is the host's: five where a refused connect is
+    // instant, four on Windows (2 s a probe).
+    rc = sft_expect(ctx, "no-cache", said3.contains("no connection to 127.0.0.1:1 after ") and not said3.contains("after 1 attempts"), "the connect probe gave up after one attempt:\n" ++ said3)
     if rc != 0: return rc
 
     // 4. A cache entry that is not the pinned bytes is never served: it is

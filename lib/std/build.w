@@ -2493,10 +2493,12 @@ fn build_timeout_or(timeout: i32, fallback: i32) -> i32:
 
 // The fetch program an action compiles and runs. With a connect timeout it
 // first opens and closes a TCP connection to the host, retrying after 1, 2,
-// 3 and 4 s (#2412: one resolver blip failed four corpus downloads at once;
-// ten seconds in all, inside the shortest download budget a fetch is given),
+// 3 and 4 s (#2412: one resolver blip failed four corpus downloads at once),
 // and exits 3 when every probe fails (a host that is down
-// is not worth five download attempts); every
+// is not worth five download attempts). The probes stop early rather than
+// outlive the caller's deadline (`deadline-ms`): a refused connect is not
+// instant everywhere (Windows retries the SYN, 2 s a probe), and a program
+// killed at the deadline cannot say why it failed. Every
 // download attempt then gives up when the server says nothing for `idle_ms`.
 // A fetch retries with a growing pause, so one dropped connection does not
 // fail a lane. build/https_fetch.w is the build layer's own copy for drivers
@@ -2525,13 +2527,15 @@ fn build_https_fetch_source() -> str:
     "fn main -> i32:\n" ++
     "    let argv = args()\n" ++
     "    if argv.len() < 3:\n" ++
-    "        print(\"usage: https_fetch <url> <output> [<connect-ms> <idle-ms>]\")\n" ++
+    "        print(\"usage: https_fetch <url> <output> [<connect-ms> <idle-ms> [<deadline-ms>]]\")\n" ++
     "        return 2\n" ++
+    "    let started = now_ns()\n" ++
     "    let url = argv[1] ++ \"\"\n" ++
     "    let output = argv[2] ++ \"\"\n" ++
     "    let connect_ms = if argv.len() >= 5: number(argv[3]) else: 0\n" ++
     "    let idle_ms = if argv.len() >= 5: number(argv[4]) else: 0\n" ++
-    "    if connect_ms < 0 or idle_ms < 0:\n" ++
+    "    let deadline_ms = if argv.len() >= 6: number(argv[5]) else: 0\n" ++
+    "    if connect_ms < 0 or idle_ms < 0 or deadline_ms < 0:\n" ++
     "        print(\"https_fetch: the timeouts are milliseconds\")\n" ++
     "        return 2\n" ++
     "    if connect_ms > 0:\n" ++
@@ -2543,12 +2547,19 @@ fn build_https_fetch_source() -> str:
     "            print(\"not an https URL: \" ++ url)\n" ++
     "            return 2\n" ++
     "        var fd = -1\n" ++
+    "        var probes = 0\n" ++
     "        for probe in 1i32..ATTEMPTS + 1:\n" ++
+    "            let probe_started = now_ns()\n" ++
     "            fd = tcp_connect_timeout(host, port, connect_ms)\n" ++
-    "            if fd >= 0: break\n" ++
-    "            if probe < ATTEMPTS: sleep_secs(probe)\n" ++
+    "            probes = probe\n" ++
+    "            if fd >= 0 or probe == ATTEMPTS: break\n" ++
+    "            // The pause and one more probe like this one must end before\n" ++
+    "            // the deadline, or the caller kills this program unheard.\n" ++
+    "            let now = now_ns()\n" ++
+    "            if deadline_ms > 0 and (now - started + now - probe_started) / 1000000 + probe * 1000 >= deadline_ms: break\n" ++
+    "            sleep_secs(probe)\n" ++
     "        if fd < 0:\n" ++
-    "            print(f\"no connection to {host}:{port} after {ATTEMPTS} attempts (each waited at most {connect_ms / 1000} s)\")\n" ++
+    "            print(f\"no connection to {host}:{port} after {probes} attempts (each waited at most {connect_ms / 1000} s)\")\n" ++
     "            return 3\n" ++
     "        let _ = socket_close(fd)\n" ++
     "    for attempt in 1i32..ATTEMPTS + 1:\n" ++
@@ -2633,6 +2644,7 @@ fn ActionCtx.fetch_url(self: &Self, cmd_dir: &str, url: &str, part: &str, downlo
     argv.push(with_str_clone_ref(part))
     argv.push(f"{BUILD_FETCH_CONNECT_MS}")
     argv.push(f"{BUILD_FETCH_IDLE_MS}")
+    argv.push(f"{download_ms}")
     let result = self.process_runner().run_capture(argv, cmd_dir ++ "/https_fetch.stdout", cmd_dir ++ "/https_fetch.stderr", download_ms)
     if result.timed_out:
         return f"no complete response within {download_ms / 1000} s"
