@@ -125,14 +125,20 @@ fn with_ld_main() -> i32:
 fn with_self_exe() -> str:
     let argv0 = with_arg_at(0)
     if argv0.contains("/") or argv0.contains("\\"):
-        // Absolute: a child may run in another directory (a build action
-        // in the project root), where a relative spelling names nothing
-        // or another file.
+        // Absolute when this process's cwd is the one the spelling was
+        // relative to: a child may run in another directory (a build
+        // action in the project root), where a relative spelling names
+        // nothing or another file. A parent that resolved a relative
+        // argv[0] against its own cwd and then chdir'd the child (the
+        // test runner) leaves a spelling this cwd cannot absolutize;
+        // existence decides, and the raw spelling stands otherwise.
         if runtime_path_is_absolute(argv0):
             return argv0
         let cwd = runtime_cwd()
         if cwd.len() > 0:
-            return cwd ++ "/" ++ argv0
+            let joined = cwd ++ "/" ++ argv0
+            if runtime_file_exists(joined) != 0:
+                return joined
         return argv0
     let windows = runtime_sysinfo_os() == "Windows"
     if windows:
