@@ -7237,6 +7237,14 @@ impl Sema:
         let d0 = self.get_type_d0(tid as TypeId)
         // Direct match: struct/enum/alias whose name matches a type param symbol
         if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
+            // A type its declaration made is never a type parameter, whatever
+            // its name: a program's own `type U` mapped through iter_map[T, U, I]
+            // was rewritten to the U the specialization binds, building
+            // Mapped[&i32, i32, ListIter[i32]] for a List of the struct and
+            // a field-type miss in MIR (#2772). A parameter's placeholder has
+            // no declaration.
+            if self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
+                return tid
             for si in 0..count:
                 let subst_sym = subst_syms[si]
                 if subst_sym == d0:
