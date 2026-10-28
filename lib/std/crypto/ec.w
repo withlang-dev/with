@@ -1,14 +1,15 @@
-// Elliptic curve operations over NIST P-256
+// Elliptic curve operations over NIST P-256 and P-384
 // Uses Jacobian coordinates and Montgomery multiplication via bigint i31.
+// The field and point arithmetic is generic over the modulus loaded by
+// the curve's loaders; only constants and byte widths differ per curve.
 //
-// Curve: y² = x³ - 3x + b over F_p
-// p = 2^256 - 2^224 + 2^192 + 2^96 - 1
+// Curves: y² = x³ - 3x + b over F_p
 
 use std.crypto.bigint
 
-// Field element: 256-bit value in i31 format.
-// Header (1) + 9 limbs = 10 u32s. Use 12 for safety.
-let FE_WORDS: i32 = 12
+// Field element: value in i31 format.
+// Header (1) + 13 limbs covers 384 bits (P-256 needs 10). Use 16.
+let FE_WORDS: i32 = 16
 
 // Initialize field prime p into dst (i31 format).
 unsafe fn p256_load_p(dst: *mut u32):
@@ -94,24 +95,35 @@ unsafe fn fe_mul(dst: *mut u32, a: *const u32, b: *const u32, p: *const u32, p0i
 unsafe fn fe_sqr(dst: *mut u32, a: *const u32, p: *const u32, p0i: u32):
     i31_montmul(dst, a, a, p, p0i)
 
-// dst = a^(-1) mod p using Fermat: a^(p-2) mod p
-unsafe fn fe_inv(dst: *mut u32, a: *const u32, p: *const u32, p0i: u32):
-    // p - 2 in bytes
-    var pm2: [u8; 32] = [
-        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0x00u8, 0x00u8, 0x00u8, 0x01u8,
-        0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
-        0x00u8, 0x00u8, 0x00u8, 0x00u8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
-        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFDu8,
-    ]
+// dst = a^(-1) mod p using Fermat: a^(p-2) mod p.
+// `pm2`/`pm2_len` are the curve's p-2 in big-endian bytes.
+unsafe fn fe_inv(dst: *mut u32, a: *const u32, p: *const u32, p0i: u32, pm2: *const u8, pm2_len: i32):
     let mlen = i31_word_count(*(p + 0u64))
     // Copy a to dst
     var i = 0
     while i <= mlen:
         *(dst + i as u64) = *(a + i as u64)
         i = i + 1
-    var t1: [u32; 12] = [0u32; 12]
-    var t2: [u32; 12] = [0u32; 12]
-    i31_modpow(dst, &pm2[0] as *const u8, 32, p, p0i, &raw mut t1[0] as *mut u32, &raw mut t2[0] as *mut u32)
+    var t1: [u32; 16] = [0u32; 16]
+    var t2: [u32; 16] = [0u32; 16]
+    i31_modpow(dst, pm2, pm2_len, p, p0i, &raw mut t1[0] as *mut u32, &raw mut t2[0] as *mut u32)
+
+// P-256's p - 2 and P-384's p - 2, for fe_inv.
+const P256_PM2: [u8; 32] = [
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0x00u8, 0x00u8, 0x00u8, 0x01u8,
+    0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
+    0x00u8, 0x00u8, 0x00u8, 0x00u8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFDu8,
+]
+
+const P384_PM2: [u8; 48] = [
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFEu8,
+    0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
+    0x00u8, 0x00u8, 0x00u8, 0x00u8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFDu8,
+]
 
 // Copy field element
 unsafe fn fe_copy(dst: *mut u32, src: *const u32):
@@ -147,9 +159,9 @@ unsafe fn fe_from_monty(x: *mut u32, p: *const u32, p0i: u32):
 // Point at infinity: Z = 0.
 //
 // Each coordinate is FE_WORDS u32s in Montgomery form.
-// A point is 3 * FE_WORDS = 36 u32s.
+// A point is 3 * FE_WORDS = 48 u32s.
 
-let POINT_WORDS: i32 = 36
+let POINT_WORDS: i32 = 48
 
 unsafe fn point_x(pt: *mut u32) -> *mut u32:
     pt
@@ -189,11 +201,11 @@ unsafe fn point_is_zero(pt: *const u32) -> u32:
 // Point doubling: R = 2*P (Jacobian coordinates)
 // Algorithm from "Guide to ECC" Algorithm 3.21
 unsafe fn point_double(r: *mut u32, pt: *const u32, p: *const u32, p0i: u32):
-    var a: [u32; 12] = [0u32; 12]
-    var b: [u32; 12] = [0u32; 12]
-    var c: [u32; 12] = [0u32; 12]
-    var d: [u32; 12] = [0u32; 12]
-    var t: [u32; 12] = [0u32; 12]
+    var a: [u32; 16] = [0u32; 16]
+    var b: [u32; 16] = [0u32; 16]
+    var c: [u32; 16] = [0u32; 16]
+    var d: [u32; 16] = [0u32; 16]
+    var t: [u32; 16] = [0u32; 16]
     let ap = &raw mut a[0] as *mut u32
     let bp = &raw mut b[0] as *mut u32
     let cp = &raw mut c[0] as *mut u32
@@ -245,14 +257,14 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
         point_copy(r, pt1)
         return
 
-    var u1: [u32; 12] = [0u32; 12]
-    var u2: [u32; 12] = [0u32; 12]
-    var s1: [u32; 12] = [0u32; 12]
-    var s2: [u32; 12] = [0u32; 12]
-    var h: [u32; 12] = [0u32; 12]
-    var rr: [u32; 12] = [0u32; 12]
-    var t: [u32; 12] = [0u32; 12]
-    var t2v: [u32; 12] = [0u32; 12]
+    var u1: [u32; 16] = [0u32; 16]
+    var u2: [u32; 16] = [0u32; 16]
+    var s1: [u32; 16] = [0u32; 16]
+    var s2: [u32; 16] = [0u32; 16]
+    var h: [u32; 16] = [0u32; 16]
+    var rr: [u32; 16] = [0u32; 16]
+    var t: [u32; 16] = [0u32; 16]
+    var t2v: [u32; 16] = [0u32; 16]
     let u1p = &raw mut u1[0] as *mut u32
     let u2p = &raw mut u2[0] as *mut u32
     let s1p = &raw mut s1[0] as *mut u32
@@ -276,8 +288,8 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     fe_mul(u2p, p2x, t2p as *const u32, p, p0i)
 
     // S1 = Y1*Z2³, S2 = Y2*Z1³ (separate buffers to avoid montmul aliasing)
-    var z2_cubed: [u32; 12] = [0u32; 12]
-    var z1_cubed: [u32; 12] = [0u32; 12]
+    var z2_cubed: [u32; 16] = [0u32; 16]
+    var z1_cubed: [u32; 16] = [0u32; 16]
     fe_mul(&raw mut z2_cubed[0] as *mut u32, tp as *const u32, p2z, p, p0i)
     fe_mul(s1p, p1y, &z2_cubed[0] as *const u32, p, p0i)
     fe_mul(&raw mut z1_cubed[0] as *mut u32, t2p as *const u32, p1z, p, p0i)
@@ -302,7 +314,7 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     fe_mul(t2p, tp as *const u32, hp as *const u32, p, p0i)
 
     // u1h2 = U1*H² (separate buffer to avoid aliasing u1p as both dst and src)
-    var u1h2: [u32; 12] = [0u32; 12]
+    var u1h2: [u32; 16] = [0u32; 16]
     fe_mul(&raw mut u1h2[0] as *mut u32, u1p as *const u32, tp as *const u32, p, p0i)
     fe_sqr(rx, rrp as *const u32, p, p0i)
     fe_sub(rx, rx as *const u32, t2p as *const u32, p)
@@ -315,21 +327,21 @@ unsafe fn point_add(r: *mut u32, pt1: *const u32, pt2: *const u32, p: *const u32
     fe_sub(ry, ry as *const u32, tp as *const u32, p)
 
     // z1z2 = Z1*Z2 (separate buffer to avoid aliasing rz as both dst and src in next mul)
-    var z1z2: [u32; 12] = [0u32; 12]
+    var z1z2: [u32; 16] = [0u32; 16]
     fe_mul(&raw mut z1z2[0] as *mut u32, p1z, p2z, p, p0i)
     fe_mul(rz, &z1z2[0] as *const u32, hp as *const u32, p, p0i)
 
 // Scalar multiplication: R = k * P
-// k is a 32-byte big-endian scalar.
-unsafe fn point_mul(r: *mut u32, k: *const u8, pt: *const u32, p: *const u32, p0i: u32):
+// k is a big-endian scalar of scalar_len bytes (32 or 48).
+unsafe fn point_mul(r: *mut u32, k: *const u8, scalar_len: i32, pt: *const u32, p: *const u32, p0i: u32):
     point_zero(r, p)
 
-    var tmp: [u32; 36] = [0u32; 36]
+    var tmp: [u32; 48] = [0u32; 48]
     let tmpp = &raw mut tmp[0] as *mut u32
 
     // Double-and-add, MSB first
     var bi = 0
-    while bi < 32:
+    while bi < scalar_len:
         let raw = *(k + bi as u64)
         let byte = raw as u32
         var bj = 0
@@ -349,14 +361,14 @@ unsafe fn point_mul(r: *mut u32, k: *const u8, pt: *const u32, p: *const u32, p0
         bi = bi + 1
 
 // Convert Jacobian point to affine coordinates (X/Z², Y/Z³) and encode.
-// Output: 32 bytes for x, 32 bytes for y.
-unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *const u32, p0i: u32):
-    var z_copy: [u32; 12] = [0u32; 12]
-    var z_inv: [u32; 12] = [0u32; 12]
-    var z_inv2: [u32; 12] = [0u32; 12]
-    var z_inv3: [u32; 12] = [0u32; 12]
-    var ax: [u32; 12] = [0u32; 12]
-    var ay: [u32; 12] = [0u32; 12]
+// Output: field_bytes each for x and y.
+unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *const u32, p0i: u32, field_bytes: i32, pm2: *const u8, pm2_len: i32):
+    var z_copy: [u32; 16] = [0u32; 16]
+    var z_inv: [u32; 16] = [0u32; 16]
+    var z_inv2: [u32; 16] = [0u32; 16]
+    var z_inv3: [u32; 16] = [0u32; 16]
+    var ax: [u32; 16] = [0u32; 16]
+    var ay: [u32; 16] = [0u32; 16]
 
     let zcp = &raw mut z_copy[0] as *mut u32
     let zip = &raw mut z_inv[0] as *mut u32
@@ -374,7 +386,7 @@ unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *co
     fe_from_monty(zcp, p, p0i)
 
     // z_inv = Z^(-1) (normal form)
-    fe_inv(zip, zcp as *const u32, p, p0i)
+    fe_inv(zip, zcp as *const u32, p, p0i, pm2, pm2_len)
 
     // Convert z_inv to Montgomery for subsequent multiplications
     fe_to_monty(zip, p)
@@ -392,79 +404,143 @@ unsafe fn point_to_affine(x_out: *mut u8, y_out: *mut u8, pt: *const u32, p: *co
     fe_from_monty(ayp, p, p0i)
 
     // Encode to big-endian bytes
-    i31_encode(x_out, 32, axp as *const u32)
-    i31_encode(y_out, 32, ayp as *const u32)
+    i31_encode(x_out, field_bytes, axp as *const u32)
+    i31_encode(y_out, field_bytes, ayp as *const u32)
 
 // ── Public API ─────────────────────────────────────────────────────
 
-// Compute public key from private key: Q = k * G
-// private_key: 32 bytes (big-endian scalar)
-// public_key: 65 bytes output (0x04 || X || Y, uncompressed)
-unsafe fn p256_compute_public(private_key: *const u8, public_key: *mut u8):
-    var p: [u32; 12] = [0u32; 12]
-    p256_load_p(&raw mut p[0] as *mut u32)
-    let pp = &p[0] as *const u32
-    let p0i = i31_ninv31(p[1])
+// Compute public key from private key on the curve whose constants are
+// loaded: Q = k * G. private_key is `width` bytes (big-endian scalar);
+// public_key receives 1 + 2*width bytes (0x04 || X || Y, uncompressed).
+// gx/gy are the generator's field elements in normal form.
+unsafe fn ec_compute_public_impl(
+    private_key: *const u8, public_key: *mut u8,
+    width: i32, p: *const u32, pm2: *const u8,
+    gx: *const u32, gy: *const u32,
+):
+    let p0i = i31_ninv31(*(p + 1u64))
 
-    // Load generator G in Montgomery form
-    var gx: [u32; 12] = [0u32; 12]
-    var gy: [u32; 12] = [0u32; 12]
-    var gz: [u32; 12] = [0u32; 12]
-    p256_load_gx(&raw mut gx[0] as *mut u32, pp)
-    p256_load_gy(&raw mut gy[0] as *mut u32, pp)
-    fe_one(&raw mut gz[0] as *mut u32, pp)
-    fe_to_monty(&raw mut gx[0] as *mut u32, pp)
-    fe_to_monty(&raw mut gy[0] as *mut u32, pp)
-    fe_to_monty(&raw mut gz[0] as *mut u32, pp)
-
-    // Pack into point
-    var g_pt: [u32; 36] = [0u32; 36]
+    // Pack generator G in Montgomery form
+    var g_pt: [u32; 48] = [0u32; 48]
     let gp = &raw mut g_pt[0] as *mut u32
-    fe_copy(point_x(gp), &gx[0] as *const u32)
-    fe_copy(point_y(gp), &gy[0] as *const u32)
-    fe_copy(point_z(gp), &gz[0] as *const u32)
+    fe_copy(point_x(gp), gx)
+    fe_copy(point_y(gp), gy)
+    fe_one(point_z(gp), p)
+    fe_to_monty(point_x(gp), p)
+    fe_to_monty(point_y(gp), p)
+    fe_to_monty(point_z(gp), p)
 
     // R = k * G
-    var r_pt: [u32; 36] = [0u32; 36]
+    var r_pt: [u32; 48] = [0u32; 48]
     let rp = &raw mut r_pt[0] as *mut u32
-    point_mul(rp, private_key, gp as *const u32, pp, p0i)
+    point_mul(rp, private_key, width, gp as *const u32, p, p0i)
 
     // Convert to affine and output
     *(public_key + 0u64) = 0x04u8
-    point_to_affine(public_key + 1u64, public_key + 33u64, rp as *const u32, pp, p0i)
+    point_to_affine(public_key + 1u64, public_key + (1 + width) as u64, rp as *const u32, p, p0i, width, pm2, width)
 
-// ECDH: compute shared secret from private key and peer's public key.
-// private_key: 32 bytes
-// peer_public: 65 bytes (0x04 || X || Y)
-// secret: 32 bytes output (x-coordinate of k * peer_public)
-unsafe fn p256_ecdh(private_key: *const u8, peer_public: *const u8, secret: *mut u8):
-    var p: [u32; 12] = [0u32; 12]
-    p256_load_p(&raw mut p[0] as *mut u32)
-    let pp = &p[0] as *const u32
-    let p0i = i31_ninv31(p[1])
+// ECDH on the curve whose constants are loaded: the x-coordinate of
+// k * peer_public (width bytes). private_key is width bytes;
+// peer_public is 1 + 2*width bytes (0x04 || X || Y).
+unsafe fn ec_ecdh_impl(
+    private_key: *const u8, peer_public: *const u8, secret: *mut u8,
+    width: i32, p: *const u32, pm2: *const u8,
+):
+    let p0i = i31_ninv31(*(p + 1u64))
 
-    // Decode peer public key
-    var qx: [u32; 12] = [0u32; 12]
-    var qy: [u32; 12] = [0u32; 12]
-    var qz: [u32; 12] = [0u32; 12]
-    i31_decode_reduce(&raw mut qx[0] as *mut u32, peer_public + 1u64, 32, pp)
-    i31_decode_reduce(&raw mut qy[0] as *mut u32, peer_public + 33u64, 32, pp)
-    fe_one(&raw mut qz[0] as *mut u32, pp)
-    fe_to_monty(&raw mut qx[0] as *mut u32, pp)
-    fe_to_monty(&raw mut qy[0] as *mut u32, pp)
-    fe_to_monty(&raw mut qz[0] as *mut u32, pp)
-
-    var q_pt: [u32; 36] = [0u32; 36]
+    // Decode peer public key into a Jacobian Montgomery point
+    var q_pt: [u32; 48] = [0u32; 48]
     let qp = &raw mut q_pt[0] as *mut u32
-    fe_copy(point_x(qp), &qx[0] as *const u32)
-    fe_copy(point_y(qp), &qy[0] as *const u32)
-    fe_copy(point_z(qp), &qz[0] as *const u32)
+    i31_decode_reduce(point_x(qp), peer_public + 1u64, width, p)
+    i31_decode_reduce(point_y(qp), peer_public + (1 + width) as u64, width, p)
+    fe_one(point_z(qp), p)
+    fe_to_monty(point_x(qp), p)
+    fe_to_monty(point_y(qp), p)
+    fe_to_monty(point_z(qp), p)
 
     // R = k * Q
-    var r_pt: [u32; 36] = [0u32; 36]
+    var r_pt: [u32; 48] = [0u32; 48]
     let rp = &raw mut r_pt[0] as *mut u32
-    point_mul(rp, private_key, qp as *const u32, pp, p0i)
+    point_mul(rp, private_key, width, qp as *const u32, p, p0i)
 
     // Output x-coordinate
-    var y_dummy: [u8; 32] = [0u8; 32]
-    point_to_affine(secret, &raw mut y_dummy[0] as *mut u8, rp as *const u32, pp, p0i)
+    var y_dummy: [u8; 48] = [0u8; 48]
+    point_to_affine(secret, &raw mut y_dummy[0] as *mut u8, rp as *const u32, p, p0i, width, pm2, width)
+
+// P-256 public key from a 32-byte private key (65-byte output).
+unsafe fn p256_compute_public(private_key: *const u8, public_key: *mut u8):
+    var p: [u32; 16] = [0u32; 16]
+    var gx: [u32; 16] = [0u32; 16]
+    var gy: [u32; 16] = [0u32; 16]
+    p256_load_p(&raw mut p[0] as *mut u32)
+    p256_load_gx(&raw mut gx[0] as *mut u32, &p[0] as *const u32)
+    p256_load_gy(&raw mut gy[0] as *mut u32, &p[0] as *const u32)
+    ec_compute_public_impl(private_key, public_key, 32, &p[0] as *const u32, &P256_PM2[0] as *const u8, &gx[0] as *const u32, &gy[0] as *const u32)
+
+// P-256 ECDH: 32-byte private key and peer point, 32-byte secret.
+unsafe fn p256_ecdh(private_key: *const u8, peer_public: *const u8, secret: *mut u8):
+    var p: [u32; 16] = [0u32; 16]
+    p256_load_p(&raw mut p[0] as *mut u32)
+    ec_ecdh_impl(private_key, peer_public, secret, 32, &p[0] as *const u32, &P256_PM2[0] as *const u8)
+
+// P-384 public key from a 48-byte private key (97-byte output).
+unsafe fn p384_compute_public(private_key: *const u8, public_key: *mut u8):
+    var p: [u32; 16] = [0u32; 16]
+    var gx: [u32; 16] = [0u32; 16]
+    var gy: [u32; 16] = [0u32; 16]
+    p384_load_p(&raw mut p[0] as *mut u32)
+    p384_load_gx(&raw mut gx[0] as *mut u32, &p[0] as *const u32)
+    p384_load_gy(&raw mut gy[0] as *mut u32, &p[0] as *const u32)
+    ec_compute_public_impl(private_key, public_key, 48, &p[0] as *const u32, &P384_PM2[0] as *const u8, &gx[0] as *const u32, &gy[0] as *const u32)
+
+// P-384 ECDH: 48-byte private key and peer point, 48-byte secret.
+unsafe fn p384_ecdh(private_key: *const u8, peer_public: *const u8, secret: *mut u8):
+    var p: [u32; 16] = [0u32; 16]
+    p384_load_p(&raw mut p[0] as *mut u32)
+    ec_ecdh_impl(private_key, peer_public, secret, 48, &p[0] as *const u32, &P384_PM2[0] as *const u8)
+
+// ── P-384 constants (FIPS 186-4 §D.1.2.4) ──────────────────────────
+
+unsafe fn p384_load_p(dst: *mut u32):
+    var p_bytes: [u8; 48] = [
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFEu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0x00u8, 0x00u8, 0x00u8, 0x00u8,
+        0x00u8, 0x00u8, 0x00u8, 0x00u8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+    ]
+    i31_decode(dst, &p_bytes[0] as *const u8, 48)
+
+unsafe fn p384_load_n(dst: *mut u32):
+    var n_bytes: [u8; 48] = [
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8, 0xFFu8,
+        0xC7u8, 0x63u8, 0x4Du8, 0x81u8, 0xF4u8, 0x37u8, 0x2Du8, 0xDFu8,
+        0x58u8, 0x1Au8, 0x0Du8, 0xB2u8, 0x48u8, 0xB0u8, 0xA7u8, 0x7Au8,
+        0xECu8, 0xECu8, 0x19u8, 0x6Au8, 0xCCu8, 0xC5u8, 0x29u8, 0x73u8,
+    ]
+    i31_decode(dst, &n_bytes[0] as *const u8, 48)
+
+unsafe fn p384_load_gx(dst: *mut u32, p: *const u32):
+    var gx_bytes: [u8; 48] = [
+        0xAAu8, 0x87u8, 0xCAu8, 0x22u8, 0xBEu8, 0x8Bu8, 0x05u8, 0x37u8,
+        0x8Eu8, 0xB1u8, 0xC7u8, 0x1Eu8, 0xF3u8, 0x20u8, 0xADu8, 0x74u8,
+        0x6Eu8, 0x1Du8, 0x3Bu8, 0x62u8, 0x8Bu8, 0xA7u8, 0x9Bu8, 0x98u8,
+        0x59u8, 0xF7u8, 0x41u8, 0xE0u8, 0x82u8, 0x54u8, 0x2Au8, 0x38u8,
+        0x55u8, 0x02u8, 0xF2u8, 0x5Du8, 0xBFu8, 0x55u8, 0x29u8, 0x6Cu8,
+        0x3Au8, 0x54u8, 0x5Eu8, 0x38u8, 0x72u8, 0x76u8, 0x0Au8, 0xB7u8,
+    ]
+    i31_decode_reduce(dst, &gx_bytes[0] as *const u8, 48, p)
+
+unsafe fn p384_load_gy(dst: *mut u32, p: *const u32):
+    var gy_bytes: [u8; 48] = [
+        0x36u8, 0x17u8, 0xDEu8, 0x4Au8, 0x96u8, 0x26u8, 0x2Cu8, 0x6Fu8,
+        0x5Du8, 0x9Eu8, 0x98u8, 0xBFu8, 0x92u8, 0x92u8, 0xDCu8, 0x29u8,
+        0xF8u8, 0xF4u8, 0x1Du8, 0xBDu8, 0x28u8, 0x9Au8, 0x14u8, 0x7Cu8,
+        0xE9u8, 0xDAu8, 0x31u8, 0x13u8, 0xB5u8, 0xF0u8, 0xB8u8, 0xC0u8,
+        0x0Au8, 0x60u8, 0xB1u8, 0xCEu8, 0x1Du8, 0x7Eu8, 0x81u8, 0x9Du8,
+        0x7Au8, 0x43u8, 0x1Du8, 0x7Cu8, 0x90u8, 0xEAu8, 0x0Eu8, 0x5Fu8,
+    ]
+    i31_decode_reduce(dst, &gy_bytes[0] as *const u8, 48, p)

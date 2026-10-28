@@ -1254,6 +1254,10 @@ pub fn rt_sysinfo_os() -> str:
 pub fn rt_sysinfo_arch() -> str:
     with_str_from_cstr(c"wasm32".ptr)
 
+// No OS trust store is reachable from wasm; TLS verification refuses.
+pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
+    -1
+
 // ── networking (no sockets in WASI preview1) ──────────────────────────
 
 fn rt_net_empty_str() -> str: rt_empty_str()
