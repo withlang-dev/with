@@ -1958,6 +1958,12 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
         return invariance_fail(ctx, "could not create repo copy directory: " ++ repo_copy)
     if fs.copy_tree("src", build_project_join(repo_copy, "src")) != 0:
         return invariance_fail(ctx, "could not copy src into repo fixture")
+    // The compiler-source classifier keys on the checkout marker
+    // (Resolve.resolve_dir_is_compiler_checkout): without seed.lock the
+    // copied src/ is a user program and its `use rt.*` is refused, on
+    // every host.
+    if fs.write_text(build_project_join(repo_copy, "seed.lock"), fs.read_text("seed.lock")) != 0:
+        return invariance_fail(ctx, "could not copy seed.lock into repo fixture")
     let copied_seed = build_project_join(repo_copy, "src/main" ++ host_exe_suffix())
     if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
         return invariance_fail(ctx, "could not remove copied seed from repo fixture")
