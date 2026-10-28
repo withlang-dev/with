@@ -1637,6 +1637,23 @@ const SDK_ZIG_TAR_GZ_SHA256: str = "966f170284ac8a1757dd55a092275b2d2a032ef40878
 const SDK_LIBCXX_ABILIST_NAME: str = "arm64-apple-darwin.libcxxabi.v1.stable.exceptions.nonew.abilist"
 const SDK_LIBCXX_ABILIST_SHA256: str = "15f185e6248890bfd4ddce53740b9437cbe5307b1916755d84e4dd96122c3638"
 
+// #2530: the declared macOS system libraries whose headers and stubs the
+// sysroot carries beyond libc — sqlite3, z, bz2, xml2, curl, iconv
+// (Eric, 2026-10-26). zlib.h and iconv.h already ship in the darwin libc
+// headers above; the other four headers come from these pinned upstream
+// archives, at the versions macOS 11 (the minimum deployment target)
+// shipped, so a header never declares a symbol the oldest supported
+// OS lacks. Every stub's symbol list is extracted from those headers'
+// own API macros below; no Apple SDK file is read or copied.
+const SDK_SQLITE3_VERSION: str = "3.32.2"
+const SDK_SQLITE3_TAR_GZ_SHA256: str = "2dbef1254c1dbeeb5d13d7722d37e633f18ccbba689806b0a65b68701a5b6084"
+const SDK_BZIP2_VERSION: str = "1.0.6"
+const SDK_BZIP2_TAR_GZ_SHA256: str = "a2848f34fcd5d6cf47def00461fcb528a0484d8edef8208d6d2e2909dc61d9cd"
+const SDK_LIBXML2_VERSION: str = "2.9.4"
+const SDK_LIBXML2_TAR_GZ_SHA256: str = "bceac3fd6fd1285c84b7afea9e56c39696b9a83a62531b4e5a3af7782b22eafa"
+const SDK_CURL_VERSION: str = "7.64.1"
+const SDK_CURL_TAR_GZ_SHA256: str = "89b0ac5c50bf1b54df4946ebfb627cf979ec4bdb94404dd7ce4dd5683c6d5202"
+
 // A merge sort: the sysroot sorts thousands of names (libc++'s symbols) and
 // a source-built SDK's archive 14,000 paths; an insertion sort that rebuilt
 // its list for every item passed the evaluator's step limit.
@@ -1746,6 +1763,311 @@ pub fn sdk_libcxx_tbd_from_abilist(abilist: &str) -> str:
     out.push_str(" ]\n...\n")
     out.to_str()
 
+// One .tbd from a symbol list, in the shape sdk_libcxx_tbd_from_abilist
+// writes. "" when the list is empty, so a header that yielded no API
+// symbols fails the action instead of stubbing an empty library.
+fn sdk_darwin_lib_tbd(install_name: &str, symbols: List[str]) -> str:
+    if symbols.len() == 0:
+        return ""
+    let sorted = sdk_merge_sort_strings(symbols)
+    var out = StringBuilder.new()
+    out.push_str("--- !tapi-tbd\n")
+    out.push_str("tbd-version:     4\n")
+    out.push_str("targets:         [ arm64-macos, arm64e-macos ]\n")
+    out.push_str("install-name:    '" ++ install_name ++ "'\n")
+    out.push_str("current-version: 1.0\n")
+    out.push_str("exports:\n")
+    out.push_str("  - targets:         [ arm64-macos, arm64e-macos ]\n")
+    out.push_str("    symbols:         [ ")
+    var prev = ""
+    var first = true
+    for i in 0..sorted.len():
+        if sorted[i] == prev:
+            continue
+        prev = sdk_owned_text(sorted[i])
+        if not first:
+            out.push_str(",\n                       ")
+        first = false
+        out.push_str("'_")
+        out.push_str(sorted[i])
+        out.push_str("'")
+    out.push_str(" ]\n...\n")
+    out.to_str()
+
+fn sdk_is_ident_byte(b: i32) -> bool:
+    (b >= 65 and b <= 90) or (b >= 97 and b <= 122) or (b >= 48 and b <= 57) or b == 95
+
+fn sdk_text_has_at(text: &str, at: i64, marker: &str) -> bool:
+    if at + marker.len() > text.len():
+        return false
+    for k in 0..marker.len():
+        if text[(at + k)] != marker[k]:
+            return false
+    true
+
+// The start index of the identifier ending at or before `end`
+// (exclusive), skipping whitespace; -1 when there is none.
+fn sdk_ident_start_before(text: &str, end: i64) -> i64:
+    var j = end - 1
+    while j >= 0 and (text[j] == 32 or text[j] == 9 or text[j] == 10 or text[j] == 13):
+        j = j - 1
+    if j < 0 or not sdk_is_ident_byte(text[j]):
+        return -1
+    var start = j
+    while start >= 0 and sdk_is_ident_byte(text[start]):
+        start = start - 1
+    start + 1
+
+// Every API name a header declares through `marker` (SQLITE_API,
+// CURL_EXTERN, XMLPUBFUN, ZEXPORT, ...): the identifier before the
+// declaration's first '(' (or ';' / '[' for data), filtered to
+// `prefix` when one is given. BZ_API(name) and zlib's OF((...))
+// spellings name the function one position in.
+fn sdk_header_api_symbols(text: &str, marker: &str, prefix: &str) -> List[str]:
+    let out: List[str] = List.new()
+    var i = 0
+    while i + marker.len() <= text.len():
+        if not sdk_text_has_at(text, i, marker):
+            i = i + 1
+            continue
+        let before_ok = i == 0 or not sdk_is_ident_byte(text[(i - 1)])
+        let after = i + marker.len()
+        let after_ok = after >= text.len() or not sdk_is_ident_byte(text[after])
+        i = after
+        if not before_ok or not after_ok:
+            continue
+        var term = -1
+        var term_byte = 0
+        var k = after
+        while k < text.len() and k < after + 512:
+            let b = text[k]
+            if b == 40 or b == 59 or b == 91:
+                term = k
+                term_byte = b
+                break
+            k = k + 1
+        if term < 0:
+            continue
+        var start = sdk_ident_start_before(text, term)
+        if start < 0:
+            continue
+        var name: str = text.slice(start, term).trim()
+        if term_byte == 40 and name == "BZ_API":
+            var close_at = -1
+            var m = term + 1
+            while m < text.len() and m < term + 128:
+                if text[m] == 41:
+                    close_at = m
+                    break
+                m = m + 1
+            if close_at < 0:
+                continue
+            start = sdk_ident_start_before(text, close_at)
+            if start < 0:
+                continue
+            name = text.slice(start, close_at).trim()
+        else if term_byte == 40 and name == "OF":
+            start = sdk_ident_start_before(text, start)
+            if start < 0:
+                continue
+            let end2 = sdk_ident_start_before(text, term)
+            name = text.slice(start, end2).trim()
+        if name.len() == 0 or name == marker:
+            continue
+        if prefix.len() > 0 and not name.starts_with(prefix):
+            continue
+        out.push(sdk_owned_text(name.trim()))
+    out
+
+fn sdk_header_symbols_union(parts: &List[str], marker: &str, prefix: &str) -> List[str]:
+    let out: List[str] = List.new()
+    for i in 0..parts.len():
+        let syms = sdk_header_api_symbols(parts[i], marker, prefix)
+        for j in 0..syms.len():
+            out.push(syms[j])
+    out
+
+// libxml2's one generated header: xmlversion.h is xmlversion.h.in with
+// the release's version and feature switches substituted. The switches
+// are the pinned release's configure defaults except THREAD_ALLOC and
+// DEBUG, which follow Apple's system build (both enabled), and ICU,
+// which stays off: the sysroot carries no ICU headers for encoding.h
+// to include. An @TOKEN@ this table does not name fails the build.
+fn sdk_libxml2_xmlversion(template: &str) -> str:
+    // Built by push, not an array literal: build actions also run in
+    // the comptime evaluator, where an array literal bound to a List
+    // is not one yet (#2760).
+    let keys = "MODULE_EXTENSION WITH_TRIO WITH_THREADS WITH_THREAD_ALLOC WITH_TREE WITH_OUTPUT WITH_PUSH WITH_READER WITH_PATTERN WITH_WRITER WITH_SAX1 WITH_FTP WITH_HTTP WITH_VALID WITH_HTML WITH_LEGACY WITH_C14N WITH_CATALOG WITH_DOCB WITH_XPATH WITH_XPTR WITH_XINCLUDE WITH_ICONV WITH_ICU WITH_ISO8859X WITH_DEBUG WITH_MEM_DEBUG WITH_RUN_DEBUG WITH_REGEXPS WITH_SCHEMAS WITH_SCHEMATRON WITH_MODULES WITH_ZLIB WITH_LZMA".split(" ")
+    let values = ".so 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0 1 1 0 0 1 1 1 1 1 1".split(" ")
+    var out = StringBuilder.new()
+    var i = 0
+    while i < template.len():
+        if template[i] == 64:
+            var close = -1
+            var j = i + 1
+            while j < template.len() and j < i + 64:
+                if template[j] == 64:
+                    close = j
+                    break
+                j = j + 1
+            if close > i + 1:
+                let token = template.slice((i + 1) as i64, close as i64)
+                var value = ""
+                var found = false
+                if token == "VERSION":
+                    value = SDK_LIBXML2_VERSION
+                    found = true
+                else if token == "LIBXML_VERSION_NUMBER":
+                    value = "20904"
+                    found = true
+                else if token == "LIBXML_VERSION_EXTRA":
+                    found = true
+                for k in 0..keys.len():
+                    if keys[k] == token:
+                        value = sdk_owned_text(values[k])
+                        found = true
+                if not found:
+                    return ""
+                out.push_str(value)
+                i = close + 1
+                continue
+        out.push_str(template.slice(i as i64, (i + 1) as i64))
+        i = i + 1
+    out.to_str()
+
+fn sdk_declared_source_dir(scratch: &str, name: &str, top: &str) -> str:
+    sdk_join(sdk_join(scratch, name), top)
+
+fn sdk_materialize_declared_source(ctx: &ActionCtx, scratch: &str, name: &str, url: &str, sha256: &str, top: &str) -> i32:
+    let fs = ctx.fs()
+    let root = sdk_join(scratch, name)
+    let dir = sdk_declared_source_dir(scratch, name, top)
+    let marker = sdk_join(dir, ".with-source-ready")
+    if fs.exists(marker):
+        return 0
+    let _partial = fs.remove_tree(root)
+    sdk_materialize_source_tar_gz(ctx, scratch, &sdk_one_source(sdk_owned_text(url)), sdk_owned_text(sha256), sdk_join(scratch, name ++ ".tar.gz"), root, dir, marker, 300000)
+
+type SdkSysrootFiles {
+    paths: List[str],
+    contents: List[str],
+    rc: i32,
+}
+
+fn sdk_sysroot_file_seen(existing: &List[str], rel_paths: &List[str], rel: &str) -> bool:
+    for i in 0..existing.len():
+        if existing[i] == rel:
+            return true
+    for i in 0..rel_paths.len():
+        if rel_paths[i] == rel:
+            return true
+    false
+
+// #2530: append the declared macOS system libraries' headers and stubs
+// to the sysroot file list. include_root is where the sysroot's own
+// headers live (zlib.h and iconv.h are read from there).
+fn sdk_darwin_declared_libraries(ctx: &ActionCtx, scratch: &str, include_root: &str, existing: &List[str]) -> SdkSysrootFiles:
+    let rel_paths: List[str] = List.new()
+    let contents: List[str] = List.new()
+    let fs = ctx.fs()
+    if fs.mkdir_all(scratch) != 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "could not create " ++ scratch) }
+    let sqlite_rc = sdk_materialize_declared_source(ctx, scratch, "sqlite3", "https://www.sqlite.org/2020/sqlite-autoconf-3320200.tar.gz", SDK_SQLITE3_TAR_GZ_SHA256, "sqlite-autoconf-3320200")
+    if sqlite_rc != 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sqlite_rc }
+    let bzip2_rc = sdk_materialize_declared_source(ctx, scratch, "bzip2", "https://sourceware.org/pub/bzip2/bzip2-" ++ SDK_BZIP2_VERSION ++ ".tar.gz", SDK_BZIP2_TAR_GZ_SHA256, "bzip2-" ++ SDK_BZIP2_VERSION)
+    if bzip2_rc != 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: bzip2_rc }
+    let libxml2_rc = sdk_materialize_declared_source(ctx, scratch, "libxml2", "https://gitlab.gnome.org/GNOME/libxml2/-/archive/v" ++ SDK_LIBXML2_VERSION ++ "/libxml2-v" ++ SDK_LIBXML2_VERSION ++ ".tar.gz", SDK_LIBXML2_TAR_GZ_SHA256, "libxml2-v" ++ SDK_LIBXML2_VERSION)
+    if libxml2_rc != 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: libxml2_rc }
+    let curl_rc = sdk_materialize_declared_source(ctx, scratch, "curl", "https://github.com/curl/curl/archive/refs/tags/curl-7_64_1.tar.gz", SDK_CURL_TAR_GZ_SHA256, "curl-curl-7_64_1")
+    if curl_rc != 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: curl_rc }
+    let sqlite_dir = sdk_declared_source_dir(scratch, "sqlite3", "sqlite-autoconf-3320200")
+    let sqlite_h = fs.read_text(sdk_join(sqlite_dir, "sqlite3.h"))
+    let sqlite_ext_h = fs.read_text(sdk_join(sqlite_dir, "sqlite3ext.h"))
+    let bzlib_h = fs.read_text(sdk_join(sdk_declared_source_dir(scratch, "bzip2", "bzip2-" ++ SDK_BZIP2_VERSION), "bzlib.h"))
+    let zlib_h = fs.read_text(sdk_join(include_root, "zlib.h"))
+    let iconv_h = fs.read_text(sdk_join(include_root, "iconv.h"))
+    if sqlite_h.len() == 0 or bzlib_h.len() == 0 or zlib_h.len() == 0 or iconv_h.len() == 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "a declared macOS library header is missing (sqlite3.h, bzlib.h, zlib.h, iconv.h)") }
+    if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/sqlite3.h"):
+        rel_paths.push("usr/include/sqlite3.h")
+        contents.push(sdk_owned_text(sqlite_h))
+    if sqlite_ext_h.len() > 0 and not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/sqlite3ext.h"):
+        rel_paths.push("usr/include/sqlite3ext.h")
+        contents.push(sdk_owned_text(sqlite_ext_h))
+    if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/bzlib.h"):
+        rel_paths.push("usr/include/bzlib.h")
+        contents.push(sdk_owned_text(bzlib_h))
+    // curl: every public header, in sorted order.
+    let curl_include = sdk_join(sdk_declared_source_dir(scratch, "curl", "curl-curl-7_64_1"), "include/curl")
+    let curl_headers = sdk_merge_sort_strings(fs.list_files(curl_include))
+    let curl_texts: List[str] = List.new()
+    if curl_headers.len() == 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "no curl headers under " ++ curl_include) }
+    for i in 0..curl_headers.len():
+        let rel = sdk_rel_path(curl_include, sdk_normalize(curl_headers[i]))
+        if not rel.ends_with(".h"):
+            continue
+        let text = fs.read_text(curl_headers[i])
+        curl_texts.push(sdk_owned_text(text))
+        if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/curl/" ++ rel):
+            rel_paths.push(sdk_owned_text("usr/include/curl/" ++ rel))
+            contents.push(sdk_owned_text(text))
+    // libxml2: every public header, with xmlversion.h generated from its
+    // template (the one generated header in the release).
+    let xml_include = sdk_join(sdk_declared_source_dir(scratch, "libxml2", "libxml2-v" ++ SDK_LIBXML2_VERSION), "include/libxml")
+    let xml_headers = sdk_merge_sort_strings(fs.list_files(xml_include))
+    let xml_texts: List[str] = List.new()
+    if xml_headers.len() == 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "no libxml2 headers under " ++ xml_include) }
+    for i in 0..xml_headers.len():
+        let rel = sdk_rel_path(xml_include, sdk_normalize(xml_headers[i]))
+        if rel == "xmlversion.h.in" or rel == "xmlwin32version.h.in":
+            continue
+        if not rel.ends_with(".h"):
+            continue
+        let text = fs.read_text(xml_headers[i])
+        xml_texts.push(sdk_owned_text(text))
+        if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/libxml2/libxml/" ++ rel):
+            rel_paths.push(sdk_owned_text("usr/include/libxml2/libxml/" ++ rel))
+            contents.push(sdk_owned_text(text))
+    let xmlversion = sdk_libxml2_xmlversion(fs.read_text(sdk_join(xml_include, "xmlversion.h.in")))
+    if xmlversion.len() == 0:
+        return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "xmlversion.h.in names a substitution this build does not know") }
+    xml_texts.push(sdk_owned_text(xmlversion))
+    if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/libxml2/libxml/xmlversion.h"):
+        rel_paths.push("usr/include/libxml2/libxml/xmlversion.h")
+        contents.push(sdk_owned_text(xmlversion))
+    // The stubs. Every symbol list is the header's own API macros; an
+    // empty extraction fails above in sdk_darwin_lib_tbd.
+    let stubs: List[str] = List.new()
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libsqlite3.dylib", sdk_header_api_symbols(sqlite_h, "SQLITE_API", "sqlite3_")))
+    let zlib_syms = sdk_header_api_symbols(zlib_h, "ZEXPORT", "")
+    let zlib_va = sdk_header_api_symbols(zlib_h, "ZEXPORTVA", "")
+    for i in 0..zlib_va.len():
+        zlib_syms.push(zlib_va[i])
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libz.1.dylib", zlib_syms))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libbz2.1.0.dylib", sdk_header_api_symbols(bzlib_h, "BZ_EXTERN", "BZ2_")))
+    let xml_syms = sdk_header_symbols_union(&xml_texts, "XMLPUBFUN", "")
+    let xml_vars = sdk_header_symbols_union(&xml_texts, "XMLPUBVAR", "")
+    for i in 0..xml_vars.len():
+        xml_syms.push(xml_vars[i])
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libxml2.2.dylib", xml_syms))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libcurl.4.dylib", sdk_header_symbols_union(&curl_texts, "CURL_EXTERN", "curl_")))
+    let iconv_syms = "iconv iconv_open iconv_close __iconv __iconv_get_list __iconv_free_list iconv_open_into iconv_canonicalize iconvctl iconvlist iconv_set_relocation_prefix libiconv_set_relocation_prefix".split(" ")
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libiconv.2.dylib", iconv_syms))
+    let stub_names = "usr/lib/libsqlite3.tbd usr/lib/libz.tbd usr/lib/libbz2.tbd usr/lib/libxml2.tbd usr/lib/libcurl.tbd usr/lib/libiconv.tbd".split(" ")
+    for i in 0..stub_names.len():
+        if stubs[i].len() == 0:
+            return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "no API symbols extracted for " ++ stub_names[i]) }
+        if not sdk_sysroot_file_seen(existing, &rel_paths, stub_names[i]):
+            rel_paths.push(sdk_owned_text(stub_names[i]))
+            contents.push(sdk_owned_text(stubs[i]))
+    SdkSysrootFiles { paths: rel_paths, contents: contents, rc: 0 }
+
 fn sdk_darwin_sysroot_provenance() -> str:
     var out = "The With darwin sysroot (#1915): what linking a With program and c_import\n"
     out = out ++ "of libc read on macOS. Generated by `with build :darwin-sysroot`.\n\n"
@@ -1760,7 +2082,26 @@ fn sdk_darwin_sysroot_provenance() -> str:
     out = out ++ "usr/lib/libc++.tbd: generated from LLVM " ++ compiler_llvm_version() ++ "'s libc++ ABI list\n"
     out = out ++ "  " ++ sdk_libcxx_abilist_url() ++ "\n"
     out = out ++ "  sha256 " ++ SDK_LIBCXX_ABILIST_SHA256 ++ "\n"
-    out = out ++ "  LLVM: Apache-2.0 WITH LLVM-exception.\n"
+    out = out ++ "  LLVM: Apache-2.0 WITH LLVM-exception.\n\n"
+    out = out ++ "The declared macOS system libraries (#2530): headers at the versions\n"
+    out = out ++ "macOS 11 (the minimum deployment target) shipped, stubs generated from\n"
+    out = out ++ "each header's own API macros. No Apple SDK file is read or copied.\n\n"
+    out = out ++ "usr/include/sqlite3.h, sqlite3ext.h, usr/lib/libsqlite3.tbd:\n"
+    out = out ++ "  SQLite " ++ SDK_SQLITE3_VERSION ++ " https://www.sqlite.org/2020/sqlite-autoconf-3320200.tar.gz\n"
+    out = out ++ "  sha256 " ++ SDK_SQLITE3_TAR_GZ_SHA256 ++ " (public domain)\n\n"
+    out = out ++ "usr/include/bzlib.h, usr/lib/libbz2.tbd:\n"
+    out = out ++ "  bzip2 " ++ SDK_BZIP2_VERSION ++ " https://sourceware.org/pub/bzip2/bzip2-" ++ SDK_BZIP2_VERSION ++ ".tar.gz\n"
+    out = out ++ "  sha256 " ++ SDK_BZIP2_TAR_GZ_SHA256 ++ " (BSD-style, Julian Seward)\n\n"
+    out = out ++ "usr/include/libxml2/**, usr/lib/libxml2.tbd:\n"
+    out = out ++ "  libxml2 " ++ SDK_LIBXML2_VERSION ++ " https://gitlab.gnome.org/GNOME/libxml2/-/archive/v" ++ SDK_LIBXML2_VERSION ++ "/libxml2-v" ++ SDK_LIBXML2_VERSION ++ ".tar.gz\n"
+    out = out ++ "  sha256 " ++ SDK_LIBXML2_TAR_GZ_SHA256 ++ " (MIT). xmlversion.h is generated\n"
+    out = out ++ "  from xmlversion.h.in (release configure defaults; THREAD_ALLOC and\n"
+    out = out ++ "  DEBUG follow Apple's system build; ICU off — no ICU headers ship here).\n\n"
+    out = out ++ "usr/include/curl/**, usr/lib/libcurl.tbd:\n"
+    out = out ++ "  curl " ++ SDK_CURL_VERSION ++ " https://github.com/curl/curl/archive/refs/tags/curl-7_64_1.tar.gz\n"
+    out = out ++ "  sha256 " ++ SDK_CURL_TAR_GZ_SHA256 ++ " (MIT/X)\n\n"
+    out = out ++ "usr/lib/libz.tbd, usr/lib/libiconv.tbd: generated from the zlib.h and\n"
+    out = out ++ "iconv.h in the darwin libc headers above.\n"
     out
 
 fn sdk_sysroot_path_ok(rel: &str) -> bool:
@@ -1837,6 +2178,12 @@ pub fn run_darwin_sysroot_action(ctx: ActionCtx) -> i32:
             return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
         rel_paths.push("usr/include/" ++ rel)
         contents.push(fs.read_text(headers[i]))
+    let declared = sdk_darwin_declared_libraries(ctx, scratch, include_root, &rel_paths)
+    if declared.rc != 0:
+        return declared.rc
+    for i in 0..declared.paths.len():
+        rel_paths.push(declared.paths[i])
+        contents.push(declared.contents[i])
     sdk_write_darwin_sysroot(ctx, pack_path, &rel_paths, &contents, libsystem)
 
 // The sysroot an SDK already carries (its `sysroot/`), read back in the order
@@ -1872,6 +2219,17 @@ fn sdk_darwin_sysroot_from_sdk(ctx: &ActionCtx, sdk_sysroot: &str, pack_path: &s
             return sdk_fail(ctx, "a header path the sysroot pack cannot carry: " ++ headers[i])
         rel_paths.push("usr/include/" ++ rel)
         contents.push(fs.read_text(headers[i]))
+    // #2530: the declared libraries are generated from their pinned
+    // sources in both paths, so an SDK built before them still yields a
+    // complete sysroot; files a newer SDK tree already carries are not
+    // written twice (sdk_sysroot_file_seen).
+    let scratch = sdk_join("out/command", ctx.target_name())
+    let declared = sdk_darwin_declared_libraries(ctx, scratch, include_root, &rel_paths)
+    if declared.rc != 0:
+        return declared.rc
+    for i in 0..declared.paths.len():
+        rel_paths.push(declared.paths[i])
+        contents.push(declared.contents[i])
     let libsystem = contents[2].clone()
     sdk_write_darwin_sysroot(ctx, pack_path, &rel_paths, &contents, libsystem)
 
