@@ -3284,6 +3284,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     var darwin_sysroot = target_new(.Action, "darwin-sysroot", "").output(sdk_darwin_sysroot_pack())
     darwin_sysroot.action = run_darwin_sysroot_action
     darwin_sysroot = darwin_sysroot.input("build/sdk.w")
+    for lib in "libsqlite3 libz libbz2 libxml2 libcurl libiconv".split(" "):
+        darwin_sysroot = darwin_sysroot.input("build/darwin_exports/" ++ lib ++ ".txt")
     if os() == "Macos":
         // #1899: it fetches the pinned Zig source and libc++ ABI list into its
         // own scratch, so its products are all under out/ and declared — the

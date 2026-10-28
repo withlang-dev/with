@@ -1879,6 +1879,38 @@ fn sdk_header_api_symbols(text: &str, marker: &str, prefix: &str) -> List[str]:
         out.push(sdk_owned_text(name.trim()))
     out
 
+// What macOS exports from /usr/lib/<lib>.dylib, recorded in
+// build/darwin_exports/<lib>.txt by tools/darwin_exports.w: one name a
+// line, without the leading underscore; '#' lines are provenance.
+fn sdk_darwin_exported(fs: &ToolFs, lib: &str) -> List[str]:
+    let out: List[str] = List.new()
+    for line in fs.read_text("build/darwin_exports/" ++ lib ++ ".txt").split("\n"):
+        let name = line.trim()
+        if name.len() > 0 and not name.starts_with("#"):
+            out.push(sdk_owned_text(name))
+    out
+
+// A stub names what the header declares and macOS exports (#2530). A
+// header declaration Apple builds out (sqlite3_load_extension under
+// SQLITE_OMIT_LOAD_EXTENSION) is not stubbed, so a call of it fails at
+// link, as it does against Apple's own SDK, never at run time.
+fn sdk_declared_and_exported(fs: &ToolFs, declared: List[str], lib: &str) -> List[str]:
+    let a = sdk_merge_sort_strings(declared)
+    let b = sdk_merge_sort_strings(sdk_darwin_exported(fs, lib))
+    let out: List[str] = List.new()
+    var i = 0
+    var j = 0
+    while i < a.len() and j < b.len():
+        let c = sdk_str_compare(a[i], b[j])
+        if c == 0:
+            out.push(sdk_owned_text(a[i]))
+            i = i + 1
+        else if c < 0:
+            i = i + 1
+        else:
+            j = j + 1
+    out
+
 fn sdk_header_symbols_union(parts: &List[str], marker: &str, prefix: &str) -> List[str]:
     let out: List[str] = List.new()
     for i in 0..parts.len():
@@ -2041,24 +2073,28 @@ fn sdk_darwin_declared_libraries(ctx: &ActionCtx, scratch: &str, include_root: &
     if not sdk_sysroot_file_seen(existing, &rel_paths, "usr/include/libxml2/libxml/xmlversion.h"):
         rel_paths.push("usr/include/libxml2/libxml/xmlversion.h")
         contents.push(sdk_owned_text(xmlversion))
-    // The stubs. Every symbol list is the header's own API macros; an
-    // empty extraction fails above in sdk_darwin_lib_tbd.
+    // The stubs: each header's API declarations that macOS exports
+    // (build/darwin_exports). An empty list fails below.
+    let libs = "libsqlite3 libz libbz2 libxml2 libcurl libiconv".split(" ")
+    for i in 0..libs.len():
+        if sdk_darwin_exported(fs, libs[i]).len() == 0:
+            return SdkSysrootFiles { paths: rel_paths, contents: contents, rc: sdk_fail(ctx, "no export list at build/darwin_exports/" ++ libs[i] ++ ".txt (run `with run tools/darwin_exports.w` on a Mac)") }
     let stubs: List[str] = List.new()
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libsqlite3.dylib", sdk_header_api_symbols(sqlite_h, "SQLITE_API", "sqlite3_")))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libsqlite3.dylib", sdk_declared_and_exported(fs, sdk_header_api_symbols(sqlite_h, "SQLITE_API", "sqlite3_"), "libsqlite3")))
     let zlib_syms = sdk_header_api_symbols(zlib_h, "ZEXPORT", "")
     let zlib_va = sdk_header_api_symbols(zlib_h, "ZEXPORTVA", "")
     for i in 0..zlib_va.len():
         zlib_syms.push(zlib_va[i])
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libz.1.dylib", zlib_syms))
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libbz2.1.0.dylib", sdk_header_api_symbols(bzlib_h, "BZ_EXTERN", "BZ2_")))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libz.1.dylib", sdk_declared_and_exported(fs, zlib_syms, "libz")))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libbz2.1.0.dylib", sdk_declared_and_exported(fs, sdk_header_api_symbols(bzlib_h, "BZ_EXTERN", "BZ2_"), "libbz2")))
     let xml_syms = sdk_header_symbols_union(&xml_texts, "XMLPUBFUN", "")
     let xml_vars = sdk_header_symbols_union(&xml_texts, "XMLPUBVAR", "")
     for i in 0..xml_vars.len():
         xml_syms.push(xml_vars[i])
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libxml2.2.dylib", xml_syms))
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libcurl.4.dylib", sdk_header_symbols_union(&curl_texts, "CURL_EXTERN", "curl_")))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libxml2.2.dylib", sdk_declared_and_exported(fs, xml_syms, "libxml2")))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libcurl.4.dylib", sdk_declared_and_exported(fs, sdk_header_symbols_union(&curl_texts, "CURL_EXTERN", "curl_"), "libcurl")))
     let iconv_syms = "iconv iconv_open iconv_close __iconv __iconv_get_list __iconv_free_list iconv_open_into iconv_canonicalize iconvctl iconvlist iconv_set_relocation_prefix libiconv_set_relocation_prefix".split(" ")
-    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libiconv.2.dylib", iconv_syms))
+    stubs.push(sdk_darwin_lib_tbd("/usr/lib/libiconv.2.dylib", sdk_declared_and_exported(fs, iconv_syms, "libiconv")))
     let stub_names = "usr/lib/libsqlite3.tbd usr/lib/libz.tbd usr/lib/libbz2.tbd usr/lib/libxml2.tbd usr/lib/libcurl.tbd usr/lib/libiconv.tbd".split(" ")
     for i in 0..stub_names.len():
         if stubs[i].len() == 0:
@@ -2084,8 +2120,11 @@ fn sdk_darwin_sysroot_provenance() -> str:
     out = out ++ "  sha256 " ++ SDK_LIBCXX_ABILIST_SHA256 ++ "\n"
     out = out ++ "  LLVM: Apache-2.0 WITH LLVM-exception.\n\n"
     out = out ++ "The declared macOS system libraries (#2530): headers at the versions\n"
-    out = out ++ "macOS 11 (the minimum deployment target) shipped, stubs generated from\n"
-    out = out ++ "each header's own API macros. No Apple SDK file is read or copied.\n\n"
+    out = out ++ "macOS 11 (the minimum deployment target) shipped. Each stub names the\n"
+    out = out ++ "header's own API declarations that macOS exports, per the export lists\n"
+    out = out ++ "in build/darwin_exports (tools/darwin_exports.w reads them from /usr/lib\n"
+    out = out ++ "with dyld_info; each file names the macOS it was read on). No Apple SDK\n"
+    out = out ++ "file is read or copied.\n\n"
     out = out ++ "usr/include/sqlite3.h, sqlite3ext.h, usr/lib/libsqlite3.tbd:\n"
     out = out ++ "  SQLite " ++ SDK_SQLITE3_VERSION ++ " https://www.sqlite.org/2020/sqlite-autoconf-3320200.tar.gz\n"
     out = out ++ "  sha256 " ++ SDK_SQLITE3_TAR_GZ_SHA256 ++ " (public domain)\n\n"
