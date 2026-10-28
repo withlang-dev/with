@@ -276,7 +276,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not write embedded runtime fixture source")
 
     let root = ctx.project_info().project_root()
-    let bin_path = bs_join(output_dir, "hello")
+    let bin_path = bs_join(output_dir, "hello" ++ bs_exe_suffix())
     let build_stdout = bs_join(output_dir, "build.stdout")
     let build_stderr = bs_join(output_dir, "build.stderr")
     var build_args: List[str] = List.new()
