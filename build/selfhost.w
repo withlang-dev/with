@@ -3509,6 +3509,11 @@ fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &
     // (int8_t** for char**, in migrated-corpus units) a hard error
     // where the POSIX default keeps it a warning (#811).
     cc_args.push("-std=gnu17")
+    // Same promotion, independent of the dialect under `with cc`: the
+    // emitted code passes int8_t** for char** in migrated-corpus units
+    // (the cast belongs in CCodegen — #2769); POSIX host cc accepts it
+    // as the warning it is, clang 22 on mingw errors. Host parity:
+    cc_args.push("-Wno-error=incompatible-pointer-types")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
     if os() == "Linux":
