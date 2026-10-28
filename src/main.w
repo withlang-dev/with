@@ -5928,7 +5928,11 @@ fn repl_line_requires_session_state(line: &str) -> bool:
     text.starts_with("let ") or text.starts_with("var ") or text.starts_with("fn ") or text.starts_with("pub ") or text.starts_with("type ") or text.starts_with("trait ") or text.starts_with("impl ") or text.starts_with("extern ") or text.starts_with("use ")
 
 fn repl_bin_path -> str:
-    f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}"
+    // Same host exe suffix as cli_one_liner_bin_path (#1081): an
+    // extensionless relative binary does not launch on Windows, so
+    // every repl line exited -2 there (#809).
+    let suffix = if with_sysinfo_os() == "Windows": ".exe" else: ""
+    f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}" ++ suffix
 
 fn run_repl_line(line: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     if no_std:
