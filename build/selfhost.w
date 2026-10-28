@@ -31,6 +31,9 @@ fn bs_windows_skip(ctx: &ActionCtx, issue: &str) -> i32:
     print(ctx.target_name() ++ ": skipped on Windows (" ++ issue ++ ")")
     0
 
+fn bs_exe_suffix() -> str:
+    if os() == "Windows": ".exe" else: ""
+
 fn bs_join(left: &str, right: &str) -> str:
     if left.len() == 0:
         return selfhost_owned_text(right)
@@ -258,15 +261,11 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    if os() == "Windows":
-        print("embedded-runtime-regression: skipped on Windows (#811)")
-        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
-        return 0
     let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
 
-    let copied_compiler = bs_join(output_dir, "with")
+    let copied_compiler = bs_join(output_dir, "with" ++ bs_exe_suffix())
     if fs.copy_file(compiler_input, copied_compiler) != 0:
         return bs_fail(ctx, "could not copy compiler to embedded runtime fixture")
     if fs.chmod(copied_compiler, 0o755) != 0:
