@@ -5279,8 +5279,10 @@ impl MirBuilder:
                         let sig = self.sema.get_sig(method_sym)
                         if sig >= 0:
                             return self.lower_method_bin_op(lhs_expr, rhs_expr, method_sym, node)
-        // Reversed-operand dispatch: try RHS type
-        if rhs_ty != 0:
+        // Reversed-operand dispatch: try RHS type. §11.7 (#2611): only
+        // ==/!= may dispatch from the right side; Sema's recorded call
+        // above is the authority, this fallback follows the same rule.
+        if rhs_ty != 0 and (op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ):
             if rhs_tk == TypeKind.TY_STRUCT:
                 let rhs_method_name = mir_op_method_name(op)
                 if rhs_method_name.len() > 0:

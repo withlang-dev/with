@@ -11,8 +11,8 @@ impl Vector:
         Vector { x: self.x - rhs.amount, y: self.y - rhs.amount }
 
 impl Bias:
-    fn add(self: &Self, lhs: Vector) -> Vector:
-        Vector { x: lhs.x + self.amount, y: lhs.y + self.amount }
+    fn add(self: &Self, rhs: Vector) -> Vector:
+        Vector { x: rhs.x + self.amount, y: rhs.y + self.amount }
 
 fn main:
     let a = Vector { x: 1, y: 2 }
