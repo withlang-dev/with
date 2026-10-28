@@ -24,8 +24,11 @@ fn build_graph_tool(name: &str, env_name: &str, fallback: &str) -> BuildTool:
         env_name: with_str_clone_ref(env_name),
     }
 
+// A C compile is this compiler's own clang (`with cc`, #1915: the build
+// reads nothing of the host) unless $CC names another; "" means our own.
+// The host `cc` was Apple's on macOS and nothing at all on Windows (#809).
 fn build_graph_cc_tool() -> BuildTool:
-    build_graph_tool("cc", "CC", "cc")
+    build_graph_tool("cc", "CC", "")
 
 fn build_graph_ar_tool() -> BuildTool:
     build_graph_tool("ar", "AR", "ar")
