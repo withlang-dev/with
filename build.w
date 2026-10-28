@@ -1810,11 +1810,6 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return issue61_fail(ctx, "could not create output directory: " ++ output_dir)
 
-    if os() == "Windows":
-        print("issue61-regression: skipped on Windows (#809)")
-        let _ = fs.write_text(build_project_join(output_dir, ".stamp"), "ok")
-        return 0
-
     let root = ctx.project_info().project_root()
     let compiler_path = build_project_abs(root, inputs[0])
     if not fs.exists(inputs[0]):
@@ -1828,11 +1823,20 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
 
     if fs.copy_tree("src", build_project_join(repo_copy, "src")) != 0:
         return issue61_fail(ctx, "could not copy src into repo fixture")
+    // A compiler checkout is the directory holding seed.lock (Resolve);
+    // without it the copy's own `use rt.*` reads as a program reaching
+    // for the runtime and the check is refused before it starts.
+    if fs.write_text(build_project_join(repo_copy, "seed.lock"), fs.read_text("seed.lock")) != 0:
+        return issue61_fail(ctx, "could not copy seed.lock into repo fixture")
     let copied_seed = build_project_join(repo_copy, "src/main")
     if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
         return issue61_fail(ctx, "could not remove copied seed from repo fixture")
-    if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
-        return issue61_fail(ctx, "could not link lib into repo fixture")
+    // A copy, not a symlink: the next run's remove_tree of the fixture
+    // must not walk through a directory link into the real lib (a
+    // runner built by a seed without lstat file-mode semantics
+    // recursed until its stack overflowed on Windows, #809).
+    if fs.copy_tree("lib", build_project_join(repo_copy, "lib")) != 0:
+        return issue61_fail(ctx, "could not copy lib into repo fixture")
 
     let copy_err = build_copy_generated_compiler_modules(fs, repo_copy)
     if copy_err.len() > 0:
@@ -4625,6 +4629,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     issue61_regression = issue61_regression.allow_parallel()
     issue61_regression.action = issue61_regression_action
     issue61_regression = issue61_regression.input(release_compiler_bin("with"))
+    issue61_regression = issue61_regression.input("seed.lock")
     issue61_regression = issue61_regression.dep("build")
     out = out.add_target(issue61_regression)
 

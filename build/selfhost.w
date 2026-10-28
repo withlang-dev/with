@@ -18,21 +18,16 @@ type SelfhostRunResult {
 fn bs_fail(ctx: &ActionCtx, message: &str) -> i32:
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ message)
 
-// Windows green-battery gate (#809): the cli-selfhost / c-migrator targets
-// have never passed on Windows (path/spawn/fs-copy harness issues, not
-// codegen — the compiler bootstraps + fixpoints cleanly). Skip them there so
-// the green battery stays green; un-skip one at a time as each is fixed.
-fn bs_windows_skip(ctx: &ActionCtx, issue: &str) -> i32:
-    let fs = ctx.fs()
-    let output_dir = ctx.output()
-    if output_dir.len() != 0:
-        let _ = fs.mkdir_all(output_dir)
-        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
-    print(ctx.target_name() ++ ": skipped on Windows (" ++ issue ++ ")")
-    0
-
 fn bs_exe_suffix() -> str:
     if os() == "Windows": ".exe" else: ""
+
+// The host C model's `long` widths, as the migrator spells them (D156):
+// 32 bits under Windows LLP64, 64 under LP64.
+fn bs_c_long() -> str:
+    if os() == "Windows": "i32" else: "i64"
+
+fn bs_c_ulong() -> str:
+    if os() == "Windows": "u32" else: "u64"
 
 fn bs_join(left: &str, right: &str) -> str:
     if left.len() == 0:
@@ -59,10 +54,29 @@ fn bs_basename(path: &str) -> str:
         if path[i] == '/': last_slash = i
     path.slice(last_slash + 1, path.len())
 
-fn bs_abs(root: &str, path: &str) -> str:
+// Host-absolute: POSIX `/`, or a Windows drive (`C:\`, `C:/`) or UNC
+// (`\\`) spelling. The checks below spelled "absolute" as POSIX-only,
+// so a Windows kept-binary path read as relative (#809).
+fn bs_is_absolute(path: &str) -> bool:
     if path.len() > 0 and path[0] == '/':
+        return true
+    if path.len() >= 2 and path[0] == '\\' and path[1] == '\\':
+        return true
+    path.len() >= 3 and path[1] == ':' and (path[2] == '\\' or path[2] == '/')
+
+// `text` as the body of a With string literal in a generated fixture.
+fn bs_with_literal(text: &str) -> str: text.replace("\\", "\\\\").replace("\"", "\\\"")
+
+fn bs_abs(root: &str, path: &str) -> str:
+    if bs_is_absolute(path):
         return selfhost_owned_text(path)
     bs_join(root, path)
+
+// A project's default executable output: the compiler names it
+// out/bin/<name> plus the host exe suffix (an explicit -o/output_path
+// is spelled exactly, so those sites do not use this).
+fn bs_default_bin(dir: &str, name: &str) -> str:
+    bs_join(dir, "out/bin/" ++ name ++ bs_exe_suffix())
 
 fn bs_with_string_literal(value: &str) -> str:
     var out = "\""
@@ -83,39 +97,22 @@ fn bs_with_string_literal(value: &str) -> str:
 fn bs_capture_path(root: &str, output_dir: &str, label: &str, suffix: &str) -> str:
     bs_abs(root, bs_join(output_dir, label ++ "." ++ suffix))
 
-// The host C compiler for emitted-C checks, resolved as build/emit_c.w
-// resolves it (the one owner of the choice): explicit env, then the
-// pinned SDK's clang++, then the host default — clang++.exe on Windows,
-// where no `cc` exists (#811: every emit-C case failed to spawn).
-fn bs_c_compiler(ctx: &ActionCtx) -> str:
+// The C compiler for C-compiling checks: one named explicitly
+// ($WITH_EMIT_C_CC, $CC), else the compiler under test's own `cc`, the
+// clang it embeds with its sysroot. Never a host compiler: the build
+// depends on nothing of the host, Unix or Windows (#1915; #811 found no
+// `cc` on Windows at all).
+fn bs_c_compiler_argv(compiler_path: &str) -> List[str]:
+    var argv: List[str] = List.new()
     let explicit = env("WITH_EMIT_C_CC")
-    if explicit.len() > 0:
-        return explicit
     let cc = env("CC")
-    if cc.len() > 0:
-        return cc
-    let llvm_prefix = env("LLVM_PREFIX")
-    if llvm_prefix.len() > 0:
-        if os() == "Windows":
-            return llvm_prefix ++ "/bin/clang++.exe"
-        return llvm_prefix ++ "/bin/clang++"
-    let sdk_clang =
-        if os() == "Windows":
-            ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
-        else if os() == "Linux":
-            ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
-        else if os() == "Macos":
-            ".deps/llvm-22.1.6-darwin-arm64/bin/clang++"
-        else:
-            ""
-    if sdk_clang.len() > 0 and ctx.fs().exists(sdk_clang):
-        return sdk_clang
-    if os() == "Windows":
-        return "clang++.exe"
-    "cc"
-
-fn bs_push_c_compiler(ctx: &ActionCtx, argv: List[str]) -> List[str]:
-    argv.push(bs_c_compiler(ctx))
+    if explicit.len() > 0:
+        argv.push(explicit)
+    else if cc.len() > 0:
+        argv.push(cc)
+    else:
+        argv.push(compiler_path.to_owned())
+        argv.push("cc")
     argv
 
 fn bs_host_target_triple() -> str:
@@ -1218,7 +1215,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     if red.rc == 0:
         return bs_fail(ctx, "keep-binary red fixture unexpectedly passed")
     let kept = bs_line_after(red.stderr, "test binary kept: ")
-    if not kept.starts_with("/"):
+    if not bs_is_absolute(kept):
         return bs_fail(ctx, "red run did not print an absolute kept path; stderr=" ++ red.stderr)
     if not fs.host_exists(kept):
         return bs_fail(ctx, "red run's kept binary is missing: " ++ kept)
@@ -1258,7 +1255,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     if green.rc != 0:
         return bs_fail(ctx, f"keep-binary green fixture failed with exit code {green.rc}")
     let named = bs_line_after(green.stderr, "test binary: ")
-    if not named.starts_with("/"):
+    if not bs_is_absolute(named):
         return bs_fail(ctx, "verbose green run did not name an absolute test binary; stderr=" ++ green.stderr)
     if fs.host_exists(named):
         return bs_fail(ctx, "green run without --keep-binary left its test binary behind: " ++ named)
@@ -1273,15 +1270,13 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     if kept_green.rc != 0:
         return bs_fail(ctx, f"--keep-binary green fixture failed with exit code {kept_green.rc}")
     let kept_path = bs_line_after(kept_green.stderr, "test binary kept: ")
-    if not kept_path.starts_with("/"):
+    if not bs_is_absolute(kept_path):
         return bs_fail(ctx, "--keep-binary green run did not print an absolute kept path; stderr=" ++ kept_green.stderr)
     if not fs.host_exists(kept_path):
         return bs_fail(ctx, "--keep-binary green run's kept binary is missing: " ++ kept_path)
     bs_assert_not_contains(ctx, kept_green.stderr, "rerun: ", "test_keep_binary")
 
 pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -1390,8 +1385,6 @@ pub fn run_cli_selfhost_fmt_action(ctx: ActionCtx) -> i32:
     0
 
 pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -1740,7 +1733,7 @@ fn bs_check_init_in_cwd(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) ->
     if rc != 0: return rc
     let build = bs_project_expect_success(ctx, compiler_path, case_dir, "init-in-cwd-build", bs_project_args("build"))
     if build.rc != 0: return build.rc
-    bs_expect_file(ctx, bs_join(case_dir, "out/bin/" ++ expected_name), "init_in_cwd build output")
+    bs_expect_file(ctx, bs_default_bin(case_dir, expected_name), "init_in_cwd build output")
 
 fn bs_check_init_named_dir(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     if ctx.fs().mkdir_all(case_dir) != 0:
@@ -1772,7 +1765,7 @@ fn bs_check_init_named_dir(ctx: &ActionCtx, compiler_path: &str, case_dir: &str)
     if rc != 0: return rc
     let build = bs_project_expect_success(ctx, compiler_path, project_dir, "init-named-dir-build", bs_project_args("build"))
     if build.rc != 0: return build.rc
-    bs_expect_file(ctx, bs_join(project_dir, "out/bin/" ++ project_name), "init_named_dir build output")
+    bs_expect_file(ctx, bs_default_bin(project_dir, project_name), "init_named_dir build output")
 
 fn bs_check_build_uses_package_section_name(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "pkgdemo")
@@ -1781,7 +1774,7 @@ fn bs_check_build_uses_package_section_name(ctx: &ActionCtx, compiler_path: &str
     if rc != 0: return rc
     let result = bs_project_expect_success(ctx, compiler_path, case_dir, "package-section-name", bs_project_args("build"))
     if result.rc != 0: return result.rc
-    bs_expect_file(ctx, bs_join(case_dir, "out/bin/pkgdemo"), "package_section_name output")
+    bs_expect_file(ctx, bs_default_bin(case_dir, "pkgdemo"), "package_section_name output")
 
 fn bs_check_build_rejects_imperative_manifest(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_fixture(ctx, bs_join(case_dir, "with.toml"), "[package]\nname = \"badmanifest\"\nversion = \"0.1.0\"\n\n[build]\ncommand = \"echo nope\"\n", "imperative manifest")
@@ -1929,7 +1922,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     let native_target = bs_project_expect_success(ctx, compiler_path, native_target_dir, "declarative-target-default-native", bs_project_args("build"))
     if native_target.rc != 0: return native_target.rc
-    rc = bs_expect_file(ctx, bs_join(native_target_dir, "out/bin/targetnative"), "native target default output")
+    rc = bs_expect_file(ctx, bs_default_bin(native_target_dir, "targetnative"), "native target default output")
     if rc != 0: return rc
 
     let cross_target_dir = bs_join(case_dir, "target_cross")
@@ -1946,7 +1939,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     // no native binary is produced silently.
     if not cross_target.stderr.contains("not implemented yet") and not cross_target.stderr.contains("runtime object"):
         return bs_fail(ctx, "declarative_target_default_cross: expected a cross-target failure message, got: " ++ cross_target.stderr)
-    if ctx.fs().exists(bs_join(cross_target_dir, "out/bin/targetcross")):
+    if ctx.fs().exists(bs_default_bin(cross_target_dir, "targetcross")):
         return bs_fail(ctx, "cross-target manifest default produced native output")
 
     let invalid_target_dir = bs_join(case_dir, "target_invalid")
@@ -2009,7 +2002,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     let built = bs_project_expect_success(ctx, compiler_path, runtime_dir, "runtime-manifest-build", bs_project_args("build"))
     if built.rc != 0: return built.rc
-    let run = bs_run_binary_capture(ctx, bs_join(runtime_dir, "out/bin/runtimecfg"), "runtime-manifest-run", 120000)
+    let run = bs_run_binary_capture(ctx, bs_default_bin(runtime_dir, "runtimecfg"), "runtime-manifest-run", 120000)
     if run.rc != 0:
         return bs_fail(ctx, f"runtime manifest binary failed with exit code {run.rc}: " ++ run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run.stdout), "runtimecfg", "runtime_manifest_config", "stdout")
@@ -2037,8 +2030,37 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     rc = bs_assert_contains(ctx, bad_pool.stderr, "runtime.fiber_pool_size must be a positive integer", "runtime_manifest_bad_pool")
     if rc != 0: return rc
 
+    // The two-worker scheduler case needs a multi-worker fiber core;
+    // Windows has one worker (#2770), so it runs where workers exist.
+    if os() != "Windows":
+        rc = bs_check_runtime_workers(ctx, compiler_path, case_dir)
+        if rc != 0: return rc
+
+    let bad_workers_dir = bs_join(case_dir, "bad_workers")
+    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "with.toml"), "[package]\nname = \"badworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 9\n", "bad runtime worker manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "src/main.w"), "fn main:\n    print(\"badworkers\")\n", "bad runtime worker source")
+    if rc != 0: return rc
+    let bad_workers = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-workers", bs_project_args("build"), 120000, bad_workers_dir)
+    if bad_workers.rc == 0:
+        return bs_fail(ctx, "invalid runtime fiber worker count unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, bad_workers.stderr, "runtime.fiber_worker_count must be a positive integer between 1 and 8", "runtime_manifest_bad_workers")
+    if rc != 0: return rc
+
+    let unknown_dir = bs_join(case_dir, "unknown_runtime")
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "with.toml"), "[package]\nname = \"runtimeunknown\"\nversion = \"0.1.0\"\n\n[runtime]\nexecutor = \"custom\"\n", "unknown runtime manifest")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"runtimeunknown\")\n", "unknown runtime source")
+    if rc != 0: return rc
+    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-unknown", bs_project_args("build"), 120000, unknown_dir)
+    if unknown.rc == 0:
+        return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
+    bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
+
+
+fn bs_check_runtime_workers(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let scheduler_dir = bs_join(case_dir, "runtime_workers")
-    rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "with.toml"), "[package]\nname = \"runtimeworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 2\nfiber_pool_size = 8\n", "runtime worker manifest")
+    var rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "with.toml"), "[package]\nname = \"runtimeworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 2\nfiber_pool_size = 8\n", "runtime worker manifest")
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(scheduler_dir, "src/main.w"),
         "use std.sync\nuse std.task.Task\nuse std.time\n\n" ++
@@ -2108,33 +2130,12 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     let workers_built = bs_project_expect_success(ctx, compiler_path, scheduler_dir, "runtime-workers-build", bs_project_args("build"))
     if workers_built.rc != 0: return workers_built.rc
-    let workers_run = bs_run_binary_capture(ctx, bs_join(scheduler_dir, "out/bin/runtimeworkers"), "runtime-workers-run", 120000)
+    let workers_run = bs_run_binary_capture(ctx, bs_default_bin(scheduler_dir, "runtimeworkers"), "runtime-workers-run", 120000)
     if workers_run.rc != 0:
         return bs_fail(ctx, f"runtime worker binary failed with exit code {workers_run.rc}: " ++ workers_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(workers_run.stdout), "runtimeworkers", "runtime_workers", "stdout")
     if rc != 0: return rc
-
-    let bad_workers_dir = bs_join(case_dir, "bad_workers")
-    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "with.toml"), "[package]\nname = \"badworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 9\n", "bad runtime worker manifest")
-    if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "src/main.w"), "fn main:\n    print(\"badworkers\")\n", "bad runtime worker source")
-    if rc != 0: return rc
-    let bad_workers = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-workers", bs_project_args("build"), 120000, bad_workers_dir)
-    if bad_workers.rc == 0:
-        return bs_fail(ctx, "invalid runtime fiber worker count unexpectedly succeeded")
-    rc = bs_assert_contains(ctx, bad_workers.stderr, "runtime.fiber_worker_count must be a positive integer between 1 and 8", "runtime_manifest_bad_workers")
-    if rc != 0: return rc
-
-    let unknown_dir = bs_join(case_dir, "unknown_runtime")
-    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "with.toml"), "[package]\nname = \"runtimeunknown\"\nversion = \"0.1.0\"\n\n[runtime]\nexecutor = \"custom\"\n", "unknown runtime manifest")
-    if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"runtimeunknown\")\n", "unknown runtime source")
-    if rc != 0: return rc
-    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-unknown", bs_project_args("build"), 120000, unknown_dir)
-    if unknown.rc == 0:
-        return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
-    bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
-
+    0
 fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let default_dir = bs_join(case_dir, "default_warn")
     var rc = bs_write_project_manifest(ctx, default_dir, "copydefault")
@@ -2154,7 +2155,7 @@ fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: &str, c
     if default_build.rc != 0: return default_build.rc
     rc = bs_assert_contains(ctx, default_build.stderr, "warning: large Copy type 'BigDefault' is 136 bytes; implicit copies may be expensive (copy_warn_threshold=128)", "copy_warning_default")
     if rc != 0: return rc
-    let default_run = bs_run_binary_capture(ctx, bs_join(default_dir, "out/bin/copydefault"), "copy-warning-default-run", 120000)
+    let default_run = bs_run_binary_capture(ctx, bs_default_bin(default_dir, "copydefault"), "copy-warning-default-run", 120000)
     if default_run.rc != 0:
         return bs_fail(ctx, f"default copy warning binary failed with exit code {default_run.rc}: " ++ default_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(default_run.stdout), "copydefault", "copy_warning_default_semantics", "stdout")
@@ -2701,7 +2702,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
     if first.rc != 0: return first.rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/embedcache.state"), "dep:src/data.txt:", "build cache embed dep")
     if rc != 0: return rc
-    let first_run = bs_run_binary_capture(ctx, bs_join(case_dir, "out/bin/embedcache"), "build-cache-embed-first-run", 120000)
+    let first_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-first-run", 120000)
     if first_run.rc != 0:
         return bs_fail(ctx, f"embed cache first binary failed with exit code {first_run.rc}: " ++ first_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(first_run.stdout), "first", "build_cache_embed_first", "stdout")
@@ -2714,7 +2715,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
     rebuild_args |> push(":embedcache")
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-second", rebuild_args)
     if second.rc != 0: return second.rc
-    let second_run = bs_run_binary_capture(ctx, bs_join(case_dir, "out/bin/embedcache"), "build-cache-embed-second-run", 120000)
+    let second_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-second-run", 120000)
     if second_run.rc != 0:
         return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
@@ -2852,8 +2853,6 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     bs_assert_contains(ctx, strict_env.stderr, "is not comptime-callable: it reaches env -> with_getenv_str (an extern)", "effects_strict_env")
 
 pub fn run_cli_selfhost_project_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -3494,26 +3493,11 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
 
 fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
     var cc_args: List[str] = List.new()
-    // On Windows the C compiler is the compiler under test's own `cc`
-    // driver: it carries the sysroot and mingw target the real link
-    // path uses, where a bare SDK clang++ has no system includes and
-    // no `cc` exists (#811). An explicit WITH_EMIT_C_CC/CC still wins.
-    if os() == "Windows" and env("WITH_EMIT_C_CC").len() == 0 and env("CC").len() == 0:
-        cc_args.push(compiler_path.clone())
-        cc_args.push("cc")
-    else:
-        cc_args.push(bs_c_compiler(ctx))
+    for part in bs_c_compiler_argv(compiler_path): cc_args.push(part)
     cc_args.push("-O1")
-    // Emitted C is generated code written against C17: clang 22's C23
-    // default on the mingw target makes -Wincompatible-pointer-types
-    // (int8_t** for char**, in migrated-corpus units) a hard error
-    // where the POSIX default keeps it a warning (#811).
+    // Emitted C is generated code written against C17; every host
+    // compiles it in that dialect, whatever its compiler's default (#811).
     cc_args.push("-std=gnu17")
-    // Same promotion, independent of the dialect under `with cc`: the
-    // emitted code passes int8_t** for char** in migrated-corpus units
-    // (the cast belongs in CCodegen — #2769); POSIX host cc accepts it
-    // as the warning it is, clang 22 on mingw errors. Host parity:
-    cc_args.push("-Wno-error=incompatible-pointer-types")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
     if os() == "Linux":
@@ -3963,7 +3947,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let cc_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stdout")
     let cc_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stderr")
     var cc_args: List[str] = List.new()
-    cc_args = bs_push_c_compiler(ctx, move cc_args)
+    for part in bs_c_compiler_argv(compiler_path): cc_args |> push(part)
     cc_args |> push("-c")
     cc_args |> push(bs_abs(root, helper_c))
     cc_args |> push("-o")
@@ -3975,7 +3959,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
     let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
     var link_args: List[str] = List.new()
-    link_args = bs_push_c_compiler(ctx, move link_args)
+    for part in bs_c_compiler_argv(compiler_path): link_args |> push(part)
     link_args |> push("-o")
     link_args |> push(bs_abs(root, bin))
     link_args |> push(bs_abs(root, with_obj))
@@ -4097,8 +4081,6 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     0
 
 pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -4156,8 +4138,6 @@ pub fn run_cli_selfhost_edge_action(ctx: ActionCtx) -> i32:
     bs_check_darwin_arm64_c_abi_direct_aggregates(ctx, compiler_path, bs_join(output_dir, "darwin_arm64_c_abi_direct_aggregates_case"))
 
 pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -4884,7 +4864,10 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_file_contains(ctx, anon_w, "2.2204460492503131e-16", "hexadecimal float in decimal")
     if rc != 0: return rc
-    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = i64", "builtin-named typedef renamed")
+    // C `long` follows the host data model: i64 on LP64, i32 on
+    // Windows LLP64 — the migrator preserves the target's C ABI.
+    let c_long = if os() == "Windows": "i32" else: "i64"
+    rc = bs_file_contains(ctx, anon_w, "pub type isize_ = " ++ c_long, "builtin-named typedef renamed")
     if rc != 0: return rc
     // `[index] = value` designators in an array initializer, through a macro
     // (STC's Unicode group table), the unreached elements zero.
@@ -4942,7 +4925,20 @@ fn bs_check_migrate_stc_expression_forms(ctx: &ActionCtx, compiler_path: &str, c
     let packed_src = bs_join(case_dir, "bitfields_packed.c")
     rc = bs_write_fixture(ctx, packed_src, "typedef struct __attribute__((packed)) { char tag; unsigned int a:12; unsigned int b:20; } pk;\nint main(void) { pk p = {1, 2, 3}; return p.b - 3; }\n", "a packed bitfield unit")
     if rc != 0: return rc
-    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-packed", &packed_src, "untranslatable record 'pk': pk: bitfield 'b' straddles its 4-byte unit")
+    // The same refusal, named from the host layout: an Itanium host sees
+    // the straddling unit; a windows-gnu host's clang drops packed for
+    // the unit, so the record is refused as packed there.
+    let packed_refusal = if os() == "Windows": "untranslatable record 'pk': pk: a packed record's bitfield units are laid out differently" else: "untranslatable record 'pk': pk: bitfield 'b' straddles its 4-byte unit"
+    rc = bs_migrate_expect_refusal(ctx, compiler_path, case_dir, "bitfields-packed", &packed_src, packed_refusal)
+    if rc != 0: return rc
+    // Mixed declared sizes the two ABIs still place identically (the
+    // int member crosses its unit boundary either way) migrate: D147's
+    // refusal is for records whose layout differs, not for mixed sizes.
+    let agree_src = bs_join(case_dir, "bitfields_agree.c")
+    let agree_w = bs_join(case_dir, "bitfields_agree.w")
+    rc = bs_write_fixture(ctx, agree_src, "typedef struct { char x; char a:2; int b:30; } agree;\nint main(void) { agree m = {1, 1, 3}; return m.x + m.a + m.b - 5; }\n", "mixed sizes both ABIs place alike")
+    if rc != 0: return rc
+    rc = bs_migrate_check_run(ctx, compiler_path, case_dir, "bitfields-agree", &agree_src, &agree_w)
     if rc != 0: return rc
     // D143: a `pub fn` that calls itself declares its return type, so a
     // recursive void function keeps `-> Unit` (STC's quicksort,
@@ -5237,7 +5233,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "arrays.c")
     let out_w = bs_join(case_dir, "arrays.w")
-    let c_text = "#include <stdio.h>\n#include <string.h>\nstatic const unsigned int table[4] = {1, 2, 3, 4294967295u};\nstatic const int grid[2][2] = {{1, 2}, {3, 4}};\nstatic const unsigned char wide[2] = {7, 300};\nstatic const unsigned long big[1] = {5000000000ul};\nstatic unsigned char scratch[8];\ntypedef struct { unsigned char tag[4]; int rows[2][3]; } rec;\nint main(void) {\n    unsigned long n = sizeof(table) / sizeof(table[0]);\n    char buf[16];\n    int local[4] = {5, 6, 7, 8};\n    int grid2[2][3];\n    rec r;\n    memset(buf, 0, sizeof buf);\n    snprintf(buf, sizeof buf, \"%d\", local[2]);\n    grid2[1][2] = local[3];\n    r.tag[1] = 9;\n    r.rows[1][2] = 4;\n    scratch[3] = (unsigned char)grid[1][1];\n    printf(\"%lu %u %d %u %lu %s %d %d %d %d\\n\", n, table[3], grid[1][0], (unsigned)wide[1], big[0], buf, grid2[1][2], r.tag[1], r.rows[1][2], scratch[3]);\n    return 0;\n}\n"
+    let c_text = "#include <stdio.h>\n#include <string.h>\nstatic const unsigned int table[4] = {1, 2, 3, 4294967295u};\nstatic const int grid[2][2] = {{1, 2}, {3, 4}};\nstatic const unsigned char wide[2] = {7, 300};\nstatic const unsigned long long big[1] = {5000000000ull};\nstatic unsigned char scratch[8];\ntypedef struct { unsigned char tag[4]; int rows[2][3]; } rec;\nint main(void) {\n    unsigned long n = sizeof(table) / sizeof(table[0]);\n    char buf[16];\n    int local[4] = {5, 6, 7, 8};\n    int grid2[2][3];\n    rec r;\n    memset(buf, 0, sizeof buf);\n    snprintf(buf, sizeof buf, \"%d\", local[2]);\n    grid2[1][2] = local[3];\n    r.tag[1] = 9;\n    r.rows[1][2] = 4;\n    scratch[3] = (unsigned char)grid[1][1];\n    printf(\"%lu %u %d %u %llu %s %d %d %d %d\\n\", n, table[3], grid[1][0], (unsigned)wide[1], big[0], buf, grid2[1][2], r.tag[1], r.rows[1][2], scratch[3]);\n    return 0;\n}\n"
     var rc = bs_write_fixture(ctx, src, c_text, "migrate D119 arrays")
     if rc != 0: return rc
     let args = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
@@ -5254,7 +5250,7 @@ fn bs_check_migrate_d119_arrays(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let wide: List[u8] = [7, 44]", "D119 arrays: clang folds the converted value")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let big: List[u64] = [5000000000]", "D156 arrays: an unsigned long table is the model's u64 and its literal needs no cast")
+    rc = bs_assert_contains(ctx, out_text, "let big: List[u64] = [5000000000]", "D156 arrays: an unsigned long long table is u64 on every model and its literal needs no cast")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, ": List[c_char] = [0; 16]", "D119 arrays: an uninitialized local buffer is a zero fill of the length")
     if rc != 0: return rc
@@ -5562,12 +5558,14 @@ fn bs_check_migrate_strtoll_family(ctx: &ActionCtx, compiler_path: &str, case_di
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "strtoll_family.c")
     let out_w = bs_join(case_dir, "strtoll_family.w")
-    // `long double` is a double only on AArch64 Darwin and Windows (§16.1);
-    // on x86_64 Linux it is the 80-bit type and on AArch64 Linux a quad,
-    // which With has no float for, so a function over it is untranslatable
-    // there (loudly, as it must be) and the fixture asks for `strtold` only
-    // where the host has the type.
-    let has_long_double = os() == "Macos" or os() == "Windows"
+    // `long double` is a double only where the host's C model makes it
+    // one: AArch64 Darwin here. x86_64 Linux has the 80-bit type, AArch64
+    // Linux a quad, and the Windows model's MinGW parse (windows-gnu)
+    // also reports the 80-bit type — TargetSpec's table says otherwise
+    // for Windows, which is #2771. With has no float for the wider types,
+    // so a function over one is untranslatable there (loudly, as it must
+    // be) and the fixture asks for `strtold` only where the model has it.
+    let has_long_double = os() == "Macos"
     let c_text = "#include <stdlib.h>\nlong long p1(const char *s) { return strtoll(s, 0, 10); }\nunsigned long long p2(const char *s) { return strtoull(s, 0, 16); }\nfloat p3(const char *s) { return strtof(s, 0); }\n" ++ (if has_long_double: "long double p4(const char *s) { return strtold(s, 0); }\n" else: "")
     var rc = bs_write_fixture(ctx, src, c_text, "strtoll family")
     if rc != 0: return rc
@@ -6326,8 +6324,6 @@ fn bs_check_migrate_macro_body_string_literal(ctx: &ActionCtx, compiler_path: &s
     0
 
 pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -6528,7 +6524,7 @@ fn bs_check_migrate_macro_unsigned_minus(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "__local_chkmc_length", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "= ((3 as u64))", "macro_initializer_unsigned_minus")
+    rc = bs_assert_contains(ctx, out_text, "= ((3 as " ++ bs_c_ulong() ++ "))", "macro_initializer_unsigned_minus")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -6554,7 +6550,11 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ulong-max-width", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "((0 as u64) -% 1)", "ulong_max_width")
+    // ULONG_MAX at the model's width: a literal in glibc/Darwin limits.h
+    // (spelled `((0 as u64) -% 1)`), an expression macro in MinGW's
+    // (`LONG_MAX * 2UL + 1`, translated as written).
+    let ulong_max = if os() == "Windows": "(((2147483647 as u32) *% (2 as u32)) as u32) +% (1 as u32)" else: "((0 as u64) -% 1)"
+    rc = bs_assert_contains(ctx, out_text, ulong_max, "ulong_max_width")
     if rc != 0: return rc
     rc = bs_assert_not_contains(ctx, out_text, "9223372036854775807 as u32", "ulong_max_width")
     if rc != 0: return rc
@@ -6562,7 +6562,7 @@ fn bs_check_migrate_ulong_max_width(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let d156_unsigned: List[u32] = [16]", "D156: an unsigned int table is List[u32] with clang's folded literal (D119)")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "let d156_signed: List[i64] = [32]", "D156: a long table is the model's List[i64]")
+    rc = bs_assert_contains(ctx, out_text, "let d156_signed: List[" ++ bs_c_long() ++ "] = [32]", "D156: a long table is the model's fixed-width List")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "fn parse_decimal", "ulong_max_width")
     if rc != 0: return rc
@@ -6754,7 +6754,10 @@ fn bs_check_migrate_paste_suffix_macros(ctx: &ActionCtx, compiler_path: &str, ca
     // darwin spells `INTMAX_C(v)`, glibc spells `INTMAX_C(c)` — so both helper
     // signatures are the identical intended `[T] -> i64` translation, differing
     // only in that echoed name. Only the project alias is public.
-    rc = bs_assert_contains_either(ctx, out_text, "fn PROJECT_INTMAX_C[T](v: T) -> i64", "fn PROJECT_INTMAX_C[T](c: T) -> i64", "paste_suffix_project_helper_kept")
+    // The parameter's name is the system header's (v, c, MinGW's val);
+    // the kept shape is the generic i64 helper.
+    if not out_text.contains("fn PROJECT_INTMAX_C[T](v: T) -> i64") and not out_text.contains("fn PROJECT_INTMAX_C[T](c: T) -> i64") and not out_text.contains("fn PROJECT_INTMAX_C[T](val: T) -> i64"):
+        return bs_fail(ctx, "missing expected output for paste_suffix_project_helper_kept: fn PROJECT_INTMAX_C[T](<param>: T) -> i64")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "let X_MAX: i64 = 9223372036854775807", "paste_suffix_user_macro_probe_folds")
     if rc != 0: return rc
@@ -7185,9 +7188,12 @@ fn bs_check_migrate_typed_cast_macros(ctx: &ActionCtx, compiler_path: &str, case
     let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-typed-cast-macros", args)
     if result.rc != 0: return result.rc
     let out_text = ctx.fs().read_text(out_w)
-    rc = bs_assert_contains(ctx, out_text, "let ZERO_TERM: u64 = ((0 as u64) -% 1)", "typed_cast_macros")
+    // `usize` is the fixture's `unsigned long`: the max value is spelled
+    // at the model's width (a wrapping form where it exceeds i64).
+    let zero_term = if os() == "Windows": "let ZERO_TERM: u32 = 4294967295" else: "let ZERO_TERM: u64 = ((0 as u64) -% 1)"
+    rc = bs_assert_contains(ctx, out_text, zero_term, "typed_cast_macros")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as u64))", "typed_cast_macros")
+    rc = bs_assert_contains(ctx, out_text, "patlen == ((-1 as " ++ bs_c_ulong() ++ "))", "typed_cast_macros")
     if rc != 0: return rc
     var check_args: List[str] = List.new()
     check_args |> push("check")
@@ -7251,8 +7257,6 @@ fn bs_check_migrate_switch_case_scope(ctx: &ActionCtx, compiler_path: &str, case
     0
 
 pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
@@ -7297,8 +7301,13 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_migrate_anon_union_init(ctx, compiler_path, bs_join(output_dir, "anon_union_init"))
     if rc != 0: return rc
-    rc = bs_check_migrate_posix_path_calls(ctx, compiler_path, bs_join(output_dir, "posix_path_calls"))
-    if rc != 0: return rc
+    // The fixture's C names a POSIX surface (mkstemp, realpath) the
+    // model's headers must declare; the Windows model's MinGW headers
+    // have no realpath, so the parse itself fails there — the modeled
+    // surface this case pins exists only where the headers declare it.
+    if os() != "Windows":
+        rc = bs_check_migrate_posix_path_calls(ctx, compiler_path, bs_join(output_dir, "posix_path_calls"))
+        if rc != 0: return rc
     rc = bs_check_migrate_cross_file_tentative_global_owner(ctx, compiler_path, bs_join(output_dir, "cross_file_tentative_global_owner"))
     if rc != 0: return rc
     rc = bs_check_migrate_noop_pointer_casts(ctx, compiler_path, bs_join(output_dir, "noop_pointer_casts"))
@@ -7376,10 +7385,10 @@ fn bs_check_build_w_not_ignored(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     if rc != 0: return rc
     let result = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-not-ignored", bs_blob_to_args(bs_argv_append("", "build")))
     if result.rc != 0: return result.rc
-    let custom_bin = bs_join(case_dir, "out/bin/custom-build")
+    let custom_bin = bs_default_bin(case_dir, "custom-build")
     if not ctx.fs().exists(custom_bin):
         ctx.diagnostics().error("error: build_w_not_ignored missing custom-build output")
-    if ctx.fs().exists(bs_join(case_dir, "out/bin/buildwdemo")):
+    if ctx.fs().exists(bs_default_bin(case_dir, "buildwdemo")):
         ctx.diagnostics().error("error: build_w_not_ignored unexpectedly produced default package output")
     let run_result = bs_run_binary_capture(ctx, custom_bin, "build-w-not-ignored-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -7399,7 +7408,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     let canonical = bs_build_w_expect_success(ctx, compiler_path, canonical_dir, "build-w-comptime-with-canonical", bs_blob_to_args(bs_argv_append("", "build")))
     if canonical.rc != 0: return canonical.rc
-    let canonical_bin = bs_join(canonical_dir, "out/bin/canonical")
+    let canonical_bin = bs_default_bin(canonical_dir, "canonical")
     if not ctx.fs().exists(canonical_bin):
         return bs_fail(ctx, "missing canonical comptime-with output")
     let canonical_run = bs_run_binary_capture(ctx, canonical_bin, "build-w-comptime-with-canonical-run", 120000)
@@ -7416,7 +7425,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     let shorthand = bs_build_w_expect_success(ctx, compiler_path, shorthand_dir, "build-w-comptime-with-shorthand", bs_blob_to_args(bs_argv_append("", "build")))
     if shorthand.rc != 0: return shorthand.rc
-    let shorthand_bin = bs_join(shorthand_dir, "out/bin/shorthand")
+    let shorthand_bin = bs_default_bin(shorthand_dir, "shorthand")
     if not ctx.fs().exists(shorthand_bin):
         return bs_fail(ctx, "missing shorthand comptime-with output")
     let shorthand_run = bs_run_binary_capture(ctx, shorthand_bin, "build-w-comptime-with-shorthand-run", 120000)
@@ -7528,7 +7537,10 @@ fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, bas
         return bs_fail(ctx, "could not create " ++ bs_join(seed_dir, ".github"))
     if fs.copy_tree(".github/workflows", bs_join(seed_dir, ".github/workflows")) != 0:
         return bs_fail(ctx, "could not copy .github/workflows into " ++ seed_dir)
-    if fs.symlink("src/main", bs_join(seed_dir, "src/main")) != 0:
+    // The seed target's output is src/main with the host's executable
+    // suffix (src/main.exe on Windows, #2759).
+    let seed_bin = "src/main" ++ bs_exe_suffix()
+    if fs.symlink(seed_bin, bs_join(seed_dir, seed_bin)) != 0:
         return bs_fail(ctx, "could not link the pinned seed into " ++ seed_dir)
     rc = bs_force_comptime_evaluator(ctx, seed_dir)
     if rc != 0: return rc
@@ -7869,7 +7881,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "        match move envelope.message:\n" ++
         "            CompilerMessage.PreLink(command) =>\n" ++
         "                var replacement = command\n" ++
-        "                replacement.linker = \"/bin/false\"\n" ++
+        "                replacement.linker = \"with\"\n" ++
         "                ws.set_link_command(replacement)\n" ++
         "            CompilerMessage.Complete(_) => ctx.diagnostics().error(\"bad linker prelink missing\")\n" ++
         "            _ => false\n" ++
@@ -8384,7 +8396,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
     if rc != 0: return rc
     let enum_result = bs_build_w_expect_success(ctx, compiler_path, enum_dir, "build-w-comptime-payload-enum", bs_blob_to_args(bs_argv_append("", "build")))
     if enum_result.rc != 0: return enum_result.rc
-    let enum_bin = bs_join(enum_dir, "out/bin/workspace-enum")
+    let enum_bin = bs_default_bin(enum_dir, "workspace-enum")
     if not ctx.fs().exists(enum_bin):
         return bs_fail(ctx, "missing workspace enum output")
     let enum_run = bs_run_binary_capture(ctx, enum_bin, "build-w-comptime-payload-enum-run", 120000)
@@ -8467,7 +8479,7 @@ fn bs_check_build_w_library_and_targets(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     let host_result = bs_build_w_expect_success(ctx, compiler_path, host_dir, "build-w-explicit-host-target", bs_blob_to_args(bs_argv_append("", "build")))
     if host_result.rc != 0: return host_result.rc
-    let host_bin = bs_join(host_dir, "out/bin/host-target")
+    let host_bin = bs_default_bin(host_dir, "host-target")
     if not ctx.fs().exists(host_bin):
         ctx.diagnostics().error("error: build_w_explicit_host_target missing binary: " ++ host_bin)
     let host_run = bs_run_binary_capture(ctx, host_bin, "build-w-explicit-host-run", 120000)
@@ -8498,7 +8510,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     let gen_result = bs_build_w_expect_success(ctx, compiler_path, gen_dir, "build-w-generated-source", bs_blob_to_args(bs_argv_append("", "build")))
     if gen_result.rc != 0: return gen_result.rc
     let generated_source = bs_join(gen_dir, "out/gen/generated_main.w")
-    let generated_bin = bs_join(gen_dir, "out/bin/generated-app")
+    let generated_bin = bs_default_bin(gen_dir, "generated-app")
     if not ctx.fs().exists(generated_source) or not ctx.fs().exists(generated_bin):
         ctx.diagnostics().error("error: build_w_generated_source missing generated source or binary")
     let run_result = bs_run_binary_capture(ctx, generated_bin, "build-w-generated-source-run", 120000)
@@ -8575,12 +8587,34 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     let gen_link_other = bs_join(base_dir, "gen_link_other_gen")
     if ctx.fs().mkdir_all(gen_link_other) != 0: return bs_fail(ctx, "could not create " ++ gen_link_other)
     if ctx.fs().mkdir_all(bs_join(gen_link_dir, "out")) != 0: return bs_fail(ctx, "could not create " ++ bs_join(gen_link_dir, "out"))
-    if ctx.fs().symlink(gen_link_other, bs_join(gen_link_dir, "out/gen")) != 0: return bs_fail(ctx, "could not link out/gen in " ++ gen_link_dir)
+    // The compiler under test makes the link. SEED-BOUND (#809): this
+    // runner links the pinned seed's runtime, whose rt_symlink stores a
+    // `/`-spelled target that Windows cannot resolve, and the seed driver
+    // overflowed its stack walking that link on the next build. With a seed
+    // carrying the fixed rt_symlink, ctx.fs().symlink is enough again.
+    let link_root = ctx.project_info().project_root()
+    let link_program = "use std.fs\nassert(symlink(\"" ++ bs_abs(link_root, gen_link_other) ++ "\", \"" ++ bs_abs(link_root, bs_join(gen_link_dir, "out/gen")) ++ "\") == 0)\n"
+    var link_args: List[str] = List.new()
+    link_args.push("-e")
+    link_args.push(link_program)
+    let linked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-setup", &link_args, 120000, gen_link_dir)
+    if linked.rc != 0: return bs_fail(ctx, "could not link out/gen in " ++ gen_link_dir)
     let gen_link = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link", bs_blob_to_args(bs_argv_append("", "build")), 120000, gen_link_dir)
     if gen_link.rc == 0:
         ctx.diagnostics().error("error: build_w_gen_link unexpectedly succeeded")
     rc = bs_assert_contains(ctx, gen_link.stderr, "out/gen is a symlink", "build_w_gen_link")
     if rc != 0: return rc
+    // SEED-BOUND (#809): the pinned seed's runtime reads a directory link as
+    // the directory, so its driver recursed through this one fingerprinting
+    // the case outputs on the next build until the stack overflowed (#811's
+    // rt_file_mode fix). The link has served; remove it, a directory link by
+    // RemoveDirectoryW on Windows, a file on POSIX.
+    let unlink_program = "use std.fs\nlet p = \"" ++ bs_abs(link_root, bs_join(gen_link_dir, "out/gen")) ++ "\"\nif remove_file(p) != 0: assert(remove_dir(p) == 0)\n"
+    var unlink_args: List[str] = List.new()
+    unlink_args.push("-e")
+    unlink_args.push(unlink_program)
+    let unlinked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-cleanup", &unlink_args, 120000, gen_link_dir)
+    if unlinked.rc != 0: return bs_fail(ctx, "could not remove the out/gen link in " ++ gen_link_dir)
 
     let toolfs_file_escape_dir = bs_join(base_dir, "toolfs_file_escape")
     rc = bs_write_project_manifest(ctx, toolfs_file_escape_dir, "buildwtoolfsfileescape")
@@ -8688,7 +8722,7 @@ fn bs_graph_build_file() -> str:
     "    var command = target_new(.Command, \"run-two\", \"out/bin/two\")\n" ++
     "    command = command.dep(\"two\")\n" ++
     "    out = out.add_target(command)\n" ++
-    "    var install = target_new(.Install, \"install-two\", \"out/bin/two\").output(\"out/install/two\")\n" ++
+    "    var install = target_new(.Install, \"install-two\", \"out/bin/two" ++ bs_exe_suffix() ++ "\").output(\"out/install/two\")\n" ++
     "    install = install.dep(\"two\")\n" ++
     "    install = install.arg(\"0755\")\n" ++
     "    out = out.add_target(install)\n" ++
@@ -8753,7 +8787,7 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, graph_result.stdout, "target\t7\trun-two\tout/bin/two\t0\t0\t", "build_w_graph_v2")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t8\tinstall-two\tout/bin/two\t0\t0\tout/install/two", "build_w_graph_v2")
+    rc = bs_assert_contains(ctx, graph_result.stdout, "target\t8\tinstall-two\tout/bin/two" ++ bs_exe_suffix() ++ "\t0\t0\tout/install/two", "build_w_graph_v2")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, graph_result.stdout, "target\t22\thelper-copy\truntime/helper.c\t0\t0\tout/copied/helper.c", "build_w_graph_v2")
     if rc != 0: return rc
@@ -8813,9 +8847,9 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let _remove_out1 = ctx.fs().remove_tree(bs_join(case_dir, "out"))
     let group = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-group-deps", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":toolchain")))
     if group.rc != 0: return group.rc
-    rc = bs_require_case_file(ctx, case_dir, "out/bin/two", "build_w_graph_group")
+    rc = bs_require_case_file(ctx, case_dir, "out/bin/two" ++ bs_exe_suffix(), "build_w_graph_group")
     if rc != 0: return rc
-    rc = bs_forbid_case_file(ctx, case_dir, "out/bin/one", "build_w_graph_group")
+    rc = bs_forbid_case_file(ctx, case_dir, "out/bin/one" ++ bs_exe_suffix(), "build_w_graph_group")
     if rc != 0: return rc
     rc = bs_require_case_file(ctx, case_dir, "out/obj/one-o.o", "build_w_graph_group")
     if rc != 0: return rc
@@ -8844,7 +8878,7 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let _remove_out3 = ctx.fs().remove_tree(bs_join(case_dir, "out"))
     let two = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-target-select", bs_blob_to_args(bs_argv_append(bs_argv_append("", "build"), ":two")))
     if two.rc != 0: return two.rc
-    if not ctx.fs().exists(bs_join(case_dir, "out/bin/two")) or ctx.fs().exists(bs_join(case_dir, "out/bin/one")):
+    if not ctx.fs().exists(bs_join(case_dir, "out/bin/two" ++ bs_exe_suffix())) or ctx.fs().exists(bs_join(case_dir, "out/bin/one" ++ bs_exe_suffix())):
         ctx.diagnostics().error("error: build_w_graph_v2 target selection outputs were wrong")
     0
 
@@ -8878,6 +8912,24 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "fixtures/work/cwd.txt"), "cwd", ctx.target_name(), "action cwd fixture")
     if rc != 0: return rc
+    // The action's child processes are With programs run by the compiler
+    // under test, never a host's env/cat/sleep/echo (the build depends on
+    // nothing of the host, Unix or Windows).
+    let child_dir = bs_join(case_dir, "fixtures/children")
+    rc = bs_build_w_write_fixture(ctx, bs_join(child_dir, "env.w"), "use std.process\nfor name in [\"WITH_ACTION_TEST_ENV\", \"WITH_RUN_SPEC_TEST\", \"WITH_TOOL_CAPABILITY_TOKEN\", \"WITH_BUILD_ACTION_NAME\"]: print(name ++ \"=\" ++ env(name))\n", ctx.target_name(), "action env child")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(child_dir, "cat.w"), "use std.fs\nprint(read_file(\"cwd.txt\") ?? \"\")\n", ctx.target_name(), "action cwd child")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(child_dir, "sleep.w"), "use std.time\nsleep_secs(5)\n", ctx.target_name(), "action sleep child")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(child_dir, "echo.w"), "print(\"streamed-process-run\")\n", ctx.target_name(), "action echo child")
+    if rc != 0: return rc
+    let root = ctx.project_info().project_root()
+    let w = bs_with_literal(bs_abs(root, compiler_path))
+    let child_env = bs_with_literal(bs_abs(root, bs_join(child_dir, "env.w")))
+    let child_cat = bs_with_literal(bs_abs(root, bs_join(child_dir, "cat.w")))
+    let child_sleep = bs_with_literal(bs_abs(root, bs_join(child_dir, "sleep.w")))
+    let child_echo = bs_with_literal(bs_abs(root, bs_join(child_dir, "echo.w")))
     let build_text =
         "use std.build\n\n" ++
         "fn generate(ctx: ActionCtx) -> i32:\n" ++
@@ -8901,7 +8953,9 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    assert(ctx.fs().write_text(ctx.output(), \"action:\" ++ ctx.args()[0]) == 0)\n" ++
         "    assert(ctx.fs().write_text(ctx.outputs()[1], \"extra:\" ++ ctx.args()[0]) == 0)\n" ++
         "    var env_args: List[str] = List.new()\n" ++
-        "    env_args |> push(\"/usr/bin/env\")\n" ++
+        "    env_args |> push(\"" ++ w ++ "\")\n" ++
+        "    env_args |> push(\"run\")\n" ++
+        "    env_args |> push(\"" ++ child_env ++ "\")\n" ++
         "    var child_env = process_env()\n" ++
         "    child_env = child_env.set(\"WITH_ACTION_TEST_ENV\", \"present\")\n" ++
         "    let env_result = ctx.process_runner().run_capture_with_env(env_args, \"out/action/env.txt\", \"out/action/env.err\", 120000, child_env)\n" ++
@@ -8913,21 +8967,22 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    assert(inherited_env_result.rc == 0)\n" ++
         "    assert(not inherited_env_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
         "    assert(not inherited_env_result.stdout.contains(\"WITH_BUILD_ACTION_NAME=generate\"))\n" ++
-        "    let spec = process_spec(\"/usr/bin/env\").env_var(\"WITH_RUN_SPEC_TEST\", \"present\").timeout(120000)\n" ++
+        "    let spec = process_spec(\"" ++ w ++ "\").arg(\"run\").arg(\"" ++ child_env ++ "\").env_var(\"WITH_RUN_SPEC_TEST\", \"present\").timeout(120000)\n" ++
         "    let spec_result = ctx.process_runner().run_spec(spec, \"out/action/spec-env.txt\", \"out/action/spec-env.err\")\n" ++
         "    assert(spec_result.rc == 0)\n" ++
         "    assert(spec_result.stdout.contains(\"WITH_RUN_SPEC_TEST=present\"))\n" ++
         "    assert(not spec_result.stdout.contains(\"WITH_TOOL_CAPABILITY_TOKEN=with-\"))\n" ++
-        "    let cwd_spec = process_spec(\"/bin/cat\").arg(\"cwd.txt\").working_dir(ctx.project_info().project_root() ++ \"/fixtures/work\").timeout(120000)\n" ++
+        "    let cwd_spec = process_spec(\"" ++ w ++ "\").arg(\"run\").arg(\"" ++ child_cat ++ "\").working_dir(ctx.project_info().project_root() ++ \"/fixtures/work\").timeout(120000)\n" ++
         "    let cwd_result = ctx.process_runner().run_spec(cwd_spec, \"out/action/spec-cwd.txt\", \"out/action/spec-cwd.err\")\n" ++
         "    assert(cwd_result.rc == 0)\n" ++
         "    assert(cwd_result.stdout.contains(\"cwd\"))\n" ++
-        "    let timeout_spec = process_spec(\"/bin/sleep\").arg(\"1\").timeout(1)\n" ++
+        "    let timeout_spec = process_spec(\"" ++ w ++ "\").arg(\"run\").arg(\"" ++ child_sleep ++ "\").timeout(1)\n" ++
         "    let timeout_result = ctx.process_runner().run_spec(timeout_spec, \"out/action/spec-timeout.txt\", \"out/action/spec-timeout.err\")\n" ++
         "    assert(timeout_result.timed_out)\n" ++
         "    var direct_args: List[str] = List.new()\n" ++
-        "    direct_args |> push(\"/bin/echo\")\n" ++
-        "    direct_args |> push(\"streamed-process-run\")\n" ++
+        "    direct_args |> push(\"" ++ w ++ "\")\n" ++
+        "    direct_args |> push(\"run\")\n" ++
+        "    direct_args |> push(\"" ++ child_echo ++ "\")\n" ++
         "    assert(ctx.process_runner().run(direct_args) == 0)\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -9263,7 +9318,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "use std.build\n\n" ++
         "fn bad_capture(ctx: ActionCtx) -> i32:\n" ++
         "    let args: List[str] = List.new()\n" ++
-        "    args.push(\"/bin/echo\")\n" ++
+        "    args.push(\"with\")\n" ++
         "    args.push(\"bad\")\n" ++
         "    let _ = ctx.process_runner().run_capture(args, \"out/other/stdout.txt\", \"out/other/stderr.txt\", 120000)\n" ++
         "    0\n\n" ++
@@ -9310,7 +9365,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
     let bad_spec_build =
         "use std.build\n\n" ++
         "fn bad_spec(ctx: ActionCtx) -> i32:\n" ++
-        "    let spec = process_spec(\"/bin/echo\").arg(\"unused\").capture(false, true)\n" ++
+        "    let spec = process_spec(\"with\").arg(\"unused\").capture(false, true)\n" ++
         "    let _ = ctx.process_runner().run_spec(spec, \"out/action/stdout.txt\", \"out/action/stderr.txt\")\n" ++
         "    0\n\n" ++
         "pub fn build(ctx: BuildCtx) -> Build:\n" ++
@@ -9384,8 +9439,6 @@ fn bs_error_lines(text: &str) -> str:
     out
 
 pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
-    if os() == "Windows":
-        return bs_windows_skip(ctx, "#809")
     let inputs = ctx.inputs()
     if inputs.len() == 0:
         return bs_fail(ctx, "missing compiler input")
