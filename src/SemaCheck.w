@@ -2083,7 +2083,9 @@ impl Sema:
                 return 0 as TypeId
             if self.ast.get_data1(node) != TYPE_TRAIT_OBJECT_IMPL and self.ensure_trait_object_safe(trait_sym, node) == 0:
                 return 0 as TypeId
-            return self.ensure_exact_type(TypeKind.TY_TRAIT_OBJ, trait_sym, 0, 0)
+            // d1 records which trait of that name this is (index + 1, #2520):
+            // `dyn One` from two modules can be two traits.
+            return self.ensure_exact_type(TypeKind.TY_TRAIT_OBJ, trait_sym, self.lookup_trait_named(trait_sym) + 1, 0)
 
         if kind == NodeKind.NK_TYPE_INFERRED:
             return 0 as TypeId
@@ -2383,7 +2385,8 @@ impl Sema:
                 return 0 as TypeId
             return self.find_option_type_for(inner as i32) as TypeId
         if kind == NodeKind.NK_TYPE_TRAIT_OBJ:
-            return self.find_exact_type(TypeKind.TY_TRAIT_OBJ, self.ast.get_data0(node), 0, 0)
+            let trait_sym = self.ast.get_data0(node)
+            return self.find_exact_type(TypeKind.TY_TRAIT_OBJ, trait_sym, self.lookup_trait_named(trait_sym) + 1, 0)
         if kind == NodeKind.NK_TYPE_INFERRED:
             return 0 as TypeId
         if kind == NodeKind.NK_TYPE_TYPEOF:
@@ -31078,7 +31081,7 @@ impl Sema:
         // trait-qualified symbol; the registry answers where composing
         // `Owner.method` text cannot.
         if self.ambiguous_trait_method_head(owner_sym, method_sym) != 0:
-            let bound_tidx = self.bound_trait_idx_for_method(owner_sym, method_sym)
+            let bound_tidx = self.selected_trait_idx_for_method(owner_sym, method_sym)
             if bound_tidx >= 0:
                 let bound_fn = self.lookup_trait_method_fn(owner_sym, bound_tidx, method_sym)
                 if bound_fn != 0 and self.generic_fn_node_for_symbol(bound_fn) != 0:
@@ -34124,8 +34127,10 @@ impl Sema:
         0
 
     fn find_dyn_trait_method_info(trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
-        if self.trait_lookup.contains(trait_sym):
-            let trait_idx = self.trait_lookup.get(trait_sym).unwrap()
+        // #2520: the trait `dyn Name` means from this module, not the most
+        // recently registered trait of that name.
+        let trait_idx = self.lookup_trait_named(trait_sym)
+        if trait_idx >= 0:
             let method_start = self.trait_method_starts[trait_idx]
             let method_count = self.trait_method_counts[trait_idx]
             let want = self.pool_resolve(method_sym)
@@ -35189,7 +35194,7 @@ impl Sema:
         self.trace_method_resolution(node, obj_type as i32, mc_owner_sym_for_effect, field, mc_sig_idx_for_effect, mc_method_fn_for_resolution)
         // #2520 (§11.4): two traits answer this bare call and no bound of
         // the receiver's type parameter names one of them.
-        if mc_owner_sym_for_effect != 0 and self.ambiguous_trait_method_head(mc_owner_sym_for_effect, field) != 0 and self.bound_trait_idx_for_method(mc_owner_sym_for_effect, field) < 0 and self.lookup_trait_method_fn(mc_owner_sym_for_effect, -1, field) == 0:
+        if mc_owner_sym_for_effect != 0 and self.ambiguous_trait_method_head(mc_owner_sym_for_effect, field) != 0 and self.selected_trait_idx_for_method(mc_owner_sym_for_effect, field) < 0 and self.lookup_trait_method_fn(mc_owner_sym_for_effect, -1, field) == 0:
             self.emit_ambiguous_trait_method_error(mc_owner_sym_for_effect, field, node)
             return 0
         if mc_method_fn_for_resolution != 0: self.check_method_visible(mc_method_fn_for_resolution, node)
@@ -39947,6 +39952,28 @@ impl Sema:
             pos = pos + 2 + bound_count
         if found_count == 1: found else: -1
 
+    // The trait that answers a contested bare method name: the one a bound
+    // of the receiver's type parameter names; else, by §18.2's precedence,
+    // the one trait among the contestants the program declares, since a
+    // std trait is the prelude tier, which a program's own declarations
+    // outrank (#2520: a program's `trait Unit1: fn one() -> Self` beside
+    // std's `One` made `f64.one()` ambiguous). -1 when neither decides.
+    fn selected_trait_idx_for_method(type_sym: i32, method_sym: i32) -> i32:
+        let bound = self.bound_trait_idx_for_method(type_sym, method_sym)
+        if bound >= 0:
+            return bound
+        var found: i32 = -1
+        var found_count = 0
+        var cand_fn = self.ambiguous_trait_method_head(type_sym, method_sym)
+        while cand_fn != 0:
+            let impl_node: i32 = self.method_impl_nodes.get(cand_fn) ?? 0
+            let tidx = if impl_node != 0: self.trait_idx_for_impl(impl_node) else: -1
+            if tidx >= 0 and tidx < self.trait_decl_paths.len() and sema_tier_path_is_std_implementation(self.trait_decl_paths[tidx]) == 0:
+                found = tidx
+                found_count = found_count + 1
+            cand_fn = self.method_lookup.amb_next_fn.get(cand_fn) ?? 0
+        if found_count == 1: found else: -1
+
     fn lookup_trait_method_fn(type_sym: i32, trait_idx: i32, method_sym: i32) -> i32:
         let tkey = sema_trait_method_key(type_sym, trait_idx, method_sym)
         if self.method_lookup.trait_fn_lookup.contains(tkey): self.method_lookup.trait_fn_lookup.get(tkey).unwrap() else: 0
@@ -39959,7 +39986,7 @@ impl Sema:
         if type_sym <= 0 or method_sym <= 0:
             return -1
         if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
-            let bound_tidx = self.bound_trait_idx_for_method(type_sym, method_sym)
+            let bound_tidx = self.selected_trait_idx_for_method(type_sym, method_sym)
             if bound_tidx >= 0:
                 let bound_sig = self.lookup_trait_method_sig(type_sym, bound_tidx, method_sym)
                 if bound_sig >= 0:
@@ -40037,7 +40064,7 @@ impl Sema:
         if type_sym <= 0 or method_sym <= 0:
             return 0
         if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
-            let bound_tidx = self.bound_trait_idx_for_method(type_sym, method_sym)
+            let bound_tidx = self.selected_trait_idx_for_method(type_sym, method_sym)
             if bound_tidx >= 0:
                 let bound_fn = self.lookup_trait_method_fn(type_sym, bound_tidx, method_sym)
                 if bound_fn != 0:

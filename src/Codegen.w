@@ -1916,8 +1916,10 @@ impl Codegen:
         if type_node == 0:
             return 0
         let tk = self.pool.kind(type_node)
+        // The trait Sema's precedence picks for this name in this module,
+        // keyed by its identity as the vtables are (#2520).
         if tk == NodeKind.NK_TYPE_TRAIT_OBJ:
-            return self.pool.get_data0(type_node)
+            return self.sema_sym_to_codegen_sym(self.sema.trait_identity_symbol_named_at(self.pool.get_data0(type_node), type_node))
         if tk == NodeKind.NK_TYPE_REF or tk == NodeKind.NK_TYPE_PTR:
             return self.dyn_trait_from_type_node(self.pool.get_data0(type_node))
         if tk == NodeKind.NK_TYPE_GENERIC:
