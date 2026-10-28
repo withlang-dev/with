@@ -6589,9 +6589,16 @@ impl CCodegen:
                 if self.sema.type_layout_is_str_view(view_p_tid) and self.tid_is_str_or_str_view(self.operand_tid(body, op_id)):
                     out = out ++ self.str_value_text(body, op_id)
                     continue
-            if callee_extern_name == "strtod" and i == 1:
-                out = out ++ "((char **)" ++ arg_text ++ ")"
-                continue
+            // #2769: a function the included headers declare takes its
+            // `c_char` pointer chains as the header spells them. Only a
+            // bodiless extern: std.libc's own `strtol` is a With function
+            // whose emitted prototype says int8_t**.
+            if i < callee_param_count and callee_extern_name.len() > 0 and self.callee_is_bodiless(body, callee_operand) and self.extern_declared_by_included_headers(callee_extern_name):
+                let header_p_tid = if callee_sig >= 0: self.sema.sig_param_type(callee_sig, i) else: self.sema.fn_type_param_type(callee_fn_tid, i)
+                let char_spelled = self.header_char_pointer_type(header_p_tid)
+                if char_spelled.len() > 0:
+                    out = out ++ "((" ++ char_spelled ++ ")" ++ arg_text ++ ")"
+                    continue
             if self.call_param_expects_c_pointer(body, args_id, callee_operand, i) != 0:
                 if arg_text == "0" or arg_text == "NULL":
                     out = out ++ "NULL"
@@ -6712,6 +6719,15 @@ impl CCodegen:
                     let fn_sym = body.const_d0[cd]
                     return self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
         ""
+
+    // Whether a constant callee has no With body (an `extern fn`).
+    fn callee_is_bodiless(body: &MirBody, callee_op: i32) -> bool:
+        if callee_op < 0 or callee_op >= body.operand_kinds.len() or body.operand_kinds[callee_op] != OperandKind.OK_CONSTANT:
+            return false
+        let cd = body.operand_d0[callee_op]
+        if cd < 0 or cd >= body.const_kinds.len() or body.const_kinds[cd] != ConstKind.CK_FN:
+            return false
+        self.has_body_for_sym(body.const_d0[cd]) == 0
 
     fn callee_sig_from_operand(body: &MirBody, callee_op: i32) -> i32:
         if callee_op < 0 or callee_op >= body.operand_kinds.len():
@@ -10214,56 +10230,77 @@ impl CCodegen:
             return 0
         if cc_str_starts_with(name, "wl_") != 0:
             return 0
-        // A name the included libc headers declare is theirs: a With
-        // spelling (`*const i8` for `char*`) never redeclares it. The
-        // migrator's libc knowledge is the list.
-        if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN) or ci_libc_simple_rename(name).len() > 0 or ci_migrate_preamble_name_is_modeled_libc(name):
-            return 0
-        if name == "malloc" or name == "free":
-            return 0
-        if name == "mkstemp" or name == "strtod" or name == "realpath" or name == "getenv":
-            return 0
-        if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "memchr":
-            return 0
-        if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strerror":
-            return 0
-        if name == "strtol" or name == "strtoul":
-            return 0
-        if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace":
-            return 0
-        if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint":
-            return 0
-        if name == "isgraph" or name == "ispunct" or name == "iscntrl" or name == "tolower" or name == "toupper":
-            return 0
-        if name == "sqrt" or name == "pow" or name == "floor" or name == "ceil" or name == "round":
-            return 0
-        if name == "sin" or name == "cos" or name == "tan" or name == "log" or name == "log10":
-            return 0
-        if name == "exp" or name == "fabs" or name == "fmod" or name == "asin" or name == "acos":
-            return 0
-        if name == "atan" or name == "atan2":
-            return 0
-        if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf":
-            return 0
-        if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno":
-            return 0
-        if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs" or name == "putc":
-            return 0
-        if name == "feof" or name == "fread" or name == "fwrite":
-            return 0
-        if name == "setlocale" or name == "exit" or name == "clock" or name == "time" or name == "isatty":
-            return 0
-        if name == "getrlimit" or name == "setrlimit":
-            return 0
-        if name == "rename" or name == "unlink" or name == "write" or name == "read" or name == "close":
-            return 0
-        if name == "open" or name == "__open" or name == "gethostname" or name == "mkdir" or name == "rmdir":
-            return 0
-        if name == "chmod" or name == "access" or name == "symlink":
-            return 0
-        if name == "setenv" or name == "execv" or name == "execvp" or name == "chdir":
+        if self.extern_declared_by_included_headers(name):
             return 0
         1
+
+    // The header's spelling of a `c_char` pointer chain two or more deep,
+    // "" for any other type. `c_char` is the target's i8 or u8 (D155),
+    // which c_type spells int8_t or uint8_t where a header says `char`: C
+    // converts `int8_t *` to `char *` with a warning, but `int8_t **` to
+    // `char **` is an incompatible pointer type, an error under clang 22
+    // on windows-gnu (#2769: strtoll's endptr in migrated mlib code).
+    mut fn header_char_pointer_type(p_tid: i32) -> str:
+        var depth = 0
+        var cur = self.sema.resolve_alias(p_tid as TypeId)
+        while self.sema.get_type_kind(cur) == TypeKind.TY_PTR:
+            depth = depth + 1
+            cur = self.sema.resolve_alias(self.sema.get_type_d0(cur) as TypeId)
+        if depth < 2 or cur != self.sema.resolve_alias(self.sema.ty_c_char):
+            return ""
+        self.c_type(p_tid, 0).replace(self.c_type(self.sema.ty_c_char as i32, 0), "char")
+
+    // A name the included libc headers declare is theirs: a With
+    // spelling (`*const i8` for `char*`) never redeclares it. The
+    // migrator's libc knowledge is the list.
+    fn extern_declared_by_included_headers(name: &str) -> bool:
+        if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN) or ci_libc_simple_rename(name).len() > 0 or ci_migrate_preamble_name_is_modeled_libc(name):
+            return true
+        if name == "malloc" or name == "free":
+            return true
+        if name == "mkstemp" or name == "strtod" or name == "realpath" or name == "getenv":
+            return true
+        if name == "strlen" or name == "strcmp" or name == "strncmp" or name == "memchr":
+            return true
+        if name == "strcpy" or name == "strncpy" or name == "strstr" or name == "strerror":
+            return true
+        if name == "strtol" or name == "strtoul":
+            return true
+        if name == "isalpha" or name == "isdigit" or name == "isalnum" or name == "isspace":
+            return true
+        if name == "isupper" or name == "islower" or name == "isxdigit" or name == "isprint":
+            return true
+        if name == "isgraph" or name == "ispunct" or name == "iscntrl" or name == "tolower" or name == "toupper":
+            return true
+        if name == "sqrt" or name == "pow" or name == "floor" or name == "ceil" or name == "round":
+            return true
+        if name == "sin" or name == "cos" or name == "tan" or name == "log" or name == "log10":
+            return true
+        if name == "exp" or name == "fabs" or name == "fmod" or name == "asin" or name == "acos":
+            return true
+        if name == "atan" or name == "atan2":
+            return true
+        if name == "fprintf" or name == "printf" or name == "snprintf" or name == "sprintf":
+            return true
+        if name == "fopen" or name == "fclose" or name == "fflush" or name == "fileno":
+            return true
+        if name == "fgets" or name == "fgetc" or name == "fputc" or name == "fputs" or name == "putc":
+            return true
+        if name == "feof" or name == "fread" or name == "fwrite":
+            return true
+        if name == "setlocale" or name == "exit" or name == "clock" or name == "time" or name == "isatty":
+            return true
+        if name == "getrlimit" or name == "setrlimit":
+            return true
+        if name == "rename" or name == "unlink" or name == "write" or name == "read" or name == "close":
+            return true
+        if name == "open" or name == "__open" or name == "gethostname" or name == "mkdir" or name == "rmdir":
+            return true
+        if name == "chmod" or name == "access" or name == "symlink":
+            return true
+        if name == "setenv" or name == "execv" or name == "execvp" or name == "chdir":
+            return true
+        false
 
     mut fn emit_extern_fn_decls() -> str:
         var out = ""
