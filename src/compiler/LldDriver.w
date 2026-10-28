@@ -124,7 +124,16 @@ fn with_ld_main() -> i32:
 // function src/ can call only once a seed carrying it is pinned.
 fn with_self_exe() -> str:
     let argv0 = with_arg_at(0)
-    if argv0.contains("/") or argv0.contains("\\"): return argv0
+    if argv0.contains("/") or argv0.contains("\\"):
+        // Absolute: a child may run in another directory (a build action
+        // in the project root), where a relative spelling names nothing
+        // or another file.
+        if runtime_path_is_absolute(argv0):
+            return argv0
+        let cwd = runtime_cwd()
+        if cwd.len() > 0:
+            return cwd ++ "/" ++ argv0
+        return argv0
     let windows = runtime_sysinfo_os() == "Windows"
     if windows:
         let here = runtime_cwd() ++ "\\" ++ argv0 ++ (if argv0.ends_with(".exe"): "" else: ".exe")
