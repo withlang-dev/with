@@ -3913,7 +3913,7 @@ impl ComptimeEvaluator:
             if trait_kind != NodeKind.NK_IDENT and trait_kind != NodeKind.NK_TYPE_NAMED:
                 return self.fail(trait_node, "type.implements() requires a trait name")
             let trait_sym = self.ast.get_data0(trait_node)
-            if not self.sema.lang_trait_syms.contains(trait_sym) and not self.sema.trait_lookup.contains(trait_sym):
+            if not self.sema.lang_trait_syms.contains(trait_sym) and not self.sema.trait_name_known(trait_sym):
                 return self.fail(trait_node, "unknown trait '" ++ self.pool.resolve(trait_sym) ++ "'")
             return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym)))
         if method == "fields":

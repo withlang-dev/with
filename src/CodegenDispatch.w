@@ -9377,7 +9377,22 @@ impl Codegen:
         let owner_name = self.intern.resolve(owner_sym)
         let method_name = if is_set != 0: "multi_index_set" else: "multi_index"
         let qualified = owner_name ++ "." ++ method_name
-        let fn_sym = self.intern.intern(qualified)
+        // #2520 (D65): the callee is Sema's fact, not text to recompose —
+        // a trait impl's method symbol carries its trait
+        // (`Matrix.MultiIndex.multi_index`), which `Owner.method`
+        // composition cannot name. Ask Sema's method registry by the
+        // receiver's owner key; the composed text remains only for a
+        // receiver Sema has no registry row for.
+        var fn_sym = 0
+        let sema_method_sym = self.sema.pool_lookup_symbol(method_name)
+        if sema_method_sym != 0 and base_sema > 0:
+            let sema_owner_key = self.sema.method_owner_symbol_for_type(base_sema)
+            if sema_owner_key != 0:
+                let sema_fn_sym = self.sema.lookup_method_fn(sema_owner_key, sema_method_sym)
+                if sema_fn_sym != 0:
+                    fn_sym = self.sema_sym_to_codegen_sym(sema_fn_sym)
+        if fn_sym == 0:
+            fn_sym = self.intern.intern(qualified)
         let fn_val_opt = self.fn_values.get(fn_sym)
         let fn_ty_opt = self.fn_fn_types.get(fn_sym)
         if not fn_val_opt.is_some() or not fn_ty_opt.is_some():
@@ -18328,10 +18343,13 @@ impl Codegen:
 
     // ── Async function declaration ────────────────────────────────────
 
-    mut fn declare_async_function(fn_node: i32):
+    mut fn declare_async_function(fn_node: i32, decl_index: i32):
         self.ensure_async_runtime_declared()
 
-        let name_sym = self.pool.get_data0(fn_node)
+        // Sema's semantic symbol, as declare_function_at_inner takes
+        // (#2520): a trait impl method's signature lives under
+        // Owner.Trait.method, never the raw Owner.method spelling.
+        let name_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         if name_sym == 0: return
 
         let meta = self.pool.find_fn_meta(fn_node)
