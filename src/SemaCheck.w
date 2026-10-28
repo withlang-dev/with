@@ -18824,7 +18824,7 @@ impl Sema:
             let lhs_mut_state = unpack_place_mut(lhs_packed)
             let lhs_via_ro_ref = self.place_base_is_read_only_ref(base_expr)
             if lhs_kind == PlaceKind.PK_NotPlace:
-                self.emit_warning("cannot assign to a non-place expression", node)
+                self.emit_non_place_assign(base_expr, node)
             else if lhs_mut_state == PlaceMut.PM_ReadOnly or lhs_via_ro_ref != 0:
                 self.emit_read_only_place_assign(base_expr, node)
 
@@ -18928,9 +18928,9 @@ impl Sema:
                     if unpack_place_kind(base_packed) != PlaceKind.PK_NotPlace:
                         self.emit_error("type does not support index assignment (no IndexPlace impl) (§15.11)", node)
                     else:
-                        self.emit_warning("cannot assign to a non-place expression", node)
+                        self.emit_non_place_assign(target, node)
                 else:
-                    self.emit_warning("cannot assign to a non-place expression", node)
+                    self.emit_non_place_assign(target, node)
             else if lhs_mut_state == PlaceMut.PM_ReadOnly:
                 self.emit_read_only_place_assign(target, node)
             // mut.md Rev 8 §15.17 — mutation through a view-bound
@@ -23868,6 +23868,14 @@ impl Sema:
     // A read-only place: a `&T`'s pointee, a `*const T`. A downcast binding
     // (`c: Circle` over a `&dyn T`, #1860) is a view of the object; With has
     // no `&mut T` (§15.1), so the help names where mutation goes.
+    // An assignment whose target is no place is refused (#2779: a warning
+    // that then dropped the assignment let `(a, b) = (b, a)` do nothing).
+    mut fn emit_non_place_assign(target: i32, node: i32):
+        if self.ast.kind(target) == NodeKind.NK_TUPLE:
+            self.emit_error_with_help("cannot assign to a tuple: a tuple is a value, not a place", node, "assign each variable on its own: `let t = a`, then `a = b` and `b = t`")
+        else:
+            self.emit_error("cannot assign to a non-place expression", node)
+
     mut fn emit_read_only_place_assign(place_expr: i32, node: i32):
         let msg = "cannot assign through a read-only place (e.g., dereferenced &T or *const T) (§15.10)"
         let root = self.place_root_sym(place_expr)
