@@ -3472,8 +3472,8 @@ fn bs_check_c_import_names_reset_between_compilations(ctx: &ActionCtx, compiler_
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-session-name-reset", args)
     result.rc
 
-fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
-    let cc_result = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, label)
+fn bs_compile_emit_c_output(ctx: &ActionCtx, compiler_path: &str, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
+    let cc_result = bs_run_emit_c_compile(ctx, compiler_path, root, case_dir, c_path, bin, label)
     if cc_result.rc == 0:
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
@@ -3492,9 +3492,17 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
         if line.contains("with_fiber_") or line.contains("with_channel_"): return true
     false
 
-fn bs_emit_c_cc_args(ctx: &ActionCtx, root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
+fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
     var cc_args: List[str] = List.new()
-    cc_args.push(bs_c_compiler(ctx))
+    // On Windows the C compiler is the compiler under test's own `cc`
+    // driver: it carries the sysroot and mingw target the real link
+    // path uses, where a bare SDK clang++ has no system includes and
+    // no `cc` exists (#811). An explicit WITH_EMIT_C_CC/CC still wins.
+    if os() == "Windows" and env("WITH_EMIT_C_CC").len() == 0 and env("CC").len() == 0:
+        cc_args.push(compiler_path.clone())
+        cc_args.push("cc")
+    else:
+        cc_args.push(bs_c_compiler(ctx))
     cc_args.push("-O1")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
@@ -3502,7 +3510,7 @@ fn bs_emit_c_cc_args(ctx: &ActionCtx, root: &str, c_path: &str, bin: &str, libm:
         cc_args.push("-no-pie")
         cc_args.push("-Wl,--gc-sections")
     else if os() == "Windows":
-        cc_args.push("-Wl,/OPT:REF")
+        cc_args.push("-Wl,--gc-sections")
     else:
         cc_args.push("-Wl,-dead_strip")
     cc_args.push("-o")
@@ -3519,11 +3527,11 @@ fn bs_emit_c_cc_args(ctx: &ActionCtx, root: &str, c_path: &str, bin: &str, libm:
     cc_args
 
 // The host C compiler over one emitted unit and the runtime objects.
-fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> ToolProcessResult:
+fn bs_run_emit_c_compile(ctx: &ActionCtx, compiler_path: &str, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> ToolProcessResult:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3557,7 +3565,7 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-receiver-abi", emit_args)
     if emit_result.rc != 0: return emit_result.rc
 
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-receiver-abi")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-receiver-abi")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -3783,7 +3791,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
         // case is 19 MB of C and takes 112 s on the release host with this
         // target running alone; at 120 s it timed out (exit 124) in every
         // battery that ran the other test targets beside it.
-        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
+        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len():
@@ -3839,7 +3847,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: &str, case_
     emit_args |> push(bs_abs(root, c_path))
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-array-fill-rvalue", emit_args)
     if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-fill-rvalue-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -3870,7 +3878,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     emit_args |> push(bs_abs(root, c_path))
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-array-ref", emit_args)
     if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-array-ref")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-ref")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-ref-run", 120000)
     if run_result.rc != 0: return run_result.rc
