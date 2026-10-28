@@ -18,6 +18,7 @@ use render
 use compiler.EmbeddedStdlib
 use compiler.EmbeddedRuntime
 use compiler.BundleInterfaces
+use compiler.EmbeddedSysroot
 use compiler.EmbeddedClangResource
 use compiler.ModuleSource
 use compiler.FacadeRender
@@ -912,6 +913,13 @@ impl Zcu:
         key = key ++ "\n#defines:"
         for di in 0..self.project_config.c_import_defines.len():
             key = key ++ "|" ++ self.project_config.c_import_defines[di]
+        // The sysroot the header is read from (#2530): one compiler parses
+        // `sqlite3.h` from the Xcode SDK under SDKROOT (which compiles out
+        // the load-extension API) and from its embedded sysroot without it.
+        // Keyed only by spelling, an import made under one was served to the
+        // other ("undefined variable" for a function the header declares).
+        // The embedded sysroot's directory names its content hash.
+        key = key ++ "\n#sysroot:" ++ host_c_sysroot()
         key = key ++ c_import_header_content_fingerprint_line(header_spec)
         key = key ++ frontend_cimport_compiler_fingerprint_line()
         let epoch = runtime_getenv("WITH_CIMPORT_CACHE_EPOCH")
