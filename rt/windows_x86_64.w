@@ -40,6 +40,7 @@ extern fn FindFirstFileW(pattern: *const u16, data: *mut u8) -> i64
 extern fn FindNextFileW(handle: i64, data: *mut u8) -> i32
 extern fn FindClose(handle: i64) -> i32
 extern fn CreateSymbolicLinkW(link_path: *const u16, target: *const u16, flags: u32) -> i8
+extern fn DeviceIoControl(device: i64, code: u32, in_buf: *mut u8, in_size: u32, out_buf: *mut u8, out_size: u32, returned: *mut u32, overlapped: *mut u8) -> i32
 extern fn RtlCaptureStackBackTrace(frames_to_skip: u32, frames_to_capture: u32, back_trace: *mut i64, back_trace_hash: *mut u32) -> u16
 extern fn GetCurrentProcess() -> i64
 extern fn SymSetOptions(options: u32) -> u32
@@ -1089,16 +1090,86 @@ pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     let link_rc = win_utf8_to_utf16_buf(link_path, &raw mut linkw as *mut [4096]u16 as *mut u16, 4096)
     if link_rc != 0:
         return link_rc
+    // CreateSymbolicLinkW stores the target verbatim, and Windows resolves
+    // a relative target only with `\` separators: a `/` one (a tar entry's
+    // `nested/a.txt`) fails to open with ERROR_INVALID_NAME.
+    var ti = 0
+    while ti < 4096 and targetw[ti] != 0:
+        if targetw[ti] == 47: targetw[ti] = 92
+        ti = ti + 1
     // SYMBOLIC_LINK_FLAG_DIRECTORY (1) for a directory target, plus
-    // SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE (2).
-    let flags: u32 = if win_is_dir(&targetw as *const [4096]u16 as *const u16): 3 else: 2
+    // SYMBOLIC_LINK_FLAG_ALLOW_UNPRIVILEGED_CREATE (2). A relative target
+    // names a path beside the link, not under this process's cwd.
+    var probe: [4096]u16 = [0; 4096]
+    var pn = 0
+    let absolute = targetw[0] == 92 or (targetw[0] != 0 and targetw[1] == 58)
+    if not absolute:
+        var last_sep = -1
+        var li = 0
+        while li < 4096 and linkw[li] != 0:
+            if linkw[li] == 92 or linkw[li] == 47: last_sep = li
+            li = li + 1
+        while pn <= last_sep:
+            probe[pn] = linkw[pn]
+            pn = pn + 1
+    var pt = 0
+    while pt < 4096 and targetw[pt] != 0 and pn < 4095:
+        probe[pn] = targetw[pt]
+        pn = pn + 1
+        pt = pt + 1
+    let flags: u32 = if win_is_dir(&probe as *const [4096]u16 as *const u16): 3 else: 2
     if CreateSymbolicLinkW(&linkw as *const [4096]u16 as *const u16, &targetw as *const [4096]u16 as *const u16, flags) == 0:
         return win_neg_error()
     0
 
+// The target a symlink (or a junction) stores, as POSIX readlink answers:
+// "" when the path is not a link. The link itself is opened
+// (FILE_FLAG_OPEN_REPARSE_POINT, with FILE_FLAG_BACKUP_SEMANTICS for a
+// directory link) and its reparse data read with FSCTL_GET_REPARSE_POINT.
 pub fn rt_readlink(path: *const c_char) -> str:
-    let _ = path
-    win_empty_str()
+    var pathw: [4096]u16 = [0; 4096]
+    if win_utf8_to_utf16_buf(path, &raw mut pathw as *mut [4096]u16 as *mut u16, 4096) != 0:
+        return win_empty_str()
+    let handle = CreateFileW(&pathw as *const [4096]u16 as *const u16, 0, 7, null, 3, 0x02200000, 0)
+    if handle == -1:
+        return win_empty_str()
+    var data: [16384]u8 = [0 as u8; 16384]
+    var got: u32 = 0
+    let ok = DeviceIoControl(handle, 0x000900A8, null, 0, &raw mut data as *mut [16384]u8 as *mut u8, 16384, &raw mut got as *mut u32, null)
+    CloseHandle(handle)
+    if ok == 0 or got < 20:
+        return win_empty_str()
+    let tag = (data[0] as u32) | ((data[1] as u32) << 8) | ((data[2] as u32) << 16) | ((data[3] as u32) << 24)
+    // IO_REPARSE_TAG_SYMLINK keeps a flags word before its path buffer;
+    // IO_REPARSE_TAG_MOUNT_POINT (a junction) does not.
+    var names_at = 0
+    if tag == 0xA000000C: names_at = 20
+    else if tag == 0xA0000003: names_at = 16
+    else: return win_empty_str()
+    // The print name is the target as written; the substitute name is the
+    // NT form (`\??\C:\...`), read only when no print name was stored.
+    var name_off = ((data[12] as i32) | ((data[13] as i32) << 8))
+    var name_len = ((data[14] as i32) | ((data[15] as i32) << 8))
+    var skip = 0
+    if name_len == 0:
+        name_off = ((data[8] as i32) | ((data[9] as i32) << 8))
+        name_len = ((data[10] as i32) | ((data[11] as i32) << 8))
+        skip = 4
+    let units = name_len / 2
+    if names_at + name_off + name_len > got as i32 or units >= 8192:
+        return win_empty_str()
+    var name: [8192]u16 = [0; 8192]
+    var first = 0
+    if skip > 0 and units >= 4:
+        let at = names_at + name_off
+        if data[at] == 92 and data[at + 2] == 63 and data[at + 4] == 63 and data[at + 6] == 92:
+            first = 4
+    var i = first
+    while i < units:
+        let at = names_at + name_off + i * 2
+        name[i - first] = ((data[at] as u16) | ((data[at + 1] as u16) << 8))
+        i = i + 1
+    win_utf16_to_str(&name as *const [8192]u16 as *const u16)
 
 fn win_empty_str() -> str:
     with_str_from_cstr(c"".ptr)
@@ -2134,6 +2205,7 @@ c facade win32:
     fn FindNextFileW
     fn FindClose
     fn CreateSymbolicLinkW
+    fn DeviceIoControl
     fn RtlCaptureStackBackTrace
     fn GetCurrentProcess
     fn SymSetOptions

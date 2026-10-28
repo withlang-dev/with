@@ -172,7 +172,11 @@ fn build_graph_compile_object(root: &str, target: &BuildGraphTarget, operation_n
         build_graph_rt_eprint("error: could not create object output directory for target '" ++ target.name ++ "': " ++ output_dir)
         return 1
     var argv = ""
-    argv = build_graph_argv_append(argv, compiler)
+    if compiler.len() > 0:
+        argv = build_graph_argv_append(argv, compiler)
+    else:
+        argv = build_graph_argv_append(argv, with_self_exe())
+        argv = build_graph_argv_append(argv, "cc")
     argv = build_graph_append_common_compile_args(root, target, argv)
     argv = build_graph_argv_append(argv, "-c")
     argv = build_graph_argv_append(argv, source_path)

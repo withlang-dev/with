@@ -2692,6 +2692,96 @@ fn ci_record_has_bitfields(session: i64, idx: i32) -> bool:
         if with_cimport_struct_field_is_bitfield(session, idx, fi) != 0: return true
     false
 
+fn ci_align_up_bits(value: i64, align: i64) -> i64:
+    if align <= 1: value else: ((value + align - 1) / align) * align
+
+// D147 point 1: one layout for every target or a loud refusal. The plan
+// below reads clang's layout under the migrating host's ABI, which proves
+// the two ABIs agree only on an Itanium host: there, a member sharing a
+// unit with another declared size is visible. On an MSVC-layout host
+// (Windows) clang has already split the units, so nothing looks shared
+// and every such record migrated silently with the MSVC offsets, wrong
+// for every Itanium target (#809). So both ABIs' allocations are
+// simulated from the declared sizes and widths and compared member by
+// member. A run of consecutive bitfields is anchored at clang's offset
+// for its first member — sound while everything before it agreed, which
+// refusing at the first divergence maintains; the data model (a `long`
+// member's declared size) is the migrating model's on both sides, as the
+// plan's own units already assume. Returns the field index of the first
+// member the two ABIs place differently, or -1.
+fn ci_bitfield_abi_divergence(session: i64, idx: i32, decl_cursor: i32) -> i32:
+    if with_cimport_decl_kind(session, idx) == CK_UNION:
+        return -1
+    let field_count = with_cimport_struct_field_count(session, idx)
+    // Per-run state; a run opens at a bitfield whose predecessor is not
+    // one. it_*: Itanium (a storage unit sized by the largest declared
+    // type placed in it, starting at that size's boundary at or before
+    // the unit's first member; a member that does not fit before the
+    // boundary starts a unit at its own type's next boundary). ms_*:
+    // MSVC (a new unit at the member type's next boundary whenever the
+    // declared size changes or the unit is full). A zero-width member
+    // closes the unit and aligns the next member to its declared type.
+    var run_open = false
+    var it_next: i64 = 0
+    var it_chunk: i64 = 0
+    var it_chunk_start: i64 = 0
+    var ms_next: i64 = 0
+    var ms_unit: i64 = 0
+    var ms_unit_start: i64 = 0
+    var ms_used: i64 = 0
+    for fi in 0..field_count:
+        if with_cimport_struct_field_is_bitfield(session, idx, fi) == 0:
+            run_open = false
+            continue
+        let size = with_cimport_struct_field_size(session, idx, fi)
+        if size <= 0 or size > 8:
+            return -1  // The plan itself refuses this member.
+        let type_bits = size * 8
+        let width = with_cimport_struct_field_bit_width(session, idx, fi) as i64
+        if not run_open:
+            let field_cursor = ci_decl_field_cursor(session, decl_cursor, fi)
+            let anchor = if field_cursor >= 0: with_ci_cursor_field_bit_offset(session, field_cursor) else: -1
+            if anchor < 0:
+                return -1  // The plan itself refuses a memberless offset.
+            run_open = true
+            it_next = anchor
+            it_chunk = 0
+            it_chunk_start = anchor
+            ms_next = anchor
+            ms_unit = 0
+            ms_unit_start = anchor
+            ms_used = 0
+        if width == 0:
+            it_next = ci_align_up_bits(it_next, type_bits)
+            it_chunk = 0
+            it_chunk_start = it_next
+            ms_next = ci_align_up_bits(ms_next, type_bits)
+            ms_unit = 0
+            continue
+        var chunk = if it_chunk > type_bits: it_chunk else: type_bits
+        var chunk_start = (it_chunk_start / chunk) * chunk
+        var it_offset: i64 = 0
+        if it_next + width <= chunk_start + chunk:
+            it_chunk = chunk
+            it_chunk_start = chunk_start
+            it_offset = it_next
+            it_next = it_next + width
+        else:
+            it_offset = ci_align_up_bits(it_next, type_bits)
+            it_chunk = type_bits
+            it_chunk_start = it_offset
+            it_next = it_offset + width
+        if ms_unit != type_bits or ms_used + width > type_bits:
+            ms_unit_start = ci_align_up_bits(ms_next, type_bits)
+            ms_unit = type_bits
+            ms_used = 0
+        let ms_offset = ms_unit_start + ms_used
+        ms_used = ms_used + width
+        ms_next = ms_offset + width
+        if it_offset != ms_offset:
+            return fi
+    -1
+
 // The storage-unit plan of record `idx`, or a plan whose `refusal` says why
 // there is none.
 fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
@@ -2739,6 +2829,19 @@ fn ci_bitfield_plan(session: i64, idx: i32) -> CiBitPlan:
             plan.units.push(CiBitUnit { index: unit_slot, byte_offset: byte_offset, bits: unit_bits, first_field: fi })
         let ty = ci_normalize_translated_type_name(with_cimport_struct_field_type_translated(session, idx, fi))
         plan.members.push(CiBitMember { field: fi, name: fname, unit: unit_slot, shift: shift, width: width, signed: ci_bit_member_is_signed(session, field_cursor), ty: ty })
+    // The overlap refusal above sees only the migrating host's ABI; the
+    // simulation refuses the same records on an MSVC-layout host.
+    let divergent = ci_bitfield_abi_divergence(session, idx, decl_cursor)
+    if divergent >= 0:
+        let dname = with_cimport_struct_field_name(session, idx, divergent)
+        plan.refusal = name ++ ": bitfield '" ++ dname ++ "' shares a storage unit with a member of another declared size; Itanium packs across and MSVC starts a new unit, so the layout differs between the two (D147 point 1)"
+    // A packed record's bitfield units are placed by rules clang's
+    // targets do not share (windows-gnu aligns the unit to its declared
+    // type where Itanium and MSVC pack it), so no one-target layout can
+    // prove D147's agreement for it. Checked after the loop: a unit the
+    // host layout already condemns keeps its more specific refusal.
+    if plan.refusal.len() == 0 and with_cimport_decl_has_packed_attr(session, idx) != 0:
+        plan.refusal = name ++ ": a packed record's bitfield units are laid out differently by clang's targets, so one layout cannot serve every target (D147 point 1)"
     plan
 
 // The unit a bitfield field starts, or -1 (a later member of a unit renders
@@ -3697,7 +3800,8 @@ fn ci_null_deref_member_chain(session: i64, cursor: i32) -> List[str]:
     // renderer gives it (`Parent_field`); a union member's offset is a
     // D109 builtin like any other's.
     var cur_ty = with_ci_type_canonical(session, with_ci_type_pointee(session, with_ci_type_canonical(session, cast_ty)))
-    // The record's name as the cast spells it (a typedef, `Action`); the
+    // The record's name as the cast spells it (a typedef, `Action`) —
+    // the starting point each step's declaration then canonicalizes; the
     // canonical `union U` may translate to nothing.
     var cur_name = with_ci_type_translated(session, with_ci_type_pointee(session, cast_ty))
     if cur_name.len() == 0 or cur_name == "c_void":
@@ -3719,6 +3823,16 @@ fn ci_null_deref_member_chain(session: i64, cursor: i32) -> List[str]:
             spelled = false
             why = f"no declaration for the record of '{step}' (named '{cur_name}')"
             continue
+        // The record's own name, as the renderer spells the type: the
+        // cast's typedef (`md_t` for `struct real_md`) is how this host's
+        // offsetof idiom happened to name it, and naming the typedef made
+        // the migration's text depend on the migrating host's headers.
+        // An anonymous record's declaration spells no identifier
+        // (`struct (unnamed at ...)`) and keeps the typedef (or
+        // `Parent_field`) name it arrived with.
+        let decl_name = with_ci_cursor_spelling(session, decl)
+        if ci_is_c_identifier(decl_name):
+            cur_name = decl_name
         var fi = 0
         var found = -1
         while found < 0 and ci_decl_field_cursor(session, decl, fi) >= 0:
@@ -3744,6 +3858,25 @@ fn ci_null_deref_member_chain(session: i64, cursor: i32) -> List[str]:
     out.push(why)
     out
 
+// The rendered name of the record `name` denotes: a typedef of a named
+// record resolves to the record's own name (`md_t` -> `real_md`), the
+// same canonicalization ci_null_deref_member_chain does from the
+// declaration cursor. A typedef of an anonymous record keeps its name —
+// that is the name the renderer gives the record.
+fn ci_offsetof_record_canonical_name(session: i64, name: &str) -> str:
+    var cur = with_str_clone_ref(name)
+    for _ in 0..8:
+        if ci_record_index_struct(session, cur) >= 0:
+            return cur
+        let tidx = ci_record_index_typedef(session, cur)
+        if tidx < 0:
+            return cur
+        let target = ci_offsetof_record_type_name(with_cimport_typedef_underlying(session, tidx))
+        if target.len() == 0 or target == cur or not ci_is_c_identifier(target):
+            return cur
+        cur = target
+    cur
+
 // D109 (#2131): `offsetof(T, a.b)` as the `offsetof[T](a) + offsetof[A](b)`
 // builtins, so the offset is the target's and never the host's folded
 // number (pcre2's `offsetof(heapframe, ovector)` folded to 136 and was
@@ -3752,7 +3885,7 @@ fn ci_null_deref_member_chain(session: i64, cursor: i32) -> List[str]:
 fn ci_offsetof_spelling(session: i64, record: &str, designator: &str) -> str:
     if designator.contains("["):
         return ""
-    var cur = with_str_clone_ref(record)
+    var cur = ci_offsetof_record_canonical_name(session, record)
     var out = ""
     for step in designator.split("."):
         let field = ci_trim(step)
@@ -3763,7 +3896,7 @@ fn ci_offsetof_spelling(session: i64, record: &str, designator: &str) -> str:
             return ""
         let step_text = "offsetof[" ++ ci_escape_reserved(cur) ++ "](" ++ found[1] ++ ")"
         out = if out.len() == 0: step_text else: out ++ " + " ++ step_text
-        cur = found[0].clone()
+        cur = ci_offsetof_record_canonical_name(session, found[0])
     // C's offsetof is a size_t, as `sizeof` is spelled in an object macro
     // (a chain's sum is parenthesized: `as` binds tighter than `+`).
     if designator.contains("."):
@@ -9777,6 +9910,9 @@ impl CiExprPool:
 
         // Call expression.
         if kind == CXK_CALL_EXPR:
+            let iob_id = self.lower_acrt_iob_call(session, cursor, types, scope)
+            if iob_id != 0:
+                return iob_id
             return self.lower_call_simple(session, cursor, types, scope)
 
         // Compound assignment.
@@ -9900,6 +10036,32 @@ impl CiExprPool:
     // D119: `sizeof(t) / sizeof(x)` with x of t's element type (`t[0]`,
     // `*t`, or the type itself) is t's length, `t.len()`, converted to the
     // division's C type.
+    // UCRT spells the stdio streams `__acrt_iob_func(0|1|2)` where POSIX
+    // spells a global (`stderr`): the accessor std.libc owns for the
+    // stream (ci_libc_stream_accessor) is the one spelling on every
+    // target, so a constant index becomes that call with no argument.
+    // A non-constant index keeps `libc_iob(n)`.
+    fn lower_acrt_iob_call(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
+        if with_ci_num_children(session, cursor) != 2:
+            return 0
+        if ci_call_callee_name(session, with_ci_child(session, cursor, 0)) != "__acrt_iob_func":
+            return 0
+        let arg = with_ci_child(session, cursor, 1)
+        if not ci_fold_int_ok(session, arg):
+            return 0
+        let accessor = match with_ci_eval_int_value(session, arg):
+            0 => "libc_stdin"
+            1 => "libc_stdout"
+            2 => "libc_stderr"
+            _ => ""
+        if accessor.len() == 0:
+            return 0
+        let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
+        if result_ty == 0:
+            return 0
+        let no_args: List[i32] = List.new()
+        self.build_named_call_expr_typed(accessor, no_args, result_ty)
+
     fn lower_array_length_ratio(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         if with_ci_num_children(session, cursor) < 2 or with_ci_binary_op(session, cursor) != BO_DIV:
             return 0
@@ -13165,6 +13327,9 @@ impl CiStmtPool:
             return ci_value_ir_invalid()
 
         if kind == CXK_CALL_EXPR and nc > 0:
+            let iob_id = exprs.lower_acrt_iob_call(session, cursor, types, scope)
+            if iob_id != 0:
+                return ci_value_ir_plain(iob_id)
             let direct_callee_name = ci_call_name_from_source_text(with_ci_cursor_source_text(session, cursor))
             let direct_cursor_name = ci_call_callee_name(session, with_ci_child(session, cursor, 0))
             var stdarg_name = direct_callee_name
@@ -13345,12 +13510,16 @@ impl CiStmtPool:
             // function never is a value), so the call is one call per arm
             // under the condition; one arm runs, so the arguments are
             // evaluated once, as in C.
+            // A modeled libc call carries std.libc's return type, not the
+            // host declaration's (ci_libc_modeled_return_type).
+            let modeled_ret = ci_libc_modeled_return_type(ci_migrate_call_callee_name(callee_text))
+            let call_ty = if modeled_ret.len() > 0: types.named_type_from_text(modeled_ret) else: 0 as CiTypeId
             var call_id = if exprs.kind(callee_expr) == CiExprKind.CIE_TERNARY:
-                let call_then = exprs.add(CiExprKind.CIE_CALL, exprs.get_d1(callee_expr), args_start, arg_ids.len() as i32, 0)
-                let call_else = exprs.add(CiExprKind.CIE_CALL, exprs.get_d2(callee_expr), args_start, arg_ids.len() as i32, 0)
-                exprs.add(CiExprKind.CIE_TERNARY, exprs.get_d0(callee_expr), call_then as i32, call_else as i32, 0)
+                let call_then = exprs.add(CiExprKind.CIE_CALL, exprs.get_d1(callee_expr), args_start, arg_ids.len() as i32, call_ty)
+                let call_else = exprs.add(CiExprKind.CIE_CALL, exprs.get_d2(callee_expr), args_start, arg_ids.len() as i32, call_ty)
+                exprs.add(CiExprKind.CIE_TERNARY, exprs.get_d0(callee_expr), call_then as i32, call_else as i32, call_ty)
             else:
-                exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, 0)
+                exprs.add(CiExprKind.CIE_CALL, callee_expr as i32, args_start, arg_ids.len() as i32, call_ty)
             // A local identifier can denote a function pointer just as a field
             // can. Declaration identity distinguishes direct function references
             // from pointer values; the spelling of the expression cannot.
@@ -18524,7 +18693,8 @@ fn ci_condition_null_sense(session: i64, cursor: i32, name: &str) -> i32:
 // The NULL evidence a definition's body gives for parameter `name`:
 // 1 when a test's NULL branch continues (handled: Option), -1 when every
 // test's NULL branch aborts (a contract: non-null), 0 when untested.
-// `if`/`?:` are the tests; an `if` without `else` whose truth means
+// `if`/`?:` are the tests, and a short-circuit whose right side runs
+// exactly on NULL is one too; an `if` without `else` whose truth means
 // non-NULL continues past it, which is a handled NULL.
 fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
     if ci_unevaluated(session, cursor): return 0
@@ -18541,6 +18711,20 @@ fn ci_body_null_test_evidence(session: i64, cursor: i32, name: &str) -> i32:
                 if verdict == 0: verdict = -1
             else:
                 verdict = 1
+    // The same test as a short-circuit: UCRT/MinGW `assert(p)` expands to
+    // `((!!(p)) || (_assert(...), 0))`, whose right side runs exactly when
+    // the pointer is NULL. `test && rhs` with a NULL-meaning test is the
+    // mirror. The other two pairings evaluate the right side when the
+    // pointer is non-NULL and say nothing about the NULL branch.
+    if kind == CXK_BINARY_OP and nc == 2:
+        let op = with_ci_binary_op(session, cursor)
+        if op == BO_LOR or op == BO_LAND:
+            let sense = ci_condition_null_sense(session, with_ci_child(session, cursor, 0), name)
+            if (op == BO_LOR and sense == 2) or (op == BO_LAND and sense == 1):
+                if ci_subtree_aborts(session, with_ci_child(session, cursor, 1)):
+                    if verdict == 0: verdict = -1
+                else:
+                    verdict = 1
     var i = 0
     while i < nc:
         let inner = ci_body_null_test_evidence(session, with_ci_child(session, cursor, i), name)
@@ -20684,15 +20868,49 @@ fn ci_find_last_expr_child(session: i64, cursor: i32) -> i32:
         i = i - 1
     -1
 
+// Whether the subtree takes a member's address (`&x.f`, `&x.a[i]`): an
+// integer clang folds out of one — a member-address difference — is the
+// host's layout again, through a spelling that never names offsetof.
+fn ci_subtree_has_member_addr(session: i64, cursor: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) == CXK_UNARY_OP and with_ci_unary_op(session, cursor) == UO_ADDR and with_ci_num_children(session, cursor) > 0:
+        if ci_subtree_has_kind(session, with_ci_child(session, cursor, 0), CXK_MEMBER_REF):
+            return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_member_addr(session, with_ci_child(session, cursor, i)): return true
+        i = i + 1
+    false
+
+// Whether the subtree divides one sizeof by another: `sizeof(t) /
+// sizeof(t[0])` is D119's `t.len()`, a spelling the structural lowering
+// owns; folding it to the host's number pre-empts the recognizer on
+// whichever lowering path a cast's widths route the expression (#809).
+fn ci_subtree_has_sizeof_ratio(session: i64, cursor: i32) -> bool:
+    if with_ci_cursor_kind(session, cursor) == CXK_BINARY_OP and with_ci_binary_op(session, cursor) == BO_DIV and with_ci_num_children(session, cursor) >= 2:
+        let lhs = ci_peel_transparent(session, with_ci_child(session, cursor, 0))
+        let rhs = ci_peel_transparent(session, with_ci_child(session, cursor, 1))
+        if ci_cursor_is_sizeof(session, lhs) and ci_cursor_is_sizeof(session, rhs):
+            return true
+    let nc = with_ci_num_children(session, cursor)
+    var i = 0
+    while i < nc:
+        if ci_subtree_has_sizeof_ratio(session, with_ci_child(session, cursor, i)): return true
+        i = i + 1
+    false
+
 // D109 (#2131): whether clang's folded integer value of `cursor` may stand
 // in for the expression. A subtree naming `offsetof` folds to the HOST's
 // layout (pcre2's frame offsets were 64-bit numbers on wasm32), so it is
 // lowered structurally instead, where `offsetof(T, f)` becomes the
-// `offsetof[T](f)` builtin and the target decides.
+// `offsetof[T](f)` builtin and the target decides. A member-address
+// difference is the same quantity through another spelling: it folded
+// only where a narrowing cast routed it through a folding path
+// (windows-gnu), so the migration's text depended on the host (#809).
 fn ci_fold_int_ok(session: i64, cursor: i32) -> bool:
     if with_ci_eval_int_valid(session, cursor) == 0:
         return false
-    not ci_source_names_offsetof(session, with_ci_cursor_source_text(session, cursor))
+    not ci_source_names_offsetof(session, with_ci_cursor_source_text(session, cursor)) and not ci_subtree_has_member_addr(session, cursor) and not ci_subtree_has_sizeof_ratio(session, cursor)
 
 fn ci_source_names_offsetof(session: i64, src: &str) -> bool:
     src.contains("offsetof") or ci_source_names_offsetof_macro(session, src)
@@ -20941,6 +21159,47 @@ fn ci_libc_stream_accessor(name: &str) -> str:
     if name == "__stdinp" or name == "stdin": return "libc_stdin"
     if name == "__stdoutp" or name == "stdout": return "libc_stdout"
     if name == "__stderrp" or name == "stderr": return "libc_stderr"
+    ""
+
+// std.libc's return type for a modeled call, when std declares a
+// fixed-width integer: std spells the width where the host header's
+// follows its data model (`long`, `ssize_t`), so the emitted call's type
+// is std's. Typing the call with the header's width made return/store
+// coercion skip a narrowing cast C performs implicitly (MinGW's `write`
+// returns `int` where std.libc's returns i64; a `long` function
+// returning it narrowed silently under LLP64, #809). Read from the
+// std.libc this compiler carries — D90's one table, as
+// ci_libc_constant_known reads its constants. "" keeps the C type.
+fn ci_libc_modeled_return_type(name: &str) -> str:
+    let src = embedded_std_source("std/libc.w")
+    for head in ["\npub fn ", "\npub unsafe fn ", "\npub extern fn "]:
+        let at = src.find(head ++ name ++ "(")
+        if at < 0: continue
+        let decl_start = at + head.len() + name.len()
+        let rest = src.slice(decl_start, src.len())
+        let eol = rest.find("\n")
+        let decl = if eol >= 0: rest.slice(0, eol) else: rest
+        // The parameter list's own close: a function-typed parameter
+        // carries an arrow of its own.
+        var depth = 0
+        var close = -1
+        for i in 0..decl.len():
+            if decl[i] == 40: depth = depth + 1
+            else if decl[i] == 41:
+                depth = depth - 1
+                if depth == 0:
+                    close = i
+                    break
+        if close < 0: return ""
+        let after = decl.slice(close + 1, decl.len())
+        let tail = after.trim()
+        if not tail.starts_with("->"): return ""
+        var ret = tail.slice(2, tail.len())
+        let colon = ret.find(":")
+        if colon >= 0: ret = ret.slice(0, colon)
+        let width = ret.trim()
+        if width == "i8" or width == "i16" or width == "i32" or width == "i64" or width == "u8" or width == "u16" or width == "u32" or width == "u64": return width.to_owned()
+        return ""
     ""
 
 fn ci_libc_portable_callee(name: &str) -> str:
