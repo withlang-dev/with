@@ -620,9 +620,17 @@ pub fn rt_file_mode(path: *const c_char) -> i32:
     let rc = win_utf8_to_utf16_buf(path, &raw mut wpath as *mut [4096]u16 as *mut u16, 4096)
     if rc != 0:
         return rc
-    let attrs = GetFileAttributesW(&wpath as *const [4096]u16 as *const u16)
-    if attrs == 0xffffffff:
-        return win_neg_error()
+    // The lstat answer, as the POSIX backends give it: a name-surrogate
+    // reparse point (symlink or junction) is S_IFLNK, never the S_IFDIR
+    // GetFileAttributesW reports for a link to a directory. Callers that
+    // fingerprint a tree by kind descended into the link forever (#811).
+    var attrs: u32 = 0
+    var tag: u32 = 0
+    let entry_rc = win_top_entry(&wpath as *const [4096]u16 as *const u16, &raw mut attrs as *mut u32, &raw mut tag as *mut u32)
+    if entry_rc != 0:
+        return entry_rc
+    if win_is_link(attrs, tag):
+        return 0o120777
     if (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0:
         return 0o040755
     0o100644
