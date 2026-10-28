@@ -59,6 +59,9 @@ pub const Target: TargetDescription = comptime TargetDescription { os: target_os
 /// The operating system's name: `std.sysinfo`'s, the one implementation.
 pub fn os() -> str: sysinfo.os()
 
+/// The process's working directory; "" when it cannot be read.
+pub fn current_dir() -> str: with_current_dir()
+
 /// The operating system this program was compiled for.
 pub fn os_kind() -> OsKind: Target.os
 

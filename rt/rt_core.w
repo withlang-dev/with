@@ -54,6 +54,7 @@ extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_getpid() -> i32
 extern fn rt_raise(sig: i32) -> i32
 extern fn rt_kill(pid: i32, sig: i32) -> i32
+extern fn rt_getcwd(buf: *mut u8, size: i64) -> i32
 extern fn rt_sysinfo(out: *mut u8) -> i32
 extern fn rt_set_process_memory_limit_bytes(limit: i64) -> i32
 // The host name. POSIX backends forward to libc gethostname; Windows and wasm
@@ -4867,6 +4868,13 @@ pub fn with_getpid() -> i32:
 
 pub fn with_raise(sig: i32) -> i32:
     rt_raise(sig)
+
+// The working directory; "" when it cannot be read.
+pub fn with_current_dir() -> str:
+    var buf: [4096]u8 = [0 as u8; 4096]
+    if rt_getcwd(&raw mut buf[0] as *mut u8, 4096) != 0:
+        return with_str_from_cstr(c"".ptr)
+    with_str_from_cstr(&buf[0] as *const u8 as *const c_char)
 
 pub fn with_process_alive(pid: i32) -> i32:
     if pid <= 0:

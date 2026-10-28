@@ -2,8 +2,11 @@
 //
 //   with run tools/battery.w [--fail-fast] [--survey]
 //
-// Run it from a worktree's root with the pinned seed at src/main (`with build
-// :seed` once per seed.lock bump). It
+// Run it from a worktree's root with the pinned seed at src/main (src/main.exe
+// on Windows; `with build :seed` once per seed.lock bump). It runs no shell and
+// no host command (Eric, 2026-10-28): each step is an argument vector, `git`
+// included, and the build's output lands in its log by the runtime. Holding
+// the machine awake is the caller's (the battery no longer wraps caffeinate). It
 //   1. refuses a dirty tree: a battery blesses committed sources (D49);
 //   1a. exits GREEN without running when these sources already have a
 //      published green (`:sources-green`): a docs-only change never costs a
@@ -37,11 +40,28 @@
 // Logs, per-step wall times and out/battery/status.txt land in out/battery/.
 use std.crypto.sha256
 use std.fs
+use std.os
 use std.process
 use std.thread
 use std.time
 
-fn sh(cmd: &str): run(&["sh", "-c", cmd.clone()])
+fn seed -> str: if os() == "Windows": "src/main.exe" else: "src/main"
+
+// Run `argv` with stdout and stderr in `log` (merged after the run, stderr
+// last: the runtime opens the two separately); returns the exit code.
+fn run_logged(argv: &List[str], log: &str) -> i32:
+    let err = log ++ ".stderr"
+    let done = run_to_files(argv, log, err, 0)
+    let merged = (read_file(log) ?? "") ++ (read_file(err) ?? "")
+    write_file(log, merged)
+    remove_file(err)
+    done.code
+
+// The first line of a command's stdout.
+fn output_line(argv: &List[str]) -> str:
+    let out = "out/battery/cmd.stdout"
+    run_to_files(argv, out, "out/battery/cmd.stderr", 0)
+    first_line(out)
 
 fn first_line(path: &str) -> str:
     let text = read_file(path) ?? ""
@@ -66,12 +86,12 @@ fn sha256_of_file(path: &str) -> str:
 // battery is recorded; when it changed, those directories go first.
 fn clear_runtime_dirs_on_seed_change():
     let record = "out/.build-state/battery-seed.sha256"
-    let seed = sha256_of_file("src/main")
+    let seed = sha256_of_file(seed())
     let previous = first_line(record)
     if previous == seed: return
     if previous.len() > 0:
         print(f"battery: the seed changed ({previous.slice(0, 8)} -> {seed.slice(0, 8)}); removing out/lib, out/bootstrap-lib and out/tmp/with_runtime (#1797)")
-        assert(sh("rm -rf out/lib out/bootstrap-lib out/tmp/with_runtime") == 0)
+        for dir in ["out/lib", "out/bootstrap-lib", "out/tmp/with_runtime"]: remove_tree(dir)
     assert(mkdir_p("out/.build-state") == 0)
     assert(write_file(record, seed ++ "\n") == 0)
 
@@ -79,7 +99,7 @@ fn clear_runtime_dirs_on_seed_change():
 // dirties the tree; an untracked path dirties it only if it could be a build
 // input (docs/, examples/ and top-level *.md are not).
 fn tree_is_clean -> bool:
-    if sh("git status --porcelain > out/battery/git-status.txt") != 0: return false
+    if run_to_files(&["git", "status", "--porcelain"], "out/battery/git-status.txt", "out/battery/git-status.err", 0).code != 0: return false
     let text = read_file("out/battery/git-status.txt") ?? ""
     for line in text.split("\n"):
         if line.len() == 0: continue
@@ -94,8 +114,8 @@ fn slot_dir -> str: env("HOME") ++ "/.local/with-green/battery-slots"
 fn slot_owner_alive(path: &str) -> bool:
     let owner = first_line(path)
     if owner.len() == 0: return false
-    let owner_pid = owner.split("\t")[0].clone()
-    sh("kill -0 " ++ owner_pid ++ " 2>/dev/null") == 0
+    let owner_pid: i32 = owner.split("\t")[0].parse() ?? 0
+    process_alive(owner_pid)
 
 // A free slot's path, or "" when both are held by live batteries.
 fn take_slot(record: &str) -> str:
@@ -155,19 +175,22 @@ fn uat_failed(log: &str) -> str:
         if line.starts_with("uat: ") and line.contains(" FAIL "): out = out ++ (if out.len() > 0: " " else: "") ++ line.split(" ")[1]
     if out.len() > 0: out else: "with uat failed; read out/battery/uat.log"
 
-fn live_cmd -> str: env("WITH_BATTERY_LIVE_CMD")
+// The step's argument vector, one argument per line, and its log.
+fn live_cmd -> List[str]: env("WITH_BATTERY_LIVE_CMD").split("\n")
+fn live_log -> str: env("WITH_BATTERY_LIVE_LOG")
 fn live_done -> str: env("WITH_BATTERY_LIVE_DONE")
 
 fn live_worker -> i32:
-    let rc = sh(live_cmd())
+    let rc = run_logged(&live_cmd(), live_log())
     assert(write_file(live_done(), f"{rc}\n") == 0)
     rc
 
 // Run `cmd` with its output in `log`, appending `RED: <target>` to `status`
 // for each newly failed target while it runs; returns the exit code and
 // records `<name> rc=… wall=…s`.
-fn step_live(name: &str, cmd: &str, log: &str, status: &str) -> i32:
-    assert(set_env("WITH_BATTERY_LIVE_CMD", cmd) == 0)
+fn step_live(name: &str, argv: &List[str], log: &str, status: &str) -> i32:
+    assert(set_env("WITH_BATTERY_LIVE_CMD", argv.join("\n")) == 0)
+    assert(set_env("WITH_BATTERY_LIVE_LOG", log) == 0)
     assert(set_env("WITH_BATTERY_LIVE_DONE", f"out/battery/{name}.done") == 0)
     let _ = remove_file(live_done())
     let t0 = now()
@@ -177,7 +200,7 @@ fn step_live(name: &str, cmd: &str, log: &str, status: &str) -> i32:
     while not finished:
         finished = file_exists(live_done())
         if not finished: let _ = sleep_secs(1)
-        for target in failed_targets(log).split(" "):
+        for target in (failed_targets(log) ++ " " ++ failed_targets(log ++ ".stderr")).split(" "):
             if target.len() == 0 or reported.contains(" " ++ target ++ " "): continue
             reported = reported ++ target ++ " "
             let line = "RED: " ++ target
@@ -239,30 +262,39 @@ for arg in args():
         print("  across phases are reported by one battery instead of one per battery.")
         exit_code(0)
 assert(mkdir_p("out/battery") == 0)
-if not file_exists("src/main"):
-    eprint("battery: no pinned seed at src/main; run `with build :seed` first")
+if not file_exists(seed()):
+    eprint("battery: no pinned seed at " ++ seed() ++ "; run `with build :seed` first")
     exit_code(1)
 if not tree_is_clean():
     eprint("battery: the worktree is not clean (out/battery/git-status.txt); commit first — a battery blesses committed sources")
     exit_code(1)
 clear_runtime_dirs_on_seed_change()
-assert(sh("git rev-parse --short HEAD > out/battery/head.txt") == 0)
-let head = first_line("out/battery/head.txt")
+let head = output_line(&["git", "rev-parse", "--short", "HEAD"])
+assert(head.len() > 0)
+assert(write_file("out/battery/head.txt", head ++ "\n") == 0)
 // Sources a battery already passed have nothing to bless: the green is keyed
 // on the committed inputs without docs/ and top-level *.md (D49), so a change
 // confined to documents finds its parent's green and costs no run. Asked
 // before a slot is taken; it builds nothing.
-assert(sh("git rev-parse HEAD > out/battery/head-full.txt") == 0)
-let green_ask = "WITH=$PWD/src/main WITH_DRIVER_SHA256=" ++ sha256_of_file("src/main") ++ " WITH_SOURCES_COMMIT=" ++ first_line("out/battery/head-full.txt") ++ " src/main build :sources-green > out/battery/sources-green.log 2>&1"
-if sh(green_ask) == 0:
+let head_full = output_line(&["git", "rev-parse", "HEAD"])
+assert(write_file("out/battery/head-full.txt", head_full ++ "\n") == 0)
+// The children inherit WITH (the pinned seed drives, never a PATH compiler).
+let cwd = current_dir()
+let seed_path = cwd ++ "/" ++ seed()
+assert(set_env("WITH", seed_path) == 0)
+assert(set_env("WITH_DRIVER_SHA256", sha256_of_file(seed())) == 0)
+assert(set_env("WITH_SOURCES_COMMIT", head_full) == 0)
+let green_rc = run_logged(&[seed_path, "build", ":sources-green"], "out/battery/sources-green.log")
+assert(set_env("WITH_DRIVER_SHA256", "") == 0)
+assert(set_env("WITH_SOURCES_COMMIT", "") == 0)
+if green_rc == 0:
     let said = read_file("out/battery/sources-green.log") ?? ""
     var recorded = ""
     for line in said.split("\n"):
         if line.contains("these sources are green"): recorded = line.to_owned()
-    assert(write_file("out/battery/status.txt", f"{head} {env(\"PWD\")}\n" ++ recorded ++ "\nGREEN\nBATTERY_DONE\n") == 0)
+    assert(write_file("out/battery/status.txt", f"{head} {cwd}\n" ++ recorded ++ "\nGREEN\nBATTERY_DONE\n") == 0)
     print(f"battery: {head} — these sources are already green; nothing to run ({recorded.trim()})")
     exit_code(0)
-let cwd = env("PWD")
 let slot = take_slot(f"{pid()}\t{cwd}\t{head}\n")
 if slot.len() == 0:
     eprint("battery: two batteries are already running:")
@@ -272,21 +304,22 @@ let status = "out/battery/status.txt"
 assert(write_file(status, f"{head} {cwd}\n") == 0)
 print(f"battery: {head} in {cwd}")
 let ledger = "out/.build-state/battery-times.tsv"
-let flags = if fail_fast: " --fail-fast" else: ""
-// The run holds the machine awake (idle and, on AC, system sleep) and the
-// display lit (a uat scenario opens a window): on 2026-10-11 a battery
-// started inside a maintenance wake ran 45 s per 16 min for three hours.
-// No caller-side wrapper is needed: a second hold adds nothing.
+// The caller holds the machine awake and the display lit (a uat scenario
+// opens a window): on 2026-10-11 a battery started inside a maintenance
+// wake ran 45 s per 16 min for three hours. The battery itself runs no host
+// command to do it.
 var rc = 0
 // One graph run: the gate's targets, the uat scenarios (`battery-uat`, after
 // `build`) and the survey's are scheduled together by readiness and
 // remaining path, so no phase waits for the slowest lane of the one before.
 // A red is reported as it happens (step_live) and, under --fail-fast, stops
 // the run at the first; otherwise every target runs and reports.
-// A scenario that opens a window needs a lit display: the run holds the
-// display awake for its whole wall.
-let awake = if file_exists("/usr/bin/caffeinate"): "/usr/bin/caffeinate -d -i -s -u " else: ""
-let run_rc = step_live("battery", "WITH=$PWD/src/main " ++ awake ++ "src/main build :battery" ++ flags ++ " > out/battery/battery.log 2>&1", "out/battery/battery.log", status)
+var battery_argv: List[str] = List.new()
+battery_argv.push(seed_path)
+battery_argv.push("build")
+battery_argv.push(":battery")
+if fail_fast: battery_argv.push("--fail-fast")
+let run_rc = step_live("battery", &battery_argv, "out/battery/battery.log", status)
 merge_times(ledger, "out/.build-state/build-times.tsv")
 if file_exists("out/battery-uat/uat.stdout"):
     write_file("out/battery/uat.log", read_file("out/battery-uat/uat.stdout") ?? "")
