@@ -13793,7 +13793,7 @@ impl Sema:
         // a signature has been selected.
         let owner_resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(owner_ty as TypeId))
         let peer_resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(peer_ty as TypeId))
-        let owner_sym = self.get_type_name(owner_resolved)
+        let owner_sym = self.operator_owner_symbol(owner_ty, peer_ty)
         if owner_sym == 0:
             return sema_operator_candidate_none()
         let sig = self.lookup_method_sig(owner_sym, method_sym)
@@ -13811,6 +13811,37 @@ impl Sema:
         if fn_sym == 0:
             return sema_operator_candidate_none()
         SemaOperatorCandidate { sig, fn_sym, owner_sym }
+
+    // The owner whose methods implement a binary operator for `tid` beside
+    // `peer`. A nominal type owns its operators. A primitive's operator
+    // methods (`extend f64: fn mul(self: &Self, v: &V) -> V`, Scala's
+    // extension method, §9.5) answer only beside a nominal peer — `2.0 * v`,
+    // where no builtin operator applies (§11.7, D166); primitive beside
+    // primitive stays builtin, so std's `impl Eq for i32` never turns
+    // `1 == 2` into a call.
+    fn operator_owner_symbol(tid: i32, peer: i32) -> i32:
+        let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(tid as TypeId))
+        let named = self.get_type_name(resolved)
+        if named != 0:
+            return named
+        if self.get_type_name(self.auto_deref_ref_ptr_type(self.resolve_alias(peer as TypeId))) == 0:
+            return 0
+        let kind = self.get_type_kind(resolved)
+        if kind != TypeKind.TY_INT and kind != TypeKind.TY_FLOAT and kind != TypeKind.TY_BOOL:
+            return 0
+        self.method_owner_symbol_for_type(resolved as i32)
+
+    // Whether `tid` has the operator's method beside `peer`. A nominal type
+    // answers by name (a misfit signature is then diagnosed). A primitive
+    // answers only with a method that applies to this peer: std's
+    // `i32.eq(&i32)` is no operator for `o == 3` over an `Option[i32]`.
+    mut fn type_has_binary_operator_method(tid: i32, peer: i32, method_sym: i32) -> bool:
+        if method_sym == 0:
+            return false
+        let named = self.get_type_name(self.auto_deref_ref_ptr_type(self.resolve_alias(tid as TypeId)))
+        if named != 0:
+            return self.lookup_method_sig(named, method_sym) >= 0
+        self.operator_candidate_for(tid, peer, method_sym).sig >= 0
 
     fn type_has_operator_method(tid: i32, method_sym: i32) -> i32:
         if tid == 0 or method_sym == 0:
@@ -13890,7 +13921,7 @@ impl Sema:
         var rhs_candidate = if may_swap: self.operator_candidate_for(rhs, lhs, method_sym) else: sema_operator_candidate_none()
         var derived = 0
         let primitive_name = sema_operator_primitive_name(op)
-        if lhs_candidate.sig < 0 and rhs_candidate.sig < 0 and primitive_name.len() > 0 and self.type_has_operator_method(lhs, method_sym) == 0 and self.type_has_operator_method(rhs, method_sym) == 0:
+        if lhs_candidate.sig < 0 and rhs_candidate.sig < 0 and primitive_name.len() > 0 and not self.type_has_binary_operator_method(lhs, rhs, method_sym) and not self.type_has_binary_operator_method(rhs, lhs, method_sym):
             // §11.7: no fixed-name override on either operand — derive the
             // comparison from the family's primitive.
             method_sym = self.pool_intern(primitive_name)
@@ -13911,10 +13942,15 @@ impl Sema:
             selected = rhs_candidate
             reversed = 1
         else:
-            let has_named_method = self.type_has_operator_method(lhs, method_sym) != 0 or self.type_has_operator_method(rhs, method_sym) != 0
-            if has_named_method != 0:
+            let has_named_method = self.type_has_binary_operator_method(lhs, rhs, method_sym) or self.type_has_binary_operator_method(rhs, lhs, method_sym)
+            if has_named_method:
                 let op_text2 = sema_operator_symbol_text(op)
-                self.emit_error("operator '" ++ op_text2 ++ "' has no applicable implementation for " ++ self.type_name(lhs) ++ " and " ++ self.type_name(rhs), node)
+                var message = "operator '" ++ op_text2 ++ "' has no applicable implementation for " ++ self.type_name(lhs) ++ " and " ++ self.type_name(rhs)
+                // D166: only the left operand's methods serve; name where
+                // the reversed order is written.
+                if not self.type_has_binary_operator_method(lhs, rhs, method_sym) and self.type_has_binary_operator_method(rhs, lhs, method_sym):
+                    message = message ++ "; `" ++ self.type_name(rhs) ++ "." ++ method_name ++ "` serves `" ++ self.type_name(rhs) ++ " " ++ op_text2 ++ " " ++ self.type_name(lhs) ++ "` only — write this order as `" ++ method_name ++ "` on " ++ self.type_name(lhs) ++ " (`extend " ++ self.type_name(lhs) ++ ":` when it is not your type, §9.5)"
+                self.emit_error(message, node)
             return 0
         let lhs_node = self.ast.get_data1(node)
         let rhs_node = self.ast.get_data2(node)
@@ -14896,12 +14932,12 @@ impl Sema:
             let resolved_operator_name = sema_operator_method_name(op)
             if resolved_operator_name.len() > 0:
                 let resolved_operator_sym = self.pool_intern(resolved_operator_name)
-                var has_resolved_operator = self.type_has_operator_method(lhs as i32, resolved_operator_sym) != 0 or self.type_has_operator_method(rhs as i32, resolved_operator_sym) != 0
+                var has_resolved_operator = self.type_has_binary_operator_method(lhs as i32, rhs as i32, resolved_operator_sym) or self.type_has_binary_operator_method(rhs as i32, lhs as i32, resolved_operator_sym)
                 let primitive_name = sema_operator_primitive_name(op)
-                if has_resolved_operator == 0 and primitive_name.len() > 0:
+                if not has_resolved_operator and primitive_name.len() > 0:
                     let primitive_sym = self.pool_intern(primitive_name)
-                    has_resolved_operator = self.type_has_operator_method(lhs as i32, primitive_sym) != 0 or self.type_has_operator_method(rhs as i32, primitive_sym) != 0
-                if has_resolved_operator != 0:
+                    has_resolved_operator = self.type_has_binary_operator_method(lhs as i32, rhs as i32, primitive_sym) or self.type_has_binary_operator_method(rhs as i32, lhs as i32, primitive_sym)
+                if has_resolved_operator:
                     return self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
             let contextual_pair = self.contextualize_builtin_binary_operands(lhs_node, lhs as i32, rhs_node, rhs as i32)
             lhs = (contextual_pair % 4294967296) as TypeId
@@ -15011,8 +15047,8 @@ impl Sema:
         // @ matmul operator — always dispatches to method
         if op == BinaryOp.OP_MATMUL:
             let matmul_sym = self.pool_intern("matmul")
-            let has_matmul_method = self.type_has_operator_method(lhs as i32, matmul_sym) != 0 or self.type_has_operator_method(rhs as i32, matmul_sym) != 0
-            if has_matmul_method != 0:
+            let has_matmul_method = self.type_has_binary_operator_method(lhs as i32, rhs as i32, matmul_sym) or self.type_has_binary_operator_method(rhs as i32, lhs as i32, matmul_sym)
+            if has_matmul_method:
                 let matmul_ret = self.check_binary_operator_method(node, op, lhs as i32, rhs as i32)
                 if matmul_ret == 0:
                     return 0

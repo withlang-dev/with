@@ -10,9 +10,12 @@ spells the choice).
 whose `Self` is the left operand type. A method is never run with the
 operands swapped: a plain `fn sub(self, rhs: f64)` on `V` defines
 `V - f64` and says nothing about `f64 - V`. The author who wants the
-other order writes that implementation, its order spelled in its
-`Self` and parameters (a trait form such as `impl Mul[f64, V] for V`
-for the order it declares); the call site spells nothing. The one
+other order writes that implementation on the left operand's type,
+its order spelled in its `Self` and parameters (for a scalar on the
+left, an `extend f64:` method — D167; this entry first named
+`impl Mul[f64, V] for V`, which with `Mul[Rhs, Output]` is `V * f64`,
+and the reversed `impl Mul[V, V] for f64` is orphan-refused); the
+call site spells nothing. The one
 exception is `==`/`!=`: `Eq` is symmetric by contract, so the right
 operand type's `eq` answers when the left's provides none; two
 distinct applicable `eq` implementations remain ambiguous. This is
@@ -47,4 +50,6 @@ one-body-two-orders defect, one level up.
 
 **Reopens if** a scalar-left operation on a user type (NumPy's
 `2.0 * v`) needs a spelling the orphan rule forbids today; that is a
-facade/orphan question, not a dispatch swap.
+facade/orphan question, not a dispatch swap. *Reopened 2026-10-28 and
+answered by D167: the scalar's operator is an extension method of the
+scalar's type (`extend f64:`), Scala's spelling; no swap returns.*

@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D167 — A scalar on the left is the scalar's operator, written as an extension method of the scalar's type (`extend f64: fn mul(self: &Self, v: &V) -> V`), Scala being the north star; amends D166 through its reopen clause (ruled)](2026-10-28-D167-a-scalar-on-the-left-is-the-scalars-operator.md)
 - [D166 — An operator method serves only its own side; only `==`/`!=` dispatch from the right, `Eq` being symmetric by contract; no operator name licenses a swap, `*` included (ruled)](2026-10-27-D166-an-operator-method-serves-only-its-own-side.md)
 - [D165 — A text becomes a number of the type its use demands: `str.parse[T: Parse]() -> Option[T]`, strict; a generic method is applicable at a pipeline stage only when the stage can instantiate it (§9.6), so `input |> parse` stays the program's own `parse` (delegated; renumbers the unmerged branch's D160)](2026-10-26-D165-a-text-becomes-a-number-of-the-type-its-use-demands.md)
 - [D164 — `with_concurrency` starts the work itself: `(inputs, n, f) -> List[T]` with at most `n` of its tasks running at once; a task-taking limiter can bound nothing, because a `Task` is already running (delegated)](2026-10-26-D164-with-concurrency-starts-the-work-itself.md)
