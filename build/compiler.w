@@ -642,6 +642,9 @@ fn comp_resolve_seed_compiler(ctx: &ActionCtx) -> str:
                     if fs.host_exists(candidate):
                         return candidate
                 start = (i + 1) as i32
+    let local_seed = "src/main" ++ comp_host_exe_suffix()
+    if fs.exists(local_seed):
+        return local_seed
     if fs.exists("src/main"):
         return "src/main"
     let legacy_compiler = "out/bin/with" ++ comp_host_exe_suffix()
