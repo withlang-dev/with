@@ -7025,7 +7025,7 @@ impl Codegen:
         if name == "fastcall": return wl_cc_x86_fastcall()
         if name == "thiscall": return wl_cc_x86_thiscall()
         if name == "win64": return wl_cc_win64()
-        if name == "vectorcall": return wl_cc_x86_fastcall()
+        if name == "vectorcall": return wl_cc_x86_vectorcall()
         if name == "aarch64_vfabi": return wl_cc_aarch64_vfabi()
         if name == "fast": return wl_cc_fast()
         -1

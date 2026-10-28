@@ -59,6 +59,9 @@ let LLVM_CCallConv: i32 = 0
 let LLVM_FastCallConv: i32 = 8
 let LLVM_X86StdcallCallConv: i32 = 64
 let LLVM_X86FastcallCallConv: i32 = 65
+let LLVM_X86ThiscallCallConv: i32 = 70
+let LLVM_X86VectorcallCallConv: i32 = 80
+let LLVM_AArch64VectorCallConv: i32 = 97
 let LLVM_Win64CallConv: i32 = 79
 let LLVM_ObjectFile: i32 = 1
 let LLVM_ReturnStatusAction: i32 = 2
@@ -284,6 +287,9 @@ extern fn LLVMSetInitializer(g: *mut u8, v: *mut u8)
 extern fn LLVMSetGlobalConstant(g: *mut u8, c: i32)
 extern fn LLVMSetLinkage(g: *mut u8, linkage: i32)
 extern fn LLVMSetFunctionCallConv(fn_val: *mut u8, cc: u32)
+extern fn LLVMGetFunctionCallConv(fn_val: *mut u8) -> u32
+extern fn LLVMSetInstructionCallConv(instr: *mut u8, cc: u32)
+extern fn LLVMIsAFunction(v: *mut u8) -> *mut u8
 
 // Builder: control flow
 extern fn LLVMBuildBr(b: *mut u8, bb: *mut u8) -> *mut u8
@@ -1049,9 +1055,10 @@ fn wl_cc_c() -> i32: LLVM_CCallConv
 fn wl_cc_fast() -> i32: LLVM_FastCallConv
 fn wl_cc_x86_stdcall() -> i32: LLVM_X86StdcallCallConv
 fn wl_cc_x86_fastcall() -> i32: LLVM_X86FastcallCallConv
-fn wl_cc_x86_thiscall() -> i32: 33
+fn wl_cc_x86_thiscall() -> i32: LLVM_X86ThiscallCallConv
 fn wl_cc_win64() -> i32: LLVM_Win64CallConv
-fn wl_cc_aarch64_vfabi() -> i32: 97
+fn wl_cc_x86_vectorcall() -> i32: LLVM_X86VectorcallCallConv
+fn wl_cc_aarch64_vfabi() -> i32: LLVM_AArch64VectorCallConv
 fn wl_internal_linkage() -> i32: LLVM_InternalLinkage
 fn wl_private_linkage() -> i32: LLVM_PrivateLinkage
 fn wl_external_linkage() -> i32: LLVM_ExternalLinkage
@@ -1330,10 +1337,17 @@ fn wl_build_insert_value(b: i64, agg: i64, val: i64, idx: i32) -> i64:
 
 // ── Builder: call ───────────────────────────────────────────────
 
+// A direct call takes its callee's calling convention: a call whose
+// convention differs from the function's is undefined behavior in LLVM, and
+// a `@[callconv(…)]` function was declared with one its calls never carried
+// (#1025).
 fn wl_build_call(b: i64, fn_ty: i64, fn_val: i64, args_ptr: i64, cnt: isize) -> i64:
     unsafe:
         let args = if cnt > 0: args_ptr as *const *mut u8 else: 0 as *const *mut u8
-        LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr()) as i64
+        let call = LLVMBuildCall2(b as *mut u8, fn_ty as *mut u8, fn_val as *mut u8, args, cnt as u32, empty_cstr())
+        if LLVMIsAFunction(fn_val as *mut u8) != null:
+            LLVMSetInstructionCallConv(call, LLVMGetFunctionCallConv(fn_val as *mut u8))
+        call as i64
 
 fn wl_set_tail_call(call: i64): unsafe { LLVMSetTailCall(call as *mut u8, 1) }
 fn wl_set_musttail_call(call: i64): unsafe { LLVMSetTailCallKind(call as *mut u8, LLVM_TailCallKindMustTail) }
