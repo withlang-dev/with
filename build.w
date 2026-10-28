@@ -1946,10 +1946,6 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
     let output_dir = ctx.output()
     if fs.mkdir_all(output_dir) != 0:
         return invariance_fail(ctx, "could not create output directory: " ++ output_dir)
-    if os() == "Windows":
-        print("invariance-check: skipped on Windows (#811)")
-        let _ = fs.write_text(build_project_join(output_dir, ".stamp"), "ok")
-        return 0
     let root = ctx.project_info().project_root()
     let compiler_path = build_project_abs(root, inputs[0])
     if not fs.exists(inputs[0]):
@@ -1962,11 +1958,14 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
         return invariance_fail(ctx, "could not create repo copy directory: " ++ repo_copy)
     if fs.copy_tree("src", build_project_join(repo_copy, "src")) != 0:
         return invariance_fail(ctx, "could not copy src into repo fixture")
-    let copied_seed = build_project_join(repo_copy, "src/main")
+    let copied_seed = build_project_join(repo_copy, "src/main" ++ host_exe_suffix())
     if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
         return invariance_fail(ctx, "could not remove copied seed from repo fixture")
     if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
-        return invariance_fail(ctx, "could not link lib into repo fixture")
+        // Windows needs a privilege most shells lack for symlinks; the
+        // fixture is the same tree copied (#811).
+        if fs.copy_tree("lib", build_project_join(repo_copy, "lib")) != 0:
+            return invariance_fail(ctx, "could not link lib into repo fixture")
     let copy_err = build_copy_generated_compiler_modules(fs, repo_copy)
     if copy_err.len() > 0:
         return invariance_fail(ctx, copy_err)
