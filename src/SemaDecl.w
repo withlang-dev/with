@@ -2803,7 +2803,13 @@ impl Sema:
             return 1
         0
 
-    mut fn install_trait_default_type_args(trait_sym: i32, impl_node: i32):
+    // The impl's trait arguments are written in the impl's own type
+    // parameters (`impl[T] Iterable[T] for List[T]`), so each resolves under
+    // the bindings the caller had in force (`outer_*`), never through the
+    // flat named-type table: there a program's own `type T` took the name
+    // and std's `T` became an unknown type (#2772). The trait's parameters
+    // bind in the current, fresh substitution.
+    mut fn install_trait_default_type_args(trait_sym: i32, impl_node: i32, outer_syms: &List[i32], outer_tys: &List[i32]):
         if trait_sym == 0 or impl_node == 0:
             return
         let trait_idx: i32 = self.trait_idx_for_impl(impl_node)
@@ -2822,7 +2828,13 @@ impl Sema:
         while ti < tp_count and ti < arg_count:
             let tp_sym: i32 = self.trait_tp_syms[(tp_start + ti)]
             let arg_node = self.ast.get_extra(arg_start + ti)
+            let fresh_syms = move self.generic_subst_param_syms
+            let fresh_tys = move self.generic_subst_type_ids
+            self.generic_subst_param_syms = sema_clone_i32_list(outer_syms)
+            self.generic_subst_type_ids = sema_clone_i32_list(outer_tys)
             let arg_tid = self.resolve_type_expr(arg_node)
+            self.generic_subst_param_syms = fresh_syms
+            self.generic_subst_type_ids = fresh_tys
             if arg_tid != 0:
                 self.put_generic_subst(tp_sym, arg_tid as i32, arg_node)
                 self.impl_trait_arg_type_ids.insert(arg_node, arg_tid as i32)
@@ -2888,7 +2900,7 @@ impl Sema:
         self.generic_subst_type_ids = List.new()
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
-        self.install_trait_default_type_args(trait_sym, impl_node)
+        self.install_trait_default_type_args(trait_sym, impl_node, &saved_subst_syms, &saved_subst_tys)
         let resolved = self.resolve_type_expr(type_node) as i32
         if impl_type_tid != 0:
             if saved_self != 0:

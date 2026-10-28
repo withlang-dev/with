@@ -5570,7 +5570,7 @@ impl Sema:
         self.assoc_type_bindings = fresh_assoc
         self.generic_subst_param_syms = List.new()
         self.generic_subst_type_ids = List.new()
-        self.install_trait_default_type_args(self.ast.get_data2(impl_node), impl_node)
+        self.install_trait_default_type_args(self.ast.get_data2(impl_node), impl_node, &saved_subst_syms, &saved_subst_tys)
         let impl_ex = self.ast.get_data1(impl_node)
         let impl_ac = self.ast.get_extra(impl_ex)
         for iai in 0..impl_ac:
