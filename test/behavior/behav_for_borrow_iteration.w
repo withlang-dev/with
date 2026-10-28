@@ -1,7 +1,7 @@
 //! expect-stdout: ok
 
 fn doubled(xs: &List[i32]) -> List[i32]:
-    xs.map(it * 2)
+    xs |> map(it * 2) |> collect[List]()
 
 fn main:
     var xs: List[i32] = List.new()

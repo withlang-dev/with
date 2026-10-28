@@ -105,9 +105,6 @@ enum CcBuiltin: i32:
     MAP_DECREMENT
     MAP_UPDATE
     MAP_SLOT_WALK
-    LIST_MAP
-    LIST_FILTER
-    LIST_FOLD
     LIST_CONTAINS
     STR_REPEAT
     ARR_LEN
@@ -199,9 +196,6 @@ fn cc_builtin_uses_list_receiver(kind: CcBuiltin) -> bool:
     if kind == CcBuiltin.LIST_EXTEND: return true
     if kind == CcBuiltin.LIST_TAKE_FRONT: return true
     if kind == CcBuiltin.LIST_RESTORE_FRONT: return true
-    if kind == CcBuiltin.LIST_MAP: return true
-    if kind == CcBuiltin.LIST_FILTER: return true
-    if kind == CcBuiltin.LIST_FOLD: return true
     if kind == CcBuiltin.LIST_CONTAINS: return true
     if kind == CcBuiltin.LIST_JOIN: return true
     if kind == CcBuiltin.LIST_SLOT: return true
@@ -6827,9 +6821,6 @@ fn cc_builtin_from_mir_intrinsic(intrinsic: MirIntrinsic) -> CcBuiltin:
     if intrinsic == MirIntrinsic.MAP_DECREMENT: return CcBuiltin.MAP_DECREMENT
     if intrinsic == MirIntrinsic.MAP_UPDATE: return CcBuiltin.MAP_UPDATE
     if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT or intrinsic == MirIntrinsic.MAP_TAKE_AT: return CcBuiltin.MAP_SLOT_WALK
-    if intrinsic == MirIntrinsic.LIST_MAP: return CcBuiltin.LIST_MAP
-    if intrinsic == MirIntrinsic.LIST_FILTER: return CcBuiltin.LIST_FILTER
-    if intrinsic == MirIntrinsic.LIST_FOLD: return CcBuiltin.LIST_FOLD
     if intrinsic == MirIntrinsic.LIST_CONTAINS: return CcBuiltin.LIST_CONTAINS
     if intrinsic == MirIntrinsic.STR_REPEAT: return CcBuiltin.STR_REPEAT
     if intrinsic == MirIntrinsic.ARR_LEN: return CcBuiltin.ARR_LEN
@@ -8340,18 +8331,6 @@ impl CCodegen:
 
         if kind == CcBuiltin.OPT_FILTER:
             self.fail("emit-c does not support opt.filter (requires closure support)")
-            return "\n"
-
-        if kind == CcBuiltin.LIST_MAP:
-            self.fail("emit-c does not support vec.map (requires closure support)")
-            return "\n"
-
-        if kind == CcBuiltin.LIST_FILTER:
-            self.fail("emit-c does not support vec.filter (requires closure support)")
-            return "\n"
-
-        if kind == CcBuiltin.LIST_FOLD:
-            self.fail("emit-c does not support vec.fold (requires closure support)")
             return "\n"
 
         ""

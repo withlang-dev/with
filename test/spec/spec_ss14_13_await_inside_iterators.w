@@ -14,14 +14,14 @@ fn numbers -> List[i32]:
     values
 
 fn test_await_inside_map:
-    let doubled = numbers().map(n => double(n).await)
+    let doubled: List[i32] = numbers() |> map(n => double(n).await) |> collect[List]()
     assert(doubled.len() == 3)
     assert(doubled[0] == 2)
     assert(doubled[1] == 4)
     assert(doubled[2] == 6)
 
 fn test_await_inside_fold:
-    let total = numbers().fold(0, (sum, id) => sum + count_for(id).await)
+    let total = numbers() |> fold(0, (sum, id) => sum + count_for(id).await)
     assert(total == 9)
 
 fn main:

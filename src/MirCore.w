@@ -274,10 +274,6 @@ type MirBody {
     // stated by MirLower; the ownership validator's leak rule reads them.
     unwritten_at_return_bbs: List[i32],
     unwritten_at_return_locals: List[i32],
-    // #2019: an intrinsic call that invokes a closure Sema says may suspend
-    // (call_site_may_suspend): codegen leaves its loop when an invocation
-    // left by a cancellation unwind, and MirLower checks after the call.
-    call_may_cancel: List[i32],
     // D65 (#1647): call nodes Sema resolved that this body materializes
     // without a call — `for x in v.iter()` and a comprehension over it are
     // the index loop (`.iter()` is the implicit form, §13). MIR states the
@@ -582,7 +578,6 @@ fn MirBody.init_for_fn(fn_sym: i32) -> MirBody:
         unwritten_at_return_locals: List.new(),
         call_pipeline_receiver_places: List.new(),
         call_machinery_dispatch: List.new(),
-        call_may_cancel: List.new(),
         elided_call_nodes: List.new(),
         field_place_nodes: List.new(),
         field_place_places: List.new(),
@@ -843,7 +838,6 @@ impl MirBody:
         self.call_contract_required.push(0)
         self.call_pipeline_receiver_places.push(-1)
         self.call_machinery_dispatch.push(0)
-        self.call_may_cancel.push(0)
         for i in 0..count:
             self.call_arg_operands.push(operands[i])
         id
@@ -944,13 +938,6 @@ impl MirBody:
         self.field_place_nodes.push(node)
         self.field_place_places.push(place)
         self.field_place_bases.push(base)
-
-    mut fn set_call_may_cancel(call_id: i32):
-        if call_id >= 0 and call_id < self.call_may_cancel.len():
-            self.call_may_cancel[call_id] = 1
-
-    fn call_is_may_cancel(call_id: i32) -> bool:
-        call_id >= 0 and call_id < self.call_may_cancel.len() and self.call_may_cancel[call_id] != 0
 
     mut fn set_call_machinery_dispatch(call_id: i32):
         if call_id >= 0 and call_id < self.call_machinery_dispatch.len():
@@ -4210,16 +4197,6 @@ fn mir_validate_aggregate_scalar_mismatch(mir_mod: &MirModule, body: &MirBody, e
 fn mir_validate_type_is_scalar(mir_mod: &MirModule, resolved: i32) -> bool:
     let kind = mir_mod.mir_get_type_kind(resolved)
     kind == TypeKind.TY_INT or kind == TypeKind.TY_FLOAT or kind == TypeKind.TY_BOOL
-
-// #2019: the eager intrinsics whose codegen loop invokes a closure argument
-// on the calling fiber once per element (and stops at an invocation that
-// left by a cancellation unwind, when MIR marks the call).
-// The terminals and `next` calls that drive a lazy adapter chain are the
-// same: the chain's closures run inside them.
-fn mir_intrinsic_invokes_closure(intrinsic: MirIntrinsic) -> bool:
-    if intrinsic == MirIntrinsic.LIST_MAP or intrinsic == MirIntrinsic.LIST_FILTER or intrinsic == MirIntrinsic.LIST_FOLD:
-        return true
-    false
 
 // The `const fn` symbol a call terminator invokes, or 0 when the callee is
 // a place (an indirect call) or a unit operand (an intrinsic with no callee).

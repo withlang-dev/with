@@ -6,6 +6,6 @@ fn main:
     items.push(2)
     items.push(3)
     items.push(4)
-    let evens = items.filter(x => x % 2 == 0)
+    let evens = items |> filter(x => x % 2 == 0)
     for v in evens:
         write(int_to_string(v))

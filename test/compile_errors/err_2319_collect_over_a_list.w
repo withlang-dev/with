@@ -3,5 +3,5 @@
 // MIR then stopped: "BUG: user generic call lacks a concrete contract".
 fn main:
     let xs = [1, 2]
-    let ys: List[isize] = xs.map(it + 1).collect[List]()
+    let ys: List[isize] = xs.collect[List]()
     print(ys.len())
