@@ -3963,9 +3963,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
     if os() == "Windows":
-        print("emit-c-smoke: skipped on Windows (#811)")
-        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
-        return 0
+        print("emit-c-smoke: probe run on Windows (#811)")
 
     let root = ctx.project_info().project_root()
     if not fs.exists(inputs[0]):
