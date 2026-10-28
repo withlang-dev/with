@@ -1828,7 +1828,7 @@ fn issue61_regression_action(ctx: ActionCtx) -> i32:
     // for the runtime and the check is refused before it starts.
     if fs.write_text(build_project_join(repo_copy, "seed.lock"), fs.read_text("seed.lock")) != 0:
         return issue61_fail(ctx, "could not copy seed.lock into repo fixture")
-    let copied_seed = build_project_join(repo_copy, "src/main")
+    let copied_seed = build_project_join(repo_copy, "src/main" ++ host_exe_suffix())
     if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
         return issue61_fail(ctx, "could not remove copied seed from repo fixture")
     // A copy, not a symlink: the next run's remove_tree of the fixture
@@ -2348,7 +2348,7 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("drop-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs()[0])
-    let baseline = build_project_abs(root, "src/main")
+    let baseline = build_project_abs(root, "src/main" ++ host_exe_suffix())
     var args: List[str] = List.new()
     args.push(build_owned_text(candidate))
     args.push("run")
@@ -2518,7 +2518,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("move-audit: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
     let candidate = build_project_abs(root, ctx.inputs()[0])
-    let baseline = build_project_abs(root, "src/main")
+    let baseline = build_project_abs(root, "src/main" ++ host_exe_suffix())
     var args: List[str] = List.new()
     args.push(build_owned_text(candidate))
     args.push("run")
@@ -4201,7 +4201,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     drop_audit.action = run_drop_audit_action
     drop_audit = drop_audit.input(release_compiler_bin("with"))
     drop_audit = drop_audit.input("tools/drop_audit.w")
-    drop_audit = drop_audit.input("src/main")
+    drop_audit = drop_audit.input("src/main" ++ host_exe_suffix())
     drop_audit = drop_audit.dep("build")
     drop_audit = drop_audit.write_scope("out/drop-audit")
     out = out.add_target(drop_audit)
@@ -4272,7 +4272,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     move_audit.action = run_move_audit_action
     move_audit = move_audit.input(release_compiler_bin("with"))
     move_audit = move_audit.input("tools/move_audit.w")
-    move_audit = move_audit.input("src/main")
+    move_audit = move_audit.input("src/main" ++ host_exe_suffix())
     move_audit = move_audit.dep("build")
     move_audit = move_audit.write_scope("out/move-audit")
     out = out.add_target(move_audit)
