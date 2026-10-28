@@ -7,6 +7,7 @@
 
 # Seed binary (downloaded from GitHub releases, not checked in)
 src/main
+src/main.exe
 
 # Build artifacts
 zig-out/
