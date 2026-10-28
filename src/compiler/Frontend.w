@@ -1997,6 +1997,13 @@ impl Zcu:
         let normalized_text = frontend_normalize_source_text(text)
         self.current_source_path = with_str_clone_ref(name)
         self.current_source_text = with_str_clone_ref(normalized_text)
+        // The root module is the module Resolve registered (resolve_normalize_path):
+        // seeded with the spelling given on the command line, `sub/./x.w` or
+        // Windows `tools\battery.w` named a module the import graph does
+        // not hold, and every lookup keyed by the current module path missed:
+        // the root file appeared to import nothing ("'spawn_os' requires an
+        // explicit import" under `use std.thread`).
+        let module_path = resolve_normalize_path(name)
 
         // Phase 1+2: Lex + Parse.  When prelude is enabled, parse the prelude
         // USE declaration first, then (#682-inc1) expand the prelude closure
@@ -2019,7 +2026,7 @@ impl Zcu:
             var pparser = Parser.init(move ptokens, synthetic, 0, self.pool, move self.diagnostics)
             pool = pparser.parse_module()
             self.diagnostics = move pparser.diags
-            self.seed_decl_source_paths(pool, name, file_id)
+            self.seed_decl_source_paths(pool, module_path, file_id)
             pool = self.expand_prelude_closure_frontend(pool)
             // The in-unit runtime is written against std: a --no-std program
             // (core/alloc prelude, its own panic handler and entry) gets none.
@@ -2037,7 +2044,7 @@ impl Zcu:
                 uparser.enable_interface_mode()
             pool = uparser.parse_module()
             self.diagnostics = move uparser.diags
-            self.append_decl_source_paths(pool.decl_count() - before_user, name, file_id)
+            self.append_decl_source_paths(pool.decl_count() - before_user, module_path, file_id)
         else:
             var lexer = Lexer.init(normalized_text, file_id)
             let tokens = lexer.tokenize()
@@ -2048,7 +2055,7 @@ impl Zcu:
                 parser.enable_interface_mode()
             pool = parser.parse_module()
             self.diagnostics = move parser.diags
-            self.seed_decl_source_paths(pool, name, file_id)
+            self.seed_decl_source_paths(pool, module_path, file_id)
         for extra_i in 0..self.extra_source_names.len():
             let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
