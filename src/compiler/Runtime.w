@@ -203,3 +203,39 @@ fn runtime_own_tree_root() -> str:
             break
         dir = runtime_path_parent(dir)
     with_str_clone_ref(g_own_tree)
+
+// This executable, to run `with __ld` (and every other self-invocation) as a
+// child: argv[0] when it names a path; on Windows a bare name is first the
+// current directory's, as cmd runs it (#2647: a bare `with.exe` resolved
+// through PATH re-invoked an older with.exe there, "unknown command
+// '__ld'"); else argv[0] found on PATH. The one owner of the answer
+// (Frontend's c_import key reads it too). SEED-BOUND: the OS's own answer
+// (GetModuleFileNameW, _NSGetExecutablePath, /proc/self/exe) needs a runtime
+// function src/ can call only once a seed carrying it is pinned.
+fn with_self_exe() -> str:
+    let argv0 = with_arg_at(0)
+    if argv0.contains("/") or argv0.contains("\\"):
+        // Absolute when this process's cwd is the one the spelling was
+        // relative to: a child may run in another directory (a build
+        // action in the project root), where a relative spelling names
+        // nothing or another file. A parent that resolved a relative
+        // argv[0] against its own cwd and then chdir'd the child (the
+        // test runner) leaves a spelling this cwd cannot absolutize;
+        // existence decides, and the raw spelling stands otherwise.
+        if runtime_path_is_absolute(argv0):
+            return argv0
+        let cwd = runtime_cwd()
+        if cwd.len() > 0:
+            let joined = cwd ++ "/" ++ argv0
+            if runtime_file_exists(joined) != 0:
+                return joined
+        return argv0
+    let windows = runtime_sysinfo_os() == "Windows"
+    if windows:
+        let here = runtime_cwd() ++ "\\" ++ argv0 ++ (if argv0.ends_with(".exe"): "" else: ".exe")
+        if runtime_file_exists(here) != 0: return here
+    for dir in runtime_getenv("PATH").split(if windows: ";" else: ":"):
+        if dir.len() == 0: continue
+        let candidate = dir ++ "/" ++ argv0 ++ (if windows and not argv0.ends_with(".exe"): ".exe" else: "")
+        if runtime_file_exists(candidate) != 0: return candidate
+    ""
