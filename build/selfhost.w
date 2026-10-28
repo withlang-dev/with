@@ -3524,6 +3524,13 @@ fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &
     cc_args.push(bs_abs(root, "runtime"))
     if libm and os() == "Linux":
         cc_args.push("-lm")
+    if os() == "Windows":
+        // rt.o is one object, so its platform surface reaches resolution
+        // whole: winsock, dbghelp (backtraces), crypt32 (trust store) —
+        // the same import libraries the real link joins.
+        cc_args.push("-lws2_32")
+        cc_args.push("-ldbghelp")
+        cc_args.push("-lcrypt32")
     cc_args
 
 // The host C compiler over one emitted unit and the runtime objects.
