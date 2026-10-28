@@ -1964,9 +1964,6 @@ pub fn run_doc_path_check_action(ctx: ActionCtx) -> i32:
 
 pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
-    if os() == "Windows":
-        print("spec-inventory-check: skipped on Windows (#811)")
-        return comp_write_ok_output(ctx)
     // The specification is one file per chapter under docs/spec/, with the
     // sections that are not language semantics in its reference subfolders;
     // the inventory reads every chapter file as one text.

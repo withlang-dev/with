@@ -31,6 +31,9 @@ fn bs_windows_skip(ctx: &ActionCtx, issue: &str) -> i32:
     print(ctx.target_name() ++ ": skipped on Windows (" ++ issue ++ ")")
     0
 
+fn bs_exe_suffix() -> str:
+    if os() == "Windows": ".exe" else: ""
+
 fn bs_join(left: &str, right: &str) -> str:
     if left.len() == 0:
         return selfhost_owned_text(right)
@@ -80,17 +83,39 @@ fn bs_with_string_literal(value: &str) -> str:
 fn bs_capture_path(root: &str, output_dir: &str, label: &str, suffix: &str) -> str:
     bs_abs(root, bs_join(output_dir, label ++ "." ++ suffix))
 
-fn bs_c_compiler() -> str:
+// The host C compiler for emitted-C checks, resolved as build/emit_c.w
+// resolves it (the one owner of the choice): explicit env, then the
+// pinned SDK's clang++, then the host default — clang++.exe on Windows,
+// where no `cc` exists (#811: every emit-C case failed to spawn).
+fn bs_c_compiler(ctx: &ActionCtx) -> str:
     let explicit = env("WITH_EMIT_C_CC")
     if explicit.len() > 0:
         return explicit
     let cc = env("CC")
     if cc.len() > 0:
         return cc
+    let llvm_prefix = env("LLVM_PREFIX")
+    if llvm_prefix.len() > 0:
+        if os() == "Windows":
+            return llvm_prefix ++ "/bin/clang++.exe"
+        return llvm_prefix ++ "/bin/clang++"
+    let sdk_clang =
+        if os() == "Windows":
+            ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
+        else if os() == "Linux":
+            ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
+        else if os() == "Macos":
+            ".deps/llvm-22.1.6-darwin-arm64/bin/clang++"
+        else:
+            ""
+    if sdk_clang.len() > 0 and ctx.fs().exists(sdk_clang):
+        return sdk_clang
+    if os() == "Windows":
+        return "clang++.exe"
     "cc"
 
-fn bs_push_c_compiler(argv: List[str]) -> List[str]:
-    argv.push(bs_c_compiler())
+fn bs_push_c_compiler(ctx: &ActionCtx, argv: List[str]) -> List[str]:
+    argv.push(bs_c_compiler(ctx))
     argv
 
 fn bs_host_target_triple() -> str:
@@ -258,15 +283,11 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    if os() == "Windows":
-        print("embedded-runtime-regression: skipped on Windows (#811)")
-        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
-        return 0
     let compiler_input = inputs[0]
     if not fs.exists(compiler_input):
         return bs_fail(ctx, "missing compiler: " ++ compiler_input)
 
-    let copied_compiler = bs_join(output_dir, "with")
+    let copied_compiler = bs_join(output_dir, "with" ++ bs_exe_suffix())
     if fs.copy_file(compiler_input, copied_compiler) != 0:
         return bs_fail(ctx, "could not copy compiler to embedded runtime fixture")
     if fs.chmod(copied_compiler, 0o755) != 0:
@@ -277,7 +298,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not write embedded runtime fixture source")
 
     let root = ctx.project_info().project_root()
-    let bin_path = bs_join(output_dir, "hello")
+    let bin_path = bs_join(output_dir, "hello" ++ bs_exe_suffix())
     let build_stdout = bs_join(output_dir, "build.stdout")
     let build_stderr = bs_join(output_dir, "build.stderr")
     var build_args: List[str] = List.new()
@@ -3451,8 +3472,8 @@ fn bs_check_c_import_names_reset_between_compilations(ctx: &ActionCtx, compiler_
     let result = bs_edge_expect_success(ctx, compiler_path, case_dir, "c-import-session-name-reset", args)
     result.rc
 
-fn bs_compile_emit_c_output(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
-    let cc_result = bs_run_emit_c_compile(ctx, root, case_dir, c_path, bin, label)
+fn bs_compile_emit_c_output(ctx: &ActionCtx, compiler_path: &str, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> i32:
+    let cc_result = bs_run_emit_c_compile(ctx, compiler_path, root, case_dir, c_path, bin, label)
     if cc_result.rc == 0:
         return 0
     ctx.diagnostics().error(ctx.target_name() ++ f": {label} C compile failed with exit code {cc_result.rc}\n" ++ cc_result.stderr)
@@ -3471,14 +3492,34 @@ fn bs_emit_c_needs_fiber_runtime(c_text: &str) -> bool:
         if line.contains("with_fiber_") or line.contains("with_channel_"): return true
     false
 
-fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
+fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &str, bin: &str, libm: bool, fibers: bool) -> List[str]:
     var cc_args: List[str] = List.new()
-    cc_args.push(bs_c_compiler())
+    // On Windows the C compiler is the compiler under test's own `cc`
+    // driver: it carries the sysroot and mingw target the real link
+    // path uses, where a bare SDK clang++ has no system includes and
+    // no `cc` exists (#811). An explicit WITH_EMIT_C_CC/CC still wins.
+    if os() == "Windows" and env("WITH_EMIT_C_CC").len() == 0 and env("CC").len() == 0:
+        cc_args.push(compiler_path.clone())
+        cc_args.push("cc")
+    else:
+        cc_args.push(bs_c_compiler(ctx))
     cc_args.push("-O1")
+    // Emitted C is generated code written against C17: clang 22's C23
+    // default on the mingw target makes -Wincompatible-pointer-types
+    // (int8_t** for char**, in migrated-corpus units) a hard error
+    // where the POSIX default keeps it a warning (#811).
+    cc_args.push("-std=gnu17")
+    // Same promotion, independent of the dialect under `with cc`: the
+    // emitted code passes int8_t** for char** in migrated-corpus units
+    // (the cast belongs in CCodegen — #2769); POSIX host cc accepts it
+    // as the warning it is, clang 22 on mingw errors. Host parity:
+    cc_args.push("-Wno-error=incompatible-pointer-types")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
     if os() == "Linux":
         cc_args.push("-no-pie")
+        cc_args.push("-Wl,--gc-sections")
+    else if os() == "Windows":
         cc_args.push("-Wl,--gc-sections")
     else:
         cc_args.push("-Wl,-dead_strip")
@@ -3493,14 +3534,21 @@ fn bs_emit_c_cc_args(root: &str, c_path: &str, bin: &str, libm: bool, fibers: bo
     cc_args.push(bs_abs(root, "runtime"))
     if libm and os() == "Linux":
         cc_args.push("-lm")
+    if os() == "Windows":
+        // rt.o is one object, so its platform surface reaches resolution
+        // whole: winsock, dbghelp (backtraces), crypt32 (trust store) —
+        // the same import libraries the real link joins.
+        cc_args.push("-lws2_32")
+        cc_args.push("-ldbghelp")
+        cc_args.push("-lcrypt32")
     cc_args
 
 // The host C compiler over one emitted unit and the runtime objects.
-fn bs_run_emit_c_compile(ctx: &ActionCtx, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> ToolProcessResult:
+fn bs_run_emit_c_compile(ctx: &ActionCtx, compiler_path: &str, root: &str, case_dir: &str, c_path: &str, bin: &str, label: &str) -> ToolProcessResult:
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3534,7 +3582,7 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-receiver-abi", emit_args)
     if emit_result.rc != 0: return emit_result.rc
 
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-receiver-abi")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-receiver-abi")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -3690,7 +3738,7 @@ fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
 
 fn ec_c_path(c: &EcCase): bs_join(c.dir, "program.c")
 
-fn ec_bin(c: &EcCase): bs_join(c.dir, "program")
+fn ec_bin(c: &EcCase): bs_join(c.dir, "program" ++ bs_exe_suffix())
 
 fn ec_read(ctx: &ActionCtx, path: &str): ctx.fs().read_text_opt(path).unwrap_or("")
 
@@ -3760,7 +3808,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
         // case is 19 MB of C and takes 112 s on the release host with this
         // target running alone; at 120 s it timed out (exit 124) in every
         // battery that ran the other test targets beside it.
-        cc_jobs.push(par_job(bs_emit_c_cc_args(root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
+        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len():
@@ -3816,7 +3864,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: &str, case_
     emit_args |> push(bs_abs(root, c_path))
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-array-fill-rvalue", emit_args)
     if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-fill-rvalue-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -3847,7 +3895,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     emit_args |> push(bs_abs(root, c_path))
     let emit_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "emit-c-array-ref", emit_args)
     if emit_result.rc != 0: return emit_result.rc
-    rc = bs_compile_emit_c_output(ctx, root, case_dir, c_path, bin, "emit-c-array-ref")
+    rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-ref")
     if rc != 0: return rc
     let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-ref-run", 120000)
     if run_result.rc != 0: return run_result.rc
@@ -3915,7 +3963,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let cc_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stdout")
     let cc_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-cc", "stderr")
     var cc_args: List[str] = List.new()
-    cc_args = bs_push_c_compiler(move cc_args)
+    cc_args = bs_push_c_compiler(ctx, move cc_args)
     cc_args |> push("-c")
     cc_args |> push(bs_abs(root, helper_c))
     cc_args |> push("-o")
@@ -3927,7 +3975,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     let link_stdout = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stdout")
     let link_stderr = bs_capture_path(root, case_dir, "darwin-arm64-c-abi-direct-link", "stderr")
     var link_args: List[str] = List.new()
-    link_args = bs_push_c_compiler(move link_args)
+    link_args = bs_push_c_compiler(ctx, move link_args)
     link_args |> push("-o")
     link_args |> push(bs_abs(root, bin))
     link_args |> push(bs_abs(root, with_obj))
@@ -3963,10 +4011,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    if os() == "Windows":
-        print("emit-c-smoke: skipped on Windows (#811)")
-        let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
-        return 0
+
 
     let root = ctx.project_info().project_root()
     if not fs.exists(inputs[0]):
