@@ -4640,6 +4640,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         var inv = target_new(.Action, "invariance-" ++ inv_label, "").output("out/test-graph/invariance-" ++ inv_label)
         inv.action = invariance_variant_action
         inv = inv.input(release_compiler_bin("with"))
+        inv = inv.input("seed.lock")
         inv = inv.arg(build_owned_text(inv_label))
         inv = inv.allow_parallel()
         inv = inv.dep("build")
