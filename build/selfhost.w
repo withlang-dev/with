@@ -3504,6 +3504,11 @@ fn bs_emit_c_cc_args(ctx: &ActionCtx, compiler_path: &str, root: &str, c_path: &
     else:
         cc_args.push(bs_c_compiler(ctx))
     cc_args.push("-O1")
+    // Emitted C is generated code written against C17: clang 22's C23
+    // default on the mingw target makes -Wincompatible-pointer-types
+    // (int8_t** for char**, in migrated-corpus units) a hard error
+    // where the POSIX default keeps it a warning (#811).
+    cc_args.push("-std=gnu17")
     // Mirror the real link path: dead-strip removes unreferenced runtime
     // code so its undefs never reach resolution.
     if os() == "Linux":
@@ -4001,8 +4006,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
     if fs.mkdir_all(output_dir) != 0:
         return bs_fail(ctx, "could not create output directory: " ++ output_dir)
-    if os() == "Windows":
-        print("emit-c-smoke: probe run on Windows (#811)")
+
 
     let root = ctx.project_info().project_root()
     if not fs.exists(inputs[0]):
