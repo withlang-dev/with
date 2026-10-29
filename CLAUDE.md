@@ -469,6 +469,39 @@ at once.
 
 ---
 
+## Whose action is it? The user may use system tools; the toolchain is bootstrapped (D171)
+
+Before deciding whether something may run Perl, `sh`, `make`, a host C
+compiler or any other system tool, ask **whose action it is**:
+
+- **The user's.** `with get` building a user's C package, a user's own
+  project and build, a release UAT scenario (it plays a user). These **may**
+  use the host's system tools. A missing tool is named, and installing it is
+  the user's step (package-management.md).
+- **The toolchain's.** The compiler, its runtime, its build system
+  (`build.w`, `build/*.w`), the SDK and the migrated corpora. These may
+  **not**: everything they need is bootstrapped from our own sources and SDK
+  (D81, and the next section).
+
+The two never meet. Our compiler and our build never call `with get`; the
+migrated corpora (pcre2, zlib, …) serve the standard library and the
+compiler, never `with get`. So a user's C dependency is never ported,
+migrated or substituted to spare `with get` a host tool, and the
+toolchain's rule is never applied to a user's action.
+
+The release UAT selects only scenarios the toolchain can do: a scenario uses
+only dependencies `with get` provides cleanly on that platform (a Conan
+Center binary, or a CMake source build through the compiler's own `cmake`,
+`ninja` and `with cc`). A dependency chain that needs a host tool on a
+platform (openssl's Perl, libiconv's autotools) takes that platform off the
+scenario's `platforms:` line; it never starts a port or a migration
+(`uat/README.md`).
+
+Eric has had to explain this distinction three times (2026-10-28). Read it
+before proposing anything about a package's dependencies or the UAT.
+
+---
+
 ## Self-Contained Toolchain (we build our own LLVM)
 
 **Not a single line of non-With code in this repo. 1000% self-hosted.**

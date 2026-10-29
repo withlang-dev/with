@@ -1,6 +1,11 @@
 scenario: libcurl from a fresh project
 requires: network
 platforms: darwin, linux-x86_64
+# D171: only where with get provides the whole chain cleanly. libcurl needs
+# openssl, whose build needs Perl wherever with get builds it from source
+# (every package on Windows; linux-aarch64, where Conan Center has no
+# binaries). A user may use Perl; the UAT measures what the toolchain does
+# (uat/README.md).
 
 new directory
 run: with init .
