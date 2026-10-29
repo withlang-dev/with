@@ -10361,10 +10361,20 @@ impl MirBuilder:
     // D10 (decisions.md): `for msg in rx:` receives until the channel is
     // closed and drained — the loop desugars through recv() -> Option[T]:
     // loop { match rx.recv(): Some(msg) => body, None => break }.
+    // The loop borrows a place receiver, as `for x in list` does (§13): it
+    // receives through the receiver's own place, which stays open and the
+    // program's after the loop. Moved into a loop temp, the receiver was
+    // dropped (closed) at the loop's end and its place blanked, so a later
+    // `rx.recv()` read the blank (validate-all, the take-as-reset read check).
     mut fn lower_for_receiver(for_node: i32, pat_or_sym: i32, iter_expr: i32, body_expr: i32) -> i32:
-        let rx_op = self.lower_expr(iter_expr)
         let rx_ty = self.expr_type(iter_expr)
-        let rx_place = self.materialize_operand(rx_op, rx_ty, self.ast.get_start(iter_expr))
+        let rxk = self.ast.kind(iter_expr)
+        var rx_place: i32 = 0
+        if rxk == NodeKind.NK_IDENT or rxk == NodeKind.NK_FIELD_ACCESS or rxk == NodeKind.NK_INDEX:
+            rx_place = self.lower_expr_place(iter_expr)
+        else:
+            let rx_op = self.lower_expr(iter_expr)
+            rx_place = self.materialize_operand(rx_op, rx_ty, self.ast.get_start(iter_expr))
         let elem_ty = self.loop_element_type(for_node)
         let opt_ty = self.sema.find_generic_inst(self.sema.syms.option, elem_ty)
         if opt_ty == 0:
