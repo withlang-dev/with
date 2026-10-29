@@ -3984,7 +3984,12 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     // (out/<stem>, out/<stem>.o, out/<stem>.o.undef), two `with run`s of one
     // program in one directory rewrote and deleted each other's files mid-link:
     // a link that read the other's emptied report linked no runtime at all.
-    let run_dir = link_stage_output_dir_for_source(source_file) ++ f"/run.{with_getpid()}.{with_clock_nanos()}"
+    // The directory is scratch, so it is the system's: under out/ it was
+    // out/<the source's directory>, and an absolute source left that whole
+    // path behind, empty, in the caller's directory (`with run
+    // ~/tools/x.w` made ./out/Users/…/tools).
+    let scratch = runtime_temp_dir()
+    let run_dir = (if scratch.len() > 0: scratch else: link_stage_artifact_root()) ++ f"/with-run.{with_getpid()}.{with_clock_nanos()}"
     let bin_path = comp.build_binary_to_path(source_file, run_dir ++ "/" ++ link_stage_basename(link_stage_output_path_for_source(source_file)))
     if bin_path == "":
         let _ = build_graph_rt_remove_tree(run_dir)
