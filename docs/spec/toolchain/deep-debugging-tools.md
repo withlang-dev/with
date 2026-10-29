@@ -93,14 +93,27 @@ and the runtime, so lldb on the *program* resolves `rt_core.w` lines
        -o run -o "bt 24" -o quit -- ./bin
    ```
    The trap prints `trap-alloc hit=` / `trap-free hit=` for every alloc and
-   free of that payload; `tools/debug_drop_sites.lldb` adds a backtrace at
-   each hit and stops at the double-free reporter. To stop on the n-th free
-   instead, `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` panics there, and a panic
-   is an ordinary exit: add `-o "breakpoint set --name with_panic_core"`
-   before `run`, or lldb only reports `exited with status = 1`. A hardware
-   watchpoint on the payload (`watchpoint set expression -w write -s 8 --
-   <addr>`) is the other fast tool. #1014 asks for the first
-   free's site to be recorded by default so the plain report names both.
+   free of that payload, and, for a str buffer, `trap-retain` /
+   `trap-release holders-before=<n>` for every change of its holder count
+   (D111): a count that reaches a release finding 0 while another holder
+   remains names the copy that never retained. Every one of those events
+   calls `dbg_trap_hit` and nothing else does, so
+   `tools/debug_drop_sites.lldb` breaks there, adds a backtrace at each
+   event of the block (never at the other blocks' allocs and frees), and
+   stops at the double-free reporter. Tallying those backtraces by the
+   first frame in the program under test (event kind × function × line)
+   puts the unbalanced site in one line: the tuple-literal retain was found
+   that way (`(true, self.val[n])` into `(bool, str)`). To stop on the n-th
+   free instead, `WITH_DEBUG_ALLOC_TRAP_FREE_HIT=<n>` raises SIGTRAP there
+   (`_ALLOC_HIT` for allocs), which lldb stops on in that call chain; it
+   panicked before, inside the allocator's locked path, and the panic's
+   backtrace allocation deadlocked. A hardware watchpoint on the payload
+   (`watchpoint set expression -w write -s 8 -- <addr>`) is the other fast
+   tool, but never on a str's holder count (`<addr> - 8`): the count is an
+   atomic load/store-exclusive loop, the watchpoint's trap clears the
+   exclusive monitor, and the store retries forever at one instruction.
+   #1014 asks for the first free's site to be recorded by default so the
+   plain report names both.
 6. **Read the function's IR or disassembly at the join block.** `with ir
    fixture.w` prints the module as codegen built it (stdout, before the
    LLVM pipeline); `WITH_DUMP_LLIR_PRE=1` / `WITH_DUMP_LLIR_POST=1` on a

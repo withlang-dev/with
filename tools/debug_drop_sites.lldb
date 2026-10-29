@@ -25,8 +25,11 @@
 #      lldb --batch -s tools/debug_drop_sites.lldb \
 #          -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr> WITH_TEST_FILTER=<test>" \
 #          -o run -o "bt 24" -o quit -- ./bin
-#    The trap-check breakpoints below fire once per alloc/free of <addr> (with
-#    a backtrace each, via their command lists); the reporter breakpoint fires
+#    The breakpoint below fires once per event of <addr>, its alloc, each free,
+#    and each retain and release of a str buffer there (dbg_trap_hit; the trap
+#    checks themselves run on every alloc and free and must not be broken on,
+#    which stopped thousands of times on unrelated blocks) (with
+#    a backtrace each, via its command list); the reporter breakpoint fires
 #    at the second free; the final `bt 24` is the stop that ended the run.
 #
 #    For a fixture that fails only under `with test`, debug the runner's own
@@ -36,15 +39,13 @@
 # Do NOT set conditional breakpoints (`--condition '$x0 == <addr>'`) on rt_free
 # or rt_alloc: the expression is evaluated per hit and the run never finishes.
 # A hardware watchpoint on the payload (`watchpoint set expression -w write
-# -s 8 -- <addr>`) is the other fast tool when the trap env is not enough.
+# -s 8 -- <addr>`) is the other fast tool when the trap env is not enough —
+# but never on a str's holder count (`<addr> - 8`): the count is an atomic
+# exclusive load/store loop, the watchpoint's trap clears the monitor, and
+# the store retries forever at one instruction. The trap reports that
+# count's traffic itself (trap-retain / trap-release lines).
 
-breakpoint set --name dbg_trap_free_check
-breakpoint command add
-thread backtrace -c 12
-continue
-DONE
-
-breakpoint set --name dbg_trap_alloc_check
+breakpoint set --name dbg_trap_hit
 breakpoint command add
 thread backtrace -c 12
 continue

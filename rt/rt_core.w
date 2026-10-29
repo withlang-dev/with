@@ -1210,6 +1210,26 @@ var dbg_trap_free_count: i64 = 0
 var dbg_trap_alloc_hit_state: i32 = 0
 var dbg_trap_alloc_hit_v: i64 = 0
 var dbg_trap_alloc_count: i64 = 0
+var dbg_trap_hits: i64 = 0
+// The last event's kind: 1 alloc, 2 free, 3 retain, 4 release.
+var dbg_trap_last_kind: i64 = 0
+
+// Every event of the trapped address (WITH_DEBUG_ALLOC_TRAP_FREE): its alloc,
+// each free, and each retain and release of a str buffer starting there. The
+// one function a debugger breaks on (tools/debug_drop_sites.lldb): nothing
+// else calls it, so it stops once per event, never on the other blocks.
+@[noinline]
+fn dbg_trap_hit(kind: i64):
+    dbg_trap_last_kind = kind
+    dbg_trap_hits = dbg_trap_hits + 1
+
+// A trap stopping on the n-th hit (WITH_DEBUG_ALLOC_TRAP_FREE_HIT / _ALLOC_HIT):
+// SIGTRAP, so a debugger stops on the call chain. The check runs inside the
+// allocator's locked path; a panic there printed its backtrace, allocated,
+// and deadlocked on the lock it held.
+fn dbg_trap_stop(msg: &str):
+    dbg_puts(msg)
+    rt_raise(5)
 
 fn dbg_trap_free_addr() -> i64:
     if dbg_trap_free_state == 0:
@@ -1247,8 +1267,9 @@ fn dbg_trap_free_check(ptr_addr: i64, drop_origin_ptr: i64, drop_origin_len: i64
         dbg_puts(" origin=")
         dbg_put_bytes(drop_origin_ptr as *const u8, drop_origin_len)
     dbg_puts("\n")
+    dbg_trap_hit(2)
     if dbg_trap_free_hit() == dbg_trap_free_count:
-        with_panic_core("debug-alloc: trapped free of watched address", "", 0)
+        dbg_trap_stop("debug-alloc: trapped free of watched address\n")
 
 fn dbg_trap_alloc_hit() -> i64:
     if dbg_trap_alloc_hit_state == 0:
@@ -1273,8 +1294,21 @@ fn dbg_trap_alloc_check(ptr_addr: i64, origin: i64):
     dbg_puts(" origin=")
     dbg_put_i64(origin)
     dbg_puts("\n")
+    dbg_trap_hit(1)
     if dbg_trap_alloc_hit() == dbg_trap_alloc_count:
-        with_panic_core("debug-alloc: trapped alloc of watched address", "", 0)
+        dbg_trap_stop("debug-alloc: trapped alloc of watched address\n")
+
+// D111 count traffic of the trapped str buffer: a retain or a release, with
+// the count it found (holders beyond the first; a release finding 0 frees).
+fn dbg_trap_count_check(ptr_addr: i64, release: bool, before: i64):
+    if dbg_trap_free_addr() != ptr_addr:
+        return
+    dbg_puts(if release: "debug-alloc: trap-release addr=" else: "debug-alloc: trap-retain addr=")
+    dbg_put_i64(ptr_addr)
+    dbg_puts(" holders-before=")
+    dbg_put_i64(before)
+    dbg_puts("\n")
+    dbg_trap_hit(if release: 4 else: 3)
 
 fn rt_alloc_effective_limit_unlocked() -> i64:
     if rt_alloc_limit_state == 0:
@@ -2806,7 +2840,9 @@ pub fn with_str_concat_n_move_first(parts: *const str, count: i64) -> str:
     let result = make_str(out as *const u8, total)
     if first_owned != 0 and first_ptr as i64 != 0:
         // The first part was moved in: its hold is released, not freed.
-        if unsafe { (*str_holders(first_ptr)).fetch_sub(1, .AcqRel) } == 0:
+        let before = unsafe { (*str_holders(first_ptr)).fetch_sub(1, .AcqRel) }
+        dbg_trap_count_check(first_ptr as i64, true, before)
+        if before == 0:
             rt_free(first_ptr as *mut u8)
     result
 
@@ -3619,7 +3655,8 @@ fn str_holders(p: *const u8) -> *mut Atomic[i64]: (p as i64 - 8) as *mut Atomic[
 pub fn with_str_retain(s: *const u8):
     let p = unsafe *(s as *const *const u8)
     if p as i64 != 0 and rt_payload_start_is_owned(p) != 0:
-        unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
+        let before = unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
+        dbg_trap_count_check(p as i64, false, before)
 
 // #2307: a str made from a `&str` view. A view that starts an owned payload
 // shares it, as a copy of the str would (a prefix of an immutable buffer is
@@ -3630,7 +3667,8 @@ pub fn with_str_retain(s: *const u8):
 pub fn with_str_own_view(s: &str) -> str:
     let p = unsafe *(s as *const str as *const *const u8)
     if p as i64 != 0 and rt_payload_start_is_owned(p) != 0:
-        unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
+        let before = unsafe { (*str_holders(p)).fetch_add(1, .AcqRel) }
+        dbg_trap_count_check(p as i64, false, before)
         return make_str(p, s.len())
     with_str_clone_ref(s)
 
@@ -3645,7 +3683,9 @@ pub fn with_str_free(s: *mut u8) -> Unit:
 pub fn with_str_free_drop_origin(s: *mut u8, drop_origin: *const u8, drop_origin_len: i64) -> Unit:
     let p = unsafe *(s as *const *mut u8)
     if p as i64 != 0 and rt_payload_start_is_owned(p as *const u8) != 0:
-        if unsafe { (*str_holders(p)).fetch_sub(1, .AcqRel) } == 0:
+        let before = unsafe { (*str_holders(p)).fetch_sub(1, .AcqRel) }
+        dbg_trap_count_check(p as i64, true, before)
+        if before == 0:
             rt_free_with_drop_origin(p, drop_origin, drop_origin_len)
     else if p as i64 != 0 and dbg_on() != 0:
         // #1363: the ownership check above turns a second free of a str
