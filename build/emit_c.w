@@ -73,38 +73,25 @@ fn emitc_trim(text: &str) -> str:
         end = end - 1
     text.slice(start as i64, end as i64)
 
-fn emitc_c_compiler(ctx: &ActionCtx) -> str:
+// #2782 (Law 8, Eric 2026-10-28: the build runs no host command): the C
+// compiler is the compiler under test's own `cc` — its embedded clang
+// driver, sysroot and lld — as the emit-c smoke's (bs_c_compiler_argv).
+// WITH_EMIT_C_CC or CC is the user's explicit choice and wins.
+fn emitc_c_compiler_argv(compiler_path: &str) -> List[str]:
+    var argv: List[str] = List.new()
     let explicit = env("WITH_EMIT_C_CC")
-    if explicit.len() > 0:
-        return explicit
     let cc = env("CC")
-    if cc.len() > 0:
-        return cc
-    let llvm_prefix = env("LLVM_PREFIX")
-    if llvm_prefix.len() > 0:
-        if os() == "Windows":
-            return llvm_prefix ++ "/bin/clang++.exe"
-        return llvm_prefix ++ "/bin/clang++"
-    // The static-LLVM SDK may not ship the clang driver (only the archives
-    // the compiler links statically). Use it when present; otherwise the
-    // host C compiler, which is what the emit-c smoke already uses.
-    let sdk_clang =
-        if os() == "Windows":
-            ".deps/llvm-22.1.6-windows-x86_64-msvc/bin/clang++.exe"
-        else if os() == "Linux":
-            ".deps/llvm-22.1.6-linux-x86_64/bin/clang++"
-        else if os() == "Macos":
-            ".deps/llvm-22.1.6-darwin-arm64/bin/clang++"
-        else:
-            ""
-    if sdk_clang.len() > 0 and ctx.fs().exists(sdk_clang):
-        return sdk_clang
-    if os() == "Windows":
-        return "clang++.exe"
-    "cc"
+    if explicit.len() > 0:
+        argv.push(explicit)
+    else if cc.len() > 0:
+        argv.push(cc)
+    else:
+        argv.push(emit_c_owned_text(compiler_path))
+        argv.push("cc")
+    argv
 
-fn emitc_push_c_compiler(ctx: &ActionCtx, argv: List[str]) -> List[str]:
-    argv.push(emitc_c_compiler(ctx))
+fn emitc_push_c_compiler(argv: List[str], root: &str, compiler_path: &str) -> List[str]:
+    for part in emitc_c_compiler_argv(emitc_abs(root, compiler_path)): argv.push(part)
     argv
 
 fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
@@ -115,88 +102,25 @@ fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
     argv |> push("none")
     argv
 
+// The target is the one the real link uses: on Windows the windows-gnu
+// triple `cc` defaults to (#1915), whose import libraries come with the
+// compiler; no Visual Studio or Windows Kits path is read.
 fn emitc_push_host_c_flags(argv: List[str]) -> List[str]:
     if os() == "Linux":
         argv |> push("-no-pie")
-        argv |> push("-fuse-ld=lld")
     if os() == "Windows":
-        argv |> push("-target")
-        if arch() == "aarch64":
-            argv |> push("aarch64-pc-windows-msvc")
-        else:
-            argv |> push("x86_64-pc-windows-msvc")
-        argv |> push("-fms-runtime-lib=static")
-        argv |> push("-D_CRT_SECURE_NO_WARNINGS")
-        argv |> push("-fuse-ld=lld")
-        argv |> push("-Wl,/stack:8388608")
-        argv |> push("-Wl,/libpath:" ++ emitc_windows_um_libdir())
-        argv |> push("-Wl,/libpath:" ++ emitc_windows_ucrt_libdir())
-        argv |> push("-Wl,/libpath:" ++ emitc_windows_msvc_libdir())
+        argv |> push("-Wl,--stack,8388608")
     argv
-
-// Windows SDK/CRT lib-arch subdir for the host: arm64 or x64. The
-// hardcoded fallbacks below embed this; env overrides (set by the
-// runner / cross SDK) take precedence and are used verbatim.
-fn emitc_windows_lib_arch():
-    if arch() == "aarch64": "arm64" else: "x64"
-
-fn emitc_windows_um_libdir():
-    let dir = env("WITH_WINDOWS_UM_LIBDIR")
-    if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/" ++ emitc_windows_lib_arch()
-
-fn emitc_windows_ucrt_libdir():
-    let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
-    if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/" ++ emitc_windows_lib_arch()
-
-fn emitc_windows_msvc_libdir():
-    let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
-    if dir.len() > 0: return dir
-    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/" ++ emitc_windows_lib_arch()
-
-// Windows import-library paths. Honour the explicit libdir env override
-// (set by the runner / cross-build SDK) before the baked-in VS2019/Windows-Kit
-// paths, which do not exist on a clean runner or a self-hosting VM that carries
-// its own .deps/winsdk. Mirrors Link.w's link_stage_windows_libpath.
-fn emitc_windows_sdk_um_lib(name: &str) -> str:
-    let dir = env("WITH_WINDOWS_UM_LIBDIR")
-    if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/um/" ++ emitc_windows_lib_arch() ++ "/" ++ name
-
-fn emitc_windows_sdk_ucrt_lib(name: &str) -> str:
-    let dir = env("WITH_WINDOWS_UCRT_LIBDIR")
-    if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Windows Kits/10/Lib/10.0.19041.0/ucrt/" ++ emitc_windows_lib_arch() ++ "/" ++ name
-
-fn emitc_windows_msvc_lib(name: &str) -> str:
-    let dir = env("WITH_WINDOWS_MSVC_LIBDIR")
-    if dir.len() > 0: return dir ++ "/" ++ name
-    "C:/Program Files (x86)/Microsoft Visual Studio/2019/BuildTools/VC/Tools/MSVC/14.29.30133/lib/" ++ emitc_windows_lib_arch() ++ "/" ++ name
 
 fn emitc_push_system_libs(argv: List[str]) -> List[str]:
     if os() == "Windows":
-        argv |> push(emitc_windows_msvc_lib("libcpmt.lib"))
-        argv |> push(emitc_windows_msvc_lib("libcmt.lib"))
-        argv |> push(emitc_windows_msvc_lib("oldnames.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("kernel32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("advapi32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("bcrypt.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("crypt32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("shell32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("user32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("ole32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("oleaut32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("uuid.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("ws2_32.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("version.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("psapi.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("dbghelp.lib"))
-        argv |> push(emitc_windows_sdk_um_lib("ntdll.lib"))
-    else:
-        argv |> push("-lc")
-        if os() == "Linux":
-            argv |> push("-lm")
+        // rt.o's platform surface: winsock, dbghelp (backtraces), crypt32
+        // (trust store), as bs_emit_c_cc_args links it.
+        argv |> push("-lws2_32")
+        argv |> push("-ldbghelp")
+        argv |> push("-lcrypt32")
+    else if os() == "Linux":
+        argv |> push("-lm")
     argv
 
 fn emitc_index_of(text: &str, needle: &str) -> isize:
@@ -624,14 +548,14 @@ pub fn run_bootstrap_c_emit_sources_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     emitc_generate_stub_files(ctx, out_dir)
 
-fn emitc_compile_c_compiler(ctx: &ActionCtx, main_c: &str, output_path: &str) -> i32:
+fn emitc_compile_c_compiler(ctx: &ActionCtx, compiler_path: &str, main_c: &str, output_path: &str) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let llvm_rsp = "out/lib/llvm_link.rsp"
     if not fs.exists(llvm_rsp) or fs.read_text(llvm_rsp).len() == 0:
         return emitc_fail(ctx, "missing LLVM link metadata: " ++ llvm_rsp)
     var argv: List[str] = List.new()
-    argv = emitc_push_c_compiler(ctx, move argv)
+    argv = emitc_push_c_compiler(move argv, root, compiler_path)
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
     argv |> push("-o")
@@ -758,10 +682,10 @@ fn emitc_build_hello_c(ctx: &ActionCtx, compiler_path: &str, hello_c: &str) -> i
     argv |> push(emitc_abs(root, hello_c))
     emitc_run_capture(ctx, "emit-hello-c", argv, 600000)
 
-fn emitc_compile_hello(ctx: &ActionCtx, hello_c: &str, output_path: &str) -> i32:
+fn emitc_compile_hello(ctx: &ActionCtx, compiler_path: &str, hello_c: &str, output_path: &str) -> i32:
     let root = ctx.project_info().project_root()
     var argv: List[str] = List.new()
-    argv = emitc_push_c_compiler(ctx, move argv)
+    argv = emitc_push_c_compiler(move argv, root, compiler_path)
     argv |> push("-O1")
     argv = emitc_push_host_c_flags(move argv)
     argv |> push("-o")
@@ -830,13 +754,13 @@ pub fn run_emit_c_test_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = emitc_generate_stub_files(ctx, emitc_dirname(main_c))
     if rc != 0: return rc
-    rc = emitc_compile_c_compiler(ctx, main_c, with_from_c)
+    rc = emitc_compile_c_compiler(ctx, compiler_path, main_c, with_from_c)
     if rc != 0: return rc
     rc = emitc_expect_same_version(ctx, compiler_path, with_from_c)
     if rc != 0: return rc
     rc = emitc_build_hello_c(ctx, with_from_c, hello_c)
     if rc != 0: return rc
-    rc = emitc_compile_hello(ctx, hello_c, hello_bin)
+    rc = emitc_compile_hello(ctx, compiler_path, hello_c, hello_bin)
     if rc != 0: return rc
     rc = emitc_run_hello(ctx, hello_bin)
     if rc != 0: return rc

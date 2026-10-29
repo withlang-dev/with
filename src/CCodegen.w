@@ -394,6 +394,8 @@ type CCodegen {
     hold_pre: str,
     hold_texts: HashMap[i32, str],
     hold_counter: i32,
+    // @[link_name("sym")] of each extern fn, by its symbol (extern_link_name).
+    extern_link_names: HashMap[i32, str],
 }
 
 // #1766: how a closure holds its environment (CodegenDispatch D63 tags).
@@ -477,6 +479,7 @@ fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: S
         hold_pre: "",
         hold_texts: HashMap.new(),
         hold_counter: 0,
+        extern_link_names: HashMap.new(),
     }
     for i in 0..cg.mir_mod.body_fn_syms.len():
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -1020,10 +1023,28 @@ impl CCodegen:
     fn extern_sym_c_name(fn_sym: i32) -> str:
         if fn_sym == 0:
             return "sym0"
+        let linked = self.extern_link_name(fn_sym)
+        if linked.len() > 0:
+            return linked
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return "sym0"
         cc_sanitize_ident(self.canonical_extern_name(raw))
+
+    // The C symbol an extern fn's `@[link_name("sym")]` names (the parser
+    // keeps it in the fn's calling-convention slot as `link_name:sym`), or
+    // "". The emitted C called `ci_unlink` where the program links unlink.
+    fn extern_link_name(fn_sym: i32) -> str:
+        self.extern_link_names.get(fn_sym) ?? ""
+
+    mut fn prepare_extern_link_names():
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN:
+                continue
+            let cc = self.fn_callconv_name(self.ast.find_fn_meta(decl))
+            if cc.starts_with("link_name:"):
+                self.extern_link_names.insert(self.ast.get_data0(decl), cc.slice(10, cc.len()))
 
     fn canonical_extern_name(name: &str) -> str:
         // c_import can suffix C symbols as "name.<n>" to avoid With-side name
@@ -1411,6 +1432,9 @@ impl CCodegen:
 
     // The discriminant of the enum value `expr`.
     fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
+        // An enum with no payloads is its discriminant (an int32_t).
+        if self.type_is_payload_enum(enum_tid) == 0:
+            return "(" ++ expr ++ ")"
         if not self.option_is_nullable_pointer(enum_tid):
             return "(" ++ expr ++ ").tag"
         let some_disc = self.sema.type_reflection_variant_discriminant(enum_tid, self.payload_enum_named_variant(enum_tid, self.sema.syms.some))
@@ -1484,6 +1508,15 @@ impl CCodegen:
         if payload_text.len() > 0:
             out = out ++ ", ." ++ self.payload_enum_variant_field(variant_index) ++ " = " ++ payload_text
         out ++ cc_rbrace()
+
+// A With field's C member name: a field spelled as a C keyword or a name
+// the runtime header defines (`signed`, `bool`) takes a trailing `_`.
+// Every site that writes a member (struct definitions, places, literals,
+// layout asserts, the glue) spells it through here.
+fn cc_member(name: str) -> str:
+    match name:
+        "auto" | "break" | "case" | "char" | "const" | "continue" | "default" | "do" | "double" | "else" | "enum" | "extern" | "float" | "for" | "goto" | "if" | "inline" | "int" | "long" | "register" | "restrict" | "return" | "short" | "signed" | "sizeof" | "static" | "struct" | "switch" | "typedef" | "union" | "unsigned" | "void" | "volatile" | "while" | "bool" | "true" | "false" | "NULL" => name ++ "_"
+        _ => name
 
 // A field of a multi-field variant's payload struct (#2017).
 fn cc_payload_struct_field(field_idx: i32): f"field{field_idx}"
@@ -2263,6 +2296,13 @@ impl CCodegen:
                 if self.sema.get_type_d1(resolved) == 0:
                     return "const " ++ array_pointer
                 return array_pointer
+            // An extern C fn type is a C function pointer already; a With fn
+            // value is a {fn_ptr, ctx} pair, so a pointer to one points at
+            // the pair (`compare: *const fn(…)` was laid out as the pair).
+            // A `&fn(…)` view is passed as the pair itself.
+            if inner_kind == TypeKind.TY_FN and tk == TypeKind.TY_PTR:
+                let pair = self.fn_type_c_name(inner_resolved as i32)
+                return if self.sema.get_type_d1(resolved) == 0: "const " ++ pair ++ "*" else: pair ++ "*"
             if inner_kind == TypeKind.TY_FN or inner_kind == TypeKind.TY_EXTERN_FN:
                 return self.fn_type_c_name(inner_resolved as i32)
             if inner_kind == TypeKind.TY_VOID:
@@ -2894,11 +2934,13 @@ impl CCodegen:
     // an Option of the type a payload is copied into. The Option guess typed
     // such a Result local Option[ZipEntry] and refused its Err downcast as a
     // unit variant (#2017).
+    // A local MIR declares as an enum with payloads (an Option included) has
+    // that type (D65): a downcast read through it never re-types it. Read
+    // from `copy _7<as v1>.f0.*`, an `Option[&i32]` became `Option[i32]`,
+    // the projection after the downcast ignored.
     fn local_declared_non_option_payload_enum(body: &MirBody, local_id: i32) -> bool:
         let declared = self.sema.resolve_alias(self.local_declared_tid(body, local_id) as TypeId) as i32
-        if self.type_is_payload_enum(declared) == 0:
-            return false
-        self.sema.get_type_kind(declared as TypeId) != TypeKind.TY_GENERIC_INST or self.sema.get_generic_inst_base(declared) != self.sema.syms.option
+        self.type_is_payload_enum(declared) != 0
 
     mut fn local_payload_downcast_option_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
@@ -3284,12 +3326,17 @@ impl CCodegen:
 
     // #1810: whether `ref(borrow, place)` produces a `&str` view — a shared
     // borrow of a place laid out as str — rather than a pointer to the place.
+    // A reference to a fn value is the {fn_ptr, ctx} pair itself, as c_type
+    // spells `&fn(…)`: a view by value, like a `&str`.
     mut fn ref_rvalue_is_str_view(body: &MirBody, rval_id: i32) -> bool:
         if rval_id < 0 or rval_id >= body.rval_kinds.len() or body.rval_kinds[rval_id] != RvalueKind.RK_REF:
             return false
+        let target = self.place_ref_target_tid(body, body.rval_d1[rval_id])
+        if target > 0 and self.sema.get_type_kind(self.sema.resolve_alias(target as TypeId)) == TypeKind.TY_FN:
+            return true
         if body.rval_d0[rval_id] == BorrowKind.EXCLUSIVE:
             return false
-        self.sema.type_layout_repr_is_str(self.place_ref_target_tid(body, body.rval_d1[rval_id]))
+        self.sema.type_layout_repr_is_str(target)
 
     // The C lvalue of a bare local: a global's name, or the local's own
     // name, dereferenced when the local holds a pointer to its value — a
@@ -3354,7 +3401,7 @@ impl CCodegen:
                     self.fail("unsupported str field access in C backend: " ++ field_name)
                     current_tid = 0
                     continue
-                let field_name = cc_intern_resolve(self.intern, pd)
+                let field_name = cc_member(cc_intern_resolve(self.intern, pd))
                 // A distinct type is its inner type in C (`typedef double
                 // TotalF64`): `.value` is the same object, no member.
                 if tk == TypeKind.TY_STRUCT and field_name == "value" and self.type_is_distinct(resolved as i32) != 0:
@@ -3399,7 +3446,8 @@ impl CCodegen:
             if pk == ProjKind.PK_DEREF:
                 // A `&str` view is itself the str it names (#1810): its own
                 // storage is the header, so there is nothing to dereference.
-                if not self.sema.type_layout_is_str_view(resolved as i32):
+                let fn_view = tk == TypeKind.TY_REF and self.sema.get_type_kind(self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)) == TypeKind.TY_FN
+                if not self.sema.type_layout_is_str_view(resolved as i32) and not fn_view:
                     out = "(*" ++ out ++ ")"
                 if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
                     current_tid = self.sema.get_type_d0(resolved)
@@ -3676,7 +3724,7 @@ impl CCodegen:
         var out = cc_lbrace()
         for fi in 0..count:
             let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
-            let field_name = cc_intern_resolve(self.intern, field_sym)
+            let field_name = cc_member(cc_intern_resolve(self.intern, field_sym))
             let field_tid = self.effective_field_tid(resolved, field_sym, self.sema.type_extra[(start + fi * 3 + 1)])
             var value: i32 = 0
             for li in 0..lit_count:
@@ -3890,6 +3938,18 @@ impl CCodegen:
                 return str_cmp
             let lhs_tid = self.operand_tid(body, d1)
             let rhs_tid = self.operand_tid(body, d2)
+            // #2137 (§11.7): `==` on an aggregate (an Option, a tuple, a
+            // struct) is structural, through the walk map keys compare by;
+            // C has no `==` on a struct.
+            if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ:
+                let eq_tid = self.operand_sema_tid(body, d1)
+                if eq_tid > 0 and self.key_type_has_walk(self.sema.resolve_alias(eq_tid as TypeId) as i32):
+                    // The walk reads both sides by address: each is held in
+                    // a temporary (a constant operand is no lvalue).
+                    let eq_c = self.c_type(eq_tid, 0)
+                    let equal = self.key_eq_text("__with_eql", "__with_eqr", eq_tid)
+                    let test = if d0 == BinaryOp.OP_EQ: equal else: "!" ++ equal
+                    return "(" ++ cc_lbrace() ++ " " ++ eq_c ++ " __with_eql = " ++ lhs ++ "; " ++ eq_c ++ " __with_eqr = " ++ rhs ++ "; " ++ test ++ "; " ++ cc_rbrace() ++ ")"
             let raw_ptr_bin = self.raw_pointer_binop_text(d0, lhs, rhs, lhs_tid, rhs_tid)
             if raw_ptr_bin.len() > 0:
                 return raw_ptr_bin
@@ -4091,7 +4151,7 @@ impl CCodegen:
                     0
                 var agg_field_tid: i32 = 0
                 if dst_tk == TypeKind.TY_STRUCT and name_sym != 0:
-                    let field_name = cc_intern_resolve(self.intern, name_sym)
+                    let field_name = cc_member(cc_intern_resolve(self.intern, name_sym))
                     if field_name.len() > 0 and self.struct_field_tid(dst_resolved as i32, name_sym) != 0:
                         out = out ++ "." ++ field_name ++ " = "
                         agg_field_tid = self.struct_field_tid(dst_resolved as i32, name_sym)
@@ -4190,7 +4250,7 @@ impl CCodegen:
             if name_sym == 0:
                 self.fail("emit-c: struct aggregate assignment with array fields requires named fields")
                 return ""
-            let field_name = cc_intern_resolve(self.intern, name_sym)
+            let field_name = cc_member(cc_intern_resolve(self.intern, name_sym))
             let field_tid = self.struct_field_tid(dst_resolved as i32, name_sym)
             if field_name.len() == 0 or field_tid == 0:
                 self.fail("emit-c: unresolved struct field in aggregate assignment")
@@ -4528,20 +4588,20 @@ impl CCodegen:
         var out = CcCalleeHint.NONE
 
         if base == "new":
-            if cc_str_contains(owner, "HashMap") != 0 or cc_str_contains(raw, "HashMap") != 0:
+            if owner == "HashMap" or raw.starts_with("HashMap."):
                 out = CcCalleeHint.MAP_NEW
-            else if cc_str_contains(owner, "List") != 0 or cc_str_contains(raw, "List") != 0:
+            else if owner == "List" or raw.starts_with("List."):
                 out = CcCalleeHint.LIST_NEW
-            else if cc_str_contains(owner, "Option") != 0 or cc_str_contains(raw, "Option") != 0:
+            else if owner == "Option" or raw.starts_with("Option."):
                 out = CcCalleeHint.OPT_NEW
         else if owner.len() > 0:
-            if cc_str_contains(owner, "HashMap") != 0:
+            if owner == "HashMap":
                 if base == "insert" or base == "get" or base == "contains" or cc_is_len_method(base) or base == "remove":
                     out = CcCalleeHint.MAP_RECV
-            else if cc_str_contains(owner, "List") != 0:
+            else if owner == "List":
                 if base == "push" or base == "get" or cc_is_len_method(base) or base == "remove" or base == "clear" or base == "pop":
                     out = CcCalleeHint.LIST_RECV
-            else if cc_str_contains(owner, "Option") != 0:
+            else if owner == "Option":
                 if base == "is_some" or base == "unwrap" or base == "expect":
                     out = CcCalleeHint.OPT_RECV
 
@@ -5714,32 +5774,32 @@ impl CCodegen:
         let recv_is_list =
             if callee_hint == CcCalleeHint.LIST_RECV:
                 1
-            else if cc_str_contains(first_owner, "List") != 0:
+            else if first_owner == "List":
                 1
             else:
                 0
         let recv_is_map =
             if callee_hint == CcCalleeHint.MAP_RECV:
                 1
-            else if cc_str_contains(first_owner, "HashMap") != 0:
+            else if first_owner == "HashMap":
                 1
             else:
                 0
         let recv_is_opt =
             if callee_hint == CcCalleeHint.OPT_RECV:
                 1
-            else if cc_str_contains(first_owner, "Option") != 0:
+            else if first_owner == "Option":
                 1
             else:
                 0
-        let recv_is_listslot = if cc_str_contains(first_owner, "ListSlot") != 0: 1 else: 0
+        let recv_is_listslot = if first_owner == "ListSlot": 1 else: 0
 
         if method == "new":
             let concrete_new_sym = self.canonical_body_sym(callee_sym)
             if concrete_new_sym != 0:
                 let concrete_name = cc_intern_resolve(self.intern, concrete_new_sym)
                 let concrete_owner = cc_owner_prefix(concrete_name)
-                if cc_str_contains(concrete_owner, "List") == 0 and cc_str_contains(concrete_owner, "HashMap") == 0:
+                if concrete_owner != "List" and concrete_owner != "HashMap":
                     return CcBuiltin.NONE
             var dst_kind = self.infer_place_kind(body, dest_place)
             if dst_kind == CcPlaceKind.UNKNOWN:
@@ -5773,7 +5833,7 @@ impl CCodegen:
         let recv_is_atomic =
             if self.sema.get_type_kind(first_atomic_tid) == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(first_atomic_tid as i32) == "Atomic":
                 1
-            else if cc_str_contains(first_owner, "Atomic") != 0:
+            else if first_owner == "Atomic":
                 1
             else:
                 0
@@ -6048,7 +6108,7 @@ impl CCodegen:
             return self.sema.ty_u32 as i32
         if kind == CcBuiltin.MAP_REMOVE:
             let owner = self.call_first_arg_owner_text(body, args_id)
-            if cc_str_contains(owner, "HashMap") != 0:
+            if owner == "HashMap":
                 let hinted = self.call_dest_expected_tid(body, dest_place)
                 if hinted != 0 and self.is_void_tid(hinted) == 0:
                     return hinted
@@ -7294,7 +7354,7 @@ impl CCodegen:
                 return "    abort();"
             let recv = self.map_recv_text(body, args_id)
             let owner = self.call_first_arg_owner_text(body, args_id)
-            let recv_is_hashmap = if cc_str_contains(owner, "HashMap") != 0: 1 else: 0
+            let recv_is_hashmap = if owner == "HashMap": 1 else: 0
             let key_operand = self.call_arg_operand(body, args_id, 1)
             let key_text = self.operand_text(body, key_operand)
             let key_tid = self.map_call_key_tid(body, args_id, key_operand)
@@ -7954,12 +8014,23 @@ impl CCodegen:
             var elem_tid = self.operand_tid(body, elem_operand)
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
                 elem_tid = self.sema.ty_i64 as i32
-            let elem_ty = self.c_type(elem_tid, 0)
+            // Each element is compared by its type's `==` (§11.7): a str by
+            // its text, an aggregate part by part. By its bytes, a str
+            // compared pointers, so `["--emit-c"].contains(arg)` was false
+            // for an `arg` spelled the same.
+            let list_elem = self.list_element_tid(self.recv_value_tid(body, args_id))
+            let cmp_tid = if list_elem > 0: list_elem else: elem_tid
+            let cmp_c = self.c_type(cmp_tid, 0)
+            let needle_tid = self.operand_sema_tid(body, elem_operand)
+            let needle_c = self.c_type(if needle_tid > 0: needle_tid else: elem_tid, 0)
+            let needle_is_ref = needle_tid > 0 and self.sema.get_type_kind(self.sema.resolve_alias(needle_tid as TypeId)) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(self.sema.resolve_alias(needle_tid as TypeId) as i32)
+            let needle_lv = if needle_is_ref: "(*__with_needle)" else: "__with_needle"
+            let equal = self.key_eq_text("__with_cur", needle_lv, cmp_tid)
             let dst = self.place_text(body, dest_place)
-            var out = "    " ++ cc_lbrace() ++ " int64_t __with_found = 0; int64_t __with_ci; int64_t __with_cn = with_vec_len(" ++ recv_ptr ++ "); " ++ elem_ty ++ " __with_needle = " ++ elem_text ++ ";"
+            var out = "    " ++ cc_lbrace() ++ " int64_t __with_found = 0; int64_t __with_ci; int64_t __with_cn = with_vec_len(" ++ recv_ptr ++ "); " ++ needle_c ++ " __with_needle = " ++ elem_text ++ ";"
             out = out ++ " for (__with_ci = 0; __with_ci < __with_cn; __with_ci++) " ++ cc_lbrace()
-            out = out ++ " " ++ elem_ty ++ " __with_cur; memcpy(&__with_cur, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_ci, sizeof(" ++ elem_ty ++ ")), sizeof(" ++ elem_ty ++ "));"
-            out = out ++ " if (memcmp(&__with_cur, &__with_needle, sizeof(" ++ elem_ty ++ ")) == 0) " ++ cc_lbrace() ++ " __with_found = 1; break; " ++ cc_rbrace()
+            out = out ++ " " ++ cmp_c ++ " __with_cur; memcpy(&__with_cur, with_vec_get_ptr_es(" ++ recv_ptr ++ ", __with_ci, sizeof(" ++ cmp_c ++ ")), sizeof(" ++ cmp_c ++ "));"
+            out = out ++ " if (" ++ equal ++ ") " ++ cc_lbrace() ++ " __with_found = 1; break; " ++ cc_rbrace()
             out = out ++ " " ++ cc_rbrace()
             if has_ret != 0:
                 out = out ++ " " ++ dst ++ " = __with_found;"
@@ -9157,6 +9228,11 @@ impl CCodegen:
             if self.rvalue_is_zero_const(body, d1):
                 let zero_addr = if dst_tk == TypeKind.TY_ARRAY: dst_place else: "&(" ++ dst_place ++ ")"
                 return "    memset(" ++ zero_addr ++ ", 0, sizeof(" ++ dst_place ++ "));"
+            // `&raw const s` of a str is the address of its header: a raw
+            // pointer, never the `&str` view a shared reference is (#1810).
+            if dst_tk == TypeKind.TY_PTR and d1 >= 0 and d1 < body.rval_kinds.len() and body.rval_kinds[d1] == RvalueKind.RK_REF:
+                let target = self.place_text(body, body.rval_d1[d1])
+                return "    " ++ dst_place ++ " = (" ++ self.c_type(dst_tid, 0) ++ ")(&" ++ target ++ ");"
             if dst_tk == TypeKind.TY_FN:
                 let fat_sym = self.rvalue_ck_fn_sym(body, d1)
                 if fat_sym != 0:
@@ -9958,7 +10034,7 @@ impl CCodegen:
                 out = out ++ self.record_keyword(resolved as i32) ++ " " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 var field_names: List[str] = List.new()
                 for fi in 0..self.sema.type_reflection_field_count(resolved as i32):
-                    let field_name = cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi))
+                    let field_name = cc_member(cc_intern_resolve(self.intern, self.sema.type_reflection_field_name(resolved as i32, fi)))
                     out = out ++ "    " ++ self.c_decl(self.sema.type_reflection_field_type_frozen(resolved as i32, fi), field_name) ++ ";\n"
                     field_names.push(field_name)
                 // D72 (§2.5.1): the template's hidden liveness byte.
@@ -9985,7 +10061,7 @@ impl CCodegen:
                 let field_sym: i32 = self.sema.type_extra[(start + fi * 3)]
                 let raw_field_tid: i32 = self.sema.type_extra[(start + fi * 3 + 1)]
                 let field_tid = self.effective_field_tid(resolved, field_sym, raw_field_tid)
-                let field_name = cc_intern_resolve(self.intern, field_sym)
+                let field_name = cc_member(cc_intern_resolve(self.intern, field_sym))
                 // §16.4 `@[align(N)]`: the field's declared alignment, the
                 // one TypeLayout places it at (#2022).
                 let align_slot = start + count * 3 + fi
@@ -10301,7 +10377,8 @@ impl CCodegen:
     fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> i32:
         if not referenced.contains(fn_sym):
             return 0
-        let name = self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
+        let linked = self.extern_link_name(fn_sym)
+        let name = if linked.len() > 0: linked else: self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
         // A with_* runtime function the fixed block below declares (the str,
         // fmt, memory and fiber entry points) is not redeclared; every other
         // with_* prototype comes from the With extern declaration itself, so
@@ -10339,6 +10416,10 @@ impl CCodegen:
         if ci_libc_symbol_allowed_as(name, CI_LIBC_KIND_FN) or ci_libc_simple_rename(name).len() > 0 or ci_migrate_preamble_name_is_modeled_libc(name):
             return true
         if name == "malloc" or name == "free":
+            return true
+        // Runtime entry points with_runtime.h declares (in the runtime's
+        // own signatures, rt_core.w): a second, emitted extern conflicted.
+        if name == "with_arg_at" or name == "with_vec_get_ptr_es":
             return true
         if name == "mkstemp" or name == "strtod" or name == "realpath" or name == "getenv":
             return true
@@ -11443,6 +11524,7 @@ impl CCodegen:
         out.write("extern void with_fiber_panic_capture(const uint8_t*, int32_t);\n")
         out.write("\n")
 
+        self.prepare_extern_link_names()
         self.prepare_global_init_bodies()
         if self.had_error != 0:
             return ""
@@ -11613,6 +11695,15 @@ impl CCodegen:
             return body.place_sema_types[place_id]
         self.place_tid(body, place_id)
 
+    // The type MIR gives an operand: its place's, or its constant's.
+    mut fn operand_sema_tid(body: &MirBody, operand_id: i32) -> i32:
+        let ok = body.operand_kinds[operand_id]
+        if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
+            return self.place_sema_tid(body, body.operand_d0[operand_id])
+        if ok == OperandKind.OK_CONSTANT:
+            return body.const_types[body.operand_d0[operand_id]]
+        0
+
     // `drop(place)`: the place's glue, guarded when the move analysis saw
     // its local moved (§2.5.2: a local never moved never holds the
     // sentinel, and a live value that happens to be all zero still drops).
@@ -11760,7 +11851,7 @@ impl CCodegen:
     fn glue_field_names(resolved: i32) -> List[str]:
         var out: List[str] = List.new()
         for sym in self.glue_field_syms(resolved):
-            out.push(cc_intern_resolve(self.intern, sym))
+            out.push(cc_member(cc_intern_resolve(self.intern, sym)))
         out
 
     mut fn glue_field_tids(resolved: i32) -> List[i32]:
@@ -12033,6 +12124,9 @@ impl CCodegen:
         let tk = self.sema.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY:
             return true
+        // §4.5: a distinct type is its underlying type in C (a typedef).
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return self.key_type_has_walk(self.sema.resolve_alias(self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)] as TypeId) as i32)
         if tk == TypeKind.TY_STRUCT:
             return true
         if self.type_is_payload_enum(resolved) != 0:
