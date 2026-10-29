@@ -1,3 +1,4 @@
+//! skip-on: windows IoError.Os carries Win32 codes there (#2773); the Windows case is behav_fs_read_file_io_error_windows.w
 //! expect-stdout: ok
 // #953 (spec §10.2 `read_file(path)?`), closing #909: read_file reports the
 // OS error instead of "". A missing path is Err(IoError.Os(2, path)) whose

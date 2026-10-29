@@ -6,7 +6,8 @@
 // its target. list_files_text lists the link as a leaf, as the lstat walk
 // lists a symlink on POSIX. copy_tree copies a file link as the file it
 // names, as open() follows one on POSIX, and refuses a directory link with
-// -21 (EISDIR), as the POSIX copy fails on a directory symlink: a tree is
+// ERROR_DIRECTORY_NOT_SUPPORTED (-336; the Win32 code IoError.Os carries,
+// #2773), as the POSIX copy fails on a directory symlink: a tree is
 // never duplicated from outside itself. Both walkers asked
 // GetFileAttributesW, which calls a junction a directory, and descended
 // into its target.
@@ -63,12 +64,12 @@ fn main:
 
     // A copy of the tree refuses the junction and never enters its target.
     let copied = base ++ "\\copy"
-    assert(copy_tree(tree, copied) == -21)
+    assert(copy_tree(tree, copied) == -336)
     assert(not file_exists(copied ++ "\\link\\keep.txt"))
     assert(not file_exists(copied ++ "\\link"))
     assert(read_file(keep ++ "\\keep.txt").unwrap() == "must survive")
     // A copy of the junction itself is refused the same way.
-    assert(copy_tree(tree ++ "\\link", base ++ "\\copy2") == -21)
+    assert(copy_tree(tree ++ "\\link", base ++ "\\copy2") == -336)
     assert(not file_exists(base ++ "\\copy2"))
     assert(read_file(keep ++ "\\keep.txt").unwrap() == "must survive")
     // A tree without a link still copies whole.
