@@ -1086,6 +1086,9 @@ type Sema {
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
+    // (type, trait) pairs a derive validation is checking: assumed to hold
+    // while it runs, so a recursive payload (`List[Self]`) closes.
+    derives_assumed: HashMap[i64, i32],
     recursion_open_sym: i32,
     recursion_inferred_type: i32,
     // The node of a path that disagreed in the first pass (reported after
@@ -3468,6 +3471,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         comptime_callable_visiting: HashSet[i32].new(),
         value_to_option_nodes: HashMap.new(),
         pipeline_implicit_iter: HashMap.new(),
+        derives_assumed: HashMap.new(),
         recursion_open_sym: 0,
         recursion_inferred_type: 0,
         recursion_pass1_mismatch: 0,

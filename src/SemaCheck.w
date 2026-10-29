@@ -30840,6 +30840,8 @@ impl Sema:
             type_sym = self.pool_lookup_symbol(self.type_name(resolved as i32))
         if type_sym == 0:
             return 0
+        // A derive validation in progress assumes its own (type, trait).
+        if self.derives_assumed.contains(sema_pair_key(type_sym, trait_sym)): return 1
         self.select_trait_impl(type_sym, trait_sym)
 
     // Frozen read twin for codegen compatibility checks. Exact/direct trait answers are
