@@ -6970,6 +6970,16 @@ impl MirBuilder:
         self.lower_collection_literal_call(node, MirIntrinsic.MAP_LITERAL, &args)
 
     mut fn lower_deref(expr: i32) -> i32:
+        // The place `*e` names is the one the value `*e` reads (lower_expr's
+        // UOP_DEREF): through a reference, the exact reference value. A D27
+        // element has a physical T place under its exact &T, and `Deref` on
+        // that place dereferenced T itself when T is a pointer, so `**ptrs[i]`
+        // projected through the pointer twice (#893).
+        let expr_ty = self.expr_type(expr)
+        if self.sema.get_type_kind(self.sema.resolve_alias(expr_ty as TypeId)) == TypeKind.TY_REF:
+            let ref_op = self.lower_expr(expr)
+            let ref_place = self.materialize_operand(ref_op, expr_ty, self.ast.get_start(expr))
+            return self.new_deref_place(ref_place)
         let base = self.lower_expr_place(expr)
         self.new_deref_place(base)
 
