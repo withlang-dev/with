@@ -207,6 +207,9 @@ fn step_live(name: &str, argv: &List[str], log: &str, status: &str) -> i32:
             print(line)
             append(status, line)
     let rc = join(&worker)
+    // The log ends with the rc line tools/verdict.w reads; without it a
+    // finished battery read as OPEN forever.
+    append(log, f"rc={rc}")
     let line = f"{name} rc={rc} wall={now() - t0}s"
     print(line)
     append(status, line)
