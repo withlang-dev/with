@@ -2324,10 +2324,10 @@ fn PoolState.new() -> Self:
 // outlived `:battery` by minutes). Killing them here covers every such return.
 impl Drop for PoolState:
     move fn drop():
-        for i in self.oldest..self.names.len() as i32:
-            if self.done[i] != 0: continue
+        for i in 0..self.names.len():
+            if i < self.oldest or self.done[i] != 0: continue
             with_eprint("build: stopping '" ++ self.names[i] ++ "', still running when the build ended")
-            let _ = build_graph_rt_exec_wait(self.pids[i], 1)
+            build_graph_rt_exec_wait(self.pids[i], 1)
             if self.slots[i] >= 0: build_graph_jobserver_release(with_getenv_str("WITH_BUILD_JOBSERVER"), self.slots[i])
 
 impl PoolState:
