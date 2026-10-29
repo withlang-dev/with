@@ -1218,35 +1218,6 @@ fn posix_restore_signal_mask(prev_mask: *const u32):
     if prev_mask as i64 != 0:
         let _ = rt_libc_sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut u32)
 
-// A child that runs past its timeout is sampled before it is killed
-// (#2249): `/usr/bin/sample <pid> 2` writes the stack tree to
-// /tmp/with-timeout-<pid>.sample, and the path is printed on stderr, so a
-// timeout names the hot loop (two migrations ran twenty minutes each
-// before one was sampled by hand: an exponential resolver walk).
-fn posix_sample_child_on_timeout(pid: i32):
-    var digits: [12]u8 = [0 as u8; 12]
-    var di: i32 = 12
-    var x = pid
-    if x == 0:
-        di = 11
-        digits[11] = 48 as u8
-    while x > 0:
-        di = di - 1
-        digits[di] = ((x % 10) + 48) as u8
-        x = x / 10
-    let pid_text = with_str_from_bytes((&digits as *const u8 as i64 + di as i64) as *const u8, (12 - di) as i64)
-    let out_path = "/tmp/with-timeout-" ++ pid_text ++ ".sample"
-    let blob = "/usr/bin/sample\0" ++ pid_text ++ "\0" ++ "2\0" ++ "-file\0" ++ out_path ++ "\0"
-    let blob_buf = posix_str_to_c_buf(blob)
-    let null_buf = posix_str_to_c_buf("/dev/null")
-    if blob_buf as i64 == 0 or null_buf as i64 == 0:
-        return
-    let _ = posix_run_argv(blob_buf as *const u8, blob.len(), null_buf, null_buf, 0 as *const c_char, 0 as *const c_char, 20000, true)
-    with_free(blob_buf)
-    with_free(null_buf)
-    let note = "timeout: child " ++ pid_text ++ " sampled to " ++ out_path ++ " (the top frames name the loop it was in)\n"
-    let _w = rt_write(2, note as *const u8, note.len())
-
 fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
     var status: i32 = -1
     let start_ns = with_clock_nanos()
@@ -1268,7 +1239,6 @@ fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
                 continue
             return -1
         if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
-            posix_sample_child_on_timeout(pid)
             let _term = rt_libc_kill(-pid, POSIX_SIGTERM)
             let _sleep = with_usleep(10000)
             let waited_after_term = rt_libc_waitpid(pid, &raw mut status, POSIX_WNOHANG)

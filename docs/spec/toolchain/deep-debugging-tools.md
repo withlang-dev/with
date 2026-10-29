@@ -635,11 +635,19 @@ a temporary — and the temporary-view checker should have refused it
 
 ### A pass that runs past its timeout
 
-The runner samples the child before killing it: on a timeout the runtime
-runs `/usr/bin/sample <pid> 2` into `/tmp/with-timeout-<pid>.sample` and
-prints the path on stderr (`timeout: child N sampled to …`). The top frames
-name the hot loop; two migrations ran twenty minutes each before one was
-sampled by hand (an exponential resolver walk, #2249).
+The timeout error names the target and the command it ran. Run that
+command again and, while it runs, attach the debugger to it (verified
+2026-10-29):
+
+```sh
+lldb --batch -p <pid> -o "bt all" -o "process kill"
+```
+
+The top frames name the hot loop; two migrations ran twenty minutes each
+before one was looked at this way (an exponential resolver walk, #2249).
+The runtime once ran `/usr/bin/sample` on every timed-out child itself; it
+no longer does, since the toolchain runs no host command (Eric,
+2026-10-28), and a deliberate stop (a build ending early) is not a hang.
 
 ### Two compiler generations disagree
 
