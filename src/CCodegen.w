@@ -11150,32 +11150,17 @@ impl CCodegen:
                 out.write("\n")
             out.write(self.emit_term(body, bb))
             out.write("\n")
-        // Emit stub labels for any BB indices referenced beyond block_count
-        let max_ref = self.max_referenced_bb(body)
-        var stub_bb = body.block_count()
-        while stub_bb <= max_ref:
-            out.write(f"bb{stub_bb}: ;\n")
-            stub_bb = stub_bb + 1
+        // #982: a successor past the body's blocks is invalid MIR. Empty stub
+        // labels made control fall off the function's end; they were emitted
+        // for "references" that read a call's destination place (its d2) as
+        // a block number.
+        for bb in 0..body.block_count():
+            for target in mir_term_successors(body, bb):
+                if target >= body.block_count():
+                    self.fail(f"bb{bb}'s terminator names bb{target}, past the body's {body.block_count()} blocks")
+                    return ""
         out.write(cc_rbrace() ++ "\n")
         out.finish()
-
-    fn max_referenced_bb(body: &MirBody) -> i32:
-        var max_bb = body.block_count() - 1
-        for bb in 0..body.block_count():
-            let tk = body.term_kind(bb)
-            let d0 = body.term_data0(bb)
-            let d1 = body.term_data1(bb)
-            let d2 = body.term_data2(bb)
-            let d3 = body.term_data3(bb)
-            if d2 > max_bb: max_bb = d2
-            if d3 > max_bb: max_bb = d3
-            if tk == TermKind.TK_SWITCH_INT and d1 >= 0 and d1 < body.switch_table_starts.len():
-                let start = body.switch_table_starts[d1]
-                let count = body.switch_table_counts[d1]
-                for i in 0..count:
-                    let tgt = body.switch_table_targets[(start + i)]
-                    if tgt > max_bb: max_bb = tgt
-        max_bb
 
     fn find_main_sym() -> i32:
         for i in 0..self.mir_mod.body_fn_syms.len():

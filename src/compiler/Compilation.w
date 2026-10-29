@@ -627,12 +627,19 @@ impl Compilation:
     // from the tree.
     fn register_embedded_bundle_interfaces() -> bool:
         var rt_registered = false
+        var missing: List[str] = List.new()
         for bi in 0..embedded_bundle_count():
-            if not embedded_bundle_present(bi):
-                continue
             // #2131: a bundle's interface is its target's (D39: layouts are
             // the target's); a slot for another target is not registered.
             if not embedded_bundle_for_this_target(bi):
+                continue
+            // #1076: an empty slot for this target means its modules compile
+            // from source in every unit — correct, and seconds per compile.
+            // Said once, so a timing or a profile is not read as the bundled
+            // path (a :dev stage1 carries none; a release binary all).
+            // An empty `rt` slot is found beside a runtime root instead (D30).
+            if not embedded_bundle_present(bi):
+                if embedded_bundle_name(bi) != "rt": missing.push(embedded_bundle_name(bi))
                 continue
             let name = embedded_bundle_name(bi)
             // The emit-C lane compiles every module in-unit and links no
@@ -678,6 +685,10 @@ impl Compilation:
                     if bundle_interfaces_register_wi(wi_text) == 0:
                         with_eprint("error: runtime root " ++ root ++ ": rt.wi has no `module <path>` sections")
                         return false
+        // Not while emitting C (every module is in-unit there) or building a
+        // bundle (its own slot is the one being filled).
+        if missing.len() > 0 and not self.emit_c_in_unit and self.bundle_corpus.len() == 0:
+            runtime_eprint("note: this compiler carries no bundle for " ++ missing.join(", ") ++ "; those modules compile from source")
         true
 
     fn manifest_lies_under_bundle_corpus(manifest: &str) -> bool:

@@ -1659,8 +1659,20 @@ fn mir_drop_state_block_has_successor(body: &MirBody, pred: i32, target: i32) ->
     false
 
 // The successors a terminator can transfer to, in the same order
-// mir_drop_state_block_has_successor recognizes them.
+// mir_drop_state_block_has_successor recognizes them; a switch on a
+// constant has only the arm it takes.
 fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
+    if body.term_kind(bb) == TermKind.TK_SWITCH_INT:
+        let chosen = mir_drop_state_constant_switch_target(body, bb)
+        if chosen >= 0:
+            var out: List[i32] = List.new()
+            out.push(chosen)
+            return out
+    mir_term_successors(body, bb)
+
+// Every block a terminator names as a successor: which data slot holds a
+// block is the terminator kind's (a call's d2 is its destination place).
+fn mir_term_successors(body: &MirBody, bb: i32) -> List[i32]:
     var out: List[i32] = List.new()
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
@@ -1670,10 +1682,6 @@ fn mir_drop_state_block_successors(body: &MirBody, bb: i32) -> List[i32]:
     if kind == TermKind.TK_GOTO:
         out.push(d0)
     else if kind == TermKind.TK_SWITCH_INT:
-        let chosen = mir_drop_state_constant_switch_target(body, bb)
-        if chosen >= 0:
-            out.push(chosen)
-            return out
         if d1 >= 0 and d1 < body.switch_table_starts.len():
             let start: i32 = body.switch_table_starts[d1]
             let count: i32 = body.switch_table_counts[d1]
