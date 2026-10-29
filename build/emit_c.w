@@ -419,7 +419,7 @@ fn emitc_public_function_name(line: &str) -> str:
 fn emitc_is_bridge_abi_symbol(name: &str) -> bool:
     name.starts_with("wl_") or name.starts_with("with_cimport_") or name.starts_with("with_ci_")
 
-fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> List[EmitCFunction]:
+fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: &str) -> (bool, List[EmitCFunction]):
     let exports: List[EmitCFunction] = List.new()
     let lines = emitc_split_lines(text)
     for li in 0..lines.len():
@@ -430,11 +430,13 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
         let fn_sig = emitc_parse_export_function(name, line)
         if fn_sig.ok == 0:
             let _ = emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
-            return List.new()
+            return (false, List.new())
         exports.push(fn_sig)
-    exports
+    (true, exports)
 
-fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
+// The public C ABI the sources declare, and whether every source was read
+// and every declaration parsed (an empty list is a valid answer).
+fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> (bool, List[EmitCFunction]):
     let all: List[EmitCFunction] = List.new()
     let fs = ctx.fs()
     for si in 0..sources.len():
@@ -442,13 +444,14 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFu
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
             let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
-            return List.new()
-        var exports = emitc_collect_public_abi_from_text(ctx, text, source_path)
-        if exports.len() == 0:
-            return List.new()
+            return (false, List.new())
+        let (ok, found) = emitc_collect_public_abi_from_text(ctx, text, source_path)
+        if not ok:
+            return (false, List.new())
+        var exports = found
         while exports.len() > 0:
             all.push(exports.remove(0))
-    all
+    (true, all)
 
 fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunction]:
     let all: List[EmitCFunction] = List.new()
@@ -488,9 +491,13 @@ fn emitc_generate_stub_files(ctx: &ActionCtx, dir: &str) -> i32:
     let bridge_sources: List[str] = List.new()
     bridge_sources |> push("src/compiler/LlvmBridge.w")
     bridge_sources |> push("src/compiler/ClangBridge.w")
-    let stub_exports = emitc_collect_public_abi(ctx, bridge_sources)
-    if stub_exports.len() == 0:
-        return emitc_fail(ctx, "found no bridge exports")
+    // The bridges declare their public C ABI here, if any. Since D100 made
+    // them package-internal (#2463) they have none: the emitted unit
+    // defines every wl_* function itself, so the header and the stubs
+    // declare nothing (a parse failure still fails, inside the scan).
+    let (scanned, stub_exports) = emitc_collect_public_abi(ctx, bridge_sources)
+    if not scanned:
+        return 1
     let fs = ctx.fs()
     if fs.mkdir_all(dir) != 0:
         return emitc_fail(ctx, "could not create " ++ dir)

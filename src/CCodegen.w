@@ -382,6 +382,18 @@ type CCodegen {
     closure_in_loop: List[i32],
     closure_env_kinds: List[i32],
     closure_index_by_sym: HashMap[i32, i32],
+    // #983: the per-type drop and copy glue (ensure_glue), prototypes and
+    // definitions in creation order, and the bodies of the types' Drop impls.
+    glue_done: HashMap[str, i32],
+    glue_protos: List[str],
+    glue_defs: List[str],
+    drop_body_by_owner: HashMap[i32, i32],
+    drop_receivers_ready: bool,
+    // D111: the holds of the statement being emitted (held_operand_text).
+    hold_active: bool,
+    hold_pre: str,
+    hold_texts: HashMap[i32, str],
+    hold_counter: i32,
 }
 
 // #1766: how a closure holds its environment (CodegenDispatch D63 tags).
@@ -456,6 +468,15 @@ fn c_emit_module(mir_mod: MirModule, ast: &AstPool, intern: &InternPool, sema: S
         closure_in_loop: List.new(),
         closure_env_kinds: List.new(),
         closure_index_by_sym: HashMap.new(),
+        glue_done: HashMap.new(),
+        glue_protos: List.new(),
+        glue_defs: List.new(),
+        drop_body_by_owner: HashMap.new(),
+        drop_receivers_ready: false,
+        hold_active: false,
+        hold_pre: "",
+        hold_texts: HashMap.new(),
+        hold_counter: 0,
     }
     for i in 0..cg.mir_mod.body_fn_syms.len():
         let sym: i32 = cg.mir_mod.body_fn_syms[i]
@@ -1271,7 +1292,9 @@ impl CCodegen:
         if cached.is_some():
             return cached.unwrap()
         let sig_idx = self.sig_index_for_sym(fn_sym)
-        let out = if sig_idx >= 0: self.sema.sig_param_uses_value_ref_abi(sig_idx, param_idx) else: 0
+        var out = if sig_idx >= 0: self.sema.sig_param_uses_value_ref_abi(sig_idx, param_idx) else: 0
+        if out == 0 and self.param_is_drop_receiver(fn_sym, param_idx):
+            out = 1
         self.fn_pointer_param_cache.insert(cache_key, out)
         out
 
@@ -3725,7 +3748,9 @@ impl CCodegen:
         let ok = body.operand_kinds[operand_id]
         let od = body.operand_d0[operand_id]
         if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
-            return self.place_text(body, od)
+            let text = self.place_text(body, od)
+            let hold = if self.hold_active: body.operand_hold(operand_id) else: 0
+            return if hold != 0: self.held_operand_text(body, operand_id, od, hold, text) else: text
         if ok == OperandKind.OK_CONSTANT:
             return self.const_text(body, od)
         self.fail(f"unsupported operand kind {ok}")
@@ -4082,6 +4107,11 @@ impl CCodegen:
                     if agg_fn_sym != 0:
                         field_text = self.fat_fn_literal(agg_fn_sym, self.sema.resolve_alias(agg_field_tid) as i32)
                 out = out ++ field_text
+        // D72 (§2.5.1): a constructed value of a struct with the hidden
+        // liveness byte is live; its zero-filled storage is the reset
+        // sentinel the drop guard skips (mir_store_liveness_byte).
+        if (dst_tk == TypeKind.TY_STRUCT or self.generic_inst_is_declared_struct(dst_resolved as i32)) and self.sema.struct_liveness_byte_frozen_tid(self.sema.get_type_d0(dst_resolved), dst_resolved as i32) != 0:
+            out = out ++ ", .__with_live = 1"
         out = out ++ cc_rbrace()
         out
 
@@ -4181,6 +4211,9 @@ impl CCodegen:
                     return ""
             else:
                 out = out ++ " " ++ field_place ++ " = " ++ value_text ++ ";"
+        // D72 (§2.5.1): a constructed value is live (mir_store_liveness_byte).
+        if self.sema.struct_liveness_byte_frozen_tid(self.sema.get_type_d0(dst_resolved), dst_resolved as i32) != 0:
+            out = out ++ " " ++ dst_place ++ ".__with_live = 1;"
         out ++ " " ++ cc_rbrace()
 
     mut fn map_recv_text(body: &MirBody, args_id: i32) -> str:
@@ -4204,6 +4237,14 @@ impl CCodegen:
             if inner != 0 and self.c_type(inner, 0) == "with_vec":
                 return "((with_vec*)(" ++ recv ++ "))"
         "&(" ++ recv ++ ")"
+
+    // The collection a builtin's receiver names, through its reference.
+    mut fn recv_value_tid(body: &MirBody, args_id: i32) -> i32:
+        let recv_tid = self.sema.resolve_alias(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
+        let recv_tk = self.sema.get_type_kind(recv_tid)
+        if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
+            return self.sema.resolve_alias(self.sema.get_type_d0(recv_tid)) as i32
+        recv_tid as i32
 
     // D115 Amendment 1: the `sizeof(elem)` a sized List helper takes, from
     // the receiver's element type (never from the header).
@@ -4273,6 +4314,11 @@ impl CCodegen:
                 n = "(int64_t)" ++ header ++ "->len"
             if is_str:
                 out = out ++ " with_vec_extend_str((uint8_t*)" ++ target ++ ", " ++ data ++ ", " ++ n ++ ");"
+            else if self.glue_needed(elem_tid):
+                // D111: each appended element with copy glue is one more
+                // holder (mir_emit_list_extend_from).
+                let hold = self.copy_call_text("((" ++ elem_c ++ "*)__with_dst->ptr)[__with_i]", elem_tid)
+                out = out ++ " " ++ cc_lbrace() ++ " with_vec* __with_dst = (with_vec*)" ++ target ++ "; int64_t __with_from = __with_dst->len; with_vec_extend_bits_es((uint8_t*)__with_dst, " ++ data ++ ", " ++ n ++ ", " ++ es ++ "); for (int64_t __with_i = __with_from; __with_i < __with_dst->len; __with_i++) " ++ cc_lbrace() ++ " " ++ hold ++ " " ++ cc_rbrace() ++ " " ++ cc_rbrace()
             else:
                 out = out ++ " with_vec_extend_bits_es((uint8_t*)" ++ target ++ ", " ++ data ++ ", " ++ n ++ ", " ++ es ++ ");"
         if not in_place and has_ret != 0:
@@ -5871,6 +5917,13 @@ impl CCodegen:
             return 0
         if kind == CcBuiltin.LIST_NEW:
             return CC_PSEUDO_TID_LIST
+        // D116: `a ++ b` is a new List of its destination's type; `++=`
+        // appends in place. With no result type the concatenation was
+        // built and never stored: `a ++ a` read as an empty List.
+        if kind == CcBuiltin.LIST_CONCAT:
+            return if dest_place >= 0 and dest_place < body.place_locals.len(): self.place_sema_tid(body, dest_place) else: self.sema.ty_void as i32
+        if kind == CcBuiltin.LIST_EXTEND:
+            return self.sema.ty_void as i32
         // The slot walk's destinations are MirLower's typed temps (#1434).
         if kind == CcBuiltin.MAP_SLOT_WALK:
             return self.place_tid_no_infer(body, dest_place)
@@ -5896,7 +5949,10 @@ impl CCodegen:
             if dst != 0 and self.is_void_tid(dst) == 0:
                 return dst
             return self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-        if kind == CcBuiltin.LIST_REMOVE or kind == CcBuiltin.LIST_CLEAR:
+        // `remove` transfers the element out (D27).
+        if kind == CcBuiltin.LIST_REMOVE:
+            return self.list_element_tid(self.recv_value_tid(body, args_id))
+        if kind == CcBuiltin.LIST_CLEAR:
             return self.sema.ty_void as i32
         if kind == CcBuiltin.VECSLOT_SET:
             return self.sema.ty_void as i32
@@ -6277,6 +6333,12 @@ impl CCodegen:
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
                 return self.c_sig_return_type(sig_idx)
+        // `Atomic.new(v)` is the generic `new` MIR typed by its destination;
+        // by name alone it resolved to another type's `new` (StringBuilder).
+        if dest_place >= 0 and cc_base_name(cc_intern_resolve(self.intern, self.call_callee_fn_sym(body, callee_operand))) == "new":
+            let dest_tid = self.place_sema_tid(body, dest_place)
+            if self.generic_inst_base_name(dest_tid) == "Atomic":
+                return dest_tid
         let builtin_ret = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         if builtin_ret != 0:
             return builtin_ret
@@ -6954,7 +7016,13 @@ impl CCodegen:
             let elem_ty = self.c_type(elem_tid, 0)
             var out = ""
             if has_ret != 0:
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = ((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index];\n"
+                let dst = self.place_text(body, dest_place)
+                out = out ++ "    " ++ dst ++ " = ((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index];\n"
+                // D111: the element read out is one more holder.
+                let read_tid = self.place_sema_tid(body, dest_place)
+                let hold = self.copy_call_text(dst, read_tid)
+                if hold.len() > 0:
+                    out = out ++ "    " ++ hold ++ "\n"
             else:
                 out = out ++ "    (void)((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index];\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -6973,7 +7041,11 @@ impl CCodegen:
             if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
-            var out = "    ((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index] = " ++ val ++ ";\n"
+            let slot = "((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index]"
+            // The replaced element's owner drops before the store.
+            let old_drop = self.drop_call_text(slot, elem_tid, true)
+            var out = if old_drop.len() > 0: "    " ++ old_drop ++ "\n" else: ""
+            out = out ++ "    " ++ slot ++ " = " ++ val ++ ";\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7040,7 +7112,15 @@ impl CCodegen:
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
             let idx = self.operand_text(body, self.call_arg_operand(body, args_id, 1))
-            var out = "    with_vec_remove_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ self.list_recv_elem_sizeof_text(body, args_id) ++ ");\n"
+            let es = self.list_recv_elem_sizeof_text(body, args_id)
+            // #606: the element moves into the result, then the tail closes
+            // over its slot, so it lives only in the result (#983: the
+            // result was never written; `xs.remove(i)` read as zero).
+            var out = "    " ++ cc_lbrace() ++ " void* __with_e = with_vec_get_ptr_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ es ++ ");"
+            if has_ret != 0:
+                let dst = self.place_text(body, dest_place)
+                out = out ++ " memcpy(&(" ++ dst ++ "), __with_e, sizeof(" ++ dst ++ "));"
+            out = out ++ " with_vec_remove_es(" ++ recv_ptr ++ ", (int64_t)(" ++ idx ++ "), " ++ es ++ "); " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7049,27 +7129,25 @@ impl CCodegen:
                 self.fail("vec.clear expects one argument")
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
-            var out = "    with_vec_clear(" ++ recv_ptr ++ ");\n"
+            // #606: each live element drops before the length resets.
+            let elem = self.list_element_tid(self.recv_value_tid(body, args_id))
+            var out = ""
+            if self.glue_needed(elem):
+                let elem_c = self.c_type(elem, 0)
+                out = "    " ++ cc_lbrace() ++ " with_vec* __l = " ++ recv_ptr ++ "; for (int64_t __i = 0; __i < __l->len; __i++) " ++ cc_lbrace() ++ " " ++ self.drop_call_text("((" ++ elem_c ++ "*)__l->ptr)[__i]", elem, true) ++ " " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+            out = out ++ "    with_vec_clear(" ++ recv_ptr ++ ");\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
         if kind == CcBuiltin.LIST_MAKE_UNIQUE:
-            // D120: copy-on-write before a mutation of a value List. The C
-            // backend copies bits; a List whose elements carry copy glue is
-            // not emitted in C yet, and says so.
+            // D120: copy-on-write before a mutation of a value List; a fresh
+            // buffer's elements with copy glue take their holds.
             if argc < 1:
                 self.fail("list make-unique expects one argument")
                 return "    abort();"
             let recv_ptr = self.list_recv_ptr_text(body, args_id)
-            let es = self.list_recv_elem_sizeof_text(body, args_id)
-            // The C output copies every value by its bits and leans on the
-            // runtime's owned-payload check at a free (a copied str is not
-            // retained here either, D111); the fresh buffer's elements are
-            // bit copies the same way. The element copy glue is the LLVM
-            // backend's (mir_emit_list_element_copy_glue_ptr).
-            var out = "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ");\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
+            let elem = self.list_element_tid(self.recv_value_tid(body, args_id))
+            return self.list_make_unique_text(recv_ptr, elem) ++ f"    goto bb{next_bb};"
 
         if kind == CcBuiltin.MAP_MAKE_UNIQUE:
             // D120 stage 2: the same before a mutation of a value HashMap or
@@ -7078,9 +7156,8 @@ impl CCodegen:
                 self.fail("map make-unique expects one argument")
                 return "    abort();"
             let recv = self.map_recv_text(body, args_id)
-            var out = "    (void)with_hashmap_make_unique((void**)&(" ++ recv ++ "));\n"
-            out = out ++ f"    goto bb{next_bb};"
-            return out
+            let map_tid = self.recv_value_tid(body, args_id)
+            return self.map_make_unique_text(recv, map_tid) ++ f"    goto bb{next_bb};"
 
         if kind == CcBuiltin.LIST_CONCAT or kind == CcBuiltin.LIST_EXTEND:
             return self.emit_list_concat(body, args_id, dest_place, kind, has_ret, next_bb)
@@ -7148,7 +7225,7 @@ impl CCodegen:
                     val_tid = self.sema.ty_i64 as i32
                 let key_ty = self.c_type(key_tid, 0)
                 let val_ty = self.c_type(val_tid, 0)
-                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_kind_text(key_tid) ++ ", 0, 0);\n"
+                out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid) ++ ");\n"
             else:
                 out = out ++ "    (void)0;\n"
             out = out ++ f"    goto bb{next_bb};"
@@ -7179,7 +7256,8 @@ impl CCodegen:
             // handle MAP_NEW produced. Lazily creating wrote through const
             // receivers and silently accepted handles LLVM would crash on.
             var out = "    " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ ";"
-            out = out ++ " with_hashmap_insert((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace() ++ "\n"
+            let map_tid = self.recv_value_tid(body, args_id)
+            out = out ++ self.owned_map_insert_text("(void*)(intptr_t)(" ++ recv ++ ")", is_str_key, key_tid, self.hashmap_value_tid(map_tid)) ++ " " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7223,6 +7301,16 @@ impl CCodegen:
             let key_ty = self.c_type(key_tid, 0)
             let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
             var out = f"    {cc_lbrace()} {key_ty} __with_k = {key_text}; "
+            // #1189: removal transfers the stored key out too; one that owns
+            // memory is dropped here (the probe is the caller's, D110).
+            let stored_key = self.hashmap_key_tid(self.recv_value_tid(body, args_id))
+            let key_glue = self.glue_needed(stored_key)
+            var key_drop = ""
+            if key_glue:
+                out = out ++ self.c_type(stored_key, 0) ++ " __with_sk = " ++ self.zero_value_text(stored_key) ++ "; "
+                key_drop = " " ++ self.drop_call_text("__with_sk", stored_key, true)
+            let remove_call = if key_glue: "with_hashmap_remove_entry((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_sk, " else: "with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, "
+            let remove_tail = if key_glue: ")" else: ", " ++ is_str_key ++ ")"
             if recv_is_hashmap != 0:
                 let dst = self.place_text(body, dest_place)
                 if self.type_is_payload_enum(ret_tid) == 0:
@@ -7236,13 +7324,13 @@ impl CCodegen:
                 let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(ret_tid, some_variant, 0)
                 let payload_c = self.c_type(payload_tid, 0)
                 out = out ++ payload_c ++ " __with_v = " ++ self.zero_value_text(payload_tid) ++ ";"
-                out = out ++ " if ((" ++ recv ++ ") != 0 && with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_v, " ++ is_str_key ++ ") != 0) "
+                out = out ++ " if ((" ++ recv ++ ") != 0 && " ++ remove_call ++ "&__with_v" ++ remove_tail ++ " != 0) "
                 out = out ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(ret_tid, some_variant, "__with_v") ++ "; " ++ cc_rbrace()
-                out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(ret_tid, none_variant, "") ++ "; " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+                out = out ++ " else " ++ cc_lbrace() ++ " " ++ dst ++ " = " ++ self.payload_enum_literal(ret_tid, none_variant, "") ++ "; " ++ cc_rbrace() ++ key_drop ++ " " ++ cc_rbrace() ++ "\n"
             else:
                 if has_ret != 0:
                     out = out ++ self.place_text(body, dest_place) ++ " = "
-                out = out ++ "(((" ++ recv ++ ") != 0) && (with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, (void*)0, " ++ is_str_key ++ ") != 0)); " ++ cc_rbrace() ++ "\n"
+                out = out ++ "(((" ++ recv ++ ") != 0) && (" ++ remove_call ++ "(void*)0" ++ remove_tail ++ " != 0));" ++ key_drop ++ " " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -7780,11 +7868,18 @@ impl CCodegen:
                 value = if dest_is_view: self.ref_from_slot_ptr_text(at, dest_tid) else: "(*(" ++ self.c_type(dest_tid, 0) ++ "*)" ++ at ++ ")"
                 // D100: no unchecked helpers; a dead slot has nothing to read.
                 slot_guard = "    if (!with_hashmap_slot_occupied(" ++ map_ptr ++ ", " ++ slot ++ ")) with_panic(WITH_STR_LIT(\"map slot holds no entry: slot_key/slot_value read a removed or out-of-range slot\"), WITH_STR_LIT(\"\"), 0);\n"
+        // The guard leads the read (it was overwritten here, so a dead
+        // slot was read with no panic).
         var out = slot_guard.clone()
         if has_ret != 0:
-            out = "    " ++ self.place_text(body, dest_place) ++ " = " ++ value ++ ";\n"
+            let dst = self.place_text(body, dest_place)
+            out = out ++ "    " ++ dst ++ " = " ++ value ++ ";\n"
+            // D111: a key or value read out by value is one more holder.
+            let read_tid = self.place_sema_tid(body, dest_place)
+            if self.sema.get_type_kind(self.sema.resolve_alias(read_tid as TypeId)) != TypeKind.TY_REF and self.glue_needed(read_tid):
+                out = out ++ "    " ++ self.copy_call_text(dst, read_tid) ++ "\n"
         else:
-            out = "    (void)" ++ value ++ ";\n"
+            out = out ++ "    (void)" ++ value ++ ";\n"
         out ++ f"    goto bb{next_bb};"
 
     mut fn emit_builtin_list_extra_call_term(body: &MirBody, kind: CcBuiltin, args_id: i32, dest_place: i32, next_bb: i32, argc: i32, ret_tid: i32, has_ret: i32) -> str:
@@ -7793,7 +7888,11 @@ impl CCodegen:
                 self.fail("map.clear expects one argument")
                 return "    abort();"
             let recv = self.map_recv_text(body, args_id)
-            var out = "    if ((" ++ recv ++ ") != 0) with_hashmap_clear((void*)(intptr_t)(" ++ recv ++ "));\n"
+            // The table is type-erased: the live entries drop through the
+            // receiver's type before clear resets occupancy.
+            let map_tid = self.recv_value_tid(body, args_id)
+            let entries = self.map_entries_glue_text(map_tid, false)
+            var out = "    " ++ cc_lbrace() ++ " uint8_t* __h = (uint8_t*)(intptr_t)(" ++ recv ++ "); if (__h != NULL) " ++ cc_lbrace() ++ " " ++ entries ++ "with_hashmap_clear(__h); " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
             out = out ++ f"    goto bb{next_bb};"
             return out
 
@@ -8429,6 +8528,15 @@ impl CCodegen:
         if intrinsic == MirIntrinsic.COLLECTION_LITERAL or intrinsic == MirIntrinsic.MAP_LITERAL:
             return self.emit_collection_literal_term(body, intrinsic, args_id, dest_place, next_bb)
 
+        // `Atomic.new(v)`: the cell `{ val }` emit_struct_type_defs declares
+        // (#985 made std.random's state one, in a global's initializer).
+        let new_tid = if name == "new" and dest_place >= 0: self.place_sema_tid(body, dest_place) else: 0
+        if new_tid != 0 and self.generic_inst_base_name(new_tid) == "Atomic" and self.call_arg_count(body, args_id) == 1:
+            let value = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+            let dst = self.place_text(body, dest_place)
+            let cell_c = self.c_type(new_tid, 0)
+            return "    " ++ dst ++ " = (" ++ cell_c ++ ")" ++ cc_lbrace() ++ " .val = " ++ value ++ " " ++ cc_rbrace() ++ ";\n" ++ f"    goto bb{next_bb};"
+
         self.fail("emit-c does not support generic intrinsic " ++ if name.len() > 0: name else: "<unknown>")
         "\n"
 
@@ -8463,13 +8571,14 @@ impl CCodegen:
         let key_ty = self.c_type(key_tid, 0)
         let val_ty = self.c_type(val_tid, 0)
         let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
-        out = out ++ " void* __with_h = with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_kind_text(key_tid) ++ ", 0, 0);"
+        out = out ++ " void* __with_h = with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid) ++ ");"
         let entry_count = if is_set: argc else: argc / 2
         for i in 0..entry_count:
             let key_idx = if is_set: i else: i * 2
             let key_text = self.collection_literal_elem_text(body, args_id, key_idx, key_tid)
             let val_text = if is_set: "1" else: self.collection_literal_elem_text(body, args_id, key_idx + 1, val_tid)
-            out = out ++ " " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ "; with_hashmap_insert(__with_h, &__with_k, &__with_v, " ++ is_str_key ++ "); " ++ cc_rbrace()
+            let insert = self.owned_map_insert_text("__with_h", is_str_key, key_tid, if is_set: 0 else: val_tid)
+            out = out ++ " " ++ cc_lbrace() ++ " " ++ key_ty ++ " __with_k = " ++ key_text ++ "; " ++ val_ty ++ " __with_v = " ++ val_text ++ ";" ++ insert ++ " " ++ cc_rbrace()
         out = out ++ " " ++ dst ++ " = (int64_t)(intptr_t)__with_h; " ++ cc_rbrace() ++ "\n"
         out ++ f"    goto bb{next_bb};"
 
@@ -9043,6 +9152,11 @@ impl CCodegen:
             let dst_tid = self.place_tid(body, d0)
             let dst_resolved = self.sema.resolve_alias(dst_tid)
             let dst_tk = self.sema.get_type_kind(dst_resolved)
+            // §2.5.1: the reset-on-move blank is all-zero bytes, padding
+            // included: the drop guard reads every byte (#983).
+            if self.rvalue_is_zero_const(body, d1):
+                let zero_addr = if dst_tk == TypeKind.TY_ARRAY: dst_place else: "&(" ++ dst_place ++ ")"
+                return "    memset(" ++ zero_addr ++ ", 0, sizeof(" ++ dst_place ++ "));"
             if dst_tk == TypeKind.TY_FN:
                 let fat_sym = self.rvalue_ck_fn_sym(body, d1)
                 if fat_sym != 0:
@@ -9159,11 +9273,7 @@ impl CCodegen:
         if sk == StmtKind.StorageDead:
             return f"    /* StorageDead(_{d0}); */"
         if sk == StmtKind.Drop:
-            let p = self.place_text(body, d0)
-            let pt = self.place_tid(body, d0)
-            if pt == CC_PSEUDO_TID_LIST:
-                return "    with_vec_clear(&(" ++ p ++ "));"
-            return "    /* drop(" ++ p ++ "); */"
+            return self.drop_place_text(body, d0)
         if sk == StmtKind.Nop:
             return "    /* nop */"
         self.fail(f"unsupported statement kind {sk}")
@@ -9283,15 +9393,7 @@ impl CCodegen:
             out = out ++ f"    goto bb{d3};"
             return out
         if tk == TermKind.TK_DROP_AND_GOTO:
-            let p = self.place_text(body, d0)
-            let pt = self.place_tid(body, d0)
-            var out = ""
-            if pt == CC_PSEUDO_TID_LIST:
-                out = out ++ "    with_vec_clear(&(" ++ p ++ "));\n"
-            else:
-                out = out ++ "    /* drop(" ++ p ++ "); */\n"
-            out = out ++ f"    goto bb{d1};"
-            return out
+            return self.drop_place_text(body, d0) ++ f"\n    goto bb{d1};"
         self.fail(f"unsupported terminator kind {tk}")
         "    abort();"
 
@@ -10170,17 +10272,18 @@ impl CCodegen:
     // are named one by one: the block declares five, and a `with_fiber_`
     // prefix here left every other fiber extern (std.task's coroutine calls
     // for g.pull()) with no prototype at all.
-    // #2180: how the runtime map hashes and compares a key: 0, by its
-    // bytes; 1, as a `str`. A key that needs hash and equality functions
-    // has none in the emit-C lane yet, and is refused rather than compared
-    // by its bytes.
-    mut fn map_key_kind_text(key_tid: i32) -> str:
-        let resolved = self.sema.resolve_alias(key_tid as TypeId)
-        let tk = self.sema.get_type_kind(resolved)
-        if tk == TypeKind.TY_STR: return "1"
-        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR: return "0"
-        self.fail("emit-c has no hash and equality functions for a map key of type " ++ self.sema.type_name(key_tid) ++ " (#2180)")
-        "0"
+    // #2180 (§11.7, D96): how the runtime map hashes and compares a key,
+    // as with_hashmap_new_keyed's last three arguments: 0, by its bytes (an
+    // integer, a bool, a raw pointer); 1, as a `str`; 2, by the functions
+    // generated for its type (key_hash_fn_name, key_eq_fn_name).
+    mut fn map_key_args_text(key_tid: i32) -> str:
+        let resolved = self.sema.resolve_alias(key_tid as TypeId) as i32
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved): return "1, 0, 0"
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR: return "0, 0, 0"
+        let hash_fn = self.key_hash_fn_name(resolved)
+        let eq_fn = self.key_eq_fn_name(resolved)
+        "2, " ++ hash_fn ++ ", " ++ eq_fn
 
     fn prelude_block_declares(name: &str) -> bool:
         cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
@@ -10839,15 +10942,22 @@ impl CCodegen:
             if kind == CC_CLOSURE_ENV_CELL:
                 let cell = self.closure_cell_struct(idx)
                 out = out ++ cell ++ " " ++ cc_lbrace() ++ " void (*drop_fn)(void*); void* (*clone_fn)(void*); " ++ env ++ " env; " ++ cc_rbrace() ++ ";\n"
-                // The cell's drop frees it. The C backend destroys no value
-                // anywhere (every drop(...) it emits is a comment), so the
-                // captures are not destroyed here either.
-                out = out ++ "static void " ++ name ++ "_drop(void* cell) " ++ cc_lbrace() ++ " with_free(cell); " ++ cc_rbrace() ++ "\n"
+                // The cell's drop drops every capture that needs it (guarded:
+                // a consuming body blanks the slot it moved out of), then
+                // frees the cell (gen_closure_env_drop_fn).
+                var drops = ""
+                for ci in 0..count:
+                    let call = self.drop_call_text(f"c->env.c{ci}", body.local_type_ids[ci + 1], true)
+                    if call.len() > 0:
+                        drops = drops ++ " " ++ call
+                out = out ++ "static void " ++ name ++ "_drop(void* cell) " ++ cc_lbrace() ++ " " ++ cell ++ "* c = (" ++ cell ++ "*)cell; (void)c;" ++ drops ++ " with_free(cell); " ++ cc_rbrace() ++ "\n"
                 if self.closure_cell_clonable(idx):
                     out = out ++ "static void* " ++ name ++ "_clone(void* old) " ++ cc_lbrace() ++ " " ++ cell ++ "* c = (" ++ cell ++ "*)with_alloc_aligned((int64_t)sizeof(" ++ cell ++ "), (int64_t)_Alignof(" ++ cell ++ ")); memcpy(c, old, sizeof(" ++ cell ++ "));"
+                    // D111: the clone is one more holder of every capture.
                     for ci in 0..count:
-                        if self.sema.get_type_kind(self.sema.resolve_alias(body.local_type_ids[ci + 1])) == TypeKind.TY_STR:
-                            out = out ++ f" c->env.c{ci} = with_str_clone_ref(c->env.c{ci});"
+                        let call = self.copy_call_text(f"c->env.c{ci}", body.local_type_ids[ci + 1])
+                        if call.len() > 0:
+                            out = out ++ " " ++ call
                     out = out ++ " return c; " ++ cc_rbrace() ++ "\n"
             out = out ++ "static " ++ self.closure_fn_sig(idx) ++ ";\n"
         if any_inline:
@@ -11146,9 +11256,15 @@ impl CCodegen:
                 if self.check_interrupted() != 0:
                     return ""
                 out.write(self.line_directive(body, start + si))
-                out.write(self.emit_stmt_line(body, start + si))
+                self.begin_holds()
+                let stmt_text = self.emit_stmt_line(body, start + si)
+                self.hold_active = false
+                out.write(self.with_holds(stmt_text))
                 out.write("\n")
-            out.write(self.emit_term(body, bb))
+            self.begin_holds()
+            let term_text = self.emit_term(body, bb)
+            self.hold_active = false
+            out.write(self.with_holds(term_text))
             out.write("\n")
         // #982: a successor past the body's blocks is invalid MIR. Empty stub
         // labels made control fall off the function's end; they were emitted
@@ -11278,7 +11394,24 @@ impl CCodegen:
         out.write("extern with_str with_sysinfo_hostname(void);\n")
         // §16.3c, D47: a str lent to a `const char *` parameter.
         out.write("extern uint8_t* with_cstr_lend(with_str);\n")
-        out.write("extern void with_cstr_release(uint8_t*);\n\n")
+        out.write("extern void with_cstr_release(uint8_t*);\n")
+        // #983: the drop and copy glue's runtime (rt_core, channel_runtime).
+        out.write("extern void with_str_free(with_str*);\n")
+        out.write("extern void with_str_retain(const with_str*);\n")
+        out.write("extern with_str with_str_own_view(with_str);\n")
+        out.write("extern int64_t with_slotmap_capacity(uint8_t*);\n")
+        out.write("extern int32_t with_slotmap_slot_occupied(uint8_t*, int64_t);\n")
+        out.write("extern uint8_t* with_slotmap_value_ptr_at(uint8_t*, int64_t);\n")
+        out.write("extern void with_slotmap_free(uint8_t*);\n")
+        out.write("extern int32_t with_hashmap_remove_entry(void*, const void*, void*, void*);\n")
+        out.write("extern void with_hasher_init(uint8_t*);\n")
+        out.write("extern void with_hasher_write(uint8_t*, const uint8_t*, int64_t);\n")
+        out.write("extern void with_hasher_write_str(uint8_t*, with_str);\n")
+        out.write("extern int64_t with_hasher_finish(uint8_t*);\n")
+        out.write("extern void with_channel_release_sender(int64_t);\n")
+        out.write("extern void with_channel_release_receiver(int64_t);\n")
+        // §2.5.1: the reset-on-move sentinel is all-zero storage.
+        out.write("static inline int __with_is_zero(const void* p, size_t n) " ++ cc_lbrace() ++ " const unsigned char* b = (const unsigned char*)p; for (size_t i = 0; i < n; i++) if (b[i] != 0) return 0; return 1; " ++ cc_rbrace() ++ "\n\n")
         out.write("#ifdef WITH_BOOTSTRAP_TYPES_H\n")
         out.write("extern with_str with_str_concat_ref(with_str, with_str);\n")
         out.write("extern with_str with_str_concat_n(const with_str*, int64_t);\n")
@@ -11384,6 +11517,8 @@ impl CCodegen:
         var body_texts: List[str] = List.new()
         for _ in 0..self.mir_mod.bodies.len(): body_texts.push("")
         var thunk_defs = ""
+        // #983: glue names the Drop impls it calls; bodies make more glue.
+        var glue_scanned: isize = 0
         var grew = true
         while grew:
             grew = false
@@ -11405,6 +11540,9 @@ impl CCodegen:
             // their targets.
             thunk_defs = self.emit_fat_thunk_defs()
             reach.scan(thunk_defs)
+            while glue_scanned < self.glue_defs.len():
+                reach.scan(self.glue_defs[glue_scanned])
+                glue_scanned += 1
             if reach.pending(): grew = true
         if self.had_error != 0:
             return ""
@@ -11434,10 +11572,12 @@ impl CCodegen:
             any_decl = true
         if any_decl:
             out.write("\n")
+        for proto in self.glue_protos: out.write(proto)
         out.write(closure_decls)
         // The thunks' static definitions precede the bodies (every reached
         // function already has its prototype above).
         out.write(thunk_defs)
+        for def in self.glue_defs: out.write(def)
         for i in 0..self.mir_mod.bodies.len():
             if not reach.emitted(i as i32): continue
             out.write(body_texts[i])
@@ -11449,3 +11589,660 @@ impl CCodegen:
         // C entrypoint wrapper for With `main`.
         out.write(main_wrapper)
         out.finish()
+
+// ── Ownership: drop glue, copy glue and operand holds (#983) ─────────
+//
+// The C backend runs the destructors and takes the holds the LLVM backend
+// does (CodegenDispatch: mir_emit_drop_ptr_for_sema_type,
+// mir_emit_copy_glue_ptr, mir_eval_operand), shape for shape. Each type's
+// drop and copy is one static C function, `__with_drop_<tid>(T*)` and
+// `__with_copy_<tid>(T*)`, declared before every body so a type recursive
+// through its own collection calls its declaration (#1557's class). A
+// member's drop is guarded by the reset-on-move sentinel (§2.5.1, #697):
+// all-zero storage owns nothing, so it is skipped.
+impl CCodegen:
+    fn glue_needed(tid: i32) -> bool:
+        tid > 0 and tid != CC_PSEUDO_TID_LIST and self.sema.type_needs_drop_frozen(tid) != 0
+
+    // The type a place holds: MIR's (Sema's), the one its drop is decided by.
+    mut fn place_sema_tid(body: &MirBody, place_id: i32) -> i32:
+        let local = body.place_locals[place_id]
+        if body.place_proj_counts[place_id] == 0 and local >= 0 and local < body.local_type_ids.len() and body.local_type_ids[local] > 0:
+            return body.local_type_ids[local]
+        if place_id < body.place_sema_types.len() and body.place_sema_types[place_id] > 0:
+            return body.place_sema_types[place_id]
+        self.place_tid(body, place_id)
+
+    // `drop(place)`: the place's glue, guarded when the move analysis saw
+    // its local moved (§2.5.2: a local never moved never holds the
+    // sentinel, and a live value that happens to be all zero still drops).
+    mut fn drop_place_text(body: &MirBody, place_id: i32) -> str:
+        let tid = self.place_sema_tid(body, place_id)
+        if tid == CC_PSEUDO_TID_LIST or (tid == 0 and self.place_tid(body, place_id) == CC_PSEUDO_TID_LIST):
+            self.fail(f"emit-c: drop of a List whose element type MIR does not name (place {place_id} of " ++ cc_intern_resolve(self.intern, body.fn_sym) ++ ")")
+            return "    abort();"
+        if not self.glue_needed(tid):
+            return ""
+        let guarded = body.local_ever_moved(body.place_locals[place_id])
+        let lv = self.place_text(body, place_id)
+        "    " ++ self.drop_call_text(lv, tid, guarded)
+
+    // A call of `tid`'s drop glue on the lvalue `lv`.
+    mut fn drop_call_text(lv: &str, tid: i32, guarded: bool) -> str:
+        if not self.glue_needed(tid):
+            return ""
+        let name = self.ensure_drop_glue(tid)
+        if name.len() == 0:
+            return ""
+        let call = name ++ "(" ++ self.glue_arg(lv, tid) ++ ");"
+        if guarded: "if (!__with_is_zero(&(" ++ lv ++ "), sizeof(" ++ lv ++ "))) " ++ call else: call
+
+    // The glue's argument: the value's address, or an array's first element.
+    fn glue_arg(lv: &str, tid: i32) -> str:
+        if self.sema.get_type_kind(self.sema.resolve_alias(tid as TypeId)) == TypeKind.TY_ARRAY: "(" ++ lv ++ ")" else: "&(" ++ lv ++ ")"
+
+    mut fn glue_param_c_type(resolved: i32) -> str:
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY:
+            return self.c_type(self.sema.get_type_d0(resolved as TypeId), 0)
+        self.c_type(resolved, 0)
+
+    // Seed-bound: the name observed, so the caller's `name` is not the
+    // insert's last-use take (the tail StorageDead fix in this stack); the
+    // next seed pin inserts it in place.
+    mut fn mark_glue_done(name: &str):
+        self.glue_done.insert(name, 1)
+
+    // Declares `name` for `resolved` and builds its body once.
+    mut fn ensure_glue(kind: &str, resolved: i32) -> str:
+        let name = f"__with_{kind}_{resolved}"
+        if self.glue_done.contains(name):
+            return name
+        self.mark_glue_done(name)
+        let sig = "static void " ++ name ++ "(" ++ self.glue_param_c_type(resolved) ++ "* p)"
+        self.glue_protos.push(sig ++ ";\n")
+        let lv = if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY: "p" else: "(*p)"
+        let text = if kind == "drop": self.drop_glue_body(lv, resolved) else: self.copy_glue_body(lv, resolved)
+        self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ "\n" ++ text ++ cc_rbrace() ++ "\n")
+        name
+
+    mut fn ensure_drop_glue(tid: i32) -> str:
+        self.ensure_glue("drop", self.sema.resolve_alias(tid as TypeId) as i32)
+
+    // The statements dropping the value at `lv` of type `resolved`, in the
+    // order the LLVM backend drops it.
+    mut fn drop_glue_body(lv: &str, resolved: i32) -> str:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        // §4.5 (D75): a distinct type has its underlying type's destructor.
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return "    " ++ self.drop_call_text(lv, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)], false) ++ "\n"
+        if tk == TypeKind.TY_TUPLE:
+            var out = ""
+            var i = self.sema.get_type_d1(resolved as TypeId) - 1
+            while i >= 0:
+                out = out ++ "    " ++ self.drop_call_text(lv ++ f".field{i}", self.tuple_field_tid(resolved, i), true) ++ "\n"
+                i = i - 1
+            return out
+        if tk == TypeKind.TY_ARRAY:
+            let elem = self.sema.get_type_d0(resolved as TypeId)
+            let n = self.sema.get_type_d1(resolved as TypeId)
+            return f"    for (int64_t __i = {n} - 1; __i >= 0; __i--) " ++ cc_lbrace() ++ " " ++ self.drop_call_text(lv ++ "[__i]", elem, true) ++ " " ++ cc_rbrace() ++ "\n"
+        if tk == TypeKind.TY_STR:
+            return "    with_str_free(&(" ++ lv ++ "));\n"
+        // D63: a callable value owns its environment when its context word
+        // is tagged as a heap cell (tag 2); the cell's own drop fn frees it.
+        if tk == TypeKind.TY_FN:
+            return "    " ++ cc_lbrace() ++ " uintptr_t __b = (uintptr_t)(" ++ lv ++ ").ctx; if ((__b & 3u) == 2u) " ++ cc_lbrace() ++ " void* __cell = (void*)(__b - 2u); (*(void (**)(void*))__cell)(__cell); (" ++ lv ++ ").ctx = 0; " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+        if tk == TypeKind.TY_GENERIC_INST:
+            let generic = self.drop_generic_inst_body(lv, resolved)
+            if generic.len() > 0:
+                return generic
+        // with-abi §3: a nullable-pointer Option is its payload; null is None.
+        if self.option_is_nullable_pointer(resolved):
+            var payload: i32 = 0
+            for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                if self.sema.type_reflection_variant_payload_count(resolved, vi) > 0:
+                    payload = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, 0)
+            return "    if ((" ++ lv ++ ") != 0) " ++ cc_lbrace() ++ " " ++ self.drop_call_text(lv, payload, false) ++ " " ++ cc_rbrace() ++ "\n"
+        var out = ""
+        let has_drop = self.sema.type_has_drop_impl(resolved) != 0
+        if has_drop:
+            let fn_name = self.user_drop_fn_name(resolved)
+            if fn_name.len() == 0:
+                return "    abort();\n"
+            out = out ++ "    " ++ fn_name ++ "(&(" ++ lv ++ "));\n"
+        let variants = if self.type_is_payload_enum(resolved) != 0: self.sema.type_reflection_variant_count(resolved) else: 0
+        if variants == 0:
+            return out ++ self.drop_struct_fields_text(lv, resolved)
+        // #693: an enum's payload cleanup belongs to the variant switch; an
+        // explicit drop owns it entirely.
+        if has_drop:
+            return out
+        out = out ++ "    switch ((" ++ lv ++ ").tag) " ++ cc_lbrace() ++ "\n"
+        for vi in 0..variants:
+            var case_text = ""
+            for pi in 0..self.sema.type_reflection_variant_payload_count(resolved, vi):
+                let ptid = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi)
+                case_text = case_text ++ " " ++ self.drop_call_text(lv ++ self.payload_enum_field_path(resolved, vi, pi), ptid, true)
+            if case_text.len() > 0:
+                out = out ++ f"    case {self.sema.type_reflection_variant_discriminant(resolved, vi)}:" ++ case_text ++ " break;\n"
+        out ++ "    default: break;\n    " ++ cc_rbrace() ++ "\n"
+
+    // A struct's fields in reverse, each guarded, minus those the type's
+    // Drop body consumed (drop_consumed_field).
+    mut fn drop_struct_fields_text(lv: &str, resolved: i32) -> str:
+        let names = self.glue_field_names(resolved)
+        let tids = self.glue_field_tids(resolved)
+        let syms = self.glue_field_syms(resolved)
+        let owner = self.sema.get_type_d0(resolved as TypeId)
+        var out = ""
+        var fi = names.len() - 1
+        while fi >= 0:
+            if owner == 0 or self.sema.drop_consumed_field(owner, syms[fi]) == 0:
+                let call = self.drop_call_text(lv ++ "." ++ names[fi], tids[fi], true)
+                if call.len() > 0:
+                    out = out ++ "    " ++ call ++ "\n"
+            fi = fi - 1
+        out
+
+    // A struct's C members, as emit_struct_type_defs declares them.
+    fn glue_field_syms(resolved: i32) -> List[i32]:
+        var out: List[i32] = List.new()
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
+            let start = self.sema.get_type_d1(resolved as TypeId)
+            for fi in 0..self.sema.get_type_d2(resolved as TypeId):
+                out.push(self.sema.type_extra[(start + fi * 3)])
+            return out
+        if self.generic_inst_is_declared_struct(resolved):
+            for fi in 0..self.sema.type_reflection_field_count(resolved):
+                out.push(self.sema.type_reflection_field_name(resolved, fi))
+        out
+
+    fn glue_field_names(resolved: i32) -> List[str]:
+        var out: List[str] = List.new()
+        for sym in self.glue_field_syms(resolved):
+            out.push(cc_intern_resolve(self.intern, sym))
+        out
+
+    mut fn glue_field_tids(resolved: i32) -> List[i32]:
+        var out: List[i32] = List.new()
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
+            let start = self.sema.get_type_d1(resolved as TypeId)
+            for fi in 0..self.sema.get_type_d2(resolved as TypeId):
+                out.push(self.effective_field_tid(resolved, self.sema.type_extra[(start + fi * 3)], self.sema.type_extra[(start + fi * 3 + 1)]))
+            return out
+        if self.generic_inst_is_declared_struct(resolved):
+            for fi in 0..self.sema.type_reflection_field_count(resolved):
+                out.push(self.sema.type_reflection_field_type_frozen(resolved, fi))
+        out
+
+    // The compiler-backed generic instances: Box, Rc/Arc, List, HashMap,
+    // HashSet, SlotMap and the channel endpoints. "" for any other.
+    mut fn drop_generic_inst_body(lv: &str, resolved: i32) -> str:
+        let base = self.sema.get_generic_inst_base(resolved)
+        let box_pointee = self.std_box_pointee_tid(resolved)
+        if box_pointee != 0:
+            if self.sema.get_type_kind(self.sema.resolve_alias(box_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
+                self.fail("emit-c: dropping a Box[dyn " ++ self.sema.type_name(box_pointee) ++ "] needs the trait's vtable drop slot, which the C backend does not lower (#1847)")
+                return "    abort();\n"
+            // #697/§2.5.1: a reset-on-move Box is null.
+            return "    if ((" ++ lv ++ ") != NULL) " ++ cc_lbrace() ++ " " ++ self.drop_call_text("(*(" ++ lv ++ "))", box_pointee, true) ++ " with_free((void*)(" ++ lv ++ ")); " ++ cc_rbrace() ++ "\n"
+        if self.sema.type_symbol_is_std_rc_owner(base) != 0:
+            // RcControl {strong, value}: the last holder drops the payload
+            // and frees both cells; Arc counts atomically.
+            let payload = self.sema.get_generic_inst_arg(resolved, 0)
+            let payload_c = self.c_type(payload, 0)
+            let dec = if cc_intern_resolve(self.intern, base) == "Arc": "__atomic_sub_fetch((int64_t*)__c, 1, __ATOMIC_ACQ_REL) == 0" else: "--(*(int64_t*)__c) == 0"
+            return "    " ++ cc_lbrace() ++ " uint8_t* __c = (uint8_t*)(" ++ lv ++ ").ptr; if (__c != NULL && " ++ dec ++ ") " ++ cc_lbrace() ++ " " ++ payload_c ++ "* __v = *(" ++ payload_c ++ "**)(__c + 8); " ++ self.drop_call_text("(*__v)", payload, false) ++ " with_free((void*)__v); with_free((void*)__c); " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+        if base == self.sema.syms.list:
+            let elem = self.sema.get_generic_inst_arg(resolved, 0)
+            let elem_c = self.c_type(elem, 0)
+            let es = "(int64_t)sizeof(" ++ elem_c ++ ")"
+            var elems = ""
+            if self.glue_needed(elem):
+                elems = "for (int64_t __i = 0; __i < (" ++ lv ++ ").len; __i++) " ++ cc_lbrace() ++ " " ++ self.drop_call_text("((" ++ elem_c ++ "*)(" ++ lv ++ ").ptr)[__i]", elem, true) ++ " " ++ cc_rbrace() ++ " "
+            // D120: only the buffer's last holder drops the elements and frees it.
+            return "    if (with_vec_release_last(&(" ++ lv ++ "), " ++ es ++ ")) " ++ cc_lbrace() ++ " " ++ elems ++ "with_vec_free_buffer_at((" ++ lv ++ ").ptr, (" ++ lv ++ ").cap, " ++ es ++ ", (" ++ lv ++ ").start); (" ++ lv ++ ") = (with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace() ++ "; " ++ cc_rbrace() ++ "\n"
+        if base == self.sema.syms.hashmap or base == self.sema.syms.hashset:
+            let entries = self.map_entries_glue_text(resolved, false)
+            return "    " ++ cc_lbrace() ++ " uint8_t* __h = (uint8_t*)(intptr_t)(" ++ lv ++ "); if (__h != NULL && with_hashmap_release_last(__h)) " ++ cc_lbrace() ++ " " ++ entries ++ "with_hashmap_free(__h); " ++ cc_rbrace() ++ " (" ++ lv ++ ") = 0; " ++ cc_rbrace() ++ "\n"
+        if base == self.sema.syms.slotmap:
+            let elem = self.sema.get_generic_inst_arg(resolved, 0)
+            let elem_c = self.c_type(elem, 0)
+            var elems = ""
+            if self.glue_needed(elem):
+                elems = "int64_t __cap = with_slotmap_capacity(__h); for (int64_t __i = 0; __i < __cap; __i++) " ++ cc_lbrace() ++ " if (!with_slotmap_slot_occupied(__h, __i)) continue; " ++ self.drop_call_text("(*(" ++ elem_c ++ "*)with_slotmap_value_ptr_at(__h, __i))", elem, true) ++ " " ++ cc_rbrace() ++ " "
+            return "    " ++ cc_lbrace() ++ " uint8_t* __h = (uint8_t*)(" ++ lv ++ ").ptr; if (__h != NULL) " ++ cc_lbrace() ++ " " ++ elems ++ "with_slotmap_free(__h); " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+        let base_name = cc_intern_resolve(self.intern, base)
+        if base_name == "Sender":
+            return "    with_channel_release_sender((" ++ lv ++ ").handle);\n"
+        if base_name == "Receiver":
+            return "    with_channel_release_receiver((" ++ lv ++ ").handle);\n"
+        ""
+
+    // The glue over a map's live entries, in a block holding its table as
+    // `__h`: each key's and value's drop, or (copy) each one's copy glue
+    // after make-unique copied the table.
+    mut fn map_entries_glue_text(resolved: i32, copying: bool) -> str:
+        let key = self.hashmap_key_tid(resolved)
+        let value = self.hashmap_value_tid(resolved)
+        let key_glue = self.glue_needed(key)
+        let value_glue = self.glue_needed(value)
+        if not key_glue and not value_glue:
+            return ""
+        var each = ""
+        if key_glue:
+            let key_lv = "(*(" ++ self.c_type(key, 0) ++ "*)with_hashmap_key_ptr_at(__h, __i))"
+            each = each ++ " " ++ (if copying: self.copy_call_text(key_lv, key) else: self.drop_call_text(key_lv, key, true))
+        if value_glue:
+            let value_lv = "(*(" ++ self.c_type(value, 0) ++ "*)with_hashmap_value_ptr_at(__h, __i))"
+            each = each ++ " " ++ (if copying: self.copy_call_text(value_lv, value) else: self.drop_call_text(value_lv, value, true))
+        "int64_t __cap = with_hashmap_capacity(__h); for (int64_t __i = 0; __i < __cap; __i++) " ++ cc_lbrace() ++ " if (!with_hashmap_slot_occupied(__h, __i)) continue;" ++ each ++ " " ++ cc_rbrace() ++ " "
+
+    // The C function a type's `impl Drop` lowered to: a generic instance's
+    // specialization (Sema's concrete_drop_mono_syms), else the body Sema
+    // registers as the owner's `drop` (drop_owner_for_fn_symbol).
+    mut fn user_drop_fn_name(resolved: i32) -> str:
+        var sym: i32 = self.sema.concrete_drop_mono_syms.get(resolved) ?? 0
+        if sym == 0:
+            if not self.drop_receivers_ready:
+                self.drop_receivers_ready = true
+                for i in 0..self.mir_mod.body_fn_syms.len():
+                    let fn_sym = self.mir_mod.body_fn_syms[i]
+                    let owner = self.sema.drop_owner_for_fn_symbol(fn_sym)
+                    if owner != 0 and not self.drop_body_by_owner.contains(owner):
+                        self.drop_body_by_owner.insert(owner, fn_sym)
+            sym = self.drop_body_by_owner.get(self.sema.get_type_d0(resolved as TypeId)) ?? 0
+        let body_sym = self.canonical_body_sym(sym)
+        if body_sym == 0:
+            self.fail("emit-c: the Drop impl of " ++ self.sema.type_name(resolved) ++ " has no lowered body to call")
+            return ""
+        self.fn_c_name(body_sym)
+
+    // A `Drop.drop` receiver is the value in its owner's storage (FnAbi
+    // owned_place): the body and the glue's field cleanup after it read one
+    // place, so a field the body moves out is blanked where the glue looks.
+    fn param_is_drop_receiver(fn_sym: i32, param_idx: i32) -> bool:
+        if param_idx != 0:
+            return false
+        if self.sema.drop_owner_for_fn_symbol(fn_sym) != 0:
+            return true
+        for entry in self.sema.concrete_drop_mono_syms:
+            if entry.1 == fn_sym:
+                return true
+        false
+
+    // ── copy glue (D111, D120) ──
+
+    mut fn copy_call_text(lv: &str, tid: i32) -> str:
+        if not self.glue_needed(tid):
+            return ""
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STR:
+            return "with_str_retain(&(" ++ lv ++ "));"
+        self.ensure_glue("copy", resolved) ++ "(" ++ self.glue_arg(lv, resolved) ++ ");"
+
+    mut fn copy_glue_body(lv: &str, resolved: i32) -> str:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return "    " ++ self.copy_call_text(lv, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)]) ++ "\n"
+        if tk == TypeKind.TY_STR:
+            return "    with_str_retain(&(" ++ lv ++ "));\n"
+        if tk == TypeKind.TY_TUPLE:
+            var out = ""
+            for i in 0..self.sema.get_type_d1(resolved as TypeId):
+                out = out ++ "    " ++ self.copy_call_text(lv ++ f".field{i}", self.tuple_field_tid(resolved, i)) ++ "\n"
+            return out
+        if tk == TypeKind.TY_ARRAY:
+            let elem = self.sema.get_type_d0(resolved as TypeId)
+            return f"    for (int64_t __i = 0; __i < {self.sema.get_type_d1(resolved as TypeId)}; __i++) " ++ cc_lbrace() ++ " " ++ self.copy_call_text(lv ++ "[__i]", elem) ++ " " ++ cc_rbrace() ++ "\n"
+        if tk == TypeKind.TY_GENERIC_INST:
+            let base = self.sema.get_generic_inst_base(resolved)
+            // D120 stage 2: a HashMap or HashSet of values shares its table.
+            if base == self.sema.syms.hashmap or base == self.sema.syms.hashset:
+                return "    if ((" ++ lv ++ ") != 0) with_hashmap_retain((uint8_t*)(intptr_t)(" ++ lv ++ "));\n"
+            // D120: a List of values shares its buffer.
+            if base == self.sema.syms.list:
+                return "    with_vec_retain(&(" ++ lv ++ "), (int64_t)sizeof(" ++ self.c_type(self.sema.get_generic_inst_arg(resolved, 0), 0) ++ "));\n"
+        if self.type_is_payload_enum(resolved) != 0 and not self.option_is_nullable_pointer(resolved):
+            var out = "    switch ((" ++ lv ++ ").tag) " ++ cc_lbrace() ++ "\n"
+            for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                var case_text = ""
+                for pi in 0..self.sema.type_reflection_variant_payload_count(resolved, vi):
+                    let ptid = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi)
+                    case_text = case_text ++ " " ++ self.copy_call_text(lv ++ self.payload_enum_field_path(resolved, vi, pi), ptid)
+                if case_text.len() > 0:
+                    out = out ++ f"    case {self.sema.type_reflection_variant_discriminant(resolved, vi)}:" ++ case_text ++ " break;\n"
+            return out ++ "    default: break;\n    " ++ cc_rbrace() ++ "\n"
+        if tk == TypeKind.TY_STRUCT or self.generic_inst_is_declared_struct(resolved):
+            let names = self.glue_field_names(resolved)
+            let tids = self.glue_field_tids(resolved)
+            var out = ""
+            for fi in 0..names.len():
+                let call = self.copy_call_text(lv ++ "." ++ names[fi], tids[fi])
+                if call.len() > 0:
+                    out = out ++ "    " ++ call ++ "\n"
+            return out
+        self.fail("emit-c: no copy glue for Copy type " ++ self.sema.type_name(resolved) ++ " (D111)")
+        "    abort();\n"
+
+    // D120: after make-unique copied a shared buffer, each element with copy
+    // glue is one more holder of what it shares.
+    mut fn list_make_unique_text(recv_ptr: &str, elem: i32) -> str:
+        let elem_c = self.c_type(elem, 0)
+        let es = "(int64_t)sizeof(" ++ elem_c ++ ")"
+        if not self.glue_needed(elem):
+            return "    (void)with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ");\n"
+        "    if (with_vec_make_unique_bits(" ++ recv_ptr ++ ", " ++ es ++ ")) " ++ cc_lbrace() ++ " with_vec* __l = " ++ recv_ptr ++ "; for (int64_t __i = 0; __i < __l->len; __i++) " ++ cc_lbrace() ++ " " ++ self.copy_call_text("((" ++ elem_c ++ "*)__l->ptr)[__i]", elem) ++ " " ++ cc_rbrace() ++ " " ++ cc_rbrace() ++ "\n"
+
+    mut fn map_make_unique_text(recv: &str, map_tid: i32) -> str:
+        let entries = self.map_entries_glue_text(self.sema.resolve_alias(map_tid as TypeId) as i32, true)
+        if entries.len() == 0:
+            return "    (void)with_hashmap_make_unique((void**)&(" ++ recv ++ "));\n"
+        "    if (with_hashmap_make_unique((void**)&(" ++ recv ++ "))) " ++ cc_lbrace() ++ " uint8_t* __h = (uint8_t*)(intptr_t)(" ++ recv ++ "); " ++ entries ++ cc_rbrace() ++ "\n"
+
+    // An insert of `__with_k`/`__with_v` into `handle`: ordinary insert and
+    // literals transfer the same owners; a duplicate keeps the stored key,
+    // drops the unused incoming one and replaces the value, dropping the old
+    // (mir_emit_owned_map_insert). `value_tid` is 0 for a set.
+    mut fn owned_map_insert_text(handle: &str, is_str_key: &str, key_tid: i32, value_tid: i32) -> str:
+        let insert = " with_hashmap_insert(" ++ handle ++ ", &__with_k, &__with_v, " ++ is_str_key ++ ");"
+        let key_glue = self.glue_needed(key_tid)
+        let value_glue = value_tid != 0 and self.glue_needed(value_tid)
+        if not key_glue and not value_glue:
+            return insert
+        var replace = ""
+        if value_glue:
+            let value_c = self.c_type(value_tid, 0)
+            replace = replace ++ " " ++ self.drop_call_text("(*(" ++ value_c ++ "*)__with_old)", value_tid, true)
+        if value_tid != 0:
+            replace = replace ++ " memcpy(__with_old, &__with_v, sizeof(__with_v));"
+        if key_glue:
+            replace = replace ++ " " ++ self.drop_call_text("__with_k", key_tid, true)
+        " void* __with_old = with_hashmap_get_ptr(" ++ handle ++ ", &__with_k, " ++ is_str_key ++ "); if (__with_old != NULL) " ++ cc_lbrace() ++ replace ++ " " ++ cc_rbrace() ++ " else" ++ insert
+
+    // ── operand holds (D111) ──
+
+    // An operand MIR recorded a hold for, as the consumer reads it: a
+    // retained copy takes a hold on what the source carries; a taken copy
+    // hands the value over and blanks the source, so the source's drop
+    // releases nothing. The work lands before the statement (hold_pre), once
+    // however often the statement's text names the operand.
+    mut fn held_operand_text(body: &MirBody, operand_id: i32, place_id: i32, hold: i32, text: &str) -> str:
+        let done = self.hold_texts.get(operand_id)
+        if done.is_some():
+            return done.unwrap()
+        let tid = self.place_sema_tid(body, place_id)
+        var out: str = text
+        if hold == MIR_HOLD_TAKE:
+            out = f"__with_take{self.hold_counter}"
+            self.hold_counter = self.hold_counter + 1
+            if self.sema.get_type_kind(self.sema.resolve_alias(tid as TypeId)) == TypeKind.TY_ARRAY:
+                self.hold_pre = self.hold_pre ++ " __typeof__(" ++ text ++ ") " ++ out ++ "; memcpy(" ++ out ++ ", " ++ text ++ ", sizeof(" ++ out ++ "));"
+            else:
+                self.hold_pre = self.hold_pre ++ " __typeof__(" ++ text ++ ") " ++ out ++ " = " ++ text ++ ";"
+            self.hold_pre = self.hold_pre ++ " memset(&(" ++ text ++ "), 0, sizeof(" ++ text ++ "));"
+        else if tid == self.sema.ty_str as i32 and body.place_proj_counts[place_id] > 0 and body.proj_kinds[(body.place_proj_starts[place_id] + body.place_proj_counts[place_id] - 1)] == ProjKind.PK_DEREF:
+            // #2307: a str read through a view owns its bytes: shared when
+            // the view starts an owned buffer, copied otherwise.
+            out = f"__with_own{self.hold_counter}"
+            self.hold_counter = self.hold_counter + 1
+            self.hold_pre = self.hold_pre ++ " with_str " ++ out ++ " = with_str_own_view(" ++ text ++ ");"
+        else:
+            self.hold_pre = self.hold_pre ++ " " ++ self.copy_call_text(text, tid)
+        self.hold_texts.insert(operand_id, out)
+        // Seed-bound: the stored copy, not `out`. Every seed through the
+        // 2026-10-25 one lowers a tail `out` after `insert(…, out)` as a
+        // read of the blank the insert's last-use take left (the tail
+        // StorageDead fix in this stack); the next seed pin returns `out`.
+        self.hold_texts.get(operand_id).unwrap()
+
+    // A statement or terminator's text with its holds in front of it.
+    mut fn with_holds(text: &str) -> str:
+        if self.hold_pre.len() == 0:
+            return text
+        "    " ++ cc_lbrace() ++ self.hold_pre ++ "\n" ++ text ++ "\n    " ++ cc_rbrace()
+
+    // `RK_USE` of a `CK_ZERO_SIZED` constant: the reset-on-move blank.
+    fn rvalue_is_zero_const(body: &MirBody, rval_id: i32) -> bool:
+        if rval_id < 0 or rval_id >= body.rval_kinds.len() or body.rval_kinds[rval_id] != RvalueKind.RK_USE:
+            return false
+        let op = body.rval_d0[rval_id]
+        if op < 0 or op >= body.operand_kinds.len() or body.operand_kinds[op] != OperandKind.OK_CONSTANT:
+            return false
+        let cid = body.operand_d0[op]
+        cid >= 0 and cid < body.const_kinds.len() and body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED
+
+    mut fn begin_holds():
+        self.hold_active = true
+        self.hold_pre = ""
+        self.hold_texts = HashMap.new()
+
+// ── Map keys (§11.7, D96, #2180) ─────────────────────────────────────
+//
+// A key that is not its bytes (a tuple, a struct, an enum with payloads, a
+// List, a str inside any of them) is hashed and compared by functions
+// generated for its type, part by part in the order the LLVM backend's
+// mir_emit_hash_ptrs and mir_emit_eq_ptrs walk it, so equal keys hash
+// alike. A key with its own `Eq` or a key projection is refused here, not
+// compared by its parts.
+impl CCodegen:
+    // A type whose parts the walks visit; any other is compared and hashed
+    // by its bytes (an integer, a float, a bool, a pointer, a plain enum, an
+    // opaque runtime handle).
+    fn key_type_has_walk(resolved: i32) -> bool:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY:
+            return true
+        if tk == TypeKind.TY_STRUCT:
+            return true
+        if self.type_is_payload_enum(resolved) != 0:
+            return true
+        if tk == TypeKind.TY_GENERIC_INST:
+            return self.sema.get_generic_inst_base(resolved) == self.sema.syms.list or self.std_box_pointee_tid(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
+        false
+
+    mut fn key_refuse_projection(resolved: i32) -> bool:
+        if self.sema.concrete_key_sigs.contains(resolved):
+            self.fail("emit-c: a map key of type " ++ self.sema.type_name(resolved) ++ " hashes and compares by its key projection, which the C backend does not call yet (#2180)")
+            return true
+        false
+
+    // A type with an `eq` of its own (derived or written) compares by it:
+    // its specialization (Sema's concrete_eq_mono_syms), each argument
+    // passed as its C prototype takes it.
+    mut fn concrete_eq_call_text(la: &str, lb: &str, resolved: i32) -> str:
+        let mono: i32 = self.sema.concrete_eq_mono_syms.get(resolved) ?? 0
+        let body_sym = self.canonical_body_sym(mono)
+        if body_sym == 0:
+            self.fail("emit-c: the eq of map key type " ++ self.sema.type_name(resolved) ++ " has no lowered body to call (#2180)")
+            return "0"
+        let sig = self.sig_index_for_sym(body_sym)
+        var args = ""
+        for i in 0..2:
+            let lv = if i == 0: la else: lb
+            let p_tid = if sig >= 0: self.sema.sig_param_type(sig, i) else: 0
+            let by_ref = self.fn_param_is_c_pointer(body_sym, i) != 0 or (p_tid > 0 and self.sema.get_type_kind(self.sema.resolve_alias(p_tid as TypeId)) == TypeKind.TY_REF)
+            if i > 0: args = args ++ ", "
+            args = args ++ (if by_ref: "&(" ++ lv ++ ")" else: lv)
+        "(" ++ self.fn_c_name(body_sym) ++ "(" ++ args ++ ") != 0)"
+
+    // Statements feeding the value at `lv` (of `tid`) to the hasher `st`.
+    mut fn key_hash_text(lv: &str, tid: i32, st: &str) -> str:
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        if self.key_refuse_projection(resolved):
+            return ""
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved):
+            return " with_hasher_write_str(" ++ st ++ ", " ++ lv ++ ");"
+        if tk == TypeKind.TY_REF:
+            return self.key_hash_text("(*" ++ lv ++ ")", self.sema.get_type_d0(resolved as TypeId), st)
+        if self.key_type_has_walk(resolved):
+            let name = self.ensure_key_walk("hash", resolved)
+            return " " ++ name ++ "(" ++ self.glue_arg(lv, resolved) ++ ", " ++ st ++ ");"
+        " with_hasher_write(" ++ st ++ ", (const uint8_t*)&(" ++ lv ++ "), (int64_t)sizeof(" ++ lv ++ "));"
+
+    // An expression: whether the values at `la` and `lb` (of `tid`) are equal.
+    mut fn key_eq_text(la: &str, lb: &str, tid: i32) -> str:
+        let resolved = self.sema.resolve_alias(tid as TypeId) as i32
+        if self.key_refuse_projection(resolved):
+            return "0"
+        if self.sema.concrete_eq_sigs.contains(resolved):
+            return self.concrete_eq_call_text(la, lb, resolved)
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved):
+            return "with_str_eq_ref(" ++ la ++ ", " ++ lb ++ ")"
+        if tk == TypeKind.TY_REF:
+            return self.key_eq_text("(*" ++ la ++ ")", "(*" ++ lb ++ ")", self.sema.get_type_d0(resolved as TypeId))
+        if self.key_type_has_walk(resolved):
+            let name = self.ensure_key_walk("eq", resolved)
+            return name ++ "(" ++ self.glue_arg(la, resolved) ++ ", " ++ self.glue_arg(lb, resolved) ++ ")"
+        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_PTR or tk == TypeKind.TY_ENUM:
+            return "((" ++ la ++ ") == (" ++ lb ++ "))"
+        "(memcmp(&(" ++ la ++ "), &(" ++ lb ++ "), sizeof(" ++ la ++ ")) == 0)"
+
+    // `__with_keyhash_<t>(p, st)` / `__with_keyeq_<t>(a, b)`: one aggregate
+    // type's walk, declared before its body so a recursive type calls it.
+    mut fn ensure_key_walk(kind: &str, resolved: i32) -> str:
+        let name = f"__with_keywalk_{kind}_{resolved}"
+        if self.glue_done.contains(name):
+            return name
+        self.mark_glue_done(name)
+        let param_c = self.glue_param_c_type(resolved)
+        let is_array = self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY
+        if kind == "hash":
+            let sig = "static void " ++ name ++ "(" ++ param_c ++ "* p, uint8_t* st)"
+            self.glue_protos.push(sig ++ ";\n")
+            let body = self.key_hash_walk_text(if is_array: "p" else: "(*p)", resolved)
+            self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ body ++ " " ++ cc_rbrace() ++ "\n")
+        else:
+            let sig = "static int32_t " ++ name ++ "(" ++ param_c ++ "* a, " ++ param_c ++ "* b)"
+            self.glue_protos.push(sig ++ ";\n")
+            let body = self.key_eq_walk_text(if is_array: "a" else: "(*a)", if is_array: "b" else: "(*b)", resolved)
+            self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ body ++ " return 1; " ++ cc_rbrace() ++ "\n")
+        name
+
+    mut fn key_hash_walk_text(lv: &str, resolved: i32) -> str:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_TUPLE:
+            var out = ""
+            for i in 0..self.sema.get_type_d1(resolved as TypeId):
+                out = out ++ self.key_hash_text(lv ++ f".field{i}", self.tuple_field_tid(resolved, i), "st")
+            return out
+        if tk == TypeKind.TY_ARRAY:
+            let n = self.sema.get_type_d1(resolved as TypeId)
+            return f" for (int64_t __i = 0; __i < {n}; __i++) " ++ cc_lbrace() ++ self.key_hash_text(lv ++ "[__i]", self.sema.get_type_d0(resolved as TypeId), "st") ++ " " ++ cc_rbrace()
+        if tk == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(resolved) == self.sema.syms.list:
+            let elem = self.sema.get_generic_inst_arg(resolved, 0)
+            let elem_c = self.c_type(elem, 0)
+            let each = self.key_hash_text("((" ++ elem_c ++ "*)(" ++ lv ++ ").ptr)[__i]", elem, "st")
+            return " with_hasher_write(st, (const uint8_t*)&(" ++ lv ++ ").len, 8); for (int64_t __i = 0; __i < (" ++ lv ++ ").len; __i++) " ++ cc_lbrace() ++ each ++ " " ++ cc_rbrace()
+        let box_pointee = self.std_box_pointee_tid(resolved)
+        if box_pointee != 0:
+            if self.sema.get_type_kind(self.sema.resolve_alias(box_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
+                return " with_hasher_write(st, (const uint8_t*)&(" ++ lv ++ "), (int64_t)sizeof(" ++ lv ++ "));"
+            return self.key_hash_text("(*(" ++ lv ++ "))", box_pointee, "st")
+        if self.type_is_payload_enum(resolved) != 0:
+            if self.option_is_nullable_pointer(resolved):
+                var payload: i32 = 0
+                for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                    if self.sema.type_reflection_variant_payload_count(resolved, vi) == 1:
+                        payload = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, 0)
+                return " " ++ cc_lbrace() ++ " uint8_t __some = (" ++ lv ++ ") != 0; with_hasher_write(st, &__some, 1); if (__some) " ++ cc_lbrace() ++ self.key_hash_text(lv, payload, "st") ++ " " ++ cc_rbrace() ++ " " ++ cc_rbrace()
+            var out = " with_hasher_write(st, (const uint8_t*)&(" ++ lv ++ ").tag, (int64_t)sizeof((" ++ lv ++ ").tag)); switch ((" ++ lv ++ ").tag) " ++ cc_lbrace()
+            for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                let pc = self.sema.type_reflection_variant_payload_count(resolved, vi)
+                if pc == 0:
+                    continue
+                out = out ++ f" case {self.sema.type_reflection_variant_discriminant(resolved, vi)}:"
+                for pi in 0..pc:
+                    out = out ++ self.key_hash_text(lv ++ self.payload_enum_field_path(resolved, vi, pi), self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi), "st")
+                out = out ++ " break;"
+            return out ++ " default: break; " ++ cc_rbrace()
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return self.key_hash_text(lv, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)], "st")
+        let names = self.glue_field_names(resolved)
+        let tids = self.glue_field_tids(resolved)
+        var out = ""
+        for fi in 0..names.len():
+            out = out ++ self.key_hash_text(lv ++ "." ++ names[fi], tids[fi], "st")
+        out
+
+    mut fn key_eq_walk_text(la: &str, lb: &str, resolved: i32) -> str:
+        let tk = self.sema.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_TUPLE:
+            var out = ""
+            for i in 0..self.sema.get_type_d1(resolved as TypeId):
+                let tid = self.tuple_field_tid(resolved, i)
+                out = out ++ " if (!" ++ self.key_eq_text(la ++ f".field{i}", lb ++ f".field{i}", tid) ++ ") return 0;"
+            return out
+        if tk == TypeKind.TY_ARRAY:
+            let n = self.sema.get_type_d1(resolved as TypeId)
+            let elem = self.sema.get_type_d0(resolved as TypeId)
+            return f" for (int64_t __i = 0; __i < {n}; __i++) " ++ cc_lbrace() ++ " if (!" ++ self.key_eq_text(la ++ "[__i]", lb ++ "[__i]", elem) ++ ") return 0; " ++ cc_rbrace()
+        if tk == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(resolved) == self.sema.syms.list:
+            let elem = self.sema.get_generic_inst_arg(resolved, 0)
+            let elem_c = self.c_type(elem, 0)
+            let each = self.key_eq_text("((" ++ elem_c ++ "*)(" ++ la ++ ").ptr)[__i]", "((" ++ elem_c ++ "*)(" ++ lb ++ ").ptr)[__i]", elem)
+            return " if ((" ++ la ++ ").len != (" ++ lb ++ ").len) return 0; for (int64_t __i = 0; __i < (" ++ la ++ ").len; __i++) " ++ cc_lbrace() ++ " if (!" ++ each ++ ") return 0; " ++ cc_rbrace()
+        let box_pointee = self.std_box_pointee_tid(resolved)
+        if box_pointee != 0:
+            if self.sema.get_type_kind(self.sema.resolve_alias(box_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
+                return " if ((" ++ la ++ ") != (" ++ lb ++ ")) return 0;"
+            return " if (!" ++ self.key_eq_text("(*(" ++ la ++ "))", "(*(" ++ lb ++ "))", box_pointee) ++ ") return 0;"
+        if self.type_is_payload_enum(resolved) != 0:
+            if self.option_is_nullable_pointer(resolved):
+                var payload: i32 = 0
+                for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                    if self.sema.type_reflection_variant_payload_count(resolved, vi) == 1:
+                        payload = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, 0)
+                return " if (((" ++ la ++ ") == 0) != ((" ++ lb ++ ") == 0)) return 0; if ((" ++ la ++ ") != 0 && !" ++ self.key_eq_text(la, lb, payload) ++ ") return 0;"
+            var out = " if ((" ++ la ++ ").tag != (" ++ lb ++ ").tag) return 0; switch ((" ++ la ++ ").tag) " ++ cc_lbrace()
+            for vi in 0..self.sema.type_reflection_variant_count(resolved):
+                let pc = self.sema.type_reflection_variant_payload_count(resolved, vi)
+                if pc == 0:
+                    continue
+                out = out ++ f" case {self.sema.type_reflection_variant_discriminant(resolved, vi)}:"
+                for pi in 0..pc:
+                    let path = self.payload_enum_field_path(resolved, vi, pi)
+                    out = out ++ " if (!" ++ self.key_eq_text(la ++ path, lb ++ path, self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, pi)) ++ ") return 0;"
+                out = out ++ " break;"
+            return out ++ " default: break; " ++ cc_rbrace()
+        if tk == TypeKind.TY_STRUCT and self.sema.distinct_type_names.contains(self.sema.get_type_d0(resolved as TypeId)):
+            return " if (!" ++ self.key_eq_text(la, lb, self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)]) ++ ") return 0;"
+        let names = self.glue_field_names(resolved)
+        let tids = self.glue_field_tids(resolved)
+        var out = ""
+        for fi in 0..names.len():
+            out = out ++ " if (!" ++ self.key_eq_text(la ++ "." ++ names[fi], lb ++ "." ++ names[fi], tids[fi]) ++ ") return 0;"
+        out
+
+    // `__with_keyhash_<t>(const void*) -> int64_t`, the hash the runtime
+    // map calls: a keyed hasher fed the key's parts.
+    mut fn key_hash_fn_name(resolved: i32) -> str:
+        let name = f"__with_keyhash_{resolved}"
+        if self.glue_done.contains(name):
+            return name
+        self.mark_glue_done(name)
+        let sig = "static int64_t " ++ name ++ "(const void* k)"
+        self.glue_protos.push(sig ++ ";\n")
+        let key_c = self.glue_param_c_type(resolved)
+        let lv = if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY: "((" ++ key_c ++ "*)k)" else: "(*(" ++ key_c ++ "*)k)"
+        let feed = self.key_hash_text(lv, resolved, "(uint8_t*)__st")
+        self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ " uint64_t __st[7]; with_hasher_init((uint8_t*)__st);" ++ feed ++ " return with_hasher_finish((uint8_t*)__st); " ++ cc_rbrace() ++ "\n")
+        name
+
+    // `__with_keyeq_<t>(const void*, const void*) -> int32_t`.
+    mut fn key_eq_fn_name(resolved: i32) -> str:
+        let name = f"__with_keyeqfn_{resolved}"
+        if self.glue_done.contains(name):
+            return name
+        self.mark_glue_done(name)
+        let sig = "static int32_t " ++ name ++ "(const void* a, const void* b)"
+        self.glue_protos.push(sig ++ ";\n")
+        let key_c = self.glue_param_c_type(resolved)
+        let is_array = self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY
+        let la = if is_array: "((" ++ key_c ++ "*)a)" else: "(*(" ++ key_c ++ "*)a)"
+        let lb = if is_array: "((" ++ key_c ++ "*)b)" else: "(*(" ++ key_c ++ "*)b)"
+        let equal = self.key_eq_text(la, lb, resolved)
+        self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ " return " ++ equal ++ " ? 1 : 0; " ++ cc_rbrace() ++ "\n")
+        name
