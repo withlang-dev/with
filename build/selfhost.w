@@ -9697,7 +9697,7 @@ fn bs_check_pcre2_compile_builds(ctx: &ActionCtx, compiler_path: &str, base_dir:
     let root = ctx.project_info().project_root()
     let src = bs_join(base_dir, "pcre2_compile_builds.w")
     let bin = bs_join(base_dir, "pcre2_compile_builds")
-    var rc = bs_write_fixture(ctx, src, "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
+    var rc = bs_write_fixture(ctx, src, "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\n\nfn main:\n    let _ = unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut u64), (null as *mut pcre2_real_compile_context_8)) }\n    print(\"ok\")\n", "pcre2 compile builds")
     if rc != 0: return rc
     var args: List[str] = List.new()
     args |> push("build")
@@ -10054,7 +10054,7 @@ fn bs_check_object_symbols(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str, 
             "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\n"
         else:
             "use std.engines.pcre2.defs\nuse std.engines.pcre2.pcre2_compile\nuse std.engines.pcre2.pcre2_match\n"
-        let pcre_text = imports ++ "\n@[c_export(\"call_compile\")]\nfn call_compile() -> *mut pcre2_real_code_8:\n    unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut c_ulong), (null as *mut pcre2_real_compile_context_8)) }\n"
+        let pcre_text = imports ++ "\n@[c_export(\"call_compile\")]\nfn call_compile() -> *mut pcre2_real_code_8:\n    unsafe { pcre2_compile_8((null as *const u8), 0, 0, (null as *mut c_int), (null as *mut u64), (null as *mut pcre2_real_compile_context_8)) }\n"
         rc = bs_write_fixture(ctx, pcre_src, pcre_text, label)
         if rc != 0: return rc
         rc = bs_build_emit_obj(ctx, compiler_path, label ++ "-build", pcre_src, pcre_obj)

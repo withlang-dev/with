@@ -2151,9 +2151,14 @@ fn link_stage_named_runtime_root_is_this_generation(dir: &str) -> bool:
 // (stage1 embeds the seed's), every host runtime object the directory holds
 // is compared, and the bridges, which nothing embeds, still need the
 // generation (link_stage_find_llvm_static_bridge).
-fn link_stage_runtime_dir_matches_embedded(dir: &str) -> bool:
+fn link_stage_runtime_dir_matches_embedded(dir: &str) -> bool: link_stage_runtime_dir_embedded_mismatch(dir).len() == 0
+
+// Why `dir`'s runtime objects are not the ones this compiler embeds, or ""
+// when they are: the refusal names the object, so a mismatch on one host is
+// read from the error, not reconstructed (#2788).
+fn link_stage_runtime_dir_embedded_mismatch(dir: &str) -> str:
     if not link_stage_embedded_runtime_is_this_generation():
-        return false
+        return f"this compiler's embedded runtime is generation {compiler_runtime_generation()}, not its own"
     var compared = 0
     // The runtime bundle: the root's rt.o is the bytes the `rt` slot holds.
     for bi in 0..embedded_bundle_count():
@@ -2162,16 +2167,18 @@ fn link_stage_runtime_dir_matches_embedded(dir: &str) -> bool:
         let on_disk = runtime_read_file(dir ++ "/rt.o")
         if on_disk.len() == 0: continue
         let embedded = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
-        if embedded.len() != on_disk.len() or embedded != on_disk: return false
+        if embedded.len() != on_disk.len() or embedded != on_disk:
+            return f"rt.o differs from the embedded rt slot ({on_disk.len()} bytes on disk, {embedded.len()} embedded)"
         compared += 1
     let names = ["cimport_stubs.o", "fiber_asm.o"]
     for name in names:
         let on_disk = runtime_read_file(dir ++ "/" ++ name)
         if on_disk.len() == 0: continue
         let embedded = link_stage_embedded_runtime_object(name)
-        if embedded.len() != on_disk.len() or embedded != on_disk: return false
+        if embedded.len() != on_disk.len() or embedded != on_disk:
+            return f"{name} differs from the embedded one ({on_disk.len()} bytes on disk, {embedded.len()} embedded)"
         compared += 1
-    compared > 0
+    if compared == 0: "it holds none of rt.o, cimport_stubs.o, fiber_asm.o" else: ""
 
 // The generation that compiled a runtime object set, as the build recorded it
 // (build/compiler.w run_write_runtime_producer_action); "" when none is.
@@ -2201,7 +2208,7 @@ fn link_stage_runtime_generation_refusal() -> str:
     if explicit.len() > 0:
         let producer = link_stage_runtime_dir_producer(explicit)
         let recorded = if producer.len() > 0: producer else: "none recorded (no .producer)"
-        return "error: WITH_RUNTIME_ROOT=" ++ explicit ++ " holds runtime objects of compiler generation " ++ recorded ++ ", not this compiler's (" ++ compiler_generation() ++ "), and they are not the objects this compiler embeds; linking them would mix compiler generations (D30, #1815). Compile that root with this compiler."
+        return "error: WITH_RUNTIME_ROOT=" ++ explicit ++ " holds runtime objects of compiler generation " ++ recorded ++ ", not this compiler's (" ++ compiler_generation() ++ "), and they are not the objects this compiler embeds (" ++ link_stage_runtime_dir_embedded_mismatch(explicit) ++ "); linking them would mix compiler generations (D30, #1815). Compile that root with this compiler."
     "error: no runtime objects of this compiler's generation (" ++ compiler_generation() ++ ") to link: its embedded runtime is generation " ++ compiler_runtime_generation() ++ " (a stage1 carries the seed's) and no runtime directory holds this generation's; run `with build :dev`, which compiles out/bootstrap/lib with stage1 (D30, #1815)"
 
 // Directory holding the link inputs built FOR the active target:
