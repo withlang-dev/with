@@ -575,6 +575,43 @@ fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: 
     report.note(f"resolution-audit: call-arguments named-owned={judged} into-borrowing-params={judged_borrows}")
     checked
 
+// #2774: a parameter typed `&T` receives a reference (a `ref(...)`
+// temporary or a reference-typed place) or a place of exactly `T`, whose
+// address codegen passes (an in-place receiver), never a value of another
+// type. An enum argument into an `&i64` reached the call as the enum (Sema
+// accepted the conversion, MIR recorded no auto-reference) and the callee
+// read eight bytes from four, while every audit here passed.
+fn resolution_audit_ref_params(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+    var checked = 0
+    for bi in 0..mir_mod.bodies.len():
+        let body = &mir_mod.bodies[bi]
+        if body.lowering_failed != 0: continue
+        let site = resolution_site(sema, pool, body, source_path, source_text)
+        for bb in 0..body.block_count():
+            if body.term_kind(bb) != TermKind.TK_CALL: continue
+            let call_id = body.term_data1(bb)
+            if call_id < 0 or call_id >= body.call_arg_starts.len(): continue
+            if body.call_intrinsic(call_id) != MirIntrinsic.NONE: continue
+            let sig = body.call_sig_index(call_id)
+            if sig < 0 or sig >= sema.sig_names.len(): continue
+            let argc = body.call_arg_counts[call_id]
+            if argc != sema.sig_get_param_count(sig): continue
+            for ai in 0..argc:
+                let param_ty = sema.sig_param_type(sig, ai)
+                if param_ty <= 0 or sema.get_type_kind(sema.resolve_alias(param_ty as TypeId)) != TypeKind.TY_REF: continue
+                let op = body.call_arg_operands[(body.call_arg_starts[call_id] + ai)]
+                if op < 0 or op >= body.operand_kinds.len(): continue
+                let kind = body.operand_kinds[op]
+                let data = body.operand_d0[op]
+                let arg_ty = if kind == OperandKind.OK_CONSTANT and data >= 0 and data < body.const_types.len(): body.const_types[data] else if (kind == OperandKind.OK_COPY or kind == OperandKind.OK_MOVE) and data >= 0 and data < body.place_sema_types.len(): body.place_sema_types[data] else: 0
+                if arg_ty <= 0: continue
+                checked = checked + 1
+                let arg_kind = sema.get_type_kind(sema.resolve_alias(arg_ty as TypeId))
+                if arg_kind == TypeKind.TY_REF or arg_kind == TypeKind.TY_PTR or arg_kind == TypeKind.TY_NEVER: continue
+                if sema.types_identical(arg_ty, sema.get_type_d0(sema.resolve_alias(param_ty as TypeId))): continue
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, body.call_ast_node(call_id))}: call to `{sema.pool_resolve(sema.sig_names[sig])}` argument {ai}: a {sema.type_name(arg_ty)} value passed for a {sema.type_name(param_ty)} parameter")
+    checked
+
 // D65 phase 5 (#1647): every call MIR lowered from a source call whose
 // callee is a bare name carries Sema's record of what the name resolved to
 // (CallCalleeKind); MirLower dispatches on it and nothing else. A call with
@@ -761,6 +798,8 @@ fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
     let index_places = resolution_audit_index_places(report, sema, mir_mod, pool, source_path, source_text)
     let view_origins = resolution_audit_view_origins(report, sema, mir_mod, pool, source_path, source_text)
     let captures = resolution_audit_captures(report, sema, mir_mod, pool, source_path, source_text)
+    let ref_params = resolution_audit_ref_params(report, sema, mir_mod, pool, source_path, source_text)
+    report.note(f"resolution-audit: reference-parameters judged={ref_params}")
     resolution_audit_expr_operands(report, sema, mir_mod, pool, source_path, source_text)
     resolution_audit_callee_kinds(report, sema, mir_mod, pool, source_path, source_text)
     resolution_audit_resolved_calls(report, sema, mir_mod, pool, source_path, source_text)

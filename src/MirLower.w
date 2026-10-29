@@ -13130,9 +13130,10 @@ impl MirBuilder:
         // §4.2.6 (#2336): a narrower integer widens into the pointee, so the
         // view is of a temporary at the pointee's width, never of the
         // narrower place (an `&i64` over a four-byte `i32` read -1 as
-        // 4294967295). Sema accepted the widening; this materializes it.
+        // 4294967295); a discriminant enum is its integer value (§4.4a,
+        // #2774). Sema accepted the conversion; this materializes it.
         let pointee = self.sema.get_type_d0(self.sema.resolve_alias(expected_ty as TypeId))
-        let place = if pointee != 0 and self.sema.numeric_types_differ(pointee, actual_ty):
+        let place = if pointee != 0 and self.sema.auto_ref_arg_converts(pointee, actual_ty):
             let narrow_value = self.lower_expr(arg_node)
             let widened = self.lower_value_cast(narrow_value, actual_ty, pointee, span)
             self.materialize_operand(widened, pointee, span)

@@ -387,7 +387,13 @@ impl Sema:
         // value went by value before, and an `&i64` read an `i32` place
         // eight bytes wide.
         if self.is_plain_numeric_type(pointee_resolved as i32) and self.is_plain_numeric_type(actual_resolved as i32):
-            return if self.numeric_types_differ(pointee_resolved as i32, actual_resolved as i32) and self.implicit_numeric_join(pointee_resolved, actual_resolved) != pointee_resolved: 0 else: 1
+            return if self.auto_ref_narrows(pointee_resolved as i32, actual_resolved as i32): 0 else: 1
+        // §4.4a (#2774): a discriminant enum is its integer value and is
+        // referenced as a temporary of the pointee's type, as a narrower
+        // integer is. Unreferenced it went by value, and an `&i64` read the
+        // enum's four bytes and the next field's.
+        if self.enum_repr_type(actual_resolved as i32) != 0 and self.get_type_kind(pointee_resolved) == TypeKind.TY_INT:
+            return if self.auto_ref_narrows(pointee_resolved as i32, actual_resolved as i32): 0 else: 1
         let pointee_kind = self.get_type_kind(pointee_resolved)
         let actual_kind = self.get_type_kind(actual_resolved)
         if pointee_kind == TypeKind.TY_STRUCT and actual_kind == TypeKind.TY_STRUCT:
@@ -426,7 +432,13 @@ impl Sema:
         // value went by value before, and an `&i64` read an `i32` place
         // eight bytes wide.
         if self.is_plain_numeric_type(pointee_resolved as i32) and self.is_plain_numeric_type(actual_resolved as i32):
-            return if self.numeric_types_differ(pointee_resolved as i32, actual_resolved as i32) and self.implicit_numeric_join(pointee_resolved, actual_resolved) != pointee_resolved: 0 else: 1
+            return if self.auto_ref_narrows(pointee_resolved as i32, actual_resolved as i32): 0 else: 1
+        // §4.4a (#2774): a discriminant enum is its integer value and is
+        // referenced as a temporary of the pointee's type, as a narrower
+        // integer is. Unreferenced it went by value, and an `&i64` read the
+        // enum's four bytes and the next field's.
+        if self.enum_repr_type(actual_resolved as i32) != 0 and self.get_type_kind(pointee_resolved) == TypeKind.TY_INT:
+            return if self.auto_ref_narrows(pointee_resolved as i32, actual_resolved as i32): 0 else: 1
         let pointee_kind = self.get_type_kind(pointee_resolved)
         let actual_kind = self.get_type_kind(actual_resolved)
         if pointee_kind == TypeKind.TY_STRUCT and actual_kind == TypeKind.TY_STRUCT:
