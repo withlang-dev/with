@@ -14422,10 +14422,20 @@ impl CiStmtPool:
             var block_scope = scope
             let block_mark = ci_scope_mark(block_scope)
             var bailed = false
+            // #2781: a statement after an unconditional return, break,
+            // continue or goto never runs, and With refuses unreachable code
+            // (§20b.5), so it is not translated; a case, default or label
+            // starts reachable code again.
+            var dead = false
             var ci = 0
             while ci < ccn and not bailed:
                 let child = with_ci_child(session, cursor, ci)
-                if with_ci_cursor_kind(session, child) == CXK_DECL_STMT:
+                let child_kind = with_ci_cursor_kind(session, child)
+                if dead and child_kind != CXK_CASE_STMT and child_kind != CXK_DEFAULT_STMT and child_kind != CXK_LABEL_STMT and not ci_subtree_has_labels(session, child):
+                    ci = ci + 1
+                    continue
+                dead = child_kind == CXK_RETURN_STMT or child_kind == CXK_BREAK_STMT or child_kind == CXK_CONTINUE_STMT or child_kind == CXK_GOTO_STMT
+                if child_kind == CXK_DECL_STMT:
                     ci_trace_port("STRUCTURAL[b11.6.decl_compound]")
                     let decl_ir = self.lower_decl_stmt_structural(session, child, block_scope, false, exprs, types)
                     if decl_ir.stmt_id != 0:
