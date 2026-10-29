@@ -172,6 +172,30 @@ s.to_slug()               // ERROR: ambiguous — slug::to_slug or url::to_slug?
 slug.to_slug(&s)          // OK: fully qualified
 ```
 
+**Trait-qualified calls.** When two traits of equal rank give a type a
+method of one name, a bare call of it is a **compile error** (ambiguous).
+The caller names the trait the way it names an extension's package:
+`Trait.method(args)`. An instance method takes its receiver as the first
+argument, passed as the method's receiver mode states. A static method
+takes `Self` from the type its use demands; a call with no such demand is
+a compile error.
+
+```
+trait Unit1:
+    fn one() -> Self
+trait Unit2:
+    fn one() -> Self
+impl Unit1 for f64:
+    fn one(): 1.0
+impl Unit2 for f64:
+    fn one(): 2.0
+
+f64.one()                  // ERROR: ambiguous — Unit1.one or Unit2.one?
+let a: f64 = Unit1.one()   // OK: Self is f64, from the use
+print(Unit1.one())         // ERROR: nothing demands Self
+Name1.name(p)              // OK: the receiver is the first argument
+```
+
 ### 11.5 Async Methods in Traits
 
 Async methods in traits are permitted and require no special rules.
