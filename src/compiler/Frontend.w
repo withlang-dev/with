@@ -3026,9 +3026,6 @@ impl Zcu:
                 continue
             if user_verdict == FRONTEND_FN_DISPLACE:
                 frontend_displace_fn_decl(merged_pool, self.pool, id, user_import_paths[oi])
-            if ik == NodeKind.NK_EXTERN_VAR:
-                if frontend_extern_var_shadowed_in_tier(user_import_ordered, merged_pool, self.pool, oi) or frontend_extern_var_shadowed_by_tier(root_ordered, merged_pool, self.pool, id):
-                    continue
             merged_pool.add_decl(id)
             rebuilt_paths.push(frontend_owned_text(user_import_paths[oi]))
             rebuilt_file_ids.push(user_import_file_ids[oi])
@@ -3037,8 +3034,6 @@ impl Zcu:
             let id = root_ordered[oi]
             let ik = merged_pool.kind(id)
             if ik == NodeKind.NK_EXTERN_FN and frontend_list_contains_i32(embedded_rt_fn_names, merged_pool.get_data0(id)):
-                continue
-            if ik == NodeKind.NK_EXTERN_VAR and frontend_extern_var_shadowed_in_tier(root_ordered, merged_pool, self.pool, oi as i32):
                 continue
             merged_pool.add_decl(id)
             rebuilt_paths.push(frontend_owned_text(root_paths[oi]))

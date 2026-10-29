@@ -1,6 +1,6 @@
 //! check-only
 // Regression helper for issue #113.
-// Keep the owner untyped so sema must merge the extern declaration rather than
-// relying on the frontend's current extern-var decl filter.
+// The owner is untyped; issue2335_extern_var_typed_owner.w is the typed case.
+// Sema merges the extern declaration with its owner either way.
 
 var issue113_shared_counter = 41
