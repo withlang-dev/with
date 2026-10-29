@@ -8,6 +8,7 @@ pub enum Color:
     Red
     Green
     Mixed(i32, i32)
+impl Copy for Color
 pub type Handle = distinct i32
 pub enum Level: u8:
     Low = 1

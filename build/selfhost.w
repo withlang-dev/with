@@ -5588,12 +5588,12 @@ fn bs_check_migrate_strtoll_family(ctx: &ActionCtx, compiler_path: &str, case_di
     let out_w = bs_join(case_dir, "strtoll_family.w")
     // `long double` is a double only where the host's C model makes it
     // one: AArch64 Darwin here. x86_64 Linux has the 80-bit type, AArch64
-    // Linux a quad, and the Windows model's MinGW parse (windows-gnu)
-    // also reports the 80-bit type — TargetSpec's table says otherwise
-    // for Windows, which is #2771. With has no float for the wider types,
+    // Linux a quad, x86_64 Windows (windows-gnu, #1915) the 80-bit type,
+    // and AArch64 Windows a double, as TargetSpec's table says (#2771).
+    // With has no float for the wider types,
     // so a function over one is untranslatable there (loudly, as it must
     // be) and the fixture asks for `strtold` only where the model has it.
-    let has_long_double = os() == "Macos"
+    let has_long_double = arch() == "aarch64" and (os() == "Macos" or os() == "Windows")
     let c_text = "#include <stdlib.h>\nlong long p1(const char *s) { return strtoll(s, 0, 10); }\nunsigned long long p2(const char *s) { return strtoull(s, 0, 16); }\nfloat p3(const char *s) { return strtof(s, 0); }\n" ++ (if has_long_double: "long double p4(const char *s) { return strtold(s, 0); }\n" else: "")
     var rc = bs_write_fixture(ctx, src, c_text, "strtoll family")
     if rc != 0: return rc
