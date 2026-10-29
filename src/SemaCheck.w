@@ -20726,6 +20726,11 @@ impl Sema:
             let unknown_field_msg = "unknown field '" ++ self.pool_resolve(field) ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'"
             if self.in_concrete_generic_body != 0:
                 self.emit_error_with_help(unknown_field_msg, node, "a generic body is checked for each instantiation (§11.2), and this one's type has no fields; bound the type parameter by a trait whose method provides the value, or instantiate it with a type that has the field")
+            else if self.unannotated_literal_binding(expr) < 0:
+                // Law 1: nothing types the parameter, and a field is not an
+                // integer's, so its type is the programmer's to state.
+                let p: str = self.pool_resolve(self.ast.get_data0(expr))
+                self.emit_error_with_help(f"the type of closure parameter `{p}` is not known: nothing passed to the closure or demanded of it types it, and `.{self.pool_resolve(field)}` is not an integer's", node, f"annotate it: `({p}: T) => …`")
             else:
                 self.emit_error(unknown_field_msg, node)
         0
@@ -24952,6 +24957,8 @@ impl Sema:
         // a list started before the loop would read that argument as a
         // parameter type (#1402).
         let param_tys: List[i32] = List.new()
+        var inferred_param_syms: List[i32] = List.new()
+        var inferred_param_prev: List[i32] = List.new()
         // Partial application: if body is NK_CALL, resolve callee param types for placeholders
         var partial_sig: i32 = -1
         if self.ast.kind(body) == NodeKind.NK_CALL:
@@ -24982,6 +24989,19 @@ impl Sema:
                             if ai < self.sig_get_param_count(partial_sig):
                                 p_ty = self.sig_param_type(partial_sig, ai)
                             break
+            // Law 1, D126: a parameter nothing types (no annotation, no
+            // expected function type, no partial-application slot) is an
+            // integer at the type its body's demands agree on, as a local its
+            // literal typed is: isize until a demand narrows it. A use that
+            // needs another kind of value is refused with the annotation it
+            // needs; `i32` was a default that chose a meaning.
+            if p_type_node == 0 and p_ty == self.ty_i32 as i32 and (expected_fn_tid == 0 or pi >= self.get_type_d1(expected_fn_tid)) and not (partial_sig >= 0 and self.ast.kind(body) == NodeKind.NK_CALL):
+                let key = -(node * 64 + pi + 1)
+                p_ty = if self.int_local_decisions.contains(key): ((self.int_local_decisions.get(key).unwrap() / 4294967296) as i32) else: self.ty_isize as i32
+                inferred_param_syms.push(p_sym)
+                inferred_param_prev.push(self.int_local_closure_params.get(p_sym) ?? 0)
+                self.int_local_closure_params.insert(p_sym, key)
+                self.int_local_closure_keys.insert(key, 1)
             self.scope_put_at(p_sym, p_ty, 0, if p_type_node > 0: p_type_node else: node)
             param_tys.push(p_ty)
         let te_start = self.type_extra.len() as i32
@@ -25034,6 +25054,9 @@ impl Sema:
         let creation_moved_fields = self.save_moved_field_state()
         self.closure_body_depth = self.closure_body_depth + 1
         let checked_body_ty = if expected_ret_ty != 0: self.check_expr_with_expected(body, expected_ret_ty as TypeId) else: self.check_expr_value_context(body)
+        for ii in 0..inferred_param_syms.len():
+            if inferred_param_prev[ii] != 0: self.int_local_closure_params.insert(inferred_param_syms[ii], inferred_param_prev[ii])
+            else: self.int_local_closure_params.remove(inferred_param_syms[ii])
         self.closure_body_depth = self.closure_body_depth - 1
         self.restore_scope_states(&creation_states)
         self.restore_moved_field_state(&creation_moved_fields)
@@ -28360,9 +28383,14 @@ impl Sema:
         if not is_default and expected_ty != 0 and self.ast.kind(arg_node) == NodeKind.NK_UNARY and self.ast.get_data0(arg_node) == UnaryOp.UOP_REF and self.get_type_kind(self.resolve_alias(expected_ty as TypeId)) == TypeKind.TY_REF:
             self.ceremony_sites.insert(arg_node, 2)
         if not is_default:
-            return if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
+            let arg_ty = if self.join_meets_ref_param(arg_node, expected_ty): self.check_join_arg_at_ref_param(arg_node, expected_ty)
                 else if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId)
                 else: self.check_expr_value_context(arg_node)
+            // D126 for a closure's untyped parameters: the function type its
+            // value is passed at types them. This pass takes the demanded
+            // type; the body's next check gives the closure that type.
+            if self.note_closure_param_demands(arg_node, expected_ty): return expected_ty as TypeId
+            return arg_ty
         let saved_file_id: i32 = self.local_file_id
         let saved_module_has_ci: i32 = self.current_module_has_ci
         let saved_module_path = self.current_module_path.clone()
@@ -28766,6 +28794,9 @@ impl Sema:
         // D128: a loop variable over a literal range (`for i in 1..9`).
         let for_decl = self.int_local_for_decls.get(sym) ?? 0
         if for_decl != 0: return for_decl
+        // A closure parameter nothing types (its key is negative).
+        let param_key = self.int_local_closure_params.get(sym) ?? 0
+        if param_key != 0 and self.scope_binding_is_local(sym): return param_key
         let in_scope = self.binding_decl_nodes.get(sym) ?? 0
         let decl = if in_scope != 0: in_scope else: self.fn_int_literal_lets.get((self.current_fn_sig_idx as i64) * 4294967296 + sym as i64) ?? 0
         if decl <= 0 or self.ast.kind(decl) != NodeKind.NK_LET_BINDING or self.local_let_type_ann_extra(self.ast.get_data2(decl)) >= 0:
@@ -28932,6 +28963,9 @@ impl Sema:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
             let decl = self.unannotated_literal_binding(node)
+            if decl < 0:
+                out.push(decl)
+                return out
             if decl != 0:
                 // D128 (#2569): a comprehension clause binding over a list
                 // literal; the demand lands on the literal (keyed by it).
@@ -29110,6 +29144,30 @@ impl Sema:
 
     // D128: a demand of `expected` on the undecided literal-typed locals
     // `node` reads, recorded for the body's next check. True when recorded.
+    // A closure bound to a name and passed where a function type is demanded:
+    // each parameter nothing typed is demanded at that type's parameter,
+    // as an integer local is at a narrower use (D126). True when a demand
+    // was noted, so this pass takes the demanded type and the next fixes it.
+    mut fn note_closure_param_demands(arg_node: i32, expected_ty: i32) -> bool:
+        if expected_ty == 0 or arg_node <= 0 or self.ast.kind(arg_node) != NodeKind.NK_IDENT: return false
+        var want = self.resolve_alias(expected_ty as TypeId)
+        if self.get_type_kind(want) == TypeKind.TY_REF: want = self.resolve_alias(self.get_type_d0(want) as TypeId)
+        if self.get_type_kind(want) != TypeKind.TY_FN: return false
+        let closure = self.binding_value_nodes.get(self.ast.get_data0(arg_node)) ?? 0
+        if closure <= 0 or self.ast.kind(closure) != NodeKind.NK_CLOSURE: return false
+        var noted = false
+        let count = if self.ast.get_data2(closure) < self.get_type_d1(want): self.ast.get_data2(closure) else: self.get_type_d1(want)
+        for pi in 0..count:
+            let key = -(closure * 64 + pi + 1)
+            if not self.int_local_closure_keys.contains(key) or self.int_local_decisions.contains(key): continue
+            let demand = self.fn_type_param_type(want as i32, pi)
+            if demand == 0 or not self.is_plain_numeric_type(demand) or self.types_identical(demand, self.ty_isize as i32): continue
+            self.int_local_demands.push(key)
+            self.int_local_demands.push(demand)
+            self.int_local_demands.push(arg_node)
+            noted = true
+        noted
+
     mut fn note_int_local_demand(node: i32, expected: i32) -> bool:
         var noted = false
         for d in self.literal_binding_lets_in(node):
@@ -29181,6 +29239,7 @@ impl Sema:
                 self.emit_error_with_label(f"`{name}` is `{got}` from its use here, and `{want}` is demanded at this use; a local's uses must agree on its type (§4.2.1)", node, first_use, f"`{name}` is `{got}` from this use")
                 return true
             if literal_let == 0: self.emit_error(msg, node)
+            else if literal_let < 0: self.emit_error_with_help(msg, node, f"`{self.pool_resolve(self.ast.get_data0(node))}` is a closure parameter nothing types, so it is `{got}`; annotate it (`({self.pool_resolve(self.ast.get_data0(node))}: T) => …`)")
             else: self.emit_error_with_label(msg, node, literal_let, f"`{self.pool_resolve(self.ast.get_data0(node))}` is `{got}` from its literal here (§4.1)")
             return true
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:

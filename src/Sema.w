@@ -2388,6 +2388,11 @@ type Sema {
     // (`for i in 1..9`), a literal-typed local like a `let` (no shadowing,
     // so the name is the key).
     int_local_for_decls: HashMap[i32, i32],
+    // A closure parameter nothing types, while its body is checked: name ->
+    // its key, -(closure node * 64 + index + 1), never an AST node.
+    int_local_closure_params: HashMap[i32, i32],
+    // Every such parameter key, for a demand on the closure value itself.
+    int_local_closure_keys: HashMap[i32, i32],
     // D128 (#2343): a loop or comprehension binding that walks a literal's
     // binding (`for x in xs`, `[a + b for (a, b) in src]` over `let src =
     // [(1, 2)]`): the name → that `let`, and the name → its position in the
@@ -4106,6 +4111,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         it_closure_depth: 0,
         int_local_recheck_names: List.new(),
         int_local_for_decls: HashMap.new(),
+        int_local_closure_params: HashMap.new(),
+        int_local_closure_keys: HashMap.new(),
         iter_literal_lets: HashMap.new(),
         iter_literal_positions: HashMap.new(),
         fn_demand_lets: HashMap.new(),
