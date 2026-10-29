@@ -36477,10 +36477,15 @@ impl Sema:
                         if refused_subst != 0:
                             return refused_subst
                     return refused_ret
-                if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0:
+                // A `mut self` receiver is the place the method mutates, not an
+                // owned value: an element view (`self.xs[i].bump()`, D27) is
+                // never copied out. With the copy recorded, MIR lowered the
+                // receiver through a shared view and mutated through it (the
+                // emitted C passed 589 `const with_vec *` to mutating calls).
+                if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0 and self.method_has_mut_self_flag(type_name_sym, field) == 0:
                     let exact_receiver_ty = self.recorded_expr_type_or_zero(expr)
                     if exact_receiver_ty != 0:
-                        let _ = self.record_contextual_copy_adjustment(expr, self.sig_param_type(sig_idx, 0), exact_receiver_ty)
+                        self.record_contextual_copy_adjustment(expr, self.sig_param_type(sig_idx, 0), exact_receiver_ty)
                 let build_sym = self.pool_lookup_symbol("build")
                 if build_sym != 0 and field == build_sym:
                     if self.check_visible_derive_builder_build(type_name_sym, expr, node) == 0:
