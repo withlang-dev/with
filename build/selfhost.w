@@ -2030,11 +2030,9 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     rc = bs_assert_contains(ctx, bad_pool.stderr, "runtime.fiber_pool_size must be a positive integer", "runtime_manifest_bad_pool")
     if rc != 0: return rc
 
-    // The two-worker scheduler case needs a multi-worker fiber core;
-    // Windows has one worker (#2770), so it runs where workers exist.
-    if os() != "Windows":
-        rc = bs_check_runtime_workers(ctx, compiler_path, case_dir)
-        if rc != 0: return rc
+    // The two-worker scheduler case: every fiber core has workers (#2770).
+    rc = bs_check_runtime_workers(ctx, compiler_path, case_dir)
+    if rc != 0: return rc
 
     let bad_workers_dir = bs_join(case_dir, "bad_workers")
     rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "with.toml"), "[package]\nname = \"badworkers\"\nversion = \"0.1.0\"\n\n[runtime]\nfiber_worker_count = 9\n", "bad runtime worker manifest")

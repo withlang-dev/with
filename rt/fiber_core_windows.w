@@ -2,6 +2,11 @@
 //
 // This module owns the remaining scheduler/stack/panic core. It uses manual
 // ABI declarations instead of c_import so the runtime stays self-contained.
+// The scheduler is fiber_core_darwin's, worker for worker (#2770): up to
+// MAX_FIBER_WORKERS threads, each with its own run queue, stealing from the
+// others; Win32 SRW locks and condition variables are its mutex and
+// condition, and the platform pieces (guarded stacks with headroom, the
+// vectored exception handler) are Windows'.
 
 extern fn with_alloc(size: i64) -> *mut u8
 extern fn with_alloc_origin(size: i64, origin: i64) -> *mut u8
@@ -16,20 +21,26 @@ extern fn rt_mmap(size: i64) -> *mut u8
 extern fn rt_munmap(ptr: *mut u8, size: i64) -> Unit
 extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_exit(code: i32) -> Never
-extern fn rt_raise(sig: i32) -> i32
 extern fn rt_fiber_page_size() -> i64
 extern fn rt_fiber_mmap_flags() -> i32
 extern fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit
-extern fn rt_fiber_reset_signal_handler(sig: i32) -> Unit
-extern fn rt_fiber_fault_addr(info: *const u8) -> i64
 extern fn rt_fiber_protect_guard(region: *mut u8, len: i64) -> Unit
+extern fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64
+extern fn rt_thread_join(handle: i64) -> i32
 extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_clock_ns() -> i64
+// The thread a worker runs on, as Win32 numbers it.
+extern fn GetCurrentThreadId() -> u32
+extern fn AcquireSRWLockExclusive(lock: *mut u8)
+extern fn ReleaseSRWLockExclusive(lock: *mut u8)
+extern fn SleepConditionVariableSRW(cond: *mut u8, lock: *mut u8, ms: u32, flags: u32) -> i32
+extern fn WakeAllConditionVariable(cond: *mut u8)
 
 extern fn with_fiber_switch(save: *mut u8, restore: *mut u8) -> Unit
 extern fn with_fiber_prepare_initial_context(ctx: *mut u8, stack: *mut u8, stack_size: i64) -> Unit
 
 let MAX_FIBERS: i32 = 1024
+let MAX_FIBER_WORKERS: i32 = 8
 let DBG_ALLOC_ORIGIN_FIBER: i64 = 4
 let FIBER_STACK_SIZE: i64 = 65536
 let FIBER_SLOT_BITS: i32 = 10
@@ -58,15 +69,12 @@ let FIBER_OFF_SLOT: i64 = 412
 let FIBER_OFF_HAS_PANIC: i64 = 416
 let FIBER_OFF_PANIC_MSG: i64 = 424
 let FIBER_OFF_PANIC_MSG_LEN: i64 = 432
+let FIBER_OFF_OWNER_WORKER: i64 = 436
 let FIBER_OFF_COMPLETION_SEQUENCE: i64 = 440
 let FIBER_OFF_WAKE_AT: i64 = 448
+let FIBER_SLEEP_SLICE_NS: i64 = 2000000
 
-let PROT_NONE: i32 = 0
-let PROT_READ_WRITE: i32 = 3
 let MAP_FAILED: i64 = -1
-
-let RT_SIGBUS: i32 = 10
-let RT_SIGSEGV: i32 = 11
 
 let FIBER_ALT_STACK_SIZE: i64 = 131072
 
@@ -79,8 +87,21 @@ let FIBER_ALT_STACK_SIZE: i64 = 131072
 // committed slack is the Windows analogue of the POSIX alt stack.
 let FIBER_GUARD_HEADROOM: i64 = 65536
 
-var current_fiber: i64 = 0
-var scheduler_ctx: [328]u8 = [0 as u8; 328]
+var scheduler_mutex: [16]i64 = [0 as i64; 16]
+var scheduler_cond: [16]i64 = [0 as i64; 16]
+var scheduler_primitives_initialized: i32 = 0
+var scheduler_shutdown_requested: i32 = 0
+var scheduler_running_fibers: i32 = 0
+var configured_worker_count: i32 = 1
+var active_worker_count: i32 = 1
+var worker_threads_started: i32 = 0
+var worker_current_fibers: [8]i64 = [0 as i64; 8]
+var worker_scheduler_ctxs: [2624]u8 = [0 as u8; 2624]
+var worker_thread_ids: [8]i64 = [0 as i64; 8]
+var worker_handles: [8]i64 = [0 as i64; 8]
+var worker_queue_entries: [8192]i64 = [0 as i64; 8192]
+var worker_queue_heads: [8]i32 = [0 as i32; 8]
+var worker_queue_counts: [8]i32 = [0 as i32; 8]
 var free_pool_head: i64 = 0
 var fiber_page_size: i64 = 0
 var fiber_pool_reuse_count: i64 = 0
@@ -89,15 +110,11 @@ var fiber_pool_free_count: i32 = 0
 var fiber_default_stack_size: i64 = 0
 var fiber_pool_limit: i32 = 0
 var live_fiber_count: i32 = 0
+var fiber_steal_attempts: i64 = 0
 var fiber_steal_events: i64 = 0
 var scheduler_round: i64 = 0
+var cross_thread_cancel_count: i64 = 0
 var completion_sequence: i64 = 0
-var ready_queue: [1024]i64 = [0 as i64; 1024]
-var ready_queue_head: i32 = 0
-var ready_queue_count: i32 = 0
-var steal_queue: [1024]i64 = [0 as i64; 1024]
-var steal_queue_head: i32 = 0
-var steal_queue_count: i32 = 0
 var fibers_by_slot: [1024]i64 = [0 as i64; 1024]
 var fiber_slot_generations: [1024]u32 = [0 as u32; 1024]
 var free_fiber_slots: [1024]i32 = [0 as i32; 1024]
@@ -107,23 +124,67 @@ var panicked_fiber_head: i32 = 0
 var panicked_fiber_count: i32 = 0
 var fiber_alt_stack_buf: [131072]u8 = [0 as u8; 131072]
 // §13.4 pulled generators: a coroutine is a pooled fiber block that the
-// scheduler never sees (with_fiber_coro_*): the coroutine whose first resume
-// with_fiber_start is bootstrapping, and the coroutine running now (the
-// vectored handler checks its guard page too).
-var coro_starting: i64 = 0
-var current_coro: i64 = 0
+// scheduler never sees. Its caller resumes it directly and it switches back
+// at each element (with_fiber_coro_*). Per worker: the coroutine whose first
+// resume _with_fiber_start is bootstrapping, and the coroutine running now
+// (the stack-overflow handler checks its guard page too).
+var worker_coro_starting: [8]i64 = [0 as i64; 8]
+var worker_current_coros: [8]i64 = [0 as i64; 8]
 
-fn scheduler_ctx_ptr() -> *mut u8:
-    (&raw mut scheduler_ctx) as *mut [328]u8 as *mut u8
+fn scheduler_mutex_ptr() -> *mut u8:
+    (&raw mut scheduler_mutex) as *mut [16]i64 as *mut u8
+
+fn scheduler_cond_ptr() -> *mut u8:
+    (&raw mut scheduler_cond) as *mut [16]i64 as *mut u8
+
+// An SRW lock and a condition variable are initialized all-zero
+// (SRWLOCK_INIT, CONDITION_VARIABLE_INIT): the zeroed globals are ready.
+fn scheduler_init_primitives():
+    scheduler_primitives_initialized = 1
+
+fn scheduler_lock():
+    AcquireSRWLockExclusive(scheduler_mutex_ptr())
+
+fn scheduler_unlock():
+    ReleaseSRWLockExclusive(scheduler_mutex_ptr())
+
+// INFINITE (0xFFFFFFFF) never times out, so a zero return is a failure.
+fn scheduler_wait():
+    if SleepConditionVariableSRW(scheduler_cond_ptr(), scheduler_mutex_ptr(), 0xFFFFFFFF as u32, 0 as u32) == 0:
+        abort()
+
+fn scheduler_wake_all():
+    WakeAllConditionVariable(scheduler_cond_ptr())
+
+fn worker_ctx_base() -> i64:
+    (&raw mut worker_scheduler_ctxs) as *mut [2624]u8 as i64
+
+fn scheduler_ctx_ptr(worker: i32) -> *mut u8:
+    (worker_ctx_base() + worker as i64 * FIBER_CTX_SIZE) as *mut u8
+
+fn current_worker_index() -> i32:
+    let tid = GetCurrentThreadId()
+    var i: i32 = 0
+    while i < active_worker_count:
+        if worker_thread_ids[i] == tid:
+            return i
+        i = i + 1
+    0
+
+fn current_worker_fiber() -> i64:
+    worker_current_fibers[current_worker_index()]
 
 fn alt_stack_ptr() -> *mut u8:
     (&raw mut fiber_alt_stack_buf) as *mut [131072]u8 as *mut u8
 
-fn ready_queue_base() -> i64:
-    (&raw mut ready_queue) as *mut [1024]i64 as i64
+fn worker_queue_base() -> i64:
+    (&raw mut worker_queue_entries) as *mut [8192]i64 as i64
 
-fn steal_queue_base() -> i64:
-    (&raw mut steal_queue) as *mut [1024]i64 as i64
+fn worker_queue_heads_base() -> i64:
+    (&raw mut worker_queue_heads) as *mut [8]i32 as i64
+
+fn worker_queue_counts_base() -> i64:
+    (&raw mut worker_queue_counts) as *mut [8]i32 as i64
 
 fn fibers_by_slot_base() -> i64:
     (&raw mut fibers_by_slot) as *mut [1024]i64 as i64
@@ -164,10 +225,6 @@ fn store_i64_index(base: i64, index: i32, value: i64):
 fn load_i32(base: i64, offset: i64) -> i32:
     unsafe:
         *((base + offset) as *const i32)
-
-fn load_u32(base: i64, offset: i64) -> u32:
-    unsafe:
-        *((base + offset) as *const u32)
 
 fn store_i32(base: i64, offset: i64, value: i32):
     unsafe:
@@ -268,6 +325,12 @@ fn fiber_panic_msg_len(f: i64) -> i32:
 fn fiber_set_panic_msg_len(f: i64, value: i32):
     store_i32(f, FIBER_OFF_PANIC_MSG_LEN, value)
 
+fn fiber_owner_worker(f: i64) -> i32:
+    load_i32(f, FIBER_OFF_OWNER_WORKER)
+
+fn fiber_set_owner_worker(f: i64, value: i32):
+    store_i32(f, FIBER_OFF_OWNER_WORKER, value)
+
 fn fiber_completion_sequence(f: i64) -> i64:
     load_i64(f, FIBER_OFF_COMPLETION_SEQUENCE)
 
@@ -331,46 +394,89 @@ fn enqueue_panicked_fiber(fiber_id: i32):
     store_i32_index(panicked_fiber_ids_base(), tail, fiber_id)
     panicked_fiber_count = panicked_fiber_count + 1
 
-fn enqueue(f: i64):
-    if ready_queue_count >= MAX_FIBERS:
-        abort()
-    let tail = fiber_ring_index(ready_queue_head + ready_queue_count)
-    store_i64_index(ready_queue_base(), tail, f)
-    ready_queue_count = ready_queue_count + 1
+fn worker_queue_slot(worker: i32, index: i32) -> i32:
+    worker * MAX_FIBERS + fiber_ring_index(index)
 
-fn dequeue() -> i64:
-    if ready_queue_count <= 0:
+fn worker_queue_count(worker: i32) -> i32:
+    load_i32_index(worker_queue_counts_base(), worker)
+
+fn worker_queue_head(worker: i32) -> i32:
+    load_i32_index(worker_queue_heads_base(), worker)
+
+fn worker_set_queue_count(worker: i32, value: i32):
+    store_i32_index(worker_queue_counts_base(), worker, value)
+
+fn worker_set_queue_head(worker: i32, value: i32):
+    store_i32_index(worker_queue_heads_base(), worker, value)
+
+fn enqueue_worker(worker: i32, f: i64):
+    let count = worker_queue_count(worker)
+    if count >= MAX_FIBERS:
+        abort()
+    fiber_set_owner_worker(f, worker)
+    let tail = worker_queue_slot(worker, worker_queue_head(worker) + count)
+    store_i64_index(worker_queue_base(), tail, f)
+    worker_set_queue_count(worker, count + 1)
+
+fn enqueue_worker_front(worker: i32, f: i64):
+    let count = worker_queue_count(worker)
+    if count >= MAX_FIBERS:
+        abort()
+    fiber_set_owner_worker(f, worker)
+    let head = fiber_ring_index(worker_queue_head(worker) - 1)
+    worker_set_queue_head(worker, head)
+    store_i64_index(worker_queue_base(), worker_queue_slot(worker, head), f)
+    worker_set_queue_count(worker, count + 1)
+
+fn pop_worker_local(worker: i32) -> i64:
+    let count = worker_queue_count(worker)
+    if count <= 0:
         return 0
-    let f = load_i64_index(ready_queue_base(), ready_queue_head)
-    store_i64_index(ready_queue_base(), ready_queue_head, 0)
-    ready_queue_head = fiber_ring_index(ready_queue_head + 1)
-    ready_queue_count = ready_queue_count - 1
+    let tail_index = worker_queue_slot(worker, worker_queue_head(worker) + count - 1)
+    let f = load_i64_index(worker_queue_base(), tail_index)
+    store_i64_index(worker_queue_base(), tail_index, 0)
+    worker_set_queue_count(worker, count - 1)
     f
 
-fn enqueue_steal(f: i64):
-    if steal_queue_count >= MAX_FIBERS:
-        abort()
-    let tail = fiber_ring_index(steal_queue_head + steal_queue_count)
-    store_i64_index(steal_queue_base(), tail, f)
-    steal_queue_count = steal_queue_count + 1
-
-fn dequeue_steal() -> i64:
-    if steal_queue_count <= 0:
+fn steal_from_worker(victim: i32) -> i64:
+    fiber_steal_attempts = fiber_steal_attempts + 1
+    let count = worker_queue_count(victim)
+    if count <= 0:
         return 0
-    let f = load_i64_index(steal_queue_base(), steal_queue_head)
-    store_i64_index(steal_queue_base(), steal_queue_head, 0)
-    steal_queue_head = fiber_ring_index(steal_queue_head + 1)
-    steal_queue_count = steal_queue_count - 1
+    let head = worker_queue_head(victim)
+    let f = load_i64_index(worker_queue_base(), worker_queue_slot(victim, head))
+    store_i64_index(worker_queue_base(), worker_queue_slot(victim, head), 0)
+    worker_set_queue_head(victim, fiber_ring_index(head + 1))
+    worker_set_queue_count(victim, count - 1)
+    fiber_steal_events = fiber_steal_events + 1
     f
 
-fn dequeue_any() -> i64:
-    let ready = dequeue()
-    if ready != 0:
-        return ready
-    let stolen = dequeue_steal()
-    if stolen != 0:
-        fiber_steal_events = fiber_steal_events + 1
-    stolen
+fn dequeue_for_worker(worker: i32) -> i64:
+    let local = pop_worker_local(worker)
+    if local != 0:
+        return local
+    if active_worker_count <= 1:
+        return 0
+    var checked = 1
+    while checked < active_worker_count:
+        let victim_offset = ((scheduler_round + checked as i64) % (active_worker_count as i64)) as i32
+        let victim = (worker + victim_offset) % active_worker_count
+        if victim != worker:
+            let stolen = steal_from_worker(victim)
+            if stolen != 0:
+                scheduler_round = scheduler_round + 1
+                return stolen
+        checked = checked + 1
+    scheduler_round = scheduler_round + 1
+    0
+
+fn total_queued_fibers() -> i32:
+    var total: i32 = 0
+    var i: i32 = 0
+    while i < active_worker_count:
+        total = total + worker_queue_count(i)
+        i = i + 1
+    total
 
 fn guard_page_size() -> i64:
     if fiber_page_size != 0:
@@ -497,6 +603,13 @@ fn fiber_guard_hit(f: i64, fault_addr: i64) -> bool:
         return false
     fault_addr >= stack as i64 - guard_page_size() and fault_addr < stack as i64
 
+fn load_u32(base: i64, offset: i64) -> u32:
+    unsafe { *((base + offset) as *const u32) }
+
+// The vectored exception handler: a guard-page fault (STATUS_GUARD_PAGE,
+// STATUS_ACCESS_VIOLATION) on the running worker's fiber or coroutine
+// stack is a fiber stack overflow. EXCEPTION_RECORD.ExceptionCode at 0,
+// ExceptionInformation[1] (the faulting address) at 40.
 pub fn with_fiber_veh(exception_info: *mut u8) -> i32:
     let rec = load_i64(exception_info as i64, 0)
     if rec == 0:
@@ -505,12 +618,14 @@ pub fn with_fiber_veh(exception_info: *mut u8) -> i32:
     if code != 0x80000001 as u32 and code != 0xc0000005 as u32:
         return 0
     let fault_addr = load_i64(rec, 40)
-    if fiber_guard_hit(current_coro, fault_addr):
+    let worker = current_worker_index()
+    if fiber_guard_hit(worker_current_coros[worker], fault_addr):
         let _ = rt_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
         rt_exit(134)
-    if fiber_guard_hit(current_fiber, fault_addr):
+    let current = worker_current_fibers[worker]
+    if fiber_guard_hit(current, fault_addr):
         let _ = rt_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
-        fiber_write_i32(2, fiber_id(current_fiber))
+        fiber_write_i32(2, fiber_id(current))
         let _ = rt_write(2, ")\n" as *const u8, 2)
         rt_exit(134)
     0
@@ -519,109 +634,185 @@ fn fiber_install_signal_handlers():
     rt_fiber_install_signal_handlers(alt_stack_ptr(), FIBER_ALT_STACK_SIZE, with_fiber_veh as i64)
 
 pub unsafe fn with_fiber_bootstrap_load(entry_out: *mut i64, arg_out: *mut i64, result_out: *mut i64):
-    if coro_starting != 0:
+    let worker = current_worker_index()
+    let coro: i64 = worker_coro_starting[worker]
+    if coro != 0:
         // A coroutine's entry never returns (with_fiber_coro_finish), so
-        // with_fiber_start never reaches with_fiber_bootstrap_finish for it.
-        let coro = coro_starting
-        coro_starting = 0
+        // _with_fiber_start never reaches with_fiber_bootstrap_finish for it.
+        worker_coro_starting[worker] = 0
         *entry_out = fiber_entry_ptr(coro)
         *arg_out = fiber_arg_ptr(coro)
         *result_out = 0
         return
-    if current_fiber == 0:
+    let current = worker_current_fibers[worker]
+    if current == 0:
         *entry_out = 0
         *arg_out = 0
         *result_out = 0
         return
-    *entry_out = fiber_entry_ptr(current_fiber)
-    *arg_out = fiber_arg_ptr(current_fiber)
-    *result_out = fiber_result_buf(current_fiber) as i64
+    *entry_out = fiber_entry_ptr(current)
+    *arg_out = fiber_arg_ptr(current)
+    *result_out = fiber_result_buf(current) as i64
 
 pub fn with_fiber_bootstrap_finish():
-    if current_fiber == 0:
+    let worker = current_worker_index()
+    let current = worker_current_fibers[worker]
+    if current == 0:
         abort()
+    scheduler_lock()
     completion_sequence = completion_sequence + 1
-    fiber_set_completion_sequence(current_fiber, completion_sequence)
-    fiber_set_state(current_fiber, FIBER_STATE_DONE)
-    with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
+    fiber_set_completion_sequence(current, completion_sequence)
+    fiber_set_state(current, FIBER_STATE_DONE)
+    scheduler_wake_all()
+    scheduler_unlock()
+    with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
     abort()
 
-fn run_one_fiber():
-    let f = dequeue_any()
-    if f == 0:
-        return
-    fiber_set_state(f, FIBER_STATE_RUNNING)
-    current_fiber = f
-    with_fiber_switch(scheduler_ctx_ptr(), f as *mut u8)
-    current_fiber = 0
+fn finish_scheduler_turn(worker: i32, f: i64):
+    scheduler_lock()
+    if scheduler_running_fibers > 0:
+        scheduler_running_fibers = scheduler_running_fibers - 1
+    worker_current_fibers[worker] = 0
     if fiber_state(f) == FIBER_STATE_SUSPENDED:
-        if (scheduler_round & 1) == 0:
-            enqueue_steal(f)
-        else:
-            enqueue(f)
-        scheduler_round = scheduler_round + 1
+        enqueue_worker_front(worker, f)
+    scheduler_wake_all()
+    scheduler_unlock()
+
+fn run_one_fiber_for_worker(worker: i32) -> i32:
+    scheduler_lock()
+    let f = dequeue_for_worker(worker)
+    if f == 0:
+        scheduler_unlock()
+        return 0
+    fiber_set_state(f, FIBER_STATE_RUNNING)
+    worker_current_fibers[worker] = f
+    scheduler_running_fibers = scheduler_running_fibers + 1
+    scheduler_unlock()
+    with_fiber_switch(scheduler_ctx_ptr(worker), f as *mut u8)
+    finish_scheduler_turn(worker, f)
+    1
+
+fn scheduler_worker_loop(worker: i32):
+    while true:
+        if run_one_fiber_for_worker(worker) != 0:
+            continue
+        scheduler_lock()
+        while total_queued_fibers() == 0 and scheduler_shutdown_requested == 0:
+            scheduler_wait()
+        let done = scheduler_shutdown_requested != 0 and total_queued_fibers() == 0 and scheduler_running_fibers == 0
+        scheduler_unlock()
+        if done:
+            return
+
+fn scheduler_worker_entry(arg: *mut u8) -> *mut u8:
+    let worker = (arg as i64) as i32
+    scheduler_lock()
+    worker_thread_ids[worker] = GetCurrentThreadId()
+    scheduler_wake_all()
+    scheduler_unlock()
+    scheduler_worker_loop(worker)
+    0 as *mut u8
 
 pub fn with_fiber_in_fiber() -> i32:
-    if current_fiber != 0: 1 else: 0
+    if current_worker_fiber() != 0: 1 else: 0
 
 pub fn with_runtime_current_cancel_requested() -> i32:
-    if current_fiber == 0:
+    let current = current_worker_fiber()
+    if current == 0:
         return 0
-    if fiber_cancel_requested(current_fiber) != 0: 1 else: 0
+    if fiber_cancel_requested(current) != 0: 1 else: 0
+
+fn scheduler_start_workers():
+    if worker_threads_started != 0:
+        return
+    worker_threads_started = 1
+    var i = 1
+    while i < active_worker_count:
+        let handle = rt_thread_spawn(scheduler_worker_entry as *mut u8, (i as i64) as *mut u8)
+        if handle < 0:
+            with_ewrite("fatal: could not start fiber scheduler worker\n")
+            abort()
+        worker_handles[i] = handle
+        i = i + 1
 
 pub fn with_runtime_core_init():
-    current_fiber = 0
-    coro_starting = 0
-    current_coro = 0
+    scheduler_init_primitives()
+    scheduler_lock()
+    scheduler_shutdown_requested = 0
+    scheduler_running_fibers = 0
+    worker_threads_started = 0
+    active_worker_count = if configured_worker_count > 0: configured_worker_count else: 1
+    worker_thread_ids[0] = GetCurrentThreadId()
     fiber_page_size = guard_page_size()
     fiber_pool_reuse_count = 0
     fiber_pool_alloc_count = 0
     free_fiber_pool()
     live_fiber_count = 0
+    fiber_steal_attempts = 0
     fiber_steal_events = 0
-    scheduler_round = 0
+    cross_thread_cancel_count = 0
     completion_sequence = 0
-    ready_queue_head = 0
-    ready_queue_count = 0
-    steal_queue_head = 0
-    steal_queue_count = 0
+    scheduler_round = 0
     free_fiber_slot_count = MAX_FIBERS
     panicked_fiber_head = 0
     panicked_fiber_count = 0
-    var i = 0
+    var i: i32 = 0
     while i < MAX_FIBERS:
-        store_i64_index(ready_queue_base(), i, 0)
-        store_i64_index(steal_queue_base(), i, 0)
         store_i64_index(fibers_by_slot_base(), i, 0)
         store_u32_index(fiber_slot_generations_base(), i, 0 as u32)
         store_i32_index(free_fiber_slots_base(), i, MAX_FIBERS - 1 - i)
         store_i32_index(panicked_fiber_ids_base(), i, 0)
         i = i + 1
+    i = 0
+    while i < MAX_FIBER_WORKERS:
+        worker_current_fibers[i] = 0
+        worker_coro_starting[i] = 0
+        worker_current_coros[i] = 0
+        worker_thread_ids[i] = 0
+        worker_handles[i] = 0
+        worker_set_queue_head(i, 0)
+        worker_set_queue_count(i, 0)
+        i = i + 1
+    i = 0
+    while i < 8192:
+        store_i64_index(worker_queue_base(), i, 0)
+        i = i + 1
+    worker_thread_ids[0] = GetCurrentThreadId()
+    scheduler_unlock()
     fiber_install_signal_handlers()
+    scheduler_start_workers()
 
 pub fn with_runtime_configure_fibers(stack_size: i64, pool_size: i32, worker_count: i32) -> i32:
-    if worker_count > 1:
-        return -1
     let next_stack = if stack_size > 0: stack_size else: FIBER_STACK_SIZE
     let next_pool = if pool_size > 0: pool_size else: MAX_FIBERS
-    if live_fiber_count != 0 or free_pool_head != 0:
-        if next_stack == fiber_effective_stack_size() and next_pool == fiber_effective_pool_limit():
+    let next_workers = if worker_count > 0: worker_count else: 1
+    if next_workers < 1 or next_workers > MAX_FIBER_WORKERS:
+        return -1
+    if live_fiber_count != 0 or free_pool_head != 0 or worker_threads_started != 0:
+        if next_stack == fiber_effective_stack_size() and next_pool == fiber_effective_pool_limit() and next_workers == active_worker_count:
             return 0
         return -1
     fiber_default_stack_size = next_stack
     fiber_pool_limit = next_pool
+    configured_worker_count = next_workers
     0
 
-// #995: as fiber_core_darwin.w: a spawn past the live-task limit stops loudly.
+// #995: a spawn the runtime cannot hold is a loud stop. It returned -1,
+// which became a Task's fiber id with no check, and awaiting that Task
+// returned at once with a result no fiber wrote (zeros past task 1024).
 pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, result_size: i32, stack_size: i32) -> i32:
+    scheduler_lock()
     if live_fiber_count >= MAX_FIBERS:
+        scheduler_unlock()
         with_panic_ref("spawn: as many tasks are running as one program holds at once (MAX_FIBERS); await some before spawning more", "", 0)
     let slot = allocate_fiber_slot()
     if slot < 0:
+        scheduler_unlock()
         return -1
     let f = acquire_fiber()
     if f == 0:
         release_fiber_slot(slot)
+        scheduler_unlock()
         return -1
 
     let wanted_stack_size = if stack_size > 0: stack_size as i64 else: fiber_effective_stack_size()
@@ -632,6 +823,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
         if stack as i64 == 0:
             release_fiber_slot(slot)
             with_free(f as *mut u8)
+            scheduler_unlock()
             return -1
         fiber_set_stack(f, stack)
 
@@ -649,6 +841,7 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
     fiber_set_has_panic(f, 0)
     fiber_set_panic_msg(f, 0 as *const u8)
     fiber_set_panic_msg_len(f, 0)
+    fiber_set_owner_worker(f, current_worker_index())
     fiber_set_completion_sequence(f, 0)
     fiber_set_wake_at(f, 0)
     fiber_set_next(f, 0)
@@ -656,23 +849,28 @@ pub fn with_fiber_spawn(entry_fn: *const u8, arg: *mut u8, result_buf: *mut u8, 
     live_fiber_count = live_fiber_count + 1
 
     with_fiber_prepare_initial_context(f as *mut u8, fiber_stack(f), fiber_stack_size(f))
-
-    if (fiber_id & 1) == 0:
-        enqueue_steal(f)
-    else:
-        enqueue(f)
+    enqueue_worker(current_worker_index(), f)
+    scheduler_wake_all()
+    scheduler_unlock()
     return fiber_id
 
 pub fn with_fiber_yield():
-    if current_fiber == 0:
+    let worker = current_worker_index()
+    let current = worker_current_fibers[worker]
+    if current == 0:
         return
-    fiber_set_state(current_fiber, FIBER_STATE_SUSPENDED)
-    with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
+    scheduler_lock()
+    fiber_set_state(current, FIBER_STATE_SUSPENDED)
+    scheduler_wake_all()
+    scheduler_unlock()
+    with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
 
 // ── Sleep (§14.3) ─────────────────────────────────────────────────────────
-// The Darwin core's contract (rt/fiber_core_darwin.w): a sleeping fiber is
-// suspended, not its thread (#2117). The thread blocks only when every
-// queued fiber is asleep, and then no longer than the earliest wake time.
+// A sleeping fiber is suspended, not its thread: it records when it wakes and
+// yields, so the other fibers run while it waits (#2117). The thread itself
+// blocks only when every queued fiber is asleep, and then no longer than the
+// earliest wake time or FIBER_SLEEP_SLICE_NS, which bounds how late a
+// cancellation requested from another thread is seen.
 
 fn fiber_wake_at(f: i64) -> i64:
     load_i64(f, FIBER_OFF_WAKE_AT)
@@ -680,20 +878,26 @@ fn fiber_wake_at(f: i64) -> i64:
 fn fiber_set_wake_at(f: i64, value: i64):
     store_i64(f, FIBER_OFF_WAKE_AT, value)
 
-// The earlier of `earliest` and the wake times of one queue's fibers, or 0
-// when one of them is not asleep.
-fn earliest_wake_in_queue(base: i64, head: i32, count: i32, earliest: i64) -> i64:
-    var out = earliest
-    for k in 0..count:
-        let queued = load_i64_index(base, fiber_ring_index(head + k))
-        if queued == 0: continue
-        let wake = fiber_wake_at(queued)
-        if wake == 0: return 0
-        if wake < out: out = wake
-    out
+// The earliest wake time among the queued fibers and `own`, or 0 when a
+// queued fiber is not asleep. Caller holds the scheduler lock.
+fn earliest_wake_if_all_asleep(own: i64) -> i64:
+    var earliest = own
+    for worker in 0..active_worker_count:
+        let head = worker_queue_head(worker)
+        for k in 0..worker_queue_count(worker):
+            let queued = load_i64_index(worker_queue_base(), worker_queue_slot(worker, head + k))
+            if queued == 0: continue
+            let wake = fiber_wake_at(queued)
+            if wake == 0: return 0
+            if wake < earliest: earliest = wake
+    earliest
 
+/// Suspend the current fiber until the monotonic clock reads `wake_at`, or
+/// until its cancellation is requested. Returns 0 at the wake time and -1
+/// when cut short. Outside a fiber the thread sleeps.
 pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
-    let current = current_fiber
+    let worker = current_worker_index()
+    let current = worker_current_fibers[worker]
     if current == 0:
         let wait = wake_at - rt_clock_ns()
         return if wait > 0: rt_nanosleep(wait) else: 0
@@ -701,21 +905,28 @@ pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
         if fiber_cancel_requested(current) != 0: return -1
         let now = rt_clock_ns()
         if now >= wake_at: return 0
+        scheduler_lock()
         fiber_set_wake_at(current, wake_at)
-        var earliest = earliest_wake_in_queue(ready_queue_base(), ready_queue_head, ready_queue_count, wake_at)
-        if earliest != 0: earliest = earliest_wake_in_queue(steal_queue_base(), steal_queue_head, steal_queue_count, earliest)
+        let earliest = earliest_wake_if_all_asleep(wake_at)
+        scheduler_unlock()
         if earliest > now:
-            let _ = rt_nanosleep(earliest - now)
+            let idle = earliest - now
+            let _ = rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
         with_fiber_yield()
+        scheduler_lock()
         fiber_set_wake_at(current, 0)
+        scheduler_unlock()
     0
 
 // ── Coroutines (§13.4 `g.pull()`) ─────────────────────────────────────────
-// The Darwin core's contract (rt/fiber_core_darwin.w): a coroutine runs
-// `entry(arg)` on a pooled fiber stack, driven by its caller alone, outside
-// every run queue. The caller's context lives in a block the coroutine owns
-// (the result-buffer field); the coroutine that was running when it was
-// resumed is kept in the free-list field.
+// A coroutine runs `entry(arg)` on a pooled fiber stack, driven by its caller
+// alone: with_fiber_coro_resume switches into it and returns when it calls
+// with_fiber_coro_suspend or with_fiber_coro_finish. It never enters a run
+// queue, has no fiber id, and is not a scheduled fiber: `current_worker_fiber`
+// stays the caller's. The caller's context lives in a block the coroutine
+// owns (the result-buffer field, unused by coroutines); the coroutine that was
+// running when it was resumed is kept in the free-list field, which is unused
+// while the block is out of the pool.
 
 fn coro_check(co: i64, what: &str):
     if co == 0 or fiber_id(co) != 0 or fiber_result_buf(co) as i64 == 0:
@@ -726,13 +937,19 @@ fn coro_fatal_state(what: &str):
     with_ewrite("fatal: with_fiber_coro_" ++ what ++ ": coroutine in the wrong state\n")
     abort()
 
+/// A coroutine that will run `entry(arg)` at its first resume; 0 when no
+/// fiber stack can be had.
 pub fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64:
+    scheduler_lock()
     let f = acquire_fiber()
+    scheduler_unlock()
     if f == 0:
         return 0
     let caller = with_alloc_origin(FIBER_CTX_SIZE, DBG_ALLOC_ORIGIN_FIBER)
     if caller as i64 == 0:
+        scheduler_lock()
         recycle_fiber(f)
+        scheduler_unlock()
         return 0
     with_memset(caller, 0, FIBER_CTX_SIZE)
     with_memset(f as *mut u8, 0, FIBER_CTX_SIZE)
@@ -746,20 +963,24 @@ pub fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64:
     with_fiber_prepare_initial_context(f as *mut u8, fiber_stack(f), fiber_stack_size(f))
     f
 
+/// Run the coroutine until it suspends or finishes.
 pub fn with_fiber_coro_resume(co: i64):
     coro_check(co, "resume")
     let state = fiber_state(co)
     if state != FIBER_STATE_READY and state != FIBER_STATE_SUSPENDED:
         coro_fatal_state("resume")
+    let worker = current_worker_index()
     if state == FIBER_STATE_READY:
-        coro_starting = co
-    fiber_set_next(co, current_coro)
-    current_coro = co
+        worker_coro_starting[worker] = co
+    fiber_set_next(co, worker_current_coros[worker])
+    worker_current_coros[worker] = co
     fiber_set_state(co, FIBER_STATE_RUNNING)
     with_fiber_switch(fiber_result_buf(co), co as *mut u8)
-    current_coro = fiber_next(co)
+    worker_current_coros[current_worker_index()] = fiber_next(co)
     fiber_set_next(co, 0)
 
+/// From inside the coroutine: return to the caller's resume; the next resume
+/// continues here.
 pub fn with_fiber_coro_suspend(co: i64):
     coro_check(co, "suspend")
     if fiber_state(co) != FIBER_STATE_RUNNING:
@@ -767,6 +988,8 @@ pub fn with_fiber_coro_suspend(co: i64):
     fiber_set_state(co, FIBER_STATE_SUSPENDED)
     with_fiber_switch(co as *mut u8, fiber_result_buf(co))
 
+/// From inside the coroutine, as its last act: return to the caller's resume
+/// for good. The entry must not return; a resume after this is fatal.
 pub fn with_fiber_coro_finish(co: i64):
     coro_check(co, "finish")
     if fiber_state(co) != FIBER_STATE_RUNNING:
@@ -775,6 +998,8 @@ pub fn with_fiber_coro_finish(co: i64):
     with_fiber_switch(co as *mut u8, fiber_result_buf(co))
     abort()
 
+/// Release a coroutine that has not started or has finished; its stack
+/// returns to the fiber pool.
 pub fn with_fiber_coro_free(co: i64):
     coro_check(co, "free")
     let state = fiber_state(co)
@@ -782,15 +1007,19 @@ pub fn with_fiber_coro_free(co: i64):
         coro_fatal_state("free")
     with_free(fiber_result_buf(co))
     fiber_set_result_buf(co, 0 as *mut u8)
+    scheduler_lock()
     recycle_fiber(co)
+    scheduler_unlock()
 
 pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
     *panic_msg_out = 0 as *const u8
     *panic_msg_len_out = 0
     *cancelled_return_out = 0
 
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
+        scheduler_unlock()
         return 0
 
     *cancelled_return_out = fiber_cancelled_return(f)
@@ -803,6 +1032,7 @@ pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *m
 
     unregister_fiber(f)
     recycle_fiber(f)
+    scheduler_unlock()
     1
 
 pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32) -> i32:
@@ -810,6 +1040,7 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
     *panic_msg_out = 0 as *const u8
     *panic_msg_len_out = 0
 
+    scheduler_lock()
     while panicked_fiber_count > 0:
         let queued_fiber_id = load_i32_index(panicked_fiber_ids_base(), panicked_fiber_head)
         store_i32_index(panicked_fiber_ids_base(), panicked_fiber_head, 0)
@@ -827,43 +1058,70 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
         fiber_set_has_panic(f, 0)
         unregister_fiber(f)
         recycle_fiber(f)
+        scheduler_unlock()
         return 1
+    scheduler_unlock()
     0
 
+fn running_worker_for_fiber(f: i64) -> i32:
+    var i: i32 = 0
+    while i < active_worker_count:
+        if worker_current_fibers[i] == f:
+            return i
+        i = i + 1
+    -1
+
 pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) == FIBER_STATE_DONE:
+        scheduler_unlock()
         return 0
     fiber_set_cancel_requested(f, 1)
+    let running_worker = running_worker_for_fiber(f)
+    let owner_worker = if running_worker >= 0: running_worker else: fiber_owner_worker(f)
+    if owner_worker >= 0 and owner_worker != current_worker_index():
+        cross_thread_cancel_count = cross_thread_cancel_count + 1
+    scheduler_wake_all()
+    scheduler_unlock()
     1
 
 pub fn with_fiber_set_result(value: i64):
-    if current_fiber != 0:
-        store_i64(current_fiber, FIBER_OFF_RESULT, value)
+    let current = current_worker_fiber()
+    if current != 0:
+        store_i64(current, FIBER_OFF_RESULT, value)
 
 pub fn with_runtime_current_set_cancelled_return():
-    if current_fiber != 0:
-        fiber_set_cancelled_return_flag(current_fiber, 1)
+    let current = current_worker_fiber()
+    if current != 0:
+        fiber_set_cancelled_return_flag(current, 1)
 
 pub fn with_runtime_current_cancelled_return() -> i32:
-    if current_fiber == 0:
+    let current = current_worker_fiber()
+    if current == 0:
         return 0
-    fiber_cancelled_return(current_fiber)
+    fiber_cancelled_return(current)
 
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
+        scheduler_unlock()
         return 0
-    fiber_cancelled_return(f)
+    let out = fiber_cancelled_return(f)
+    scheduler_unlock()
+    out
 
 pub fn with_runtime_current_set_cancel_requested():
-    if current_fiber != 0:
-        fiber_set_cancel_requested(current_fiber, 1)
+    let current = current_worker_fiber()
+    if current != 0:
+        fiber_set_cancel_requested(current, 1)
 
 pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
-    if current_fiber == 0:
+    let worker = current_worker_index()
+    let current = worker_current_fibers[worker]
+    if current == 0:
         return
-    fiber_set_has_panic(current_fiber, 1)
     var buf: *mut u8 = 0 as *mut u8
     if msg_len >= 0:
         buf = with_alloc(msg_len + 1)
@@ -871,62 +1129,109 @@ pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
             with_memcpy(buf, msg, msg_len)
             unsafe:
                 *((buf as i64 + msg_len as i64) as *mut u8) = 0 as u8
-    fiber_set_panic_msg(current_fiber, buf as *const u8)
-    fiber_set_panic_msg_len(current_fiber, msg_len)
+    scheduler_lock()
+    fiber_set_has_panic(current, 1)
+    fiber_set_panic_msg(current, buf as *const u8)
+    fiber_set_panic_msg_len(current, msg_len)
     completion_sequence = completion_sequence + 1
-    fiber_set_completion_sequence(current_fiber, completion_sequence)
-    fiber_set_state(current_fiber, FIBER_STATE_DONE)
-    enqueue_panicked_fiber(fiber_id(current_fiber))
-    with_fiber_switch(current_fiber as *mut u8, scheduler_ctx_ptr())
+    fiber_set_completion_sequence(current, completion_sequence)
+    fiber_set_state(current, FIBER_STATE_DONE)
+    enqueue_panicked_fiber(fiber_id(current))
+    scheduler_wake_all()
+    scheduler_unlock()
+    with_fiber_switch(current as *mut u8, scheduler_ctx_ptr(worker))
     abort()
 
 pub fn with_runtime_core_shutdown():
-    var i = 0
+    scheduler_lock()
+    scheduler_shutdown_requested = 1
+    scheduler_wake_all()
+    scheduler_unlock()
+    var wi = 1
+    while wi < active_worker_count:
+        let handle = worker_handles[wi]
+        if handle > 0:
+            rt_thread_join(handle)
+        wi = wi + 1
+
+    scheduler_lock()
+    var i: i32 = 0
     while i < MAX_FIBERS:
         let f = load_i64_index(fibers_by_slot_base(), i)
         if f != 0:
             unregister_fiber(f)
             recycle_fiber(f)
         i = i + 1
-    ready_queue_head = 0
-    ready_queue_count = 0
-    steal_queue_head = 0
-    steal_queue_count = 0
-    current_fiber = 0
+    i = 0
+    while i < active_worker_count:
+        worker_current_fibers[i] = 0
+        worker_set_queue_head(i, 0)
+        worker_set_queue_count(i, 0)
+        i = i + 1
     panicked_fiber_head = 0
     panicked_fiber_count = 0
     free_fiber_pool()
+    worker_threads_started = 0
+    active_worker_count = 1
+    scheduler_running_fibers = 0
+    scheduler_unlock()
 
 pub fn with_runtime_core_has_fibers() -> i32:
-    if ready_queue_count > 0 or steal_queue_count > 0: 1 else: 0
+    scheduler_lock()
+    let has = total_queued_fibers() > 0 or scheduler_running_fibers > 0
+    scheduler_unlock()
+    if has: 1 else: 0
 
 pub fn with_runtime_core_run_one_step():
-    if ready_queue_count > 0 or steal_queue_count > 0:
-        run_one_fiber()
+    if run_one_fiber_for_worker(current_worker_index()) == 0:
+        rt_nanosleep(1000)
 
 pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0:
-        // §14.7/#637: a well-formed handle that no longer resolves names a
-        // reaped (terminal) fiber — report done, not a silent false. Kept
-        // in lockstep with the Darwin core.
+        scheduler_unlock()
+        // §14.7/#637: handles are minted only by spawn, and a slot is
+        // released only after its fiber reached a terminal state and was
+        // reaped (await/join/panic-take). A well-formed handle that no
+        // longer resolves therefore names a finished task — report done,
+        // not a silent false.
         let stale_slot = fiber_slot_from_id(fiber_id)
         if fiber_id > 0 and stale_slot >= 0 and stale_slot < MAX_FIBERS:
             return 1
         return 0
-    if fiber_state(f) == FIBER_STATE_DONE: 1 else: 0
+    let done = fiber_state(f) == FIBER_STATE_DONE
+    scheduler_unlock()
+    if done: 1 else: 0
 
 pub fn with_runtime_fiber_completion_sequence(fiber_id: i32) -> i64:
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0 or fiber_state(f) != FIBER_STATE_DONE:
+        scheduler_unlock()
         return 0
-    fiber_completion_sequence(f)
+    let sequence = fiber_completion_sequence(f)
+    scheduler_unlock()
+    sequence
 
 pub fn with_runtime_fiber_is_live(fiber_id: i32) -> i32:
+    scheduler_lock()
     let f = fiber_lookup(fiber_id)
     if f == 0:
+        scheduler_unlock()
         return 0
+    scheduler_unlock()
     1
+
+pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
+    scheduler_lock()
+    let f = fiber_lookup(fiber_id)
+    if f == 0:
+        scheduler_unlock()
+        return -1
+    let worker = running_worker_for_fiber(f)
+    scheduler_unlock()
+    worker
 
 pub fn with_fiber_pool_reuses() -> i64:
     fiber_pool_reuse_count
@@ -938,9 +1243,10 @@ pub fn with_fiber_stack_size_bytes() -> i64:
     fiber_effective_stack_size()
 
 pub fn with_fiber_current_stack_size_bytes() -> i64:
-    if current_fiber == 0:
+    let current = current_worker_fiber()
+    if current == 0:
         return 0
-    fiber_stack_size(current_fiber)
+    fiber_stack_size(current)
 
 pub fn with_fiber_pool_free_count() -> i32:
     fiber_pool_free_count
@@ -957,21 +1263,17 @@ pub fn with_fiber_live_fibers() -> i32:
 pub fn with_fiber_steal_events() -> i64:
     fiber_steal_events
 
-pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
-    let _ = fiber_id
-    if current_fiber != 0: 0 else: -1
-
 pub fn with_fiber_steal_attempts() -> i64:
-    fiber_steal_events
+    fiber_steal_attempts
 
 pub fn with_fiber_worker_count() -> i32:
-    1
+    active_worker_count
 
 pub fn with_fiber_current_worker_index() -> i32:
-    0
+    current_worker_index()
 
 pub fn with_fiber_cross_thread_cancels() -> i64:
-    0
+    cross_thread_cancel_count
 
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
 // Every foreign call above is described here; the `runtime-domain-audit`
@@ -996,3 +1298,10 @@ c facade ucrt:
     fn abort
         preserves domain environ
         preserves domain locale
+    // The scheduler's thread identity and synchronization (kernel32):
+    // Win32 rows say nothing, so each invalidates every declared domain.
+    fn GetCurrentThreadId
+    fn AcquireSRWLockExclusive
+    fn ReleaseSRWLockExclusive
+    fn SleepConditionVariableSRW
+    fn WakeAllConditionVariable
