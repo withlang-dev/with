@@ -77,7 +77,7 @@ void with_vec_append_bytes(uint8_t *v, with_str s);
 // D115 Amendment 1 step 1: sized helpers; the element size is static at
 // every call. D116: `++` and `++=`.
 void with_vec_push_es(with_vec *v, const void *elem, int64_t elem_size);
-void *with_vec_get_ptr_es(with_vec *v, int64_t index, int64_t elem_size);
+void *with_vec_get_ptr_es(void *v, int64_t index, int64_t elem_size);
 void with_vec_remove_es(with_vec *v, int64_t index, int64_t elem_size);
 void with_vec_extend_bits_es(uint8_t *v, const uint8_t *src, int64_t n, int64_t elem_size);
 void with_vec_extend_str(uint8_t *v, const uint8_t *src, int64_t n);
@@ -203,7 +203,7 @@ void with_flush_stdout(void);
 // ── Process ────────────────────────────────────────────────────────
 
 int32_t with_arg_count(void);
-with_str with_arg_at(int32_t idx);
+with_str with_arg_at(int64_t idx);
 void with_runtime_set_argv(int32_t argc, char **argv);
 void with_install_interrupt_handlers(void);
 void with_raise_stack_limit(void);
