@@ -7480,6 +7480,28 @@ impl Sema:
             return self.get_type_d0(ep) != self.get_type_d0(ap)
         (ek == TypeKind.TY_INT and ak == TypeKind.TY_FLOAT) or (ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_INT)
 
+    // The value an argument converts from when a reference demands a numeric
+    // pointee: a discriminant enum is its integer value (§4.4a), so it
+    // converts as its representation type does (#2774).
+    fn numeric_source_type(tid: i32) -> i32:
+        let repr = self.enum_repr_type(tid)
+        if repr != 0: repr else: tid
+
+    // An argument auto-referenced into `&pointee` would be an implicit
+    // narrowing (§4.2.6): a wider integer, another sign, or a discriminant
+    // enum whose representation is either.
+    fn auto_ref_narrows(pointee: i32, actual: i32) -> bool:
+        let source = self.numeric_source_type(actual)
+        self.numeric_types_differ(pointee, source) and self.implicit_numeric_join(pointee as TypeId, source as TypeId) != self.resolve_alias(pointee as TypeId)
+
+    // An argument auto-referenced into `&pointee` is viewed through a
+    // converted temporary, never its own place: a narrower integer widens
+    // (#2336), and a discriminant enum's value is its integer (§4.4a, #2774).
+    fn auto_ref_arg_converts(pointee: i32, actual: i32) -> bool:
+        if self.numeric_types_differ(pointee, actual):
+            return true
+        self.enum_repr_type(actual) != 0 and self.get_type_kind(self.resolve_alias(pointee as TypeId)) == TypeKind.TY_INT
+
     mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
@@ -10830,7 +10852,7 @@ impl Sema:
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
                 let auto_pointee = self.get_type_d0(exp_r)
-                if self.numeric_types_differ(auto_pointee, act_r as i32) and self.implicit_numeric_join(auto_pointee as TypeId, act_r) != self.resolve_alias(auto_pointee as TypeId):
+                if self.auto_ref_narrows(auto_pointee, act_r as i32):
                     return 0
                 if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
                     return 1
@@ -11102,6 +11124,8 @@ impl Sema:
                         return 1
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
+                if self.auto_ref_narrows(self.get_type_d0(exp_r), act_r as i32):
+                    return 0
                 if self.types_compatible_frozen(self.get_type_d0(exp_r), act_r) != 0:
                     return 1
         0
