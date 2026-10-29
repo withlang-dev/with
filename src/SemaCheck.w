@@ -19109,6 +19109,10 @@ impl Sema:
             self.iter_next_mono_syms.insert(key_node, new_mono_val)
         if saved_ty_val != 0:
             self.typed_expr_types.insert(key_node, saved_ty_val)
+        else:
+            // A `for` node had no type: next()'s return stayed stamped on
+            // it, and a `for` arm of a value `if` read as `Option[T]`.
+            self.typed_expr_types.remove(key_node)
         if saved_sig_val >= 0:
             self.resolved_call_sigs.insert(key_node, saved_sig_val)
         else:
