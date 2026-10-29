@@ -26,9 +26,16 @@ fn embedded_bundle_name(index: i32) -> str:
 // it (#2131). A bundle is consulted only for the target being compiled.
 fn embedded_bundle_target(index: i32) -> str:
     embedded_bundles_target_data(index)
+// A native build reads the native slots and a cross build its tag's. A host
+// that is also a cross tag (windows_x86_64, linux_x86_64) carries its
+// runtime twice, compiled for the host and for the named triple, and the
+// bytes differ: each reader took whichever slot came first, so the
+// generation check compared out/lib/rt.o, the native bundle, with the
+// tagged one and refused this compiler's own runtime (#2788: 1305063 bytes
+// on disk, 1305107 embedded on win10).
 fn embedded_bundle_for_this_target(index: i32) -> bool:
     let target = embedded_bundle_target(index)
-    if target.len() == 0: target_spec_is_native() else: target == target_spec_resolved_name()
+    if target.len() == 0: target_spec_is_native() else: not target_spec_is_native() and target == target_spec_resolved_name()
 
 // A str view over an embedded blob (no copy): the {ptr, len} pair written
 // directly, the way the link stage views embedded runtime objects.
