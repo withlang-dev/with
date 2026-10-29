@@ -5280,7 +5280,48 @@ impl Sema:
         let kind = self.ast.kind(node)
         (kind == NodeKind.NK_VARIANT_SHORTHAND or kind == NodeKind.NK_IDENT) and self.ast.get_data0(node) == self.syms.none
 
-    mut fn facade_prepare_callback_call(mi: i32, node: i32, extra_start: i32, arg_count: i32) -> FacadeCallbackCall:
+    // Law 2: a closure literal passed as the userdata takes the type the
+    // callback argument receives it as. The facade's rendered callback type
+    // is `extern "C" fn(…, &U, …)`: binding `U` to a marker finds the `&U`
+    // position, and a named callback's parameter there is `&T`, so the
+    // closure is checked against `T` (its untyped parameters take T's).
+    // 0 when the callback is not a named function or has no such parameter.
+    mut fn facade_userdata_expected_from_callback(mi: i32, fn_sym: i32, self_type: i32, node: i32, extra_start: i32, arg_count: i32) -> i32:
+        if fn_sym == 0:
+            return 0
+        // The paired callback, or each callback a generated wrapper serves (D76).
+        var positions: List[i32] = List.new()
+        if self.facade_callback_methods[mi].callback_param >= 0: positions.push(self.facade_callback_methods[mi].callback_param)
+        for w in self.facade_callback_methods[mi].wrapped_params: positions.push(w)
+        let has_resolved = self.has_resolved_call_args(node)
+        for r in positions:
+            if r < 0 or r >= arg_count: continue
+            let cb_node = if has_resolved != 0: self.get_resolved_call_arg(node, r) else: self.ast.get_extra(extra_start + r)
+            let found = self.facade_userdata_expected_at(mi, fn_sym, self_type, cb_node, r)
+            if found != 0: return found
+        0
+
+    mut fn facade_userdata_expected_at(mi: i32, fn_sym: i32, self_type: i32, cb_node: i32, r: i32) -> i32:
+        if cb_node <= 0 or self.ast.kind(cb_node) != NodeKind.NK_IDENT:
+            return 0
+        let cb_sig = self.get_visible_sig(self.ast.get_data0(cb_node))
+        if cb_sig < 0:
+            return 0
+        let marker = self.ty_never as i32
+        let rendered = self.facade_callback_fn_param_expected_type(mi, fn_sym, self_type, marker, r)
+        let callable = if rendered != 0: self.callable_type_resolved(rendered) else: 0
+        if callable == 0:
+            return 0
+        for pi in 0..self.get_type_d1(callable):
+            let rp = self.resolve_alias(self.type_extra[self.get_type_d0(callable) + pi] as TypeId)
+            if self.get_type_kind(rp) != TypeKind.TY_REF or self.resolve_alias(self.get_type_d0(rp) as TypeId) != self.resolve_alias(marker as TypeId) or pi >= self.sig_get_param_count(cb_sig):
+                continue
+            let p = self.resolve_alias(self.sig_param_type(cb_sig, pi) as TypeId)
+            if self.get_type_kind(p) == TypeKind.TY_REF:
+                return self.get_type_d0(p)
+        0
+
+    mut fn facade_prepare_callback_call(mi: i32, node: i32, extra_start: i32, arg_count: i32, fn_sym: i32, self_type: i32) -> FacadeCallbackCall:
         var context = FacadeCallbackCall { userdata_node: 0, userdata_type: 0, nullable: false, valid: true }
         if mi < 0 or (self.facade_callback_methods[mi].callback_param < 0 and self.facade_callback_methods[mi].wrapped_params.len() == 0):
             return context
@@ -5318,7 +5359,8 @@ impl Sema:
                 if context.nullable and self.ast.kind(ud_node) == NodeKind.NK_VARIANT_SHORTHAND:
                     context.userdata_type = self.facade_check_userdata_shorthand(ud_node)
                 else:
-                    context.userdata_type = self.check_expr_value_context(ud_node) as i32
+                    let ud_expected = if self.ast.kind(ud_node) == NodeKind.NK_CLOSURE: self.facade_userdata_expected_from_callback(mi, fn_sym, self_type, node, extra_start, arg_count) else: 0
+                    context.userdata_type = if ud_expected != 0: self.check_expr_with_expected(ud_node, ud_expected as TypeId) as i32 else: self.check_expr_value_context(ud_node) as i32
                 self.facade_userdata_ctor = saved_ctor
         context
 

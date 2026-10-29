@@ -42,7 +42,11 @@ fn on_data(ptr: *mut c_char, size: u64, nmemb: u64, sink: &fn(i32) -> Unit) -> u
     size * nmemb
 
 fn configure() -> bool:
-    var total = 0
+    // The counter's type is the callback's (`&fn(i32) -> Unit`), as in
+    // behav_libcurl_facade_callback_pair: `sink`'s parameter is typed by what
+    // its body demands, and a pair's `U` binds per call, so the pairing does
+    // not reach it.
+    var total: i32 = 0
     let sink = n => total = total + n
     let made = Easy.new()
     if made.is_none(): return false
