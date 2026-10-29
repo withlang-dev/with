@@ -9481,6 +9481,8 @@ pub fn run_cli_selfhost_build_w_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = bs_check_build_w_shared_output(ctx, compiler_path, bs_join(base_dir, "shared_output"))
     if rc != 0: return rc
+    rc = bs_check_build_w_early_return_stops_lanes(ctx, compiler_path, bs_join(base_dir, "early_return"))
+    if rc != 0: return rc
     bs_check_build_w_action_failures(ctx, compiler_path, bs_join(base_dir, "action_failures"))
 
 // #2014: two targets declaring one output are refused when the graph loads,
@@ -9513,6 +9515,50 @@ fn bs_check_build_w_shared_output(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     if ctx.fs().exists(bs_join(case_dir, "out/action/shared.txt")):
         return bs_fail(ctx, "build_w_shared_output: the refused graph still ran a writer")
+    0
+
+// A build that ends early stops the lanes it started: an install whose source
+// is missing ended `with build` while a pooled action ran on and wrote its
+// output after the build had reported (2026-10-29: `with uat` outlived a
+// battery by minutes).
+fn bs_check_build_w_early_return_stops_lanes(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    var rc = bs_write_project_manifest(ctx, case_dir, "earlyreturn")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"unused\")\n", ctx.target_name(), "early return source")
+    if rc != 0: return rc
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "fixtures/sleep.w"), "use std.time\nsleep_secs(5)\n", ctx.target_name(), "early return sleep child")
+    if rc != 0: return rc
+    let build =
+        "use std.build\n" ++
+        "use std.time\n\n" ++
+        "fn slow(ctx: ActionCtx) -> i32:\n" ++
+        "    let _ = sleep_secs(3)\n" ++
+        "    ctx.fs().write_text(ctx.output(), \"late\")\n\n" ++
+        "pub fn build(ctx: BuildCtx) -> Build:\n" ++
+        "    var out = ctx.new_build()\n" ++
+        "    var s = target_new(.Action, \"slow\", \"\").output(\"out/slow.txt\")\n" ++
+        "    s = s.allow_parallel()\n" ++
+        "    s.action = slow\n" ++
+        "    out = out.add_target(s)\n" ++
+        "    var i = target_new(.Install, \"publish\", \"out/missing.txt\").output(\"out/published.txt\")\n" ++
+        "    i = i.input(\"out/missing.txt\")\n" ++
+        "    i = i.arg(\"0644\")\n" ++
+        "    out = out.add_target(i)\n" ++
+        "    out = out.add_target(target_new(.Group, \"all\", \"\").dep(\"slow\").dep(\"publish\"))\n" ++
+        "    out.default(\"all\")\n"
+    rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build, ctx.target_name(), "early return build.w")
+    if rc != 0: return rc
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    if result.rc == 0:
+        return bs_fail(ctx, "build_w_early_return: a build with a missing install source unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, result.stderr, "build: stopping 'slow', still running when the build ended", "build_w_early_return")
+    if rc != 0: return rc
+    // Outlast the action's sleep, then look for what an orphan would write.
+    let waited = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return-wait", bs_blob_to_args(bs_argv_append(bs_argv_append("", "run"), "fixtures/sleep.w")), 120000, case_dir)
+    if waited.rc != 0:
+        return bs_fail(ctx, "build_w_early_return: the sleep child failed")
+    if ctx.fs().exists(bs_join(case_dir, "out/slow.txt")):
+        return bs_fail(ctx, "build_w_early_return: the stopped lane ran on and wrote out/slow.txt after the build ended")
     0
 
 

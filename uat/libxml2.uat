@@ -1,5 +1,11 @@
 scenario: libxml2 from a fresh project, over the facade with get writes
 requires: network
+platforms: darwin, linux-x86_64
+# D171: only where with get provides the whole chain cleanly. libxml2 needs
+# libiconv, whose build is autotools (sh and make) wherever with get builds
+# it from source (every package on Windows; linux-aarch64, where Conan
+# Center has no binaries). A user may use them; the UAT measures what the
+# toolchain does (uat/README.md).
 
 new directory
 run: with init .

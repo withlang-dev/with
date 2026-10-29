@@ -26135,6 +26135,25 @@ impl Sema:
             if start_value != 0:
                 let _ = self.record_contextual_copy_adjustment(start, start_value, elem_type as i32)
                 elem_type = start_value as TypeId
+        // §4.2.6: typed bounds meet where an operator's operands meet, at the
+        // type one widens into losslessly (implicit_numeric_join), so `a..n`
+        // with `a: i32`, `n: isize` is a Range[isize] as `n..a` always was;
+        // the end was an owned demand of the start's type, which refused it
+        // as a narrowing. An untyped end still takes the start's type.
+        if start != 0 and end != 0 and self.is_plain_numeric_type(elem_type as i32) and not self.expr_is_untyped_literal_arith(end):
+            let end_exact = self.check_expr_value_context(end)
+            let end_value = self.shared_copy_pointee(end_exact as i32)
+            let end_ty = if end_value != 0: end_value as TypeId else: end_exact
+            if self.is_plain_numeric_type(end_ty as i32):
+                let join = self.implicit_numeric_join(elem_type, end_ty)
+                if join == 0:
+                    self.reject_implicit_numeric_narrowing(end, elem_type as i32, end_exact as i32)
+                    return self.ensure_exact_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
+                self.record_contextual_copy_adjustment(end, join as i32, end_exact as i32)
+                return self.ensure_exact_type(TypeKind.TY_RANGE, join as i32, inclusive, 0) as i32
+            if self.types_compatible(elem_type, end_ty) == 0 and self.has_contextual_copy_adjustment(end) == 0:
+                self.emit_error("range bounds must have compatible types", node)
+            return self.ensure_exact_type(TypeKind.TY_RANGE, elem_type as i32, inclusive, 0) as i32
         if end != 0:
             var end_ty = if start != 0: self.check_expr_with_owned_demand(end, elem_type) else: self.check_expr_value_context(end)
             if start == 0:

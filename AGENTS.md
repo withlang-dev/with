@@ -441,7 +441,7 @@ Two surfaces, never conflated: user programs use exactly the language
 syntax and the `std.*` APIs (`lib/std/`); `with_*` symbols and everything in
 `rt/*.w` are the compiler's own runtime — user source never names one; the
 compiler emits those calls (`std.regex` is a facade over the pcre2 `.wo`
-bundle, `std.re`, D38/D39). If you catch yourself asking "how does a user
+bundle, `std.engines.pcre2`, D38/D39). If you catch yourself asking "how does a user
 program get the `with_*` symbols?", the question is malformed. The standard
 library reaches the runtime as a module, never an extern: `use rt.rt_core`,
 and by role `use rt.platform` / `use rt.fiber_core` (the active target's
@@ -451,10 +451,54 @@ compiler: `use rt.*` from a program is refused ("a program reaches it
 through std"). A new `extern fn with_*` in `lib/std` is a regression. A
 runtime function is safe by its declaration: an `unsafe` block whose only
 content is a call of one is vacuous and refused (R4c). The compiler's own
-`src/` modules still declare their runtime externs (agreeing duplicates of
-the interface): they become `use rt.*` once a seed carrying the step-4
-resolver rule is pinned, since the pinned seed refuses that import from
-`src/`.
+`src/` modules reach the runtime the same way (`use rt.rt_core`, and by
+role `use rt.platform`) and libc through `std.libc`; a new `extern fn` in
+`src/` is a regression unless it names a C symbol of our own bridge objects
+(the `wl_*`/`clang_*` LLVM and Clang bridges, the tool `main`s), never a
+runtime or libc function: an agreeing duplicate is a second declaration of
+one fact, and the one that disagreed (`exit` typed as returning) hid dead
+code (2026-10-25 sweep). A runtime fact crosses the seam typed:
+`with_system_info() -> SysInfo`, never a byte pointer with a layout comment.
+One constraint shapes the order of such changes: `src/` is compiled by the
+pinned seed against the seed's runtime interface and linked with the seed's
+runtime, so a new runtime API reaches `src/` only after a seed carrying it is
+pinned (a byte-form stand-in stays, marked seed-bound, until then and is
+deleted in the pin's own stack: `with_sysinfo` lived from #2621 to the
+2026-10-25 seed); `lib/std` is compiled by the tree's compiler and uses it
+at once.
+
+---
+
+## Whose action is it? The user may use system tools; the toolchain is bootstrapped (D171)
+
+Before deciding whether something may run Perl, `sh`, `make`, a host C
+compiler or any other system tool, ask **whose action it is**:
+
+- **The user's.** `with get` building a user's C package, a user's own
+  project and build, a release UAT scenario (it plays a user). These **may**
+  use the host's system tools. A missing tool is named, and installing it is
+  the user's step (package-management.md).
+- **The toolchain's.** The compiler, its runtime, its build system
+  (`build.w`, `build/*.w`), the SDK and the migrated corpora. These may
+  **not**: everything they need is bootstrapped from our own sources and SDK
+  (D81, and the next section).
+
+The two never meet. Our compiler and our build never call `with get`; the
+migrated corpora (pcre2, zlib, …) serve the standard library and the
+compiler, never `with get`. So a user's C dependency is never ported,
+migrated or substituted to spare `with get` a host tool, and the
+toolchain's rule is never applied to a user's action.
+
+The release UAT selects only scenarios the toolchain can do: a scenario uses
+only dependencies `with get` provides cleanly on that platform (a Conan
+Center binary, or a CMake source build through the compiler's own `cmake`,
+`ninja` and `with cc`). A dependency chain that needs a host tool on a
+platform (openssl's Perl, libiconv's autotools) takes that platform off the
+scenario's `platforms:` line; it never starts a port or a migration
+(`uat/README.md`).
+
+Eric has had to explain this distinction three times (2026-10-28). Read it
+before proposing anything about a package's dependencies or the UAT.
 
 ---
 
@@ -689,6 +733,21 @@ Read the relevant source. Confirm AST layouts and naming conventions. When you
 can't find something, grep `examples/`, `src/` and `docs/spec/README.md`
 before assuming it doesn't exist. Never rely on memory.
 
+### Source never names a document's path
+
+Code cites a ruling by its D-number, the spec by its section (§), and any
+other document by its file name alone (`wo_bundles.md`, never
+`docs/spec/toolchain/wo_bundles.md`). A document's directory moves
+(`proposals/` becomes `completed/`); a path to it made moving one proposal
+change 31 source files and cost a battery (#2632). `doc-path-check` (in the
+gate) refuses a `docs/…md` path in `src/`, `build/`, `lib/`, `tools/`,
+`rt/` and `test/`, except a file the program itself reads or writes.
+
+Moving, renaming or archiving a document is a docs-only change: it touches
+`docs/` and nothing else, takes `spec-inventory-check` only, and never a
+battery. The battery agrees: it exits GREEN without running when the
+committed sources already have a published green (`:sources-green`).
+
 ### Code style — write the least ceremony
 
 Match the surrounding code and the mission at the character level:
@@ -711,8 +770,20 @@ Match the surrounding code and the mission at the character level:
   parameter, or a returned value is). A file full of the legacy idiom is a
   backlog to burn down; a mechanical class of it is a `with -p` or Lexer-based
   rewrite, not N hand edits.
-- **Never take an idiom from a migrated corpus (D112).** `lib/std/re`,
-  `lib/std/zl`, `lib/std/c_algorithms`, `lib/std/tommyds` (every corpus in
+- **A corpus is re-promoted for exactly three reasons (D112): its upstream
+  pin moves, its migrator pin is bumped for a fix it needs, or a ruling
+  breaks its output (batched in that ruling's campaign). A migrator change
+  never re-migrates or re-promotes a corpus.** The build refuses a promote on
+  an unchanged pin without `WITH_CORPUS_PROMOTE=migrator-pin:#NNNN` or
+  `ruling:DNNN` (`corpus-promote-guard-check`, in the gate). Design every
+  mechanism that touches corpora as if there were 20,000 of them (Eric,
+  2026-10-22): no per-corpus copies that must agree, no O(corpora) gate,
+  no cross-corpus coordination. A new corpus coexists with every promoted
+  one; when it cannot, the defect is in the compiler or in the migrator's
+  output shape, never in the promoted corpora (an `extern fn` is its
+  module's view of a C symbol, `Sema.extern_view_sig`).
+- **Never take an idiom from a migrated corpus (D112).** `lib/std/engines/pcre2`,
+  `lib/std/engines/zlib`, `lib/std/engines/c_algorithms`, `lib/std/engines/tommyds` (every corpus in
   `build/corpora.w`) and `test/corpora/` are generated by `with migrate` from a
   pinned migrator generation and carry its idioms (hoisted ternary temps, push
   chains, `.clone()` on a str). They prove the migrator and compiler work, not

@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D171 — User actions may use system tools; the compiler and its build are bootstrapped; a UAT scenario uses only dependencies `with get` provides cleanly on its platform (ruled; #2788)](2026-10-28-D171-a-uat-scenario-uses-only-dependencies-with-get-provides-cleanly.md)
 - [D169 — A trait names its method as §11.4 names an extension's: `Trait.method(args)`, the receiver the first argument, a static method's `Self` from its use (ruled; #2520)](2026-10-28-D169-a-trait-names-its-method-as-a-module-names-its-function.md)
 - [D168 — A List's adapters are its iterator's: no eager `List.map`, `filter`, `fold`; a pipeline iterates a List (D142), the closure sees a view, `collect` copies a value out (delegated; #2772)](2026-10-28-D168-a-lists-adapters-are-its-iterators.md)
 - [D167 — A scalar on the left is the scalar's operator, written as an extension method of the scalar's type (`extend f64: fn mul(self: &Self, v: &V) -> V`), Scala being the north star; amends D166 through its reopen clause (ruled)](2026-10-28-D167-a-scalar-on-the-left-is-the-scalars-operator.md)
