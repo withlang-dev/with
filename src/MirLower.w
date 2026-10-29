@@ -7869,6 +7869,32 @@ impl MirBuilder:
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, read_place, read_rv, self.ast.get_start(tail_expr))
         self.body.new_operand(OperandKind.OK_COPY, read_place)
 
+    // A tail that moves a whole local of this block out (`let out = …; out`)
+    // is read BEFORE pop_scope_inline: left lazy, the scope exit ended the
+    // moved local (`StorageDead(_4)`) ahead of the consumer's `_0 = move _4`.
+    // Codegen read the storage anyway, but the last-use pass (D111) read the
+    // StorageDead as the local's end, so an earlier copy of it
+    // (`xs.push(out)`) became the take that blanked it, and the function
+    // returned the blank.
+    mut fn materialize_tail_move_of_scope_local(result: i32, tail_expr: i32) -> i32:
+        if self.body.operand_kinds[result] != OperandKind.OK_MOVE or self.drop_scope_starts.len() == 0:
+            return result
+        let local = mir_place_plain_local(self.body, self.body.operand_d0[result])
+        if local < 0:
+            return result
+        let drop_start = self.drop_scope_starts[(self.drop_scope_starts.len() - 1)]
+        var in_scope = false
+        for di in 0..self.drop_local_ids.len():
+            if di >= drop_start and self.drop_local_ids[di] == local:
+                in_scope = true
+        if not in_scope:
+            return result
+        let moved_tmp = self.new_temp(self.local_type(local))
+        let moved_place = self.place_for_local(moved_tmp)
+        let moved_rv = self.body.new_rvalue(RvalueKind.RK_USE, result, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, moved_place, moved_rv, self.ast.get_start(tail_expr))
+        self.body.new_operand(OperandKind.OK_COPY, moved_place)
+
     // D111/D120: a view tail (`out.trim()`, `xs[n - 1]`, a `&T` into a local
     // of this block) where the block's demand is the owned value copies it
     // out, with its hold when drop-bearing, BEFORE the block's scope-exit
@@ -8061,6 +8087,7 @@ impl MirBuilder:
                 result = self.materialize_tail_field_move(result, tail_expr)
                 result = self.materialize_tail_read_of_dropped_local(result, tail_expr)
                 result = self.materialize_tail_view_for_owned_demand(result, tail_expr)
+                result = self.materialize_tail_move_of_scope_local(result, tail_expr)
             else:
                 let tail_frame = self.push_stmt_temp_frame()
                 result = self.lower_expr_discard(tail_expr)

@@ -1426,7 +1426,15 @@ impl MirDropStateMap:
     mut fn note_operand(keys: &MirDropStateKeys, body: &MirBody, operand_id: i32):
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return
-        if body.operand_kinds[operand_id] != OperandKind.OK_MOVE:
+        // D111: a copy MIR marked `+take` (the source's last use) hands the
+        // value over and codegen blanks the source: it holds the reset
+        // sentinel. Read as a plain copy, a later read of the blank passed
+        // validate-all (a tail `out` after `xs.push(out)` returned "").
+        let kind = body.operand_kinds[operand_id]
+        if kind == OperandKind.OK_COPY and body.operand_hold(operand_id) == MIR_HOLD_TAKE:
+            self.mark_place(keys, body, body.operand_d0[operand_id], MirDropState.Reset)
+            return
+        if kind != OperandKind.OK_MOVE:
             return
         self.mark_place(keys, body, body.operand_d0[operand_id], MirDropState.Moved)
 
@@ -2431,6 +2439,8 @@ fn mir_read_of_moved_owned_local(mir_mod: &MirModule, body: &MirBody, keys: &Mir
             continue
         if state.place(keys, place) == MirDropState.Moved and mir_place_holds_non_copy_owner(mir_mod, body, place):
             return f"read of {mir_place_text(body, place)}, which every path reaching it already moved out: the value belongs to its new owner (§2.5.1)"
+        if state.place(keys, place) == MirDropState.Reset and body.operand_hold(op) != MIR_HOLD_TAKE and mir_place_holds_non_copy_owner(mir_mod, body, place):
+            return f"read of {mir_place_text(body, place)}, which every path reaching it left the reset blank (a move or a last-use take): it reads no value (§2.5.1)"
     ""
 
 fn mir_place_holds_non_copy_owner(mir_mod: &MirModule, body: &MirBody, place: i32) -> bool:
