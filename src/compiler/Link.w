@@ -1722,16 +1722,35 @@ fn link_stage_elf_undefined_symbols(path: &str) -> str:
     // No symbol table: nothing referenced.
     ""
 
+// The object format a file's header names: "macho" (MH_MAGIC_64), "coff"
+// (an x86_64, arm64 or i386 machine, or the /bigobj signature), or "".
+fn link_stage_object_format(obj_path: &str) -> str:
+    let data = runtime_read_file(obj_path)
+    if data.len() < 4:
+        return ""
+    if link_stage_read_u32_le(data, 0) == 0xfeedfacf:
+        return "macho"
+    let machine = link_stage_read_u16_le(data, 0)
+    if machine == 0x8664 or machine == 0xaa64 or machine == 0x14c:
+        return "coff"
+    if machine == 0 and link_stage_read_u16_le(data, 2) == 0xffff:
+        return "coff"
+    ""
+
 fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
-    // A native macOS object is read in-process: no host nm (#1915).
-    if runtime_sysinfo_os() == "Macos" and target_spec_is_native():
+    // Every object is read in-process by the reader its own header names,
+    // on any host (#1915, D81): no nm, the SDK's or the host's. A cross
+    // COFF object (a windows_aarch64 engine bundle built on Linux or on an
+    // x86_64 Windows host) went to a GNU nm that cannot read ARM64 COFF, or
+    // to a bare llvm-nm.exe not on PATH, and the bundle could not record
+    // the contracts it imports (#2780).
+    let format = link_stage_object_format(obj_path)
+    if format == "macho":
         let symbols = link_stage_macho_undefined_symbols(obj_path)
         if symbols == "<probe-failed>":
             with_eprint(f"warning: link: {obj_path} is not a 64-bit Mach-O object this compiler can read for undefined symbols; linking every embedded bundle\n")
         return symbols
-    // So is a native Windows one (#1915, D81): no llvm-nm, the SDK's or
-    // the host's.
-    if runtime_sysinfo_os() == "Windows" and target_spec_is_native():
+    if format == "coff":
         let symbols = link_stage_coff_undefined_symbols(obj_path)
         if symbols == "<probe-failed>":
             with_eprint(f"warning: link: {obj_path} is not a COFF object this compiler can read for undefined symbols; linking every embedded bundle\n")
@@ -1751,41 +1770,14 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
         with_eprint(f"warning: link: {obj_path} is not a 64-bit little-endian ELF object this compiler can read for undefined symbols; linking every embedded bundle\n")
     if elf != "<not-elf>":
         return elf
-    let report_path = obj_path ++ ".undef"
-    let null_path = if runtime_sysinfo_os() == "Windows": "NUL" else: "/dev/null"
-    var argv = ""
-    var nm_tool = "nm"
-    if runtime_sysinfo_os() == "Windows":
-        // The SDK's llvm-nm, beside the lld this link runs (its record, or
-        // the environment's SDK, as link_stage_llvm_ld_path resolves it):
-        // a PATH lookup found none in a shell without the SDK on PATH, and
-        // every such link carried every embedded bundle (#1915).
-        let ld_path = link_stage_llvm_ld_path()
-        nm_tool = if ld_path.len() > 0: link_stage_dirname(ld_path) ++ "/llvm-nm.exe" else: "llvm-nm.exe"
-    else if not target_spec_is_native():
-        // Cross objects are foreign to the host toolchain; use the
-        // SDK's llvm-nm (beside lld) when it's available.
-        let root = link_stage_resolve_runtime_root()
-        let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
-        if ld_path.len() > 0:
-            let llvm_nm = link_stage_dirname(ld_path) ++ "/llvm-nm"
-            if link_stage_file_exists(llvm_nm):
-                nm_tool = llvm_nm
-    argv = link_stage_argv_append(argv, nm_tool)
-    argv = link_stage_argv_append(argv, "-u")
-    argv = link_stage_argv_append(argv, obj_path)
-    let probe_rc = runtime_exec_argv_capture(argv, report_path, null_path, 0)
-    if probe_rc != 0:
-        let _ = runtime_remove_file(report_path)
-        // A failed probe links EVERY embedded bundle (link_stage_bundle_needed
-        // treats it as needed): correct, but the binary carries every corpus
-        // and every corpus's externs must resolve on this target — zlib's
-        // fcntl on Windows (#1103). Say so, so a broken nm never hides.
-        with_eprint(f"warning: link: could not probe {obj_path} for undefined symbols with '{nm_tool}' (exit {probe_rc}); linking every embedded bundle\n")
-        return "<probe-failed>"
-    let symbols = runtime_read_file(report_path)
-    let _ = runtime_remove_file(report_path)
-    symbols
+    // No object format this compiler links is left to a tool: an object
+    // none of the readers names is no relocatable object it can read. A
+    // failed probe links EVERY embedded bundle (link_stage_bundle_needed
+    // treats it as needed): correct, but the binary carries every corpus
+    // and every corpus's externs must resolve on this target (#1103), so
+    // say so.
+    with_eprint(f"warning: link: {obj_path} is no Mach-O, COFF, ELF or wasm object this compiler can read for undefined symbols; linking every embedded bundle\n")
+    "<probe-failed>"
 
 fn link_stage_undefined_symbols_need_helpers_runtime(undef: &str) -> i32:
     if undef == "<probe-failed>":
