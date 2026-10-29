@@ -1,5 +1,6 @@
 scenario: libxml2 from a fresh project, over the facade with get writes
 requires: network
+platforms: darwin, linux-x86_64
 
 new directory
 run: with init .
