@@ -4546,6 +4546,34 @@ fn bs_check_migrate_char_pointer_is_c_char(ctx: &ActionCtx, compiler_path: &str,
     let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-char-pointer", check_args)
     checked.rc
 
+// #2781: C may keep statements after a return (pocketfft's rfftp_twsize
+// ends `return t; return 0;`). They never run, With refuses unreachable
+// code (§20b.5), so they are not translated; a case after a break is
+// reachable and is kept.
+fn bs_check_migrate_dead_statements(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "dead.c")
+    let out_w = bs_join(case_dir, "dead.w")
+    var rc = bs_write_fixture(ctx, src, "static unsigned long twsize(unsigned long n) {\n  unsigned long t = 0;\n  for (unsigned long k = 0; k < n; ++k) t += k;\n  return t;\n  return 0;\n}\nint pick(int n) {\n  switch (n) {\n  case 0: return 10; break;\n  case 1: return 20;\n  }\n  return 30;\n}\nunsigned long api(unsigned long n) { return twsize(n) + (unsigned long)pick((int)n); }\n", "dead statement fixture")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-dead-statements", args)
+    if result.rc != 0: return result.rc
+    if ctx.fs().read_text(out_w).contains("return ((0 as u64))"):
+        return bs_fail(ctx, "dead_statements: the return after `return t` was translated")
+    rc = bs_file_contains(ctx, out_w, "20", "dead_statements keeps the case after a break")
+    if rc != 0: return rc
+    var check_args: List[str] = List.new()
+    check_args |> push("check")
+    check_args |> push(bs_abs(root, out_w))
+    let checked = bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-dead-statements", check_args)
+    checked.rc
+
 // D159 step 1 (migrator-contracts-plan.md): the contracts
 // artifact names, per defined function, what its body proves about the
 // pointers it is handed — and names the unproved point otherwise. One small
@@ -6349,6 +6377,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_contracts(ctx, compiler_path, bs_join(output_dir, "contracts"))
     if rc != 0: return rc
     rc = bs_check_migrate_char_pointer_is_c_char(ctx, compiler_path, bs_join(output_dir, "char_pointer_is_c_char"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_dead_statements(ctx, compiler_path, bs_join(output_dir, "dead_statements"))
     if rc != 0: return rc
     rc = bs_check_migrate_local_and_member_records(ctx, compiler_path, bs_join(output_dir, "local_and_member_records"))
     if rc != 0: return rc

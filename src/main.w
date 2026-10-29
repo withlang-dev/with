@@ -5455,18 +5455,24 @@ fn migrate_apply_std_use_fixits(output_path: &str) -> i32:
     while pass < 3:
         let result = compiler_analyze_file(output_path, "select:kind=diagnostic")
         var block = ""
+        var errors = 0
         for i in 0..result.report.facts.len():
             let fact = result.report.facts[i]
             if fact.kind != AnalysisFactKind.Diagnostic or fact.flags != AnalysisDiagnosticSeverity.Error as i32:
                 continue
+            errors += 1
             let parts = fact.name.split("; add: use ")
             if parts.len() < 2:
                 continue
             let use_line = "use " ++ parts[1]
             if not ("\n" ++ block).contains("\n" ++ use_line ++ "\n"):
                 block = block ++ use_line ++ "\n"
+        // #2781: an output that does not check is a failed migration, not a
+        // written file; the analysis printed its errors above.
         if block.len() == 0:
-            return 0
+            if errors == 0: return 0
+            eprint(f"migrate: {output_path} does not check ({errors} error(s) above)")
+            return 1
         let text = with_fs_read_file(output_path)
         var to_insert = ""
         for line in block.split("\n"):
