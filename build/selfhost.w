@@ -3622,6 +3622,12 @@ fn bs_emit_c_expected_stdout(text: &str) -> str:
             first = false
     out
 
+fn bs_emit_c_expected_debug_alloc(text: &str) -> str:
+    let prefix = "//! expect-debug-alloc: "
+    for line in text.split("\n"):
+        if line.starts_with(prefix): return line.slice(prefix.len(), line.len())
+    ""
+
 // #740 roundtrip: sizeof/alignof/transmute lower to real C rather than
 // generic-call abort placeholders, and spawn_os's fn-value transmute is
 // bit-correct under the fat {fn_ptr, ctx} representation.
@@ -3711,6 +3717,9 @@ type EcCase {
     expect_stdout: str,
     trim_stdout: bool,
     stderr_needles: List[str],
+    // a fixture's `//! expect-debug-alloc:` line: the C program runs under
+    // the debug allocator and its report must contain it ("" for none)
+    debug_alloc: str,
 }
 
 fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
@@ -3718,6 +3727,7 @@ fn ec_case(name: &str, dir: &str, src: &str) -> EcCase:
         name: name.clone(), dir: dir.clone(), src: src.clone(), native: false,
         emit_flags: List.new(), emit_timeout_ms: 120000, libm: true, forbid_in_c: "",
         expect_rc: 0, check_stdout: true, expect_stdout: "ok", trim_stdout: true, stderr_needles: List.new(),
+        debug_alloc: "",
     }
 
 fn ec_c_path(c: &EcCase): bs_join(c.dir, "program.c")
@@ -3808,7 +3818,15 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
             continue
         var argv: List[str] = List.new()
         argv.push(bs_abs(root, bin))
-        let run = ctx.process_runner().run_capture(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), 120000)
+        // #983: a fixture that states its allocator verdict runs under the
+        // debug allocator, so a double free or a leak in the C backend's
+        // drops fails the case, not only a wrong line of output.
+        let run_env = if c.debug_alloc.len() > 0: process_env().set("WITH_DEBUG_ALLOC", "1") else: process_env()
+        let run = ctx.process_runner().run_capture_with_env(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), 120000, run_env)
+        if c.debug_alloc.len() > 0 and not run.stderr.contains(c.debug_alloc):
+            failed += 1
+            report = report ++ "\n" ++ c.name ++ ": the debug allocator did not report '" ++ c.debug_alloc ++ "'" ++ bs_actual_excerpt(run.stderr)
+            continue
         let actual = if c.trim_stdout: bs_trim_trailing_line_endings(run.stdout) else: run.stdout.clone()
         if run.rc != c.expect_rc or (c.check_stdout and actual != c.expect_stdout):
             failed += 1
@@ -4070,6 +4088,7 @@ pub fn run_emit_c_smoke_action(ctx: ActionCtx) -> i32:
         fixture.native = true
         fixture.emit_timeout_ms = 300000
         fixture.expect_stdout = bs_emit_c_expected_stdout(fs.read_text(path))
+        fixture.debug_alloc = bs_emit_c_expected_debug_alloc(fs.read_text(path))
         cases.push(fixture)
     if fixtures == 0:
         return bs_fail(ctx, "test/emit_c: no fixtures; the corpus cannot prove the C backend runs")
