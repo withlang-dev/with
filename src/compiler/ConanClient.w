@@ -1410,6 +1410,10 @@ fn conan_patch_read(path: &str) -> str: runtime_read_file(path)
 fn conan_patch_write(path: &str, text: &str) -> i32: runtime_write_file(path, text)
 
 // What the recipe says about a build we cannot drive, for the error.
+// Cannot drive *yet*: `with get` is the user's action, and a user's action
+// may run the host's Perl, sh or make (D171). Only the compiler and its
+// build are bootstrapped. This refusal is a missing capability, never a
+// rule to extend, and never a reason to migrate or port a user's package.
 fn conan_recipe_build_system(recipe: &str) -> str:
     if recipe.contains("Configure") and recipe.contains("perl"): return "its own Configure script, which needs Perl"
     if recipe.contains("Autotools(") or recipe.contains("AutotoolsToolchain"): return "autotools (sh and make)"
