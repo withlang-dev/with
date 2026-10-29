@@ -42,12 +42,12 @@ fn show_hs(h: &H[str]) -> str:
         .Y => "Y"
 
 fn g_text(g: G[i64]) -> str:
-    match move g:
+    match g:
         G.A(h) => show_h(h)
         G.B(n) => f"B {n}"
 
 fn gs_text(g: &G[str]) -> str:
-    match move g:
+    match g:
         .A(h) => show_hs(h)
         .B(n) => f"B {n}"
 
@@ -64,7 +64,7 @@ fn wrap_text(w: Wrap[i64]) -> str:
 
 fn main:
     let g: G[i64] = G.A(H.X(3))
-    match move g:
+    match g:
         G.A(h) => print(show_h(h))
         G.B(n) => print(f"B {n}")
     print(g_text(G.A(H.X(4))))

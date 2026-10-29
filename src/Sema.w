@@ -11295,7 +11295,6 @@ impl Sema:
             let _ = self.copy_visit_stack.remove(resolved as i32)
             return out
         if tk == TypeKind.TY_ENUM:
-            // Enums are non-Copy by default; opt-in via `impl Copy for T`.
             let enum_name = self.get_type_d0(resolved)
             if enum_name > 0 and self.impl_lookup.contains(enum_name):
                 let idx = self.impl_lookup.get(enum_name).unwrap()
@@ -11304,7 +11303,12 @@ impl Sema:
                 for di in 0..count:
                     if self.impl_extra[(start + di)] == self.syms.copy_trait:
                         return 1
-            return 0
+            // #2549 (D111, as D120 stage 3 for structs): an enum whose
+            // payloads are all values is a value, unless it has a Drop impl
+            // or is declared a resource.
+            if enum_name > 0 and (self.has_drop_method(enum_name) != 0 or self.resource_type_names.contains(enum_name)):
+                return 0
+            return self.fields_all_copy(resolved as i32)
         if tk == TypeKind.TY_SLICE:
             return 1
         if tk == TypeKind.TY_GENERIC_INST:
@@ -11337,9 +11341,9 @@ impl Sema:
             // Do NOT call type_implements_trait(copy_trait) here — it just calls is_copy() back.
             if self.select_trait_impl_for_generic_inst(resolved as i32, self.syms.copy_trait) != 0:
                 return 1
-            // D120 (§2.3, stage 3): an instance of a generic struct is a
-            // value when its fields are, unless the struct has a Drop impl
-            // or is declared a resource. An enum instance stays opt-in.
+            // D120 (§2.3, stage 3): an instance of a generic struct or enum
+            // is a value when its fields or payloads are (#2549), unless the
+            // type has a Drop impl or is declared a resource.
             if generic_base > 0 and self.resource_type_names.contains(generic_base):
                 return 0
             if self.type_has_drop_impl(resolved as i32) != 0 or self.has_drop_method(generic_base) != 0:
@@ -11347,8 +11351,6 @@ impl Sema:
             // A SlotMap addresses its slots by Handle: the handles are its
             // identity, and the runtime keeps no holder count for one.
             if generic_base == self.syms.slotmap:
-                return 0
-            if self.type_reflection_variant_count(resolved as i32) > 0:
                 return 0
             return self.fields_all_copy(resolved as i32)
         1
@@ -11390,6 +11392,16 @@ impl Sema:
             if field_ty == 0 or self.is_copy(field_ty as TypeId) == 0:
                 out = 0
                 break
+        // #2549: an enum's variants' payloads are its fields.
+        for vi in 0..self.type_reflection_variant_count(resolved):
+            if out == 0: break
+            for pi in 0..self.type_reflection_variant_payload_count(resolved, vi):
+                let payload_ty = self.type_reflection_variant_payload_type(resolved, vi, pi)
+                if payload_ty == 0:
+                    self.copy_walk_incomplete = 1
+                if payload_ty == 0 or self.is_copy(payload_ty as TypeId) == 0:
+                    out = 0
+                    break
         self.copy_visit_stack.remove(resolved)
         // Exact when every field was typed and no cycle truncated the walk.
         if self.copy_walk_incomplete == 0 and self.copy_cycle_hits == hits_before:
