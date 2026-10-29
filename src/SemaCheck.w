@@ -15006,7 +15006,11 @@ impl Sema:
             let rhs_none = (self.ast.kind(rhs_node) == NodeKind.NK_VARIANT_SHORTHAND or self.ast.kind(rhs_node) == NodeKind.NK_IDENT) and self.ast.get_data0(rhs_node) == self.syms.none
             let ptr_none_cmp = ((lhs_cmp_kind == TypeKind.TY_PTR or lhs_option_ptr) and rhs_none) or ((rhs_cmp_kind == TypeKind.TY_PTR or rhs_option_ptr) and lhs_none)
             if lhs_ptr_like != rhs_ptr_like and ptr_zero_cmp == 0 and ptr_none_cmp == 0:
-                self.emit_error("comparison operands must have compatible types", node)
+                // #893: say which side is the pointer; `*(ptrs[i])` reads the
+                // pointer an element holds (D22 §6.6), and the pointee is one
+                // dereference further.
+                let ptr_side = if lhs_ptr_like: lhs else: rhs
+                self.emit_error(f"comparison operands must have compatible types: `{self.type_name(lhs as i32)}` and `{self.type_name(rhs as i32)}`; `{self.type_name(ptr_side as i32)}` is a pointer or reference, and its pointee is one dereference further (`*p`)", node)
                 return 0
             // Two instances of one generic type: `Option[i32]` beside
             // `Option[isize]` has no comparison short of converting a payload,
@@ -15018,7 +15022,7 @@ impl Sema:
                 self.emit_error(f"comparison operands must have the same type: `{self.type_name(lhs_cmp_value as i32)}` and `{self.type_name(rhs_cmp_value as i32)}`; an aggregate's elements do not convert (§4.2.6)", node)
                 return 0
             if bool_int_cmp == 0 and ptr_like_cmp == 0 and ptr_zero_cmp == 0 and ptr_none_cmp == 0 and self.builtin_arg_type_compatible(lhs, rhs) == 0 and self.builtin_arg_type_compatible(rhs, lhs) == 0:
-                self.emit_error("comparison operands must have compatible types", node)
+                self.emit_error(f"comparison operands must have compatible types: `{self.type_name(lhs as i32)}` and `{self.type_name(rhs as i32)}`", node)
                 return 0
             // §4.3d: a vector's `==` is lane-wise and yields a Mask, not the
             // one `bool` that `==` on an aggregate is (§11.7: `eq(...) ->
