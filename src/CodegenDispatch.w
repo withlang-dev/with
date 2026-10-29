@@ -5956,6 +5956,11 @@ impl Codegen:
     // with copy glue (a str, a value list, a struct holding one) is one more
     // holder of what it shares: the copy glue runs over the fresh buffer.
     mut fn mir_emit_list_element_copy_glue_ptr(ptr: i64, list_sema_ty: i32):
+        self.mir_emit_list_element_copy_glue_from(ptr, list_sema_ty, wl_const_int(wl_i64_type(self.context), 0, 0))
+
+    // The same over the elements from index `start` on: those `++` appended
+    // by their bits (mir_emit_list_extend_from).
+    mut fn mir_emit_list_element_copy_glue_from(ptr: i64, list_sema_ty: i32, start: i64):
         if ptr == 0 or list_sema_ty <= 0:
             return
         let elem_sema = self.mir_list_elem_sema_type_from_sema_type(list_sema_ty)
@@ -5968,8 +5973,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let len_val = self.mir_list_len_inline(ptr)
         let buffer = wl_build_load(self.builder, ptr_ty, ptr)
-        let zero = wl_const_int(i64_ty, 0, 0)
-        let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, zero)
+        let has_elems = wl_build_icmp(self.builder, wl_int_sgt(), len_val, start)
         let entry_bb = wl_get_insert_block(self.builder)
         let loop_bb = wl_append_bb(self.context, self.current_function, "cow.glue.loop")
         let done_bb = wl_append_bb(self.context, self.current_function, "cow.glue.done")
@@ -5985,7 +5989,7 @@ impl Codegen:
         wl_build_cond_br(self.builder, more, loop_bb, done_bb)
         let loop_end_bb = wl_get_insert_block(self.builder)
         let phi_vals: List[i64] = List.new()
-        phi_vals.push(zero)
+        phi_vals.push(start)
         phi_vals.push(next_idx)
         let phi_bbs: List[i64] = List.new()
         phi_bbs.push(entry_bb)
@@ -6414,9 +6418,15 @@ impl Codegen:
         wl_build_call(self.builder, fn_ty, f, list_data_i64(args), args.len() as i32)
 
     // D116: append `n` elements at `data` to the List at `out_ptr`.
-    mut fn mir_emit_list_extend_from(out_ptr: i64, data: i64, n: i64, es: i64, elem_is_str: bool):
+    // D111: an element `++` copies is one more holder of what it shares: a
+    // str is retained by the runtime's extend; any other element with copy
+    // glue (a List of values, a struct holding a str) takes its glue over
+    // the appended range. By bits alone, `a ++ a` of a List[List[str]]
+    // freed each inner buffer twice.
+    mut fn mir_emit_list_extend_from(out_ptr: i64, data: i64, n: i64, es: i64, elem_is_str: bool, list_sema: i32, elem_sema: i32):
         let i64_ty = wl_i64_type(self.context)
         let ptr_ty = wl_ptr_type(self.context)
+        let glue_from = if not elem_is_str and self.sema.type_needs_drop_frozen(elem_sema) != 0: self.mir_list_len_inline(out_ptr) else: 0
         let params: List[i64] = List.new()
         params.push(ptr_ty)
         params.push(ptr_ty)
@@ -6431,6 +6441,8 @@ impl Codegen:
         params.push(i64_ty)
         args.push(wl_const_int(i64_ty, es, 0))
         let _ = self.mir_list_helper_call("with_vec_extend_bits_es", params, args)
+        if glue_from != 0:
+            self.mir_emit_list_element_copy_glue_from(out_ptr, list_sema, glue_from)
 
     // D116 (§15.4.9): LIST_CONCAT builds the result List from two sequence
     // arguments; LIST_EXTEND appends argument 1 to the List at argument 0.
@@ -6475,11 +6487,11 @@ impl Codegen:
                     sema_phase_bug("BUG: a slice operand of `++` is not a fat value (D116)")
                 let data = wl_build_extract_value(self.builder, val, 0)
                 let n = self.coerce_int(wl_build_extract_value(self.builder, val, 1), i64_ty)
-                self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str)
+                self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str, list_sema, elem_sema)
             else if src_kind == TypeKind.TY_ARRAY:
                 let aptr = self.mir_intrinsic_arg_ptr(body, args_id, i)
                 let n = wl_const_int(i64_ty, self.mir_type_d1_at(src_sema) as i64, 0)
-                self.mir_emit_list_extend_from(out_ptr, aptr, n, es, elem_is_str)
+                self.mir_emit_list_extend_from(out_ptr, aptr, n, es, elem_is_str, list_sema, elem_sema)
             else:
                 let hptr = self.mir_intrinsic_arg_ptr(body, args_id, i)
                 if body.operand_kinds[op] == OperandKind.OK_MOVE:
@@ -6495,7 +6507,7 @@ impl Codegen:
                 else:
                     let data = wl_build_load(self.builder, ptr_ty, hptr)
                     let n = wl_build_load(self.builder, i64_ty, self.mir_list_header_word_ptr(hptr, 8))
-                    self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str)
+                    self.mir_emit_list_extend_from(out_ptr, data, n, es, elem_is_str, list_sema, elem_sema)
         if in_place: return 0
         wl_build_load(self.builder, list_ty, out_ptr)
 
