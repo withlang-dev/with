@@ -86,12 +86,14 @@ fn target_spec_os() -> str:
     with_sysinfo_os()
 
 // §16.1 / D155: whether C's `long double` is a double on `os`/`arch`
-// (macOS AArch64 and Windows). Elsewhere it is wider (x86_64 and AArch64
-// Linux, wasm), so `c_longdouble`, which is f64 everywhere, is not it there:
-// c_import omits a declaration that passes one, and an extern that names it
-// is refused (#977). One answer for both.
+// (AArch64 macOS and AArch64 Windows). Elsewhere it is wider (x86_64 and
+// AArch64 Linux, wasm, and x86_64 Windows, whose C is windows-gnu's — the
+// target triple below, #1915 — with an 80-bit x87 long double; #2771), so
+// `c_longdouble`, which is f64 everywhere, is not it there: c_import omits
+// a declaration that passes one, and an extern that names it is refused
+// (#977). One answer for both.
 fn c_long_double_is_double(os: &str, arch: &str) -> bool:
-    (os == "Macos" and arch == "aarch64") or os == "Windows"
+    arch == "aarch64" and (os == "Macos" or os == "Windows")
 
 // §16.1 / D155: the fixed-width spelling of a C integer alias on the active
 // target, or "" for a name that is not one. One table for every reader:
