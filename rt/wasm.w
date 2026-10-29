@@ -811,6 +811,9 @@ pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
 fn rt_empty_str() -> str:
     with_str_from_bytes(c" ".ptr, 0)
 
+// #2773: WASI has no message table; the code itself follows the text.
+pub fn rt_os_error_text(code: i32) -> str: with_str_from_cstr(c"WASI error".ptr)
+
 pub fn rt_readlink(path: *const c_char) -> str:
     var rel: [4096]u8 = [0 as u8; 4096]
     let rb = (&raw mut rel) as *mut [4096]u8 as *mut u8
