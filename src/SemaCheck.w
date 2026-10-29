@@ -36608,6 +36608,15 @@ impl Sema:
             obj_type as i32
         else:
             recv_type as i32
+        // Law 1: `Atomic.new(v)` with nothing expected holds what it is
+        // built from — `Atomic[type of v]`, as `Atomic.new(v)` under an
+        // annotation is the annotation's. Typed as the bare `Atomic`, every
+        // `load` on it was an unknown method.
+        if field == self.syms.new and self.pool_resolve(type_name_sym) == "Atomic" and arg_types.len() == 1 and arg_types[0] > 0 and self.get_type_kind(self.resolve_alias(recv_type)) != TypeKind.TY_GENERIC_INST and self.generic_constructor_return_type(type_name_sym, recv_type as i32) == recv_type as i32:
+            let cell_args: List[i32] = [arg_types[0]]
+            let made = self.ensure_generic_inst_type(type_name_sym, cell_args, 1) as i32
+            self.typed_expr_types.insert(node, made)
+            return made
         let builtin_ret = self.builtin_intrinsic_method_return_type(builtin_recv_type, type_name_sym, field)
         if builtin_ret != 0:
             // TODO(D22): producer seeding below is insufficient on its own.
