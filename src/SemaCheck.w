@@ -27853,7 +27853,7 @@ impl Sema:
         // calling a known function signature).
         let has_resolved = self.has_resolved_call_args(node)
         let facade_mi = self.facade_callback_method_for(fn_sym)
-        let facade_context = self.facade_prepare_callback_call(facade_mi, node, resolved_extra_start, resolved_arg_count)
+        let facade_context = self.facade_prepare_callback_call(facade_mi, node, resolved_extra_start, resolved_arg_count, fn_sym, 0)
         if not facade_context.valid:
             return 0
         var arg_types: List[i32] = List.new()
@@ -27914,7 +27914,9 @@ impl Sema:
                 let bind_sym = 0 - arg_node
                 arg_types.push(self.scope_lookup(bind_sym))
                 continue
-            if defer_generic_closures and expected_ty == 0 and self.arg_waits_for_fn_demand(arg_node):
+            // A facade's userdata was checked first, against its callback
+            // (facade_prepare_callback_call); it does not wait again.
+            if defer_generic_closures and expected_ty == 0 and self.arg_waits_for_fn_demand(arg_node) and arg_node != facade_context.userdata_node:
                 deferred_closure_args.push(ai)
                 arg_types.push(0)
                 continue
@@ -35410,7 +35412,9 @@ impl Sema:
         // whatever order C declares them in (SemaFacade.w
         // facade_callback_param_expected_type).
         let facade_mi = self.facade_callback_method_for_call(obj_type as i32, field)
-        let facade_context = self.facade_prepare_callback_call(facade_mi, node, extra_start, mc_resolved_arg_count)
+        let facade_recv = self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type))
+        let facade_fn = if facade_mi >= 0: self.lookup_generic_method_fn(self.get_type_name(facade_recv), field) else: 0
+        let facade_context = self.facade_prepare_callback_call(facade_mi, node, extra_start, mc_resolved_arg_count, facade_fn, facade_recv as i32)
         if not facade_context.valid:
             return 0
         let facade_ud_node = facade_context.userdata_node
