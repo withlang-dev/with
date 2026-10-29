@@ -1924,6 +1924,9 @@ type Sema {
     // join with no owned anchor joins as a view of its place — field node ->
     // the `&F` it is typed as there. MirLower lowers it as `ref(shared, place)`.
     join_field_view_arms: HashMap[i32, i32],
+    // D22 §8: join arm tails that are bindings observing a place
+    // (note_arm_tail), joined as views.
+    join_view_binding_arms: HashMap[i32, i32],
     // §2.4: value nodes of drop-body self-field lets — MirLower binds these
     // by MOVE (never the alias path); the field glue skips them via
     // drop_consumed_field.
@@ -3275,6 +3278,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let fn_callable_values = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let join_field_view_arms = sema_new_map_i32_i32()
+    let join_view_binding_arms = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
     let auto_ref_binding_values = sema_new_map_i32_i32()
     let auto_ref_payload_args = sema_new_map_i32_i32()
@@ -3887,6 +3891,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
 
         view_projection_exprs,
         join_field_view_arms,
+        join_view_binding_arms,
         drop_consumed_binding_values,
         auto_ref_binding_values,
         auto_ref_payload_args,
