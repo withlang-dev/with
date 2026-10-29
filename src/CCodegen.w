@@ -6333,6 +6333,12 @@ impl CCodegen:
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
                 return self.c_sig_return_type(sig_idx)
+        // `Atomic.new(v)` is the generic `new` MIR typed by its destination;
+        // by name alone it resolved to another type's `new` (StringBuilder).
+        if dest_place >= 0 and cc_base_name(cc_intern_resolve(self.intern, self.call_callee_fn_sym(body, callee_operand))) == "new":
+            let dest_tid = self.place_sema_tid(body, dest_place)
+            if self.generic_inst_base_name(dest_tid) == "Atomic":
+                return dest_tid
         let builtin_ret = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         if builtin_ret != 0:
             return builtin_ret
@@ -8521,6 +8527,15 @@ impl CCodegen:
         let intrinsic = body.call_intrinsic(args_id)
         if intrinsic == MirIntrinsic.COLLECTION_LITERAL or intrinsic == MirIntrinsic.MAP_LITERAL:
             return self.emit_collection_literal_term(body, intrinsic, args_id, dest_place, next_bb)
+
+        // `Atomic.new(v)`: the cell `{ val }` emit_struct_type_defs declares
+        // (#985 made std.random's state one, in a global's initializer).
+        let new_tid = if name == "new" and dest_place >= 0: self.place_sema_tid(body, dest_place) else: 0
+        if new_tid != 0 and self.generic_inst_base_name(new_tid) == "Atomic" and self.call_arg_count(body, args_id) == 1:
+            let value = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
+            let dst = self.place_text(body, dest_place)
+            let cell_c = self.c_type(new_tid, 0)
+            return "    " ++ dst ++ " = (" ++ cell_c ++ ")" ++ cc_lbrace() ++ " .val = " ++ value ++ " " ++ cc_rbrace() ++ ";\n" ++ f"    goto bb{next_bb};"
 
         self.fail("emit-c does not support generic intrinsic " ++ if name.len() > 0: name else: "<unknown>")
         "\n"
