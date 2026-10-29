@@ -1991,26 +1991,18 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
     if count == 0:
         return out
     let tmp_dir = link_stage_artifact_root() ++ "/tmp/with_runtime"
-    var rt_present = false
     for bi in 0..count:
+        // #2131: a slot carried for another target is not this link's. One
+        // slot per bundle is this target's (embedded_bundle_for_this_target),
+        // so the runtime joins once.
+        if not embedded_bundle_for_this_target(bi):
+            continue
         if not embedded_bundle_present(bi):
             // An empty `rt` slot under the lane: the runtime root's bundle.
-            if embedded_bundle_name(bi) == "rt" and needs_runtime and not rt_present:
+            if embedded_bundle_name(bi) == "rt" and needs_runtime:
                 let from_root = link_stage_runtime_root_bundle_object()
                 if from_root.len() > 0:
                     out.push(from_root)
-                    rt_present = true
-            continue
-        // A host that is also a cross tag carries its runtime twice — the
-        // native `rt` slot and `rt@<tag>` — and both are this target's: the
-        // runtime joins once (a second copy is 20 duplicate symbols at the
-        // Linux stage3 link).
-        if embedded_bundle_name(bi) == "rt" and embedded_bundle_for_this_target(bi):
-            if rt_present:
-                continue
-            rt_present = true
-        // #2131: a slot carried for another target is not this link's.
-        if not embedded_bundle_for_this_target(bi):
             continue
         let manifest = link_stage_embedded_obj_slice(embedded_bundle_manifest_start(bi) as *const u8, embedded_bundle_manifest_end(bi) as *const u8)
         let name = embedded_bundle_name(bi)
