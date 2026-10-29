@@ -85,6 +85,8 @@ extern fn rt_chmod(path: *const c_char, mode: i32) -> i32
 extern fn rt_file_mode(path: *const c_char) -> i32
 extern fn rt_readlink(path: *const c_char) -> str
 extern fn rt_os_error_text(code: i32) -> str
+extern fn rt_err_is_dir() -> i32
+extern fn rt_err_short_read() -> i32
 // stat is in the core 13 but declared with a different name to avoid confusion
 extern fn rt_stat(path: *const c_char, out: *mut u8) -> i32
 
@@ -4500,11 +4502,12 @@ fn cstr_free(cpath: *const c_char): rt_free(cpath as *mut u8)
 
 // The file's text with its status: 0, or the negated errno of the failed
 // step (#953: a failure and an empty file used to be the same ""). A
-// directory is EISDIR; a read that stops short of the measured size is EIO.
+// directory and a read that stops short of the measured size are the
+// platform's codes for them (EISDIR and EIO on POSIX; Win32 has its own).
 fn fs_read_file_status_c(cpath: *const c_char, status: *mut i32) -> str:
     unsafe *status = 0
     if fs_path_is_dir_c(cpath):
-        unsafe *status = -21  // EISDIR
+        unsafe *status = -rt_err_is_dir()
         return ""
     let fd = rt_open(cpath, 0, 0)  // O_RDONLY
     if fd < 0:
@@ -4533,7 +4536,7 @@ fn fs_read_file_status_c(cpath: *const c_char, status: *mut i32) -> str:
     let _ = rt_close(fd)
     if total < size:
         rt_free(buf)
-        unsafe *status = -5  // EIO
+        unsafe *status = -rt_err_short_read()
         return ""
     unsafe *((buf as i64 + total) as *mut u8) = 0
     make_str(buf as *const u8, total)

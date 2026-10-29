@@ -237,6 +237,13 @@ fn win_error() -> i32:
 fn win_neg_error() -> i32:
     -win_error()
 
+// The codes rt_core reports for reading a directory and for a read that
+// stops short of the measured size, in the Win32 numbers IoError.Os
+// carries here (EISDIR and EIO read as Win32 codes named other errors:
+// 21 is ERROR_NOT_READY, "The device is not ready").
+pub fn rt_err_is_dir() -> i32: WIN_EISDIR
+pub fn rt_err_short_read() -> i32: WIN_ESHORTREAD
+
 // #2773: the system's text for Win32 error `code` — the numbers IoError.Os
 // carries on Windows — without its trailing period and line end. strerror
 // read them as errnos (ERROR_INVALID_NAME, 123, printed "no protocol
@@ -289,6 +296,10 @@ let WIN_EINVAL: i32 = 87          // ERROR_INVALID_PARAMETER
 let WIN_ERANGE: i32 = 122         // ERROR_INSUFFICIENT_BUFFER
 let WIN_ENAMETOOLONG: i32 = 206   // ERROR_FILENAME_EXCED_RANGE
 let WIN_EILSEQ: i32 = 1113        // ERROR_NO_UNICODE_TRANSLATION
+let WIN_ENOMEM: i32 = 8           // ERROR_NOT_ENOUGH_MEMORY
+let WIN_EWRITE: i32 = 29          // ERROR_WRITE_FAULT
+let WIN_ESHORTREAD: i32 = 38      // ERROR_HANDLE_EOF
+let WIN_EISDIR: i32 = 336         // ERROR_DIRECTORY_NOT_SUPPORTED
 
 fn win_u16_at(s: *const u16, i: i64) -> u16: unsafe *((s as i64 + i * 2) as *const u16)
 
@@ -1020,7 +1031,7 @@ fn win_copy_file(src: *const u16, dst: *const u16) -> i32:
     if buf as i64 == 0:
         let _ = rt_close(in_fd)
         let _ = rt_close(out_fd)
-        return -12
+        return -WIN_ENOMEM
     while true:
         let n = rt_read(in_fd, buf, 65536)
         if n < 0:
@@ -1037,7 +1048,7 @@ fn win_copy_file(src: *const u16, dst: *const u16) -> i32:
                 with_free(buf)
                 let _ = rt_close(in_fd)
                 let _ = rt_close(out_fd)
-                return if w < 0: w as i32 else: -5
+                return if w < 0: w as i32 else: -WIN_EWRITE
             off = off + w
     with_free(buf)
     let cin = rt_close(in_fd)
@@ -1057,7 +1068,7 @@ fn win_copy_tree_w(src: *const u16, dst: *const u16, attrs: u32, tag: u32) -> i3
     if (attrs & FILE_ATTRIBUTE_DIRECTORY) == 0:
         return win_copy_file(src, dst)
     if win_is_link(attrs, tag):
-        return -21
+        return -WIN_EISDIR
     let mkdir_rc = win_mkdir_w(dst)
     if mkdir_rc != 0 and not win_is_dir(dst):
         return mkdir_rc
@@ -1709,7 +1720,7 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     let data = win_str_data(args)
     let cmd = with_alloc(32768 * 2)
     if cmd as i64 == 0:
-        return -12
+        return -WIN_ENOMEM
     let cmd_rc = win_build_command_line(data, args.len(), cmd as *mut u16, 32768)
     // Windows' own limit on a command line; past it the spawn fails, and
     // says why (#1916) instead of returning -1 alone.
@@ -2021,7 +2032,7 @@ fn rt_net_fill_sockaddr_ipv4(host: &str, port: i32, sa: *mut u8) -> i32:
 // #2062.
 fn rt_net_apply_timeout(fd: i64, ms: i32) -> i32:
     if ms < 0:
-        return -22
+        return -WIN_EINVAL
     var value: i32 = ms
     if setsockopt(fd, 65535, 4102, &value as *const i32 as *const u8, 4) != 0:
         return -1

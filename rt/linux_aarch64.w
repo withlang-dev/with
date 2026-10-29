@@ -694,6 +694,11 @@ pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
 // carries here.
 pub fn rt_os_error_text(code: i32) -> str: with_str_from_cstr(rt_libc_strerror(code))
 
+// The codes rt_core reports for reading a directory and for a read that
+// stops short of the measured size, in the numbers IoError.Os carries here.
+pub fn rt_err_is_dir() -> i32: 21  // EISDIR
+pub fn rt_err_short_read() -> i32: 5  // EIO
+
 pub fn rt_readlink(path: *const c_char) -> str:
     var buf: [4096]u8 = [0 as u8; 4096]
     let n = rt_libc_readlink(path, &buf as *mut [4096]u8 as *mut u8, 4095 as u64)
