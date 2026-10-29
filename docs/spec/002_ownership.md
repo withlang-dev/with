@@ -146,8 +146,8 @@ is built or edited goes through a builder type that produces a `str`.
 **Collections and structs of values are values (D120, D152).** Identity is
 compositional. A `List`, `HashMap` or `HashSet` whose elements (keys and
 values) are values is a value, and so is a struct whose every field is a
-value, that has no `Drop`, and that is not declared `resource type`. A
-collection's copy class is part of its interface, stated here, not a
+value or an enum whose every payload is a value, that has no `Drop`, and
+that is not declared `resource type`. A collection's copy class is part of its interface, stated here, not a
 consequence of its layout: `List`, `HashMap` and `HashSet` copy with a
 count; every engine-backed collection (`BTreeMap`, `BTreeSet`,
 `OrderedMap`, `OrderedSet`, `PriorityQueue`, `Deque`, `UnorderedMap`,
@@ -158,8 +158,8 @@ that cannot be copied without walking it. Changing a type from one class
 to the other is an interface break and gets its own ruling; a type keeps
 its class on any engine, so an engine facade for `HashMap` supports the
 count-copy. A collection holding a resource (`List[File]`) is a
-resource, as is a struct with a resource field, a `Drop` impl, or a
-`resource type` declaration — a permit, an ID allocator, a one-shot token:
+resource, as is a struct or enum with a resource field or payload, a
+`Drop` impl, or a `resource type` declaration — a permit, an ID allocator, a one-shot token:
 value fields, but copying one would be a bug. A value collection copies in
 O(1): the buffer is shared under an atomic count, and the first mutation of a
 shared buffer copies it (copy-on-write). A buffer never shared is mutated in
