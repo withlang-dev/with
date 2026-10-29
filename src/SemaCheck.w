@@ -27288,6 +27288,83 @@ impl Sema:
         self.typed_expr_types.insert(node, ret)
         ret
 
+    // D169: `Trait.m(args)` names the trait a method comes from, as §11.4's
+    // `pkg.m(receiver)` names an extension's module: an instance method
+    // takes its receiver as the first argument, a static method its `Self`
+    // from the call's use (refused, not guessed, when nothing demands one).
+    // MirLower reads the resolved function (comp_resolved) and the qualifier
+    // mark, as for a qualified extension call. -1 when `recv_expr` names no
+    // trait.
+    mut fn check_qualified_trait_call(recv_expr: i32, method_sym: i32, extra_start: i32, arg_count: i32, node: i32) -> i32:
+        if recv_expr == 0 or self.ast.kind(recv_expr) != NodeKind.NK_IDENT:
+            return -1
+        let trait_sym = self.ast.get_data0(recv_expr)
+        if self.scope_lookup(trait_sym) >= 0 or self.lookup_named_type_visible(trait_sym) != 0 or self.get_visible_sig(trait_sym) >= 0:
+            return -1
+        let trait_idx = self.lookup_trait_named(trait_sym)
+        if trait_idx < 0:
+            return -1
+        let demand = if self.has_expected_type != 0 and self.current_value_expr_root == node: self.expected_expr_type else: 0
+        let call_name = f"{self.pool_resolve(trait_sym)}.{self.pool_resolve(method_sym)}"
+        let method_index = self.trait_method_index(trait_idx, method_sym)
+        // §13.3's `Iter.empty()` and friends keep their own diagnostic.
+        if method_index < 0 and self.pool_resolve(trait_sym) == "Iter" and self.iterator_constructor_known_but_unimplemented(self.pool_resolve(method_sym)):
+            return -1
+        if method_index < 0:
+            self.emit_error(f"trait '{self.pool_resolve(trait_sym)}' declares no method '{self.pool_resolve(method_sym)}'", node)
+            return 0
+        let takes_self = self.receiver_mode_from_param(self.trait_method_param_starts[method_index], self.trait_method_param_counts[method_index]) != ReceiverMode.None
+        var recv_ty_raw: TypeId = 0
+        var self_ty = demand
+        if takes_self:
+            if arg_count <= 0:
+                self.emit_error(f"`{call_name}` takes its receiver as the first argument (D169)", node)
+                return 0
+            let recv_arg = self.ast.get_extra(extra_start)
+            recv_ty_raw = self.check_expr(recv_arg)
+            if recv_ty_raw == 0:
+                return 0
+            self_ty = self.auto_deref_method_type(recv_ty_raw, method_sym, node, recv_arg) as i32
+        else if self_ty == 0:
+            self.emit_error(f"`{call_name}()` takes `Self` from its use; write the type it makes: `let x: T = {call_name}()` (D169)", node)
+            return 0
+        let owner_sym = self.method_owner_symbol_for_type(self_ty)
+        let fn_sym = if owner_sym != 0: self.lookup_trait_method_fn(owner_sym, trait_idx, method_sym) else: 0
+        let sig_idx = if owner_sym != 0: self.lookup_trait_method_sig(owner_sym, trait_idx, method_sym) else: -1
+        if fn_sym == 0:
+            self.emit_error(f"'{self.type_name(self_ty)}' does not implement '{self.pool_resolve(trait_sym)}'", node)
+            return 0
+        if sig_idx < 0:
+            self.emit_error(f"`{call_name}` names a method of a generic impl, which a trait-qualified call cannot reach yet (D169)", node)
+            return 0
+        if self.fn_symbol_is_unsafe(fn_sym) != 0:
+            if self.require_unsafe_operation("unsafe function call requires unsafe context", node) == 0:
+                return 0
+        self.emit_no_await_guard_may_suspend_call(node, fn_sym)
+        self.note_allocating_callee(node, fn_sym)
+        let param_count = self.sig_get_param_count(sig_idx)
+        self.check_call_arity(node, fn_sym, param_count, self.sig_is_variadic(sig_idx) != 0, arg_count, 0, call_name, "trait method")
+        for ai in 0..arg_count:
+            let arg_node = self.ast.get_extra(extra_start + ai)
+            let expected_ty = if ai < param_count: self.sig_param_type(sig_idx, ai) else: 0
+            let actual_ty = if takes_self and ai == 0:
+                recv_ty_raw as i32
+            else:
+                if expected_ty != 0: self.check_expr_with_expected(arg_node, expected_ty as TypeId) as i32 else: self.check_expr_value_context(arg_node) as i32
+            if expected_ty != 0 and actual_ty != 0:
+                if self.call_arg_type_compatible(expected_ty, actual_ty) == 0:
+                    self.emit_argument_type_mismatch(call_name, fn_sym, ai, ai, expected_ty, actual_ty, arg_node)
+                else:
+                    self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, node)
+        self.comp_resolved.insert(node, fn_sym)
+        self.qualified_extension_call_nodes.insert(node, 1)
+        self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+        self.record_call_view_origins(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+        self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, arg_count, 0)
+        let ret = self.sig_return_type(sig_idx)
+        self.typed_expr_types.insert(node, ret)
+        ret
+
     mut fn check_call(node: i32) -> i32:
         let callee = self.ast.get_data0(node)
         let extra_start = self.ast.get_data1(node)
@@ -27394,6 +27471,9 @@ impl Sema:
                 if qualified_extension_ret != 0:
                     self.typed_expr_types.insert(node, qualified_extension_ret)
                 return qualified_extension_ret
+            let qualified_trait_ret = self.check_qualified_trait_call(recv_expr, recv_field, extra_start, arg_count, node)
+            if qualified_trait_ret >= 0:
+                return qualified_trait_ret
             let checked_recv = self.check_expr(recv_expr) as i32
             let recv_ty = self.adjust_static_receiver_type(recv_expr, checked_recv)
             let vector_method = self.check_vector_method(node, recv_expr, recv_ty, recv_field, arg_count)
@@ -39912,12 +39992,15 @@ impl Sema:
         let key = sema_pair_key(type_sym, method_sym)
         if self.method_lookup.amb_heads.contains(key): self.method_lookup.amb_heads.get(key).unwrap() else: 0
 
-    fn trait_declares_method_name(trait_idx: i32, method_sym: i32) -> bool:
+    fn trait_declares_method_name(trait_idx: i32, method_sym: i32): self.trait_method_index(trait_idx, method_sym) >= 0
+
+    // The trait-method row of `method_sym` in trait `trait_idx`, or -1.
+    fn trait_method_index(trait_idx: i32, method_sym: i32) -> i32:
         let start: i32 = self.trait_method_starts[trait_idx]
         for mi in 0..self.trait_method_counts[trait_idx]:
             if self.trait_method_names[(start + mi)] == method_sym:
-                return true
-        false
+                return start + mi
+        -1
 
     // The trait index a bound of the type parameter instantiated as
     // `type_sym` names for `method_sym`, when exactly one bound trait
@@ -40243,19 +40326,25 @@ impl Sema:
         -1
 
     // #2520 (§11.4): a bare call two traits answer is ambiguous; the
-    // programmer names the trait through a bound.
+    // programmer names the trait: a bound, or `Trait.m(…)` (D169).
     mut fn emit_ambiguous_trait_method_error(owner_sym: i32, method_sym: i32, node: i32):
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
         var candidates = ""
+        var spellings = ""
         var count = 0
         var cand_fn = self.ambiguous_trait_method_head(owner_sym, method_sym)
         while cand_fn != 0:
             if count > 0:
                 candidates = candidates ++ ", "
+                spellings = spellings ++ " or "
             candidates = candidates ++ with_str_clone_ref(self.pool_resolve(cand_fn))
+            let impl_node: i32 = self.method_impl_nodes.get(cand_fn) ?? 0
+            let tidx = if impl_node != 0: self.trait_idx_for_impl(impl_node) else: -1
+            if tidx >= 0: spellings = spellings ++ f"`{self.pool_resolve(self.ast.get_data0(self.trait_decl_nodes[tidx] as NodeId))}.{method_name}(…)`"
             count = count + 1
             cand_fn = self.method_lookup.amb_next_fn.get(cand_fn) ?? 0
-        self.emit_error("ambiguous trait method '" ++ method_name ++ "' for type '" ++ with_str_clone_ref(self.pool_resolve(owner_sym)) ++ "'; candidates: " ++ candidates ++ "; name the trait through a bound (§11.4)", node)
+        // D169: the fix is spelled, not described.
+        self.emit_error("ambiguous trait method '" ++ method_name ++ "' for type '" ++ with_str_clone_ref(self.pool_resolve(owner_sym)) ++ "'; candidates: " ++ candidates ++ "; name the trait: " ++ spellings ++ " (§11.4, D169)", node)
 
     mut fn emit_ambiguous_extension_method_error(owner_sym: i32, method_sym: i32, node: i32):
         let method_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
@@ -40294,7 +40383,10 @@ impl Sema:
         let recv = self.ast.get_data0(arg_callee)
         let method = self.ast.get_data1(arg_callee)
         let recv_root = self.place_root_sym(recv)
-        if recv_root == 0:
+        // Only a bound local's borrow is registered: a qualifier (a trait
+        // in `Unit1.one()`, D169; a package in `slug.to_slug(s)`) is no
+        // value, and checking it as one reported "undefined variable".
+        if recv_root == 0 or self.scope_lookup(recv_root) < 0:
             return -1
         var recv_ty: i32 = 0
         let recv_ty_opt = self.typed_expr_types.get(recv)

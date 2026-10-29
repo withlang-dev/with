@@ -1,7 +1,7 @@
-//! expect-error: ambiguous
+//! expect-error: name the trait: `AVal.val(…)` or `BVal.val(…)`
 // #2520 (§11.4): a bare method call with two applicable trait
-// implementations is ambiguous; the programmer spells the trait
-// through a bound. Before trait identity the second impl silently
+// implementations is ambiguous; the programmer names the trait
+// (`AVal.val(x)`, D169). Before trait identity the second impl silently
 // displaced the first under one fn symbol.
 trait AVal:
     fn val(self: &Self) -> i32
