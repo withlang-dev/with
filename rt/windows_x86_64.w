@@ -3,6 +3,7 @@
 use std.builtins.c_void
 
 extern fn GetLastError() -> i32
+extern fn FormatMessageW(flags: u32, source: *const u8, message_id: u32, language_id: u32, buffer: *mut u16, size: u32, args: *mut u8) -> u32
 extern fn GetStdHandle(kind: i32) -> i64
 extern fn ReadFile(handle: i64, buf: *mut u8, len: u32, read_out: *mut u32, overlapped: *mut u8) -> i32
 extern fn WriteFile(handle: i64, buf: *const u8, len: u32, written_out: *mut u32, overlapped: *mut u8) -> i32
@@ -236,6 +237,25 @@ fn win_error() -> i32:
 fn win_neg_error() -> i32:
     -win_error()
 
+// #2773: the system's text for Win32 error `code` — the numbers IoError.Os
+// carries on Windows — without its trailing period and line end. strerror
+// read them as errnos (ERROR_INVALID_NAME, 123, printed "no protocol
+// option").
+pub fn rt_os_error_text(code: i32) -> str:
+    var buf: [512]u16 = [0; 512]
+    let base = &raw mut buf as *mut [512]u16 as *mut u16
+    // FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS
+    var n: i64 = FormatMessageW(0x1200, null, code as u32, 0, base, 512, null) as i64
+    if n == 0:
+        return with_str_from_cstr(c"unknown error".ptr)
+    while n > 0:
+        let unit: i32 = win_u16_at(base as *const u16, n - 1)
+        if unit != 13 and unit != 10 and unit != 32 and unit != 46:
+            break
+        n = n - 1
+    win_put_u16(base, n, 0)
+    win_utf16_to_str(base as *const u16)
+
 fn win_strlen16(s: *const u16) -> i64:
     var len: i64 = 0
     while unsafe *((s as i64 + len * 2) as *const u16) != 0:
@@ -262,11 +282,13 @@ fn win_cstr_len(s: *const u8) -> i64:
 //   carry, becomes U+FFFD so the `str` stays UTF-8; text longer than its
 //   buffer fails with ERANGE. A name that goes from Windows back to Windows
 //   (a directory walk) never makes this trip: it stays UTF-16.
-// The error numbers are the UCRT's (errno.h): std.fs prints them with strerror.
-let WIN_EINVAL: i32 = 22
-let WIN_ERANGE: i32 = 34
-let WIN_ENAMETOOLONG: i32 = 38
-let WIN_EILSEQ: i32 = 42
+// The failures are Win32 error codes, as every other failure of these
+// wrappers is (GetLastError's numbers): one code space, which
+// rt_os_error_text gives the system's text for (#2773).
+let WIN_EINVAL: i32 = 87          // ERROR_INVALID_PARAMETER
+let WIN_ERANGE: i32 = 122         // ERROR_INSUFFICIENT_BUFFER
+let WIN_ENAMETOOLONG: i32 = 206   // ERROR_FILENAME_EXCED_RANGE
+let WIN_EILSEQ: i32 = 1113        // ERROR_NO_UNICODE_TRANSLATION
 
 fn win_u16_at(s: *const u16, i: i64) -> u16: unsafe *((s as i64 + i * 2) as *const u16)
 
@@ -2171,6 +2193,7 @@ c facade win32:
     domain environ process
     domain locale process
     fn GetLastError
+    fn FormatMessageW
     fn GetStdHandle
     fn ReadFile
     fn WriteFile

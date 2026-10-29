@@ -84,6 +84,7 @@ extern fn rt_access(path: *const c_char, mode: i32) -> i32
 extern fn rt_chmod(path: *const c_char, mode: i32) -> i32
 extern fn rt_file_mode(path: *const c_char) -> i32
 extern fn rt_readlink(path: *const c_char) -> str
+extern fn rt_os_error_text(code: i32) -> str
 // stat is in the core 13 but declared with a different name to avoid confusion
 extern fn rt_stat(path: *const c_char, out: *mut u8) -> i32
 
@@ -3651,6 +3652,10 @@ pub fn with_vec_free_buffer_drop_origin_at(p0: *mut u8, cap0: i64, es: i64, star
 // tables don't track, so strs leak there — the safe direction for a
 // diagnostic mode.
 fn str_holders(p: *const u8) -> *mut Atomic[i64]: (p as i64 - 8) as *mut Atomic[i64]
+
+// #2773: the platform's text for an OS error code (std.fs IoError): an
+// errno's strerror on POSIX, a Win32 code's FormatMessageW on Windows.
+pub fn with_os_error_text(code: i32) -> str: rt_os_error_text(code)
 
 pub fn with_str_retain(s: *const u8):
     let p = unsafe *(s as *const *const u8)

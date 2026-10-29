@@ -5,7 +5,6 @@
 // which are backed by rt_* platform calls.
 
 use rt.rt_core
-extern fn strerror(errnum: i32) -> *mut c_char
 
 /// Check if a file exists at the given path.
 pub fn file_exists(path: &str) -> bool:
@@ -56,11 +55,12 @@ pub fn write_file(path: &str, data: &str) -> i32:
 pub error IoError =
     | Os(code: i32, path: str)
 
-/// The C library's text for the error, in the spec's shape:
-/// `No such file or directory (os error 2)`.
+/// The platform's text for the error, in the spec's shape:
+/// `No such file or directory (os error 2)`. The code is the platform's own
+/// (an errno on POSIX, a Win32 error on Windows), and so is its text.
 pub fn IoError.message(self: &Self) -> str:
     match self:
-        .Os(code, _) => with_str_from_cstr(strerror(code)) ++ f" (os error {code})"
+        .Os(code, _) => with_os_error_text(code) ++ f" (os error {code})"
 
 /// Read an entire file. `Err` carries the OS error (a missing path, a
 /// directory, a permission failure, a short read); an empty file is `Ok("")`.

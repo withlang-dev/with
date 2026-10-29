@@ -436,6 +436,8 @@ extern fn rt_libc_access(path: *const c_char, mode: i32) -> i32
 extern fn rt_libc_lstat(path: *const c_char, st: *mut u8) -> i32
 @[link_name("readlink")]
 extern fn rt_libc_readlink(path: *const c_char, buf: *mut u8, bufsize: u64) -> i64
+@[link_name("strerror")]
+extern fn rt_libc_strerror(errnum: i32) -> *const c_char
 @[link_name("opendir")]
 extern fn rt_libc_opendir(path: *const c_char) -> *mut u8
 @[link_name("readdir")]
@@ -684,6 +686,10 @@ pub fn rt_symlink(target: *const c_char, link_path: *const c_char) -> i32:
     if r < 0:
         return -get_errno()
     0
+
+// #2773: the C library's text for errno `code`, the numbers IoError.Os
+// carries here.
+pub fn rt_os_error_text(code: i32) -> str: with_str_from_cstr(rt_libc_strerror(code))
 
 pub fn rt_readlink(path: *const c_char) -> str:
     var buf: [4096]u8 = [0 as u8; 4096]
@@ -1641,6 +1647,9 @@ c facade libc:
         preserves domain environ
         preserves domain locale
     fn rt_libc_readlink
+        preserves domain environ
+        preserves domain locale
+    fn rt_libc_strerror
         preserves domain environ
         preserves domain locale
     fn rt_libc_opendir

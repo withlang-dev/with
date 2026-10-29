@@ -541,7 +541,10 @@ fn comptime_tool_path_is_parent_of(parent: &str, child: &str) -> bool:
     child.starts_with(parent) and child[parent.len()] == 47
 
 // The C library's text for an OS error number, in std.fs.IoError's shape:
-// `No such file or directory (os error 2)`.
+// `No such file or directory (os error 2)`. Seed-bound (#2773): src/ links
+// the pinned seed's runtime, which has no with_os_error_text yet, so a
+// Win32 code is still read as an errno here; the next seed pin calls
+// with_os_error_text, as IoError.message does.
 fn comptime_os_error_message(code: i32) -> str:
     with_str_from_cstr(strerror(code)) ++ f" (os error {code})"
 
