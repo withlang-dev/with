@@ -16815,14 +16815,14 @@ impl Sema:
             self.check_expr_statement_context(then_body)
         else:
             self.check_expr(then_body)
+        if in_value_context:
+            self.note_arm_tail(then_body, outer_expected as i32)
         self.leave_body_scope(then_scoped)
         self.infer_tail_node = saved_infer_tail
         self.pop_move_control_flow_context()
         self.drop_control_flow_depth = saved_drop_cf_then
         if pushed_regex_capture_scope != 0:
             self.pop_scope()
-        if in_value_context:
-            self.mark_arm_tail_consumed(then_body)
         let then_is_never: i32 = if self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
         let then_exit_states = self.save_scope_states()
         let then_exit_mf = self.save_moved_field_state()   // #695
@@ -16847,12 +16847,12 @@ impl Sema:
                 self.check_expr_statement_context(else_body)
             else:
                 self.check_expr(else_body)
+            if in_value_context:
+                self.note_arm_tail(else_body, outer_expected as i32)
             self.leave_body_scope(else_scoped)
             self.infer_tail_node = saved_infer_tail
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_else
-            if in_value_context:
-                self.mark_arm_tail_consumed(else_body)
             else_is_never = if self.get_type_kind(self.resolve_alias(else_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
             if in_value_context:
                 let join_nodes: List[i32] = List.new()
@@ -19109,6 +19109,10 @@ impl Sema:
             self.iter_next_mono_syms.insert(key_node, new_mono_val)
         if saved_ty_val != 0:
             self.typed_expr_types.insert(key_node, saved_ty_val)
+        else:
+            // A `for` node had no type: next()'s return stayed stamped on
+            // it, and a `for` arm of a value `if` read as `Option[T]`.
+            self.typed_expr_types.remove(key_node)
         if saved_sig_val >= 0:
             self.resolved_call_sigs.insert(key_node, saved_sig_val)
         else:
@@ -22096,10 +22100,13 @@ impl Sema:
                 // patterns remain structural projections, never ownership
                 // boundaries (D22 §9.7).
                 self.record_transparent_view_origins(arm_body, arm_body)
+            // D22 §8 / D144: the tail is read while the arm's bindings are in
+            // scope; after pop_scope a pattern-bound view was invisible here and
+            // the join copied its payload into a second owner.
+            if match_is_value:
+                self.note_arm_tail(arm_body, match_expected as i32)
             self.pop_scope()
             self.pop_move_control_flow_context()
-            if match_is_value:
-                self.mark_arm_tail_consumed(arm_body)
             // Union this arm's exit move-state into the merge unless the arm diverges.
             if self.get_type_kind(self.resolve_alias(arm_type as TypeId)) != TypeKind.TY_NEVER:
                 let arm_exit_states = self.save_scope_states()
@@ -30840,6 +30847,8 @@ impl Sema:
             type_sym = self.pool_lookup_symbol(self.type_name(resolved as i32))
         if type_sym == 0:
             return 0
+        // A derive validation in progress assumes its own (type, trait).
+        if self.derives_assumed.contains(sema_pair_key(type_sym, trait_sym)): return 1
         self.select_trait_impl(type_sym, trait_sym)
 
     // Frozen read twin for codegen compatibility checks. Exact/direct trait answers are
@@ -39597,6 +39606,25 @@ impl Sema:
     // does. Only a binding that outlives the arm is marked (block and pattern
     // locals are gone; §29.8 forbids shadowing, so a live name is the outer
     // one); a nested `if`/`match` tail is a value context of its own.
+    // D22 §8 / D144: the value a join arm yields, read while the arm's
+    // bindings are in scope (the join resolves after they are gone). A tail
+    // that is a binding observing a place is a view arm: the join keeps it a
+    // view (join_field_arms_as_views), unless an owned result is demanded,
+    // where consuming the view is refused (rule 6). Any other tail is
+    // consumed as the join's value.
+    mut fn note_arm_tail(arm: i32, expected: i32):
+        let leaf = self.join_arm_leaf(arm)
+        if leaf != 0 and self.ast.kind(leaf) == NodeKind.NK_IDENT:
+            let sym = self.ast.get_data0(leaf)
+            if self.scope_has(sym) != 0 and self.scope_is_view_bound(sym) != 0:
+                let tid = self.scope_lookup(sym)
+                let kind = self.get_type_kind(self.resolve_alias(tid as TypeId))
+                let owned_demand = expected != 0 and self.get_type_kind(self.resolve_alias(expected as TypeId)) != TypeKind.TY_REF
+                if self.is_copy(tid as TypeId) == 0 and kind != TypeKind.TY_REF and kind != TypeKind.TY_PTR and not owned_demand:
+                    self.join_view_binding_arms.insert(leaf, 1)
+                    return
+        self.mark_arm_tail_consumed(arm)
+
     mut fn mark_arm_tail_consumed(arm: i32):
         var n = arm
         while n != 0 and (self.ast.kind(n) == NodeKind.NK_BLOCK or self.ast.kind(n) == NodeKind.NK_GROUPED):
@@ -39700,6 +39728,9 @@ impl Sema:
         let leaf = self.join_arm_leaf(arm)
         if leaf == 0:
             return 0
+        // A binding observing a place, noted while its arm was in scope.
+        if self.join_view_binding_arms.contains(leaf):
+            return leaf
         // D73: an arm that is an assignment yields a view of its place, which
         // joins as a field view does (`let t = if p: s = e1 else: s = e2`).
         var place = leaf

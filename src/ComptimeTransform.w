@@ -2181,6 +2181,13 @@ fn ct_type_node_mentions_type_param(out: &AstPool, node: i32, tp_start: i32, tp_
 
 impl Sema:
     mut fn ct_validate_explicit_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+        let assumed = sema_pair_key(out.get_data0(decl), trait_sym)
+        self.derives_assumed.insert(assumed, 1)
+        let ok = self.ct_check_struct_derive_fields(out, intern, decl, trait_sym, all_sym)
+        self.derives_assumed.remove(assumed)
+        ok
+
+    mut fn ct_check_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
         if self.type_decl_has_derive(decl, trait_sym) == 0:
             return 1
         let trait_name = intern.resolve(trait_sym).clone()
@@ -2217,6 +2224,13 @@ impl Sema:
     // extra[0] = variant count, then per variant [name, payload_count,
     // payload type nodes...] (a disc enum leads with its repr node).
     mut fn ct_validate_explicit_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+        let assumed = sema_pair_key(out.get_data0(decl), trait_sym)
+        self.derives_assumed.insert(assumed, 1)
+        let ok = self.ct_check_enum_derive_payloads(out, intern, decl, trait_sym, all_sym)
+        self.derives_assumed.remove(assumed)
+        ok
+
+    mut fn ct_check_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
         if self.type_decl_has_derive(decl, trait_sym) == 0:
             return 1
         let trait_name = intern.resolve(trait_sym).clone()

@@ -1086,6 +1086,9 @@ type Sema {
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
+    // (type, trait) pairs a derive validation is checking: assumed to hold
+    // while it runs, so a recursive payload (`List[Self]`) closes.
+    derives_assumed: HashMap[i64, i32],
     recursion_open_sym: i32,
     recursion_inferred_type: i32,
     // The node of a path that disagreed in the first pass (reported after
@@ -1921,6 +1924,9 @@ type Sema {
     // join with no owned anchor joins as a view of its place — field node ->
     // the `&F` it is typed as there. MirLower lowers it as `ref(shared, place)`.
     join_field_view_arms: HashMap[i32, i32],
+    // D22 §8: join arm tails that are bindings observing a place
+    // (note_arm_tail), joined as views.
+    join_view_binding_arms: HashMap[i32, i32],
     // §2.4: value nodes of drop-body self-field lets — MirLower binds these
     // by MOVE (never the alias path); the field glue skips them via
     // drop_consumed_field.
@@ -3272,6 +3278,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let fn_callable_values = sema_new_map_i32_i32()
     let view_projection_exprs = sema_new_map_i32_i32()
     let join_field_view_arms = sema_new_map_i32_i32()
+    let join_view_binding_arms = sema_new_map_i32_i32()
     let drop_consumed_binding_values = sema_new_map_i32_i32()
     let auto_ref_binding_values = sema_new_map_i32_i32()
     let auto_ref_payload_args = sema_new_map_i32_i32()
@@ -3468,6 +3475,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         comptime_callable_visiting: HashSet[i32].new(),
         value_to_option_nodes: HashMap.new(),
         pipeline_implicit_iter: HashMap.new(),
+        derives_assumed: HashMap.new(),
         recursion_open_sym: 0,
         recursion_inferred_type: 0,
         recursion_pass1_mismatch: 0,
@@ -3883,6 +3891,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
 
         view_projection_exprs,
         join_field_view_arms,
+        join_view_binding_arms,
         drop_consumed_binding_values,
         auto_ref_binding_values,
         auto_ref_payload_args,

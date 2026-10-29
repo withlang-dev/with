@@ -14592,6 +14592,18 @@ impl MirBuilder:
             return 0
         if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.result: 1 else: 0
 
+    // Field `i` of the tuple Sema typed `node` (D65: Sema owns the tuple's
+    // type; an element's own type may be the view a field materializes), or
+    // `fallback` when the node has no tuple type.
+    mut fn tuple_field_type(node: i32, i: i32, fallback: i32) -> i32:
+        let tup_ty = self.expr_type(node)
+        if tup_ty <= 0:
+            return fallback
+        let resolved = self.sema.resolve_alias(tup_ty as TypeId)
+        if self.sema.get_type_kind(resolved) != TypeKind.TY_TUPLE or i >= self.sema.get_type_d1(resolved):
+            return fallback
+        self.sema.type_extra[(self.sema.get_type_d0(resolved) + i)]
+
     fn is_list_type(type_id: i32) -> i32:
         if type_id == 0:
             return 0
@@ -17658,7 +17670,13 @@ impl MirBuilder:
                 // source so its destructor is not also run at its scope exit (which
                 // would double-free). Paired with the tuple's element-drop
                 // (mir_emit_drop_tuple_ptr) — both land together.
-                if self.sema.type_needs_drop_frozen(elem_ty) != 0:
+                // D22/D111: the field holds what Sema's tuple type says it holds.
+                // A view element (`self.val[n]`, `&str`) in an owned field
+                // (`(bool, str)`) is a copy, one more holder: judged by the
+                // element's own type it was copied in with no retain, and the
+                // tuple and the list each freed the buffer once.
+                let field_ty = self.tuple_field_type(node, i, elem_ty)
+                if self.sema.type_needs_drop_frozen(field_ty) != 0:
                     self.consume_moved_operand(elem_op)
             let tup_fid = self.body.new_agg_fields(tup_fields, tup_names)
             let tup_rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, tup_fid, 0)
