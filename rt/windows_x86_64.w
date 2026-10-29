@@ -758,7 +758,10 @@ extern fn rt_ucrt_fileno(stream: *mut c_void) -> i32
 extern fn rt_ucrt_fseeki64(stream: *mut c_void, offset: i64, whence: i32) -> i32
 @[link_name("_ftelli64")]
 extern fn rt_ucrt_ftelli64(stream: *mut c_void) -> i64
-@[link_name("strtold")]
+// std.libc's strtold is the correctly rounded double (#2176), strtod's: the
+// UCRT's strtold is its strtod (its long double is a double), and the link's
+// `strtold` is mingwex's 80-bit x87 one, returned through a hidden pointer.
+@[link_name("strtod")]
 extern fn rt_ucrt_strtold(nptr: *const c_char, endptr: *mut *mut c_char) -> f64
 // std.libc strtol/strtoul parse a 64-bit long on every target (D114: With
 // code sees one width); the UCRT's long is 32 bits, so its 64-bit parses.

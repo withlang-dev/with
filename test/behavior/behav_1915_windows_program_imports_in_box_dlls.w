@@ -39,7 +39,7 @@ fn c_string(b: &str, at: i64) -> str:
 fn in_box(dll: &str) -> bool:
     if dll.starts_with("api-ms-win-crt-") or dll.starts_with("api-ms-win-core-"):
         return true
-    let names = ["kernel32.dll", "ntdll.dll", "ucrtbase.dll", "advapi32.dll", "bcrypt.dll", "ws2_32.dll", "dbghelp.dll", "shell32.dll", "user32.dll", "ole32.dll", "oleaut32.dll", "version.dll", "psapi.dll"]
+    let names = ["kernel32.dll", "ntdll.dll", "ucrtbase.dll", "advapi32.dll", "bcrypt.dll", "crypt32.dll", "ws2_32.dll", "dbghelp.dll", "shell32.dll", "user32.dll", "ole32.dll", "oleaut32.dll", "version.dll", "psapi.dll"]
     for n in names:
         if dll == n:
             return true
