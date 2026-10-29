@@ -1026,12 +1026,15 @@ type Sema {
     // #2520: trait identity is (module, name). Candidates chain by trait
     // index behind trait_candidate_heads (sym -> trait index), resolved
     // with the same visibility rules as named types; trait_decl_paths is
-    // the declaring module per trait index.
+    // the declaring module and trait_decl_nodes the declaration per trait
+    // index.
     trait_candidate_heads: HashMap[i32, i32],
     trait_candidate_paths: List[str],
     trait_candidate_pubs: List[i32],
     trait_candidate_nexts: List[i32],
     trait_decl_paths: List[str],
+    trait_decl_nodes: List[i32],
+    trait_idx_by_decl_node: HashMap[i32, i32],
     // Trait type params: flat vec of type param name syms per trait
     trait_tp_starts: List[i32],
     trait_tp_counts: List[i32],
@@ -3443,6 +3446,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         trait_candidate_pubs: List.new(),
         trait_candidate_nexts: List.new(),
         trait_decl_paths: List.new(),
+        trait_decl_nodes: List.new(),
+        trait_idx_by_decl_node: HashMap.new(),
         trait_tp_starts: List.new(),
         trait_tp_counts: List.new(),
         trait_tp_syms: List.new(),
@@ -5467,17 +5472,44 @@ impl Sema:
     fn trait_name_known(sym: i32) -> bool:
         self.trait_candidate_head(sym) >= 0 or self.trait_lookup.contains(sym)
 
-    // The trait index `sym` names from the current module, or -1.
+    // The trait index `sym` names from the current module, or -1. Among
+    // visible candidates §18.2's precedence decides (#2520): the module's
+    // own declaration, then another program module's, then std's (the
+    // prelude tier), so a program's `trait One` is the One it means.
     fn lookup_trait_visible(sym: i32) -> i32:
+        self.trait_by_precedence(sym, self.current_module_path, true)
+
+    // The trait a written `dyn Name` denotes: the visible one by
+    // precedence, else the one registered under the name, as a prelude
+    // trait the program reaches with no import (`dyn Error`) is. One answer
+    // in every context, so a signature's `&dyn Error` and a body's are one
+    // type.
+    fn lookup_trait_named(sym: i32) -> i32:
+        let visible = self.lookup_trait_visible(sym)
+        if visible >= 0: visible else: self.trait_lookup.get(sym) ?? -1
+
+    // The identity symbol of the trait `sym` names in the module that
+    // holds `node`, for a pass after Sema holding a written `dyn Name`.
+    fn trait_identity_symbol_named_at(sym: i32, node: i32):
+        let ti = self.trait_by_precedence(sym, self.node_module_path_view(node), false)
+        if ti >= 0: self.trait_identity_symbol(ti) else: sym
+
+    fn trait_by_precedence(sym: i32, module_path: &str, visible_only: bool):
         var i = self.trait_candidate_head(sym)
         if i < 0:
             if self.trait_lookup.contains(sym): return self.trait_lookup.get(sym).unwrap() else: return -1
+        var std_candidate = -1
+        var program_candidate = -1
         while i >= 0:
             let candidate_path: str = with_str_clone_ref(self.trait_candidate_paths[i])
-            if self.decl_visible_from_current_gated(candidate_path, self.trait_candidate_pubs[i], sym) != 0:
-                return i
+            if not visible_only or self.decl_visible_from_current_gated(candidate_path, self.trait_candidate_pubs[i], sym) != 0:
+                if candidate_path == module_path: return i
+                if sema_tier_path_is_std_implementation(candidate_path) != 0:
+                    if std_candidate < 0: std_candidate = i
+                else if program_candidate < 0:
+                    program_candidate = i
             i = self.trait_candidate_nexts[i]
-        -1
+        if program_candidate >= 0: program_candidate else: std_candidate
 
     // The trait index of `sym` in one tier (std or user), for the
     // compiler's own demands in another module's context.

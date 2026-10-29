@@ -9497,12 +9497,15 @@ impl Codegen:
             let live_resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
             let live_tk = self.sema.get_type_kind(live_resolved as TypeId)
             if live_tk == TypeKind.TY_TRAIT_OBJ:
-                return self.sema_sym_to_codegen_sym(self.sema.get_type_d0(live_resolved as TypeId) as i32)
+                return self.sema_sym_to_codegen_sym(self.sema.trait_object_identity_symbol(live_resolved))
             if live_tk == TypeKind.TY_REF or live_tk == TypeKind.TY_PTR:
                 return self.mir_dyn_trait_symbol_from_sema_type(self.sema.get_type_d0(live_resolved as TypeId) as i32)
             return 0
+        // The trait is the one Sema resolved (#2520: its index + 1 in d1),
+        // keyed by its identity symbol as the vtables are.
         if tk == TypeKind.TY_TRAIT_OBJ:
-            return self.sema_sym_to_codegen_sym(self.mir_type_d0_at(resolved))
+            let recorded = self.mir_type_d1_at(resolved)
+            return self.sema_sym_to_codegen_sym(if recorded > 0: self.sema.trait_identity_symbol(recorded - 1) else: self.mir_type_d0_at(resolved))
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
             return self.mir_dyn_trait_symbol_from_sema_type(self.mir_type_d0_at(resolved))
         if tk == TypeKind.TY_GENERIC_INST:

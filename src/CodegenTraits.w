@@ -19,8 +19,19 @@ use rt.rt_core
 // ── Collect trait info ────────────────────────────────────────────
 
 impl Codegen:
+    // The key a trait's tables (trait_map, vtables) use: Sema's identity
+    // symbol for it, its name unless that name is declared in more than
+    // one file (#2520).
+    fn cg_trait_key_for_decl(trait_node: i32):
+        let ti = self.sema.trait_idx_for_decl_node(trait_node)
+        if ti < 0: self.pool.get_data0(trait_node) else: self.sema_sym_to_codegen_sym(self.sema.trait_identity_symbol(ti))
+
+    fn cg_trait_key_for_impl(impl_node: i32):
+        let ti = self.sema.trait_idx_for_impl(impl_node)
+        if ti < 0: self.pool.get_data2(impl_node) else: self.sema_sym_to_codegen_sym(self.sema.trait_identity_symbol(ti))
+
     fn collect_trait_info(trait_node: i32):
-        let name_sym = self.pool.get_data0(trait_node)
+        let name_sym = self.cg_trait_key_for_decl(trait_node)
         let extra_start = self.pool.get_data1(trait_node)
         if self.trait_map.get(name_sym).is_some():
             return
@@ -160,7 +171,7 @@ impl Codegen:
             if self.pool.kind(trait_node) != NodeKind.NK_TRAIT_DECL:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: node={trait_node} is not a trait declaration")
                 continue
-            if self.pool.get_data0(trait_node) != trait_sym:
+            if self.cg_trait_key_for_decl(trait_node) != trait_sym:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: declaration symbol={self.pool.get_data0(trait_node)} expected={trait_sym}")
             let ast_method_count = self.pool.trait_method_count(trait_node)
             let collected_start = self.trait_method_starts[trait_idx]
@@ -363,7 +374,7 @@ impl Codegen:
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) != NodeKind.NK_IMPL_DECL:
                 continue
-            if self.pool.get_data0(decl) == impl_type_sym and self.pool.get_data2(decl) == trait_sym:
+            if self.pool.get_data0(decl) == impl_type_sym and self.cg_trait_key_for_impl(decl) == trait_sym:
                 return decl
         0
 
@@ -828,7 +839,7 @@ impl Codegen:
 
     mut fn generate_default_trait_methods_for_impl(impl_node: i32):
         let impl_type_sym = self.impl_cg_type_sym(impl_node)
-        let trait_sym = self.pool.get_data2(impl_node)
+        let trait_sym = self.cg_trait_key_for_impl(impl_node)
         if trait_sym == 0:
             return
         let trait_idx_opt = self.trait_map.get(trait_sym)
@@ -855,7 +866,7 @@ impl Codegen:
 
     mut fn generate_trait_vtable_for_impl(impl_node: i32):
         let impl_type_sym = self.impl_cg_type_sym(impl_node)
-        let trait_sym = self.pool.get_data2(impl_node)
+        let trait_sym = self.cg_trait_key_for_impl(impl_node)
         if trait_sym == 0:
             return
 

@@ -139,6 +139,35 @@ impl Sema:
                 if not self.trait_identity_first.contains(name):
                     self.trait_identity_first.insert(name, identity)
 
+    // The symbol trait `trait_idx` is keyed under downstream (vtables,
+    // dyn dispatch): its name, or its identity symbol when the name is
+    // declared in more than one file, as its impl methods are minted.
+    fn trait_identity_symbol(trait_idx: i32):
+        if trait_idx < 0 or trait_idx >= self.trait_decl_nodes.len():
+            return 0
+        let name = self.ast.get_data0(self.trait_decl_nodes[trait_idx] as NodeId)
+        if not self.colliding_trait_names.contains(name):
+            return name
+        let path_sym = self.pool_lookup_symbol(self.trait_decl_paths[trait_idx])
+        let key = sema_pair_key(name, path_sym)
+        if path_sym != 0 and self.trait_identity_syms.contains(key): self.trait_identity_syms.get(key).unwrap() else: name
+
+    fn trait_idx_for_decl_node(node: i32): self.trait_idx_by_decl_node.get(node) ?? -1
+
+    // The identity symbol of the trait `dyn Name` denotes in a type (a
+    // `TY_TRAIT_OBJ` records Sema's trait index + 1 in d1), seen through
+    // references and pointers; 0 when `tid` is no trait object.
+    fn trait_object_identity_symbol(tid: i32):
+        if tid <= 0:
+            return 0
+        var resolved = self.resolve_alias(tid as TypeId)
+        while self.get_type_kind(resolved) == TypeKind.TY_REF or self.get_type_kind(resolved) == TypeKind.TY_PTR:
+            resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_TRAIT_OBJ:
+            return 0
+        let recorded = self.get_type_d1(resolved)
+        if recorded > 0: self.trait_identity_symbol(recorded - 1) else: self.get_type_d0(resolved)
+
     // The trait segment of an impl method's symbol: "" for an inherent
     // impl, the trait's name (or its identity when the name collides
     // across files) for a trait impl.
@@ -2734,11 +2763,21 @@ impl Sema:
             else:
                 self.method_lookup.sig_lookup.insert(key, sig_idx)
                 self.method_lookup.fn_lookup.insert(key, fn_sym)
-        else if existing_fn != fn_sym and not self.method_lookup.amb_heads.contains(key):
+        else if existing_fn != fn_sym:
             let inherent_fn: i32 = self.method_lookup.trait_fn_lookup.get(sema_trait_method_key(owner_sym, -1, method_sym)) ?? 0
             if inherent_fn == 0:
-                self.method_lookup.amb_heads.insert(key, existing_fn)
-                self.method_lookup.amb_next_fn.insert(existing_fn, fn_sym)
+                if not self.method_lookup.amb_heads.contains(key):
+                    self.method_lookup.amb_heads.insert(key, existing_fn)
+                    self.method_lookup.amb_next_fn.insert(existing_fn, fn_sym)
+                else:
+                    // A third candidate joins the chain too (#2520): with
+                    // two only, std's One and a program's Unit1 read as one
+                    // program candidate and a second program trait's
+                    // method went unseen.
+                    var tail: i32 = self.method_lookup.amb_heads.get(key).unwrap()
+                    while tail != fn_sym and self.method_lookup.amb_next_fn.contains(tail):
+                        tail = self.method_lookup.amb_next_fn.get(tail).unwrap()
+                    if tail != fn_sym: self.method_lookup.amb_next_fn.insert(tail, fn_sym)
 
     // A generic method's registration: same rows, no signature. Called
     // beside register_generic_fn_node; extension candidates keep their
@@ -3129,6 +3168,8 @@ impl Sema:
         self.trait_candidate_paths.push(with_str_clone_ref(self.current_module_path))
         self.trait_candidate_pubs.push(trait_is_pub)
         self.trait_decl_paths.push(with_str_clone_ref(self.current_module_path))
+        self.trait_decl_nodes.push(node)
+        self.trait_idx_by_decl_node.insert(node, trait_idx)
         if self.ast.is_sealed_trait_node(node) != 0:
             self.sealed_traits.insert(name, 1)
         if is_local != 0:
@@ -3590,7 +3631,10 @@ impl Sema:
         0
 
     mut fn ensure_trait_object_safe(trait_sym: i32, node: i32) -> i32:
-        let trait_node = self.find_trait_decl_node(trait_sym)
+        // #2520: the trait `dyn Name` names from this module, not the last
+        // declaration registered under that name.
+        let trait_idx = self.lookup_trait_named(trait_sym)
+        let trait_node = if trait_idx >= 0: self.trait_decl_nodes[trait_idx] as NodeId else: self.find_trait_decl_node(trait_sym)
         if trait_node == 0:
             return 1
         let method_count = self.ast.trait_method_count(trait_node)
