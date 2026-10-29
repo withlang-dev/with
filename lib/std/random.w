@@ -6,37 +6,38 @@
 // an `i64` bound draws an `i64`.
 
 use rt.rt_core
+use std.sync
 
-var rng_state: i64 = 0
+// The generator's state, shared by every thread (#985): a draw is one
+// compare-exchange from the state it read to the next, so two threads never
+// draw the same value or lose a step. 0 is unseeded; the first draw seeds.
+global rng_state: Atomic[i64] = Atomic.new(0)
 
-fn ensure_seeded():
-    if rng_state == 0:
-        with_fill_random(&rng_state as *mut u8, 8)
-        if rng_state == 0:
-            rng_state = with_clock_nanos()
-        if rng_state == 0:
-            rng_state = 1
+// A seed from the runtime's random source, else the clock; never 0.
+fn fresh_seed() -> i64:
+    var s: i64 = 0
+    with_fill_random(&raw mut s as *mut u8, 8)
+    if s == 0: s = with_clock_nanos()
+    if s == 0: 1 else: s
 
 fn xorshift64() -> i64:
-    ensure_seeded()
-    var x = rng_state
-    x = x ^ (x << 13)
-    x = x ^ (x >> 7)
-    x = x ^ (x << 17)
-    rng_state = x
-    x
+    var current = rng_state.load(.Relaxed)
+    while true:
+        var x = if current == 0: fresh_seed() else: current
+        x = x ^ (x << 13)
+        x = x ^ (x >> 7)
+        x = x ^ (x << 17)
+        match rng_state.compare_exchange(current, x, .Relaxed, .Relaxed):
+            Ok(_) => return x
+            Err(actual) => current = actual
+    0
 
 /// Seed the random number generator with a specific value (for reproducibility).
 pub fn seed(value: u64):
-    rng_state = value as i64
-    if rng_state == 0:
-        rng_state = 1
+    rng_state.store(if value == 0: 1 else: value as i64, .Relaxed)
 
-/// Seed the random number generator from the current time.
-pub fn seed_now:
-    with_fill_random(&rng_state as *mut u8, 8)
-    if rng_state == 0:
-        rng_state = with_clock_nanos()
+/// Seed the random number generator from the runtime's random source.
+pub fn seed_now: rng_state.store(fresh_seed(), .Relaxed)
 
 /// A type std.random draws: `random_any` is any value of the type (a float
 /// is uniform in [0, 1)), `random_in` is uniform in [lo, hi), and `lo` when
