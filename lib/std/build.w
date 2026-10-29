@@ -689,7 +689,7 @@ fn tool_path_dirname(path: &str) -> str:
         return "."
     if last_slash == 0:
         return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn tool_path_normalize(path: &str) -> str:
     if path.len() == 0:
@@ -701,7 +701,7 @@ fn tool_path_normalize(path: &str) -> str:
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
-                let part = path.slice(start as i64, i as i64)
+                let part = path.slice(start, i)
                 if part == "..":
                     if parts.len() > 0 and parts[parts.len() - 1] != "..":
                         parts.pop()
@@ -711,7 +711,7 @@ fn tool_path_normalize(path: &str) -> str:
                     parts.push(part)
             start = i + 1
     if start < path.len():
-        let part = path.slice(start as i64, path.len() as i64)
+        let part = path.slice(start, path.len())
         if part == "..":
             if parts.len() > 0 and parts[parts.len() - 1] != "..":
                 parts.pop()
@@ -739,7 +739,7 @@ fn tool_split_by_slash(path: &str) -> List[str]:
         let ch = path[i]
         if ch == 47 or ch == 92:
             if i > start:
-                parts.push(path.slice(start as i64, i as i64))
+                parts.push(path.slice(start, i))
             start = i + 1
     if start < path.len():
         parts.push(path.slice(start as i64, path.len()))
@@ -1873,7 +1873,7 @@ fn tool_effect_resolve_executable(exe: &str) -> str:
     var i = 0
     while i <= path.len():
         if i == path.len() or path[i] == 58:
-            let dir = path.slice(start as i64, i as i64)
+            let dir = path.slice(start, i)
             let candidate = if dir.len() == 0: with_str_clone_ref(exe) else: dir ++ "/" ++ exe
             if with_fs_file_exists(candidate) != 0:
                 return candidate
@@ -2479,7 +2479,7 @@ fn build_path_dirname(path: &str) -> str:
         return "."
     if last_slash == 0:
         return "/"
-    path.slice(0, last_slash as i64)
+    path.slice(0, last_slash)
 
 fn build_host_exe_suffix() -> str:
     if with_sysinfo_os() == "Windows":
@@ -2511,15 +2511,15 @@ fn build_https_fetch_source() -> str:
     "const ATTEMPTS = 5\n\n" ++
     "fn number(text: &str) -> i32:\n" ++
     "    var value: i32 = 0\n" ++
-    "    for i in 0..text.len() as i32:\n" ++
+    "    for i in 0..text.len():\n" ++
     "        if text[i] < '0' or text[i] > '9': return -1\n" ++
     "        value = value * 10 + (text[i] - '0') as i32\n" ++
     "    if text.len() == 0: -1 else: value\n\n" ++
     "fn authority(url: &str) -> str:\n" ++
     "    if not url.starts_with(\"https://\"): return \"\"\n" ++
     "    let rest = url.slice(8, url.len())\n" ++
-    "    var end = rest.len() as i32\n" ++
-    "    for i in 0..rest.len() as i32:\n" ++
+    "    var end = rest.len()\n" ++
+    "    for i in 0..rest.len():\n" ++
     "        if rest[i] == '/' or rest[i] == '?' or rest[i] == '#':\n" ++
     "            end = i\n" ++
     "            break\n" ++

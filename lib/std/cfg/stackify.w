@@ -334,12 +334,9 @@ fn stackify_result_ok(tree: StackifyTree) -> StackifyResult:
         tree,
     }
 
-fn stackify_bool_list(count: i32, value: i32) -> List[i32]:
+fn stackify_bool_list(count: isize, value: i32) -> List[i32]:
     let out: List[i32] = List.new()
-    var i = 0
-    while i < count:
-        out.push(value)
-        i = i + 1
+    for _ in 0..count: out.push(value)
     out
 
 fn stackify_validate_graph(graph: &StackifyGraph) -> str:
@@ -413,7 +410,7 @@ impl StackifyDfsState:
                 let _ = stack_idx.pop()
 
 fn stackify_compute_preds(graph: &StackifyGraph) -> StackifyPreds:
-    let n = graph.blocks.len() as i32
+    let n = graph.blocks.len()
     let starts = stackify_bool_list(n, 0)
     let counts = stackify_bool_list(n, 0)
     var b = 0
@@ -468,7 +465,7 @@ fn stackify_domtree_merge(idom: &List[i32], rpo_pos: &List[i32], a: i32, b: i32)
     n1
 
 fn stackify_compute_idom(graph: &StackifyGraph, post_ord: &List[i32], rpo_pos: &List[i32], preds: &StackifyPreds) -> List[i32]:
-    let n = graph.blocks.len() as i32
+    let n = graph.blocks.len()
     var idom = stackify_bool_list(n, stackify_invalid())
     idom[graph.entry] = graph.entry
     var changed = true
@@ -525,7 +522,7 @@ fn stackify_compute_analysis(graph: &StackifyGraph) -> StackifyAnalysis:
             ok: false,
             message: err,
         }
-    let n = graph.blocks.len() as i32
+    let n = graph.blocks.len()
     var dfs = StackifyDfsState { visited: stackify_bool_list(n, 0), out: List.new() }
     dfs.dfs_post(graph, graph.entry)
     let post_ord = dfs.out

@@ -35325,6 +35325,14 @@ impl Sema:
             var mc_unit_expected = self.atomic_method_expected_arg_type(mc_order_type, field, 0)
             if mc_unit_expected == 0:
                 mc_unit_expected = self.method_expected_arg_type(obj_type as i32, field, 0)
+            // §4.8 (#723): `unwrap_or`'s parameter is the payload type.
+            // method_expected_arg_type leaves a given default untyped (it is
+            // a join input), but with no argument there is no join, so a
+            // Unit payload is elided like any Unit parameter.
+            if mc_unit_expected == 0 and self.pool_resolve(field) == "unwrap_or":
+                let mc_recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type)))
+                if self.get_type_kind(mc_recv) == TypeKind.TY_GENERIC_INST and (self.get_generic_inst_base(mc_recv as i32) == self.syms.option or self.get_generic_inst_base(mc_recv as i32) == self.syms.result):
+                    mc_unit_expected = self.get_generic_inst_arg(mc_recv as i32, 0)
             if mc_unit_expected == 0 and self.static_receiver_type_is_known(expr) != 0 and self.enum_has_variant(obj_type, field) != 0:
                 let mc_payload_tys = self.enum_variant_payload_types(obj_type, field)
                 if mc_payload_tys.len() == 1:

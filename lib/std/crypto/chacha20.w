@@ -55,7 +55,7 @@ unsafe fn chacha20_block(key: *const u8, nonce: *const u8, counter: u32, out: *m
     for i in 0..16:
         u32_to_le(out, i * 4, working[i])
 
-unsafe fn chacha20_crypt(key: *const u8, nonce: *const u8, counter: u32, data: *mut u8, len: i32):
+unsafe fn chacha20_crypt(key: *const u8, nonce: *const u8, counter: u32, data: *mut u8, len: isize):
     var ctr = counter
     var off = 0
     while off < len:

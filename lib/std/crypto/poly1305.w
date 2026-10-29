@@ -86,7 +86,7 @@ unsafe fn poly1305_block(ctx: *mut Poly1305, data: *const u8, hibit: u32):
     ctx.h[4] = h4
 
 // Process message bytes — handles full and partial blocks correctly.
-unsafe fn poly1305_update(ctx: *mut Poly1305, data: *const u8, len: i32):
+unsafe fn poly1305_update(ctx: *mut Poly1305, data: *const u8, len: isize):
     var off = 0
     while off + 16 <= len:
         poly1305_block(ctx, (data + off as u64) as *const u8, 1 as u32 << 24 as u32)

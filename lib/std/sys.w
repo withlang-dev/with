@@ -1,53 +1,52 @@
 // std.sys — System information
 //
 // Machine characteristics: cores, memory, page size, bandwidth.
-// Lazily initialized on first call, cached for process lifetime.
-// No c_import — uses with_sysinfo and with_clock_nanos from the runtime.
+// Measured by the first call and cached for the process lifetime.
+// No c_import — uses with_system_info and with_clock_nanos from the runtime.
 
 use rt.rt_core
+use std.sync
 
 // ── Cached state ────────────────────────────────────────────────
 
-var _cached: bool = false
-var _cpu_count: i32 = 0
-var _total_memory: usize = 0
-var _page_size: usize = 0
-var _bandwidth: f64 = 0.0
-// Optimization barrier: written by _read_pass, read by _measure_bandwidth.
-// Prevents LLVM from eliminating the read loop.
-var _bw_sink: i64 = 0
+type SysFacts:
+    cpu_count: i32
+    total_memory: usize
+    page_size: usize
+    bandwidth: f64
 
-fn _ensure_init():
-    if _cached: return
+// The first caller measures under the lock, so first calls from several
+// threads measure once and every caller reads the same facts (#985).
+global _facts: Mutex[Option[SysFacts]] = Mutex.new(None)
+
+fn facts() -> SysFacts:
+    with _facts.enter_mut() as mut cached:
+        if cached.is_none(): cached = Some(measure_facts())
+        cached.unwrap()
+
+fn measure_facts() -> SysFacts:
     let info = with_system_info()
-    _cpu_count = if info.cpu_cores > 0: info.cpu_cores else: 1
-    _total_memory = if info.memory_total > 0: info.memory_total as usize else: 0usize
-    _page_size = if info.page_size > 0: info.page_size as usize else: 4096usize
-    _bandwidth = _measure_bandwidth()
-    _cached = true
+    SysFacts {
+        cpu_count: if info.cpu_cores > 0: info.cpu_cores else: 1,
+        total_memory: if info.memory_total > 0: info.memory_total as usize else: 0usize,
+        page_size: if info.page_size > 0: info.page_size as usize else: 4096usize,
+        bandwidth: _measure_bandwidth(),
+    }
 
 // ── Public API ──────────────────────────────────────────────────
 
 /// Number of logical CPU cores (including hyperthreads).
-pub fn cpu_count() -> i32:
-    _ensure_init()
-    _cpu_count
+pub fn cpu_count() -> i32: facts().cpu_count
 
 /// Total physical memory in bytes.
-pub fn total_memory() -> usize:
-    _ensure_init()
-    _total_memory
+pub fn total_memory() -> usize: facts().total_memory
 
 /// OS page size in bytes (typically 4096 or 16384).
-pub fn page_size() -> usize:
-    _ensure_init()
-    _page_size
+pub fn page_size() -> usize: facts().page_size
 
 /// Sustained sequential read bandwidth in GB/s, measured on this machine.
 /// Returns 0.0 if no timer is available.
-pub fn memory_bandwidth() -> f64:
-    _ensure_init()
-    _bandwidth
+pub fn memory_bandwidth() -> f64: facts().bandwidth
 
 // ── Bandwidth measurement ───────────────────────────────────────
 

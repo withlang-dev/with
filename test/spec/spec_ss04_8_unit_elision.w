@@ -1,4 +1,3 @@
-//! known-issue: #723 unit elision unimplemented (pre-existing; red on the seed too)
 // Spec test: Section 4.8 — Unit Elision.
 
 fn do_work -> Result[Unit, str]: Ok()
