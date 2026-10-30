@@ -12627,8 +12627,8 @@ impl Sema:
         // a top-level `let ptr` broke every imported function with a `ptr`
         // parameter.
         let is_local = self.scope_binding_is_local(sym)
-        // A global read by another's initializer: refused when it is a later
-        // one of the same module (§9.1c), else checked first, so it is typed.
+        // A global read by another's initializer is checked first, so it is
+        // typed whatever the declaration order; its own initializer is refused.
         if tid >= 0 and not is_local and self.top_level_let_current >= 0 and not self.const_global_syms.contains(sym):
             if not self.check_top_level_let_before_use(sym, node): return 0
             tid = self.scope_lookup(sym)

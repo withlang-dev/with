@@ -8753,10 +8753,10 @@ impl Sema:
     // before it: a global left untyped after another's error made each later
     // use of it a false diagnostic ("missing return", "bitwise operator
     // requires integer operands"; #1836). A comptime value is evaluated only
-    // when its own check found no error. An initializer that reads another
-    // module's global declared later checks that one's first (check_ident),
-    // so the order of declarations never decides a type; one that reads a
-    // later global of its own module is refused (§9.1c).
+    // when its own check found no error. An initializer that reads a
+    // global declared later checks that one's first (check_ident), so the
+    // order of declarations never decides a type; one that reads its own
+    // global is refused.
     mut fn check_top_level_let_values():
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
@@ -8772,16 +8772,11 @@ impl Sema:
         let di = self.top_level_let_pending.get(sym) ?? -1
         if di < 0: return true
         let state = self.top_level_let_state.get(self.ast.get_decl(di)) ?? 0
-        if state == 1:
+        if state == 1 and di == self.top_level_let_current:
             self.emit_error("the initializer of global `" ++ self.pool_resolve(sym) ++ "` reads its own value", node)
             return false
         let outer = self.top_level_let_current
         if state == 0 and outer >= 0:
-            // §9.1c: a module's initializers run in declaration order, so a
-            // later global of the same module has no value yet.
-            if self.decl_source_paths[di] == self.decl_source_paths[outer]:
-                self.emit_error("the initializer of global `" ++ self.pool_resolve(self.ast.get_data0(self.ast.get_decl(outer))) ++ "` reads `" ++ self.pool_resolve(sym) ++ "`, declared after it: a module's initializers run in declaration order (§9.1c)", node)
-                return false
             self.check_top_level_let_value(di)
             self.update_decl_source_context(outer)
         true
