@@ -3520,8 +3520,11 @@ impl Sema:
             let idx: i32 = self.impl_lookup.get(type_name).unwrap()
             let old_start = self.impl_starts[idx]
             let old_count = self.impl_counts[idx]
+            // A colliding name's duplicate was decided by its declaration's
+            // identity above (#1457); this record is the name's, shared by
+            // every same-named type.
             for i in 0..old_count:
-                if dup_shadowed != 0 and self.impl_record_matches_tier(old_start + i, dup_want_std) == 0:
+                if impl_key != type_name or (dup_shadowed != 0 and self.impl_record_matches_tier(old_start + i, dup_want_std) == 0):
                     continue
                 if self.impl_extra[(old_start + i)] == trait_sym:
                     self.emit_error_code("duplicate implementation of trait for type", node, "E1102")
