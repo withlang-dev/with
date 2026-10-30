@@ -5433,7 +5433,11 @@ impl Sema:
         if body_expected_ret != 0 and body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             let early_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
             self.value_to_option_at_demand(early_tail, body_expected_ret, body_ty)
-        let body_materializes_copy = body_expected_ret != 0 and self.can_contextually_copy_ref(body_expected_ret as i32, body_ty as i32) != 0
+        // An unannotated body's tail viewing a temporary is returned as the
+        // Copy value (infer_unannotated_function_return_type).
+        let body_tail = if self.ast.kind(body) == NodeKind.NK_BLOCK and self.ast.get_data2(body) != 0: self.ast.get_data2(body) else: body
+        let body_copied_out = body_expected_ret == 0 and self.fn_decl_is_entry_point(node) == 0 and self.copy_out_of_temporary(body_tail, body_ty as i32) != 0
+        let body_materializes_copy = body_copied_out or (body_expected_ret != 0 and self.can_contextually_copy_ref(body_expected_ret as i32, body_ty as i32) != 0)
         if body_ty != 0 and body_ty != self.ty_void and body_ty != self.ty_never:
             if self.is_copy(body_ty) == 0:
                 self.note_returned_place_effect(body, EFF_ESCAPE_VALUE)
@@ -10719,6 +10723,12 @@ impl Sema:
     // they would under a written `-> Option[T]` (§4.9a).
     mut fn infer_unannotated_function_return_type(body: i32, body_ty: TypeId, entry_point: i32) -> i32:
         var inferred = self.infer_unannotated_function_return_type_raw(body, body_ty, entry_point)
+        // A tail that views a statement temporary cannot be returned as a
+        // view, so the body returns the Copy value it views (the binding
+        // rule's twin): `fn first(): names()[0]` is the `str`, no `-> str`.
+        let tail = if self.ast.kind(body) == NodeKind.NK_BLOCK: self.ast.get_data2(body) else: body
+        let viewed = self.copy_out_of_temporary(tail, inferred)
+        if viewed != 0: inferred = viewed
         if inferred != 0 and self.is_option_type(inferred) and not self.is_bare_none_type(inferred):
             self.convert_body_values_to_option(body, 1, inferred)
         // D22: an inferred return preserves a view (the acceptance cell
@@ -16144,7 +16154,10 @@ impl Sema:
             let tail_kind = self.get_type_kind(self.resolve_alias(tail_type))
             // D22: a tail view materializes when the return demands an owned
             // value; only an un-materialized view escapes (gate mirrors 9618).
-            let tail_materializes = self.has_contextual_copy_adjustment(tail) != 0 or (self.current_return_type != 0 and self.can_contextually_copy_ref(self.current_return_type as i32, tail_type as i32) != 0)
+            // An unannotated body's tail viewing a temporary is returned as
+            // the Copy value (infer_unannotated_function_return_type).
+            let tail_copied_out = node == self.body_tail_block and self.infer_tail_node != 0 and self.copy_out_of_temporary(tail, tail_type as i32) != 0
+            let tail_materializes = tail_copied_out or self.has_contextual_copy_adjustment(tail) != 0 or (self.current_return_type != 0 and self.can_contextually_copy_ref(self.current_return_type as i32, tail_type as i32) != 0)
             if tail_kind == TypeKind.TY_REF and tail_materializes == 0:
                 // Only the body block's tail is the return (#1406): an inner
                 // block's tail escapes just that block's own bindings.
@@ -16866,6 +16879,12 @@ impl Sema:
                     let elem_ty = self.get_type_d0(elem_view)
                     if self.type_is_plain_bits(elem_ty) and self.record_contextual_copy_adjustment(value, elem_ty, val_type as i32) != 0:
                         val_type = elem_ty as TypeId
+            // A view into a statement temporary has one meaning left as a
+            // binding: the Copy value, copied as an owned demand copies it
+            // (D22 §6.2); `let p = args()[1]` needs no `: str`.
+            let viewed = self.copy_out_of_temporary(value, val_type as i32)
+            if viewed != 0 and self.record_contextual_copy_adjustment(value, viewed, val_type as i32) != 0:
+                val_type = viewed as TypeId
         self.va_start_binding_value = saved_va_start_value
         self.match_in_stmt_pos = saved_match_stmt
         if ann_type != 0:
@@ -17976,9 +17995,22 @@ impl Sema:
             return self.expr_view_into_temporary.get(peeled).unwrap()
         0
 
+    // The Copy type `node` views inside a statement temporary, or 0: such a
+    // view cannot outlive the statement, so a binding or an inferred return
+    // of it takes the value (a `str` under D111, a List under D120, plain
+    // bits) — `let p = args()[1]`, `fn first(): names()[0]`. A non-Copy
+    // value is refused: its copy is a `.clone()`.
+    mut fn copy_out_of_temporary(node: i32, view_ty: i32) -> i32:
+        if node == 0 or view_ty == 0 or self.view_into_temporary_type(node) == 0: return 0
+        let view = self.resolve_alias(view_ty as TypeId)
+        if self.get_type_kind(view) != TypeKind.TY_REF or self.get_type_d1(view) != 0: return 0
+        let viewed = self.get_type_d0(view)
+        if self.is_copy(viewed as TypeId) != 0: viewed else: 0
+
     mut fn reject_view_into_temporary(node: i32, what: &str) -> i32:
         let temp_ty = self.view_into_temporary_type(node)
-        if temp_ty == 0: return 0
+        // A Copy value copied out of the temporary is no view of it.
+        if temp_ty == 0 or self.has_contextual_copy_adjustment(node) != 0: return 0
         let temp_name = self.type_name(temp_ty)
         // A Copy value (an i32, a str under D111) is copied by an owned
         // demand (D22 §6.2): the annotation, never a `.clone()`.
