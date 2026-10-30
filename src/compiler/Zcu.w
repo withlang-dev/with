@@ -524,8 +524,11 @@ impl Zcu:
     mut fn set_pool(new_pool: &InternPool):
         self.pool = new_pool.clone()
 
-    mut fn set_frontend_pool(new_pool: &InternPool):
-        self.frontend_pool = new_pool.clone()
+    // The frontend keeps its own copy of this Zcu's pool. It reads the field
+    // itself: passing `self.pool` to a `mut` method on `self` is an argument
+    // retaining access to the receiver (D172, §3.2).
+    mut fn sync_frontend_pool():
+        self.frontend_pool = self.pool.clone()
 
     mut fn sync_from_sema(sema: Sema):
         if zcu_debug_pool_flow_enabled() != 0:
@@ -619,13 +622,15 @@ impl Zcu:
         let empty = zcu_new_list_str()
         self.last_link_lib_names = empty
 
-    mut fn capture_last_link_lib_names(new_pool: &InternPool, result: &ResolveResult):
+    // The link library names of the last resolve, read from this Zcu's own
+    // pool and result (D172, §3.2: not passed to a `mut` method on `self`).
+    mut fn capture_last_link_lib_names():
         self.reset_last_link_lib_names()
-        for li in 0..result.link_libs.len():
-            let lib_sym = result.link_libs[li]
+        for li in 0..self.last_resolved.link_libs.len():
+            let lib_sym = self.last_resolved.link_libs[li]
             if lib_sym <= 0:
                 continue
-            let lib_name: str = with_str_clone_ref(new_pool.resolve(lib_sym))
+            let lib_name: str = with_str_clone_ref(self.pool.resolve(lib_sym))
             if lib_name.len() > 0:
                 self.last_link_lib_names.push(lib_name)
 

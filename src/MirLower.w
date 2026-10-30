@@ -3190,7 +3190,7 @@ impl MirBuilder:
 
     mut fn source_fn_operand(node: i32) -> i32:
         let _ = node
-        self.lower_synthesized_str_lit(self.pool.resolve(self.body.fn_sym))
+        self.lower_synthesized_str_lit(with_str_clone_ref(self.pool.resolve(self.body.fn_sym)))
 
     mut fn lower_magic_ident(kind: i32, node: i32) -> i32:
         if kind == SemaMagicIdentKind.FILE:
@@ -12676,7 +12676,7 @@ impl MirBuilder:
     // `args_node` is the call whose Sema-resolved arguments (defaults among
     // them) `arg_node_vec` ends with, when not `node` itself: a pipeline
     // stage's call (#2024).
-    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_list: &List[i32], ret_type_id: i32, node: i32, args_node: i32 = 0) -> i32:
+    mut fn lower_call_with_arg_nodes_recv(fn_op: i32, callee_sym: i32, recv_op: i32, arg_node_list: &List[i32], ret_type_id: i32, node: i32, args_node: i32 = 0, deferred_recv: i32 = 0, deferred_method: i32 = 0) -> i32:
         let resolved_node = if args_node != 0: args_node else: node
         var sig_idx = self.call_sig_for_sym(callee_sym)
         let recorded_sig = self.sema.resolved_call_sigs.get(node).copied()
@@ -12692,6 +12692,9 @@ impl MirBuilder:
         if recv_op >= 0:
             args.push(recv_op)
             arg_pos = 1
+        else if deferred_recv > 0:
+            args.push(-1)
+            arg_pos = 1
         let default_offset = if self.sema.has_resolved_call_args(resolved_node) != 0: arg_node_list.len() - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
         for i in 0..arg_node_list.len():
             let arg_node = arg_node_list[i]
@@ -12701,6 +12704,14 @@ impl MirBuilder:
                 args.push(self.lower_default_call_arg(arg_node, resolved_node, sig_idx, 0, (i + arg_pos) as i32))
             else:
                 args.push(self.lower_call_arg(arg_node, sig_idx, 0, (i + arg_pos) as i32, callee_sym))
+        // D172 (§3.2a): a `mut` receiver without an index projection is
+        // resolved after the arguments: an argument that replaces a field's
+        // contents or frees an owning pointer's pointee has run by then.
+        if recv_op < 0 and deferred_recv > 0:
+            let late_recv = self.lower_receiver_with_method_autoderef_for_method(deferred_recv, deferred_method)
+            if late_recv >= 0 and self.body.operand_kinds[late_recv] != OperandKind.OK_CONSTANT:
+                self.make_unique_before_mutation(self.body.operand_d0[late_recv])
+            args[0] = late_recv
         let args_id = self.body.new_call_args(args)
         self.body.set_call_ast_node(args_id, node)
         self.record_call_contract(args_id, node, sig_idx)
@@ -12917,6 +12928,14 @@ impl MirBuilder:
             expected_ty = self.sema.fn_type_param_type(callable_fn_tid, arg_i)
             if expected_ty != 0 and expected_ty != self.sema.ty_void:
                 self.expected_type = expected_ty
+        // D172 (§3.8a): a `mut` parameter's argument is the caller's place,
+        // passed in place: never moved and never copied, and made unique
+        // first, since the callee writes it (D120).
+        if sig_idx >= 0 and arg_i >= 0 and self.sema.sig_param_is_mut(sig_idx, arg_i):
+            let mut_place = self.lower_expr_place(arg_node)
+            self.make_unique_before_mutation(mut_place)
+            self.expected_type = saved_expected
+            return self.body.new_operand(OperandKind.OK_COPY, mut_place)
         let autoref_op = self.lower_auto_ref_call_arg(arg_node, expected_ty)
         if autoref_op >= 0:
             self.expected_type = saved_expected
@@ -13898,10 +13917,15 @@ impl MirBuilder:
         // path uses) instead of OK_MOVE + consume. Consuming receivers (`move
         // self` and legacy unflagged `self: T`) keep the plain-arg move path.
         var recv_op: i32 = -1
+        var late_recv: i32 = 0
         if not is_static_call:
             if self.has_contextual_copy_adjustment(self_expr) != 0:
                 recv_op = self.lower_contextual_copy_adjustment(self_expr)
+            else if self.callee_has_mut_self(callee_sym) and not self.place_expr_has_index(self_expr):
+                // D172 (§3.2a): resolved after the arguments run.
+                late_recv = self_expr
             else if self.callee_has_mut_self(callee_sym):
+                // An index projection is resolved before the arguments.
                 recv_op = self.lower_receiver_with_method_autoderef_for_method(self_expr, method_sym)
                 // D120: a `mut self` method of a value List writes it.
                 if recv_op >= 0 and self.body.operand_kinds[recv_op] != OperandKind.OK_CONSTANT:
@@ -13932,7 +13956,23 @@ impl MirBuilder:
             arg_nodes.push(method_arg)
 
         let ret_ty = self.method_call_result_type(node)
-        self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, recv_op, arg_nodes, ret_ty, node)
+        self.lower_call_with_arg_nodes_recv(fn_op, callee_sym, recv_op, arg_nodes, ret_ty, node, 0, late_recv, method_sym)
+
+    // Whether a receiver place reads through an index projection (§3.2a:
+    // resolved before the arguments rather than after).
+    fn place_expr_has_index(node: i32) -> bool:
+        var p = node
+        while p > 0:
+            let k = self.ast.kind(p)
+            if k == NodeKind.NK_INDEX:
+                return true
+            if k == NodeKind.NK_FIELD_ACCESS or k == NodeKind.NK_GROUPED:
+                p = self.ast.get_data0(p)
+            else if k == NodeKind.NK_UNARY and self.ast.get_data0(p) == UnaryOp.UOP_DEREF:
+                p = self.ast.get_data1(p)
+            else:
+                return false
+        false
 
     mut fn method_call_result_type(node: i32) -> i32:
         let pipeline_ret = self.sema.pipeline_call_return_types.get(node)

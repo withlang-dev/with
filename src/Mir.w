@@ -558,7 +558,7 @@ fn mir_agg_fields_text(body: &MirBody, fields_id: i32, pool: &InternPool, sema: 
     let ops_len = body.agg_field_operands.len()
     if start < 0 or raw_count < 0 or start > ops_len:
         return "<invalid aggregate fields>"
-    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count as isize
     let capped = if count > 256: 256 else: count
     var out = ""
     for i in 0..capped:
@@ -581,7 +581,7 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
     let ops_len = body.call_arg_operands.len()
     if start < 0 or raw_count < 0 or start > ops_len:
         return "<invalid call args>"
-    let count = if start + raw_count > ops_len: ops_len - start else: raw_count
+    let count = if start + raw_count > ops_len: ops_len - start else: raw_count as isize
     let capped = if count > 256: 256 else: count
     var out = ""
     for i in 0..capped:

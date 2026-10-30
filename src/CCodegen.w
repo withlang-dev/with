@@ -11584,7 +11584,8 @@ impl CCodegen:
             let fn_sym = self.mir_body_at(i as i64).fn_sym
             let init_global = self.global_init_target(fn_sym)
             if init_global != 0:
-                if not self.emit_all and self.init_body_is_pure(self.mir_body_at(i as i64)): init_of_global.insert(init_global, i as i32) else: reach.mark(i as i32)
+                let init_body = self.mir_body_at(i as i64)
+                if not self.emit_all and self.init_body_is_pure(init_body): init_of_global.insert(init_global, i as i32) else: reach.mark(i as i32)
                 continue
             if decls[i].len() == 0: continue
             if self.emit_all or fn_sym == main_sym or not self.fn_c_name_is_internal(fn_sym): reach.mark(i as i32) else: reach.name(self.fn_c_name(fn_sym), i as i32)

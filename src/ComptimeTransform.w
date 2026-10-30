@@ -159,6 +159,8 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
         out.mark_compiler_hook_fn(src.compiler_hook_node(hi), src.compiler_hook_phase_at(hi))
     for mi in 0..src.state.move_closure_nodes.len():
         out.mark_move_closure((src.state.move_closure_nodes[mi]) as NodeId)
+    for ai in 0..src.state.mut_arg_nodes.len():
+        out.mark_mut_arg((src.state.mut_arg_nodes[ai]) as NodeId)
     for ni in 0..src.state.non_escaping_closure_nodes.len():
         out.mark_non_escaping_closure((src.state.non_escaping_closure_nodes[ni]) as NodeId)
     for bi in 0..src.state.by_place_closure_nodes.len():

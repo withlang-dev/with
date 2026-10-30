@@ -480,10 +480,10 @@ pub const TRAIT_METHOD_SOURCE_END: i32 = 7
 pub const FN_PARAM_FLAG_NOALIAS: i32 = 1
 pub const FN_PARAM_FLAG_IMPLICIT: i32 = 2
 // mut.md Rev 8 §5.1 — receiver-place mode `mut self: Self`.
-// Set by the parser when the param name is `self` and was preceded by `mut`.
-// Stored as a flag bit so callers can detect a mutating receiver without
-// reparsing. No semantic effect during the bridge phase (P1..P11);
-// at P11 sema reads this bit to require a mutable place at the call site.
+// Set by the parser on a parameter declared `mut`: a `mut self` receiver or,
+// D172 (§3.8a), any `mut p: T` parameter: the same in-place mode.
+// Stored as a flag bit so callers can detect a mutating parameter without
+// reparsing; Sema requires a mutable place at the call site.
 pub const FN_PARAM_FLAG_MUT_SELF: i32 = 4
 // mutability.md — receiver-mode `self: &Self` (read-only view).
 // Set when param name is `self` and the declared type is a reference (&Self).
@@ -708,6 +708,8 @@ type AstPoolState {
     // is identical for `.w` and `.wi` input.
     const_decl_nodes: List[i32],
     move_closure_nodes: List[i32],
+    // D172 (§3.8): call arguments spelled `mut x`, a spelling of intent only.
+    mut_arg_nodes: List[i32],
     non_escaping_closure_nodes: List[i32],
     by_place_closure_nodes: List[i32],
     // (closure node, `-> T` type node) pairs: a closure's declared result
@@ -760,6 +762,7 @@ type AstPoolState {
     // kept when the comptime transform folds the declaration to its value.
     untyped_const_inits: HashMap[i32, i32],
     move_closure_set: HashMap[i32, i32],
+    mut_arg_set: HashMap[i32, i32],
     non_escaping_closure_set: HashMap[i32, i32],
     by_place_closure_set: HashMap[i32, i32],
     closure_ret_type_map: HashMap[i32, i32],
@@ -895,6 +898,7 @@ fn AstPool.new -> AstPool:
             comptime_decl_nodes: List.new(),
             const_decl_nodes: List.new(),
             move_closure_nodes: List.new(),
+            mut_arg_nodes: List.new(),
             non_escaping_closure_nodes: List.new(),
             by_place_closure_nodes: List.new(),
             closure_ret_type_nodes: List.new(),
@@ -933,6 +937,7 @@ fn AstPool.new -> AstPool:
             const_decl_set: HashMap.new(),
             untyped_const_inits: HashMap.new(),
             move_closure_set: HashMap.new(),
+            mut_arg_set: HashMap.new(),
             non_escaping_closure_set: HashMap.new(),
             by_place_closure_set: HashMap.new(),
             closure_ret_type_map: HashMap.new(),
@@ -2265,6 +2270,12 @@ impl AstPool:
     fn is_move_closure(node: NodeId) -> i32:
         if self.state.move_closure_set.contains(node as i32): return 1
         0
+
+    fn mark_mut_arg(node: NodeId):
+        self.state.mut_arg_nodes.push(node as i32)
+        self.state.mut_arg_set.insert(node as i32, 1)
+
+    fn is_mut_arg(node: NodeId) -> bool: self.state.mut_arg_set.contains(node as i32)
 
     fn mark_non_escaping_closure(node: NodeId):
         if self.state.non_escaping_closure_set.contains(node as i32): return

@@ -1790,7 +1790,12 @@ impl Sema:
         // D12 receivers occupy parameter 0 only. Matching later params by
         // owner type name made `other: i32` in `impl Eq for i32` share-place
         // (#732) — and post-D5 there is no effects sweep to co-decide, so the
-        // positional rule is the whole rule.
+        // positional rule is the whole rule. A `mut` parameter (D172,
+        // §3.8a) is the receiver's in-place mode at any position: the
+        // caller's place, whatever its type.
+        let declared_mut = fn_param_is_mut_self(self.ast.fn_param_flags(param_start, param_idx))
+        if declared_mut != 0 and self.pool_resolve(self.ast.fn_param_name(param_start, param_idx)) != "self":
+            return 1
         if param_idx != 0:
             return 0
         if method_owner_sym == 0 or self_type_id == 0:
@@ -2469,7 +2474,7 @@ impl Sema:
             self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), self.get_sig(name))
             self.extern_sig_modules.insert(self.get_sig(name), with_str_clone_ref(self.current_module_path))
             self.extern_fn_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
-            self.extern_chain_link(self.get_sig(name), self.pool_resolve(name))
+            self.extern_chain_link(self.get_sig(name), with_str_clone_ref(self.pool_resolve(name)))
             return
 
         let ret_node = self.ast.fn_meta_ret(meta)
@@ -2526,7 +2531,7 @@ impl Sema:
         self.extern_decl_sites.insert(self.current_module_path ++ "\n" ++ self.pool_resolve(name), sig_idx)
         self.extern_sig_modules.insert(sig_idx, with_str_clone_ref(self.current_module_path))
         self.extern_fn_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
-        self.extern_chain_link(sig_idx, self.pool_resolve(name))
+        self.extern_chain_link(sig_idx, with_str_clone_ref(self.pool_resolve(name)))
 
     // Links an extern declaration's signature into the view chain of its text.
     mut fn extern_chain_link(sig_idx: i32, text: &str):

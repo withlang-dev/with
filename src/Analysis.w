@@ -571,7 +571,19 @@ fn analysis_collect_signatures(report: &AnalysisReport, sema: &Sema, source_path
             param.flags = if sema.sig_param_uses_value_ref_abi(si, pi) != 0: 1 else: 0
             param.path = with_str_clone_ref(sig.path)
             param.name = with_str_clone_ref(name)
-            param.detail = analysis_param_class(sema, si, pi) ++ f" direct={sema.sig_param_direct_effect(si, pi)} final={param.effects} value-ref={param.flags}"
+            // The declared type's span (D172: a `&T` parameter whose body
+            // writes it is a `mut p: T` one, rewritten at this span).
+            var declared_ref = false
+            if decl > 0:
+                let meta = sema.ast.find_fn_meta(decl)
+                if meta >= 0 and pi < sema.ast.fn_meta_param_count(meta):
+                    let type_node = sema.ast.fn_param_type(sema.ast.fn_meta_param_start(meta), pi)
+                    if type_node > 0:
+                        param.node = type_node
+                        param.start = sema.ast.get_start(type_node)
+                        param.end = sema.ast.get_end(type_node)
+                        declared_ref = sema.ast.kind(type_node) == NodeKind.NK_TYPE_REF
+            param.detail = analysis_param_class(sema, si, pi) ++ f" direct={sema.sig_param_direct_effect(si, pi)} final={param.effects} value-ref={param.flags} declared-ref={declared_ref}"
             report.add(param.owned_copy())
 
             var abi = move param
