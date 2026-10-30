@@ -12,6 +12,9 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D175 — Runtime globals initialize in dependency order, transitively through called functions; declaration order among the eligible; cycles are errors; safe code may not access a global whose completed initialization cannot be established (ruled)](2026-10-30-D175-runtime-globals-initialize-in-dependency-order.md)
+- [D174 — A view that cannot outlive its statement establishes an owned-value demand: an unannotated binding or return of a view into a statement temporary takes an independent Copy, else is refused; a declared `&T` stays a view (ruled; amends D22)](2026-10-30-D174-a-view-that-cannot-outlive-its-statement-establishes-an-owned-demand-d22-amendment.md)
+- [D173 — A name resolves lexically, once: a local shadows a module-scope function for every use; a call of a non-callable local is an error, never a fallback (ruled)](2026-10-30-D173-a-name-resolves-lexically-once-a-non-callable-local-is-an-error-when-called.md)
 - [D172 — Mutation is a declared capability on any parameter (`mut p: T`); exclusive access begins when the call does; read-path caches are a sealed std type, `Memo[K, V]`; a `fn` receiver is read-only for every write (ruled)](2026-10-29-D172-mutation-is-a-declared-capability-on-any-parameter.md)
 - [D171 — User actions may use system tools; the compiler and its build are bootstrapped; a UAT scenario uses only dependencies `with get` provides cleanly on its platform (ruled; #2788)](2026-10-28-D171-a-uat-scenario-uses-only-dependencies-with-get-provides-cleanly.md)
 - [D169 — A trait names its method as §11.4 names an extension's: `Trait.method(args)`, the receiver the first argument, a static method's `Self` from its use (ruled; #2520)](2026-10-28-D169-a-trait-names-its-method-as-a-module-names-its-function.md)

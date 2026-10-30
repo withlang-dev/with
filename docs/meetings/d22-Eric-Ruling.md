@@ -1370,3 +1370,13 @@ The ruling may be summarized as:
 Or, in operational form:
 
 > A shared reference remains a shared reference through inference, forwarding, and structural projection. When an independently established context requires an owned value, the compiler may copy the pointee only when the pointee is `Copy`. Until such an owned value is actually produced, every transparent carrier preserves the reference’s origin.
+
+## Amendment (D174, Eric 2026-10-30)
+
+A view that cannot outlive its statement establishes an owned-value demand:
+an unannotated binding or function return whose inferred view would refer to
+a statement temporary requires an owned result. If the viewed type supports
+`Copy`, the compiler materializes an independent owned copy before the
+temporary is destroyed. Otherwise, the program is rejected. An explicitly
+declared `&T` remains a request for a view and does not trigger this
+conversion. See `2026-10-30-D174-a-view-that-cannot-outlive-its-statement-establishes-an-owned-demand-d22-amendment.md`.

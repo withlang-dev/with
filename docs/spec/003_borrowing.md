@@ -338,7 +338,16 @@ An owned-value demand is established independently by:
 
 Inference alone does not create an owned demand. In particular, `let x =
 view`, an inferred function return (§9.1), a pattern binding, or a closure
-capture preserves the reference type. Method and overload resolution first
+capture preserves the reference type.
+
+A view that cannot outlive its statement is the exception (D174): an
+unannotated binding or function return whose inferred view would refer to a
+statement temporary requires an owned result. If the viewed type supports
+`Copy`, the compiler materializes an independent owned copy before the
+temporary is destroyed. Otherwise, the program is rejected. An explicitly
+declared `&T` remains a request for a view and does not trigger this
+conversion. So `let p = args()[1]` binds the `str`, and `fn first():
+names()[0]` returns it. Method and overload resolution first
 preserve reference identity and apply ordinary auto-dereferencing; contextual Copy
 materialization may satisfy an already-selected by-value receiver but does not
 change receiver dispatch or ABI.

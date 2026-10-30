@@ -134,6 +134,20 @@ This removes the naming ceremony of pure narrowing chains (`s`,
 old binding would still be live after the new declaration, the rebind
 is still an error.
 
+**A local shadows a module-scope function, without fallback (D173).** A
+local binding may take the name of a module-scope function; within its scope
+the name resolves to the local, for every use. Name resolution first, type
+checking second: a call of a local that is not callable is an error at the
+call site, inside an interpolation as outside it, and never resolves to the
+function the local shadows.
+
+```
+fn first() -> i32: 2
+fn main:
+    let first = [1, 2]
+    print(first())       // error: 'first' is not callable
+```
+
 ### 29.9 Pipeline-first guidance
 
 Because rebinding/shadowing is disallowed, stepwise transformations should use pipelines (`|>`) and scoped `with` bindings instead of repeated `let name = ...` rebinding.

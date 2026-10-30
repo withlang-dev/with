@@ -260,8 +260,12 @@ reassigned, never moved out of; an owned copy is spelled `.clone()`. A
 `const` is a value, not a place — each use materializes it.
 
 **Initialization.** Global initializers are ordinary expressions.
-They run before `main`, on the initial thread, in declaration order
-within a module. Because concurrency in With can only be created by
+Runtime globals initialize before `main`, on the initial thread, in
+dependency order. A global's initializer runs after every global it may
+read, including through transitively called functions. Among eligible
+globals, declaration order decides. Initialization cycles are errors.
+Safe code may not access a global whose completed initialization cannot
+be established (D175). Because concurrency in With can only be created by
 program code (§14, Invariant 3), initialization is race-free by
 construction.
 
