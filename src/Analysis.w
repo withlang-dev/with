@@ -25,21 +25,33 @@ type CompilerAnalysisResult {
     report: AnalysisReport,
 }
 
-fn analysis_line_for_offset(source: &str, offset: i32) -> i32:
-    var line: i32 = 1
-    let stop = if offset < source.len() as i32: offset else: source.len() as i32
-    for i in 0..stop:
-        if source[i] as i32 == 10:
-            line = line + 1
-    line
+// The line starts of the text a location was last asked in. Every fact of a
+// file asks in the same text, and counting its newlines from the start per
+// fact was quadratic: `analyze src/main.w facts` (pub-lint-check) ran for
+// minutes. The same buffer compares by pointer, so the check costs nothing.
+var g_analysis_line_text: str = ""
+var g_analysis_line_starts: List[i32] = [0]
 
-fn analysis_column_for_offset(source: &str, offset: i32) -> i32:
-    // An end offset can sit one past the last byte; the scan starts at the
-    // last real byte (byte_at used to read a silent 0 there — #1014 class).
-    var start: i32 = if offset - 1 < source.len(): offset - 1 else: (source.len() - 1) as i32
-    while start >= 0 and source[start] != '\n':
-        start = start - 1
-    offset - start
+// The line holding `offset` (an index into the line starts), the offset
+// clamped to the text: an end offset sits one past the last byte (#1014).
+fn analysis_line_slot(source: &str, offset: i32) -> isize:
+    if source != g_analysis_line_text:
+        g_analysis_line_text = source
+        var starts: List[i32] = [0]
+        for i in 0..source.len():
+            if source[i] == '\n': starts.push(i as i32 + 1)
+        g_analysis_line_starts = starts
+    let at = if offset < 0: 0 else if offset < source.len(): offset else: source.len() as i32
+    var lo: isize = 0
+    var hi = g_analysis_line_starts.len()
+    while lo < hi:
+        let mid = lo + (hi - lo) / 2
+        if g_analysis_line_starts[mid] <= at: lo = mid + 1 else: hi = mid
+    lo - 1
+
+fn analysis_line_for_offset(source: &str, offset: i32) -> i32: (analysis_line_slot(source, offset) + 1) as i32
+
+fn analysis_column_for_offset(source: &str, offset: i32) -> i32: offset - g_analysis_line_starts[analysis_line_slot(source, offset)] + 1
 
 fn analysis_with_node_location(fact: AnalysisFact, sema: &Sema, node: i32, source_path: &str, source_text: &str) -> AnalysisFact:
     var located = fact
