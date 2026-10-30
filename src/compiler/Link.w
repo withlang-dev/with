@@ -1368,6 +1368,13 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
     if sysroot.len() == 0:
         with_eprint("error: link: no darwin sysroot: this compiler carries none, and WITH_SDKROOT / SDKROOT name none")
         return link_stage_plan_fail()
+    // A named SDK that is gone (an Xcode update removes the one a running
+    // shell's SDKROOT named) left lld searching nothing: a page of
+    // undefined symbols, starting with `library not found for -lSystem`.
+    if with_fs_is_dir(sysroot) == 0:
+        let named_by = if runtime_getenv("WITH_SDKROOT").len() > 0: "WITH_SDKROOT" else if runtime_getenv("SDKROOT").len() > 0: "SDKROOT" else: "the [c_import] sdk_path"
+        with_eprint("error: link: " ++ named_by ++ " names the macOS SDK `" ++ sysroot ++ "`, which does not exist; point it at an installed SDK (`xcrun --sdk macosx --show-sdk-path`) or unset it to use this compiler's own sysroot")
+        return link_stage_plan_fail()
     var command = link_stage_make_darwin_llvm_link_command(self_exe, obj_path, bin_path, extras, link_libs, link_args)
     let args: List[str] = List.new()
     args.push("__ld")

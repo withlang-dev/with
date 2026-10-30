@@ -1311,6 +1311,34 @@ pub fn run_cli_selfhost_smoke_action(ctx: ActionCtx) -> i32:
     let keep_rc = bs_check_test_keep_binary(ctx, compiler_path, bs_join(output_dir, "keep-binary"))
     if keep_rc != 0:
         return keep_rc
+    bs_check_link_missing_sdk(ctx, compiler_path, bs_join(output_dir, "missing-sdk"))
+
+// An SDKROOT naming an SDK that is gone (an Xcode update removes the one a
+// running shell named) is one error that says so, never lld's page of
+// undefined symbols starting with `library not found for -lSystem`.
+fn bs_check_link_missing_sdk(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    if os() != "Macos":
+        return 0
+    let fs = ctx.fs()
+    if fs.mkdir_all(case_dir) != 0:
+        return bs_fail(ctx, "could not create missing-sdk directory: " ++ case_dir)
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "hello.w")
+    if fs.write_text(src, "fn main:\n    print(\"hello\")\n") != 0:
+        return bs_fail(ctx, "could not write " ++ src)
+    let env = process_env().set("SDKROOT", bs_abs(root, bs_join(case_dir, "MacOSX0.0.sdk")))
+    var args: List[str] = List.new()
+    args |> push("build")
+    args |> push(bs_abs(root, src))
+    args |> push("-o")
+    args |> push(bs_abs(root, bs_join(case_dir, "hello")))
+    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "link-missing-sdk", args, 120000, env)
+    if result.rc == 0:
+        return bs_fail(ctx, "missing-sdk: the link succeeded with SDKROOT naming no SDK")
+    if not result.stderr.contains("SDKROOT names the macOS SDK") or not result.stderr.contains("which does not exist"):
+        return bs_fail(ctx, "missing-sdk: the link did not say SDKROOT names a missing SDK; stderr=" ++ result.stderr)
+    if result.stderr.contains("library not found"):
+        return bs_fail(ctx, "missing-sdk: the link still ran lld over the missing SDK; stderr=" ++ result.stderr)
     0
 
 fn bs_one_liner_args(first: &str, second: &str) -> List[str]:
