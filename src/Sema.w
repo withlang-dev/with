@@ -1242,6 +1242,12 @@ type Sema {
     // when the scope ends
     global_value_decl_paths: HashMap[i32, str],
     global_value_decl_bindings: HashMap[i32, i32],
+    // Each global initializer by its name (sym → decl index) and its check's
+    // state by declaration (1 running, 2 done): a use of an untyped global
+    // checks its initializer first, whatever the declaration order.
+    top_level_let_pending: HashMap[i32, i32],
+    top_level_let_state: HashMap[i32, i32],
+    top_level_let_current: i32,
     shadowed_global_syms: List[i32],
     shadowed_global_indices: List[i32],
     global_race_access_syms: List[i32],
@@ -3558,6 +3564,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         interface_eager: 0,
         global_value_decl_paths,
         global_value_decl_bindings,
+        top_level_let_pending: HashMap.new(),
+        top_level_let_state: HashMap.new(),
+        top_level_let_current: -1,
         shadowed_global_syms: List.new(),
         shadowed_global_indices: List.new(),
         global_race_access_syms: List.new(),
