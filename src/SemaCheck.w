@@ -2905,7 +2905,10 @@ impl Sema:
     // capture ephemeral references".
     mut fn check_bodies():
         let count = self.ast.decl_count()
-        self.prepare_body_order(count)
+        // Prepared before the global initializers (check_module), whose
+        // calls may have checked bodies already; preparing again would
+        // check them twice.
+        if self.body_order_state.len() != count: self.prepare_body_order(count)
         // §21.1 rule 6: every `from` clause before any body, so a call
         // checked first reads its callee's declared origins.
         for di in 0..count:
@@ -2939,6 +2942,7 @@ impl Sema:
         self.judge_declared_view_origins()
         self.judge_placeholder_writes()
         self.check_calls_against_live_global_views()
+        self.order_global_initializers()
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
     // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —
@@ -3292,6 +3296,18 @@ impl Sema:
         if body == -1:
             return
         self.push_global_write_record(body, sym, node, self.local_file_id, GLOBAL_WRITE_PLACE)
+
+    // D175: the effect body of the initializer of decl `di`.
+    fn global_init_body(di: i32): GLOBAL_INIT_BODY + di
+
+    // D175: a read of the global `sym` by the body being checked.
+    mut fn push_global_read_record(sym: i32, node: i32):
+        let body = self.global_effect_body()
+        if body == -1: return
+        self.global_read_records.push(body)
+        self.global_read_records.push(sym)
+        self.global_read_records.push(node)
+        self.global_read_records.push(self.local_file_id)
 
     mut fn push_global_write_record(body: i32, sym: i32, node: i32, file: i32, kind: i32):
         self.global_write_records.push(body)
@@ -3816,6 +3832,142 @@ impl Sema:
             if seen.contains(self.global_write_records[wi * GLOBAL_WRITE_STRIDE]):
                 out = self.push_unique_i32(move out, self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1])
         out
+
+    // D175 (§9.1c): runtime globals initialize in dependency order. An
+    // initializer may read every global its body reads and every global a
+    // body its calls run reads, transitively: a callee, a callable it hands
+    // along, every impl of a dyn method, every callable of a called value's
+    // type, a drop's Drop impls (expand_global_dispatchers, run first), so
+    // the set holds for every path safe code can take. Among the
+    // initializers whose dependencies are done, declaration order decides;
+    // initializers that read one another, directly or through what they
+    // call, are refused. A read names a global by its symbol, so it depends
+    // on every initializer of that name (two modules' private `x`): more
+    // order, never less.
+    mut fn order_global_initializers():
+        var inits: List[i32] = List.new()
+        var sym_head: HashMap[i32, isize] = HashMap.new()
+        var sym_next: List[isize] = List.new()
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.ast.get_data1(decl) == 0: continue
+            if self.ast.let_decl_is_interface_provided(decl) or self.decl_is_lazy_skipped(di): continue
+            let sym = self.ast.get_data0(decl)
+            sym_next.push(sym_head.get(sym) ?? -1)
+            sym_head.insert(sym, inits.len())
+            inits.push(di)
+        if inits.len() == 0: return
+        let index = self.global_call_index()
+        var read_head: HashMap[i32, isize] = HashMap.new()
+        var read_next: List[isize] = List.new()
+        for ri in 0..self.global_read_records.len() / GLOBAL_READ_STRIDE:
+            let body: i32 = self.global_read_records[ri * GLOBAL_READ_STRIDE]
+            read_next.push(read_head.get(body) ?? -1)
+            read_head.insert(body, ri)
+        // deps[k]: the inits (positions) init k may read, and the read that
+        // makes each a dependency (for the cycle's diagnostic).
+        var deps: List[List[isize]] = List.new()
+        var dep_reads: List[List[isize]] = List.new()
+        for k in 0..inits.len():
+            var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+            let work: List[i32] = List.new()
+            let root = GLOBAL_INIT_BODY + inits[k]
+            seen.insert(root, 1)
+            work.push(root)
+            var w = 0
+            while w < work.len():
+                var ci: i32 = index.head.get(work[w]) ?? -1
+                w = w + 1
+                while ci >= 0:
+                    let target_start: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 3]
+                    let target_count: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 4]
+                    for ti in target_start..target_start + target_count:
+                        let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                        if not seen.contains(target):
+                            seen.insert(target, 1)
+                            work.push(target)
+                    ci = index.next[ci]
+            var mine: List[isize] = List.new()
+            var mine_reads: List[isize] = List.new()
+            var have: HashMap[isize, i32] = HashMap.new()
+            for body in work:
+                var ri = read_head.get(body) ?? -1
+                while ri >= 0:
+                    var pos = sym_head.get(self.global_read_records[ri * GLOBAL_READ_STRIDE + 1]) ?? -1
+                    while pos >= 0:
+                        if not have.contains(pos):
+                            have.insert(pos, 1)
+                            mine.push(pos)
+                            mine_reads.push(ri)
+                        pos = sym_next[pos]
+                    ri = read_next[ri]
+            deps.push(mine)
+            dep_reads.push(mine_reads)
+        var done: List[bool] = List.new()
+        for k in 0..inits.len(): done.push(false)
+        var progress = true
+        while progress:
+            progress = false
+            for k in 0..inits.len():
+                if done[k]: continue
+                var ready = true
+                // Seed-bound: the pinned seed miscompiles `for d in deps[k]`
+                // (#2840); the bound row iterates correctly. Delete with the
+                // seed that carries the fix.
+                let row = deps[k]
+                for d in row:
+                    if not done[d]: ready = false
+                if ready:
+                    done[k] = true
+                    // The rank by the initializer's value node (and a
+                    // `comptime`'s inner expression), which codegen holds.
+                    let rank = self.global_init_order.len()
+                    let value = self.ast.get_data1(self.ast.get_decl(inits[k]))
+                    self.global_init_rank.insert(value, rank)
+                    if self.ast.kind(value) == NodeKind.NK_COMPTIME and self.ast.get_data0(value) != 0:
+                        self.global_init_rank.insert(self.ast.get_data0(value), rank)
+                    self.global_init_order.push(inits[k])
+                    progress = true
+                    break
+        for k in 0..inits.len():
+            if not done[k]:
+                self.report_global_init_cycle(inits, deps, dep_reads, done, k)
+                return
+
+    // The cycle through the first initializer left unordered: `a` reads
+    // `b`, which reads `a` — each step with the read that makes it, the
+    // first reported where it is.
+    mut fn report_global_init_cycle(inits: &List[i32], deps: &List[List[isize]], dep_reads: &List[List[isize]], done: &List[bool], start: isize):
+        var path: List[isize] = List.new()
+        var reads: List[isize] = List.new()
+        var on_path: HashMap[isize, isize] = HashMap.new()
+        var k = start
+        while k >= 0 and not on_path.contains(k):
+            on_path.insert(k, path.len())
+            path.push(k)
+            var next: isize = -1
+            for j in 0..deps[k].len():
+                if not done[deps[k][j]] and next == -1:
+                    next = deps[k][j]
+                    reads.push(dep_reads[k][j])
+            k = next
+        if k < 0: return
+        let first = on_path.get(k).unwrap()
+        let name_of_k: str = with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.ast.get_decl(inits[k]))))
+        var names = ""
+        for p in first..path.len():
+            names = names ++ "`" ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.ast.get_decl(inits[path[p]])))) ++ "`, which reads "
+        names = names ++ "`" ++ name_of_k ++ "`"
+        let ri = reads[first]
+        let node: i32 = self.global_read_records[ri * GLOBAL_READ_STRIDE + 2]
+        let file: i32 = self.global_read_records[ri * GLOBAL_READ_STRIDE + 3]
+        // A cycle of one is the self-read check_top_level_let_before_use
+        // reports when the reading body is checked inside the initializer.
+        let message = if path.len() - first == 1: "the initializer of global `" ++ name_of_k ++ "` reads its own value, through what it calls (§9.1c, D175)"
+            else: "the initializers of globals read one another, so none can run first: the initializer of " ++ names ++ " (§9.1c, D175)"
+        var diag = Diagnostic.err(message, Span { file, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        diag.add_note("a global's initializer runs after every global it reads, through every function it calls")
+        self.diags.emit(diag)
 
     // The call path from `sig` to a body that writes `sym`, for a bundle
     // build's refusal: "`f`, which calls `g`, which writes it" (the
@@ -4386,6 +4538,8 @@ impl Sema:
     fn global_effect_body_name(body: i32) -> str:
         if body <= -2:
             return "a closure"
+        if body >= GLOBAL_INIT_BODY and body < GLOBAL_PARAM_BODY:
+            return "the initializer of `" ++ with_str_clone_ref(self.pool_resolve(self.ast.get_data0(self.ast.get_decl(body - GLOBAL_INIT_BODY)))) ++ "`"
         if self.is_dispatch_body(body):
             let index = body - GLOBAL_DISPATCH_BODY
             let kind: i32 = self.global_dispatchers[index * GLOBAL_DISPATCH_STRIDE]
@@ -10934,6 +11088,10 @@ const GLOBAL_SITE_RETURN_DROP: i32 = 4
 const GLOBAL_TARGET_STRIDE: i32 = 3
 const GLOBAL_BINDING_STRIDE: i32 = 4
 const GLOBAL_VIEW_CHECK_STRIDE: i32 = 6
+// D175: a global's initializer is a body of its own, GLOBAL_INIT_BODY + its
+// decl index (below every callable parameter's body, above every signature).
+const GLOBAL_INIT_BODY: i32 = 268435456
+const GLOBAL_READ_STRIDE: i32 = 4
 const GLOBAL_PARAM_BODY: i32 = 536870912
 const GLOBAL_DISPATCH_BODY: i32 = 1073741824
 const GLOBAL_DISPATCH_STRIDE: i32 = 3
@@ -12656,6 +12814,7 @@ impl Sema:
                 self.global_value_ident_nodes.insert(node, sym)
             if not is_local and self.global_value_decl_kind(sym) != 0:
                 self.record_name_use(node, "global", self.decl_path_of_symbol(sym), self.pool_resolve(sym))
+                self.push_global_read_record(sym, node)
             if sym != self.assign_target_revive_sym:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
             if not is_local and self.in_comptime_fn != 0 and self.is_mutable_global(sym) != 0:

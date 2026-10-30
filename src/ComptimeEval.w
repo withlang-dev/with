@@ -8794,7 +8794,12 @@ impl Sema:
         self.top_level_let_state.insert(decl, 1)
         let outer = self.top_level_let_current
         self.top_level_let_current = di
+        // D175: the initializer is a body of the global effect graph, so the
+        // globals it reads, directly or through what it calls, order it.
+        let saved_effect_body = self.current_effect_body
+        self.current_effect_body = self.global_init_body(di)
         self.check_top_level_let_initializer(di, decl, value)
+        self.current_effect_body = saved_effect_body
         self.top_level_let_current = outer
         self.top_level_let_state.insert(decl, 2)
 

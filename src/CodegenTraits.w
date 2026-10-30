@@ -1700,7 +1700,26 @@ impl Codegen:
         function
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
-        for i in 0..self.module_runtime_init_syms.len():
+        // §9.1c (D175): the wrapper runs the initializers in Sema's
+        // dependency order, each after every global it may read.
+        var ranks: List[isize] = List.new()
+        for i in 0..self.module_runtime_init_nodes.len():
+            let rank = self.sema.global_init_rank.get(self.module_runtime_init_nodes[i])
+            if rank.is_none():
+                with_eprint("error: BUG: the runtime initializer of '" ++ self.intern.resolve(self.module_runtime_init_syms[i]) ++ "' has no place in Sema's initialization order (D175)")
+                self.had_error = 1
+                return
+            ranks.push(rank.unwrap())
+        var ranked: List[isize] = List.new()
+        var taken: List[bool] = List.new()
+        for i in 0..ranks.len(): taken.push(false)
+        for n in 0..ranks.len():
+            var best: isize = -1
+            for i in 0..ranks.len():
+                if not taken[i] and (best < 0 or ranks[i] < ranks[best]): best = i
+            taken[best] = true
+            ranked.push(best)
+        for i in ranked:
             let name_sym: i32 = self.module_runtime_init_syms[i]
             let value_node: i32 = self.module_runtime_init_nodes[i]
             let result_tid: i32 = self.module_runtime_init_type_ids[i]

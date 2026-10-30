@@ -1276,6 +1276,12 @@ type Sema {
     // every body is checked (check_calls_against_live_global_views), since a
     // callee's writes are known only then (forward references, recursion).
     global_write_records: List[i32],
+    // D175 (§9.1c): every read of a global, as [body, sym, node, file]
+    // (global_effect_body), and the order the runtime initializers run in:
+    // decl indices, each after every global its initializer may read.
+    global_read_records: List[i32],
+    global_init_order: List[i32],
+    global_init_rank: HashMap[i32, isize],
     global_calls: List[i32],
     global_call_targets: List[i32],
     global_call_bindings: List[i32],
@@ -3581,6 +3587,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_race_concurrency_file: 0,
         global_race_concurrency_reason: "",
         global_write_records: List.new(),
+        global_read_records: List.new(),
+        global_init_order: List.new(),
+        global_init_rank: HashMap.new(),
         global_calls: List.new(),
         global_call_targets: List.new(),
         global_call_bindings: List.new(),
@@ -10474,6 +10483,9 @@ impl Sema:
         self.validate_no_std_requirements()
         if profile:
             t = with_clock_nanos()
+        // D43 (§4.10): a global initializer that calls an unannotated function
+        // has that body checked first, as any use does (ensure_body_typed).
+        self.prepare_body_order(self.ast.decl_count())
         self.check_top_level_let_values()
         if profile:
             sema_profile_report("top_level_let_values", t)
