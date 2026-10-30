@@ -723,6 +723,36 @@ pub fn mir_test_scalar_field_projection() -> Unit:
     assert(scalar_projection_verdict(true).contains("of a scalar"))
     assert(scalar_projection_verdict(false) == "")
 
+// A dereference of a value that is no reference: `for d in deps[k]` derefed
+// the element place `_xs[_i]`, declared the inner List, and the verifier took
+// the declared type. The base is an i32 local, or a `&i32` for the control.
+fn deref_projection_verdict(base_is_value: bool) -> str:
+    var mir_mod = MirModule.init()
+    for kind in [0, TypeKind.TY_INT, TypeKind.TY_REF]:
+        mir_mod.sema_type_kinds.push(kind)
+        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_REF: 1 else: 0)
+        mir_mod.sema_type_d1.push(0)
+        mir_mod.sema_type_d2.push(0)
+    let int_ty = 1
+    let ref_ty = 2
+    var body = MirBody.init_for_fn(1)
+    let base_local = body.new_temp(if base_is_value: int_ty else: ref_ty)
+    let base = body.new_place(base_local)
+    let deref = body.new_deref_place(base, int_ty)
+    let dest_local = body.new_temp(int_ty)
+    let dest = body.new_place(dest_local)
+    let entry = body.new_block()
+    let deref_read = body.new_operand(OperandKind.OK_COPY, deref)
+    let read = body.new_rvalue(RvalueKind.RK_USE, deref_read, 0, 0)
+    body.push_stmt(entry, StmtKind.Assign, dest, read, 0)
+    body.set_terminator(entry, TermKind.TK_RETURN, 0, 0, 0, 0, 0)
+    let err = validate_typed_mir_body(mir_mod, body)
+    with_str_clone_ref(err.message)
+
+pub fn mir_test_deref_projection:
+    assert(deref_projection_verdict(true).contains("not a reference or a pointer"))
+    assert(deref_projection_verdict(false) == "")
+
 // #1464: a fiber intrinsic whose task operand is not a task handle — the
 // awaited value's type standing where the Task[T] lives. Type 2 is the
 // generic instance Task[i32] (base symbol 9, the module's Task symbol).

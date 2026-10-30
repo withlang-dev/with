@@ -4542,6 +4542,31 @@ fn mir_validate_scalar_field_projection(mir_mod: &MirModule, body: &MirBody) -> 
                 return f"place {mir_place_text(body, place)} projects component {body.proj_d0[(proj_start + pi)]} of a scalar (ty={base_ty})"
     ""
 
+// A dereference reads through a reference or a pointer. The place's declared
+// type hid a dereference of a value: `_xs[_i].*` read a List element's
+// buffer pointer as a List (`for d in deps[k]`), and verification passed.
+fn mir_validate_deref_projection(mir_mod: &MirModule, body: &MirBody) -> str:
+    var place: i32 = -1
+    while place + 1 < body.place_locals.len():
+        place += 1
+        let proj_count = body.place_proj_counts[place]
+        let proj_start = body.place_proj_starts[place]
+        for pi in 0..proj_count:
+            if body.proj_kinds[(proj_start + pi)] != ProjKind.PK_DEREF:
+                continue
+            let base_ty = mir_validate_place_prefix_type(mir_mod, body, place, proj_count - pi)
+            if base_ty <= 0:
+                continue
+            let base = mir_mod.mir_resolve_alias(base_ty)
+            let base_kind = mir_mod.mir_get_type_kind(base)
+            // A std Box is its payload's pointer (codegen's deref reads it
+            // so); a kind the MIR's type snapshot does not hold is unknown
+            // here, never a verdict.
+            let is_box = base_kind == TypeKind.TY_GENERIC_INST and mir_mod.sema_box_sym != 0 and mir_mod.mir_get_type_d0(base) == mir_mod.sema_box_sym
+            if base_kind != TypeKind.TY_ERR and base_kind != TypeKind.TY_REF and base_kind != TypeKind.TY_PTR and not is_box:
+                return f"place {mir_place_text(body, place)} dereferences a value that is not a reference or a pointer (ty={base_ty})"
+    ""
+
 // #1464: the fiber intrinsics take a task handle. A handle in a local typed
 // as the awaited value (`async fn f(): 1` typed its calls `i32`) is a Task
 // stored where MIR believes a T lives.
@@ -4593,6 +4618,9 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
     let scalar_projection = mir_validate_scalar_field_projection(mir_mod, body)
     if scalar_projection.len() > 0:
         return mir_validation_fail(body.fn_sym, 0, scalar_projection)
+    let deref_projection = mir_validate_deref_projection(mir_mod, body)
+    if deref_projection.len() > 0:
+        return mir_validation_fail(body.fn_sym, 0, deref_projection)
     let params = mir_validate_body_params(mir_mod, body)
     if params.len() > 0:
         return mir_validation_fail(body.fn_sym, 0, params)
