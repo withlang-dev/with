@@ -4,6 +4,7 @@
 extern fn with_fiber_in_fiber() -> i32
 extern fn with_fiber_yield() -> Unit
 extern fn with_runtime_core_init() -> Unit
+extern fn with_install_interrupt_handlers()
 extern fn with_runtime_core_shutdown() -> Unit
 extern fn with_debug_alloc_report_leaks() -> Unit
 extern fn with_runtime_core_has_fibers() -> i32
@@ -83,6 +84,11 @@ fn fiber_report_unhandled_panics() -> i32:
         with_ewrite("\n")
 
 pub fn with_runtime_init():
+    // A program that runs a child passes SIGINT, SIGTERM and SIGHUP on to it
+    // (the child runs in a process group of its own) and exits 128 + the
+    // signal. Only the compiler installed this: a timed-out `with run`
+    // program died and its own child ran on, orphaned.
+    with_install_interrupt_handlers()
     with_runtime_core_init()
 
 pub fn with_runtime_shutdown():
