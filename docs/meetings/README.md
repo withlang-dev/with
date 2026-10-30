@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D172 — Mutation is a declared capability on any parameter (`mut p: T`); exclusive access begins when the call does; read-path caches are a sealed std type, `Memo[K, V]`; a `fn` receiver is read-only for every write (ruled)](2026-10-29-D172-mutation-is-a-declared-capability-on-any-parameter.md)
 - [D171 — User actions may use system tools; the compiler and its build are bootstrapped; a UAT scenario uses only dependencies `with get` provides cleanly on its platform (ruled; #2788)](2026-10-28-D171-a-uat-scenario-uses-only-dependencies-with-get-provides-cleanly.md)
 - [D169 — A trait names its method as §11.4 names an extension's: `Trait.method(args)`, the receiver the first argument, a static method's `Self` from its use (ruled; #2520)](2026-10-28-D169-a-trait-names-its-method-as-a-module-names-its-function.md)
 - [D168 — A List's adapters are its iterator's: no eager `List.map`, `filter`, `fold`; a pipeline iterates a List (D142), the closure sees a view, `collect` copies a value out (delegated; #2772)](2026-10-28-D168-a-lists-adapters-are-its-iterators.md)

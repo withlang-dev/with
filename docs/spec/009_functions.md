@@ -499,6 +499,9 @@ the dotted `fn Type.name` — is associated / free (no receiver).
 | `fn Type.m()` at top level | none (associated) | `Type.m()` | — |
 | `mut`/`move fn` at top level | *error* — mode with no receiver | — | — |
 
+A `fn` receiver is read-only for every write through it: assignment,
+a `mut fn` call, a `mut` parameter, and std container mutations alike.
+
 **One name may have an observing form and an owned form; the receiver's
 syntax selects (D117).** A type may declare a method name twice, once as
 `fn` and once as `move fn`. A call on an owned receiver — a temporary, or a

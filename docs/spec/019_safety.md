@@ -4,6 +4,19 @@
 
 All code is safe unless explicitly `unsafe`.
 
+`std` provides one compiler-known type whose contents may change
+through a shared view. Constructing or accessing it directly is
+`unsafe`. The compiler does not assume memory inside it is unchanged
+across calls, whatever the views reaching it, and every backend must
+preserve this: under LLVM, `readonly` and `noalias` are adjusted
+separately, each kept wherever it remains valid; in emitted C, the
+marker's storage is never `const`-qualified and never placed in
+read-only storage. A constant whose type contains the marker is an
+error, since a constant is an immutable static (D127). Safe
+abstractions built on the marker (such as `std`'s `Memo`) must never
+expose a view of its contents. There is no general interior mutability
+in safe code.
+
 ### 19.2 `unsafe` Required For
 
 - Raw pointer dereference
