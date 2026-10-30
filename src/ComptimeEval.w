@@ -1852,7 +1852,7 @@ impl ComptimeEvaluator:
                 return comptime_value_enum(resolved as i32, self.sema.syms.ok, start, 1)
         self.unsupported_default_value(resolved as i32, node)
 
-    fn comptime_fn_return_type(fn_sym: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> i32:
+    mut fn comptime_fn_return_type(fn_sym: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> i32:
         let sig_idx = self.sema.get_sig(fn_sym)
         if sig_idx < 0:
             return 0
@@ -2060,10 +2060,10 @@ impl ComptimeEvaluator:
             return 0
         1
 
-    fn push_scope() -> Unit:
+    mut fn push_scope() -> Unit:
         self.scope_starts.push(self.slot_syms.len() as i32)
 
-    fn pop_scope():
+    mut fn pop_scope():
         if self.scope_starts.len() == 0:
             return
         let start = self.scope_starts[(self.scope_starts.len() - 1)]
@@ -2073,7 +2073,7 @@ impl ComptimeEvaluator:
             self.slot_muts.pop()
         self.scope_starts.pop()
 
-    fn bind_value(sym: i32, value: ComptimeValue, is_mut: i32) -> Unit:
+    mut fn bind_value(sym: i32, value: ComptimeValue, is_mut: i32) -> Unit:
         self.slot_syms.push(sym)
         self.slot_values.push(value)
         self.slot_muts.push(is_mut)
@@ -2083,7 +2083,7 @@ impl ComptimeEvaluator:
         with self.slot_values.slot(slot_index) as mut slot:
             slot.set(move value)
 
-    fn record_runtime_env_set(name: &str) -> Unit:
+    mut fn record_runtime_env_set(name: &str) -> Unit:
         for i in 0..self.runtime_env_names.len():
             if self.runtime_env_names[i] == name:
                 return
@@ -2171,7 +2171,7 @@ impl ComptimeEvaluator:
                 parts.push(with_str_clone_ref(item.text))
         parts
 
-    fn effect_tool_identity(parts: &List[str]) -> str:
+    mut fn effect_tool_identity(parts: &List[str]) -> str:
         if parts.len() == 0:
             return ""
         let exe = parts[0]
@@ -2217,7 +2217,7 @@ fn comptime_effect_resolve_executable(exe: &str) -> str:
     ""
 
 impl ComptimeEvaluator:
-    fn effect_env_text_from_process_env_value(value: &ComptimeValue) -> str:
+    mut fn effect_env_text_from_process_env_value(value: &ComptimeValue) -> str:
         if value.kind != ComptimeValueKind.CV_STRUCT:
             return ""
         let vars = self.struct_field_value_by_name(value, "vars")
@@ -2297,7 +2297,7 @@ impl ComptimeEvaluator:
     // imports; `comptime match Target.os` through a corpus-private std.os on
     // one compiler generation and not the other). Sema's gate decides, from
     // the module being evaluated, and the message is the runtime use's.
-    fn module_let_visible(decl: i32) -> i32: self.sema.decl_node_visible_from_current(decl)
+    mut fn module_let_visible(decl: i32) -> i32: self.sema.decl_node_visible_from_current(decl)
 
     fn invisible_name_message(sym: i32) -> str:
         let name = self.pool.resolve(sym)
@@ -2364,7 +2364,7 @@ impl ComptimeEvaluator:
             di = di - 1
         0
 
-    fn find_fn_decl_node(sym: i32) -> i32:
+    mut fn find_fn_decl_node(sym: i32) -> i32:
         if self.sema.fn_decl_nodes.contains(sym):
             return self.sema.fn_decl_nodes.get(sym).unwrap()
         let generic = self.sema.generic_fn_node_for_symbol(sym)
@@ -2439,7 +2439,7 @@ impl ComptimeEvaluator:
                 return text
         with_str_clone_ref(self.sema.source_text)
 
-    fn push_extra_value(value: ComptimeValue) -> Unit:
+    mut fn push_extra_value(value: ComptimeValue) -> Unit:
         self.extra_values.push(value)
 
     fn binding_sym(node: i32) -> i32:
@@ -2452,16 +2452,16 @@ impl ComptimeEvaluator:
             return self.binding_sym(self.ast.get_data0(node))
         0
 
-    fn copy_extra_slice(start: i32, count: i32) -> i32:
+    mut fn copy_extra_slice(start: i32, count: i32) -> i32:
         let new_start = self.extra_values.len() as i32
         for i in 0..count:
             self.extra_values.push(self.extra_snapshot_value_at((start + i) as i64))
         new_start
 
-    fn copy_list_snapshot(value: &ComptimeValue) -> i32:
+    mut fn copy_list_snapshot(value: &ComptimeValue) -> i32:
         self.copy_extra_slice(value.extra_start, value.extra_count)
 
-    fn copy_map_snapshot(value: &ComptimeValue) -> i32:
+    mut fn copy_map_snapshot(value: &ComptimeValue) -> i32:
         self.copy_extra_slice(value.extra_start, value.extra_count * 2)
 
     mut fn rebind_collection_receiver(recv_node: i32, value: ComptimeValue, node: i32) -> ComptimeControl:
@@ -2743,7 +2743,7 @@ impl ComptimeEvaluator:
             return self.sema.ty_i64 as i32
         fallback
 
-    fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
+    mut fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
         if value.kind == ComptimeValueKind.CV_INT:
@@ -2986,7 +2986,7 @@ impl ComptimeEvaluator:
                 return 0
         self.static_type_expr(node)
 
-    fn struct_field_index(type_id: i32, field_sym: i32) -> i32:
+    mut fn struct_field_index(type_id: i32, field_sym: i32) -> i32:
         let field_count = self.sema.type_reflection_field_count(type_id)
         for fi in 0..field_count:
             if self.sema.type_reflection_field_name(type_id, fi) == field_sym:
@@ -4057,13 +4057,13 @@ impl ComptimeEvaluator:
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
-    fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
+    mut fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
         let start = self.extra_values.len() as i32
         for i in 0..values.len():
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
-    fn struct_field_value_by_name(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
+    mut fn struct_field_value_by_name(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
         if value.kind != ComptimeValueKind.CV_STRUCT:
             return comptime_value_invalid()
         let field_sym = self.pool.intern(field_name) as i32
@@ -4181,7 +4181,7 @@ impl ComptimeEvaluator:
         let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
         clean_root ++ "/" ++ path
 
-    fn workspace_str_list_field(options: &ComptimeValue, field_name: &str) -> List[str]:
+    mut fn workspace_str_list_field(options: &ComptimeValue, field_name: &str) -> List[str]:
         let out: List[str] = List.new()
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind != ComptimeValueKind.CV_LIST and value.kind != ComptimeValueKind.CV_ARRAY:
@@ -4192,14 +4192,14 @@ impl ComptimeEvaluator:
                 out.push(with_str_clone_ref(item.text))
         out
 
-    fn workspace_str_option(options: &ComptimeValue, field_name: &str) -> str:
+    mut fn workspace_str_option(options: &ComptimeValue, field_name: &str) -> str:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_STR:
             // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
             return value.text.clone()
         ""
 
-    fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
+    mut fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
         let value = self.struct_field_value_by_name(options, field_name)
         if comptime_value_is_intlike(value) != 0:
             return value.data0 as i32
@@ -4212,20 +4212,20 @@ impl ComptimeEvaluator:
                     return self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym) as i32
         default_value
 
-    fn workspace_bool_option(options: &ComptimeValue, field_name: &str, default_value: bool) -> bool:
+    mut fn workspace_bool_option(options: &ComptimeValue, field_name: &str, default_value: bool) -> bool:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_BOOL:
             return value.data0 != 0
         default_value
 
-    fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
+    mut fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
         let raw = self.workspace_str_list_field(options, field_name)
         let out: List[str] = List.new()
         for i in 0..raw.len():
             out.push(self.workspace_path(root, raw[i]))
         out
 
-    fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
+    mut fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
         let excludes = self.workspace_str_list_field(options, "exclude_basenames")
         var out = ""
         for i in 0..excludes.len():

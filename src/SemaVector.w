@@ -45,9 +45,9 @@ impl Sema:
                 let n = total / w
                 self.register_prim(f"m{w}x{n}", self.mask_type(w, n))
 
-    fn vector_type(lane: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_VECTOR, lane, n, 0) as i32
+    mut fn vector_type(lane: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_VECTOR, lane, n, 0) as i32
 
-    fn mask_type(w: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_MASK, w, n, 0) as i32
+    mut fn mask_type(w: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_MASK, w, n, 0) as i32
 
     fn is_vector_type(tid: i32) -> bool:
         tid > 0 and self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VECTOR
@@ -121,11 +121,11 @@ impl Sema:
 
     // §4.3d: what a lane-wise comparison of `tid` yields,
     // Mask[N, width(T)].
-    fn vector_compare_mask_type(tid: i32) -> i32:
+    mut fn vector_compare_mask_type(tid: i32) -> i32:
         self.mask_type(self.vector_lane_bits(self.vector_lane_type(tid)), self.vector_lane_count(tid))
 
     // §4.3d: `.bits()` — the unsigned integer vector of the same lane width.
-    fn vector_bits_type(tid: i32) -> i32:
+    mut fn vector_bits_type(tid: i32) -> i32:
         let bits = self.vector_lane_bits(self.vector_lane_type(tid))
         let lane = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
         self.vector_type(lane as i32, self.vector_lane_count(tid))
@@ -143,7 +143,7 @@ impl Sema:
 
     // §4.3d: the compile-time integer a generic lane count `N` is bound to
     // (`fn dot[N](a: Vector[f32, N])`), as a generic substitution.
-    fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
+    mut fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
 
     fn const_int_value(tid: i32) -> i32:
         if tid <= 0 or self.get_type_kind(self.resolve_alias(tid as TypeId)) != TypeKind.TY_CONST_INT: return -1
@@ -181,9 +181,9 @@ impl Sema:
             return lane_name ++ f"x{n}"
         f"Vector[{lane_name}, {n}]"
 
-    fn is_vector_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Vector"
+    mut fn is_vector_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Vector"
 
-    fn is_mask_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Mask"
+    mut fn is_mask_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Mask"
 
     // The lane count argument of `Vector[T, N]` / `Mask[N, W]`: a
     // compile-time integer constant ≥ 1, or -1 after a diagnostic.
@@ -243,7 +243,7 @@ impl Sema:
 
     // The frozen twin: every Vector/Mask type a MIR-era consumer names was
     // registered while checking.
-    fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
+    mut fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
         if self.pool_resolve_symbol(base_sym) == "Mask":
             let n = self.vector_count_node_value(a0, self.vector_count_subst(a0))
             if n < 1: return 0

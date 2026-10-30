@@ -317,7 +317,7 @@ impl Sema:
                 return 1
         0
 
-    fn builtin_arg_type_compatible_frozen(expected: i32, actual: i32) -> i32:
+    mut fn builtin_arg_type_compatible_frozen(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         if self.types_compatible_frozen(expected, actual) != 0:
@@ -411,7 +411,7 @@ impl Sema:
             return self.types_compatible(pointee, actual)
         0
 
-    fn can_auto_ref_arg_frozen(expected: i32, actual: i32) -> i32:
+    mut fn can_auto_ref_arg_frozen(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 0
         let expected_resolved = self.resolve_alias(expected as TypeId)
@@ -2525,7 +2525,7 @@ impl Sema:
         args.push(storage_tid)
         self.find_generic_inst_type(self.syms.fixed_string, args, 1) as i32
 
-    fn resolve_generic_type_frozen(node: i32) -> i32:
+    mut fn resolve_generic_type_frozen(node: i32) -> i32:
         var gi_base_sym = self.ast.get_data0(node)
         if (self.is_vector_symbol(gi_base_sym) or self.is_mask_symbol(gi_base_sym)) and self.ast.get_data2(node) == 2:
             let vg_start = self.ast.get_data1(node)
@@ -2578,7 +2578,7 @@ impl Sema:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
         self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
-    fn resolve_type_expr_frozen(node: i32) -> TypeId:
+    mut fn resolve_type_expr_frozen(node: i32) -> TypeId:
         if node == 0:
             return 0 as TypeId
         let kind = self.ast.kind(node)
@@ -2675,7 +2675,7 @@ impl Sema:
             return self.ty_i32
         0 as TypeId
 
-    fn resolve_type_level_arg_expr_frozen(node: i32) -> i32:
+    mut fn resolve_type_level_arg_expr_frozen(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -2946,7 +2946,7 @@ impl Sema:
     // `let r = first(v); v.push(2); print(r)` compiled when `first` was
     // declared below `main`. Such a function is checked before the first
     // declaration that calls it, as an unannotated one is (#1196).
-    fn decl_returns_view(decl: i32, di: i32) -> bool:
+    mut fn decl_returns_view(decl: i32, di: i32) -> bool:
         let sig = self.get_sig(self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di))
         if sig < 0:
             return false
@@ -2961,7 +2961,7 @@ impl Sema:
     // method is checked before its callers as a view-returning one is. Only
     // a parameter that can carry a view — a reference, an ephemeral value, a
     // callable (§12.4) — can be stored as one.
-    fn decl_may_store_view_into_receiver(decl: i32, di: i32) -> bool:
+    mut fn decl_may_store_view_into_receiver(decl: i32, di: i32) -> bool:
         let sig = self.get_sig(self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di))
         if sig < 0 or self.sig_receiver_mode(sig) == ReceiverMode.None:
             return false
@@ -3230,7 +3230,7 @@ impl Sema:
         self.global_race_concurrency_file = self.local_file_id
         self.global_race_concurrency_reason = with_str_clone_ref(reason)
 
-    fn global_symbol_is_synchronized(sym: i32) -> i32:
+    mut fn global_symbol_is_synchronized(sym: i32) -> i32:
         let tid = self.scope_lookup(sym)
         if tid <= 0:
             return 0
@@ -4094,7 +4094,7 @@ impl Sema:
     // and the place's own root when its parameter takes it by place (`&T`,
     // `[]T`, a reading or mutating receiver). A `copy`/`move` argument is
     // an independent value.
-    fn push_arg_global_views(out0: List[i32], arg: i32, by_place: bool) -> List[i32]:
+    mut fn push_arg_global_views(out0: List[i32], arg: i32, by_place: bool) -> List[i32]:
         var out = out0
         if arg <= 0 or self.ast.kind(arg) == NodeKind.NK_MOVE_ARG or self.ast.kind(arg) == NodeKind.NK_COPY_ARG:
             return out
@@ -4137,7 +4137,7 @@ impl Sema:
 
     // The bodies of function `fn_sym`, declared at `fn_node`: its own
     // signature, and every concrete specialization of it.
-    fn push_fn_bodies(out0: List[i32], fn_sym: i32, fn_node: i32) -> List[i32]:
+    mut fn push_fn_bodies(out0: List[i32], fn_sym: i32, fn_node: i32) -> List[i32]:
         var out = out0
         let sig = if fn_sym != 0: self.get_sig(fn_sym) else: -1
         if sig >= 0:
@@ -4439,7 +4439,7 @@ impl Sema:
 
     // A value that outlives the drops at a scope's end or a `return` when
     // it views a global (`views` of note_drop_global_effects): 0 otherwise.
-    fn expr_views_global(node: i32) -> bool:
+    mut fn expr_views_global(node: i32) -> bool:
         if node <= 0:
             return false
         var roots: List[i32] = List.new()
@@ -5722,6 +5722,8 @@ impl Sema:
                     if p_tid > 0:
                         let p_tk = self.get_type_kind(self.resolve_alias(p_tid))
                         if p_tk == TypeKind.TY_REF:
+                            if pi == 0 and (eff & EFF_WRITE) != 0 and self.sig_receiver_mode(sig_idx) == ReceiverMode.Read:
+                                self.receiver_write_demand_sigs.insert(sig_idx, 1)
                             eff = eff & (EFF_READ | EFF_ESCAPE_VIEW | EFF_RAW_PTR_VALIDITY | EFF_STORE_IN_RECEIVER)
                         else if p_tk == TypeKind.TY_PTR:
                             eff = eff & (EFF_READ | EFF_RAW_PTR_VALIDITY)
@@ -6199,7 +6201,7 @@ impl Sema:
         self.fn_label_next_scope_id = self.fn_label_next_scope_id + 1
         self.fn_label_scope_stack.push(self.fn_label_next_scope_id)
 
-    fn label_registry_exit_scope():
+    mut fn label_registry_exit_scope():
         if self.fn_label_scope_stack.len() > 0:
             self.fn_label_scope_stack.pop()
 
@@ -6227,13 +6229,13 @@ impl Sema:
         self.fn_label_orders.push(order)
         self.fn_label_used.push(0)
 
-    fn register_goto_site(sym: i32, node: i32, order: i32) -> Unit:
+    mut fn register_goto_site(sym: i32, node: i32, order: i32) -> Unit:
         self.fn_goto_syms.push(sym)
         self.fn_goto_nodes.push(node)
         self.fn_goto_paths.push(self.label_registry_path())
         self.fn_goto_orders.push(order)
 
-    fn register_init_barrier(node: i32, order: i32) -> Unit:
+    mut fn register_init_barrier(node: i32, order: i32) -> Unit:
         self.fn_init_nodes.push(node)
         self.fn_init_paths.push(self.label_registry_path())
         self.fn_init_orders.push(order)
@@ -6823,7 +6825,7 @@ impl Sema:
             return r
         0
 
-    fn cheader_generate(guard: &str) -> str:
+    mut fn cheader_generate(guard: &str) -> str:
         let exported: List[i32] = List.new()
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
@@ -6882,7 +6884,7 @@ impl Sema:
             out = out ++ "    " ++ self.cheader_decl_with_name(ftid, fname) ++ ";\n"
         out ++ "} " ++ self.type_name(tid) ++ ";\n\n"
 
-    fn cheader_prototype(fn_node: i32) -> str:
+    mut fn cheader_prototype(fn_node: i32) -> str:
         let sig = self.get_sig(self.ast.get_data0(fn_node))
         if sig < 0:
             return ""
@@ -7603,7 +7605,7 @@ impl Sema:
                 return 1
         0
 
-    fn expr_is_tuple_of_tasks(node: i32) -> i32:
+    mut fn expr_is_tuple_of_tasks(node: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_TUPLE:
             return 0
         let extra_start = self.ast.get_data0(node)
@@ -7615,7 +7617,7 @@ impl Sema:
                 return 0
         1
 
-    fn expr_is_task_value(node: i32) -> i32:
+    mut fn expr_is_task_value(node: i32) -> i32:
         if node == 0:
             return 0
         if self.typed_expr_types.contains(node):
@@ -7685,12 +7687,12 @@ impl Sema:
             return 1
         0
 
-    fn expr_is_awaitable_task_value(node: i32) -> i32:
+    mut fn expr_is_awaitable_task_value(node: i32) -> i32:
         if self.expr_is_task_value(node) != 0:
             return 1
         self.expr_is_scoped_task_value(node)
 
-    fn expr_is_scoped_task_value(node: i32) -> i32:
+    mut fn expr_is_scoped_task_value(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -8148,7 +8150,7 @@ impl Sema:
 
     // The declaration a callee symbol runs: its own, or, for a concrete
     // specialization, its generic template's — 0 when it has none.
-    fn fn_decl_node_for_suspend(fn_sym: i32) -> i32:
+    mut fn fn_decl_node_for_suspend(fn_sym: i32) -> i32:
         if self.fn_decl_nodes.contains(fn_sym):
             return self.fn_decl_nodes.get(fn_sym).unwrap()
         if self.concrete_specialization_by_sym.contains(fn_sym):
@@ -8598,7 +8600,7 @@ impl Sema:
     // so the fiber can be cancelled while it runs and the callee then leaves
     // without producing its value. Calling an async fn spawns its Task and
     // calling a gen fn builds its generator: neither suspends the caller.
-    fn call_target_may_suspend(callee: i32) -> bool:
+    mut fn call_target_may_suspend(callee: i32) -> bool:
         let fn_node = self.fn_decl_node_for_suspend(callee)
         if fn_node == 0 or not self.suspend_fact_nodes.contains(fn_node):
             return false
@@ -8900,7 +8902,7 @@ impl Sema:
             return 0
         0
 
-    fn fn_symbol_is_std_thread_spawn_os(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_std_thread_spawn_os(fn_sym: i32) -> i32:
         if self.pool_resolve(fn_sym) != "spawn_os":
             return 0
         let source_path = self.fn_symbol_source_path(fn_sym)
@@ -8912,7 +8914,7 @@ impl Sema:
             return 1
         0
 
-    fn fn_symbol_is_std_builtins_named(fn_sym: i32, name: &str) -> i32:
+    mut fn fn_symbol_is_std_builtins_named(fn_sym: i32, name: &str) -> i32:
         if self.pool_resolve(fn_sym) != name:
             return 0
         let source_path = self.fn_symbol_source_path(fn_sym)
@@ -8924,7 +8926,7 @@ impl Sema:
             return 1
         0
 
-    fn fn_symbol_is_std_builtins_drop(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_std_builtins_drop(fn_sym: i32) -> i32:
         self.fn_symbol_is_std_builtins_named(fn_sym, "drop")
 
     // D86 (§18.2): `assert`, `require` and `check` of std.builtins and of
@@ -8932,7 +8934,7 @@ impl Sema:
     // give their parameters; a call evaluates the condition and, only when
     // it is false, the message and location (check_call, MirLower.w
     // lower_call, ComptimeEval.w eval_call).
-    fn fn_symbol_is_precondition_form(fn_sym: i32) -> bool:
+    mut fn fn_symbol_is_precondition_form(fn_sym: i32) -> bool:
         let name = self.pool_resolve(fn_sym)
         if name != "assert" and name != "require" and name != "check":
             return false
@@ -8941,7 +8943,7 @@ impl Sema:
 
     // std.sync's (and std.collections') `fence`: the declaration MIR lowers
     // to the atomic fence intrinsic. Its module decides, never the name.
-    fn fn_symbol_is_std_fence(fn_sym: i32) -> bool:
+    mut fn fn_symbol_is_std_fence(fn_sym: i32) -> bool:
         if self.pool_resolve(fn_sym) != "fence":
             return false
         let path = self.fn_symbol_source_path(fn_sym)
@@ -9714,7 +9716,7 @@ impl Sema:
     //   0: target parameter is not relevant here
     //   1: target parameter is definitely consumed in this expression
     //  -1: target parameter is used in an unproven/escaping way
-    fn task_param_expr_disposition(node: i32, target_sym: i32) -> i32:
+    mut fn task_param_expr_disposition(node: i32, target_sym: i32) -> i32:
         if node == 0 or target_sym == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -9845,7 +9847,7 @@ impl Sema:
             return -1
         0
 
-    fn task_param_block_disposition(node: i32, target_sym: i32) -> i32:
+    mut fn task_param_block_disposition(node: i32, target_sym: i32) -> i32:
         let extra_start = self.ast.get_data0(node)
         let stmt_count = self.ast.get_data1(node)
         var shadowed = false
@@ -9950,7 +9952,7 @@ impl Sema:
             return self.task_param_expr_mentions(self.ast.get_data2(node), target_sym)
         1
 
-    fn task_param_consumed_summary(fn_sym: i32, param_i: i32) -> i32:
+    mut fn task_param_consumed_summary(fn_sym: i32, param_i: i32) -> i32:
         if fn_sym == 0 or param_i < 0:
             return 0
         let key = sema_pair_key(fn_sym, param_i)
@@ -11372,7 +11374,7 @@ impl Sema:
     fn fn_decl_is_variadic_definition(fn_node: i32) -> bool:
         fn_node != 0 and self.ast.kind(fn_node) == NodeKind.NK_FN_DECL and (self.ast.get_data2(fn_node) / FnFlags.VARIADIC) % 2 == 1
 
-    fn fn_symbol_is_unsafe(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_unsafe(fn_sym: i32) -> i32:
         self.fn_decl_is_unsafe(self.fn_symbol_decl_node(fn_sym))
 
     fn fn_decl_is_unsafe(fn_node: i32) -> i32:
@@ -11405,7 +11407,7 @@ impl Sema:
     // type is unsafe exactly when the call is (#1829). A presented facade
     // call (§16.2b.8) is safe at its call site; the function's value is not
     // presented, so a value use passes `presented` false.
-    fn fn_symbol_unsafe_call_reason(fn_sym: i32, presented: bool) -> str:
+    mut fn fn_symbol_unsafe_call_reason(fn_sym: i32, presented: bool) -> str:
         if self.fn_symbol_is_unsafe(fn_sym) != 0 and not presented:
             return "unsafe function call requires unsafe context"
         if self.fn_symbol_is_raw_c_import(fn_sym) != 0:
@@ -11427,7 +11429,7 @@ impl Sema:
 
     // The declaring path that classifies a call to `fn_sym` from the current
     // module: its own declaration when it has one, else the symbol's.
-    fn extern_classification_path(fn_sym: i32) -> str:
+    mut fn extern_classification_path(fn_sym: i32) -> str:
         if self.module_declares_extern(fn_sym):
             return with_str_clone_ref(self.current_module_path)
         self.fn_symbol_source_path(fn_sym)
@@ -11438,12 +11440,12 @@ impl Sema:
     // Greet)` share it, and the program's function was judged by the
     // extern's rule: "manual extern function call requires unsafe context".
     // A module's own extern declaration is the one its calls use (#1695).
-    fn resolves_to_extern(fn_sym: i32) -> bool:
+    mut fn resolves_to_extern(fn_sym: i32) -> bool:
         if self.module_declares_extern(fn_sym): return true
         let sig_idx = self.get_sig(fn_sym)
         sig_idx < 0 or self.extern_sig_modules.contains(sig_idx)
 
-    fn fn_symbol_is_manual_extern(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_manual_extern(fn_sym: i32) -> i32:
         if not self.extern_fn_names.contains(fn_sym) or not self.resolves_to_extern(fn_sym):
             return 0
         if self.ci_syms.contains(fn_sym):
@@ -11457,7 +11459,7 @@ impl Sema:
             return 0
         1
 
-    fn fn_symbol_is_manual_extern_value_abi(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_manual_extern_value_abi(fn_sym: i32) -> i32:
         if not self.extern_fn_names.contains(fn_sym) or not self.resolves_to_extern(fn_sym):
             return 0
         if self.ci_syms.contains(fn_sym):
@@ -11471,7 +11473,7 @@ impl Sema:
             return 0
         1
 
-    fn manual_extern_requires_unsafe(fn_sym: i32) -> i32:
+    mut fn manual_extern_requires_unsafe(fn_sym: i32) -> i32:
         let sig_idx = self.get_sig(fn_sym)
         if sig_idx < 0:
             return 1
@@ -11485,7 +11487,7 @@ impl Sema:
                 return 1
         0
 
-    fn fn_symbol_is_raw_c_import(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_raw_c_import(fn_sym: i32) -> i32:
         if not self.ci_syms.contains(fn_sym):
             return 0
         let fn_name = self.pool_resolve(fn_sym)
@@ -12761,7 +12763,7 @@ impl Sema:
     // §9.5: a method declared outside its type's module reaches the
     // receiver's fields only through `self.`; "" when `sym` is no field of
     // the receiver in scope.
-    fn bare_receiver_field_help(sym: i32) -> str:
+    mut fn bare_receiver_field_help(sym: i32) -> str:
         let self_sym = self.pool_lookup_symbol("self")
         if self_sym == 0 or self.scope_lookup(self_sym) < 0 or not self.scope_binding_is_local(self_sym):
             return ""
@@ -13686,18 +13688,18 @@ impl Sema:
     // formatter is registered in whatever module formats the value (a std
     // collection's body formats the user's element type), so the lookup
     // cannot depend on which names that module imports.
-    fn debug_fmt_template(resolved: i32) -> i32:
+    mut fn debug_fmt_template(resolved: i32) -> i32:
         let base_tid = self.generic_inst_template_tid(resolved)
         if base_tid == 0: 0 else: self.resolve_alias(base_tid as TypeId) as i32
 
-    fn debug_fmt_generic_struct(resolved: i32) -> bool:
+    mut fn debug_fmt_generic_struct(resolved: i32) -> bool:
         let template = self.debug_fmt_template(resolved)
         template != 0 and self.get_type_kind(template as TypeId) == TypeKind.TY_STRUCT
 
     // The enum declaration whose variants `resolved` has: itself, or the
     // template of a generic enum inst (Option[T], Result[T, E], ...). 0 when
     // `resolved` is not an enum.
-    fn debug_fmt_enum_base(resolved: i32) -> i32:
+    mut fn debug_fmt_enum_base(resolved: i32) -> i32:
         let kind = self.get_type_kind(resolved as TypeId)
         if kind == TypeKind.TY_ENUM: return resolved
         if kind != TypeKind.TY_GENERIC_INST: return 0
@@ -13861,7 +13863,7 @@ impl Sema:
             return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
         self.resolve_type_expr(type_node) as i32
 
-    fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    mut fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         if type_node == 0:
             return self.ty_void as i32
         let kind = self.ast.kind(type_node)
@@ -13999,7 +14001,7 @@ impl Sema:
             return SemaImplTargetMatch { 1, subst_names, subst_types }
         sema_impl_target_no_match()
 
-    fn impl_target_match_frozen(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
+    mut fn impl_target_match_frozen(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
         let subst_names: List[i32] = List.new()
         let subst_types: List[i32] = List.new()
         let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
@@ -14053,7 +14055,7 @@ impl Sema:
             return SemaImplTargetMatch { 1, subst_names, subst_types }
         sema_impl_target_no_match()
 
-    fn try_method_fn(carrier_ty: i32, method_sym: i32) -> i32:
+    mut fn try_method_fn(carrier_ty: i32, method_sym: i32) -> i32:
         let owner_sym = self.method_owner_symbol_for_type(carrier_ty)
         if owner_sym == 0:
             return 0
@@ -14062,7 +14064,7 @@ impl Sema:
             return direct
         self.lookup_generic_method_fn(owner_sym, method_sym)
 
-    fn deref_method_fn(source_ty: i32) -> i32:
+    mut fn deref_method_fn(source_ty: i32) -> i32:
         let owner_sym = self.method_owner_symbol_for_type(source_ty)
         if owner_sym == 0:
             return 0
@@ -14106,7 +14108,7 @@ impl Sema:
                 return target_actual
         self.resolve_type_node_with_subst(arg_node, source_ty, subst_names, subst_types)
 
-    fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    mut fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let arg_kind = self.ast.kind(arg_node)
         if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
             let arg_sym = self.ast.get_data0(arg_node)
@@ -14164,7 +14166,7 @@ impl Sema:
             return SemaDerefInfo { ok: 1, target_ty: concrete_target, result_ref_ty: concrete_result_ref, deref_fn }
         sema_deref_info_none()
 
-    fn resolve_user_deref_info_frozen(source_ty: i32) -> SemaDerefInfo:
+    mut fn resolve_user_deref_info_frozen(source_ty: i32) -> SemaDerefInfo:
         let deref_trait_name = "Deref"
         if source_ty == 0:
             return sema_deref_info_none()
@@ -14378,7 +14380,7 @@ impl Sema:
             return self.lookup_method_sig(named, method_sym) >= 0
         self.operator_candidate_for(tid, peer, method_sym).sig >= 0
 
-    fn type_has_operator_method(tid: i32, method_sym: i32) -> i32:
+    mut fn type_has_operator_method(tid: i32, method_sym: i32) -> i32:
         if tid == 0 or method_sym == 0:
             return 0
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(tid as TypeId))
@@ -16650,7 +16652,7 @@ impl Sema:
     // the iterator holds root in dying storage. A named receiver keeps the
     // ordinary origin tracking; a view-typed (&T) rvalue receiver borrows
     // something that outlives the statement and is not this hole.
-    fn expr_borrows_owned_temp_iter(node: i32) -> i32:
+    mut fn expr_borrows_owned_temp_iter(node: i32) -> i32:
         if node <= 0:
             return 0
         let kind = self.ast.kind(node)
@@ -16974,7 +16976,7 @@ impl Sema:
     // The generic type a bare name in an annotation names (`List`, `Option`,
     // a user `Pair`), or 0: a name with arguments, a non-generic type, or
     // anything that is not a plain name.
-    fn bare_generic_annotation(type_node: i32) -> i32:
+    mut fn bare_generic_annotation(type_node: i32) -> i32:
         if type_node == 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_NAMED:
             return 0
         let base = self.canonical_symbol_by_text(self.ast.get_data0(type_node))
@@ -17504,7 +17506,7 @@ impl Sema:
         self.comptime_callable_chain.insert(fn_sym, chain.clone())
         chain
 
-    fn fn_symbol_is_comptime(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_comptime(fn_sym: i32) -> i32:
         let fn_node = self.fn_symbol_decl_node(fn_sym)
         if fn_node == 0:
             return 0
@@ -17518,12 +17520,12 @@ impl Sema:
             return 1
         0
 
-    fn fn_symbol_decl_node(fn_sym: i32) -> i32:
+    mut fn fn_symbol_decl_node(fn_sym: i32) -> i32:
         if self.fn_decl_nodes.contains(fn_sym):
             return self.fn_decl_nodes.get(fn_sym).unwrap()
         self.generic_fn_node_for_symbol(fn_sym)
 
-    fn fn_symbol_source_path(fn_sym: i32) -> str:
+    mut fn fn_symbol_source_path(fn_sym: i32) -> str:
         if self.fn_decl_source_paths.contains(fn_sym):
             return with_str_clone_ref(self.fn_decl_source_paths.get(fn_sym).unwrap())
         let fn_node = self.fn_symbol_decl_node(fn_sym)
@@ -17537,7 +17539,7 @@ impl Sema:
     // The module whose code a body runs: a named function's declaring
     // module, or for a specialization its template's (#1766); "" when
     // neither is recorded.
-    fn fn_body_source_path(fn_sym: i32) -> str:
+    mut fn fn_body_source_path(fn_sym: i32) -> str:
         let declared = self.fn_symbol_source_path(fn_sym)
         if declared.len() > 0:
             return declared
@@ -17545,7 +17547,7 @@ impl Sema:
             return with_str_clone_ref(self.specialization_source_paths.get(fn_sym).unwrap())
         ""
 
-    fn fn_symbol_is_tool_comptime_allowed(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_tool_comptime_allowed(fn_sym: i32) -> i32:
         let source_path = self.fn_symbol_source_path(fn_sym)
         if capability_registry_is_std_build_path(source_path):
             return 1
@@ -17565,13 +17567,13 @@ fn sema_is_string_builder_comptime_method_name(name: &str) -> i32:
     0
 
 impl Sema:
-    fn fn_symbol_is_std_string_builder_comptime_allowed(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_std_string_builder_comptime_allowed(fn_sym: i32) -> i32:
         let source_path = self.fn_symbol_source_path(fn_sym)
         if not source_path.ends_with("string.w"):
             return 0
         sema_is_string_builder_comptime_method_name(self.pool_resolve(fn_sym))
 
-    fn fn_symbol_is_std_str_comptime_allowed(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_std_str_comptime_allowed(fn_sym: i32) -> i32:
         let source_path = self.fn_symbol_source_path(fn_sym)
         // D104 (#2225): every `impl str` method std.string spells with a With
         // body runs at compile time (the evaluator takes the user-method path
@@ -17604,7 +17606,7 @@ impl Sema:
     // `domain environ`).
     fn current_facade_is_runtime() -> bool: sema_path_is_runtime_implementation(self.decl_source_path_for_node(self.current_facade_node)) != 0
 
-    fn fn_is_in_unit_runtime_abi_def(fn_sym: i32) -> bool:
+    mut fn fn_is_in_unit_runtime_abi_def(fn_sym: i32) -> bool:
         sema_name_is_compiler_abi_extern(self.pool_resolve(fn_sym)) != 0 and sema_path_is_runtime_implementation(self.fn_symbol_source_path(fn_sym)) != 0
 
     mut fn check_comptime_call_restriction(fn_sym: i32, node: i32) -> i32:
@@ -17682,7 +17684,7 @@ impl Sema:
         xs.push(value)
         xs
 
-    fn collect_expr_view_deps(node: i32, out0: List[i32]) -> List[i32]:
+    mut fn collect_expr_view_deps(node: i32, out0: List[i32]) -> List[i32]:
         var out = out0
         if node == 0:
             return out
@@ -17892,7 +17894,7 @@ impl Sema:
             if arm != 0 and self.ast.get_data1(arm) != 0: bodies.push(self.ast.get_data1(arm))
         bodies
 
-    fn compute_expr_view_origin_mask(node: i32) -> i32:
+    mut fn compute_expr_view_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
         // Same D22 ownership boundary as collect_expr_view_deps.
@@ -18006,7 +18008,7 @@ impl Sema:
     // only the slot the inner view was read from.
     // `node` is a view of a view: its recorded type, or for a binding its
     // declared type (a method receiver records the auto-dereferenced one).
-    fn node_is_view_of_view(node: i32) -> bool:
+    mut fn node_is_view_of_view(node: i32) -> bool:
         if self.type_is_view_of_view(self.typed_expr_types.get(node) ?? 0): return true
         self.ast.kind(node) == NodeKind.NK_IDENT and self.type_is_view_of_view(self.scope_lookup(self.ast.get_data0(node)))
 
@@ -18016,7 +18018,7 @@ impl Sema:
         self.get_type_kind(resolved) == TypeKind.TY_REF and self.type_is_view_handle(self.get_type_d0(resolved))
 
     // The parameters whose own storage the VALUE of `node` may point into.
-    fn compute_expr_storage_origin_mask(node: i32) -> i32:
+    mut fn compute_expr_storage_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
         if self.has_contextual_copy_adjustment(node) != 0:
@@ -18099,7 +18101,7 @@ impl Sema:
 
     // The parameters whose own storage the PLACE `node` lies in: a field
     // reached through a handle lies in what the handle's value views.
-    fn compute_place_storage_origin_mask(node: i32) -> i32:
+    mut fn compute_place_storage_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -18123,7 +18125,7 @@ impl Sema:
     // caller's (its origin bit says so), a local's are its own storage
     // mask; through a handle the pointee's contents are unknown, so the
     // handle's own answer stands.
-    fn compute_contents_storage_origin_mask(node: i32) -> i32:
+    mut fn compute_contents_storage_origin_mask(node: i32) -> i32:
         if node == 0:
             return 0
         // Behind a view of a view, the contents are what the inner view views.
@@ -18149,7 +18151,7 @@ impl Sema:
     // The storage a call argument hands the callee's parameter: a receiver
     // place (auto-dereferenced through a handle), any other argument by its
     // value — `&x` is x's storage, a reference local's is what it views.
-    fn arg_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
+    mut fn arg_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
         if is_receiver and self.node_is_view_of_view(arg):
             return 0
         if is_receiver and not self.type_is_view_handle(self.typed_expr_types.get(arg) ?? 0):
@@ -18159,7 +18161,7 @@ impl Sema:
     // What a call argument's parameter VIEWS, for a callee whose result
     // views only that: the receiver place's contents; the pointee's
     // contents behind `&place`; nothing behind a parameter handed on.
-    fn arg_viewed_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
+    mut fn arg_viewed_storage_origin_mask(arg: i32, is_receiver: bool) -> i32:
         if arg == 0:
             return 0
         if is_receiver:
@@ -18235,7 +18237,7 @@ impl Sema:
                 return true
         false
 
-    fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &List[i32]):
+    mut fn record_transparent_view_origins_from_nodes(result_node: i32, source_nodes: &List[i32]):
         if result_node == 0 or self.has_contextual_copy_adjustment(result_node) != 0:
             return
         var param_mask: i32 = 0
@@ -18379,7 +18381,7 @@ impl Sema:
 
     // A struct/enum pattern on a by-value Drop subject is the #1272 disarm (or
     // an error already reported): it takes the value apart, so it consumes.
-    fn pattern_disarms_drop_subject(node: i32, subject_type: i32) -> i32:
+    mut fn pattern_disarms_drop_subject(node: i32, subject_type: i32) -> i32:
         if node == 0 or self.drop_pattern_owner_sym(subject_type) == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -18618,7 +18620,7 @@ impl Sema:
         self.set_expr_view_deps(node, mask, deps)
 
     // std.task's `Pulled[T]`, by the instance's recorded declaration.
-    fn type_is_std_pulled_inst(tid: i32) -> i32:
+    mut fn type_is_std_pulled_inst(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST or self.pool_resolve(self.get_type_d0(resolved)) != "Pulled":
             return 0
@@ -18722,7 +18724,7 @@ impl Sema:
                 return origin_sym
         0
 
-    fn expr_type_is_generator_state(expr_node: i32) -> i32:
+    mut fn expr_type_is_generator_state(expr_node: i32) -> i32:
         if expr_node == 0:
             return 0
         var tid = 0
@@ -18956,7 +18958,7 @@ impl Sema:
     // (emit_facade_invalidated_view_error). A binding that holds a resource
     // — a dependent child, a reference to the resource — is not a view of
     // its memory and is left alone (§27 is lifetime, not invalidation).
-    fn facade_apply_call_touches(fx: i32, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
+    mut fn facade_apply_call_touches(fx: i32, call_node: i32, sig_idx: i32, param_offset: i32, recv_node: i32, extra_start: i32, arg_count: i32, has_resolved: i32):
         let mask = self.facade_call_effects[fx].touch_params
         let param_count = self.sig_get_param_count(sig_idx)
         for pi in 0..param_count:
@@ -18997,7 +18999,7 @@ impl Sema:
             let d: i32 = self.facade_call_effects[fx].touch_domains[di]
             self.facade_poison_foreign_views(self.facade_domain_list[d].origin_sym, call_node, fx, -1)
 
-    fn facade_poison_foreign_views(origin_sym: i32, call_node: i32, fx: i32, pi: i32):
+    mut fn facade_poison_foreign_views(origin_sym: i32, call_node: i32, fx: i32, pi: i32):
         if origin_sym == 0:
             return
         for bi in 0..self.bind_names.len():
@@ -19343,7 +19345,7 @@ impl Sema:
             return
         self.emit_warning("string concatenation with ++ inside a loop repeatedly copies the accumulator; use StringBuilder or collect pieces and concatenate once", node)
 
-    fn assignment_target_value_type(node: i32, exact_type: i32) -> TypeId:
+    mut fn assignment_target_value_type(node: i32, exact_type: i32) -> TypeId:
         if node == 0 or exact_type == 0:
             return exact_type as TypeId
         let kind = self.ast.kind(node)
@@ -19885,7 +19887,7 @@ impl Sema:
     // A capture of a binding that names a place rather than a local of its
     // own is taken through a &T (MirLower's closure_capture_source); make sure
     // that type exists before types freeze.
-    fn ensure_capture_ref_types(syms: &List[i32]):
+    mut fn ensure_capture_ref_types(syms: &List[i32]):
         for si in 0..syms.len():
             let ty = self.scope_lookup(syms[si])
             if ty > 0:
@@ -20260,7 +20262,7 @@ impl Sema:
     // is an `@[iter_of_self]` method, so its elements are views of the
     // collection (what for_iterable_yields_views answers for the spelled
     // call).
-    fn implicit_iter_yields_views(key_node: i32) -> i32:
+    mut fn implicit_iter_yields_views(key_node: i32) -> i32:
         let iter_fn: i32 = self.for_iter_fn_syms.get(key_node) ?? 0
         if iter_fn == 0:
             return 0
@@ -20271,7 +20273,7 @@ impl Sema:
     // record_view_producer_origins records them for the spelled call: the
     // parameter mask, the collected deps, else the iterated place's root (a
     // local collection, so `&x.field` cannot escape).
-    fn record_for_binding_view_origins(sym: i32, iterable: i32):
+    mut fn record_for_binding_view_origins(sym: i32, iterable: i32):
         let param_mask = self.compute_expr_view_origin_mask(iterable)
         var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(iterable, move deps)
@@ -20308,7 +20310,7 @@ impl Sema:
     // when `sym` is not a loop view binding. The innermost binding wins.
     // End the loop views registered since `count` (a comprehension's generator
     // clauses, #1734).
-    fn truncate_for_view_bindings(count: i32):
+    mut fn truncate_for_view_bindings(count: i32):
         while self.for_view_binding_syms.len() > count:
             self.for_view_binding_syms.pop()
             self.for_view_binding_depths.pop()
@@ -20349,7 +20351,7 @@ impl Sema:
     // The place a `for` reads on every iteration: the iterable itself when it
     // is a place, the receiver when it is a spelled view-iterator call
     // (`xs.iter()`, `m.keys()`); 0 for a temporary or a range.
-    fn for_iterated_place(iterable: i32) -> i32:
+    mut fn for_iterated_place(iterable: i32) -> i32:
         var node = iterable
         while node != 0 and self.ast.kind(node) == NodeKind.NK_GROUPED:
             node = self.ast.get_data0(node)
@@ -20486,7 +20488,7 @@ impl Sema:
                     return raw_ret
         self.ensure_result_type_for(raw_ret, err_ty)
 
-    fn optional_chain_wrap_result_for_error_type_frozen(raw_ret: i32, err_ty: i32) -> i32:
+    mut fn optional_chain_wrap_result_for_error_type_frozen(raw_ret: i32, err_ty: i32) -> i32:
         let rr = self.resolve_alias(raw_ret as TypeId)
         if self.get_type_kind(rr) == TypeKind.TY_GENERIC_INST and self.get_type_d0(rr) == self.syms.result:
             if self.get_generic_inst_arg_count(rr as i32) == 2:
@@ -20525,7 +20527,7 @@ impl Sema:
             return base
         self.optional_chain_wrap_result_for_error_type(f, err_ty)
 
-    fn optional_chain_result_type_frozen(base: i32, member: i32) -> i32:
+    mut fn optional_chain_result_type_frozen(base: i32, member: i32) -> i32:
         if base == 0:
             return base
         let payload = self.optional_chain_payload_type(base)
@@ -20576,7 +20578,7 @@ impl Sema:
                 return ret
         0
 
-    fn optional_chain_method_raw_result_type_frozen(payload: i32, member: i32) -> i32:
+    mut fn optional_chain_method_raw_result_type_frozen(payload: i32, member: i32) -> i32:
         if payload == 0:
             return 0
         let recv_type = self.auto_deref_ref_ptr_type(payload as TypeId) as i32
@@ -20596,7 +20598,7 @@ impl Sema:
                 return ret
         0
 
-    fn optional_chain_wrap_result_type(raw_ret: i32) -> i32:
+    mut fn optional_chain_wrap_result_type(raw_ret: i32) -> i32:
         let rr = self.resolve_alias(raw_ret as TypeId)
         if self.get_type_kind(rr) == TypeKind.TY_GENERIC_INST:
             if self.get_type_d0(rr) == self.syms.option:
@@ -20632,7 +20634,7 @@ impl Sema:
             return 0
         self.optional_chain_wrap_result_for_error_type(raw_ret, err_ty)
 
-    fn optional_chain_method_result_type_no_check_frozen(base: i32, member: i32) -> i32:
+    mut fn optional_chain_method_result_type_no_check_frozen(base: i32, member: i32) -> i32:
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
             let raw_ret = self.optional_chain_method_raw_result_type_frozen(payload, member)
@@ -20795,7 +20797,7 @@ impl Sema:
     // #742: the compute-on-miss twin of this read is gone — its only callers
     // were codegen, which runs on a frozen Sema; eager_type_caches_pass fills
     // the generic field caches before freeze, and a miss here is loud.
-    fn struct_field_type_frozen(struct_type: i32, field: i32) -> i32:
+    mut fn struct_field_type_frozen(struct_type: i32, field: i32) -> i32:
         if struct_type == 0:
             return 0
 
@@ -20905,7 +20907,7 @@ impl Sema:
                 return self.ty_i64 as i32
         0
 
-    fn field_access_type_direct_frozen(field_base: TypeId, field: i32) -> i32:
+    mut fn field_access_type_direct_frozen(field_base: TypeId, field: i32) -> i32:
         let ftk = self.get_type_kind(field_base)
         if ftk == TypeKind.TY_STRUCT or ftk == TypeKind.TY_GENERIC_INST:
             return self.struct_field_type_frozen(field_base as i32, field)
@@ -20925,7 +20927,7 @@ impl Sema:
                 return self.ty_i64 as i32
         0
 
-    fn autoderef_record_steps(expr: i32, step_fns: &List[i32], step_tys: &List[i32]):
+    mut fn autoderef_record_steps(expr: i32, step_fns: &List[i32], step_tys: &List[i32]):
         if with_getenv_str("WITH_DEBUG_DEREF").len() > 0:
             with_eprint(f"[deref-record] expr={expr} steps={step_fns.len()}")
         if expr == 0:
@@ -20953,14 +20955,14 @@ impl Sema:
             return 1
         0
 
-    fn autoderef_type_has_field_frozen(ty: TypeId, field: i32) -> i32:
+    mut fn autoderef_type_has_field_frozen(ty: TypeId, field: i32) -> i32:
         if self.field_access_type_direct_frozen(ty, field) != 0:
             return 1
         if self.get_type_kind(ty) == TypeKind.TY_ENUM and self.enum_has_variant(ty as i32, field) != 0:
             return 1
         0
 
-    fn autoderef_type_has_method(ty: TypeId, method: i32) -> i32:
+    mut fn autoderef_type_has_method(ty: TypeId, method: i32) -> i32:
         if self.get_type_kind(ty) == TypeKind.TY_REF:
             return 0
         if self.enum_accessor_variant_for_method(ty as i32, method) != 0:
@@ -21048,7 +21050,7 @@ impl Sema:
         self.emit_error("auto-deref cycle through Deref implementation", node)
         current
 
-    fn autoderef_next_type_frozen(current: TypeId) -> TypeId:
+    mut fn autoderef_next_type_frozen(current: TypeId) -> TypeId:
         let tk = self.get_type_kind(current)
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let inner = self.get_type_d0(current)
@@ -21060,7 +21062,7 @@ impl Sema:
             return current
         self.resolve_alias(deref_info.result_ref_ty as TypeId)
 
-    fn auto_deref_method_type_frozen(tid: TypeId, method: i32) -> TypeId:
+    mut fn auto_deref_method_type_frozen(tid: TypeId, method: i32) -> TypeId:
         var current = self.resolve_alias(tid)
         let seen: List[i32] = List.new()
         var depth = 0
@@ -21120,7 +21122,7 @@ impl Sema:
         self.ast.get_extra(lit_extra)
 
     // Record (or update) the last-written union field for a tracked variable.
-    fn union_set_last_written(var_sym: i32, field_sym: i32):
+    mut fn union_set_last_written(var_sym: i32, field_sym: i32):
         if not self.union_last_written.contains(var_sym):
             self.union_tracked_syms.push(var_sym)
         self.union_last_written.insert(var_sym, field_sym)
@@ -21130,7 +21132,7 @@ impl Sema:
     // (0) so subsequent reads conservatively require unsafe. Entries stay present
     // (tracked) rather than removed, so the unknown state is enforced. Iteration is
     // over the insertion-ordered List to keep codegen deterministic.
-    fn union_clear_last_written():
+    mut fn union_clear_last_written():
         for i in 0..self.union_tracked_syms.len():
             self.union_last_written.insert(self.union_tracked_syms[i], 0)
 
@@ -21312,7 +21314,7 @@ impl Sema:
         // this node to a normal NK_FIELD_ACCESS.
         0
 
-    fn index_expr_is_type_level(expr: i32) -> bool:
+    mut fn index_expr_is_type_level(expr: i32) -> bool:
         if expr == 0:
             return false
         let kind = self.ast.kind(expr)
@@ -21510,7 +21512,7 @@ impl Sema:
         self.emit_error(f"type '{indexed_name}' cannot be indexed: it is not a positional collection and implements no IndexPlace", node)
         0
 
-    fn is_runtime_multi_index_node(node: i32) -> i32:
+    mut fn is_runtime_multi_index_node(node: i32) -> i32:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_MULTI_INDEX:
             return 1
@@ -22250,7 +22252,7 @@ impl Sema:
     // resolved tid, not a fresh symbol lookup — with a shadowed sym the flat
     // type_decl_nodes map holds the newest (user) decl, and std-internal
     // literals would be validated against the user's field list.
-    fn struct_literal_decl_node(name: i32, tid: i32) -> i32:
+    mut fn struct_literal_decl_node(name: i32, tid: i32) -> i32:
         if tid != 0:
             let resolved = self.resolve_alias(tid as TypeId) as i32
             if self.type_decl_nodes_by_tid.contains(resolved):
@@ -23115,7 +23117,7 @@ impl Sema:
         0
 
     // Field count of a struct (or generic struct instance); -1 otherwise.
-    fn exh_struct_field_count(ty: i32) -> i32:
+    mut fn exh_struct_field_count(ty: i32) -> i32:
         let r = self.resolve_alias(ty as TypeId)
         let tk = self.get_type_kind(r)
         if tk == TypeKind.TY_STRUCT:
@@ -23126,7 +23128,7 @@ impl Sema:
                 return self.get_type_d2(self.resolve_alias(base_tid as TypeId))
         -1
 
-    fn exh_class(ty: i32) -> SemaExhClass:
+    mut fn exh_class(ty: i32) -> SemaExhClass:
         if ty == 0:
             return SemaExhClass.Open
         let tk = self.get_type_kind(ty as TypeId)
@@ -23193,7 +23195,7 @@ impl Sema:
         out.push(h)
         out
 
-    fn exh_constructor_count(cls: SemaExhClass, ty: i32) -> i32:
+    mut fn exh_constructor_count(cls: SemaExhClass, ty: i32) -> i32:
         if cls == SemaExhClass.Bool:
             return 2
         if cls == SemaExhClass.Enum:
@@ -23202,7 +23204,7 @@ impl Sema:
 
     // The variant a variant pattern names, compared unqualified; the
     // for-comprehension markers name Some/Ok and None/Err (check_pattern).
-    fn exh_variant_name(h: i32, ty: i32) -> i32:
+    mut fn exh_variant_name(h: i32, ty: i32) -> i32:
         let name = self.ast.get_data0(h)
         let text = self.pool_resolve(name)
         if text == "_Payload":
@@ -23214,7 +23216,7 @@ impl Sema:
     // Which constructor of the column a head pattern is; -1 for a pattern
     // that tests a value without being a constructor (a literal, a named
     // constant, a regex): it covers no constructor as a whole.
-    fn exh_constructor_of(h: i32, cls: SemaExhClass, ty: i32) -> i32:
+    mut fn exh_constructor_of(h: i32, cls: SemaExhClass, ty: i32) -> i32:
         let k = self.ast.kind(h)
         if cls == SemaExhClass.Bool:
             if k != NodeKind.NK_PAT_BOOL:
@@ -23254,7 +23256,7 @@ impl Sema:
 
     // The sub-patterns a head pattern of constructor `ctor` gives each of
     // its `arity` fields; 0 (a catch-all) for a field it leaves unstated.
-    fn exh_constructor_fields(h: i32, cls: SemaExhClass, ty: i32, arity: i32) -> List[i32]:
+    mut fn exh_constructor_fields(h: i32, cls: SemaExhClass, ty: i32, arity: i32) -> List[i32]:
         let out: List[i32] = List.new()
         if h == 0:
             for _ in 0..arity:
@@ -23347,7 +23349,7 @@ impl Sema:
             return if self.ast.get_data2(h) != 0: hi else: hi - 1
         0
 
-    fn exh_render(cls: SemaExhClass, ty: i32, ctor: i32, fields: &List[str]) -> str:
+    mut fn exh_render(cls: SemaExhClass, ty: i32, ctor: i32, fields: &List[str]) -> str:
         if cls == SemaExhClass.Bool:
             return if ctor != 0: "true" else: "false"
         var parts = ""
@@ -23772,7 +23774,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_payload_subst_tys
         result
 
-    fn resolve_generic_enum_payload_frozen(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> List[i32]:
+    mut fn resolve_generic_enum_payload_frozen(gi_tid: i32, base_sym: i32, variant_name: i32, expected_count: i32) -> List[i32]:
         let resolved = self.resolve_alias(gi_tid)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.get_generic_inst_base(resolved as i32) != base_sym:
             sema_phase_bug("BUG: resolve_generic_enum_payload_frozen received the wrong generic instance")
@@ -23959,7 +23961,7 @@ impl Sema:
             out_variants.push(path_variants[(best_start + pi)])
         ErrorConversionChain { 1, ambiguous, best_first_variant, other_first_variant, out_types, out_variants }
 
-    fn error_conversion_chain_frozen(target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
+    mut fn error_conversion_chain_frozen(target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
         if target_err_ty <= 0 or source_err_ty <= 0:
             return error_conversion_chain_not_found()
         if self.error_conversion_type_matches(target_err_ty, source_err_ty) != 0:
@@ -24101,7 +24103,7 @@ impl Sema:
                 pos = pos + 2 + payload_count
         result
 
-    fn enum_variant_payload_types_frozen(enum_tid: i32, variant_name: i32) -> List[i32]:
+    mut fn enum_variant_payload_types_frozen(enum_tid: i32, variant_name: i32) -> List[i32]:
         var result: List[i32] = List.new()
         let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
         let resolved = self.resolve_alias(enum_tid)
@@ -24192,7 +24194,7 @@ fn sema_accessor_snake_name(name: &str) -> str:
     result
 
 impl Sema:
-    fn enum_variant_decl_type(enum_tid: i32) -> i32:
+    mut fn enum_variant_decl_type(enum_tid: i32) -> i32:
         if enum_tid == 0:
             return 0
         let resolved = self.resolve_alias(enum_tid)
@@ -24205,7 +24207,7 @@ impl Sema:
                 return self.resolve_alias(base_tid as TypeId) as i32
         0
 
-    fn enum_accessor_variant_for_method(enum_tid: i32, method_sym: i32) -> i32:
+    mut fn enum_accessor_variant_for_method(enum_tid: i32, method_sym: i32) -> i32:
         let enum_decl = self.enum_variant_decl_type(enum_tid)
         if enum_decl == 0:
             return 0
@@ -24230,7 +24232,7 @@ impl Sema:
 
     // 1 = is_variant, 2 = as_variant by value, 3 = as_variant_ref by shared ref,
     // 4 = as_variant_mut by exclusive ref.
-    fn enum_accessor_kind_for_method(enum_tid: i32, method_sym: i32) -> i32:
+    mut fn enum_accessor_kind_for_method(enum_tid: i32, method_sym: i32) -> i32:
         let variant_sym = self.enum_accessor_variant_for_method(enum_tid, method_sym)
         if variant_sym == 0:
             return 0
@@ -24246,7 +24248,7 @@ impl Sema:
             return 4
         0
 
-    fn enum_variant_index_for_type(enum_tid: i32, variant_sym: i32) -> i32:
+    mut fn enum_variant_index_for_type(enum_tid: i32, variant_sym: i32) -> i32:
         let enum_decl = self.enum_variant_decl_type(enum_tid)
         if enum_decl == 0 or variant_sym == 0:
             return -1
@@ -24267,7 +24269,7 @@ impl Sema:
     // declares it `None | Some(T)`; codegen, which builds and tests Options
     // knowing only their LLVM type, asks here instead of assuming an order.
     // Option is not a repr enum: a variant's discriminant is its index.
-    fn std_option_variant_index(variant_sym: i32) -> i32:
+    mut fn std_option_variant_index(variant_sym: i32) -> i32:
         var i = self.named_type_candidate_head(self.syms.option)
         while i >= 0:
             let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -24279,11 +24281,11 @@ impl Sema:
 
     // The tag of that variant: its discriminant, which is not its index
     // under WITH_DEBUG_PERMUTE_TAGS. -1 without an Option.
-    fn std_option_variant_tag(variant_sym: i32) -> i64: self.std_generic_enum_variant_tag(self.syms.option, variant_sym)
+    mut fn std_option_variant_tag(variant_sym: i32) -> i64: self.std_generic_enum_variant_tag(self.syms.option, variant_sym)
 
     // The tag of a variant of std's generic enum `enum_sym` (Option,
     // Result): its discriminant. -1 when the program has no such enum.
-    fn std_generic_enum_variant_tag(enum_sym: i32, variant_sym: i32) -> i64:
+    mut fn std_generic_enum_variant_tag(enum_sym: i32, variant_sym: i32) -> i64:
         var i = self.named_type_candidate_head(enum_sym)
         while i >= 0:
             let tid = self.resolve_alias(self.named_type_candidate_tids[i] as TypeId) as i32
@@ -24298,7 +24300,7 @@ impl Sema:
     // discriminant (`B = -3`), so there is no "absent" value: a caller asks
     // enum_variant_index_for_type whether the variant exists (a -1 sentinel
     // here read `B = -3` as absent and lowered it as its index 1, #1451).
-    fn enum_variant_discriminant_for_type(enum_tid: i32, variant_sym: i32) -> i64:
+    mut fn enum_variant_discriminant_for_type(enum_tid: i32, variant_sym: i32) -> i64:
         let enum_decl = self.enum_variant_decl_type(enum_tid)
         let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
         let index = if enum_decl == 0: -1 else: self.enum_variant_index_for_type(enum_decl, bare_variant_sym)
@@ -24314,7 +24316,7 @@ impl Sema:
     // Option.is_none; two repr enums with an `X` shared one value).
     // The variant of the payload-free enum `tid` whose discriminant is
     // `disc`, or 0: `tid` is no such enum, or no variant has that value.
-    fn enum_variant_sym_for_discriminant(tid: i32, disc: i64) -> i32:
+    mut fn enum_variant_sym_for_discriminant(tid: i32, disc: i64) -> i32:
         if tid <= 0: return 0
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_ENUM or self.disc_has_payload.contains(resolved): return 0
@@ -24328,7 +24330,7 @@ impl Sema:
 
     // The tag of variant `index` of `enum_tid` (an enum or an instance of a
     // generic one): what codegen stores and tests, asked here (D65).
-    fn enum_variant_discriminant_by_index(enum_tid: i32, index: i32) -> i64:
+    mut fn enum_variant_discriminant_by_index(enum_tid: i32, index: i32) -> i64:
         let decl = self.enum_variant_decl_type(enum_tid)
         if decl == 0:
             sema_phase_bug(f"BUG: codegen asked a tag of type {enum_tid}, which declares no variants")
@@ -24392,7 +24394,7 @@ impl Sema:
                 let _ = self.check_expr_value_context(arg_node)
                 self.mark_moved_if_consumed(arg_node)
 
-    fn expected_variant_constructor_type(variant_name: i32) -> i32:
+    mut fn expected_variant_constructor_type(variant_name: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0:
             return 0
         let expected = self.resolve_alias(self.expected_expr_type)
@@ -24413,13 +24415,13 @@ impl Sema:
     // The expected type's instance of `enum_tid` for `Enum.Variant`: only an
     // instance of this enum types the variant (another enum sharing the
     // variant name does not).
-    fn expected_variant_instance_of(enum_tid: i32, variant_name: i32) -> i32:
+    mut fn expected_variant_instance_of(enum_tid: i32, variant_name: i32) -> i32:
         let expected = self.expected_variant_constructor_type(variant_name)
         if expected == 0 or self.enum_pattern_owner_sym(expected) != self.enum_pattern_owner_sym(enum_tid):
             return 0
         expected
 
-    fn qualified_enum_variant_sym(enum_tid: i32, variant_name: i32) -> i32:
+    mut fn qualified_enum_variant_sym(enum_tid: i32, variant_name: i32) -> i32:
         if enum_tid == 0 or variant_name == 0:
             return variant_name
         let bare_variant_name = self.unqualified_enum_variant_sym(variant_name)
@@ -24499,7 +24501,7 @@ impl Sema:
 
     // Whether the receiver's type declares a method of this exact name, by
     // the owner mapping the method-call checker itself resolves through.
-    fn type_has_method_named(recv_ty: i32, method_sym: i32) -> bool:
+    mut fn type_has_method_named(recv_ty: i32, method_sym: i32) -> bool:
         let owner = self.method_owner_symbol_for_type(recv_ty)
         if owner != 0 and self.lookup_method_sig(owner, method_sym) >= 0: return true
         // A generic owner's methods (`impl[T] List[T]`) live in the generic table.
@@ -24529,7 +24531,7 @@ impl Sema:
             return -1
         self.get_type_d1(resolved)
 
-    fn pattern_child_subject_type(parent_subject_type: i32, child_type: i32) -> i32:
+    mut fn pattern_child_subject_type(parent_subject_type: i32, child_type: i32) -> i32:
         if child_type == 0:
             return 0
         let ref_mut = self.pattern_subject_ref_mutability(parent_subject_type)
@@ -24601,7 +24603,7 @@ impl Sema:
         self.emit_error_with_help("cannot destructure `" ++ type_text ++ "` by pattern: `" ++ type_text ++ "` implements Drop, and taking it apart would skip its destructor", node, "keep it whole (`let t = " ++ subject_text ++ "`) or " ++ read_hint ++ "; only a `move fn` of `" ++ type_text ++ "` may take it apart")
         -1
 
-    fn drop_pattern_owner_sym(subject_type: i32) -> i32:
+    mut fn drop_pattern_owner_sym(subject_type: i32) -> i32:
         if subject_type == 0:
             return 0
         let resolved = self.resolve_alias(subject_type as TypeId)
@@ -24611,7 +24613,7 @@ impl Sema:
         if kind == TypeKind.TY_GENERIC_INST: self.get_generic_inst_base(resolved as i32) else: self.get_type_name(resolved)
 
     // The owner type of the enclosing method when it is a `move fn`; 0 otherwise.
-    fn enclosing_move_fn_owner() -> i32:
+    mut fn enclosing_move_fn_owner() -> i32:
         if self.current_fn_symbol == 0:
             return 0
         let si = self.get_sig(self.current_fn_symbol)
@@ -25251,7 +25253,7 @@ impl Sema:
     // The name a call-once diagnostic gives a callee: a facade's free
     // callback bridge under the name the program calls it by, not the
     // rendered `__with_facade_<name>`.
-    fn call_once_callee_name(callee_sym: i32) -> str:
+    mut fn call_once_callee_name(callee_sym: i32) -> str:
         let mi = self.facade_callback_method_for(callee_sym)
         if mi >= 0 and self.facade_callback_methods[mi].receiver_params == 0:
             return self.facade_presented_free_name(self.facade_callback_methods[mi].contract)
@@ -26457,7 +26459,7 @@ impl Sema:
                 return ret_ty
         rhs_ty as i32
 
-    fn pipeline_method_has_mut_receiver(node: i32, recv_type: i32, method: i32) -> i32:
+    mut fn pipeline_method_has_mut_receiver(node: i32, recv_type: i32, method: i32) -> i32:
         let resolved_sig = self.resolved_call_sigs.get(node)
         if resolved_sig.is_some():
             return if self.sig_receiver_mode(resolved_sig.unwrap()) == ReceiverMode.Mut: 1 else: 0
@@ -27413,12 +27415,12 @@ impl Sema:
             return 1
         0
 
-    fn store_unit_elided_call_arg(call_node: i32):
+    mut fn store_unit_elided_call_arg(call_node: i32):
         let args: List[i32] = List.new()
         args.push(0)
         self.store_resolved_call_args(call_node, args)
 
-    fn try_unit_elide_call_arg(call_node: i32, arg_count: i32, expected_ty: i32) -> i32:
+    mut fn try_unit_elide_call_arg(call_node: i32, arg_count: i32, expected_ty: i32) -> i32:
         if arg_count != 0:
             return 0
         if self.ast.has_call_named_args(call_node) != 0:
@@ -27799,7 +27801,7 @@ impl Sema:
 
     // Whether the current module may name the type `sym` module `path`
     // declares (its `pub`), for a namespaced type annotation.
-    fn named_type_visible_in(sym: i32, path: &str) -> bool:
+    mut fn named_type_visible_in(sym: i32, path: &str) -> bool:
         var i = self.named_type_candidate_head(sym)
         while i >= 0:
             if self.named_type_candidate_paths[i] == path:
@@ -28950,7 +28952,7 @@ impl Sema:
             self.emit_error("value is not callable", callee)
         0
 
-    fn store_resolved_call_args(call_node: i32, args: &List[i32]):
+    mut fn store_resolved_call_args(call_node: i32, args: &List[i32]):
         let start = self.call_resolved_args_data.len() as i32
         let count = args.len() as i32
         for i in 0..count:
@@ -28961,7 +28963,7 @@ impl Sema:
     fn resolved_call_arg_key(call_node: i32, idx: i32) -> i64:
         (call_node as i64) * 4294967296 + idx as i64
 
-    fn mark_resolved_call_arg_default(call_node: i32, idx: i32):
+    mut fn mark_resolved_call_arg_default(call_node: i32, idx: i32):
         self.call_resolved_default_arg_keys.insert(self.resolved_call_arg_key(call_node, idx), 1)
 
     fn resolved_call_arg_is_default(call_node: i32, idx: i32) -> i32:
@@ -29166,7 +29168,7 @@ impl Sema:
             self.emit_error(f"{what} '{callee_name}' expects {shown_min}-{shown_max} argument(s), found {shown_actual}", node)
         false
 
-    fn fn_min_expected_arg_count(fn_sym: i32, fallback_expected: i32) -> i32:
+    mut fn fn_min_expected_arg_count(fn_sym: i32, fallback_expected: i32) -> i32:
         if fallback_expected <= 0:
             return fallback_expected
         // #2002: a generic method's declaration is its generic fn node.
@@ -29506,7 +29508,7 @@ impl Sema:
     // a name in `expr`, the List of its element with that name's position at
     // `want` and the other positions as already decided. 0 when the demand
     // adds nothing to the decision in force.
-    fn int_local_demand_type(decl: i32, want: i32, expr: i32) -> i32:
+    mut fn int_local_demand_type(decl: i32, want: i32, expr: i32) -> i32:
         if not self.list_literal_let(decl): return want
         let positions = self.iter_binding_positions_in(expr, decl)
         if positions.len() == 0:
@@ -29543,7 +29545,7 @@ impl Sema:
     // Whether a demand of `want` on `expr` still has something to decide
     // about the local `decl` (a literal walked by a tuple pattern is decided
     // one position at a time).
-    fn int_local_undecided(decl: i32, want: i32, expr: i32) -> bool:
+    mut fn int_local_undecided(decl: i32, want: i32, expr: i32) -> bool:
         if not self.int_local_decisions.contains(decl): return true
         self.list_literal_let(decl) and self.int_local_demand_type(decl, want, expr) != 0
 
@@ -29931,7 +29933,7 @@ impl Sema:
         self.has_expected_type = saved_has
         out
 
-    fn enum_has_variant(enum_tid: i32, variant_sym: i32) -> i32:
+    mut fn enum_has_variant(enum_tid: i32, variant_sym: i32) -> i32:
         let resolved = self.resolve_alias(enum_tid)
         let resolved_kind = self.get_type_kind(resolved)
         let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
@@ -29955,7 +29957,7 @@ impl Sema:
 
     // The first variant of enum `enum_tid` that carries a payload, or 0 when
     // every variant is a unit variant (§4.4a from_int, #1497).
-    fn enum_first_payload_variant(enum_tid: i32) -> i32:
+    mut fn enum_first_payload_variant(enum_tid: i32) -> i32:
         let resolved = self.resolve_alias(enum_tid)
         if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             let base_tid = self.generic_inst_template_tid(resolved)
@@ -29970,7 +29972,7 @@ impl Sema:
             pos = pos + 2 + payload_count
         0
 
-    fn enum_pattern_owner_sym(type_id: i32) -> i32:
+    mut fn enum_pattern_owner_sym(type_id: i32) -> i32:
         if type_id == 0:
             return 0
         let resolved = self.resolve_alias(type_id)
@@ -29985,7 +29987,7 @@ impl Sema:
                     return base_sym
         0
 
-    fn enum_pattern_type(type_id: i32) -> i32:
+    mut fn enum_pattern_type(type_id: i32) -> i32:
         if type_id == 0:
             return 0
         let resolved = self.resolve_alias(type_id)
@@ -30575,7 +30577,7 @@ impl Sema:
         self.generic_subst_type_ids = saved_generic_call_subst_tys
         resolved_ret
 
-    fn clear_generic_substitution():
+    mut fn clear_generic_substitution():
         while self.generic_subst_param_syms.len() > 0:
             self.generic_subst_param_syms.pop()
             self.generic_subst_type_ids.pop()
@@ -30626,7 +30628,7 @@ impl Sema:
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.offsetof_owner_types.get(node) ?? 0
 
-    fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
+    mut fn type_level_arg_in_body(body_sym: i32, type_node: i32) -> i32:
         if self.concrete_specialization_by_sym.contains(body_sym):
             return self.specialization_type_args.get(sema_pair_key(body_sym, type_node)) ?? 0
         self.resolve_type_level_arg_expr_frozen(type_node)
@@ -30787,7 +30789,7 @@ impl Sema:
 
     // Whether parameter `pi` of the generic `fn_sym` is a bare type parameter
     // whose bounds name Display (`print[T: Display](v: T)`, §18.2).
-    fn generic_param_bounded_by_display(fn_sym: i32, pi: i32) -> i32:
+    mut fn generic_param_bounded_by_display(fn_sym: i32, pi: i32) -> i32:
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         if fn_node == 0:
             return 0
@@ -30834,7 +30836,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         0
 
-    fn impl_target_bare_type_param(impl_node: i32, sym: i32) -> i32:
+    mut fn impl_target_bare_type_param(impl_node: i32, sym: i32) -> i32:
         if impl_node == 0 or sym == 0:
             return 0
         if self.primitive_type_by_sym(sym) != 0:
@@ -30856,7 +30858,7 @@ impl Sema:
                     return 1
         0
 
-    fn impl_target_has_bare_type_params(impl_node: i32) -> i32:
+    mut fn impl_target_has_bare_type_params(impl_node: i32) -> i32:
         if impl_node == 0:
             return 0
         let target_node = self.ast.find_impl_target_type_node(impl_node as NodeId)
@@ -30873,7 +30875,7 @@ impl Sema:
                     return 1
         0
 
-    fn type_param_exists_in_impl_context(tp_start: i32, tp_count: i32, impl_node: i32, sym: i32) -> i32:
+    mut fn type_param_exists_in_impl_context(tp_start: i32, tp_count: i32, impl_node: i32, sym: i32) -> i32:
         if self.type_param_exists(tp_start, tp_count, sym) != 0:
             return 1
         self.impl_target_bare_type_param(impl_node, sym)
@@ -31260,7 +31262,7 @@ impl Sema:
     // syms. Direct impl records must come from the tid's own tier; blanket
     // impls apply across tiers (a bound-generic impl is not name-keyed).
     // Uncached — the flat selection_cache would conflate the two meanings.
-    fn select_trait_impl_tiered(type_sym: i32, trait_sym: i32, want_std: i32) -> i32:
+    mut fn select_trait_impl_tiered(type_sym: i32, trait_sym: i32, want_std: i32) -> i32:
         if self.impl_lookup.contains(type_sym):
             let idx = self.impl_lookup.get(type_sym).unwrap()
             let start = self.impl_starts[idx]
@@ -31294,7 +31296,7 @@ impl Sema:
         self.blanket_guard.remove(key)
         found
 
-    fn select_trait_impl(type_sym: i32, trait_sym: i32) -> i32:
+    mut fn select_trait_impl(type_sym: i32, trait_sym: i32) -> i32:
         let key = self.selection_cache_key(type_sym, trait_sym)
         if let Some(cached) = self.selection_cache.get(key):
             return cached
@@ -31387,7 +31389,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         1
 
-    fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    mut fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
@@ -31523,7 +31525,7 @@ impl Sema:
     // Frozen read twin for codegen compatibility checks. Exact/direct trait answers are
     // read-only; generic blanket impl selection still depends on type-node resolution, so
     // hit that path loudly instead of silently guessing.
-    fn type_implements_trait_frozen(tid: i32, trait_sym: i32) -> i32:
+    mut fn type_implements_trait_frozen(tid: i32, trait_sym: i32) -> i32:
         if tid == 0 or trait_sym == 0:
             return 0
         let resolved = self.resolve_alias(tid)
@@ -31831,7 +31833,7 @@ impl Sema:
             return self.type_identity_symbol_for_tid(named, resolved as i32)
         self.dyn_arg_concrete_type_symbol(resolved as i32)
 
-    fn lookup_generic_method_fn(owner_sym: i32, method_sym: i32) -> i32:
+    mut fn lookup_generic_method_fn(owner_sym: i32, method_sym: i32) -> i32:
         let existing = self.lookup_method_fn(owner_sym, method_sym)
         if existing != 0 and self.generic_fn_node_for_symbol(existing) != 0:
             return existing
@@ -31859,7 +31861,7 @@ impl Sema:
             return qualified
         0
 
-    fn owner_inst_from_current_subst(owner_sym: i32, tp_start: i32, tp_count: i32) -> i32:
+    mut fn owner_inst_from_current_subst(owner_sym: i32, tp_start: i32, tp_count: i32) -> i32:
         if tp_count == 0:
             return self.lookup_named_type_visible(owner_sym)
         let args: List[i32] = List.new()
@@ -32834,7 +32836,7 @@ impl Sema:
         out
 
     // The generic enum base behind a variant call's checked type, or 0.
-    fn pending_enum_base_of(val_type: i32) -> i32:
+    mut fn pending_enum_base_of(val_type: i32) -> i32:
         let resolved = self.resolve_alias(val_type as TypeId) as i32
         var base = 0
         var td_node: i32 = 0
@@ -32991,7 +32993,7 @@ impl Sema:
             return 0
         self.settle_pending_generic_binding(sym, inst, 0)
 
-    fn pending_generic_constructor_base(value: i32, val_type: i32) -> i32:
+    mut fn pending_generic_constructor_base(value: i32, val_type: i32) -> i32:
         if value == 0:
             return 0
         if self.ast.kind(value) == NodeKind.NK_GROUPED:
@@ -33217,7 +33219,7 @@ impl Sema:
             return 0
         original_sym
 
-    fn visible_builder_chain_root_matches(node: i32, original_sym: i32, builder_sym: i32) -> i32:
+    mut fn visible_builder_chain_root_matches(node: i32, original_sym: i32, builder_sym: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
             return 0
         let callee = self.ast.get_data0(node)
@@ -33235,7 +33237,7 @@ impl Sema:
             return 0
         self.visible_builder_chain_root_matches(recv, original_sym, builder_sym)
 
-    fn visible_builder_chain_has_setter(node: i32, builder_sym: i32, field_sym: i32) -> i32:
+    mut fn visible_builder_chain_has_setter(node: i32, builder_sym: i32, field_sym: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
             return 0
         let callee = self.ast.get_data0(node)
@@ -33271,12 +33273,12 @@ impl Sema:
                 return 0
         1
 
-    fn ensure_list_str_type() -> i32:
+    mut fn ensure_list_str_type() -> i32:
         let args: List[i32] = List.new()
         args.push(self.ty_str as i32)
         self.ensure_generic_inst_type(self.syms.list, args, 1) as i32
 
-    fn ensure_list_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_list_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.list, elem_ty)
         if found != 0:
             return found
@@ -33284,7 +33286,7 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.list, args, 1) as i32
 
-    fn ensure_listiter_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_listiter_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.listiter, elem_ty)
         if found != 0:
             return found
@@ -33346,7 +33348,7 @@ impl Sema:
         let owner = self.get_generic_inst_base(resolved as i32)
         0
 
-    fn ensure_handle_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_handle_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.handle, elem_ty)
         if found != 0:
             return found
@@ -33354,7 +33356,7 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.handle, args, 1) as i32
 
-    fn ensure_slotmapslot_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_slotmapslot_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.slotmapslot, elem_ty)
         if found != 0:
             return found
@@ -33381,7 +33383,7 @@ impl Sema:
         let elem = self.get_generic_inst_arg(recv_type, if name == "slot_key": 0 else: 1)
         self.ensure_exact_type(TypeKind.TY_REF, elem, 0, 0) as i32
 
-    fn ensure_option_ref_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_option_ref_type_for(elem_ty: i32) -> i32:
         let ref_ty = self.ensure_exact_type(TypeKind.TY_REF, elem_ty, 0, 0) as i32
         if ref_ty == 0:
             return 0
@@ -33436,7 +33438,7 @@ impl Sema:
             self.typed_expr_types.insert(node, result)
         result
 
-    fn ensure_option_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_option_type_for(elem_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.option, elem_ty)
         if found != 0:
             return found
@@ -33444,7 +33446,7 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.option, args, 1) as i32
 
-    fn ensure_result_type_for(ok_ty: i32, err_ty: i32) -> i32:
+    mut fn ensure_result_type_for(ok_ty: i32, err_ty: i32) -> i32:
         let args: List[i32] = List.new()
         args.push(ok_ty)
         args.push(err_ty)
@@ -33468,7 +33470,7 @@ impl Sema:
         args.push(err_ty)
         self.find_generic_inst_type(self.syms.result, args, 2) as i32
 
-    fn ensure_context_error_type_for(source_err_ty: i32) -> i32:
+    mut fn ensure_context_error_type_for(source_err_ty: i32) -> i32:
         let found = self.find_generic_inst(self.syms.context_error, source_err_ty)
         if found != 0:
             return found
@@ -33801,7 +33803,7 @@ impl Sema:
     fn is_collection_len_method(field: i32) -> bool:
         self.collection_len_method_return_type(self.pool_resolve(field)) != 0
 
-    fn ensure_listrange_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_listrange_type_for(elem_ty: i32) -> i32:
         let existing = self.find_generic_inst(self.syms.listrange, elem_ty)
         if existing != 0:
             return existing
@@ -33809,7 +33811,7 @@ impl Sema:
         args.push(elem_ty)
         self.ensure_generic_inst_type(self.syms.listrange, args, 1) as i32
 
-    fn ensure_listrange_pair_type_for(elem_ty: i32) -> i32:
+    mut fn ensure_listrange_pair_type_for(elem_ty: i32) -> i32:
         let range_ty = self.ensure_listrange_type_for(elem_ty)
         let elems: List[i32] = List.new()
         elems.push(range_ty)
@@ -34051,7 +34053,7 @@ impl Sema:
         let resolved = self.resolve_alias(elem as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_REF: self.get_type_d0(resolved) as i32 else: elem
 
-    fn builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
+    mut fn builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
         if recv_type == 0:
             return 0
         let resolved = self.resolve_alias(recv_type as TypeId)
@@ -34313,7 +34315,7 @@ impl Sema:
         // identifier arguments).
         self.resolve_parameter_type_expr(ty_node) as i32
 
-    fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
+    mut fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
             return 0
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
@@ -34884,7 +34886,7 @@ impl Sema:
             return 1
         0
 
-    fn find_dyn_trait_method_info(trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
+    mut fn find_dyn_trait_method_info(trait_sym: i32, method_sym: i32) -> SemaDynTraitMethodInfo:
         // #2520: the trait `dyn Name` means from this module, not the most
         // recently registered trait of that name.
         let trait_idx = self.lookup_trait_named(trait_sym)
@@ -35670,7 +35672,7 @@ impl Sema:
         0
 
     // A receiver that names a type, not a value (a local of that name wins).
-    fn receiver_names_type(expr: i32) -> bool:
+    mut fn receiver_names_type(expr: i32) -> bool:
         if expr == 0:
             return false
         let kind = self.ast.kind(expr)
@@ -35700,7 +35702,7 @@ impl Sema:
     // The lowering of a builtin method call (MethodLowering): the one table
     // MirLower's method dispatch reads. `raw` and `recv` are the receiver
     // type before and after auto-deref.
-    fn method_lowering_kind(raw: i32, recv: i32, expr: i32, field: i32, arg_count: i32, intrinsic: MirIntrinsic) -> MethodLowering:
+    mut fn method_lowering_kind(raw: i32, recv: i32, expr: i32, field: i32, arg_count: i32, intrinsic: MirIntrinsic) -> MethodLowering:
         let name = self.pool_resolve(field)
         if name == "as_option" and raw > 0 and self.get_type_kind(self.resolve_alias(raw as TypeId)) == TypeKind.TY_PTR:
             return MethodLowering.PtrAsOption
@@ -35756,7 +35758,7 @@ impl Sema:
 
     // The type a static receiver expression names (a local of the same
     // name is a value, not a type), or 0.
-    fn static_receiver_sema_base(expr: i32) -> i32:
+    mut fn static_receiver_sema_base(expr: i32) -> i32:
         if expr == 0:
             return 0
         let kind = self.ast.kind(expr)
@@ -35774,7 +35776,7 @@ impl Sema:
     // compiler-known containers are their interned symbols; a channel
     // endpoint and Atomic are std declarations (a user's own type of that
     // name is not one: `tid`'s template decides when it is known).
-    fn std_generic_of_base(base: i32, tid: i32) -> StdGeneric:
+    mut fn std_generic_of_base(base: i32, tid: i32) -> StdGeneric:
         if base == 0:
             return StdGeneric.None
         if base == self.syms.list: return StdGeneric.List
@@ -35800,7 +35802,7 @@ impl Sema:
         StdGeneric.None
 
     // The std generic a type is (through aliases, not through references).
-    fn std_generic_of(tid: i32) -> StdGeneric:
+    mut fn std_generic_of(tid: i32) -> StdGeneric:
         if tid <= 0:
             return StdGeneric.None
         let resolved = self.resolve_alias(tid as TypeId) as i32
@@ -36319,6 +36321,20 @@ impl Sema:
                 if self.place_base_is_read_only_ref(expr) != 0:
                     self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
                     return 0
+                // D172 (1), §9: a binding-rooted chain is read-only by its root
+                // (a plain `fn`'s receiver borrows immutably), which only
+                // classify_place knows: place_base_is_read_only_ref stops at
+                // an identifier root. The user `mut fn` path asks it; this one
+                // did not, so `fn grow(): self.xs.push(i)` grew the list while
+                // a caller held a view into it. The write is recorded before
+                // the refusal, so the receiver requirement names the `mut fn`.
+                if not element_place:
+                    let builtin_recv = self.classify_place(expr)
+                    if unpack_place_kind(builtin_recv) != PlaceKind.PK_NotPlace and unpack_place_mut(builtin_recv) == PlaceMut.PM_ReadOnly:
+                        self.note_place_effect(expr, EFF_WRITE)
+                        let message = self.read_only_mutation_message(expr, node)
+                        if message.len() > 0: self.emit_error(message, node) else: self.emit_builtin_mutable_receiver_error(type_name_sym, field, node)
+                        return 0
                 var deref_expr = expr
                 if self.ast.kind(deref_expr) == NodeKind.NK_GROUPED:
                     deref_expr = self.ast.get_data0(deref_expr)
@@ -37260,7 +37276,7 @@ impl Sema:
     // `TypeInfo` access or `std.builtins.drop`. audit:resolution reads this
     // answer for a MIR callee symbol that has no signature and no generic
     // template; MirLower's builtin branch must never lower anything else.
-    fn call_callee_is_builtin(node: i32) -> i32:
+    mut fn call_callee_is_builtin(node: i32) -> i32:
         if node <= 0 or node >= self.ast.node_count() or self.ast.kind(node) != NodeKind.NK_CALL:
             return 0
         if self.va_start_calls.contains(node) or self.va_arg_calls.contains(node):
@@ -37537,11 +37553,11 @@ impl Sema:
 
     // The named type a static receiver denotes: the import's type by
     // identity for a namespace-bound ident (#1757), else the visible one.
-    fn static_receiver_named_type(expr: i32, base_sym: i32) -> i32:
+    mut fn static_receiver_named_type(expr: i32, base_sym: i32) -> i32:
         let ns_tid = self.ast.namespace_bound_type(expr as NodeId)
         if ns_tid != 0: ns_tid else: self.lookup_named_type_visible(base_sym)
 
-    fn static_receiver_type_is_known(expr: i32) -> i32:
+    mut fn static_receiver_type_is_known(expr: i32) -> i32:
         let base_sym = self.static_receiver_base_sym(expr)
         if base_sym == 0:
             return 0
@@ -37560,7 +37576,7 @@ impl Sema:
             return 1
         0
 
-    fn type_reflection_field_count(tid: i32) -> i32:
+    mut fn type_reflection_field_count(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_STRUCT:
@@ -37576,7 +37592,7 @@ impl Sema:
     // user-spelled name: the D29 prelude gate must not hide the template
     // (#911 — an import-gated std generic reached via method return made
     // the eager cache pass preregister zero fields, then phase-bug).
-    fn type_reflection_base_template(base_sym: i32) -> i32:
+    mut fn type_reflection_base_template(base_sym: i32) -> i32:
         let visible = self.lookup_named_type_visible(base_sym)
         if visible != 0:
             return visible
@@ -37600,7 +37616,7 @@ impl Sema:
             i = self.named_type_candidate_next[i]
         only
 
-    fn type_reflection_field_name(tid: i32, field_index: i32) -> i32:
+    mut fn type_reflection_field_name(tid: i32, field_index: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_STRUCT:
@@ -37625,7 +37641,7 @@ impl Sema:
     // struct declaration `owner` names, through references and pointers;
     // -1 when the owner has no struct declaration with that field (a tuple,
     // a variant payload, a compiler-laid-out record keep their positions).
-    fn struct_field_decl_index(owner: i32, field: i32) -> i32:
+    mut fn struct_field_decl_index(owner: i32, field: i32) -> i32:
         var cur = if owner > 0: self.resolve_alias(owner as TypeId) as i32 else: 0
         for _ in 0..8:
             let kind = self.get_type_kind(cur as TypeId)
@@ -37653,14 +37669,14 @@ impl Sema:
 
     // The declaration node of a struct type or a generic instance's
     // template, or 0.
-    fn type_decl_node_of(tid: i32) -> i32:
+    mut fn type_decl_node_of(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST: return self.generic_inst_decl_node(resolved)
         self.type_decl_nodes_by_tid.get(resolved) ?? 0
 
     // A record with C's layout: declared by a c_import, or `@[repr(C)]`
     // (a migrated or hand-written mirror).
-    fn type_is_c_record(tid: i32) -> bool:
+    mut fn type_is_c_record(tid: i32) -> bool:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_STRUCT: return false
         let decl = self.type_decl_node_of(resolved)
@@ -37781,7 +37797,7 @@ impl Sema:
                 return ti as i32
         -1
 
-    fn type_reflection_field_type_frozen(tid: i32, field_index: i32) -> i32:
+    mut fn type_reflection_field_type_frozen(tid: i32, field_index: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_STRUCT:
@@ -37805,7 +37821,7 @@ impl Sema:
             sema_phase_bug("BUG: type_reflection_field_type_frozen generic-inst field type miss")
         0
 
-    fn type_reflection_variant_base(tid: i32) -> i32:
+    mut fn type_reflection_variant_base(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_ENUM:
@@ -37834,13 +37850,13 @@ impl Sema:
             pos = pos + 2 + payload_count
         -1
 
-    fn type_reflection_variant_count(tid: i32) -> i32:
+    mut fn type_reflection_variant_count(tid: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
         self.get_type_d2(base_tid)
 
-    fn type_reflection_variant_name(tid: i32, variant_index: i32) -> i32:
+    mut fn type_reflection_variant_name(tid: i32, variant_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -37849,7 +37865,7 @@ impl Sema:
             return 0
         self.type_extra[pos]
 
-    fn type_reflection_variant_payload_count(tid: i32, variant_index: i32) -> i32:
+    mut fn type_reflection_variant_payload_count(tid: i32, variant_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -37858,7 +37874,7 @@ impl Sema:
             return 0
         self.type_extra[(pos + 1)]
 
-    fn type_reflection_variant_discriminant(tid: i32, variant_index: i32) -> i64:
+    mut fn type_reflection_variant_discriminant(tid: i32, variant_index: i32) -> i64:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -37885,7 +37901,7 @@ impl Sema:
                     return payload_tid
         self.type_extra[(pos + 2 + payload_index)]
 
-    fn type_reflection_variant_payload_type_frozen(tid: i32, variant_index: i32, payload_index: i32) -> i32:
+    mut fn type_reflection_variant_payload_type_frozen(tid: i32, variant_index: i32, payload_index: i32) -> i32:
         let base_tid = self.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -38107,7 +38123,7 @@ impl Sema:
     // are_borrows_disjoint_paths reads paths).
     fn borrow_path_mark() -> i32: self.borrow_path_data.len() as i32
 
-    fn borrow_collect_path(node: i32) -> i32:
+    mut fn borrow_collect_path(node: i32) -> i32:
         let start = self.borrow_path_data.len()
         self.borrow_collect_path_inner(node)
         (self.borrow_path_data.len() - start) as i32
@@ -38117,7 +38133,7 @@ impl Sema:
     // initializer is not a place rooted at `root`. An index projection views
     // the whole indexed collection — its element storage can move under any
     // write to it (#887) — so the path stops at the indexed place.
-    fn view_binding_place_path(node: i32, root: i32) -> i32:
+    mut fn view_binding_place_path(node: i32, root: i32) -> i32:
         var place = node
         while place != 0 and (self.ast.kind(place) == NodeKind.NK_GROUPED or self.ast.kind(place) == NodeKind.NK_NO_SUSPEND):
             place = self.ast.get_data0(place)
@@ -38129,7 +38145,7 @@ impl Sema:
 
     // Returns 1 once an index projection has been crossed: the fields below
     // it are not part of the path.
-    fn view_binding_place_path_inner(node: i32) -> i32:
+    mut fn view_binding_place_path_inner(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -38152,7 +38168,7 @@ const INDEX_PATH_BASE: i32 = -100000
 const INDEX_PATH_WILDCARD: i32 = -99999
 
 impl Sema:
-    fn borrow_collect_path_inner(node: i32):
+    mut fn borrow_collect_path_inner(node: i32):
         if node == 0:
             return
         let kind = self.ast.kind(node)
@@ -39443,7 +39459,7 @@ impl Sema:
     // root is not the storage, and naming it pinned every field view of a
     // loop or element binding to that binding. A bare `&e` borrows the
     // reference's own slot and stays rooted at `e`.
-    fn ref_storage_root_sym(place: i32) -> i32:
+    mut fn ref_storage_root_sym(place: i32) -> i32:
         var peeled = place
         while peeled != 0 and self.ast.kind(peeled) == NodeKind.NK_GROUPED:
             peeled = self.ast.get_data0(peeled)
@@ -39494,7 +39510,7 @@ fn unpack_place_mut(packed: i64) -> i32:
     (packed % 4294967296) as i32
 
 impl Sema:
-    fn type_is_index_place(tid: i32) -> i32:
+    mut fn type_is_index_place(tid: i32) -> i32:
         if tid == 0:
             return 0
         var resolved = self.resolve_alias(tid as TypeId)
@@ -40648,12 +40664,12 @@ impl Sema:
     // A method of an `impl Drop for T` block is T's drop body, whatever key
     // T's methods are registered under (§18.1: std's `CString.drop` beside
     // a user's own `CString`, whose name the function's text resolves to).
-    fn fn_node_is_drop_body(node: i32, fn_sym: i32) -> bool:
+    mut fn fn_node_is_drop_body(node: i32, fn_sym: i32) -> bool:
         let impl_node = self.impl_node_for_method_decl(node)
         if impl_node != 0 and self.ast.get_data2(impl_node) == self.syms.drop: return true
         self.drop_owner_for_fn_symbol(fn_sym) != 0
 
-    fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
+    mut fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
         // #2520: owner and method come from the registration maps, not a
         // text split — a trait impl's symbol is `Owner.Drop.drop`, whose
         // first-dot split reads the method as "Drop.drop".
@@ -40785,7 +40801,7 @@ impl Sema:
         let tkey = sema_trait_method_key(type_sym, trait_idx, method_sym)
         if self.method_lookup.trait_sig_lookup.contains(tkey): self.method_lookup.trait_sig_lookup.get(tkey).unwrap() else: -1
 
-    fn lookup_method_sig(type_sym: i32, method_sym: i32) -> i32:
+    mut fn lookup_method_sig(type_sym: i32, method_sym: i32) -> i32:
         if type_sym <= 0 or method_sym <= 0:
             return -1
         if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
@@ -40863,7 +40879,7 @@ impl Sema:
         self.diags.emit(move diag)
         false
 
-    fn lookup_method_fn(type_sym: i32, method_sym: i32) -> i32:
+    mut fn lookup_method_fn(type_sym: i32, method_sym: i32) -> i32:
         if type_sym <= 0 or method_sym <= 0:
             return 0
         if self.ambiguous_trait_method_head(type_sym, method_sym) != 0:
@@ -40924,7 +40940,7 @@ impl Sema:
                 return with_str_clone_ref(self.module_paths[target])
         ""
 
-    fn extension_path_visible_from_current(path: &str) -> i32:
+    mut fn extension_path_visible_from_current(path: &str) -> i32:
         if path.len() == 0 or path == self.current_module_path:
             return 1
         if self.global_visible_module_paths.contains(path):
@@ -40944,7 +40960,7 @@ impl Sema:
                 return 1
         0
 
-    fn extension_candidate_visible(idx: i32) -> i32:
+    mut fn extension_candidate_visible(idx: i32) -> i32:
         if idx < 0 or idx >= self.extension_method_fn_syms.len() or idx >= self.extension_method_paths.len():
             return 0
         let fn_sym = self.extension_method_fn_syms[idx]
@@ -40954,7 +40970,7 @@ impl Sema:
 
     // §11.4: an extension declared beside its type is inherent-equivalent
     // and wins over extensions imported from other modules.
-    fn inherent_equivalent_extension_candidate(owner_sym: i32, method_sym: i32) -> i32:
+    mut fn inherent_equivalent_extension_candidate(owner_sym: i32, method_sym: i32) -> i32:
         let owner_path = self.type_decl_source_path(owner_sym)
         if owner_path.len() == 0:
             return -1
@@ -40965,7 +40981,7 @@ impl Sema:
                 return i
         -1
 
-    fn visible_extension_candidate_count(owner_sym: i32, method_sym: i32) -> isize:
+    mut fn visible_extension_candidate_count(owner_sym: i32, method_sym: i32) -> isize:
         if self.inherent_equivalent_extension_candidate(owner_sym, method_sym) >= 0:
             return 1
         var count = 0
@@ -40974,7 +40990,7 @@ impl Sema:
                 count = count + 1
         count
 
-    fn unique_visible_extension_sig(owner_sym: i32, method_sym: i32) -> i32:
+    mut fn unique_visible_extension_sig(owner_sym: i32, method_sym: i32) -> i32:
         let inherent = self.inherent_equivalent_extension_candidate(owner_sym, method_sym)
         if inherent >= 0:
             return self.extension_method_sig_idxs[inherent]
@@ -40991,7 +41007,7 @@ impl Sema:
             return found
         -1
 
-    fn unique_visible_extension_fn(owner_sym: i32, method_sym: i32) -> i32:
+    mut fn unique_visible_extension_fn(owner_sym: i32, method_sym: i32) -> i32:
         let inherent = self.inherent_equivalent_extension_candidate(owner_sym, method_sym)
         if inherent >= 0:
             return self.extension_method_fn_syms[inherent]
@@ -41190,7 +41206,7 @@ impl Sema:
 
     // The receiver of a call to an `@[iter_of_self]` method (`xs.iter()`,
     // `m.keys()`), whose result retains access to that receiver; 0 otherwise.
-    fn iter_of_self_call_receiver(call: i32) -> i32:
+    mut fn iter_of_self_call_receiver(call: i32) -> i32:
         if call == 0 or self.ast.kind(call) != NodeKind.NK_CALL:
             return 0
         let callee = self.ast.get_data0(call)
@@ -41339,7 +41355,7 @@ impl Sema:
     // receiver place (e.g., List.iter, HashMap.entries). Used by check_call's
     // arg-loop to register a SHARED borrow on the receiver place root for the
     // duration of the enclosing call so that sibling closure mutations conflict.
-    fn fn_symbol_is_iter_of_self(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_iter_of_self(fn_sym: i32) -> i32:
         if fn_sym == 0:
             return 0
         if self.fn_decl_nodes.contains(fn_sym):
@@ -41349,13 +41365,13 @@ impl Sema:
             return self.ast.is_iter_of_self_fn_node(generic_node)
         0
 
-    fn method_is_iter_of_self_fn(type_sym: i32, method_sym: i32) -> i32:
+    mut fn method_is_iter_of_self_fn(type_sym: i32, method_sym: i32) -> i32:
         if self.builtin_method_is_iter_of_self(type_sym, method_sym) != 0:
             return 1
         let fn_sym = self.lookup_method_fn(type_sym, method_sym)
         self.fn_symbol_is_iter_of_self(fn_sym)
 
-    fn method_has_mut_self_flag(type_sym: i32, method_sym: i32) -> i32:
+    mut fn method_has_mut_self_flag(type_sym: i32, method_sym: i32) -> i32:
         var fn_sym = self.lookup_method_fn(type_sym, method_sym)
         if fn_sym == 0:
             fn_sym = self.lookup_generic_method_fn(type_sym, method_sym)
@@ -41379,7 +41395,7 @@ impl Sema:
         let pflags = self.ast.fn_param_flags(ps, 0)
         fn_param_is_mut_self(pflags)
 
-    fn method_has_move_self_flag(type_sym: i32, method_sym: i32) -> i32:
+    mut fn method_has_move_self_flag(type_sym: i32, method_sym: i32) -> i32:
         var fn_sym = self.lookup_method_fn(type_sym, method_sym)
         if fn_sym == 0:
             fn_sym = self.lookup_generic_method_fn(type_sym, method_sym)

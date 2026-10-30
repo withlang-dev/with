@@ -1143,7 +1143,7 @@ impl Zcu:
             Some(reason) => with_str_clone_ref(reason)
             None => "untranslated C construct"
 
-    fn c_import_record_omissions_frontend(synthetic: &str):
+    mut fn c_import_record_omissions_frontend(synthetic: &str):
         let prefix = "// @with-cimport-omitted|"
         var pos = 0
         let total = synthetic.len()

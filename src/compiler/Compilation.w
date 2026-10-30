@@ -771,7 +771,7 @@ impl Compilation:
         taken_zcu.import_root_dir = dir
         self.zcu = taken_zcu
 
-    fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
+    mut fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
         self.cli_diag_gen_ends.push(gen_end)
         self.cli_diag_source_names.push(with_str_clone_ref(source_name))
@@ -1118,7 +1118,7 @@ impl Compilation:
     fn has_errors() -> bool:
         self.zcu.diagnostics.has_errors()
 
-    fn get_pool() -> &InternPool:
+    mut fn get_pool() -> &InternPool:
         self.zcu.pool
 
     mut fn emit_ir(pool: &AstPool) -> bool:

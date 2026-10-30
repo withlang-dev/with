@@ -1263,7 +1263,7 @@ impl CCodegen:
             return 0
         sym
 
-    fn canonical_body_sym(fn_sym: i32) -> i32:
+    mut fn canonical_body_sym(fn_sym: i32) -> i32:
         if fn_sym == 0:
             return 0
         if self.canonical_body_cache.contains(fn_sym):
@@ -1286,7 +1286,7 @@ impl CCodegen:
         self.canonical_body_cache.insert(fn_sym, out)
         out
 
-    fn lookup_body_sym_by_name(name: &str) -> i32:
+    mut fn lookup_body_sym_by_name(name: &str) -> i32:
         if name.len() == 0:
             return 0
         let cached = self.body_fn_name_map.get(name)
@@ -1301,18 +1301,18 @@ impl CCodegen:
         self.body_fn_name_map.insert(with_str_clone_ref(name), out)
         out
 
-    fn has_body_for_sym(fn_sym: i32) -> i32:
+    mut fn has_body_for_sym(fn_sym: i32) -> i32:
         if self.canonical_body_sym(fn_sym) != 0:
             return 1
         0
 
-    fn body_sig_index(fn_sym: i32) -> i32:
+    mut fn body_sig_index(fn_sym: i32) -> i32:
         let direct = self.sema.get_sig(fn_sym)
         if direct >= 0:
             return direct
         self.sig_index_for_sym(fn_sym)
 
-    fn fn_param_is_c_pointer(fn_sym: i32, param_idx: i32) -> i32:
+    mut fn fn_param_is_c_pointer(fn_sym: i32, param_idx: i32) -> i32:
         let cache_key = cc_body_local_cache_key(fn_sym, param_idx)
         let cached = self.fn_pointer_param_cache.get(cache_key)
         if cached.is_some():
@@ -1324,7 +1324,7 @@ impl CCodegen:
         self.fn_pointer_param_cache.insert(cache_key, out)
         out
 
-    fn local_is_c_pointer_param(body: &MirBody, local_id: i32) -> i32:
+    mut fn local_is_c_pointer_param(body: &MirBody, local_id: i32) -> i32:
         if local_id <= 0:
             return 0
         let sig_idx = self.body_sig_index(body.fn_sym)
@@ -1333,7 +1333,7 @@ impl CCodegen:
             return 0
         self.fn_param_is_c_pointer(body.fn_sym, local_id - 1)
 
-    fn call_param_expects_c_pointer(body: &MirBody, args_id: i32, callee_operand: i32, param_idx: i32) -> i32:
+    mut fn call_param_expects_c_pointer(body: &MirBody, args_id: i32, callee_operand: i32, param_idx: i32) -> i32:
         if body.call_requires_contract(args_id):
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
@@ -1378,7 +1378,7 @@ impl CCodegen:
             return out ++ "__with"
         out
 
-    fn type_is_payload_enum(tid: i32) -> i32:
+    mut fn type_is_payload_enum(tid: i32) -> i32:
         let base_tid = self.sema.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -1419,7 +1419,7 @@ impl CCodegen:
     // The member path from an enum value to payload field `field_idx` of
     // `variant_index`: the variant's member itself when it has one field,
     // else that field of the variant's payload struct (#2017).
-    fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
+    mut fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
         let member = self.enum_payload_member(enum_tid, variant_index)
         if self.sema.type_reflection_variant_payload_count(enum_tid, variant_index) == 1: member else: member ++ "." ++ cc_payload_struct_field(field_idx)
 
@@ -1436,7 +1436,7 @@ impl CCodegen:
         if self.option_is_nullable_pointer(enum_tid): "" else: "." ++ self.payload_enum_variant_field(variant_index)
 
     // The discriminant of the enum value `expr`.
-    fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
+    mut fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
         // An enum with no payloads is its discriminant (an int32_t).
         if self.type_is_payload_enum(enum_tid) == 0:
             return "(" ++ expr ++ ")"
@@ -1446,7 +1446,7 @@ impl CCodegen:
         let none_disc = self.sema.type_reflection_variant_discriminant(enum_tid, self.payload_enum_named_variant(enum_tid, self.sema.syms.none))
         f"((" ++ expr ++ f") != 0 ? {some_disc} : {none_disc})"
 
-    fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
+    mut fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -1476,7 +1476,7 @@ impl CCodegen:
                 found = vi
         found
 
-    fn payload_enum_single_payload_variant(enum_tid: i32) -> i32:
+    mut fn payload_enum_single_payload_variant(enum_tid: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -1489,7 +1489,7 @@ impl CCodegen:
             found = vi
         found
 
-    fn payload_enum_single_unit_variant(enum_tid: i32) -> i32:
+    mut fn payload_enum_single_unit_variant(enum_tid: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -2185,7 +2185,7 @@ impl CCodegen:
             return 0
         tid
 
-    fn type_match(expected: i32, actual: i32) -> i32:
+    mut fn type_match(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         if self.sema.types_compatible_frozen(expected, actual) != 0:
@@ -2194,7 +2194,7 @@ impl CCodegen:
             return 1
         0
 
-    fn strict_type_match(expected: i32, actual: i32) -> i32:
+    mut fn strict_type_match(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 1
         let e = self.sema.resolve_alias(expected)
@@ -2218,7 +2218,7 @@ impl CCodegen:
             return 1
         0
 
-    fn prefer_inferred_tid(current_tid: i32, candidate_tid: i32) -> i32:
+    mut fn prefer_inferred_tid(current_tid: i32, candidate_tid: i32) -> i32:
         let cand = self.sema.resolve_alias(candidate_tid as TypeId) as i32
         if cand == 0 or self.is_void_tid(cand) != 0:
             return current_tid
@@ -2547,7 +2547,7 @@ impl CCodegen:
     // and their instantiated types. The containers the C backend models
     // itself (List, HashMap, HashSet, SlotMap, the synthetic structs above)
     // and payload enums have their own representations (#1562).
-    fn generic_inst_is_declared_struct(tid: i32) -> bool:
+    mut fn generic_inst_is_declared_struct(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.std_box_pointee_tid(resolved as i32) != 0:
             return false
@@ -2569,7 +2569,7 @@ impl CCodegen:
         self.sema.get_generic_inst_arg(resolved as i32, 0)
 
     // The instantiated type of a declared generic struct's field, or 0.
-    fn generic_struct_field_tid(tid: i32, field_sym: i32) -> i32:
+    mut fn generic_struct_field_tid(tid: i32, field_sym: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid) as i32
         for fi in 0..self.sema.type_reflection_field_count(resolved):
             if self.sema.type_reflection_field_name(resolved, fi) == field_sym:
@@ -2581,13 +2581,13 @@ impl CCodegen:
     // The struct a by-value member needs complete before its record: the
     // member's own, or a fixed array's element (`tab[265]` of a record); 0
     // when the member holds no struct by value.
-    fn c_value_member_struct_tid(tid: i32) -> i32:
+    mut fn c_value_member_struct_tid(tid: i32) -> i32:
         var cur = self.sema.resolve_alias(tid as TypeId) as i32
         while self.sema.get_type_kind(cur as TypeId) == TypeKind.TY_ARRAY:
             cur = self.sema.resolve_alias(self.sema.get_type_d0(cur as TypeId) as TypeId) as i32
         if self.tid_is_c_struct_value(cur): cur else: 0
 
-    fn tid_is_c_struct_value(tid: i32) -> bool:
+    mut fn tid_is_c_struct_value(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         let kind = self.sema.get_type_kind(resolved as TypeId)
         if self.option_is_nullable_pointer(resolved):
@@ -2596,7 +2596,7 @@ impl CCodegen:
 
     // A field of a generic instance: a declared struct's own field, or a
     // field the backend synthesizes for a modeled container (List's ptr/len).
-    fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
+    mut fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
         if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.list_synthetic_field_tid(tid, field_sym)
 
     fn listslot_element_tid(tid: i32) -> i32:
@@ -2754,7 +2754,7 @@ impl CCodegen:
             return 0
         body.place_locals[place_id]
 
-    fn local_declared_tid(body: &MirBody, local_id: i32) -> i32:
+    mut fn local_declared_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0 or local_id >= body.local_type_ids.len():
             return 0
         let declared = body.local_type_ids[local_id]
@@ -2826,7 +2826,7 @@ impl CCodegen:
         self.local_effective_cache.insert(cache_key, declared)
         declared
 
-    fn local_struct_collection_tid(body: &MirBody, local_id: i32) -> i32:
+    mut fn local_struct_collection_tid(body: &MirBody, local_id: i32) -> i32:
         let declared = self.local_declared_tid(body, local_id)
         if local_id <= 0:
             return declared
@@ -2952,7 +2952,7 @@ impl CCodegen:
     // that type (D65): a downcast read through it never re-types it. Read
     // from `copy _7<as v1>.f0.*`, an `Option[&i32]` became `Option[i32]`,
     // the projection after the downcast ignored.
-    fn local_declared_non_option_payload_enum(body: &MirBody, local_id: i32) -> bool:
+    mut fn local_declared_non_option_payload_enum(body: &MirBody, local_id: i32) -> bool:
         let declared = self.sema.resolve_alias(self.local_declared_tid(body, local_id) as TypeId) as i32
         self.type_is_payload_enum(declared) != 0
 
@@ -3020,7 +3020,7 @@ fn cc_list_tid_at(values: &List[i32], local_id: i32) -> i32:
     value
 
 impl CCodegen:
-    fn record_local_tid(values: List[i32], local_id: i32, tid: i32) -> List[i32]:
+    mut fn record_local_tid(values: List[i32], local_id: i32, tid: i32) -> List[i32]:
         if local_id < 0 or local_id >= values.len():
             return values
         if tid == 0 or self.is_void_tid(tid) != 0:
@@ -3108,7 +3108,7 @@ impl CCodegen:
             out = self.record_local_tid(move out, li, self.local_ref_target_tid(body, li))
         out
 
-    fn place_local_tid(body: &MirBody, place_id: i32) -> i32:
+    mut fn place_local_tid(body: &MirBody, place_id: i32) -> i32:
         let local_id = self.place_local_id(body, place_id)
         self.local_declared_tid(body, local_id)
 
@@ -3210,13 +3210,13 @@ impl CCodegen:
                     return 1
         0
 
-    fn local_value_use_mark_place(body: &MirBody, place_id: i32):
+    mut fn local_value_use_mark_place(body: &MirBody, place_id: i32):
         let local_id = self.place_local_id(body, place_id)
         if local_id < 0:
             return
         self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, local_id), 1)
 
-    fn local_value_use_mark_operand(body: &MirBody, operand_id: i32):
+    mut fn local_value_use_mark_operand(body: &MirBody, operand_id: i32):
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return
         let ok = body.operand_kinds[operand_id]
@@ -3224,7 +3224,7 @@ impl CCodegen:
             return
         self.local_value_use_mark_place(body, body.operand_d0[operand_id])
 
-    fn local_value_use_mark_rvalue(body: &MirBody, rval_id: i32):
+    mut fn local_value_use_mark_rvalue(body: &MirBody, rval_id: i32):
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return
         let rk = body.rval_kinds[rval_id]
@@ -3272,7 +3272,7 @@ impl CCodegen:
             for i in 0..count:
                 self.local_value_use_mark_operand(body, body.agg_field_operands[(start + i)])
 
-    fn local_value_use_populate(body: &MirBody):
+    mut fn local_value_use_populate(body: &MirBody):
         for li in 0..body.local_count():
             self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, li), 0)
         for bb in 0..body.block_count():
@@ -3299,7 +3299,7 @@ impl CCodegen:
                 // is not a dead temp (#1766: nums(3) returned zeroes).
                 self.local_value_use_cache.insert(cc_body_local_cache_key(body.fn_sym, 0), 1)
 
-    fn local_has_value_use(body: &MirBody, local_id: i32) -> i32:
+    mut fn local_has_value_use(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
             return 0
         let cache_key = cc_body_local_cache_key(body.fn_sym, local_id)
@@ -3356,7 +3356,7 @@ impl CCodegen:
     // name, dereferenced when the local holds a pointer to its value — a
     // value-ref ABI parameter, or a closure capture by place or in an owned
     // cell (#1766), as the LLVM backend's indirect locals do.
-    fn local_base_text(body: &MirBody, local_id: i32) -> str:
+    mut fn local_base_text(body: &MirBody, local_id: i32) -> str:
         let global_sym = self.local_global_sym(body, local_id)
         if global_sym != 0:
             return self.global_c_name(global_sym)
@@ -4577,7 +4577,7 @@ impl CCodegen:
             return Some(raw.unwrap() as CcPlaceKind)
         None
 
-    fn place_kind_cache_store(body_fn_sym: i32, place_id: i32, kind: CcPlaceKind):
+    mut fn place_kind_cache_store(body_fn_sym: i32, place_id: i32, kind: CcPlaceKind):
         self.place_kind_cache.insert(cc_body_local_cache_key(body_fn_sym, place_id), kind as i32)
 
     fn callee_hint_cache_lookup(fn_sym: i32) -> Option[CcCalleeHint]:
@@ -4586,10 +4586,10 @@ impl CCodegen:
             return Some(raw.unwrap() as CcCalleeHint)
         None
 
-    fn callee_hint_cache_store(fn_sym: i32, kind: CcCalleeHint):
+    mut fn callee_hint_cache_store(fn_sym: i32, kind: CcCalleeHint):
         self.callee_hint_cache.insert(fn_sym, kind as i32)
 
-    fn callee_field_hint(fn_sym: i32) -> CcCalleeHint:
+    mut fn callee_field_hint(fn_sym: i32) -> CcCalleeHint:
         if fn_sym == 0:
             return CcCalleeHint.NONE
         let cache_hit = self.callee_hint_cache_lookup(fn_sym)
@@ -4668,7 +4668,7 @@ impl CCodegen:
             return CcPlaceKind.HASHMAP
         CcPlaceKind.OPTION
 
-    fn infer_place_kind(body: &MirBody, place_id: i32) -> CcPlaceKind:
+    mut fn infer_place_kind(body: &MirBody, place_id: i32) -> CcPlaceKind:
         let cache_hit = self.place_kind_cache_lookup(body.fn_sym, place_id)
         if cache_hit.is_some():
             return cache_hit.unwrap()
@@ -4991,7 +4991,7 @@ impl CCodegen:
                 break
         out
 
-    fn describe_qualified_method_candidates(body: &MirBody, method_sym: i32, args_id: i32, only_local_defs: i32) -> str:
+    mut fn describe_qualified_method_candidates(body: &MirBody, method_sym: i32, args_id: i32, only_local_defs: i32) -> str:
         let raw = cc_intern_resolve(self.intern, method_sym)
         if raw.len() == 0:
             return ""
@@ -5082,12 +5082,12 @@ impl CCodegen:
             return 1
         0
 
-    fn method_infer_push(method_sym: i32, args_id: i32, dest_place: i32) -> Unit:
+    mut fn method_infer_push(method_sym: i32, args_id: i32, dest_place: i32) -> Unit:
         self.active_method_syms.push(method_sym)
         self.active_method_args.push(args_id)
         self.active_method_dests.push(dest_place)
 
-    fn method_infer_pop():
+    mut fn method_infer_pop():
         if self.active_method_syms.len() == 0:
             return
         self.active_method_syms.pop()
@@ -5103,11 +5103,11 @@ impl CCodegen:
             return 1
         0
 
-    fn direct_infer_push(args_id: i32, dest_place: i32) -> Unit:
+    mut fn direct_infer_push(args_id: i32, dest_place: i32) -> Unit:
         self.active_direct_args.push(args_id)
         self.active_direct_dests.push(dest_place)
 
-    fn direct_infer_pop():
+    mut fn direct_infer_pop():
         if self.active_direct_args.len() == 0:
             return
         self.active_direct_args.pop()
@@ -5123,7 +5123,7 @@ impl CCodegen:
             return cached.unwrap()
         -1234567
 
-    fn call_infer_cache_store(kind: &str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32, value: i32) -> Unit:
+    mut fn call_infer_cache_store(kind: &str, body_fn_sym: i32, callee_sym: i32, args_id: i32, dest_place: i32, value: i32) -> Unit:
         self.call_infer_cache.insert(cc_call_infer_cache_key(kind, body_fn_sym, callee_sym, args_id, dest_place), value)
 
     fn field_cache_lookup(struct_tid: i32, field_sym: i32) -> i32:
@@ -5135,12 +5135,12 @@ impl CCodegen:
             return self.field_cache_tids[i]
         -1234567
 
-    fn field_cache_store(struct_tid: i32, field_sym: i32, tid: i32) -> Unit:
+    mut fn field_cache_store(struct_tid: i32, field_sym: i32, tid: i32) -> Unit:
         self.field_cache_struct_tids.push(struct_tid)
         self.field_cache_syms.push(field_sym)
         self.field_cache_tids.push(tid)
 
-    fn field_cache_record(struct_tid: i32, field_sym: i32, tid: i32):
+    mut fn field_cache_record(struct_tid: i32, field_sym: i32, tid: i32):
         if tid == 0 or self.is_void_tid(tid) != 0:
             return
         if self.field_cache_lookup(struct_tid, field_sym) != -1234567:
@@ -5226,7 +5226,7 @@ impl CCodegen:
             return cached.unwrap()
         -1234567
 
-    fn local_infer_cache_store(body_fn_sym: i32, local_id: i32, tid: i32):
+    mut fn local_infer_cache_store(body_fn_sym: i32, local_id: i32, tid: i32):
         self.local_infer_cache.insert(cc_body_local_cache_key(body_fn_sym, local_id), tid)
 
     fn local_usage_hint_cache_lookup(body_fn_sym: i32, local_id: i32) -> i32:
@@ -5235,7 +5235,7 @@ impl CCodegen:
             return cached.unwrap()
         -1234567
 
-    fn local_usage_hint_cache_store(body_fn_sym: i32, local_id: i32, tid: i32):
+    mut fn local_usage_hint_cache_store(body_fn_sym: i32, local_id: i32, tid: i32):
         self.local_usage_hint_cache.insert(cc_body_local_cache_key(body_fn_sym, local_id), tid)
 
     mut fn local_usage_hint_tid(body: &MirBody, local_id: i32) -> i32:
@@ -5652,7 +5652,7 @@ impl CCodegen:
         let _ = dest_place
         self.extern_sym_c_name(sym)
 
-    fn sig_index_for_sym(fn_sym: i32) -> i32:
+    mut fn sig_index_for_sym(fn_sym: i32) -> i32:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if self.sig_idx_cache.contains(fn_sym):
             return self.sig_idx_cache.get(fn_sym).unwrap()
@@ -6455,7 +6455,7 @@ impl CCodegen:
 
         fallback
 
-    fn call_callee_sig_return_tid(body: &MirBody, callee_operand: i32) -> i32:
+    mut fn call_callee_sig_return_tid(body: &MirBody, callee_operand: i32) -> i32:
         if callee_operand < 0 or callee_operand >= body.operand_kinds.len():
             return 0
         if body.operand_kinds[callee_operand] != OperandKind.OK_CONSTANT:
@@ -6851,7 +6851,7 @@ impl CCodegen:
         ""
 
     // Whether a constant callee has no With body (an `extern fn`).
-    fn callee_is_bodiless(body: &MirBody, callee_op: i32) -> bool:
+    mut fn callee_is_bodiless(body: &MirBody, callee_op: i32) -> bool:
         if callee_op < 0 or callee_op >= body.operand_kinds.len() or body.operand_kinds[callee_op] != OperandKind.OK_CONSTANT:
             return false
         let cd = body.operand_d0[callee_op]
@@ -6859,7 +6859,7 @@ impl CCodegen:
             return false
         self.has_body_for_sym(body.const_d0[cd]) == 0
 
-    fn callee_sig_from_operand(body: &MirBody, callee_op: i32) -> i32:
+    mut fn callee_sig_from_operand(body: &MirBody, callee_op: i32) -> i32:
         if callee_op < 0 or callee_op >= body.operand_kinds.len():
             return -1
         let ok = body.operand_kinds[callee_op]
@@ -8757,7 +8757,7 @@ impl CCodegen:
             return out
         ""
 
-    fn field_place_matches(body: &MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
+    mut fn field_place_matches(body: &MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
         if place_id < 0 or place_id >= body.place_locals.len():
             return 0
         let count = body.place_proj_counts[place_id]
@@ -10898,7 +10898,7 @@ impl CCodegen:
 
     // Locals 1..count are a body's parameters: the signature's for a named
     // function, the retained MIR's (captures, then parameters) for a closure.
-    fn body_param_count(body: &MirBody) -> i32:
+    mut fn body_param_count(body: &MirBody) -> i32:
         if body.anonymous_type != 0:
             return body.n_params
         let sig_idx = self.body_sig_index(body.fn_sym)
@@ -11858,7 +11858,7 @@ impl CCodegen:
         out
 
     // A struct's C members, as emit_struct_type_defs declares them.
-    fn glue_field_syms(resolved: i32) -> List[i32]:
+    mut fn glue_field_syms(resolved: i32) -> List[i32]:
         var out: List[i32] = List.new()
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
             let start = self.sema.get_type_d1(resolved as TypeId)
@@ -11870,7 +11870,7 @@ impl CCodegen:
                 out.push(self.sema.type_reflection_field_name(resolved, fi))
         out
 
-    fn glue_field_names(resolved: i32) -> List[str]:
+    mut fn glue_field_names(resolved: i32) -> List[str]:
         var out: List[str] = List.new()
         for sym in self.glue_field_syms(resolved):
             out.push(cc_member(cc_intern_resolve(self.intern, sym)))
@@ -11974,7 +11974,7 @@ impl CCodegen:
     // A `Drop.drop` receiver is the value in its owner's storage (FnAbi
     // owned_place): the body and the glue's field cleanup after it read one
     // place, so a field the body moves out is blanked where the glue looks.
-    fn param_is_drop_receiver(fn_sym: i32, param_idx: i32) -> bool:
+    mut fn param_is_drop_receiver(fn_sym: i32, param_idx: i32) -> bool:
         if param_idx != 0:
             return false
         if self.sema.drop_owner_for_fn_symbol(fn_sym) != 0:
@@ -12142,7 +12142,7 @@ impl CCodegen:
     // A type whose parts the walks visit; any other is compared and hashed
     // by its bytes (an integer, a float, a bool, a pointer, a plain enum, an
     // opaque runtime handle).
-    fn key_type_has_walk(resolved: i32) -> bool:
+    mut fn key_type_has_walk(resolved: i32) -> bool:
         let tk = self.sema.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_ARRAY:
             return true

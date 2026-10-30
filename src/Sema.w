@@ -2126,6 +2126,10 @@ type Sema {
     // Cleared and set by check_fn_body_with_sig; used to accumulate effects as the body is checked.
     current_fn_param_syms: List[i32],   // param name symbols for the function being checked
     current_fn_param_effs: List[i32],   // accumulated effect bits per param
+    // Signatures whose body writes a read (`fn`) receiver: the write the
+    // &T clamp drops from the effects callers see, kept so the receiver
+    // requirement names the `mut fn` the method is (D172).
+    receiver_write_demand_sigs: HashMap[i32, i32],
     current_fn_param_direct_effs: List[i32], // body-local effects, excluding propagated calls
     current_fn_raw_derefs: i32,              // the body dereferenced a raw pointer
     sig_raw_deref_bodies: HashMap[i32, i32], // sig -> 1: its body reads through a raw pointer (§21.1 rule 6)
@@ -2620,7 +2624,7 @@ fn sema_debug_borrows_enabled -> i32:
 fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS").len() > 0
 
 impl Sema:
-    fn debug_unknown_type(sym: i32, node: i32, context: &str):
+    mut fn debug_unknown_type(sym: i32, node: i32, context: &str):
         if sema_debug_stage1_enabled() == 0:
             return
         let name = self.pool_resolve_symbol(sym)
@@ -2850,7 +2854,7 @@ impl Sema:
             return 0
         self.type_symbol_is_std_box(self.get_type_d0(resolved))
 
-    fn fn_symbol_is_std_box_member(fn_sym: i32) -> i32:
+    mut fn fn_symbol_is_std_box_member(fn_sym: i32) -> i32:
         sema_path_is_std_box_module(self.fn_symbol_source_path(fn_sym))
 
     fn type_symbol_is_std_rc_owner(sym: i32) -> i32:
@@ -4087,6 +4091,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         generic_body_depth: 0,
         current_fn_param_syms: List.new(),
         current_fn_param_effs: List.new(),
+        receiver_write_demand_sigs: HashMap.new(),
         current_fn_param_direct_effs: List.new(),
         current_fn_raw_derefs: 0,
         sig_raw_deref_bodies: sema_new_map_i32_i32(),
@@ -4559,7 +4564,7 @@ impl Sema:
             return self.named_type_candidate_heads.get(sym).unwrap()
         -1
 
-    fn index_named_type_candidate(sym: i32, candidate_index: i32):
+    mut fn index_named_type_candidate(sym: i32, candidate_index: i32):
         self.named_type_candidate_next.push(self.named_type_candidate_head(sym))
         self.named_type_candidate_heads.insert(sym, candidate_index)
 
@@ -4628,7 +4633,7 @@ impl Sema:
         let path_sym = self.pool_lookup_symbol(self.current_module_path)
         path_sym != 0 and self.ci_modules.contains(path_sym)
 
-    fn record_decl_visibility(sym: i32, node: i32, is_pub: i32) -> Unit:
+    mut fn record_decl_visibility(sym: i32, node: i32, is_pub: i32) -> Unit:
         if sym == 0:
             return
         let record = self.decl_visibility_syms.len() as i32
@@ -4812,7 +4817,7 @@ impl Sema:
     // §18.2 tier 3 under Eric's #1221 ruling: of the candidates an explicit
     // import of the current module provides, the one whose import is written
     // last. -1 when no explicit import provides the name.
-    fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
+    mut fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         var best: i32 = -1
         var best_pos = -1
@@ -4827,7 +4832,7 @@ impl Sema:
     // candidate `c` is written (its byte offset), or -1 when none does. A
     // c_import's declarations are provided by that `use c_import` of their
     // importing module (Zcu records its offset in decl_is_c_import).
-    fn import_position_of(c: i32, path: &str, is_pub: i32, name: &str) -> i32:
+    mut fn import_position_of(c: i32, path: &str, is_pub: i32, name: &str) -> i32:
         if self.ci_syms.contains(c):
             if path != self.current_module_path:
                 return -1
@@ -4906,7 +4911,7 @@ impl Sema:
 
     // D100: a module path's package; a path the Zcu never saw is the
     // program's (std's when it is a std path).
-    fn vis_note(text: &str):
+    mut fn vis_note(text: &str):
         if self.visibility_explain_on != 0: self.visibility_explain_log.push(with_str_clone_ref(text))
 
     // `with analyze file.w 'explain:visible:<name>'` (#2249): every
@@ -4985,7 +4990,7 @@ impl Sema:
     // #2211: one resolved name use, for the analyzer's `reference` facts. The
     // referencing module is the current one; `node` is 0 for a type name
     // (resolved without a node).
-    fn record_name_use(node: i32, kind: &str, path: &str, name: &str):
+    mut fn record_name_use(node: i32, kind: &str, path: &str, name: &str):
         if path.len() == 0: return
         self.name_use_nodes.push(node)
         self.name_use_kinds.push(with_str_clone_ref(kind))
@@ -5003,7 +5008,7 @@ impl Sema:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
         if sema_tier_path_is_std_implementation(path) != 0: "<std>" else: "<program>"
 
-    fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
+    mut fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
             return 1
         if self.current_module_path.len() == 0:
@@ -5053,7 +5058,7 @@ impl Sema:
     //      only through an explicit import path (never the synthetic prelude
     //      edge), or through the fallback bridge (std_fallback_bridge_path).
     //      Replaced by the §18.2 fallback tier (#752, after #751).
-    fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
+    mut fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
         if target_path.len() == 0:
             return 1
         if self.current_module_path.len() == 0:
@@ -5206,7 +5211,7 @@ impl Sema:
     // engine corpus module is entered only from the start module itself or
     // from its own corpus (#1362): importing a facade over it (std.zlib)
     // does not import it.
-    fn module_visible_no_prelude(target_path: &str) -> i32:
+    mut fn module_visible_no_prelude(target_path: &str) -> i32:
         if self.current_module_path.len() == 0:
             return 1
         if target_path == self.current_module_path:
@@ -5290,7 +5295,7 @@ impl Sema:
     fn module_in_bundle_corpus(module_idx: i32) -> bool:
         self.bundle_corpus.len() > 0 and module_idx >= 0 and module_idx < self.module_paths.len() and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(self.module_paths[module_idx]))
 
-    fn symbol_visible_from_current(sym: i32) -> i32:
+    mut fn symbol_visible_from_current(sym: i32) -> i32:
         let symbol_name = self.pool_resolve(sym)
         if symbol_name.starts_with("with_") or symbol_name.starts_with("rt_") or symbol_name.starts_with("wl_"):
             return 1
@@ -5326,7 +5331,7 @@ impl Sema:
     // the engine leak never turns such a program into an error; a name
     // with no engine twin keeps the prelude gate (#750). Returns that
     // declaration's module path, "" when the bridge does not apply.
-    fn std_fallback_bridge_path(sym: i32) -> str:
+    mut fn std_fallback_bridge_path(sym: i32) -> str:
         if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path) != 0:
             return ""
         let paths = sema_new_list_str()
@@ -5373,7 +5378,7 @@ impl Sema:
         // nothing displaces resolves (or not) through the gate alone.
         if engine_twin.len() > 0 and modules.len() == 1: sema_owned_text(modules[0]) else: ""
 
-    fn decl_node_visible_from_current(node: i32) -> i32:
+    mut fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
             return 1
         let record = self.decl_visibility_node_index.get(node)
@@ -5389,7 +5394,7 @@ impl Sema:
     fn has_extern_var_decl(sym: i32) -> i32:
         if self.extern_var_texts.contains(self.pool_resolve(sym)): 1 else: 0
 
-    fn private_symbol_path_from_current(sym: i32) -> str:
+    mut fn private_symbol_path_from_current(sym: i32) -> str:
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
             let path = self.decl_visibility_paths[i]
@@ -5485,7 +5490,7 @@ impl Sema:
         else:
             self.emit_error("symbol '" ++ name ++ "' is not visible from this module", node)
 
-    fn module_is_visible_from_current(target_path: &str) -> i32:
+    mut fn module_is_visible_from_current(target_path: &str) -> i32:
         if target_path.len() == 0:
             return 1
         if self.global_visible_module_paths.contains(target_path):
@@ -5550,13 +5555,13 @@ impl Sema:
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 
-    fn lookup_named_type_visible(sym: i32) -> i32:
+    mut fn lookup_named_type_visible(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 1)
 
     // Ambient lookup for compiler-demand resolutions (regex literals, async
     // Task synthesis, dyn boxing): lowerings the user never spelled bypass
     // the D29 prelude gate, but still honor module privacy.
-    fn lookup_named_type_ambient(sym: i32) -> i32:
+    mut fn lookup_named_type_ambient(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 0)
 
     // D29 scaffolding (#750): registration-truth lookup for codegen. Picks the
@@ -5589,7 +5594,7 @@ impl Sema:
     // visible candidates §18.2's precedence decides (#2520): the module's
     // own declaration, then another program module's, then std's (the
     // prelude tier), so a program's `trait One` is the One it means.
-    fn lookup_trait_visible(sym: i32) -> i32:
+    mut fn lookup_trait_visible(sym: i32) -> i32:
         self.trait_by_precedence(sym, self.current_module_path, true)
 
     // The trait a written `dyn Name` denotes: the visible one by
@@ -5597,17 +5602,17 @@ impl Sema:
     // trait the program reaches with no import (`dyn Error`) is. One answer
     // in every context, so a signature's `&dyn Error` and a body's are one
     // type.
-    fn lookup_trait_named(sym: i32) -> i32:
+    mut fn lookup_trait_named(sym: i32) -> i32:
         let visible = self.lookup_trait_visible(sym)
         if visible >= 0: visible else: self.trait_lookup.get(sym) ?? -1
 
     // The identity symbol of the trait `sym` names in the module that
     // holds `node`, for a pass after Sema holding a written `dyn Name`.
-    fn trait_identity_symbol_named_at(sym: i32, node: i32):
+    mut fn trait_identity_symbol_named_at(sym: i32, node: i32):
         let ti = self.trait_by_precedence(sym, self.node_module_path_view(node), false)
         if ti >= 0: self.trait_identity_symbol(ti) else: sym
 
-    fn trait_by_precedence(sym: i32, module_path: &str, visible_only: bool):
+    mut fn trait_by_precedence(sym: i32, module_path: &str, visible_only: bool):
         var i = self.trait_candidate_head(sym)
         if i < 0:
             if self.trait_lookup.contains(sym): return self.trait_lookup.get(sym).unwrap() else: return -1
@@ -5687,7 +5692,7 @@ impl Sema:
     fn scoped_type_binding(sym: i32, named_tid: i32, saw_recorded: i32, saw_named_tid: i32) -> i32:
         if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0): named_tid else: 0
 
-    fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
+    mut fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
         var global_tid: i32 = 0
         var saw_recorded: i32 = 0
@@ -5755,19 +5760,19 @@ impl Sema:
             return global_tid
         0
 
-    fn has_named_type_visible(sym: i32) -> i32:
+    mut fn has_named_type_visible(sym: i32) -> i32:
         if self.lookup_named_type_visible(sym) != 0:
             return 1
         0
 
-    fn typeinfo_builtin_shadowed(sym: i32) -> i32:
+    mut fn typeinfo_builtin_shadowed(sym: i32) -> i32:
         if self.scope_lookup(sym) >= 0:
             return 1
         if self.has_named_type_visible(sym) != 0:
             return 1
         0
 
-    fn typeinfo_module_field(callee: i32) -> i32:
+    mut fn typeinfo_module_field(callee: i32) -> i32:
         var access = callee
         let kind = self.ast.kind(callee)
         if kind == NodeKind.NK_INDEX:
@@ -6285,7 +6290,7 @@ impl Sema:
         let snippet = text.slice(start as i64, end as i64)
         extract_name_after_keyword_in_text(snippet, keyword)
 
-    fn set_pretty_symbol(sym: i32, name: &str):
+    mut fn set_pretty_symbol(sym: i32, name: &str):
         if sym <= 0:
             return
         if name.len() == 0:
@@ -6323,7 +6328,7 @@ impl Sema:
             self.type_d1[tid] == d1 and
             self.type_d2[tid] == d2
 
-    fn index_exact_type(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32):
+    mut fn index_exact_type(tid: i32, kind: i32, d0: i32, d1: i32, d2: i32):
         let key = sema_exact_type_hash(kind, d0, d1, d2)
         var head: i32 = -1
         if self.exact_type_cache_heads.contains(key):
@@ -6354,7 +6359,7 @@ impl Sema:
     mut fn freeze_symbols():
         self.symbols_frozen = 1
 
-    fn add_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
+    mut fn add_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
         if self.types_frozen != 0:
             sema_phase_bug("BUG: Sema.add_type called after freeze_types")
         let id = self.type_kinds.len() as i32
@@ -6388,7 +6393,7 @@ impl Sema:
             ti = self.exact_type_cache_next[ti]
         0 as TypeId
 
-    fn ensure_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
+    mut fn ensure_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
         let existing = self.find_exact_type(kind, d0, d1, d2)
         if existing != 0:
             return existing
@@ -6408,7 +6413,7 @@ impl Sema:
                 return ti as TypeId
         0 as TypeId
 
-    fn ensure_tuple_type(elems: &List[i32], elem_count: i32) -> TypeId:
+    mut fn ensure_tuple_type(elems: &List[i32], elem_count: i32) -> TypeId:
         let existing = self.find_tuple_type(elems, elem_count)
         if existing != 0:
             return existing
@@ -6447,13 +6452,13 @@ impl Sema:
     fn find_extern_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.find_fn_type_of_kind_u(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
-    fn ensure_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
+    mut fn ensure_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.ensure_callable_type(TypeKind.TY_FN, params, param_count, ret, 0)
 
-    fn ensure_extern_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
+    mut fn ensure_extern_fn_type(params: &List[i32], param_count: i32, ret: TypeId) -> TypeId:
         self.ensure_callable_type(TypeKind.TY_EXTERN_FN, params, param_count, ret, 0)
 
-    fn ensure_callable_type(kind: i32, params: &List[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
+    mut fn ensure_callable_type(kind: i32, params: &List[i32], param_count: i32, ret: TypeId, flags: i32) -> TypeId:
         let existing = self.find_fn_type_of_kind_u(kind, params, param_count, ret, flags)
         if existing != 0:
             return existing
@@ -6525,7 +6530,7 @@ impl Sema:
     // §16.11: the unsafe twin of a callable type — the same parameters and
     // result, unsafe to call. A function whose direct call needs `unsafe`
     // has this type as a value (#1829).
-    fn unsafe_callable_type(tid: i32) -> i32:
+    mut fn unsafe_callable_type(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let kind = self.get_type_kind(resolved)
         if (kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN) or self.fn_type_is_unsafe(resolved) != 0:
@@ -6539,7 +6544,7 @@ impl Sema:
 
     // #1832: the C variadic function-pointer type of a variadic function's
     // signature: its fixed parameters, then `...`.
-    fn variadic_callable_type(tid: i32) -> i32:
+    mut fn variadic_callable_type(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let param_count = self.get_type_d1(resolved)
         let start = self.get_type_d0(resolved)
@@ -6681,7 +6686,7 @@ impl Sema:
                 return ti as TypeId
         0 as TypeId
 
-    fn ensure_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
+    mut fn ensure_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
         let existing = self.find_generic_inst_type(base_sym, args, arg_count)
         if existing != 0:
             return existing
@@ -6806,7 +6811,7 @@ impl Sema:
 
     // A generic inst whose template reflects fields/variants now but whose
     // caches were filled when it reflected none (see eager_type_caches_pass).
-    fn generic_inst_prereg_pending(tid: i32) -> i32:
+    mut fn generic_inst_prereg_pending(tid: i32) -> i32:
         if self.type_reflection_field_count(tid) > 0 and not self.generic_struct_field_index_type_cache.contains(sema_pair_key(tid, 0)):
             return 1
         if self.type_reflection_variant_count(tid) > 0:
@@ -7134,7 +7139,7 @@ impl Sema:
     // the one recorded when the instance was resolved, else the symbol's
     // template as reflection finds it (an instance minted without a type
     // expression — an intrinsic's result, a builtin container).
-    fn generic_inst_template_tid(tid: i32) -> i32:
+    mut fn generic_inst_template_tid(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -7164,7 +7169,7 @@ impl Sema:
     // template's identity first; the flat symbol-keyed map (the newest
     // declaration of that name in any module) only for an instance with no
     // recorded template.
-    fn generic_inst_decl_node(tid: i32) -> i32:
+    mut fn generic_inst_decl_node(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let template = self.generic_inst_template_tid(resolved)
         if template != 0:
@@ -7185,7 +7190,7 @@ impl Sema:
     // `Handle[T]`, whose T a facade Handle's generic method call then
     // tried to infer. The flat map only for an owner with no type
     // (a builtin owner, #959).
-    fn owner_decl_node_for_type(owner_sym: i32, owner_type: i32) -> i32:
+    mut fn owner_decl_node_for_type(owner_sym: i32, owner_type: i32) -> i32:
         if owner_type != 0:
             let resolved = self.resolve_alias(owner_type as TypeId) as i32
             if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
@@ -7477,7 +7482,7 @@ impl Sema:
     // substitute_type: walk a TypeId, replacing type parameters with concrete types.
     // subst_syms/subst_tids/count define the mapping: subst_syms[i] → subst_tids[i].
     // Returns the substituted TypeId, or the original if no substitution applies.
-    fn substitute_type(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+    mut fn substitute_type(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
         if tid <= 0 or count == 0:
             return tid
         let kind = self.get_type_kind(tid as TypeId)
@@ -7720,7 +7725,7 @@ impl Sema:
 
     // ── Scope management ─────────────────────────────────────────────
 
-    fn push_scope() -> Unit:
+    mut fn push_scope() -> Unit:
         self.scope_starts.push(self.bind_names.len() as i32)
 
     mut fn emit_pending_generic_binding_error(sym: i32):
@@ -7791,7 +7796,7 @@ impl Sema:
             return 1
         0
 
-    fn scope_insert_at(sym: i32, tid: i32, is_mut: i32):
+    mut fn scope_insert_at(sym: i32, tid: i32, is_mut: i32):
         let idx = self.bind_names.len() as i32
         self.bind_names.push(sym)
         self.bind_types.push(tid)
@@ -8018,7 +8023,7 @@ impl Sema:
         if existing_kind == GLOBAL_VALUE_DECL_EXTERN and decl_kind != GLOBAL_VALUE_DECL_EXTERN:
             self.global_value_decl_kinds.insert(sym, decl_kind)
 
-    fn scope_lookup(sym: i32) -> i32:
+    mut fn scope_lookup(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_types[opt.unwrap()]
@@ -8100,7 +8105,7 @@ impl Sema:
     // moved value" whenever the stale bytes held `f`'s symbol — a verdict
     // that flipped with unrelated source text (src/main.w:3003 on one tree,
     // :2008 on another).
-    fn field_move_path_for_expr(node: i32) -> FieldMovePath:
+    mut fn field_move_path_for_expr(node: i32) -> FieldMovePath:
         let none = FieldMovePath { base_sym: 0, path_start: 0, path_count: 0 }
         let base_sym = self.place_root_sym(node)
         if base_sym == 0:
@@ -8113,7 +8118,7 @@ impl Sema:
             return none
         FieldMovePath { base_sym, path_start, path_count }
 
-    fn mark_field_moved(node: i32):
+    mut fn mark_field_moved(node: i32):
         let path = self.field_move_path_for_expr(node)
         if path.base_sym == 0:
             return
@@ -8132,7 +8137,7 @@ impl Sema:
         if self.marking_explicit_move != 0:
             self.explicitly_partial_syms.insert(base_sym, 1)
 
-    fn field_is_moved(node: i32) -> i32:
+    mut fn field_is_moved(node: i32) -> i32:
         let path = self.field_move_path_for_expr(node)
         if path.base_sym == 0:
             return 0
@@ -8675,7 +8680,7 @@ impl Sema:
                 provenance.poisoned_binding_node = 0
                 slot.set(provenance)
 
-    fn set_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
+    mut fn set_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
         if sym == 0:
             return
         if param_mask == 0 and deps.len() == 0:
@@ -8723,7 +8728,7 @@ impl Sema:
     // pushed element's borrow origins to the container binding, so a later escape
     // of the container is caught by the ephemeral-escape checks.
     // One row of `sym`'s view facts as they stand now (explain:origin).
-    fn note_view_fact(sym: i32, node: i32, event: i32):
+    mut fn note_view_fact(sym: i32, node: i32, event: i32):
         if sym == 0: return
         self.view_fact_fns.push(self.current_fn_symbol)
         self.view_fact_syms.push(sym)
@@ -8737,7 +8742,7 @@ impl Sema:
         for di in 0..count: self.view_fact_deps.push(self.binding_view_dep_at(sym, di))
         self.view_fact_dep_counts.push(count)
 
-    fn add_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
+    mut fn add_binding_view_deps(sym: i32, param_mask: i32, deps: &List[i32]):
         if sym == 0:
             return
         if param_mask == 0 and deps.len() == 0:
@@ -8814,7 +8819,7 @@ impl Sema:
             return self.bind_provenance[opt.unwrap()].poisoned_binding_node
         0
 
-    fn poison_live_views_for_origin(origin_sym: i32, origin_node: i32):
+    mut fn poison_live_views_for_origin(origin_sym: i32, origin_node: i32):
         if origin_sym == 0:
             return
         for bi in 0..self.bind_names.len():
@@ -8837,7 +8842,7 @@ impl Sema:
             if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
 
-    fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> i32:
+    mut fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> i32:
         if node == 0 or origin_sym == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -8903,7 +8908,7 @@ impl Sema:
                 return 1
         0
 
-    fn binding_value_depends_on_origin(sym: i32, origin_sym: i32) -> i32:
+    mut fn binding_value_depends_on_origin(sym: i32, origin_sym: i32) -> i32:
         if not self.binding_value_nodes.contains(sym):
             return 0
         self.expr_view_depends_on_origin(self.binding_value_nodes.get(sym).unwrap(), origin_sym)
@@ -8927,7 +8932,7 @@ impl Sema:
             return 1
         if self.impl_extra_is_std[record_idx] == want_std: 1 else: 0
 
-    fn type_has_drop_impl(tid: i32) -> i32:
+    mut fn type_has_drop_impl(tid: i32) -> i32:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
@@ -9050,7 +9055,7 @@ impl Sema:
     // changed.
     // The declaration node whose fields decide tid's liveness byte: the
     // laid-out type's own, by identity (see liveness_byte_decl_cache).
-    fn struct_decl_node_for_liveness(name_sym: i32, tid: i32) -> i32:
+    mut fn struct_decl_node_for_liveness(name_sym: i32, tid: i32) -> i32:
         var decl = if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_GENERIC_INST: self.generic_inst_decl_node(tid) else: 0
         if decl == 0 and self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
             decl = self.type_decl_nodes_by_tid.get(self.resolve_alias(tid as TypeId) as i32).unwrap()
@@ -9092,7 +9097,7 @@ impl Sema:
     // The frozen verdict for the type `tid` itself denotes: its own
     // declaration's row, the name row only when no declaration row was
     // recorded (a builtin recorded before any module existed).
-    fn struct_liveness_byte_frozen_tid(name_sym: i32, tid: i32) -> i32:
+    mut fn struct_liveness_byte_frozen_tid(name_sym: i32, tid: i32) -> i32:
         let decl = self.struct_decl_node_for_liveness(name_sym, tid)
         if decl != 0 and self.liveness_byte_decl_cache.contains(decl):
             return self.liveness_byte_decl_cache.get(decl).unwrap()
@@ -9486,7 +9491,7 @@ impl Sema:
                 self.diags.emit(move diag)
                 return
 
-    fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &List[i32]):
+    mut fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &List[i32]):
         if expr_node == 0:
             return
         self.expr_view_storage_origins.remove(expr_node)
@@ -9509,7 +9514,7 @@ impl Sema:
 
     // Narrows the storage subset of a node's recorded origins; called after
     // set_expr_view_deps, which resets it to the whole mask.
-    fn set_expr_view_storage_mask(expr_node: i32, storage_mask: i32):
+    mut fn set_expr_view_storage_mask(expr_node: i32, storage_mask: i32):
         if expr_node == 0 or not self.expr_view_param_origins.contains(expr_node):
             return
         let whole = self.expr_view_origin_mask(expr_node)
@@ -9538,7 +9543,7 @@ impl Sema:
         let start = self.expr_view_dep_starts.get(expr_node).unwrap()
         self.expr_view_dep_data[(start + idx)]
 
-    fn set_closure_capture_summary(closure_node: i32, capture_syms: &List[i32], capture_effs: &List[i32]):
+    mut fn set_closure_capture_summary(closure_node: i32, capture_syms: &List[i32], capture_effs: &List[i32]):
         if closure_node == 0:
             return
         let start = self.closure_capture_summary_data.len() as i32
@@ -9629,7 +9634,7 @@ impl Sema:
 
     // ── Function signature management ────────────────────────────────
 
-    fn add_sig(name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
+    mut fn add_sig(name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
         let idx = self.sig_names.len() as i32
         self.sig_names.push(name)
         // get_visible_sig matches by resolved text; chain the signatures
@@ -9855,7 +9860,7 @@ impl Sema:
     // explain:effect provenance recording. Value packs kind*2^56 + a*2^28 + b:
     // kind 1 = direct (a = AST node, b = file id); kind 2 = effect-flow edge
     // (a = callee sig, b = callee param). First set wins.
-    fn record_effect_provenance_direct(sig: i32, pi: i32, bits: i32, node: i32):
+    mut fn record_effect_provenance_direct(sig: i32, pi: i32, bits: i32, node: i32):
         if (bits & EFF_CONSUME) != 0:
             self.record_effect_provenance_bit(sig, pi, 0, 1, node, self.local_file_id)
         if (bits & EFF_ESCAPE_VALUE) != 0:
@@ -9865,7 +9870,7 @@ impl Sema:
         if (bits & EFF_RAW_PTR_VALIDITY) != 0:
             self.record_effect_provenance_bit(sig, pi, 3, 1, node, self.local_file_id)
 
-    fn record_effect_provenance_edge(sig: i32, pi: i32, bits: i32, callee_sig: i32, callee_pi: i32):
+    mut fn record_effect_provenance_edge(sig: i32, pi: i32, bits: i32, callee_sig: i32, callee_pi: i32):
         if (bits & EFF_CONSUME) != 0:
             self.record_effect_provenance_bit(sig, pi, 0, 2, callee_sig, callee_pi)
         if (bits & EFF_ESCAPE_VALUE) != 0:
@@ -9875,7 +9880,7 @@ impl Sema:
         if (bits & EFF_RAW_PTR_VALIDITY) != 0:
             self.record_effect_provenance_bit(sig, pi, 3, 2, callee_sig, callee_pi)
 
-    fn record_effect_provenance_bit(sig: i32, pi: i32, bit_idx: i32, kind: i64, a: i32, b: i32):
+    mut fn record_effect_provenance_bit(sig: i32, pi: i32, bit_idx: i32, kind: i64, a: i32, b: i32):
         let key = effect_prov_key(sig, pi, bit_idx)
         if self.effect_prov.contains(key):
             return
@@ -9883,7 +9888,7 @@ impl Sema:
 
     // `mask`: the parameters the returned view may originate from;
     // `storage_mask`: the subset whose own storage it may point into.
-    fn note_param_view_fact(pi: i32, storage: bool, node: i32):
+    mut fn note_param_view_fact(pi: i32, storage: bool, node: i32):
         self.param_view_fact_sigs.push(self.current_fn_sig_idx)
         self.param_view_fact_params.push(pi)
         self.param_view_fact_storage.push(if storage: 1 else: 0)
@@ -9961,7 +9966,7 @@ impl Sema:
             return self.effect_arg_is_projection(self.ast.get_data0(node))
         1
 
-    fn record_effect_edge(callee_sig: i32, callee_pi: i32, arg_node: i32):
+    mut fn record_effect_edge(callee_sig: i32, callee_pi: i32, arg_node: i32):
         let caller_sig = self.current_fn_sig_idx
         if caller_sig < 0 or callee_sig < 0 or callee_pi < 0 or arg_node <= 0:
             return
@@ -9976,7 +9981,7 @@ impl Sema:
             if pi != caller_pi and (raw_origins & sema_param_origin_bit(pi)) != 0:
                 self.record_effect_edge_for_param(caller_sig, pi, callee_sig, callee_pi, 1)
 
-    fn record_effect_edge_for_param(caller_sig: i32, caller_pi: i32, callee_sig: i32, callee_pi: i32, projection: i32):
+    mut fn record_effect_edge_for_param(caller_sig: i32, caller_pi: i32, callee_sig: i32, callee_pi: i32, projection: i32):
         self.effect_flow_edges.push(caller_sig)
         self.effect_flow_edges.push(caller_pi)
         self.effect_flow_edges.push(callee_sig)
@@ -10074,7 +10079,7 @@ impl Sema:
             return self.concrete_specialization_nodes[specialization.unwrap()]
         0
 
-    fn sig_is_drop_body(sig: i32) -> bool:
+    mut fn sig_is_drop_body(sig: i32) -> bool:
         let node = self.receiver_decl_node_for_sig(sig)
         if node == 0: return false
         let impl_node = self.impl_node_for_method_decl(node)
@@ -10086,6 +10091,8 @@ impl Sema:
         for si in 0..self.sig_names.len() as i32:
             if self.receiver_decl_node_for_sig(si) == node and self.sig_get_param_count(si) > 0:
                 required = required | (self.sig_param_effect(si, 0) & EFF_DECLARED_MASK)
+                if self.receiver_write_demand_sigs.contains(si):
+                    required = required | EFF_WRITE
         required
 
     fn receiver_decl_has_effect_signature(node: i32) -> bool:
@@ -10268,7 +10275,7 @@ impl Sema:
 
     // #D5/P1: record a plain non-Copy value argument (with its file) for the
     // post-fixpoint ownership check.
-    fn record_consume_call_site(arg_node: i32, callee_sig: i32, callee_pi: i32):
+    mut fn record_consume_call_site(arg_node: i32, callee_sig: i32, callee_pi: i32):
         if arg_node <= 0 or callee_sig < 0 or callee_pi < 0:
             return
         self.consume_call_sites.push(arg_node)
@@ -10344,7 +10351,7 @@ impl Sema:
             if self.sig_param_uses_value_ref_abi(callee_sig, callee_pi) != 0:
                 continue
 
-    fn get_sig(name: i32) -> i32:
+    mut fn get_sig(name: i32) -> i32:
         // An extern declaration is its module's view of a C symbol, as a C
         // prototype is a translation unit's: a module that declares `strlen`
         // calls it through its own signature whatever other modules declare
@@ -10368,7 +10375,7 @@ impl Sema:
     // module it imports directly (a corpus's `defs`), else one it reaches
     // through its imports (the walk is cached). Symbols are matched by text:
     // every imported module's names live in its own pool.
-    fn extern_view_sig(text: &str) -> i32:
+    mut fn extern_view_sig(text: &str) -> i32:
         if not self.extern_fn_texts.contains(text): return -1
         let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ text)
         if own.is_some() and own.unwrap() >= 0: return own.unwrap()
@@ -10386,7 +10393,7 @@ impl Sema:
             i = self.extern_chain_prev.get(i) ?? -1
         -1
 
-    fn get_visible_sig(name: i32) -> i32:
+    mut fn get_visible_sig(name: i32) -> i32:
         let direct = self.get_sig(name)
         if direct >= 0:
             return direct
@@ -10425,7 +10432,7 @@ impl Sema:
             return 1
         0
 
-    fn fn_node_is_generic_template(node: i32, sym: i32) -> i32:
+    mut fn fn_node_is_generic_template(node: i32, sym: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_FN_DECL:
             return 0
         let meta = self.ast.find_fn_meta(node)
@@ -10511,7 +10518,7 @@ impl Sema:
                 return 1
         0
 
-    fn generic_fn_node_for_symbol(sym: i32) -> i32:
+    mut fn generic_fn_node_for_symbol(sym: i32) -> i32:
         if sym == 0:
             return 0
         let target = self.pool_resolve_symbol(sym)
@@ -10621,7 +10628,7 @@ impl Sema:
             return self.fn_clause_group_lookup.get(dispatch_sym).unwrap()
         -1
 
-    fn ensure_fn_clause_group(dispatch_sym: i32) -> i32:
+    mut fn ensure_fn_clause_group(dispatch_sym: i32) -> i32:
         let existing = self.fn_clause_group_index(dispatch_sym)
         if existing >= 0:
             return existing
@@ -11125,7 +11132,7 @@ impl Sema:
 
     // Frozen twin for MIR lowering; sema's acceptance of the coercion during
     // checking preregistered any generic-inst impl answer it needs.
-    fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> i32:
+    mut fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> i32:
         if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
             return 0
         let exp_pointee = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
@@ -11138,7 +11145,7 @@ impl Sema:
             return 0
         self.type_implements_trait_frozen(act_pointee, self.get_type_d0(exp_pointee))
 
-    fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
+    mut fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
         if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
             return 0
         let param_count = self.get_type_d1(expected)
@@ -11151,7 +11158,7 @@ impl Sema:
                 return 0
         self.types_compatible_frozen(self.get_type_d2(expected), self.get_type_d2(actual))
 
-    fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> i32:
+    mut fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
@@ -11163,7 +11170,7 @@ impl Sema:
             return 0
         self.types_compatible_frozen(exp_pointee, self.get_type_d0(act_r))
 
-    fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:
+    mut fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:
         if expected == actual:
             return 1
         if expected == 0 or actual == 0:
@@ -11261,7 +11268,7 @@ impl Sema:
             return 0
         0
 
-    fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> i32:
+    mut fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> i32:
         if self.types_compatible_fast_frozen(expected, actual) != 0:
             return 1
 
@@ -11659,7 +11666,7 @@ impl Sema:
         if incomplete_before != 0: self.copy_walk_incomplete = 1
         out
 
-    fn has_drop_method(type_name: i32) -> i32:
+    mut fn has_drop_method(type_name: i32) -> i32:
         if type_name <= 0:
             return 0
         if let Some(cached) = self.drop_method_cache.get(type_name):
@@ -11669,7 +11676,7 @@ impl Sema:
         self.drop_method_cache.insert(type_name, has)
         has
 
-    fn record_drop_consumed_field(owner_sym: i32, field_sym: i32):
+    mut fn record_drop_consumed_field(owner_sym: i32, field_sym: i32):
         if owner_sym == 0 or field_sym == 0:
             return
         for i in 0..self.drop_consumed_field_owner_syms.len():

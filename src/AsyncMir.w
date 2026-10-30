@@ -56,7 +56,7 @@ fn AsyncMirBody.init(fn_sym: i32, flavor: i32) -> AsyncMirBody:
     }
 
 impl AsyncMirBody:
-    fn add_suspend(kind: i32, span_start: i32, span_end: i32, resume_bb: i32, live_locals: i32, storage_dead: i32, drop_count: i32) -> Unit:
+    mut fn add_suspend(kind: i32, span_start: i32, span_end: i32, resume_bb: i32, live_locals: i32, storage_dead: i32, drop_count: i32) -> Unit:
         let idx = self.suspend_kinds.len() as i32
         self.suspend_kinds.push(kind)
         self.suspend_span_starts.push(span_start)
@@ -91,7 +91,7 @@ impl AsyncMirModule:
     fn deinit():
         return
 
-    fn add_body(body: AsyncMirBody) -> Unit:
+    mut fn add_body(body: AsyncMirBody) -> Unit:
         let fn_sym: i32 = body.fn_sym
         self.bodies.push(move body)
         self.body_fn_syms.push(fn_sym)
