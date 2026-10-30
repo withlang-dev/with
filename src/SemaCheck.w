@@ -28038,6 +28038,19 @@ impl Sema:
                 self.fn_param_invocations.insert(fn_sym, invocations)
                 if invocations > 1 and not self.fn_param_many_nodes.contains(fn_sym):
                     self.fn_param_many_nodes.insert(fn_sym, node)
+            // D173 (§29.8): the name is resolved once, lexically; a local
+            // that is not callable is an error at the call, never a fallback
+            // to the module-scope function it shadows.
+            if local_tid >= 0 and callable_value_tid == 0 and self.scope_binding_is_local(fn_sym):
+                let local_name: str = with_str_clone_ref(self.pool_resolve(fn_sym))
+                let at = Span { file: self.local_file_id, start: self.ast.get_start(callee), end: self.ast.get_end(callee) }
+                var diag = Diagnostic.err(f"'{local_name}' is not callable", at)
+                diag.add_label(at, f"'{local_name}' resolves to a local binding of type {self.type_name(local_tid)}")
+                let fn_text_sym = self.canonical_symbol_by_text(fn_sym)
+                if self.get_sig(fn_text_sym) >= 0 or self.generic_fn_node_for_symbol(fn_text_sym) != 0:
+                    diag.add_note(f"this binding shadows the function '{local_name}' declared at module scope")
+                self.diags.emit(diag)
+                return 0
             // #2568: a name a runtime intrinsic has (`src()`) that another
             // module's own declaration took is still the intrinsic where that
             // declaration is not visible (a default argument checked in its
