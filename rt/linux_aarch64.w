@@ -1178,8 +1178,15 @@ fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
             return -1
         if timeout_ms > 0 and with_clock_nanos() - start_ns >= timeout_ns:
             let _term = rt_libc_kill(-pid, POSIX_SIGTERM)
-            let _sleep = with_usleep(10000)
-            let waited_after_term = rt_libc_waitpid(pid, &raw mut status, POSIX_WNOHANG)
+            // Each program forwards the signal down its own tree before it
+            // exits (with_install_interrupt_handlers): a second for that, then
+            // KILL. Ten milliseconds killed the parent mid-forward.
+            var waited_after_term = 0
+            var grace = 0
+            while grace < 100 and waited_after_term != pid:
+                let _sleep = with_usleep(10000)
+                waited_after_term = rt_libc_waitpid(pid, &raw mut status, POSIX_WNOHANG)
+                grace += 1
             if waited_after_term != pid:
                 let _kill = rt_libc_kill(-pid, 9)
                 let _wait = rt_libc_waitpid(pid, &raw mut status, 0)
