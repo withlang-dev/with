@@ -5537,6 +5537,54 @@ fn bs_check_migrate_shared_defs_cross_module_test(ctx: &ActionCtx, compiler_path
     if check.rc != 0: return check.rc
     0
 
+// A macro constant that names a unit's `static` table (pcre2test's
+// `cmdlistcount`, `sizeof(cmdlist) / sizeof(cmdstruct)`, D119's
+// `cmdlist.len()`) is the unit's own: shared defs cannot see a private
+// global. The constant precedes the table it reads, and the program prints
+// the table's length.
+fn bs_check_migrate_shared_defs_unit_static_count(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let generated_dir = bs_join(case_dir, "generated")
+    let check_dir = bs_join(case_dir, "check_project")
+    var rc = bs_write_fixture(ctx, bs_join(case_dir, "api.h"), "#define TABLE_LIMIT 8\nint helper(int x);\n", "unit static count header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "lib.c"), "#include \"api.h\"\n\nint helper(int x) {\n  return x + TABLE_LIMIT;\n}\n", "unit static count lib")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "example.c"), "#include \"api.h\"\n#include <stdio.h>\n\ntypedef struct { const char *name; int value; } cmdstruct;\nstatic cmdstruct cmdlist[] = { {\"a\", 1}, {\"b\", 2}, {\"c\", 3} };\n#define cmdlistcount (sizeof(cmdlist)/sizeof(cmdstruct))\n\nint main(void) {\n  printf(\"%d %d\\n\", (int)cmdlistcount, helper(0));\n  return 0;\n}\n", "unit static count example")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("--no-c-export")
+    args |> push("--shared-defs")
+    args |> push("testpkg.defs")
+    args |> push("-I")
+    args |> push(bs_abs(root, case_dir))
+    args |> push("-o")
+    args |> push(bs_abs(root, generated_dir))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-shared-defs-unit-static-count", args)
+    if result.rc != 0: return result.rc
+    let example_w = bs_join(generated_dir, "example.w")
+    rc = bs_file_forbids(ctx, bs_join(generated_dir, "defs.w"), "cmdlistcount", "shared_defs_unit_static_count defs")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, example_w, "cmdlist.len()", "shared_defs_unit_static_count example")
+    if rc != 0: return rc
+    let fs = ctx.fs()
+    if fs.mkdir_all(bs_join(check_dir, "lib/testpkg")) != 0:
+        return bs_fail(ctx, "could not create shared_defs_unit_static_count check project")
+    if fs.write_text(bs_join(check_dir, "lib/testpkg/defs.w"), fs.read_text(bs_join(generated_dir, "defs.w"))) != 0:
+        return bs_fail(ctx, "could not write shared_defs_unit_static_count defs")
+    if fs.write_text(bs_join(check_dir, "lib/testpkg/lib.w"), fs.read_text(bs_join(generated_dir, "lib.w"))) != 0:
+        return bs_fail(ctx, "could not write shared_defs_unit_static_count lib")
+    if fs.write_text(bs_join(check_dir, "main.w"), fs.read_text(example_w)) != 0:
+        return bs_fail(ctx, "could not write shared_defs_unit_static_count main")
+    var run_args: List[str] = List.new()
+    run_args |> push("run")
+    run_args |> push("main.w")
+    let run = bs_migrate_expect_success(ctx, compiler_path, check_dir, "run-shared-defs-unit-static-count", run_args)
+    if run.rc != 0: return run.rc
+    bs_assert_contains(ctx, run.stdout, "3 8", "shared_defs_unit_static_count run")
+
 fn bs_check_migrate_switch_macro_case_values(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "switch_macro_cases.c")
@@ -6430,6 +6478,8 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_shared_defs_ownerless_extern(ctx, compiler_path, bs_join(output_dir, "shared_defs_ownerless_extern"))
     if rc != 0: return rc
     rc = bs_check_migrate_shared_defs_cross_module_test(ctx, compiler_path, bs_join(output_dir, "shared_defs_cross_module_test"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_shared_defs_unit_static_count(ctx, compiler_path, bs_join(output_dir, "shared_defs_unit_static_count"))
     if rc != 0: return rc
     rc = bs_check_migrate_switch_macro_case_values(ctx, compiler_path, bs_join(output_dir, "switch_macro_case_values"))
     if rc != 0: return rc

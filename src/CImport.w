@@ -4214,6 +4214,27 @@ fn ci_macro_expands_empty(session: i64, indices: &HashMap[str, i32], index: i32,
         pos = end
     true
 
+// The variables the unit defines (its `static`s and the definitions in its
+// own file): the unit's module holds them, so a constant whose value names
+// one is the unit's own, emitted after them (§9.1c), never the shared defs'
+// (pcre2test's `cmdlistcount` is `sizeof(cmdlist) / sizeof(cmdstruct)`,
+// D119's `cmdlist.len()`, and `cmdlist` is static).
+fn ci_unit_var_names(type_session: i64) -> List[str]:
+    var names: List[str] = List.new()
+    for i in 0..with_cimport_decl_count(type_session):
+        if with_cimport_decl_kind(type_session, i) != CK_VAR: continue
+        let defined_here = ci_migrate_var_in_primary_file(type_session, i, g_migrate_current_input_path) and ci_migrate_var_definition_kind(type_session, i) != CI_VAR_DECL_ONLY
+        if with_cimport_var_storage_class(type_session, i) == CX_SC_STATIC or defined_here:
+            names.push(with_cimport_decl_name(type_session, i))
+    names
+
+// The constant `line` goes to the shared defs unless it names one of
+// `unit_vars`; false means the caller emits it into the unit.
+fn ci_macro_shared_let_add(unit_vars: &List[str], name: &str, line: &str) -> bool:
+    for v in unit_vars:
+        if ci_migrate_text_mentions_ident(line, v): return false
+    ci_migrate_shared_decl_add("let", name, line)
+
 fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> str:
     let cxx = with_cimport_is_cxx(type_session)
     let count = with_cimport_macro_count(session)
@@ -4230,6 +4251,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
     var literal_values = ""
     var blank_macros = ""
     let object_macro_types = ci_collect_object_macro_type_map(session, macro_source, cxx)
+    let unit_vars = ci_unit_var_names(type_session)
     g_migrate_macro_session = session
     var probes = CiMacroProbes.new()
     for i in 0..count:
@@ -4494,7 +4516,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                 lit_ann = lit_range_ann
             ci_record_int_const_type(name, lit_ann)
             let let_line = "let " ++ safe_name ++ ": " ++ lit_ann ++ " = " ++ ci_render_int_value(clean_value)
-            if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+            if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else if ci_is_char_literal(stripped):
             let char_val = ci_char_to_int(stripped)
@@ -4503,7 +4525,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                 ci_mark_macro_const_emitted(name)
                 known_values = known_values ++ name ++ "=" ++ char_val ++ "|"
                 let let_line = "let " ++ safe_name ++ ": i32 = " ++ char_val
-                if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+                if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                     output = output ++ let_line ++ "\n"
         else if ci_is_float_literal(stripped) and ci_float_type_from_suffix(stripped) == "c_longdouble" and not ci_c_long_double_representable(with_cimport_target_triple()):
             // #2176: an `L` literal is a long double, which this target has
@@ -4516,14 +4538,14 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
             let clean_value = ci_strip_float_suffix(stripped)
             ci_mark_macro_const_emitted(name)
             let let_line = "let " ++ safe_name ++ ": " ++ float_ty ++ " = " ++ clean_value
-            if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+            if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else if ci_is_concatenated_string(stripped) or ci_is_string_literal(stripped):
             let safe_name = ci_escape_reserved(name)
             let concat_value = ci_concat_strings(stripped)
             ci_mark_macro_const_emitted(name)
             let let_line = "let " ++ safe_name ++ " = " ++ concat_value
-            if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+            if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                 output = output ++ let_line ++ "\n"
         else:
             // A macro naming a declared type is a type alias, not a value:
@@ -4567,7 +4589,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                 if probe_result.len() > 0:
                     ci_mark_macro_const_emitted(name)
                     ci_record_int_const_type(name, ci_let_line_type(probe_result))
-                    if not ci_migrate_shared_decl_add("let", ci_escape_reserved(name), probe_result):
+                    if not ci_macro_shared_let_add(unit_vars, ci_escape_reserved(name), probe_result):
                         output = output ++ probe_result ++ "\n"
                     continue
             // Give constant macro invocations and offsetof their semantic
@@ -4629,7 +4651,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     ci_mark_macro_const_emitted(name)
                     ci_record_int_const_type(name, ci_translated_int_type(ref))
                     let ref_line = "let " ++ safe_name ++ " = " ++ ref
-                    if not ci_migrate_shared_decl_add("let", safe_name, ref_line):
+                    if not ci_macro_shared_let_add(unit_vars, safe_name, ref_line):
                         output = output ++ ref_line ++ "\n"
                     continue
                 ci_mark_macro_const_emitted(name)
@@ -4667,7 +4689,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     mac_value = "(" ++ mac_value ++ " as " ++ mac_ann ++ ")"
                 ci_record_int_const_type(name, mac_ann)
                 let let_line = "let " ++ safe_name ++ ": " ++ mac_ann ++ " = " ++ mac_value
-                if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+                if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                     output = output ++ let_line ++ "\n"
             else:
                 let eval_result = ci_eval_const_expr_ctx(stripped, known_values)
@@ -4682,7 +4704,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     // literal-fit check for every such limits.h macro.
                     ci_record_int_const_type(name, ci_int_annotation_for_value(eval_result))
                     let let_line = "let " ++ safe_name ++ ": " ++ ci_int_annotation_for_value(eval_result) ++ " = " ++ ci_render_int_value(eval_result)
-                    if not ci_migrate_shared_decl_add("let", safe_name, let_line):
+                    if not ci_macro_shared_let_add(unit_vars, safe_name, let_line):
                         output = output ++ let_line ++ "\n"
                 else:
                     // No typed translation and no constant value: the macro

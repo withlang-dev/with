@@ -12620,13 +12620,18 @@ impl Sema:
         // Check local/param scope (always visible — local bindings are never c_import).
         // §18.1/§18.2: a qualified name names a declaration; a local of the
         // short name does not shadow it.
-        let tid = if self.ast.is_namespace_bound(node as NodeId) and self.scope_binding_is_local(sym): -1 else: self.scope_lookup(sym)
+        var tid = if self.ast.is_namespace_bound(node as NodeId) and self.scope_binding_is_local(sym): -1 else: self.scope_lookup(sym)
 
         // A parameter or local shadows every global of its name. The checks below
         // look the name up again, and found another module's private global:
         // a top-level `let ptr` broke every imported function with a `ptr`
         // parameter.
         let is_local = self.scope_binding_is_local(sym)
+        // A global read by another's initializer: refused when it is a later
+        // one of the same module (§9.1c), else checked first, so it is typed.
+        if tid >= 0 and not is_local and self.top_level_let_current >= 0 and not self.const_global_syms.contains(sym):
+            if not self.check_top_level_let_before_use(sym, node): return 0
+            tid = self.scope_lookup(sym)
         if tid >= 0:
             let binding_decl = self.binding_decl_node(sym)
             if not is_local and binding_decl != 0 and self.decl_node_visible_from_current(binding_decl) == 0 and self.has_extern_var_decl(sym) == 0:

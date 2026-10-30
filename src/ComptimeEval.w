@@ -8753,58 +8753,96 @@ impl Sema:
     // before it: a global left untyped after another's error made each later
     // use of it a false diagnostic ("missing return", "bitwise operator
     // requires integer operands"; #1836). A comptime value is evaluated only
-    // when its own check found no error.
+    // when its own check found no error. An initializer that reads another
+    // module's global declared later checks that one's first (check_ident),
+    // so the order of declarations never decides a type; one that reads a
+    // later global of its own module is refused (§9.1c).
     mut fn check_top_level_let_values():
         for di in 0..self.ast.decl_count():
-            self.update_decl_source_context(di)
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
-                continue
-            let value = self.ast.get_data1(decl)
-            // Zero-initialized `var x: T`, or D39 interface-provided storage:
-            // no initializer to check.
-            if value == 0 or self.ast.let_decl_is_interface_provided(decl):
-                continue
+            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.get_data1(decl) != 0 and not self.ast.let_decl_is_interface_provided(decl):
+                let name = self.ast.get_data0(decl)
+                if not self.top_level_let_pending.contains(name): self.top_level_let_pending.insert(name, di)
+        for di in 0..self.ast.decl_count():
+            self.check_top_level_let_value(di)
 
-            let name = self.ast.get_data0(decl)
-            let flags = self.ast.get_data2(decl)
-            if with_getenv_str("WITH_TRACE_TLL").len() > 0:
-                let t_ae = self.top_level_let_type_ann_extra(flags)
-                let t_an = if t_ae >= 0: self.ast.get_extra(t_ae) else: 0
-                let t_ak = if t_an != 0: self.ast.kind(t_an) as i32 else: -1
-                let t_asym = if t_an != 0 and t_ak == NodeKind.NK_TYPE_NAMED as i32: self.pool_resolve(self.ast.get_data0(t_an)) ++ "" else: "?".to_owned()
-                with_eprint(f"[tll] di={di} decl={decl} name='{self.pool_resolve(name)}' value={value} vkind={self.ast.kind(value) as i32} ann_extra={t_ae} ann_node={t_an} ann_kind={t_ak} ann_name='{t_asym}' resolved={self.resolve_type_expr(t_an) as i32}")
-            let errors_before = self.diags.count_by_severity(DiagSeverity.Error)
-            let is_comptime_value = if self.ast.kind(value) == NodeKind.NK_COMPTIME: 1 else: 0
-            // #643: every top-level initializer must be checked, including a
-            // plain annotated `let`/`var`. Skipping an initializer merely
-            // because collection already knew its declared type left nested
-            // expressions absent from typed_expr_types. Runtime-init MIR then
-            // lowered those unchecked expressions with fallback types; a cast
-            // used as a raw-pointer index base became TY_VOID and reached LLVM
-            // as a store of void. The annotation is the expected type, not a
-            // substitute for checking the value.
-            let type_value = if is_comptime_value != 0 and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
-            let ann_extra = self.top_level_let_type_ann_extra(flags)
-            let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
-            let val_type = if ann_type != 0: self.check_expr_with_expected(type_value, ann_type) else: self.check_expr(type_value)
-            // The annotation is an owned demand like a local one's (#1803).
-            if ann_type != 0 and val_type != 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
-                if self.types_compatible(ann_type as i32, val_type as i32) == 0:
-                    if self.arithmetic_result_type(ann_type, val_type) == 0:
-                        self.emit_error("type mismatch in binding", decl)
-            let final_type = if ann_type != 0: ann_type else: val_type
-            if final_type != 0:
-                self.typed_binding_types.insert(decl as i32, final_type as i32)
-                self.scope_update_type(name, final_type as i32)
-                let canonical_name = self.pool_lookup_symbol(self.pool_resolve(name))
-                if canonical_name != 0 and canonical_name != name:
-                    self.scope_update_type(canonical_name, final_type as i32)
-            if final_type != 0:
-                self.typed_expr_types.insert(value, final_type as i32)
-                // Only NK_COMPTIME stores an inner expression in data0. For an
-                // ordinary literal/identifier, data0 is a symbol, not a node.
-                if type_value != value:
-                    self.typed_expr_types.insert(type_value, final_type as i32)
-            if is_comptime_value != 0 and self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
-                let _ = self.force_eval_comptime_expr(value)
+    // The global `sym`'s initializer, checked before a use reads its type;
+    // false when the use is inside that initializer's own check.
+    mut fn check_top_level_let_before_use(sym: i32, node: i32) -> bool:
+        let di = self.top_level_let_pending.get(sym) ?? -1
+        if di < 0: return true
+        let state = self.top_level_let_state.get(self.ast.get_decl(di)) ?? 0
+        if state == 1:
+            self.emit_error("the initializer of global `" ++ self.pool_resolve(sym) ++ "` reads its own value", node)
+            return false
+        let outer = self.top_level_let_current
+        if state == 0 and outer >= 0:
+            // §9.1c: a module's initializers run in declaration order, so a
+            // later global of the same module has no value yet.
+            if self.decl_source_paths[di] == self.decl_source_paths[outer]:
+                self.emit_error("the initializer of global `" ++ self.pool_resolve(self.ast.get_data0(self.ast.get_decl(outer))) ++ "` reads `" ++ self.pool_resolve(sym) ++ "`, declared after it: a module's initializers run in declaration order (§9.1c)", node)
+                return false
+            self.check_top_level_let_value(di)
+            self.update_decl_source_context(outer)
+        true
+
+    mut fn check_top_level_let_value(di: i32):
+        let decl = self.ast.get_decl(di)
+        if self.ast.kind(decl) != NodeKind.NK_LET_DECL or self.top_level_let_state.contains(decl):
+            return
+        self.update_decl_source_context(di)
+        let value = self.ast.get_data1(decl)
+        // Zero-initialized `var x: T`, or D39 interface-provided storage:
+        // no initializer to check.
+        if value == 0 or self.ast.let_decl_is_interface_provided(decl):
+            return
+        self.top_level_let_state.insert(decl, 1)
+        let outer = self.top_level_let_current
+        self.top_level_let_current = di
+        self.check_top_level_let_initializer(di, decl, value)
+        self.top_level_let_current = outer
+        self.top_level_let_state.insert(decl, 2)
+
+    mut fn check_top_level_let_initializer(di: i32, decl: i32, value: i32):
+        let name = self.ast.get_data0(decl)
+        let flags = self.ast.get_data2(decl)
+        if with_getenv_str("WITH_TRACE_TLL").len() > 0:
+            let t_ae = self.top_level_let_type_ann_extra(flags)
+            let t_an = if t_ae >= 0: self.ast.get_extra(t_ae) else: 0
+            let t_ak = if t_an != 0: self.ast.kind(t_an) as i32 else: -1
+            let t_asym = if t_an != 0 and t_ak == NodeKind.NK_TYPE_NAMED as i32: self.pool_resolve(self.ast.get_data0(t_an)) ++ "" else: "?".to_owned()
+            with_eprint(f"[tll] di={di} decl={decl} name='{self.pool_resolve(name)}' value={value} vkind={self.ast.kind(value) as i32} ann_extra={t_ae} ann_node={t_an} ann_kind={t_ak} ann_name='{t_asym}' resolved={self.resolve_type_expr(t_an) as i32}")
+        let errors_before = self.diags.count_by_severity(DiagSeverity.Error)
+        let is_comptime_value = if self.ast.kind(value) == NodeKind.NK_COMPTIME: 1 else: 0
+        // #643: every top-level initializer must be checked, including a
+        // plain annotated `let`/`var`. Skipping an initializer merely
+        // because collection already knew its declared type left nested
+        // expressions absent from typed_expr_types. Runtime-init MIR then
+        // lowered those unchecked expressions with fallback types; a cast
+        // used as a raw-pointer index base became TY_VOID and reached LLVM
+        // as a store of void. The annotation is the expected type, not a
+        // substitute for checking the value.
+        let type_value = if is_comptime_value != 0 and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
+        let ann_extra = self.top_level_let_type_ann_extra(flags)
+        let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
+        let val_type = if ann_type != 0: self.check_expr_with_expected(type_value, ann_type) else: self.check_expr(type_value)
+        // The annotation is an owned demand like a local one's (#1803).
+        if ann_type != 0 and val_type != 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
+            if self.types_compatible(ann_type as i32, val_type as i32) == 0:
+                if self.arithmetic_result_type(ann_type, val_type) == 0:
+                    self.emit_error("type mismatch in binding", decl)
+        let final_type = if ann_type != 0: ann_type else: val_type
+        if final_type != 0:
+            self.typed_binding_types.insert(decl as i32, final_type as i32)
+            self.scope_update_type(name, final_type as i32)
+            let canonical_name = self.pool_lookup_symbol(self.pool_resolve(name))
+            if canonical_name != 0 and canonical_name != name:
+                self.scope_update_type(canonical_name, final_type as i32)
+        if final_type != 0:
+            self.typed_expr_types.insert(value, final_type as i32)
+            // Only NK_COMPTIME stores an inner expression in data0. For an
+            // ordinary literal/identifier, data0 is a symbol, not a node.
+            if type_value != value:
+                self.typed_expr_types.insert(type_value, final_type as i32)
+        if is_comptime_value != 0 and self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
+            let _ = self.force_eval_comptime_expr(value)
