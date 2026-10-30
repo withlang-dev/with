@@ -10169,6 +10169,9 @@ impl CCodegen:
                 self.mir_mod.body_fn_syms.push(init_sym)
                 self.mir_mod.bodies.push(body)
                 self.global_init_syms.push(sym)
+                if not self.sema.global_init_rank.contains(value):
+                    self.fail(f"emit-c: BUG: the initializer of global '{cc_intern_resolve(self.intern, sym)}' has no place in Sema's initialization order (D175)")
+                    return
                 self.global_init_decl_indices.push(di)
                 self.global_init_fn_syms.push(init_sym)
                 grew = true
@@ -10232,10 +10235,10 @@ impl CCodegen:
         let g = self.global_c_name(self.global_init_target(fn_sym))
         "    memcpy(&" ++ g ++ ", &_0, sizeof(" ++ g ++ "));\n    return;"
 
-    // The entry wrapper's calls, in declaration order (§9.1c).
+    // The entry wrapper's calls, in Sema's dependency order (§9.1c, D175).
     fn global_init_calls_text(skipped: &List[i32]) -> str:
         var out = ""
-        for di in 0..self.ast.decl_count():
+        for di in self.sema.global_init_order:
             for i in 0..self.global_init_decl_indices.len():
                 if self.global_init_decl_indices[i] == di and not skipped.contains(self.global_init_fn_syms[i]):
                     out = out ++ "    " ++ self.fn_c_name(self.global_init_fn_syms[i]) ++ "();\n"
