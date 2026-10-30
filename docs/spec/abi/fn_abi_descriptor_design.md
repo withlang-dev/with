@@ -115,7 +115,12 @@ parameter/receiver mode plus physical type shape: plain consuming scalars use
 form, explicit `&T` is a borrowed pointer value, `mut fn` receivers use
 `IndirectPlace`, `move fn` receivers use an owned mode, and dyn values use
 `Fat`. Inferred body effects remain analysis facts; they never select a
-different source ownership contract. Then:
+different source ownership contract.
+
+A `&T` parameter keeps `readonly` and `noalias` except where `T` contains
+the marker type, adjusted per §19 (D172).
+
+Then:
 
 - **Callee prologue** (`declare_function`): for each `ArgAbi`, emit the param type
   + attrs from `pass` (Direct → value; Indirect/IndirectPlace → `ptr` + byval/

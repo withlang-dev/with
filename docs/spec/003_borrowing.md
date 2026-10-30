@@ -7,8 +7,11 @@
 ```
 
 With has a single reference type: `&T`. There is no `&mut T` in safe
-code. Mutation is expressed through owned values (`mut self: Self`
-receivers), `with` scoped access, and `IndexPlace` projections.
+code. Mutation in place is a parameter mode, not a type: a `mut`
+receiver or a `mut` parameter (§3.8a) grants the callee exclusive
+access to the caller's place for the duration of the call. Mutation is
+otherwise expressed through owned values, `with` scoped access, and
+`IndexPlace` projections.
 
 For unsafe FFI, raw pointers (`*const T`, `*mut T`) and address-of
 (`&raw mut x`) provide mutable pointer semantics (§19).
@@ -24,16 +27,50 @@ Active shared borrows (`&T`) of a place are invalidated when that
 place is mutated. Mutation occurs through:
 
 - Assignment to the place (`x = value`)
-- Calling a `mut self` method on the place (`x.push(v)`)
+- Calling a `mut self` method on the place (`x.push(v)`), or passing
+  the place to a `mut` parameter (§3.8a)
 - Mutation through `with` scoped access or `IndexPlace` projection
 
 Enforced at compile time via view-liveness analysis.
 
-A `mut self` receiver is **exclusive** for the duration of the call:
-an argument to the same call may not retain access to the receiver's
-place — a reference to it or one of its fields, an iterator or view
-over it, or a shared-representation value (`str`, slice) read from
-its fields. Bind such values to a local before the call.
+A `mut` receiver or `mut` parameter is **exclusive** for the duration
+of the call: no other argument of the same call may retain access to
+its place — a reference to it or one of its fields, an iterator or view
+over it, a shared-representation value (`str`, slice) read from its
+fields, or the same place passed to a second parameter of either mode.
+Arguments to `mut` parameters naming structurally disjoint fields
+(§3.6) are not the same place. Exclusivity begins at call activation
+(§3.2a).
+
+### 3.2a Access Activation
+
+A call proceeds in four steps:
+
+1. Every argument expression is evaluated, left to right. A `mut`
+   argument's place is not moved or copied by this step.
+2. Each `mut` receiver or `mut` argument place is resolved. A place
+   containing an index projection is resolved before step 1 begins.
+   Any other place (a variable, a field path, or an auto-deref through
+   an owning pointer, §3.7) is resolved after step 1 ends.
+3. The exclusivity rules of §3.2 are checked against what step 1
+   produced.
+4. Exclusive access is activated and the callee is entered.
+
+An argument's evaluation may therefore mutate a place that a `mut`
+receiver or argument of the same call names, provided its result
+retains no access to that place when the call begins:
+
+```
+pool.add_node(pool.make_node(kind))   // make_node runs, then add_node
+state.child.update(state.reset())
+// the reset happens first; the child updated is the one that exists afterward
+```
+
+An argument mutates a place if it assigns to it, calls a `mut` method on
+it, or passes it to a `mut` parameter, directly or through any call in
+the argument's expression, as determined from declared modes. An
+argument that mutates a container read by an index projection of the
+same call's `mut` place is an error naming both.
 
 ### 3.3 Second-Class Restriction
 
@@ -208,7 +245,8 @@ This also works for method calls: `alice.greet()` works when
 `greet` takes `self: &Self`.
 
 **Restriction:** Auto-referencing only creates shared borrows
-(`&T`). Mutation uses `mut self` receivers on owned values:
+(`&T`). Mutation in place uses a `mut` receiver or a `mut` parameter
+(§3.8a):
 
 ```
 extend User:
@@ -225,8 +263,12 @@ binding remains valid afterward. A plain `T` parameter consumes: the
 argument is moved into the callee (copied, for `Copy` types), and the
 caller's binding is invalidated. No call-site annotation is ever
 required for either mode — a plain call `f(x)` is always legal and
-means whatever the signature says. `move x`, `copy x`, and `&x`
-remain available as explicit spellings of intent:
+means whatever the signature says. A `mut T` parameter mutates in
+place: the argument must be a mutable place, and the caller's binding
+remains valid afterward. `move x`, `copy x`, `mut x` and `&x` remain
+available as explicit spellings of intent. `mut x` at a call site is
+valid only where the parameter is `mut`; it never grants a mode the
+signature does not.
 
 ```with
 take(alice)        // signature take(a: User): consumes alice
@@ -354,6 +396,32 @@ does not introduce an ambient reference-to-value inference coercion.
 
 **The vibe:** "The function just wants to look at the data. I
 shouldn't have to manually type `&`."
+
+### 3.8a Mutable Parameters
+
+A parameter declared `mut p: T` receives exclusive, in-place access to
+the caller's argument for the duration of the call. Ownership does not
+transfer: on return the caller's place holds the value as the callee
+left it.
+
+```
+fn add_node(mut pool: AstPool, node: Node) -> NodeId:
+    pool.nodes.push(node)
+    pool.nodes.len() - 1
+
+var pool = AstPool.new()
+let id = add_node(pool, leaf)      // pool is mutated in place
+```
+
+- The argument must be a mutable place: a `var` binding, a field or
+  `IndexPlace` projection of one, or a `mut` parameter or receiver of
+  the enclosing function. Passing a `let` binding, a constant, a
+  temporary or a value reached through `&T` is an error.
+- The parameter is a mode, not a type. It cannot be stored in a field
+  or container, returned, or captured by an escaping closure. It may be
+  passed on to another `mut` parameter or used as a `mut` receiver.
+- Exclusivity and activation follow §3.2 and §3.2a.
+- A receiver `mut fn` is the same mode on the first parameter.
 
 ### 3.9 Implicit Trait Object Coercion
 
