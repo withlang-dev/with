@@ -1837,6 +1837,9 @@ impl Codegen:
     fn mir_fn_syms_len() -> i64: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms.len() }
     fn mir_fn_sym_at(i: i64) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).body_fn_syms[i] }
     fn mir_find_body_idx(sym: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).find_body(sym) }
+    // The module's body for the global initializer whose value is `value`
+    // (MirModule.global_init_body_syms), or 0 when its backend lowers it.
+    fn mir_global_init_body_sym(value: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).global_init_body_syms.get(value) ?? 0 }
     fn mir_resolve_alias_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_resolve_alias(tid) }
     fn mir_type_kind_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_get_type_kind(tid) }
     fn mir_type_d0_at(tid: i32) -> i32: unsafe { (*(self.mir_ptr as *const MirModule)).mir_get_type_d0(tid) }

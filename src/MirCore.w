@@ -323,6 +323,10 @@ type MirModule {
     bodies: List[MirBody],
     body_fn_syms: List[i32],
     body_index_by_fn_sym: HashMap[i32, i32],
+    // A global initializer lowered with the module (one that creates a
+    // closure or an async block, whose bodies must join the module): its
+    // value node to its body's symbol. Both backends run that body.
+    global_init_body_syms: HashMap[i32, i32],
     // Snapshot of sema type tables at lowering time.
     // MirLower takes sema by value; its List reallocs can free
     // the shared buffer that the caller's sema copy points to.
@@ -403,6 +407,7 @@ fn MirModule.init -> MirModule:
         bodies: List.new(),
         body_fn_syms: List.new(),
         body_index_by_fn_sym: HashMap.new(),
+        global_init_body_syms: HashMap.new(),
         sema_type_kinds: List.new(),
         sema_type_d0: List.new(),
         sema_type_d1: List.new(),

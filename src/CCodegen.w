@@ -10160,19 +10160,22 @@ impl CCodegen:
                 let value = self.ast.get_data1(decl)
                 if tid == 0 or self.global_init_text(value, tid, self.decl_source_text(decl)).len() > 0:
                     continue
-                let init_sym = self.intern.intern("__with_init_global_" ++ cc_sanitize_ident(cc_intern_resolve(self.intern, sym)) ++ f"__{sym}")
-                let saved_module = with_str_clone_ref(self.sema.current_module_path)
-                self.sema.current_module_path = self.decl_source_path(decl)
-                let body = self.lower_global_init_body(init_sym, value, tid)
-                self.sema.current_module_path = saved_module
-                let invalid = validate_use_after_kill(&body, &self.intern)
-                if invalid.len() > 0:
-                    self.fail(f"emit-c: the initializer of global '{cc_intern_resolve(self.intern, sym)}' lowered to invalid MIR: {invalid}")
-                    return
+                // An initializer that creates closures was lowered with the
+                // module, its closures beside it (MirModule.
+                // global_init_body_syms); any other is lowered here.
+                let module_body_sym = self.mir_mod.global_init_body_syms.get(value) ?? 0
+                let init_sym = if module_body_sym != 0: module_body_sym else: self.intern.intern("__with_init_global_" ++ cc_sanitize_ident(cc_intern_resolve(self.intern, sym)) ++ f"__{sym}")
+                if module_body_sym == 0:
+                    let saved_module = with_str_clone_ref(self.sema.current_module_path)
+                    self.sema.current_module_path = self.decl_source_path(decl)
+                    let body = self.lower_global_init_body(init_sym, value, tid)
+                    self.sema.current_module_path = saved_module
+                    let invalid = validate_use_after_kill(&body, &self.intern)
+                    if invalid.len() > 0:
+                        self.fail(f"emit-c: the initializer of global '{cc_intern_resolve(self.intern, sym)}' lowered to invalid MIR: {invalid}")
+                        return
+                    self.mir_mod.add_body(body)
                 self.body_fn_map.insert(init_sym, 1)
-                self.mir_mod.body_index_by_fn_sym.insert(init_sym, self.mir_mod.bodies.len() as i32)
-                self.mir_mod.body_fn_syms.push(init_sym)
-                self.mir_mod.bodies.push(body)
                 self.global_init_syms.push(sym)
                 if not self.sema.global_init_rank.contains(value):
                     self.fail(f"emit-c: BUG: the initializer of global '{cc_intern_resolve(self.intern, sym)}' has no place in Sema's initialization order (D175)")

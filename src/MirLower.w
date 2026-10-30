@@ -19772,6 +19772,18 @@ fn lower_debug_formatter(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, ent
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
+// Whether global `di`'s initializer creates a body of its own: a closure or
+// an async block among its nodes (they sit between the previous
+// declaration's nodes and its own, as check_callee_bodies_first scans them).
+fn global_initializer_creates_bodies(sema: &Sema, ast_pool: &AstPool, di: i32) -> bool:
+    let decl = ast_pool.get_decl(di)
+    var n = sema.body_order_lower[di] + 1
+    while n < decl:
+        let k = ast_pool.kind(n)
+        if k == NodeKind.NK_CLOSURE or k == NodeKind.NK_ASYNC_BLOCK: return true
+        n = n + 1
+    false
+
 fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirLowerResult:
     var sema = input_sema
     sema.prepare_source_line_offsets()
@@ -19814,6 +19826,27 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
         if sema.generic_fn_node_for_symbol(dispatch_sym) != 0:
             continue
         mir_mod.add_body(lower_fn_clause_dispatcher(&sema, ast_pool, pool, gi))
+
+    // A global initializer that creates a closure or an async block is
+    // lowered here, with the module: the bodies it creates join the module
+    // as a function's do, where codegen finds them (lowered in a backend,
+    // they reached no module and codegen stopped: "anonymous expression
+    // lacks retained MIR"). Such an initializer is never a constant; both
+    // backends run this body for its global.
+    var oi = 0
+    while oi < sema.global_init_order.len():
+        let di = sema.global_init_order[oi]
+        oi = oi + 1
+        let decl = ast_pool.get_decl(di)
+        let value = ast_pool.get_data1(decl)
+        let tid = sema.typed_binding_types.get(decl as i32) ?? 0
+        if tid == 0 or not global_initializer_creates_bodies(&sema, ast_pool, di): continue
+        sema.update_decl_source_context(di)
+        let init_sym = pool.intern(f"__with_init_body_{decl as i32}")
+        var builder = MirBuilder.init(&sema, ast_pool, pool, init_sym)
+        builder.lower_global_initializer(value, tid)
+        mir_mod.global_init_body_syms.insert(value, init_sym)
+        mir_mod.add_lowered_function(LoweredFunction { body: move builder.body, anonymous_bodies: move builder.anonymous_bodies })
 
     // Lower the dynamic specialization queue to a fixpoint. Rechecking a body
     // can discover nested calls, and preregistration can expose concrete
