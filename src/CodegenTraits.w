@@ -1604,51 +1604,17 @@ impl Codegen:
         // so its return-lowering must read its own (absent) sret status, not the
         // stale predecessor's.
         self.current_function_name_sym = init_sym
+        // An initializer that creates closures was lowered with the module,
+        // its closures beside it (MirModule.global_init_body_syms); any other
+        // is lowered here.
         var init_builder = MirBuilder.init(self.sema, self.pool, self.intern, init_sym)
-        init_builder.lower_global_initializer(value_node, result_tid)
-        let init_body = move init_builder.body
-        // Codegen-synthesized bodies never reach `--dump-mir` (that dumps the
-        // Sema-lowered module). WITH_DUMP_INIT_MIR exposes them; #719 was
-        // invisible without it.
-        if with_getenv_str("WITH_DUMP_INIT_MIR").len() > 0:
-            with_eprint(dump_mir_body(&init_body, &self.intern, &self.sema))
-        // #719 class: a synthesized body that reads a killed local computes from
-        // zeroed storage. Report it here rather than emitting silently broken code.
-        let uak = validate_use_after_kill(&init_body, &self.intern)
-        if uak.len() > 0:
-            // #2006: an error line with the build still green is a silent
-            // fallback; the unit must not link.
-            with_eprint("error: BUG: const initializer MIR is invalid: " ++ uak)
-            self.had_error = 1
-        self.mir_scan_memory_locals(init_body)
-
-        // Void results keep the dead i32 slot — alloca of void traps in LLVM.
-        let init_ret_store_ty = if ret_ty != wl_void_type(self.context): ret_ty else: wl_i32_type(self.context)
-        let ret_alloca = self.create_entry_alloca(init_ret_store_ty)
-        self.mir_local_ptrs.insert(0, ret_alloca)
-        self.mir_local_types.insert(0, ret_ty)
-
-        self.mir_bind_global_locals(init_body)
-
-        for bb in 0..init_body.block_count():
-            let llbb = wl_append_bb(self.context, function, f"mir.bb{bb}")
-            self.mir_bb_values.push(llbb)
-
-        let init_label = f"initializer of {self.intern.resolve(name_sym)}"
-        if self.mir_bb_values.len() > 0:
-            wl_build_br(self.builder, self.mir_bb_values[0])
+        let module_body_sym = self.mir_global_init_body_sym(value_node)
+        if module_body_sym != 0:
+            let module_body = self.mir_body_at(self.mir_find_body_idx(module_body_sym))
+            self.emit_runtime_init_blocks(function, ret_ty, module_body, name_sym, value_node)
         else:
-            // Unreachable: init_builder came from MirBuilder.init above,
-            // which creates the entry block.
-            self.mir_emit_failed("a body with no block", init_label, value_node, 0)
-
-        // A failure is a reported BUG (#2006), never a `ret null`.
-        for bb in 0..init_body.block_count():
-            if bb < 0 or bb >= self.mir_bb_values.len():
-                continue
-            wl_position_at_end(self.builder, self.mir_bb_values[bb])
-            let _ = self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
-        self.mir_terminate_default_unreachable()
+            init_builder.lower_global_initializer(value_node, result_tid)
+            self.emit_runtime_init_blocks(function, ret_ty, init_builder.body, name_sym, value_node)
 
         self.mir_local_ptrs = saved_mir_locals
         self.mir_local_values = saved_mir_values
@@ -1691,6 +1657,52 @@ impl Codegen:
             wl_position_at_end(self.builder, saved_bb)
 
         function
+
+    // The blocks of a runtime initializer function, from its MIR body: the
+    // module's (an initializer with closures) or the one lowered here.
+    mut fn emit_runtime_init_blocks(function: i64, ret_ty: i64, init_body: &MirBody, name_sym: i32, value_node: i32):
+        // Codegen-synthesized bodies never reach `--dump-mir` (that dumps the
+        // Sema-lowered module). WITH_DUMP_INIT_MIR exposes them; #719 was
+        // invisible without it.
+        if with_getenv_str("WITH_DUMP_INIT_MIR").len() > 0:
+            with_eprint(dump_mir_body(init_body, &self.intern, &self.sema))
+        // #719 class: a synthesized body that reads a killed local computes from
+        // zeroed storage. Report it here rather than emitting silently broken code.
+        let uak = validate_use_after_kill(init_body, &self.intern)
+        if uak.len() > 0:
+            // #2006: an error line with the build still green is a silent
+            // fallback; the unit must not link.
+            with_eprint("error: BUG: const initializer MIR is invalid: " ++ uak)
+            self.had_error = 1
+        self.mir_scan_memory_locals(init_body)
+
+        // Void results keep the dead i32 slot — alloca of void traps in LLVM.
+        let init_ret_store_ty = if ret_ty != wl_void_type(self.context): ret_ty else: wl_i32_type(self.context)
+        let ret_alloca = self.create_entry_alloca(init_ret_store_ty)
+        self.mir_local_ptrs.insert(0, ret_alloca)
+        self.mir_local_types.insert(0, ret_ty)
+
+        self.mir_bind_global_locals(init_body)
+
+        for bb in 0..init_body.block_count():
+            let llbb = wl_append_bb(self.context, function, f"mir.bb{bb}")
+            self.mir_bb_values.push(llbb)
+
+        let init_label = f"initializer of {self.intern.resolve(name_sym)}"
+        if self.mir_bb_values.len() > 0:
+            wl_build_br(self.builder, self.mir_bb_values[0])
+        else:
+            // Unreachable: every initializer body comes from a MirBuilder,
+            // whose init creates the entry block.
+            self.mir_emit_failed("a body with no block", init_label, value_node, 0)
+
+        // A failure is a reported BUG (#2006), never a `ret null`.
+        for bb in 0..init_body.block_count():
+            if bb < 0 or bb >= self.mir_bb_values.len():
+                continue
+            wl_position_at_end(self.builder, self.mir_bb_values[bb])
+            let _ = self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
+        self.mir_terminate_default_unreachable()
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
         // §9.1c (D175): the wrapper runs the initializers in Sema's
