@@ -10441,11 +10441,17 @@ impl MirBuilder:
         else:
             let list_op = self.lower_expr(list_expr)
             list_place = self.materialize_operand(list_op, list_ty, self.ast.get_start(list_expr))
-        var resolved_list = self.sema.resolve_alias(list_ty)
-        // A &List[T] receiver (ref-typed binding) reads through one deref.
-        if self.sema.get_type_kind(resolved_list) == TypeKind.TY_REF:
+        // A &List[T] receiver (ref-typed binding) reads through one deref. A
+        // D27 index has semantic type &List[T] while its place already
+        // denotes the physical List slot (lower_index), so the place's own
+        // type decides: dereferencing `_xs[_i]` read the header's buffer
+        // pointer as a List (`for d in deps[k]` iterated nothing, or
+        // crashed).
+        var place_ty = self.place_local_type(list_place)
+        if place_ty == 0 or place_ty == self.sema.ty_void as i32:
+            place_ty = list_ty
+        if self.sema.get_type_kind(self.sema.resolve_alias(place_ty)) == TypeKind.TY_REF:
             list_place = self.new_deref_place(list_place)
-            resolved_list = self.sema.resolve_alias(self.sema.get_type_d0(resolved_list))
         self.lower_for_iter_ref_place(for_node, pat_or_sym, list_place, self.ast.get_start(list_expr), body_expr)
 
     // The borrow-iterating loop over a List PLACE (a binding, a field, a
