@@ -1971,11 +1971,12 @@ fn invariance_variant_action(ctx: ActionCtx) -> i32:
     let copied_seed = build_project_join(repo_copy, "src/main" ++ host_exe_suffix())
     if fs.exists(copied_seed) and fs.remove_file(copied_seed) != 0:
         return invariance_fail(ctx, "could not remove copied seed from repo fixture")
-    if fs.symlink("lib", build_project_join(repo_copy, "lib")) != 0:
-        // Windows needs a privilege most shells lack for symlinks; the
-        // fixture is the same tree copied (#811).
-        if fs.copy_tree("lib", build_project_join(repo_copy, "lib")) != 0:
-            return invariance_fail(ctx, "could not link lib into repo fixture")
+    // A copy, never a directory link: a link left in out/ is walked by the
+    // next build's driver, and the pinned seed's runtime on Windows reads it
+    // as the directory and overflowed its stack (0xC00000FD) on a reused
+    // tree. lib is 10 MB beside the src copy above.
+    if fs.copy_tree("lib", build_project_join(repo_copy, "lib")) != 0:
+        return invariance_fail(ctx, "could not copy lib into repo fixture")
     let copy_err = build_copy_generated_compiler_modules(fs, repo_copy)
     if copy_err.len() > 0:
         return invariance_fail(ctx, copy_err)
