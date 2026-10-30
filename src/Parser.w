@@ -4398,6 +4398,14 @@ impl Parser:
             // move expr — explicit move at call site (not a closure)
             let move_inner = self.parse_expr()
             return self.pool.add_node(NodeKind.NK_MOVE_ARG, move_kw_start, self.prev_end(), move_inner, 0, 0)
+        // D172 (§3.8): `mut x` at a call site spells the `mut` parameter's
+        // in-place mode; it grants nothing, so the argument is the place
+        // itself, marked for Sema to hold against the parameter.
+        if t == TokenKind.TK_KW_MUT:
+            self.advance()
+            let mut_inner = self.parse_expr()
+            self.pool.mark_mut_arg(mut_inner)
+            return mut_inner
 
         // #1005: the lexer gives an unterminated string literal as an invalid
         // token that starts with its opening quote.
@@ -9593,12 +9601,8 @@ impl Parser:
             let param_flags = self.parse_param_attrs()
             var is_mut = 0
             var is_move = 0
-            var mut_tok_start: i32 = 0
-            var mut_tok_end: i32 = 0
             if self.peek() == TokenKind.TK_KW_MUT:
                 is_mut = 1
-                mut_tok_start = self.current_start()
-                mut_tok_end = self.current_end()
                 self.advance()
             else if self.peek() == TokenKind.TK_KW_MOVE:
                 is_move = 1
@@ -9624,16 +9628,10 @@ impl Parser:
             // mut.md Rev 8 §5.1 / mutability.md — receiver-place modes.
             // Tag the param so later sema phases can enforce receiver constraints.
             let is_self_param = name != 0 and self.intern.resolve(name) == "self"
-            // #645 / mutability.md: parameters are implicitly rebindable; there
-            // is NO `mut x: T` parameter modifier (`mut self` is the only place `mut`
-            // is meaningful). Reject `mut` on a non-self parameter loudly instead of
-            // silently discarding it.
-            if is_mut == 1 and is_self_param == 0:
-                let mut_span = Span { file: self.file_id, start: mut_tok_start, end: mut_tok_end }
-                var mdiag = Diagnostic.err("`mut` is not a parameter modifier — parameters are already rebindable", mut_span)
-                mdiag.add_help("remove `mut`; to mutate an independent copy, bind a local `var` inside the function body")
-                self.diags.emit(move mdiag)
-            if is_mut == 1 and is_self_param:
+            // D172 (§3.8a): any parameter may be `mut` — exclusive, in-place
+            // access to the caller's place for the call. It is the receiver's
+            // `mut self` mode generalized, so it carries the same flag.
+            if is_mut == 1:
                 extra_flags = extra_flags + FN_PARAM_FLAG_MUT_SELF
             if is_move == 1 and is_self_param:
                 extra_flags = extra_flags + FN_PARAM_FLAG_MOVE_SELF

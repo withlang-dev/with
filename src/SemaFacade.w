@@ -2416,7 +2416,7 @@ impl Sema:
         // The receiver is C's param 0: the selector is argument p - 1.
         if arg_count < p or self.ast.has_call_named_args(node) != 0:
             return field
-        self.facade_variadic_pick(ci, self.pool_resolve(field), self.ast.get_extra(extra_start + p - 1), node)
+        self.facade_variadic_pick(ci, with_str_clone_ref(self.pool_resolve(field)), self.ast.get_extra(extra_start + p - 1), node)
 
     // A free call's retarget (SemaCheck.w check_call, beside
     // facade_bridge_redirect): the case function of a variadic free

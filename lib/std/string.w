@@ -320,7 +320,7 @@ impl Iter[u8] for ByteIter:
         if self.at >= self.bytes.len(): return None
         let b = self.bytes[self.at]
         self.at += 1
-        Some(b)
+        b
 
 /// Why a `str` could not be converted to a `CString`.
 pub enum CStringError:

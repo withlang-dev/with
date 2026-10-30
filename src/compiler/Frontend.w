@@ -2094,7 +2094,7 @@ impl Zcu:
             let mod_file_id = self.last_resolved.modules[mi].file_id
             if mod_file_id >= self.next_file_id:
                 self.next_file_id = mod_file_id + 1
-        self.capture_last_link_lib_names(self.pool, self.last_resolved)
+        self.capture_last_link_lib_names()
         if self.diagnostics.has_errors():
             // #661: resolve-phase parse errors carry resolve-generation file
             // ids the render lookup can't resolve, so rendering used to fall
@@ -2143,7 +2143,7 @@ impl Zcu:
             let cimport_ns = runtime_clock_nanos() - t_cimport
             runtime_eprint(f"[profile] frontend.c_import  {cimport_ns / 1000000}.{(cimport_ns % 1000000) / 1000} ms")
         pool.set_local_decl_count(root_local_decl_count)
-        self.set_frontend_pool(self.pool)
+        self.sync_frontend_pool()
         frontend_dump_type_decl_names("post-imports", pool, self.pool)
 
         if self.diagnostics.has_errors():

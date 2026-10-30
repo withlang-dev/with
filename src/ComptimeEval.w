@@ -8654,7 +8654,7 @@ impl ComptimeEvaluator:
 
     mut fn eval_comptime_error(node: i32) -> ComptimeControl:
         let msg_sym = self.ast.get_data0(node)
-        self.fail(node, self.pool.resolve(msg_sym))
+        self.fail(node, with_str_clone_ref(self.pool.resolve(msg_sym)))
 
     mut fn eval_expr(node: i32) -> ComptimeControl:
         if node == 0:

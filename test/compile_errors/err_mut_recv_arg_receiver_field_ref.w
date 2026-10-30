@@ -1,4 +1,4 @@
-//! expect-check-fail: argument retains access to the mutable receiver
+//! expect-check-fail: an argument retains access to the `mut` receiver `a` when the call begins (§3.2)
 
 // §3.2 — a reference to a field of the mutable receiver may not be a
 // sibling argument of the same call.

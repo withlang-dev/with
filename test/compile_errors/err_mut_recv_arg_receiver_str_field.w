@@ -1,4 +1,4 @@
-//! expect-check-fail: argument retains access to the mutable receiver
+//! expect-check-fail: an argument retains access to the `mut` receiver `a` when the call begins (§3.2)
 
 // §3.2 — a str value read from the mutable receiver's fields shares the
 // underlying buffer (shallow Copy) and so retains access during the call.

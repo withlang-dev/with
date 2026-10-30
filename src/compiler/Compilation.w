@@ -2082,7 +2082,7 @@ impl Compilation:
         let text = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
         var mir_snapshot = move self.zcu.last_mir_module
         var async_snapshot = move self.zcu.last_async_mir_module
-        self.zcu.set_codegen_snapshot(move mir_snapshot, self.zcu.last_mir_dump, move async_snapshot, text)
+        self.zcu.set_codegen_snapshot(move mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), move async_snapshot, text)
         text
 
     mut fn dump_async_mir_file(source_path: &str) -> str:
@@ -2289,7 +2289,7 @@ impl Compilation:
         let _ = self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
             var mir_snapshot = move self.zcu.last_mir_module
-            self.zcu.set_codegen_snapshot(move mir_snapshot, self.zcu.last_mir_dump, AsyncMirModule.init(), "")
+            self.zcu.set_codegen_snapshot(move mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), AsyncMirModule.init(), "")
             return
 
     mut fn ensure_codegen_mir(pool: &AstPool) -> bool:

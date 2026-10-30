@@ -1761,6 +1761,276 @@ impl Sema:
             return self.expr_mentions_root_sym(self.ast.get_data1(node), sym)
         0
 
+    // The source text of a node in the file being checked, for a diagnostic
+    // that quotes what the program wrote.
+    fn call_node_text(node: i32) -> str:
+        let text = self.source_text_view_for_file_id(self.local_file_id)
+        let start = self.ast.get_start(node)
+        let end = self.ast.get_end(node)
+        if start < 0 or end <= start or end > text.len(): return ""
+        text.slice(start, end)
+
+    // D172 (§3.8a): the argument of a `mut` parameter is a mutable place the
+    // callee writes in place; it is never moved. Returns whether `param_i`
+    // is `mut`, so the caller takes neither the consuming path nor a
+    // contextual copy (an element passed to a `mut` parameter is the
+    // element, not a copy of it). A call-site `mut x` is a spelling only.
+    mut fn check_mut_param_arg(arg_node: i32, call_node: i32, sig_idx: i32, param_i: i32) -> bool:
+        let callee = if sig_idx >= 0 and sig_idx < self.sig_names.len(): self.pool_resolve(self.sig_names[sig_idx]) else: ""
+        if not self.sig_param_is_mut(sig_idx, param_i):
+            if arg_node > 0 and self.ast.is_mut_arg(arg_node as NodeId):
+                self.emit_error(f"`mut` at a call site is valid only where the parameter is `mut`; `{callee}` does not declare it (§3.8)", arg_node)
+            return false
+        if arg_node <= 0:
+            return true
+        let packed = self.classify_place(arg_node)
+        if unpack_place_kind(packed) == PlaceKind.PK_NotPlace:
+            self.emit_error("a `mut` parameter needs a mutable place: the argument is a temporary (§3.8a)", arg_node)
+            return true
+        if unpack_place_mut(packed) == PlaceMut.PM_ReadOnly or self.place_base_is_read_only_ref(arg_node) != 0:
+            self.emit_error(f"a `mut` parameter needs a mutable place: `{self.call_node_text(arg_node)}` is reached through a read-only view (§3.8a)", arg_node)
+            return true
+        let root = self.place_root_sym(arg_node)
+        if root != 0 and self.scope_has(root) != 0 and self.scope_lookup_mut(root) == 0:
+            self.emit_error(f"a `mut` parameter needs a mutable place: `{self.pool_resolve(root)}` is a `let` binding (§3.8a)", arg_node)
+            return true
+        self.note_place_effect(arg_node, EFF_WRITE)
+        self.record_global_place_write(arg_node, call_node)
+        self.check_mutation_against_views(arg_node, call_node)
+        self.reject_mutation_through_view_binding(root, call_node)
+        true
+
+    // D172's diagnostics for a write through a read-only place, by its root:
+    // the receiver of a plain `fn` names the method to declare `mut fn`; a
+    // `&T` parameter names the `mut` parameter it could be. "" otherwise.
+    fn read_only_mutation_message(recv: i32, call_node: i32) -> str:
+        let root = self.place_root_sym(recv)
+        if root == 0 or self.current_fn_symbol == 0:
+            return ""
+        let full = self.pool_resolve(self.current_fn_symbol)
+        let dot = full.rfind(".")
+        let fn_name = if dot >= 0: full.slice(dot + 1, full.len()) else: full
+        if self.pool_resolve(root) == "self":
+            let source = self.source_text_view_for_file_id(self.local_file_id)
+            var line = 1
+            let start = self.ast.get_start(call_node)
+            for i in 0..start:
+                if i < source.len() and source[i] as i32 == 10:
+                    line = line + 1
+            return f"`{fn_name}` mutates its receiver (`{self.call_node_text(self.ast.get_data0(call_node))}`, line {line}); declare it `mut fn {fn_name}`"
+        if self.current_fn_decl_node <= 0:
+            return ""
+        let meta = self.ast.find_fn_meta(self.current_fn_decl_node)
+        if meta < 0:
+            return ""
+        let pstart = self.ast.fn_meta_param_start(meta)
+        for pi in 0..self.ast.fn_meta_param_count(meta):
+            if self.ast.fn_param_name(pstart, pi) != root:
+                continue
+            let type_node = self.ast.fn_param_type(pstart, pi)
+            if type_node <= 0 or self.ast.kind(type_node) != NodeKind.NK_TYPE_REF:
+                return ""
+            let written = self.call_node_text(type_node)
+            let pointee = if written.starts_with("&"): written.slice(1, written.len()).trim() else: written
+            return f"`{self.pool_resolve(root)}` is a read-only view; to let `{fn_name}` mutate it, declare the parameter `mut {self.pool_resolve(root)}: {pointee}`"
+        ""
+
+    // A `mut` parameter's argument is the place itself: its type is the
+    // parameter's, an element's view (D27) standing for the element.
+    fn mut_param_arg_type_matches(expected: i32, actual: i32) -> bool:
+        let e = self.resolve_alias(expected as TypeId) as i32
+        var a = self.resolve_alias(actual as TypeId) as i32
+        if e == a or self.types_identical(e, a):
+            return true
+        if self.get_type_kind(a as TypeId) == TypeKind.TY_REF and self.get_type_d1(a as TypeId) == 0:
+            a = self.resolve_alias(self.get_type_d0(a as TypeId) as TypeId) as i32
+        e == a or self.types_identical(e, a)
+
+    // Whether places `a` and `b` overlap: one root, paths not disjoint.
+    mut fn places_overlap(a: i32, b: i32) -> bool:
+        let root = self.place_root_sym(a)
+        if root == 0 or root != self.place_root_sym(b):
+            return false
+        let a_start = self.borrow_path_mark()
+        let a_count = self.borrow_collect_path(a)
+        let b_start = self.borrow_path_mark()
+        let b_count = self.borrow_collect_path(b)
+        self.are_borrows_disjoint_paths(a_start, a_count, b_start, b_count) == 0
+
+    // The index projection a place reads through (`pools[0]` in
+    // `pools[0].n`), or 0.
+    fn place_index_projection(place: i32) -> i32:
+        var p = place
+        while p > 0:
+            let k = self.ast.kind(p)
+            if k == NodeKind.NK_INDEX:
+                return p
+            if k != NodeKind.NK_FIELD_ACCESS and k != NodeKind.NK_GROUPED:
+                return 0
+            p = self.ast.get_data0(p)
+        0
+
+    // D172 (§3.2a): the first call within `node` that mutates `target` —
+    // a `mut` receiver or a `mut` parameter whose place overlaps it — read
+    // from declared modes, or 0.
+    mut fn mutating_call_on_place(node: i32, target: i32) -> i32:
+        if node <= 0:
+            return 0
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_CALL:
+            let callee = self.ast.get_data0(node)
+            var offset = 0
+            if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
+                let recv = self.ast.get_data0(callee)
+                let method = self.ast.get_data1(callee)
+                let recv_ty = self.typed_expr_types.get(recv) ?? 0
+                if recv_ty != 0:
+                    var owner_ty = self.resolve_alias(recv_ty as TypeId)
+                    let otk = self.get_type_kind(owner_ty)
+                    if otk == TypeKind.TY_PTR or otk == TypeKind.TY_REF:
+                        owner_ty = self.resolve_alias(self.get_type_d0(owner_ty) as TypeId)
+                    let owner = self.method_owner_symbol_for_type(owner_ty as i32)
+                    if owner != 0:
+                        offset = 1
+                        if (self.method_has_mut_self_flag(owner, method) != 0 or self.builtin_method_requires_mutable_receiver(owner, method) != 0) and self.places_overlap(recv, target):
+                            return node
+                let in_recv = self.mutating_call_on_place(recv, target)
+                if in_recv > 0:
+                    return in_recv
+            let sig = self.resolved_call_sigs.get(node) ?? -1
+            let ea = self.ast.get_data1(node)
+            let ac = self.ast.get_data2(node)
+            for ai in 0..ac:
+                let arg = self.ast.get_extra(ea + ai)
+                if sig >= 0 and self.sig_param_is_mut(sig, ai as i32 + offset) and self.places_overlap(arg, target):
+                    return node
+                let inner = self.mutating_call_on_place(arg, target)
+                if inner > 0:
+                    return inner
+            return 0
+        if kind == NodeKind.NK_BINARY:
+            let lhs = self.mutating_call_on_place(self.ast.get_data1(node), target)
+            return if lhs > 0: lhs else: self.mutating_call_on_place(self.ast.get_data2(node), target)
+        if kind == NodeKind.NK_UNARY:
+            return self.mutating_call_on_place(self.ast.get_data1(node), target)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG:
+            return self.mutating_call_on_place(self.ast.get_data0(node), target)
+        if kind == NodeKind.NK_INDEX:
+            let base = self.mutating_call_on_place(self.ast.get_data0(node), target)
+            return if base > 0: base else: self.mutating_call_on_place(self.ast.get_data1(node), target)
+        0
+
+    // Whether an argument still reaches `place` when the call begins: the
+    // same place or an overlapping one passed on (unless a plain-bits value
+    // copied out), a view or shared-representation value reaching it.
+    mut fn arg_reaches_place_at_activation(arg: i32, place: i32) -> bool:
+        if self.place_root_sym(place) == 0:
+            return false
+        // A view copied out into an owned value while the arguments are
+        // evaluated (D22's contextual copy: an `&i32` into an `i32`
+        // parameter) holds nothing of the place when the call begins.
+        if self.has_contextual_copy_adjustment(arg) != 0:
+            return false
+        // An explicit `&p` is a reference to `p` (§3.2: "a reference to it
+        // or one of its fields"), whatever type was recorded for the node.
+        if self.ast.kind(arg) == NodeKind.NK_UNARY and self.ast.get_data0(arg) == UnaryOp.UOP_REF:
+            let referent = self.ast.get_data1(arg)
+            return self.places_overlap(referent, place) or self.expr_reads_overlapping_place(referent, place)
+        let arg_ty = self.typed_expr_types.get(arg) ?? 0
+        if self.places_overlap(arg, place):
+            return arg_ty == 0 or not self.type_is_plain_bits(arg_ty)
+        // A view computed from an overlapping place (`self.first()` beside
+        // a `mut` `self`). A computed `str` is a value with its own hold
+        // (D111: a concatenation, a returned str), which no write of the
+        // place can invalidate; a str read straight from a field is the
+        // place-overlap case above. Paths decide, never the root alone: a
+        // field disjoint from the place is not it (§3.6).
+        if arg_ty == 0:
+            return false
+        let tk = self.get_type_kind(self.resolve_alias(arg_ty as TypeId))
+        if tk != TypeKind.TY_REF and tk != TypeKind.TY_SLICE:
+            return false
+        self.expr_reads_overlapping_place(arg, place)
+
+    // Whether `node` reads a place overlapping `place` anywhere within it.
+    mut fn expr_reads_overlapping_place(node: i32, place: i32) -> bool:
+        if node <= 0:
+            return false
+        let kind = self.ast.kind(node)
+        // A place chain is one path: `self.f` reads `f`, never all of `self`.
+        if kind == NodeKind.NK_IDENT or kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_INDEX:
+            if self.place_root_sym(node) != 0:
+                if self.places_overlap(node, place):
+                    return true
+                return kind == NodeKind.NK_INDEX and self.expr_reads_overlapping_place(self.ast.get_data1(node), place)
+            if kind == NodeKind.NK_INDEX:
+                return self.expr_reads_overlapping_place(self.ast.get_data0(node), place) or self.expr_reads_overlapping_place(self.ast.get_data1(node), place)
+            return kind == NodeKind.NK_FIELD_ACCESS and self.expr_reads_overlapping_place(self.ast.get_data0(node), place)
+        if kind == NodeKind.NK_CALL:
+            // A method call reads its receiver; a plain call, its arguments.
+            let callee = self.ast.get_data0(node)
+            if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and self.expr_reads_overlapping_place(self.ast.get_data0(callee), place):
+                return true
+            let ea = self.ast.get_data1(node)
+            for ai in 0..self.ast.get_data2(node):
+                if self.expr_reads_overlapping_place(self.ast.get_extra(ea + ai), place):
+                    return true
+            return false
+        if kind == NodeKind.NK_BINARY:
+            return self.expr_reads_overlapping_place(self.ast.get_data1(node), place) or self.expr_reads_overlapping_place(self.ast.get_data2(node), place)
+        if kind == NodeKind.NK_UNARY:
+            return self.expr_reads_overlapping_place(self.ast.get_data1(node), place)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG:
+            return self.expr_reads_overlapping_place(self.ast.get_data0(node), place)
+        false
+
+    // D172 (§3.2, §3.2a): a `mut` receiver or `mut` argument is exclusive
+    // for its call from activation. The arguments run first and may mutate
+    // its place; what they produce may not retain access to it, and the
+    // same place may not reach a second parameter. A place read through an
+    // index projection is resolved before the arguments run, so an argument
+    // that mutates the indexed container is an error naming both.
+    mut fn check_call_activation(mut_args: List[i32], receiver: i32, all_args: List[i32], call_node: i32):
+        var places: List[i32] = List.new()
+        if receiver > 0:
+            places.push(receiver)
+        for mi in 0..mut_args.len():
+            places.push(mut_args[mi])
+        for pi in 0..places.len():
+            let p = places[pi]
+            let root = self.place_root_sym(p)
+            if root == 0:
+                continue
+            let index_proj = self.place_index_projection(p)
+            for ai in 0..all_args.len():
+                let a = all_args[ai]
+                if a <= 0 or a == p:
+                    continue
+                if index_proj > 0:
+                    let container = self.ast.get_data0(index_proj)
+                    let mutation = self.mutating_call_on_place(a, container)
+                    if mutation > 0:
+                        self.emit_error(f"`{self.call_node_text(index_proj)}` is resolved before the arguments, and `{self.call_node_text(mutation)}` may reallocate `{self.call_node_text(container)}`; bind the argument to a local first", a)
+                        continue
+                // Two `mut` places: one report per overlapping pair, from
+                // the earlier; disjoint fields are not the same place.
+                var a_pos = -1
+                for qi in 0..places.len():
+                    if places[qi] == a:
+                        a_pos = qi as i32
+                if a_pos >= 0:
+                    if a_pos > pi and self.places_overlap(a, p):
+                        self.emit_error(f"`{self.pool_resolve(root)}` is passed to a `mut` parameter and to another parameter of the same call (§3.2)", a)
+                    continue
+                if not self.arg_reaches_place_at_activation(a, p):
+                    continue
+                if p == receiver:
+                    self.emit_error(f"an argument retains access to the `mut` receiver `{self.pool_resolve(root)}` when the call begins (§3.2)", a)
+                else if self.places_overlap(a, p):
+                    self.emit_error(f"`{self.pool_resolve(root)}` is passed to a `mut` parameter and to another parameter of the same call (§3.2)", a)
+                else:
+                    self.emit_error(f"an argument retains access to the `mut` argument `{self.pool_resolve(root)}` when the call begins (§3.2)", a)
+
     // #604 / §21.1 call-local exclusivity: while a call writes through a `[]mut`
     // view of a place, no other argument of the same call may read or view an
     // overlapping part of that place. Diagnostics speak in terms of the user's
@@ -1772,7 +2042,7 @@ impl Sema:
             if m_root == 0:
                 continue
             let m_name: str = self.pool_resolve(m_root)
-            let m_start = self.borrow_path_data.len() as i32
+            let m_start = self.borrow_path_mark()
             let m_count = self.borrow_collect_path(m_node)
             var m_pos = -1
             for pi in 0..all_args.len():
@@ -1789,7 +2059,7 @@ impl Sema:
                 if o_mut_coerced != 0:
                     // report each overlapping mut/mut pair once (from the earlier arg)
                     if oi > m_pos and self.place_root_sym(o_node) == m_root:
-                        let o_start = self.borrow_path_data.len() as i32
+                        let o_start = self.borrow_path_mark()
                         let o_count = self.borrow_collect_path(o_node)
                         if self.are_borrows_disjoint_paths(m_start, m_count, o_start, o_count) == 0:
                             self.emit_error(f"`{m_name}` cannot be passed as `[]mut` twice in one call: the callee would hold two overlapping mutable views of it", o_node)
@@ -2559,7 +2829,7 @@ impl Sema:
             self.update_decl_source_context(di)
             return
         if self.fn_decl_source_paths.contains(fn_sym):
-            self.update_source_context_path(self.fn_decl_source_paths.get(fn_sym).unwrap())
+            self.update_source_context_path(with_str_clone_ref(self.fn_decl_source_paths.get(fn_sym).unwrap()))
 
     fn no_std_decl_is_user_code(di: i32) -> i32:
         if di >= 0 and di < self.decl_source_paths.len():
@@ -4781,7 +5051,7 @@ impl Sema:
             // instantiation; its body is checked then (check_fn_body_concrete).
             // #2235: what needs an unsafe context is decided by the spelling,
             // so that much is checked here, once.
-            self.check_template_unsafe_calls(node, self.pool_resolve(fn_name))
+            self.check_template_unsafe_calls(node, with_str_clone_ref(self.pool_resolve(fn_name)))
             return
         // §16.4 union last-written tracking is per-function-body.
         self.union_last_written = sema_new_map_i32_i32()
@@ -9927,6 +10197,10 @@ impl Sema:
         if kind == NodeKind.NK_BLOCK:
             self.note_returned_place_effect(self.ast.get_data2(node), effect)
             return
+        // D172 (§3.8a): returning a `mut` parameter moves out of the caller's
+        // place; the same rule mark_moved_if_consumed holds for stores.
+        if (effect & EFF_ESCAPE_VALUE) != 0 and kind == NodeKind.NK_IDENT and self.ident_is_mut_param(self.ast.get_data0(node)):
+            self.mark_moved_if_consumed(node)
         if kind == NodeKind.NK_IF_EXPR:
             self.note_returned_place_effect(self.ast.get_data1(node), effect)
             self.note_returned_place_effect(self.ast.get_data2(node), effect)
@@ -16570,7 +16844,23 @@ impl Sema:
         // D75: the one place `va_start()` may stand — a binding's initializer.
         let saved_va_start_value: i32 = self.va_start_binding_value
         self.va_start_binding_value = value
-        let val_type = if ann_type != 0: self.check_expr_with_owned_demand(value, ann_type) else: self.check_expr_value_context(value)
+        var val_type = if ann_type != 0: self.check_expr_with_owned_demand(value, ann_type) else: self.check_expr_value_context(value)
+        // D144: a binding from a place of plain bits takes the value — an
+        // element as a field (`let k = self.starts[i]` is the i32, as `let k
+        // = self.idx` is the isize), so a later write of the list is fine.
+        // The element read as its view (D27) and kept the binding a view.
+        if ann_type == 0 and val_type != 0:
+            var elem_core = value
+            while elem_core != 0 and self.ast.kind(elem_core) == NodeKind.NK_GROUPED:
+                elem_core = self.ast.get_data0(elem_core)
+            // A built-in element place (D27); a user IndexGet is a call
+            // returning its view (#2560), not a place.
+            if elem_core != 0 and self.ast.kind(elem_core) == NodeKind.NK_INDEX and not self.index_place_get_fns.contains(elem_core):
+                let elem_view = self.resolve_alias(val_type)
+                if self.get_type_kind(elem_view) == TypeKind.TY_REF and self.get_type_d1(elem_view) == 0:
+                    let elem_ty = self.get_type_d0(elem_view)
+                    if self.type_is_plain_bits(elem_ty) and self.record_contextual_copy_adjustment(value, elem_ty, val_type as i32) != 0:
+                        val_type = elem_ty as TypeId
         self.va_start_binding_value = saved_va_start_value
         self.match_in_stmt_pos = saved_match_stmt
         if ann_type != 0:
@@ -18575,7 +18865,7 @@ impl Sema:
                 let root = self.borrow_root_place(place_node)
                 if root == 0:
                     continue
-                let path_start = self.borrow_path_data.len() as i32
+                let path_start = self.borrow_path_mark()
                 let path_count = self.borrow_collect_path(place_node)
                 self.register_gen_loop_view_borrow(ref_sym, root, self.borrow_field(place_node), path_start, path_count, iterable)
             return
@@ -18583,7 +18873,7 @@ impl Sema:
         deps = self.collect_expr_view_deps(node, move deps)
         for di in 0..deps.len():
             if deps[di] != 0 and deps[di] != ref_sym:
-                self.register_gen_loop_view_borrow(ref_sym, deps[di], 0, self.borrow_path_data.len() as i32, 0, iterable)
+                self.register_gen_loop_view_borrow(ref_sym, deps[di], 0, self.borrow_path_mark(), 0, iterable)
 
     mut fn register_gen_loop_view_borrow(ref_sym: i32, root: i32, field: i32, path_start: i32, path_count: i32, err_node: i32):
         let before = self.borrow_refs.len()
@@ -18630,11 +18920,26 @@ impl Sema:
         var store_target = if param_offset == 1: recv_node else: 0
         if store_target == 0 and param_offset == 0 and arg_count > 0 and self.sig_receiver_mode(sig_idx) != ReceiverMode.None:
             store_target = if has_resolved != 0: self.get_resolved_call_arg(call_node, 0) else: self.ast.get_extra(extra_start)
+        let mut_args: List[i32] = List.new()
+        let all_args: List[i32] = List.new()
+        if recv_node > 0:
+            all_args.push(recv_node)
         for ai in 0..arg_count:
             let param_i = ai + param_offset
             if param_i >= param_count:
                 break
             let arg_node = if has_resolved != 0: self.get_resolved_call_arg(call_node, ai) else: self.ast.get_extra(extra_start + ai)
+            if arg_node > 0:
+                all_args.push(arg_node)
+            // D172 (§3.8a): a `mut` parameter's argument is written in place,
+            // never consumed; the receiver of a static spelling is its first.
+            if param_i > 0 or param_offset == 0:
+                if self.check_mut_param_arg(arg_node, call_node, sig_idx, param_i):
+                    if arg_node > 0:
+                        mut_args.push(arg_node)
+                        self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), arg_node)
+                        self.record_effect_edge(sig_idx, param_i, arg_node)
+                    continue
             if arg_node > 0:
                 self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), arg_node)
                 // The callee stores a view of this argument into its
@@ -18672,6 +18977,8 @@ impl Sema:
                                     // #1281: `s.m(make().1)` — the element of a
                                     // temporary is an implicit field move (§2.2).
                                     self.mark_moved_if_consumed(arg_node)
+        if mut_args.len() > 0:
+            self.check_call_activation(mut_args, 0, all_args, call_node)
 
     mut fn check_return(node: i32) -> i32:
         if self.in_defer != 0:
@@ -19744,7 +20051,7 @@ impl Sema:
         if sym == 0 or root == 0 or root == sym:
             return
         let before = self.borrow_refs.len()
-        let path_start = self.borrow_path_data.len() as i32
+        let path_start = self.borrow_path_mark()
         let path_count = self.borrow_collect_path(place_node)
         self.check_borrow_create_direct(root, BorrowKind.SHARED, self.borrow_field(place_node), path_start, path_count, iterable)
         if self.borrow_refs.len() > before:
@@ -25233,14 +25540,14 @@ impl Sema:
                         while fi < self.capture_field_syms.len():
                             let field_sym: i32 = self.capture_field_syms[fi]
                             let bk: i32 = self.capture_field_kinds[fi]
-                            let path_start = self.borrow_path_data.len() as i32
+                            let path_start = self.borrow_path_mark()
                             self.borrow_path_data.push(field_sym)
                             self.check_borrow_create_direct(cap_sym, bk, field_sym, path_start, 1, node)
                             fi = fi + 1
                     else:
                         // Whole-variable capture
                         let bk = if self.expr_mutates_place(body, cap_sym) != 0: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
-                        let path_start = self.borrow_path_data.len() as i32
+                        let path_start = self.borrow_path_mark()
                         self.check_borrow_create_direct(cap_sym, bk, 0, path_start, 0, node)
                 ci = ci + 1
 
@@ -25971,7 +26278,11 @@ impl Sema:
                             self.emit_error("unknown trait '" ++ self.pool_resolve(trait_sym) ++ "'", trait_node)
                             return -1
                         return self.type_implements_trait(recv_type, trait_sym)
-        self.ct_eval_truthy(self.ast, node)
+        // Its own handle on the AST (`clone` is a holder count, AstPool being
+        // a pointer to shared state): `self.ast` as the argument of a `mut`
+        // method on `self` is a place of the receiver (D172, §3.2), which
+        // ct_eval_truthy never writes; per-field footprints (planned) will say so.
+        self.ct_eval_truthy(self.ast.clone(), node)
 
     mut fn select_comptime_if_branch(if_node: i32) -> i32:
         var current = if_node
@@ -28140,16 +28451,26 @@ impl Sema:
             // The one arity rule (#1973); a pipeline's piped value is one of
             // the arguments the call supplies.
             let expected = self.sig_get_param_count(sig_idx)
-            let _ = self.check_call_arity(node, fn_sym, expected, self.sig_is_variadic(sig_idx) != 0, resolved_arg_count + param_offset, 0, self.pool_resolve(fn_sym), "function")
+            let _ = self.check_call_arity(node, fn_sym, expected, self.sig_is_variadic(sig_idx) != 0, resolved_arg_count + param_offset, 0, with_str_clone_ref(self.pool_resolve(fn_sym)), "function")
 
             let sc_mut_args: List[i32] = List.new()
             let sc_all_args: List[i32] = List.new()
+            let mut_param_args: List[i32] = List.new()
             for ai in 0..resolved_arg_count:
                 let param_i = ai + param_offset
                 if param_i >= expected:
                     break
                 let expected_ty = self.sig_param_type(sig_idx, param_i)
                 let arg_ty = arg_types[ai]
+                let mp_arg = if has_resolved != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(resolved_extra_start + ai)
+                if self.check_mut_param_arg(mp_arg, node, sig_idx, param_i):
+                    if expected_ty != 0 and arg_ty != 0 and not self.mut_param_arg_type_matches(expected_ty, arg_ty):
+                        self.emit_argument_type_mismatch(self.safe_symbol_text(fn_sym), fn_sym, ai, param_i, expected_ty, arg_ty, if mp_arg > 0: mp_arg else: node)
+                    mut_param_args.push(mp_arg)
+                    sc_all_args.push(mp_arg)
+                    self.propagate_call_param_effect(self.sig_param_effect(sig_idx, param_i), mp_arg)
+                    self.record_effect_edge(sig_idx, param_i, mp_arg)
+                    continue
                 if expected_ty != 0 and arg_ty != 0:
                     let exp_resolved = self.resolve_alias(expected_ty)
                     if self.type_is_dyn_object(exp_resolved) == 0:
@@ -28236,6 +28557,8 @@ impl Sema:
 
             if sc_mut_args.len() > 0:
                 self.check_mut_slice_call_exclusivity(sc_mut_args, sc_all_args)
+            if mut_param_args.len() > 0:
+                self.check_call_activation(mut_param_args, 0, sc_all_args, node)
             self.check_dyn_trait_call_compat(fn_sym, resolved_extra_start, arg_types, resolved_arg_count, param_offset)
             self.record_call_view_origins(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
             self.note_sig_call_global_effects(node, sig_idx, param_offset, 0, resolved_extra_start, resolved_arg_count, has_resolved)
@@ -30485,7 +30808,7 @@ impl Sema:
                 continue
             let impl_arg_start: i32 = self.ast.state.impl_trait_type_args[(impl_args_idx + 1)]
             let impl_arg_count = self.ast.state.impl_trait_type_args[(impl_args_idx + 2)]
-            let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count
+            let bind_count = if trait_arg_count < impl_arg_count: trait_arg_count else: impl_arg_count as isize
             for tai in 0..bind_count:
                 let impl_trait_arg = self.ast.get_extra(impl_arg_start + tai)
                 let actual_trait_arg = self.resolve_impl_trait_arg_for_source(decl, arg_tid, impl_trait_arg, target_match.subst_names, target_match.subst_types)
@@ -31590,7 +31913,7 @@ impl Sema:
         let made = self.check_fn_body_concrete(fn_node, tp_syms, tp_types, mono_sym, param_concrete_types)
         // D134: a facade's facts for a method of `BorrowedR[Origin]`, kept
         // by the method's effective name, go on this instantiation.
-        self.facade_replay_generic(self.pool_resolve(method_fn_sym), made)
+        self.facade_replay_generic(with_str_clone_ref(self.pool_resolve(method_fn_sym)), made)
         made
 
 // Deduplicating symbol→type substitution accumulator. A mut-receiver
@@ -32102,7 +32425,7 @@ impl Sema:
         // decides the specialization (D69's `for` over a generic Gen impl);
         // it has no argument nodes to check. #1973: the one arity rule.
         if arg_count >= 0:
-            let _ = self.check_call_arity(node, method_fn_sym, param_count, false, arg_count, param_offset, self.pool_resolve(method_fn_sym), if param_offset == 1: "method" else: "function")
+            let _ = self.check_call_arity(node, method_fn_sym, param_count, false, arg_count, param_offset, with_str_clone_ref(self.pool_resolve(method_fn_sym)), if param_offset == 1: "method" else: "function")
         // #604 stage 1 applies to a method's arguments as to a free call's
         // (D64 found the gap: `n.read(buf)` over a `[]mut u8` refused the
         // array a free `fill(buf)` accepted): a List/array argument coerces to
@@ -34428,7 +34751,7 @@ impl Sema:
             if expected_ty != 0 and actual_ty != 0:
                 if self.types_compatible(expected_ty as TypeId, actual_ty as TypeId) == 0:
                     if self.arithmetic_result_type(expected_ty as TypeId, actual_ty as TypeId) == 0:
-                        self.emit_argument_type_mismatch(self.pool_resolve(method_sym), method_sym, ai, param_i, expected_ty, actual_ty, self.ast.get_extra(extra_start + ai))
+                        self.emit_argument_type_mismatch(with_str_clone_ref(self.pool_resolve(method_sym)), method_sym, ai, param_i, expected_ty, actual_ty, self.ast.get_extra(extra_start + ai))
 
         if info.ret_node != 0 and self.ast.kind(info.ret_node) == NodeKind.NK_TYPE_NAMED and self.ast.get_data0(info.ret_node) == self.syms.self_type:
             self.emit_error("dyn trait method return type cannot be Self", node)
@@ -35793,7 +36116,8 @@ impl Sema:
                 if recv_kind == PlaceKind.PK_NotPlace and self.ast.kind(node) != NodeKind.NK_PIPELINE:
                     self.emit_error("mutating method requires a place receiver (§15.3)", node)
                 else if recv_mut_state == PlaceMut.PM_ReadOnly or recv_via_ro_ref != 0:
-                    self.emit_error("cannot call mutating method through a read-only place (§15.2)", node)
+                    let message = self.read_only_mutation_message(expr, node)
+                    self.emit_error(if message.len() > 0: message else: "cannot call mutating method through a read-only place (§15.2)", node)
                 else:
                     // §15.6 — only check view-liveness when the receiver actually
                     // is a mutable place we'd be mutating.
@@ -35806,56 +36130,19 @@ impl Sema:
                 if self.is_copy(obj_type) == 0:
                     self.note_place_effect(expr, EFF_CONSUME)
                     self.mark_moved_if_consumed(expr)
-            // §8.2 / §15.5 — indexed access conflict in a single mutating call.
-            // If the receiver and any argument both reach through NK_INDEX into
-            // the same base symbol, the call is conservatively rejected. Only
-            // fires when the call is a known-mutating receiver (builtin or user
-            // mut self), to avoid noise on read-only method calls.
             let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0
             if is_mut_recv_call:
                 self.note_place_effect(expr, EFF_WRITE)
                 self.record_global_place_write(expr, node)
-                let recv_idx_sym = self.expr_indexed_into(expr)
-                if recv_idx_sym != 0:
-                    var ai = 0
-                    while ai < arg_count:
-                        let arg_node = self.ast.get_extra(extra_start + ai)
-                        if self.expr_indexed_into(arg_node) == recv_idx_sym:
-                            self.emit_error("conflicting accesses through indexed base in the same call (§15.5)", node)
-                            break
-                        ai = ai + 1
-                // §5.4 — nested mutating calls on the same simple binding.
-                // Only fires when the outer receiver is a plain variable (not
-                // a field projection like `self.field`), since field-projected
-                // receivers have disjoint mutation targets.
-                if self.ast.kind(expr) == NodeKind.NK_IDENT:
-                    let recv_root = self.ast.get_data0(expr)
-                    if recv_root != 0:
-                        var ai = 0
-                        while ai < arg_count:
-                            let arg_node = self.ast.get_extra(extra_start + ai)
-                            if self.expr_has_nested_mutating_call_on(arg_node, recv_root) != 0:
-                                self.emit_error("nested mutating calls on the same place; bind the inner result to a local first (§5.4)", node)
-                                break
-                            ai = ai + 1
-                        // §3.2 — a mut self receiver is exclusive for the call:
-                        // no argument may retain access to the receiver's place
-                        // (reference, iterator/view, or a shared-representation
-                        // str/slice value read from its fields).
-                        var xai = 0
-                        while xai < arg_count:
-                            let x_arg = self.ast.get_extra(extra_start + xai)
-                            var x_conflict = self.arg_retains_access_to(x_arg, recv_root)
-                            if x_conflict == 0 and self.ast.kind(x_arg) == NodeKind.NK_FIELD_ACCESS and self.place_root_sym(x_arg) == recv_root:
-                                let x_ty_opt = self.typed_expr_types.get(x_arg)
-                                if x_ty_opt.is_some():
-                                    let x_tk = self.get_type_kind(self.resolve_alias(x_ty_opt.unwrap() as TypeId))
-                                    if x_tk == TypeKind.TY_STR or x_tk == TypeKind.TY_SLICE:
-                                        x_conflict = 1
-                            if x_conflict != 0:
-                                self.emit_error("argument retains access to the mutable receiver in the same call; bind it to a local first (§3.2)", node)
-                                break
-                            xai = xai + 1
+                // D172 (§3.2, §3.2a): the receiver is exclusive from
+                // activation. An argument may mutate it while it runs
+                // (`pool.add_node(pool.make_node(k))`) but may not retain
+                // access to it; an indexed receiver is resolved first, so an
+                // argument mutating its container is an error.
+                let recv_args: List[i32] = List.new()
+                for ai in 0..arg_count:
+                    recv_args.push(self.ast.get_extra(extra_start + ai))
+                self.check_call_activation(List.new(), expr, recv_args, node)
 
         // Static enum variant constructor: Shape.Rect(1, 2), Option[i32].Some(1)
         if mc_is_static_enum_variant:
@@ -36585,7 +36872,7 @@ impl Sema:
                 if arg_types.len() > 0:
                     let split_idx_ty = arg_types[0]
                     let split_idx_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, 0) else: self.ast.get_extra(extra_start)
-                    if self.check_builtin_method_call_arg(self.pool_resolve(field), 0, self.ty_i64 as i32, split_idx_ty, split_idx_node) == 0:
+                    if self.check_builtin_method_call_arg(with_str_clone_ref(self.pool_resolve(field)), 0, self.ty_i64 as i32, split_idx_ty, split_idx_node) == 0:
                         return 0
                 return self.ensure_listrange_pair_type_for(self.get_type_d0(resolved))
 
@@ -37569,6 +37856,10 @@ impl Sema:
     // Collect full field path from an expression into borrow_path_data.
     // Returns (path_start, path_count) by storing the path and returning
     // the start index. Fields are stored root-to-leaf order.
+    // Where the next collected borrow path begins (an i32 offset, as
+    // are_borrows_disjoint_paths reads paths).
+    fn borrow_path_mark() -> i32: self.borrow_path_data.len() as i32
+
     fn borrow_collect_path(node: i32) -> i32:
         let start = self.borrow_path_data.len()
         self.borrow_collect_path_inner(node)
@@ -37681,7 +37972,7 @@ impl Sema:
         // of a projection (`&x.field`) has a path and stays legal.
         self.check_whole_use_partially_moved(operand_node)
         let new_field = self.borrow_field(operand_node)
-        let path_start = self.borrow_path_data.len() as i32
+        let path_start = self.borrow_path_mark()
         let path_count = self.borrow_collect_path(operand_node)
 
         var i = 0
@@ -37765,7 +38056,7 @@ impl Sema:
             if attached != 0:
                 continue
             let before = self.borrow_refs.len()
-            let path_start = self.borrow_path_data.len() as i32
+            let path_start = self.borrow_path_mark()
             // §3.8 / D22: a view of a field borrows that field's path, not the
             // whole root — `let src = self.source; self.pos = …` mutates a
             // disjoint sibling and leaves the view intact; only a write to the
@@ -38057,7 +38348,7 @@ impl Sema:
                 self.ret_view_placeholder_writes.push(place)
                 self.ret_view_placeholder_writes.push(holder)
                 self.ret_view_placeholder_diags.push(self.mutation_under_view_diag(place, pi, &held, err_node))
-        let path_start = self.borrow_path_data.len() as i32
+        let path_start = self.borrow_path_mark()
         let path_count = self.borrow_collect_path(place_node)
         var i: i32 = 0
         while i < self.borrow_kinds.len():
@@ -39889,10 +40180,32 @@ impl Sema:
         for ai in 0..arm_nodes.len():
             self.d32_check_owned_value_field(arm_nodes[ai], 1, context)
 
+    // D172 (§3.8a): `sym` names a `mut` parameter of the function being
+    // checked (not its receiver): the caller's place, not a value it owns.
+    fn ident_is_mut_param(sym: i32) -> bool:
+        if self.current_fn_decl_node <= 0 or sym == 0:
+            return false
+        let meta = self.ast.find_fn_meta(self.current_fn_decl_node)
+        if meta < 0:
+            return false
+        let start = self.ast.fn_meta_param_start(meta)
+        for pi in 0..self.ast.fn_meta_param_count(meta):
+            let name = self.ast.fn_param_name(start, pi)
+            if name == sym and fn_param_is_mut_self(self.ast.fn_param_flags(start, pi)) != 0:
+                return self.pool_resolve(name) != "self"
+        false
+
     mut fn mark_moved_if_consumed(node: i32):
         if node == 0:
             return
         let kind = self.ast.kind(node)
+        // D172 (§3.8a): a `mut` parameter is a mode, not a value; consuming
+        // it would move out of the caller's place.
+        if kind == NodeKind.NK_IDENT and self.ident_is_mut_param(self.ast.get_data0(node)):
+            let mp_ty = self.typed_expr_types.get(node) ?? 0
+            if mp_ty == 0 or self.is_copy(mp_ty as TypeId) == 0:
+                self.emit_error(f"a `mut` parameter is a mode, not a value: `{self.pool_resolve(self.ast.get_data0(node))}` cannot be returned, stored or moved (§3.8a)", node)
+                return
         if kind == NodeKind.NK_MOVE_ARG:
             // #782/§2.5.1: an explicit `move ...` spelling — the inner field
             // move is declared, so later whole-value uses stay sanctioned.
@@ -40553,7 +40866,7 @@ impl Sema:
         if is_iter_of_self == 0:
             return -1
         let pre_count = self.borrow_kinds.len() as i32
-        let path_start = self.borrow_path_data.len() as i32
+        let path_start = self.borrow_path_mark()
         self.check_borrow_create_direct(recv_root, BorrowKind.SHARED, 0, path_start, 0, arg_node)
         if self.borrow_kinds.len() > pre_count:
             self.borrow_refs[pre_count] = -1

@@ -9477,6 +9477,20 @@ impl Sema:
             return ReceiverMode.Read
         ReceiverMode.Missing
 
+    // D172 (§3.8a): parameter `pi` of signature `si` is declared `mut` — a
+    // `mut p: T` parameter, or a `mut self` receiver, the same mode. Read
+    // from the declaration's parameter flags, the one source of the mode.
+    fn sig_param_is_mut(si: i32, pi: i32) -> bool:
+        if si < 0 or si >= self.sig_param_counts.len() or pi < 0 or pi >= self.sig_param_counts[si]:
+            return false
+        let decl = self.receiver_decl_node_for_sig(si)
+        if decl <= 0:
+            return false
+        let meta = self.ast.find_fn_meta(decl)
+        if meta < 0 or pi >= self.ast.fn_meta_param_count(meta):
+            return false
+        fn_param_is_mut_self(self.ast.fn_param_flags(self.ast.fn_meta_param_start(meta), pi)) != 0
+
     fn sig_param_uses_value_ref_abi(si: i32, pi: i32) -> i32:
         if si < 0 or si >= self.sig_param_eff_starts.len():
             return 0
