@@ -2909,13 +2909,6 @@ impl Sema:
         // calls may have checked bodies already; preparing again would
         // check them twice.
         if self.body_order_state.len() != count: self.prepare_body_order(count)
-        // §21.1 rule 6: every `from` clause before any body, so a call
-        // checked first reads its callee's declared origins.
-        for di in 0..count:
-            let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_view_origin_count(decl) > 0 and not self.decl_is_lazy_skipped(di):
-                self.update_module_context(di)
-                self.resolve_declared_view_origins(decl, self.ast.fn_decl_body_is_interface(decl))
         // WITH_SEMA_BODY_ORDER=reverse checks top-level bodies last to first
         // (the callee-first dependencies still apply): a program whose facts
         // or diagnostics change under it depends on declaration order.
@@ -3013,6 +3006,15 @@ impl Sema:
             let earlier: i32 = self.body_typed_decls.get(bare) ?? -1
             self.body_typed_next[di] = earlier
             self.body_typed_decls.insert(bare, di)
+        // §21.1 rule 6: every `from` clause before any body, so a call
+        // checked first reads its callee's declared origins; a global
+        // initializer's call included (`word().trim()` views the temporary
+        // `trim` was handed, D174).
+        for di in 0..count:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_view_origin_count(decl) > 0 and not self.decl_is_lazy_skipped(di):
+                self.update_module_context(di)
+                self.resolve_declared_view_origins(decl, self.ast.fn_decl_body_is_interface(decl))
 
     // The name a call spells a declaration by: a method's parsed name is
     // `Owner.m`, called as `self.m()` or `Owner.m()`; a function's is
@@ -3058,20 +3060,27 @@ impl Sema:
         if self.bodies_checked_on_demand.contains(di): return
         let decl = self.ast.get_decl(di)
         if self.ast.kind(decl) == NodeKind.NK_FN_DECL and not self.decl_is_lazy_skipped(di):
-            var n: i32 = self.body_order_lower[di] + 1
-            while n < decl:
-                if self.ast.kind(n) == NodeKind.NK_CALL:
-                    let callee = self.ast.get_data0(n)
-                    let callee_kind = self.ast.kind(callee)
-                    let named = if callee_kind == NodeKind.NK_IDENT: self.ast.get_data0(callee) else: if callee_kind == NodeKind.NK_FIELD_ACCESS: self.ast.get_data1(callee) else: 0
-                    var target: i32 = if named != 0: (self.body_typed_decls.get(named) ?? -1) else: -1
-                    while target >= 0:
-                        // In progress means a cycle: that call is reported, not chased.
-                        if target != di: self.check_decl_body_in_order(target)
-                        target = self.body_typed_next[target]
-                n = n + 1
+            self.check_callee_bodies_first(di)
         self.check_one_decl_body(di)
         self.body_order_state[di] = 2
+
+    // The bodies declaration `di` calls by name whose results its check
+    // reads (an inferred return, a returned view: body_typed_decls), each
+    // checked before it, a function's or a global initializer's.
+    mut fn check_callee_bodies_first(di: i32):
+        let decl = self.ast.get_decl(di)
+        var n: i32 = self.body_order_lower[di] + 1
+        while n < decl:
+            if self.ast.kind(n) == NodeKind.NK_CALL:
+                let callee = self.ast.get_data0(n)
+                let callee_kind = self.ast.kind(callee)
+                let named = if callee_kind == NodeKind.NK_IDENT: self.ast.get_data0(callee) else: if callee_kind == NodeKind.NK_FIELD_ACCESS: self.ast.get_data1(callee) else: 0
+                var target: i32 = if named != 0: (self.body_typed_decls.get(named) ?? -1) else: -1
+                while target >= 0:
+                    // In progress means a cycle: that call is reported, not chased.
+                    if target != di: self.check_decl_body_in_order(target)
+                    target = self.body_typed_next[target]
+            n = n + 1
 
     mut fn check_one_decl_body(only: i32):
         // One iteration: the body below leaves through `continue`.

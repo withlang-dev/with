@@ -1605,14 +1605,7 @@ impl Codegen:
         // stale predecessor's.
         self.current_function_name_sym = init_sym
         var init_builder = MirBuilder.init(self.sema, self.pool, self.intern, init_sym)
-        init_builder.body.local_type_ids[0] = result_tid
-        init_builder.push_scope()
-        init_builder.expected_type = result_tid
-        let init_result = init_builder.lower_expr(value_node)
-        let init_ret_place = init_builder.place_for_local(0)
-        init_builder.assign_operand_to_place(init_ret_place, init_result, self.pool.get_end(value_node))
-        init_builder.pop_scope_inline()
-        init_builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        init_builder.lower_global_initializer(value_node, result_tid)
         let init_body = move init_builder.body
         // Codegen-synthesized bodies never reach `--dump-mir` (that dumps the
         // Sema-lowered module). WITH_DUMP_INIT_MIR exposes them; #719 was

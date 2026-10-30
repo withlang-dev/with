@@ -1466,6 +1466,25 @@ impl MirBuilder:
         while self.stmt_temp_starts.len() > frame_depth:
             self.flush_stmt_temp_frame()
 
+    // A global's initializer as the body of `fn() -> tid`, for every
+    // backend: the value lands in the return place, and the initializer's
+    // temporaries drop after the store, as a `let` statement's do. With no
+    // statement frame open they were never registered, and leaked
+    // (`let base = seed_list().len()` kept its List).
+    mut fn lower_global_initializer(value_node: i32, tid: i32):
+        self.body.local_type_ids[0] = tid
+        self.push_scope()
+        self.expected_type = tid
+        let frame = self.push_stmt_temp_frame()
+        let result = self.lower_expr(value_node)
+        // The global is one more holder of a copied value (D111, D174: an
+        // independent copy): it takes its hold before the temporaries drop.
+        self.consume_moved_operand(result)
+        self.assign_operand_to_place(self.place_for_local(0), result, self.ast.get_end(value_node))
+        self.finish_stmt_temp_frame(frame)
+        self.pop_scope_inline()
+        self.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+
     fn task_drop_kind_for_binding(node: i32, bind_ty: i32) -> i32:
         if self.sema.type_is_task(bind_ty) == 0:
             return DropKind.DK_VALUE
@@ -4190,10 +4209,12 @@ impl MirBuilder:
                 continue
             let flags = self.ast.get_data2(decl)
             let is_mut = flags % 2
-            // Prefer an explicit type annotation. Otherwise infer from the
-            // unwrapped initializer expression instead of the raw comptime wrapper.
-            var gty: i32 = 0
-            let type_extra_packed = flags / 16
+            // D65: the global's type is Sema's binding type; the annotation
+            // and the initializer's own type are read only where Sema
+            // recorded none. An initializer that copies out of a view (D174)
+            // has the view's type, not the global's.
+            var gty: i32 = self.sema.typed_binding_types.get(decl) ?? 0
+            let type_extra_packed = if gty != 0: 0 else: flags / 16
             if type_extra_packed > 0:
                 let type_node = self.ast.get_extra(type_extra_packed - 1)
                 let annotated = self.sema.resolve_type_expr_frozen(type_node) as i32

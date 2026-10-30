@@ -8775,10 +8775,23 @@ impl Sema:
         if state == 1 and di == self.top_level_let_current:
             self.emit_error("the initializer of global `" ++ self.pool_resolve(sym) ++ "` reads its own value", node)
             return false
-        let outer = self.top_level_let_current
-        if state == 0 and outer >= 0:
+        // The use may sit in a function body checked inside an initializer
+        // (a callee checked first): its file, module and locals are the
+        // caller's to get back, as ensure_body_typed keeps them.
+        if state == 0 and self.top_level_let_current >= 0:
+            let saved_file_id = self.local_file_id
+            let saved_module_path: str = self.current_module_path
+            let saved_module_has_ci = self.current_module_has_ci
+            let caller_env = self.enter_callee_lexical_env()
             self.check_top_level_let_value(di)
-            self.update_decl_source_context(outer)
+            self.leave_callee_lexical_env(caller_env)
+            // Leaving restores the caller's scope, the global's slot with it:
+            // the type its initializer settled is the global's from now on.
+            let settled = self.typed_binding_types.get(self.ast.get_decl(di)) ?? 0
+            if settled != 0: self.scope_update_type(sym, settled)
+            self.local_file_id = saved_file_id
+            self.current_module_path = saved_module_path
+            self.current_module_has_ci = saved_module_has_ci
         true
 
     mut fn check_top_level_let_value(di: i32):
@@ -8794,6 +8807,11 @@ impl Sema:
         self.top_level_let_state.insert(decl, 1)
         let outer = self.top_level_let_current
         self.top_level_let_current = di
+        // The initializer's callees are checked first, as a function's are:
+        // a call reads what their bodies infer (`trim` returns a view of its
+        // receiver, so `word().trim()` views a temporary, D174).
+        self.check_callee_bodies_first(di)
+        self.update_decl_source_context(di)
         // D175: the initializer is a body of the global effect graph, so the
         // globals it reads, directly or through what it calls, order it.
         let saved_effect_body = self.current_effect_body
@@ -8825,9 +8843,24 @@ impl Sema:
         let type_value = if is_comptime_value != 0 and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
         let ann_extra = self.top_level_let_type_ann_extra(flags)
         let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
-        let val_type = if ann_type != 0: self.check_expr_with_expected(type_value, ann_type) else: self.check_expr(type_value)
+        // A global binding is a binding: its value is checked as a local
+        // `let`'s is, the annotation an owned demand (D22 §6.2) and an
+        // unannotated value in value context. `let v: str = word().trim()`
+        // was a type mismatch here and correct in a function.
+        var val_type = if ann_type != 0: self.check_expr_with_owned_demand(type_value, ann_type) else: self.check_expr_value_context(type_value)
+        // D174: an unannotated global is an unannotated binding. A view into
+        // a temporary of its initializer dies when the initializer ends, so
+        // the global takes the Copy value it views (`let last =
+        // seed_list()[1]`, `let text = word().trim()`); a non-Copy view is
+        // refused, as a local's is.
+        if ann_type == 0 and val_type != 0:
+            let viewed = self.copy_out_of_temporary(type_value, val_type as i32)
+            if viewed != 0 and self.record_contextual_copy_adjustment(type_value, viewed, val_type as i32) != 0:
+                val_type = viewed as TypeId
+            else if self.reject_view_into_temporary(type_value, "global `" ++ with_str_clone_ref(self.pool_resolve(name)) ++ "` binds") != 0:
+                return
         // The annotation is an owned demand like a local one's (#1803).
-        if ann_type != 0 and val_type != 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
+        if ann_type != 0 and val_type != 0 and self.has_contextual_copy_adjustment(type_value) == 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
             if self.types_compatible(ann_type as i32, val_type as i32) == 0:
                 if self.arithmetic_result_type(ann_type, val_type) == 0:
                     self.emit_error("type mismatch in binding", decl)
@@ -8838,7 +8871,10 @@ impl Sema:
             let canonical_name = self.pool_lookup_symbol(self.pool_resolve(name))
             if canonical_name != 0 and canonical_name != name:
                 self.scope_update_type(canonical_name, final_type as i32)
-        if final_type != 0:
+        // A value Sema copies out of a view (D174) keeps its exact view type:
+        // the adjustment it carries yields the global's type, and MIR lowers
+        // the view at its own type before copying through it.
+        if final_type != 0 and self.has_contextual_copy_adjustment(type_value) == 0:
             self.typed_expr_types.insert(value, final_type as i32)
             // Only NK_COMPTIME stores an inner expression in data0. For an
             // ordinary literal/identifier, data0 is a symbol, not a node.

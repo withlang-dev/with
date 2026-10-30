@@ -1241,6 +1241,11 @@ impl CCodegen:
                 let declaring = self.decl_source_path(decl)
                 self.fail(f"emit-c could not resolve the type '{spelling}' of {what} '{name}' (resolved from module '{declaring}')")
             return tid
+        // D65: an unannotated global's type is Sema's binding type; an
+        // initializer that copies out of a view (D174) has the view's type.
+        let bound = self.sema.typed_binding_types.get(decl as i32) ?? 0
+        if bound != 0:
+            return bound
         let value = self.ast.get_data1(decl)
         if self.sema.typed_expr_types.contains(value):
             return self.sema.typed_expr_types.get(value).unwrap()
@@ -10176,18 +10181,11 @@ impl CCodegen:
                 self.global_init_fn_syms.push(init_sym)
                 grew = true
 
-    // The initializer as the body of `fn init_sym() -> tid`, lowered exactly
-    // as Codegen.emit_module_runtime_init_fn lowers it for the LLVM backend.
+    // The initializer as the body of `fn init_sym() -> tid`, as every backend
+    // lowers it (MirBuilder.lower_global_initializer).
     fn lower_global_init_body(init_sym: i32, value: i32, tid: i32) -> MirBody:
         var b = MirBuilder.init(self.sema, self.ast, self.intern, init_sym)
-        b.body.local_type_ids[0] = tid
-        b.push_scope()
-        b.expected_type = tid
-        let result = b.lower_expr(value)
-        let ret_place = b.place_for_local(0)
-        b.assign_operand_to_place(ret_place, result, self.ast.get_end(value))
-        b.pop_scope_inline()
-        b.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
+        b.lower_global_initializer(value, tid)
         move b.body
 
     // Whether a global's initializer only computes its value: no call (a
