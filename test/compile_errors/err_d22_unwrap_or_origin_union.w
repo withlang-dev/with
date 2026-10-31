@@ -13,6 +13,6 @@ fn main:
     var fallback: HashMap[i32, i32] = HashMap.new()
     primary.insert(1, 89)
     fallback.insert(1, 90)
-    let view = primary.get(1).unwrap_or(fallback.get(1).unwrap())
+    let view: &i32 = primary.get(1).unwrap_or(fallback.get(1).unwrap())
     primary.clear()
     assert(view == 89)

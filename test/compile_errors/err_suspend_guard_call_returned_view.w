@@ -13,7 +13,7 @@ async fn work() -> i32:
 
 async fn main:
     let held = Guard { value: 1 }
-    let view = id_i32_ref(&held.value)
+    let view: &i32 = id_i32_ref(&held.value)
     let t = work()
     let value = t.await
     assert(*view == value - 41)

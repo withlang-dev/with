@@ -6,6 +6,6 @@ use std.collections.trie.Trie
 fn main:
     var m: Trie[i32] = Trie.new()
     m.insert("a", 86)
-    let view = m.get("a").unwrap()
+    let view: &i32 = m.get("a").unwrap()
     m.insert("b", 1)
     print(*view)

@@ -1222,7 +1222,7 @@ impl PyInterp:
 
     // ── Calls ──
 
-    mut fn dotted_setting(root: &PyVal, path: &str) -> PyVal:
+    fn dotted_setting(root: &PyVal, path: &str) -> PyVal:
         var cur = pv_copy(root)
         for part in path.split("."):
             if cur.k != V_OBJ: return pv_none()

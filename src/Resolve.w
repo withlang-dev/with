@@ -496,7 +496,7 @@ impl ResolveState:
             let fn_def = pending_fn_defs[fi]
             self.resolve_fn_body(ast_pool, module_id, module_scope, fn_node, fn_def, walk_bodies)
 
-    fn record_link_lib(lib_sym: i32) -> Unit:
+    mut fn record_link_lib(lib_sym: i32) -> Unit:
         if lib_sym <= 0:
             return
         if self.link_lib_set.contains(lib_sym):
@@ -525,7 +525,7 @@ fn resolve_decl_name(pool: &AstPool, decl: NodeId) -> i32:
     0
 
 impl ResolveState:
-    fn add_def(module_id: i32, parent_def: i32, kind: i32, name_sym: i32, span_start: i32, span_end: i32) -> i32:
+    mut fn add_def(module_id: i32, parent_def: i32, kind: i32, name_sym: i32, span_start: i32, span_end: i32) -> i32:
         let did = self.result.defs.len() as i32
         self.result.defs.push(ResolvedDef {
             def_id: did,
@@ -538,7 +538,7 @@ impl ResolveState:
         })
         did
 
-    fn add_scope(module_id: i32, parent_scope: i32, owner_def: i32, kind: i32) -> i32:
+    mut fn add_scope(module_id: i32, parent_scope: i32, owner_def: i32, kind: i32) -> i32:
         let sid = self.result.scopes.len() as i32
         self.result.scopes.push(ResolvedScope {
             scope_id: sid,
@@ -549,7 +549,7 @@ impl ResolveState:
         })
         sid
 
-    fn add_binding(scope_id: i32, symbol: i32, def_id: i32):
+    mut fn add_binding(scope_id: i32, symbol: i32, def_id: i32):
         if scope_id < 0 or symbol <= 0 or def_id < 0:
             return
         self.result.bindings.push(ResolvedBinding {
@@ -559,7 +559,7 @@ impl ResolveState:
         })
         self.binding_map.insert(resolve_binding_key(scope_id, symbol), def_id)
 
-    fn resolve_fn_body(ast_pool: &AstPool, module_id: i32, module_scope: i32, fn_node: i32, fn_def: i32, walk_body: bool):
+    mut fn resolve_fn_body(ast_pool: &AstPool, module_id: i32, module_scope: i32, fn_node: i32, fn_def: i32, walk_body: bool):
         let fn_scope = self.add_scope(module_id, module_scope, fn_def, ScopeKind.SK_FN)
 
         // Register parameters as defs/bindings in function scope.
@@ -585,7 +585,7 @@ impl ResolveState:
         if walk_body and not ast_pool.fn_decl_body_is_interface(fn_node) and resolve_node_valid(ast_pool, body):
             self.walk_expr(ast_pool, module_id, fn_def, fn_scope, body)
 
-    fn walk_type_expr(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32):
+    mut fn walk_type_expr(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32):
         if not resolve_node_valid(ast_pool, node):
             return
         let kind = ast_pool.kind(node)
@@ -631,7 +631,7 @@ impl ResolveState:
             self.walk_type_expr(ast_pool, module_id, current_scope, ast_pool.get_data2(node))
             return
 
-    fn walk_expr(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, node: i32):
+    mut fn walk_expr(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, node: i32):
         if not resolve_node_valid(ast_pool, node):
             return
 
@@ -999,7 +999,7 @@ impl ResolveState:
                 self.walk_expr(ast_pool, module_id, parent_def, arm_scope, arm_body)
             return
 
-    fn bind_pattern(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, pat: i32):
+    mut fn bind_pattern(ast_pool: &AstPool, module_id: i32, parent_def: i32, current_scope: i32, pat: i32):
         if not resolve_node_valid(ast_pool, pat):
             return
 
@@ -1084,7 +1084,7 @@ impl ResolveState:
                 self.add_binding(current_scope, rest_sym, d)
             return
 
-    fn record_identifier_use(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32, sym: i32):
+    mut fn record_identifier_use(ast_pool: &AstPool, module_id: i32, current_scope: i32, node: i32, sym: i32):
         if sym <= 0 or (not resolve_node_valid(ast_pool, node)):
             return
 

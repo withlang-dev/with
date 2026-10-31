@@ -6,6 +6,6 @@ use std.collections.sorted_list.SortedList
 fn main:
     var m: SortedList[i32] = SortedList.new()
     m.insert(86)
-    let view = m.get(0)
+    let view: &i32 = m.get(0)
     m.clear()
     print(*view)

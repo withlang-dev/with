@@ -486,7 +486,7 @@ impl MirModule:
         0
 
     // No-op: reserved for future manual memory management.
-    mut fn deinit():
+    fn deinit():
         return
 
     mut fn add_body(body: MirBody):
@@ -863,7 +863,7 @@ impl MirBody:
 
     fn is_static_const_local(local_id: i32): self.static_const_locals.contains(local_id)
 
-    mut fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
+    fn set_call_intrinsic(call_id: i32, kind: MirIntrinsic):
         if call_id >= 0 and call_id < self.call_intrinsic_kinds.len():
             with self.call_intrinsic_kinds.slot(call_id) as mut slot:
                 slot.set(kind)

@@ -9,6 +9,6 @@ fn first[T](v: &List[T]) -> &T: v[0]
 
 fn main:
     var v: List[i64] = [4, 5, 6]
-    let w = first(&v)
+    let w: &i64 = first(&v)
     v.push(7)
     print(*w)

@@ -12,7 +12,7 @@ fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 127)
     let carrier: Result[&i32, str] = Ok(map.get(1).unwrap())
-    let view = match carrier:
+    let view: &i32 = match carrier:
         Ok(value) => value
         Err(_) => return
     map.clear()

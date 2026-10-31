@@ -14,6 +14,6 @@ impl Holder:
 fn main:
     var c = Cell { v: 86 }
     var h = Holder { p: &raw mut c }
-    let view = h.get().unwrap()
+    let view: &i32 = h.get().unwrap()
     h.clear()
     print(*view)

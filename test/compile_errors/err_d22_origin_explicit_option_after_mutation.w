@@ -10,6 +10,6 @@
 fn main:
     var value = 123
     let carrier: Option[&i32] = Some(&value)
-    let view = carrier.unwrap()
+    let view: &i32 = carrier.unwrap()
     value = 124
     assert(view == 123)

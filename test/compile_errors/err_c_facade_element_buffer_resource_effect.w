@@ -19,7 +19,7 @@ c facade values:
         buffer param values len param count elements
 fn main:
     let owner = Owner.make().unwrap()
-    let view = owner.observe().unwrap()
+    let view: &Value = owner.observe().unwrap()
     let values: [i32; 1] = [1]
     touch(values, owner)
     print(f"{view.n}")

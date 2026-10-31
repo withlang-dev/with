@@ -6,6 +6,6 @@ use std.collections.unordered_map.UnorderedMap
 fn main:
     var m: UnorderedMap[i32, i32] = UnorderedMap.new()
     m.insert(1, 86)
-    let view = m.get(1).unwrap()
+    let view: &i32 = m.get(1).unwrap()
     m.remove(1)
     print(*view)

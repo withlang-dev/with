@@ -11,7 +11,7 @@ fn grow():
 
 fn down(n: i32) -> &i32:
     if n == 0: return &G[0]
-    let r = up(n - 1)
+    let r: &i32 = up(n - 1)
     grow()
     r
 

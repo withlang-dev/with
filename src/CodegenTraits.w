@@ -30,7 +30,7 @@ impl Codegen:
         let ti = self.sema.trait_idx_for_impl(impl_node)
         if ti < 0: self.pool.get_data2(impl_node) else: self.sema_sym_to_codegen_sym(self.sema.trait_identity_symbol(ti))
 
-    fn collect_trait_info(trait_node: i32):
+    mut fn collect_trait_info(trait_node: i32):
         let name_sym = self.cg_trait_key_for_decl(trait_node)
         let extra_start = self.pool.get_data1(trait_node)
         if self.trait_map.get(name_sym).is_some():
@@ -90,7 +90,7 @@ impl Codegen:
         self.trait_idx_syms.push(name_sym)
         self.trait_decl_nodes.insert(name_sym, trait_node)
 
-    fn audit_trait_method_row(trait_name: &str, trait_node: i32, trait_idx: i32, method_start: i32, method_idx: i32):
+    mut fn audit_trait_method_row(trait_name: &str, trait_node: i32, trait_idx: i32, method_start: i32, method_idx: i32):
         let row = method_start + method_idx
         let ast_name = self.pool.trait_method_field(trait_node, method_idx, TRAIT_METHOD_NAME)
         let ast_flags = self.pool.trait_method_field(trait_node, method_idx, TRAIT_METHOD_FLAGS)
@@ -121,7 +121,7 @@ impl Codegen:
     // the canonical AST records. This permanently catches record-stride drift:
     // table lengths can stay parallel while every method after the first points
     // at the wrong AST fields.
-    fn audit_trait_table_contracts():
+    mut fn audit_trait_table_contracts():
         if self.analysis_enabled == 0:
             return
         let trait_count = self.trait_idx_syms.len()
@@ -167,7 +167,7 @@ impl Codegen:
             if not decl.is_some():
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: missing AST declaration")
                 continue
-            let trait_node = decl.unwrap()
+            let trait_node: i32 = decl.unwrap()
             if self.pool.kind(trait_node) != NodeKind.NK_TRAIT_DECL:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: node={trait_node} is not a trait declaration")
                 continue
@@ -951,7 +951,7 @@ impl Codegen:
             return ""
         "__vtable_" ++ type_name ++ "_" ++ trait_name
 
-    fn lookup_trait_vtable_global(impl_type_sym: i32, trait_sym: i32) -> i64:
+    mut fn lookup_trait_vtable_global(impl_type_sym: i32, trait_sym: i32) -> i64:
         let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
         let global_name = self.trait_vtable_global_name(impl_type_sym, trait_sym)
         if global_name.len() > 0:
@@ -1414,7 +1414,7 @@ impl Codegen:
             return
         wl_set_linkage(gv, 0)
 
-    fn declare_module_binding_global(name_sym: i32, global_ty: i64, is_mut: i32) -> i64:
+    mut fn declare_module_binding_global(name_sym: i32, global_ty: i64, is_mut: i32) -> i64:
         let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
         let existing = wl_get_named_global(self.llmod, name_str)
         let gv =
@@ -1428,7 +1428,7 @@ impl Codegen:
         self.module_constants.insert(name_sym, gv)
         gv
 
-    fn define_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+    mut fn define_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
         let name_str = self.current_decl_module_link_name(self.intern.resolve(name_sym))
         let existing = wl_get_named_global(self.llmod, name_str)
         let gv =
@@ -1441,7 +1441,7 @@ impl Codegen:
         self.module_constants.insert(name_sym, gv)
         gv
 
-    fn record_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
+    mut fn record_module_binding_global(name_sym: i32, global_ty: i64, init: i64, is_mut: i32) -> i64:
         if self.current_decl_is_imported_module_symbol():
             return self.declare_module_binding_global(name_sym, global_ty, is_mut)
         self.define_module_binding_global(name_sym, global_ty, init, is_mut)
@@ -1457,7 +1457,7 @@ impl Codegen:
         self.module_drop_global_syms.push(name_sym)
         self.module_drop_global_tids.push(tid)
 
-    fn record_runtime_init_storage_global(name_sym: i32, global_ty: i64) -> i64:
+    mut fn record_runtime_init_storage_global(name_sym: i32, global_ty: i64) -> i64:
         // Runtime-initialized module constants are still language-level `const`
         // bindings, but their backing storage must remain writable until the
         // wrapper main populates them via __with_init_const_* helpers.

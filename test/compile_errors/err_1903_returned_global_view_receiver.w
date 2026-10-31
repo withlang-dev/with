@@ -14,6 +14,6 @@ impl Pair:
 
 fn main:
     let p = Pair { a: 0, b: 0 }
-    let r = p.hidden()
+    let r: &Pair = p.hidden()
     bump()
     print(r.a)

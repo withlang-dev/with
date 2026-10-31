@@ -6,6 +6,6 @@ use std.collections.deque.Deque
 fn main:
     var m: Deque[i32] = Deque.new()
     m.push_back(86)
-    let view = m.get(0)
+    let view: &i32 = m.get(0)
     m.clear()
     print(*view)

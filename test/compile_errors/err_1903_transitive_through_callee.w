@@ -11,7 +11,7 @@ fn grow():
 fn main:
     HIDDEN.push(41)
     let x: List[i32] = List.new()
-    let r = outer(&x)
+    let r: &i32 = outer(&x)
     grow()
     print(*r)
 

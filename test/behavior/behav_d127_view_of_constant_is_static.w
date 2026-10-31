@@ -19,5 +19,5 @@ fn main:
     let second = pick(Some(&seven))
     let third = pick(None)
     let noise = clobber(4)
-    print(f"{*first} {*second} {*third}")
+    print(f"{first} {second} {third}")
     if noise == 0: print("unreachable")

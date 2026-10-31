@@ -3013,7 +3013,7 @@ impl Sema:
         let name: str = self.pool_resolve(if c.rename != 0: c.rename else: c.fn_sym)
         name
 
-    mut fn facade_bridge_redirect(fn_sym: i32) -> i32:
+    fn facade_bridge_redirect(fn_sym: i32) -> i32:
         if self.facade_bridge_of.len() == 0:
             return fn_sym
         let name: str = self.pool_resolve(fn_sym)
@@ -3342,7 +3342,7 @@ impl Sema:
 
     // The dependent resource a type carries — itself, or inside an
     // `Option`, `Result`, tuple, collection or reference — or -1.
-    fn facade_dependent_resource_in(tid: i32, depth: i32) -> i32:
+    mut fn facade_dependent_resource_in(tid: i32, depth: i32) -> i32:
         if tid <= 0 or depth > 6 or self.facade_resources.len() == 0:
             return -1
         let r = self.resolve_alias(tid as TypeId)
@@ -3602,7 +3602,7 @@ impl Sema:
 
     // A diagnostic about a value of type `tid` gains the dependency facts of
     // the facade resource it carries, if any.
-    fn with_facade_dependency_notes(diag0: Diagnostic, tid: i32) -> Diagnostic:
+    mut fn with_facade_dependency_notes(diag0: Diagnostic, tid: i32) -> Diagnostic:
         var diag = diag0
         let ci = self.facade_borrowed_contract_in(tid, 0)
         if ci >= 0:
@@ -4233,7 +4233,7 @@ impl Sema:
     // views). #1834: `FailedDatabase.errmsg()` invalidates views of its
     // receiver (§38, no `preserves`), and the audit read that receiver as
     // holding nothing.
-    fn facade_type_holds_resource(tid: i32, depth: i32) -> bool:
+    mut fn facade_type_holds_resource(tid: i32, depth: i32) -> bool:
         if tid <= 0 or depth > 6 or self.facade_resources.len() == 0:
             return false
         let r = self.resolve_alias(tid as TypeId)
