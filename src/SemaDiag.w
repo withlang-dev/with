@@ -254,7 +254,7 @@ impl Sema:
                 paths.insert(file_id, self.decl_source_paths[di].clone())
         var out = ""
         for (node, pattern) in self.ceremony_sites:
-            let name = if pattern == 1: "str-clone" else: if pattern == 2: "ref-at-ref-param" else: if pattern == 4: "plain-bits-field-copy-annotation" else: "some-at-option-demand"
+            let name = if pattern == 1: "str-clone" else: if pattern == 2: "ref-at-ref-param" else: if pattern == 4: "plain-bits-field-copy-annotation" else: if pattern == 5: "str-view-copy-annotation" else: "some-at-option-demand"
             let file_id = self.ast.file(node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
             out = out ++ f"{name}\t{path}\t{self.node_line(node)}\t{self.ast.get_start(node)}\t{self.ast.get_end(node)}\n"

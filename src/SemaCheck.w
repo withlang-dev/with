@@ -17211,6 +17211,12 @@ impl Sema:
         // plain-bits field read is anyway; the sweep removes the annotation.
         if ann_type != 0 and ann_type_node != 0 and val_type != 0 and self.ast.kind(value_core) == NodeKind.NK_FIELD_ACCESS and self.types_identical(ann_type as i32, val_type as i32) and self.type_is_plain_bits(val_type as i32) and self.place_root_sym(value_core) != 0:
             self.ceremony_sites.insert(ann_type_node, 4)
+        // D179 census: `let s: str = <a view of str>` written to take the str
+        // an unannotated binding takes anyway (the demand recorded the copy
+        // the binding rule would record); the sweep removes the annotation.
+        // A written `&x` or a cast would keep the view, so neither is this.
+        else if ann_type != 0 and ann_type_node != 0 and self.resolve_alias(ann_type) == self.ty_str and self.has_contextual_copy_adjustment(value_core) != 0 and not ((self.ast.kind(value_core) == NodeKind.NK_UNARY and self.ast.get_data0(value_core) == UnaryOp.UOP_REF) or self.ast.kind(value_core) == NodeKind.NK_CAST):
+            self.ceremony_sites.insert(ann_type_node, 5)
         if not self.view_projection_exprs.contains(value) and not self.view_projection_exprs.contains(value_core):
             // §2.4: a drop-body let of a self field CONSUMES (the 84ebff6d
             // observation rule contradicted the spec — spec_ss02_4 pins the
