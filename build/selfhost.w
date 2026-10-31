@@ -1625,6 +1625,17 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     rc = bs_assert_contains(ctx, diag_n.stderr, "<cli -n #1>:1:23", "one_liners")
     if rc != 0: return rc
 
+    // A `;` ends an inline `:` body (§29.13): the error names where `f` was
+    // bound, at its place in the user's code (a label was not shifted from
+    // the generated program into it), and offers the braced body.
+    let diag_inline = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-inline-body", bs_one_liner_args("-n", "if true: let f = 3; print(f)"), "x\n", 120000)
+    if diag_inline.rc == 0:
+        return bs_fail(ctx, "one-liner use after an inline body unexpectedly succeeded")
+    rc = bs_assert_contains(ctx, diag_inline.stderr, "label @1:10 `f` is bound here", "one_liners")
+    if rc != 0: return rc
+    rc = bs_assert_contains(ctx, diag_inline.stderr, "braces keep several statements in one body", "one_liners")
+    if rc != 0: return rc
+
     // ── #513: one-liner edge cases (§18.5b) ────────────────────────────
     // Multiple same-mode fragments accumulate, for -n and -p as well as -e.
     var repeat_n: List[str] = List.new()

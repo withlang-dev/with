@@ -149,7 +149,10 @@ impl Diagnostic:
                 let lloc2 = label_source.offset_to_location(lab.span.start)
                 with_eprint(render_diag_label_line_in_file(label_path, lloc2.line, lloc2.col, label_message))
             else:
-                let lloc = source.offset_to_location(lab.span.start)
+                // A one-liner's spans are offsets into the generated program;
+                // the label is shifted into the user's code as the primary is.
+                let lstart = lab.span.start - gen_start
+                let lloc = source.offset_to_location(if lstart < 0: 0 else: lstart)
                 with_eprint(render_diag_label_line(lloc.line, lloc.col, label_message))
 
         for i in 0..self.notes.len():

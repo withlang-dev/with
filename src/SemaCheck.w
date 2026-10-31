@@ -13027,9 +13027,47 @@ impl Sema:
         if field_help.len() > 0:
             self.emit_error_with_help("undefined variable", node, field_help)
             return 0
+        let ended = self.ended_binding_decl(sym, node)
+        if ended > 0:
+            self.emit_ended_binding_error(sym, node, ended)
+            return 0
         let suggestion = self.suggest_name(target_name, node)
         self.emit_error_with_suggestion("undefined variable", node, suggestion)
         0
+
+    // The declaring node of `sym` when it was bound earlier in this function,
+    // in a block that ended before `use_node`; 0 when no ended binding
+    // explains the use.
+    fn ended_binding_decl(sym: i32, use_node: i32) -> i32:
+        let decl = self.ended_bindings.get(sym) ?? 0
+        if decl <= 0 or self.ast.file(decl as NodeId) != self.ast.file(use_node as NodeId) or self.ast.get_start(decl) >= self.ast.get_start(use_node):
+            return 0
+        if self.current_fn_decl_node > 0 and (self.ast.get_start(decl) < self.ast.get_start(self.current_fn_decl_node) or self.ast.get_start(decl) > self.ast.get_end(self.current_fn_decl_node)):
+            return 0
+        decl
+
+    // Whether `decl` sits in an inline `:` body: on its own line, the text
+    // before it ends in the header's `:` (`if c: let f = 3`).
+    fn in_inline_body(decl: i32) -> bool:
+        let text = self.source_text_view_for_file_id(self.ast.file(decl as NodeId) as i32)
+        var i = self.ast.get_start(decl) - 1
+        while i >= 0 and (text[i] == ' ' or text[i] == '\t'): i -= 1
+        i >= 0 and text[i] == ':'
+
+    // An undefined name that a block bound before this use. A `;` ends an
+    // inline `:` body as a newline does (§29.13): `if c: let f = 3; print(f)`
+    // binds `f` in the `if` and reads it after.
+    mut fn emit_ended_binding_error(sym: i32, use_node: i32, decl: i32):
+        if self.suppress_errors != 0:
+            return
+        let name = self.pool_resolve(sym)
+        var diag = Diagnostic.err("undefined variable", self.diagnostic_node_span(use_node))
+        diag.add_label(self.diagnostic_node_span(decl), f"`{name}` is bound here, in a body that ends before the use")
+        if self.in_inline_body(decl):
+            diag.add_help(f"an inline `:` body is one statement, and a `;` ends it as a newline does (§29.13); braces keep several statements in one body: `if … {{ let {name} = …; … }}`")
+        else:
+            diag.add_help(f"bind `{name}` before the block to use it after it")
+        self.diags.emit(diag)
 
     fn regex_literal_pattern(node: i32) -> str:
         with_str_clone_ref(self.pool_resolve(self.ast.get_data0(node)))
