@@ -21,6 +21,6 @@ fn run_dyn(g: &dyn Grow): g.grow()
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     run_dyn(W { x: 0 })
     print(r)

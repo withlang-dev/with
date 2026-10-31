@@ -12,7 +12,7 @@ fn grow(n: i32) -> i32:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     let k = 3 |> grow()
     print(f"{k}")
     print(r)

@@ -40,7 +40,7 @@ fn views():
     let v = Views { items: ["x", "y"] }
     assert(*v[0] == "x" and *v[1] == "y")
     let second = v[1]
-    assert(*second == "y")
+    assert(second == "y")
     let n = Views { items: [10, 20, 30] }
     assert(*n[2] == 30 and *n[0] + *n[1] == 30)
 

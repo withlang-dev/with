@@ -23,6 +23,6 @@ fn run_dyn(g: &dyn Grow): g.grow()
 
 fn main:
     G.insert("k", "v" ++ "!")
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     run_dyn(W { x: 0 })
     print(r)

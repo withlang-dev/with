@@ -21,18 +21,18 @@ fn global_ref() -> &i32:
 fn test_return_ref_use_locally:
     let x = 42
     let r = same_ref(&x)
-    assert(*r == 42)
+    assert(r == 42)
 
 fn test_return_ref_from_borrowed_field:
     let b = ReturnRefBuf { data: 13 }
     let r = borrowed_field_ref(&b)
-    assert(*r == 13)
+    assert(r == 13)
 
 fn test_return_option_ref_use_locally:
     let x = 7
     let r = maybe_ref(&x, true)
     match r:
-        Some(v) => assert(*v == 7)
+        Some(v) => assert(v == 7)
         None => assert(false)
 
 fn test_return_option_ref_none:
@@ -44,4 +44,4 @@ fn test_return_option_ref_none:
 
 fn test_return_global_ref:
     let r = global_ref()
-    assert(*r == 99)
+    assert(r == 99)

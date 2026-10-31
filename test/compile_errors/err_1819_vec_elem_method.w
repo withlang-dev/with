@@ -16,6 +16,6 @@ extend W:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     W { x: 0 }.go()
     print(r)

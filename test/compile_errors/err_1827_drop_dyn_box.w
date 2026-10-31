@@ -26,7 +26,7 @@ impl Drop for Tok:
 fn main:
     G.push("first" ++ "!")
     let b: Box[dyn Named] = Box.new(Tok { n: 1 })
-    let r = G[0]
+    let r: &str = G[0]
     {
         let c = b
         print(f"{c.name()}")

@@ -1,12 +1,12 @@
 //! args: --dump-typed
 //! expect-check-stdout: typed contextual-joins=
-//! expect-check-stdout: bind borrowed: &i32
+//! expect-check-stdout: bind borrowed: i32
 //! expect-check-stdout: bind anchored: i32
 //! expect-check-stdout: bind anchored_reversed: i32
 //! expect-check-stdout: bind pinned: i32
 //! expect-check-stdout: bind owned_last: i32
 //! expect-check-stdout: bind owned_first: i32
-//! expect-check-stdout: bind five_views: &i32
+//! expect-check-stdout: bind five_views: i32
 //! expect-check-stdout: bind sequence: List[i32]
 //! expect-check-stdout: bind pinned_sequence: List[i32]
 //! expect-check-stdout: bind some_first: Option[isize]

@@ -9,7 +9,7 @@ var G: List[str] = List.new()
 fn run(g: fn() -> Unit): g()
 
 fn apply(f: fn() -> Unit):
-    let r = G[0]
+    let r: &str = G[0]
     run(f)
     print(r)
 

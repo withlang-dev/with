@@ -19,7 +19,7 @@ impl Drop for Tok:
 
 fn main:
     G.insert("k", "v" ++ "!")
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     {
         let t = Tok { n: 1 }
         print(f"{t.n}")

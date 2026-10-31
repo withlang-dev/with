@@ -10,7 +10,7 @@ fn mkv() -> List[str]:
 
 fn g(o: Option[&str]):
     var v = mkv()
-    let x = o ?? v[0]
+    let x: &str = o ?? v[0]
     for i in 0..100:
         v.push("q".clone())
     print(x)

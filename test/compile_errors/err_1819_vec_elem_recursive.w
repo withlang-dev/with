@@ -13,6 +13,6 @@ fn walk(n: i32):
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     walk(3)
     print(r)

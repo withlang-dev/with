@@ -10,6 +10,6 @@ fn apply(f: fn() -> Unit): f()
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     apply(() => { for i in 0..64: G.push(f"item{i}") })
     print(r)

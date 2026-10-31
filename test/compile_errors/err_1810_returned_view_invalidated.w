@@ -7,6 +7,6 @@ fn tail(s: &str) -> &str: s[1..]
 
 fn main:
     var s = "abc"
-    let t = tail(s)
+    let t: &str = tail(s)
     s = "xyz"
     print(t)

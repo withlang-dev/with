@@ -11,6 +11,6 @@ var G: HashMap[str, str] = HashMap.new()
 
 fn main:
     G.insert("k", "v" ++ "!")
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     for i in 0..64: G.insert(f"k{i}", f"v{i}")
     print(r)

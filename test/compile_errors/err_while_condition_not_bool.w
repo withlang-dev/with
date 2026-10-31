@@ -2,6 +2,6 @@
 
 // #654: while conditions must be bool.
 fn main:
-    var n = 0
+    var n = "a"
     while n:
-        n = n - 1
+        n = ""

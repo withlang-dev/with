@@ -16,7 +16,7 @@ impl[T] Drop for Guard[T]:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     {
         let g = Guard { v: 1 }
         print(f"{g.v}")

@@ -7064,6 +7064,10 @@ impl Sema:
         let tk = self.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_FN:
             return true
+        // A trait object is unsized: a `&dyn T` is the only form a binding
+        // can hold, so copying "the pointee" has no meaning (it trapped).
+        if tk == TypeKind.TY_TRAIT_OBJ:
+            return true
         if self.type_is_ephemeral_value(resolved) != 0:
             return true
         var parts: List[i32] = List.new()

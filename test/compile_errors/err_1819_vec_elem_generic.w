@@ -12,6 +12,6 @@ fn gm[T](x: T):
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     gm(1)
     print(r)

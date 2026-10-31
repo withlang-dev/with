@@ -16,7 +16,7 @@ impl Grow for W:
     fn tag(self: &Self) -> i32: self.x
 
 fn run(g: &dyn Grow):
-    let r = G[0]
+    let r: &str = G[0]
     g.grow()
     print(r)
 

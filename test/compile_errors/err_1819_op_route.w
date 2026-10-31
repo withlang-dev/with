@@ -15,7 +15,7 @@ impl Add[P, P] for P:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     let p = P { x: 1 } + P { x: 2 }
     print(f"{p.x}")
     print(r)

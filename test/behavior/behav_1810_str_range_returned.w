@@ -15,7 +15,7 @@
 fn tail(s: &str) -> &str: s[1..]
 
 fn tail_bound(s: &str) -> &str:
-    let t = s[1..]
+    let t: &str = s[1..]
     t
 
 fn inner(s: &str) -> Option[&str]: if s.len() > 2: Some(s[1..s.len() - 1]) else: None

@@ -11,7 +11,7 @@ fn first_key(f: fn(&str) -> &str) -> &str:
     var m: HashMap[str, i32] = HashMap.new()
     m.insert("a", 1)
     var ks = m.keys()
-    let k = ks.next().unwrap()
+    let k: &str = ks.next().unwrap()
     f(k)
 
 fn main:

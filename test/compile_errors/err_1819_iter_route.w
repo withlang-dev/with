@@ -18,7 +18,7 @@ impl Iter[i32] for Count:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     let c = Count { n: 2 }
     for i in c:
         print(f"{i}")

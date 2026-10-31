@@ -13,6 +13,6 @@ fn apply(f: fn() -> Unit): f()
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     apply(grow)
     print(r)

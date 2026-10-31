@@ -61,7 +61,7 @@ fn pattern_view(carrier: Option[&i32]):
         None => panic("missing pattern value")
 
 fn try_view(carrier: Option[&i32]) -> Option[&i32]:
-    let value = carrier?
+    let value: &i32 = carrier?
     Some(value)
 
 fn return_owned(value: &i32) -> i32: value
@@ -75,21 +75,21 @@ gen fn yield_owned(value: &i32) -> i32:
 fn main:
     let value = 120
     let carrier1: Option[&i32] = Some(&value)
-    let view = carrier1.unwrap()
+    let view: &i32 = carrier1.unwrap()
     let carrier2: Option[&i32] = Some(&value)
-    let expected_view = carrier2.expect("present")
+    let expected_view: &i32 = carrier2.expect("present")
     let result_carrier: Result[&i32, str] = Ok(&value)
-    let result_view = result_carrier.unwrap()
+    let result_view: &i32 = result_carrier.unwrap()
     let result_carrier2: Result[&i32, str] = Ok(&value)
-    let result_expected_view = result_carrier2.expect("present")
+    let result_expected_view: &i32 = result_carrier2.expect("present")
     let carrier3: Option[&i32] = Some(&value)
     let forwarded = forward(carrier3)
-    let forwarded_view = forwarded.unwrap()
-    let inferred = inferred_view(view)
+    let forwarded_view: &i32 = forwarded.unwrap()
+    let inferred: &i32 = inferred_view(view)
     let carrier4: Option[&i32] = Some(&value)
-    let patterned = pattern_view(carrier4)
+    let patterned: &i32 = pattern_view(carrier4)
     let carrier5: Option[&i32] = Some(&value)
-    let tried = try_view(carrier5).unwrap()
+    let tried: &i32 = try_view(carrier5).unwrap()
     let captured = call_captured_view(() => view)
     let closure_value = call_owned_closure(() => view)
     let exact_dispatch = resolve_exact(view)
@@ -119,7 +119,7 @@ fn main:
 
     let meter = Meter { value: 9 }
     let meter_carrier: Option[&Meter] = Some(&meter)
-    let meter_view = meter_carrier.unwrap()
+    let meter_view: &Meter = meter_carrier.unwrap()
     let method_receiver = meter_view.next()
 
     // Exact references remain reusable after each recorded materialization.

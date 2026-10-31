@@ -5,7 +5,7 @@ type P { p: str, q: str }
 
 impl P:
     mut fn f(c: bool):
-        let x = if c: self.p else: self.q
+        let x: &str = if c: self.p else: self.q
         self.p = "z".clone()
         print(x)
 

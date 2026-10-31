@@ -19,6 +19,6 @@ fn grow_g():
 fn main:
     G.insert("k", "v" ++ "!")
     let h = H { f: grow_g }
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     h.f()
     print(r)

@@ -17,6 +17,6 @@ fn grow_g():
 fn main:
     G.push("first" ++ "!")
     let h = H { f: grow_g }
-    let r = G[0]
+    let r: &str = G[0]
     h.f()
     print(r)

@@ -18,6 +18,6 @@ use std.collections.SlotMap
 fn main:
     var map: SlotMap[i32] = SlotMap.new()
     let handle = map.insert(88)
-    let view = map.get(handle).unwrap()
+    let view: &i32 = map.get(handle).unwrap()
     let snapshot: i32 = view
     assert(snapshot == 88)

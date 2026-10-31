@@ -21,7 +21,7 @@ impl Grow for Quiet:
     fn grow(self: &Self): print("quiet")
 
 fn run(g: &dyn Grow):
-    let r = G[0]
+    let r: &str = G[0]
     g.grow()
     print(r)
 
