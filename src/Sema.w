@@ -1342,6 +1342,34 @@ type Sema {
     ret_global_origin_sigs: List[i32],
     ret_view_placeholder_writes: List[i32],
     ret_view_placeholder_diags: List[Diagnostic],
+    // D178 (§3.6): a signature's footprint — the field paths its body writes
+    // through a receiver or `mut` parameter (sig, pi). Paths are field
+    // symbols root-to-leaf in footprint_path_data; an index ends a path at
+    // its field. A (sig, pi) in footprint_whole writes the whole place: an
+    // assignment to it, a write through `unsafe` or a raw pointer, a callee
+    // outside the package or without a signature. An edge is a `mut` call on
+    // a path of the place to a callee's (sig, pi); fixpoint_footprints closes
+    // them. A `mut` call that conflicts with a live view of a path is judged
+    // once the footprints are closed (judge_footprint_conflicts): a view of a
+    // path disjoint from every path the callee writes survives the call.
+    footprint_path_data: List[i32],
+    footprint_sigs: List[i32],
+    footprint_pis: List[i32],
+    footprint_starts: List[i32],
+    footprint_counts: List[i32],
+    footprint_whole: HashMap[i64, i32],
+    footprint_edges: List[i32],
+    footprint_call_callee_sig: i32,
+    footprint_call_callee_pi: i32,
+    // A write propagated from a callee's parameter effect onto an argument
+    // (propagate_call_param_effect): the callee's own write, so it defers to
+    // the edge the call recorded (footprint_edge_nodes, by argument node) and
+    // counts as the argument's path only when no edge exists (a call through
+    // a trait object or a callable). Resolved when the fixpoint starts.
+    footprint_propagated_pending: List[i32],
+    footprint_edge_nodes: HashMap[i32, i32],
+    footprint_pending_diags: List[Diagnostic],
+    footprint_pending_data: List[i32],
     declared_from_checks: List[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
@@ -3696,6 +3724,19 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         ret_global_origin_sigs: List.new(),
         ret_view_placeholder_writes: List.new(),
         ret_view_placeholder_diags: List.new(),
+        footprint_path_data: List.new(),
+        footprint_sigs: List.new(),
+        footprint_pis: List.new(),
+        footprint_starts: List.new(),
+        footprint_counts: List.new(),
+        footprint_whole: HashMap.new(),
+        footprint_edges: List.new(),
+        footprint_call_callee_sig: -1,
+        footprint_call_callee_pi: -1,
+        footprint_propagated_pending: List.new(),
+        footprint_edge_nodes: HashMap.new(),
+        footprint_pending_diags: List.new(),
+        footprint_pending_data: List.new(),
         declared_from_checks: List.new(),
         global_dispatchers: List.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
@@ -10017,6 +10058,174 @@ impl Sema:
             if dep_sym != 0:
                 self.note_param_effect(dep_sym, eff)
             self.effect_note_origin_node = 0
+            if (eff & EFF_WRITE) != 0:
+                self.note_footprint_write(expr_node, root, dep_sym, self.recording_propagated_effect > 0)
+        self.footprint_call_callee_sig = -1
+        self.footprint_call_callee_pi = -1
+
+    // D178: a write of a place rooted at a parameter of the function being
+    // checked. A `mut` call site names its callee first
+    // (footprint_call_callee_sig): the write is then an edge, closed by the
+    // fixpoint into the callee's paths under this prefix; any other write is
+    // the path itself, or the whole place when the path reaches it through
+    // something that is not a field (a dereference, a call).
+    mut fn note_footprint_write(expr_node: i32, root: i32, dep_sym: i32, propagated: bool):
+        let sig = self.current_fn_sig_idx
+        let pi = self.param_index_for_sym(root)
+        if dep_sym != 0:
+            let dep_pi = self.param_index_for_sym(dep_sym)
+            if dep_pi >= 0:
+                self.footprint_set_whole_why(sig, dep_pi, "transmute source")
+        if pi < 0:
+            return
+        let path = self.footprint_collect_path(expr_node)
+        if path.whole:
+            self.footprint_set_whole_why(sig, pi, "path through a non-field")
+            return
+        let callee_sig = self.footprint_call_callee_sig
+        if callee_sig >= 0:
+            self.footprint_edges.push(sig)
+            self.footprint_edges.push(pi)
+            self.footprint_edges.push(path.start)
+            self.footprint_edges.push(path.count)
+            self.footprint_edges.push(callee_sig)
+            self.footprint_edges.push(self.footprint_call_callee_pi)
+            self.footprint_edge_nodes.insert(expr_node, 1)
+            return
+        if propagated:
+            self.footprint_propagated_pending.push(sig)
+            self.footprint_propagated_pending.push(pi)
+            self.footprint_propagated_pending.push(path.start)
+            self.footprint_propagated_pending.push(path.count)
+            self.footprint_propagated_pending.push(expr_node)
+            return
+        if path.count == 0:
+            self.footprint_set_whole_why(sig, pi, f"the place itself, no callee (line {self.node_line(expr_node)})")
+        else:
+            self.footprint_add_path(sig, pi, path.start, path.count)
+
+    // Where the next footprint path begins (an i32 offset, as the entries
+    // store them; borrow_path_mark's shape).
+    fn footprint_mark() -> i32: self.footprint_path_data.len() as i32
+
+    fn footprint_key(sig: i32, pi: i32) -> i64: (sig as i64) * 1024 + pi
+
+    fn footprint_is_whole(sig: i32, pi: i32) -> bool:
+        self.footprint_whole.contains(self.footprint_key(sig, pi))
+
+    mut fn footprint_set_whole(sig: i32, pi: i32) -> bool: self.footprint_set_whole_why(sig, pi, "")
+
+    mut fn footprint_set_whole_why(sig: i32, pi: i32, why: &str) -> bool:
+        let key = self.footprint_key(sig, pi)
+        if self.footprint_whole.contains(key):
+            return false
+        self.footprint_whole.insert(key, 1)
+        if with_getenv_str("WITH_TRACE_FOOTPRINTS").len() > 0: eprint(f"[footprint] {self.pool_resolve(self.sig_names[sig])} p{pi} whole: {why}")
+        true
+
+    // Two paths in footprint_path_data are disjoint when they diverge at a
+    // field (§3.6); a prefix overlaps every extension, and an index element
+    // (a view's path may carry one) overlaps whatever stands at its place.
+    fn footprint_paths_disjoint(start_a: i32, count_a: i32, start_b: i32, count_b: i32) -> bool:
+        let n = if count_a < count_b: count_a else: count_b
+        for i in 0..n:
+            let fa: i32 = self.footprint_path_data[start_a + i]
+            let fb: i32 = self.footprint_path_data[start_b + i]
+            if fa != fb and fa > 0 and fb > 0:
+                return true
+        false
+
+    fn footprint_paths_equal(start_a: i32, count_a: i32, start_b: i32, count_b: i32) -> bool:
+        if count_a != count_b:
+            return false
+        for i in 0..count_a:
+            if self.footprint_path_data[start_a + i] != self.footprint_path_data[start_b + i]:
+                return false
+        true
+
+    // Adds the path to (sig, pi) unless it, or a prefix of it, is already
+    // there; returns whether the footprint grew.
+    mut fn footprint_add_path(sig: i32, pi: i32, start: i32, count: i32) -> bool:
+        if self.footprint_is_whole(sig, pi):
+            return false
+        for i in 0..self.footprint_sigs.len():
+            if self.footprint_sigs[i] != sig or self.footprint_pis[i] != pi:
+                continue
+            let have_start: i32 = self.footprint_starts[i]
+            let have_count: i32 = self.footprint_counts[i]
+            if have_count <= count and self.footprint_paths_equal(have_start, have_count, start, have_count):
+                return false
+        self.footprint_sigs.push(sig)
+        self.footprint_pis.push(pi)
+        self.footprint_starts.push(start)
+        self.footprint_counts.push(count)
+        true
+
+    // The package a signature's declaration belongs to.
+    fn sig_package(sig: i32) -> str:
+        if sig < 0 or sig >= self.sig_names.len():
+            return ""
+        self.package_of(self.decl_path_of_symbol(self.sig_names[sig]))
+
+    // Closes the footprint edges: a `mut` call on a path to a callee adds
+    // the callee's paths under that prefix; a callee whose footprint is the
+    // whole place, that has no signature, or that is outside the caller's
+    // package adds the prefix itself (the whole place when the prefix is
+    // empty). Runs after every body is checked.
+    mut fn fixpoint_footprints():
+        // A propagated write with no edge for its argument is the argument's
+        // path (the whole place when the argument is the place itself).
+        var pending_i = 0
+        while pending_i + 4 < self.footprint_propagated_pending.len():
+            let p_sig: i32 = self.footprint_propagated_pending[pending_i]
+            let p_pi: i32 = self.footprint_propagated_pending[pending_i + 1]
+            let p_start: i32 = self.footprint_propagated_pending[pending_i + 2]
+            let p_count: i32 = self.footprint_propagated_pending[pending_i + 3]
+            let p_node: i32 = self.footprint_propagated_pending[pending_i + 4]
+            pending_i += 5
+            if self.footprint_edge_nodes.contains(p_node):
+                continue
+            if p_count == 0:
+                self.footprint_set_whole_why(p_sig, p_pi, f"a propagated write of the place, no edge (line {self.node_line(p_node)})")
+            else:
+                self.footprint_add_path(p_sig, p_pi, p_start, p_count)
+        var changed = true
+        var guard = 0
+        while changed and guard < 4096:
+            changed = false
+            guard += 1
+            var i = 0
+            while i + 5 < self.footprint_edges.len():
+                let caller_sig: i32 = self.footprint_edges[i]
+                let caller_pi: i32 = self.footprint_edges[i + 1]
+                let prefix_start: i32 = self.footprint_edges[i + 2]
+                let prefix_count: i32 = self.footprint_edges[i + 3]
+                let callee_sig: i32 = self.footprint_edges[i + 4]
+                let callee_pi: i32 = self.footprint_edges[i + 5]
+                i += 6
+                if self.footprint_is_whole(caller_sig, caller_pi):
+                    continue
+                let callee_opaque = callee_sig < 0 or self.footprint_is_whole(callee_sig, callee_pi) or self.sig_package(callee_sig) != self.sig_package(caller_sig)
+                if callee_opaque:
+                    if prefix_count == 0:
+                        changed = self.footprint_set_whole_why(caller_sig, caller_pi, "opaque callee") or changed
+                    else:
+                        changed = self.footprint_add_path(caller_sig, caller_pi, prefix_start, prefix_count) or changed
+                    continue
+                // The callee's entries, read before this edge appends.
+                var callee_starts: List[i32] = List.new()
+                var callee_counts: List[i32] = List.new()
+                for ei in 0..self.footprint_sigs.len():
+                    if self.footprint_sigs[ei] == callee_sig and self.footprint_pis[ei] == callee_pi:
+                        callee_starts.push(self.footprint_starts[ei])
+                        callee_counts.push(self.footprint_counts[ei])
+                for ci in 0..callee_starts.len():
+                    let joined_start = self.footprint_mark()
+                    for k in 0..prefix_count: self.footprint_path_data.push(self.footprint_path_data[prefix_start + k])
+                    let callee_start: i32 = callee_starts[ci]
+                    let callee_count: i32 = callee_counts[ci]
+                    for k in 0..callee_count: self.footprint_path_data.push(self.footprint_path_data[callee_start + k])
+                    changed = self.footprint_add_path(caller_sig, caller_pi, joined_start, prefix_count + callee_count) or changed
 
     // D17: ownership-forcing effects do not cross a projection of a NON-COPY
     // field. A callee that consumes such a field blanks it (reset-on-move,

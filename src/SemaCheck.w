@@ -1794,9 +1794,13 @@ impl Sema:
         if root != 0 and self.scope_has(root) != 0 and self.scope_lookup_mut(root) == 0:
             self.emit_error(f"a `mut` parameter needs a mutable place: `{self.pool_resolve(root)}` is a `let` binding (§3.8a)", arg_node)
             return true
+        // D178: the argument's write is the callee's footprint for this
+        // parameter under the argument's path.
+        self.footprint_call_callee_sig = sig_idx
+        self.footprint_call_callee_pi = param_i
         self.note_place_effect(arg_node, EFF_WRITE)
         self.record_global_place_write(arg_node, call_node)
-        self.check_mutation_against_views(arg_node, call_node)
+        self.check_call_mutation_against_views(arg_node, call_node, sig_idx, param_i)
         self.reject_mutation_through_view_binding(root, call_node)
         true
 
@@ -2963,6 +2967,10 @@ impl Sema:
         self.resolve_ret_global_origin_fixpoint()
         self.judge_declared_view_origins()
         self.judge_placeholder_writes()
+        // D178: footprints close over every body, then the `mut` calls kept
+        // against live views are judged by them.
+        self.fixpoint_footprints()
+        self.judge_footprint_conflicts()
         self.check_calls_against_live_global_views()
         self.order_global_initializers()
 
@@ -36522,6 +36530,11 @@ impl Sema:
             // P7..P11; promoted to errors at P12 lockdown. Builtins are already
             // handled above via the hardcoded list.
             if self.method_has_mut_self_flag(type_name_sym, field) != 0:
+                // D178: the receiver's write is the callee's footprint under
+                // the receiver's path; the callee is named for the edge.
+                let footprint_callee_sig = mc_sig_idx_for_effect
+                self.footprint_call_callee_sig = footprint_callee_sig
+                self.footprint_call_callee_pi = 0
                 self.note_place_effect(expr, EFF_WRITE)
                 // D12 (§9.5): on a scalar or str owner every mut-fn write
                 // replaces the whole value, which on a `let` binding is
@@ -36548,7 +36561,7 @@ impl Sema:
                 else:
                     // §15.6 — only check view-liveness when the receiver actually
                     // is a mutable place we'd be mutating.
-                    self.check_mutation_against_views(expr, node)
+                    self.check_call_mutation_against_views(expr, node, footprint_callee_sig, 0)
                 self.reject_mutation_through_view_binding(self.place_root_sym(expr), node)
             else if self.method_has_move_self_flag(type_name_sym, field) != 0 or (self.builtin_method_requires_move_receiver(type_name_sym, field) != 0 and borrowed_payload_eliminator == 0):
                 // mutability.md — move self receiver: the call consumes the
@@ -36559,6 +36572,11 @@ impl Sema:
                     self.mark_moved_if_consumed(expr)
             let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(type_name_sym, field) != 0
             if is_mut_recv_call:
+                // D178: a user method's write is its footprint under the
+                // receiver's path (an edge); a builtin's is the path itself.
+                if self.method_has_mut_self_flag(type_name_sym, field) != 0:
+                    self.footprint_call_callee_sig = mc_sig_idx_for_effect
+                    self.footprint_call_callee_pi = 0
                 self.note_place_effect(expr, EFF_WRITE)
                 self.record_global_place_write(expr, node)
                 // D172 (§3.2, §3.2a): the receiver is exclusive from
@@ -38312,6 +38330,36 @@ impl Sema:
         let _ = self.view_binding_place_path_inner(place)
         (self.borrow_path_data.len() - start) as i32
 
+    // D178: the field path a written place projects from its root, stored
+    // root-to-leaf in footprint_path_data. An index ends the path at its
+    // field (any element). A projection through anything else — a
+    // dereference, a call's result, a computed field — writes the whole
+    // place as far as the footprint can tell.
+    mut fn footprint_collect_path(node: i32) -> FootprintPath:
+        let start = self.footprint_mark()
+        let whole = self.footprint_collect_path_inner(node)
+        FootprintPath { start, count: self.footprint_mark() - start, whole }
+
+    // Returns true when the path cannot be stated (whole place).
+    mut fn footprint_collect_path_inner(node: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_IDENT:
+            return false
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+            return self.footprint_collect_path_inner(self.ast.get_data0(node))
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            if self.footprint_collect_path_inner(self.ast.get_data0(node)):
+                return true
+            self.footprint_path_data.push(self.ast.get_data1(node))
+            return false
+        if kind == NodeKind.NK_INDEX:
+            // The fields below the element are not part of the path; the
+            // element's collection is what moves.
+            return self.footprint_collect_path_inner(self.ast.get_data0(node))
+        true
+
     // Returns 1 once an index projection has been crossed: the fields below
     // it are not part of the path.
     mut fn view_binding_place_path_inner(node: i32) -> i32:
@@ -38329,6 +38377,9 @@ impl Sema:
         if kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.view_binding_place_path_inner(self.ast.get_data0(node))
         0
+
+// D178: a written place's field path in Sema.footprint_path_data.
+type FootprintPath { start: i32, count: i32, whole: bool }
 
 // §8.1 sentinel for constant-index path elements. Values < INDEX_PATH_BASE
 // are constant indices encoded as INDEX_PATH_BASE - literal_value. A wildcard
@@ -38760,6 +38811,128 @@ impl Sema:
         self.store_follows_operands = 1
         self.check_mutation_against_views(place_node, err_node)
         self.store_follows_operands = saved
+
+    // D178 (§3.6): a `mut` call's write of `place_node`, judged against the
+    // live views of its root by the callee's footprint once every body is
+    // checked. A conflict with a view is kept, with the receiver's path and
+    // the view's path, and emitted by judge_footprint_conflicts only if some
+    // path the callee writes overlaps the view's; a callee without a
+    // signature, or one outside this package, writes the whole place and
+    // the conflict is reported at once.
+    mut fn check_call_mutation_against_views(place_node: i32, err_node: i32, callee_sig: i32, callee_pi: i32):
+        if callee_sig < 0 or self.sig_package(callee_sig) != self.package_of(self.current_module_path):
+            self.check_mutation_against_views(place_node, err_node)
+            return
+        let place = self.borrow_root_place(place_node)
+        if place == 0:
+            return
+        let path_start = self.borrow_path_mark()
+        let path_count = self.borrow_collect_path(place_node)
+        var i: i32 = 0
+        while i < self.borrow_kinds.len():
+            if self.borrow_places[i] != place:
+                i = i + 1
+                continue
+            let existing_kind = self.borrow_kinds[i]
+            if self.borrow_refs[i] == 0 or (existing_kind != BorrowKind.SHARED and existing_kind != BorrowKind.EXCLUSIVE):
+                i = i + 1
+                continue
+            let ex_path_start = self.borrow_path_starts[i]
+            let ex_path_count = self.borrow_path_counts[i]
+            if self.are_borrows_disjoint_paths(path_start, path_count, ex_path_start, ex_path_count) != 0:
+                i = i + 1
+                continue
+            let live = self.borrow_liveness_at(i, err_node)
+            if live.state == BORROW_DEAD:
+                self.remove_borrow_at(i)
+                continue
+            if live.state == BORROW_DEAD_HERE:
+                i = i + 1
+                continue
+            // Kept for the judgment: the receiver's path, then the view's
+            // path, copied into footprint_path_data (a view path may carry an
+            // index element, which footprint_paths_disjoint reads as overlap).
+            let recv_start = self.footprint_mark()
+            for k in 0..path_count: self.footprint_path_data.push(self.borrow_path_data[path_start + k])
+            let view_start = self.footprint_mark()
+            for k in 0..ex_path_count: self.footprint_path_data.push(self.borrow_path_data[ex_path_start + k])
+            self.footprint_pending_data.push(callee_sig)
+            self.footprint_pending_data.push(callee_pi)
+            self.footprint_pending_data.push(recv_start)
+            self.footprint_pending_data.push(path_count)
+            self.footprint_pending_data.push(view_start)
+            self.footprint_pending_data.push(ex_path_count)
+            self.footprint_pending_diags.push(self.mutation_under_view_diag(place, i, &live, err_node))
+            return
+
+    // D178: each kept conflict against the closed footprints. The call writes
+    // the whole place, or a path that is a prefix or an extension of the
+    // view's path under the receiver's: the conflict stands. Every path it
+    // writes diverges from the view's at a field: the view survives.
+    // WITH_TRACE_FOOTPRINTS=1: every footprint entry and each judgment, for
+    // a hunt (deep-debugging-tools.md).
+    fn footprint_trace_on() -> bool: with_getenv_str("WITH_TRACE_FOOTPRINTS").len() > 0
+
+    fn footprint_path_text(start: i32, count: i32) -> str:
+        var text = ""
+        for k in 0..count:
+            let el: i32 = self.footprint_path_data[start + k]
+            text = text ++ (if k > 0: "." else: "") ++ (if el > 0: self.pool_resolve(el) else: "[]")
+        text
+
+    mut fn judge_footprint_conflicts():
+        if self.footprint_trace_on():
+            for ei in 0..self.footprint_sigs.len():
+                eprint(f"[footprint] {self.pool_resolve(self.sig_names[self.footprint_sigs[ei]])} p{self.footprint_pis[ei]} writes {self.footprint_path_text(self.footprint_starts[ei], self.footprint_counts[ei])}")
+            for (key, _) in self.footprint_whole:
+                eprint(f"[footprint] {self.pool_resolve(self.sig_names[(key / 1024) as i32])} p{key % 1024} writes the whole place")
+            var ei2 = 0
+            while ei2 + 5 < self.footprint_edges.len():
+                let callee: i32 = self.footprint_edges[ei2 + 4]
+                let callee_name = if callee >= 0: self.pool_resolve(self.sig_names[callee]) else: "<no signature>"
+                eprint(f"[footprint] edge {self.pool_resolve(self.sig_names[self.footprint_edges[ei2]])} p{self.footprint_edges[ei2 + 1]} .{self.footprint_path_text(self.footprint_edges[ei2 + 2], self.footprint_edges[ei2 + 3])} -> {callee_name} p{self.footprint_edges[ei2 + 5]} packages {self.sig_package(self.footprint_edges[ei2])} / {self.sig_package(callee)}")
+                ei2 += 6
+            eprint(f"[footprint] {self.footprint_edges.len() / 6} edges, {self.footprint_pending_diags.len()} pending conflicts")
+        var kept: List[Diagnostic] = List.new()
+        var di = self.footprint_pending_diags.len() - 1
+        while di >= 0:
+            let diag = self.footprint_pending_diags.pop().unwrap()
+            let base = di * 6
+            let callee_sig: i32 = self.footprint_pending_data[base]
+            let callee_pi: i32 = self.footprint_pending_data[base + 1]
+            let recv_start: i32 = self.footprint_pending_data[base + 2]
+            let recv_count: i32 = self.footprint_pending_data[base + 3]
+            let view_start: i32 = self.footprint_pending_data[base + 4]
+            let view_count: i32 = self.footprint_pending_data[base + 5]
+            var conflicts = self.footprint_is_whole(callee_sig, callee_pi)
+            if self.footprint_trace_on():
+                eprint(f"[footprint] judge {self.pool_resolve(self.sig_names[callee_sig])} p{callee_pi}: receiver .{self.footprint_path_text(recv_start, recv_count)} view .{self.footprint_path_text(view_start, view_count)} ({view_count} elements)")
+            if not conflicts:
+                var any_path = false
+                for ei in 0..self.footprint_sigs.len():
+                    if self.footprint_sigs[ei] != callee_sig or self.footprint_pis[ei] != callee_pi:
+                        continue
+                    any_path = true
+                    let joined_start = self.footprint_mark()
+                    for k in 0..recv_count: self.footprint_path_data.push(self.footprint_path_data[recv_start + k])
+                    let fp_start: i32 = self.footprint_starts[ei]
+                    let fp_count: i32 = self.footprint_counts[ei]
+                    for k in 0..fp_count: self.footprint_path_data.push(self.footprint_path_data[fp_start + k])
+                    let disjoint = self.footprint_paths_disjoint(joined_start, recv_count + fp_count, view_start, view_count)
+                    if self.footprint_trace_on():
+                        eprint(f"[footprint]   writes .{self.footprint_path_text(joined_start, recv_count + fp_count)}: {if disjoint: \"disjoint\" else: \"overlaps\"}")
+                    if not disjoint:
+                        conflicts = true
+                        break
+                // A callee that writes nothing the footprint saw (a body not
+                // checked here) is read as the whole place.
+                if not any_path:
+                    conflicts = true
+            if conflicts:
+                kept.push(diag)
+            di = di - 1
+        while kept.len() > 0:
+            self.diags.emit(kept.pop().unwrap())
 
     mut fn check_mutation_against_views(place_node: i32, err_node: i32):
         let place = self.borrow_root_place(place_node)
