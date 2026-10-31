@@ -2236,6 +2236,11 @@ impl CCodegen:
             return current_tid
         cand
 
+    // A read-only view or `*const` pointer is `const` in C, unless what it
+    // reaches holds the marker type, whose storage is never const (§19.1).
+    fn c_view_is_const(view_tid: TypeId) -> bool:
+        self.sema.get_type_d1(view_tid) == 0 and not self.sema.type_contains_interior(self.sema.get_type_d0(view_tid))
+
     mut fn c_type(tid: i32, as_return: i32) -> str:
         if tid == CC_PSEUDO_TID_LIST:
             return "with_vec"
@@ -2298,7 +2303,7 @@ impl CCodegen:
             let inner_kind = self.sema.get_type_kind(inner_resolved)
             if inner_kind == TypeKind.TY_ARRAY:
                 let array_pointer = self.c_decl(inner_tid, "(*)")
-                if self.sema.get_type_d1(resolved) == 0:
+                if self.c_view_is_const(resolved):
                     return "const " ++ array_pointer
                 return array_pointer
             // An extern C fn type is a C function pointer already; a With fn
@@ -2321,7 +2326,7 @@ impl CCodegen:
             var base = self.c_type(inner_tid, 0)
             if base == "void":
                 base = "uint8_t"
-            if (tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF) and self.sema.get_type_d1(resolved) == 0:
+            if self.c_view_is_const(resolved):
                 return "const " ++ base ++ "*"
             return base ++ "*"
         if tk == TypeKind.TY_GENERIC_INST:
@@ -2413,7 +2418,7 @@ impl CCodegen:
                 let inner = self.sema.resolve_alias(inner_tid)
                 if self.sema.get_type_kind(inner) == TypeKind.TY_ARRAY:
                     let decl = self.c_decl(inner_tid, "(*" ++ name ++ ")")
-                    if self.sema.get_type_d1(resolved) == 0:
+                    if self.c_view_is_const(resolved):
                         return "const " ++ decl
                     return decl
         self.c_type(tid, 0) ++ " " ++ name

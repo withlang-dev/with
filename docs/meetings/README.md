@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D176 — D172's marker type is `std.memo`'s `Interior[T]`, beside `Memo[K, V]` (delegated)](2026-10-30-D176-the-marker-type-is-std-memo-interior.md)
 - [D175 — Runtime globals initialize in dependency order, transitively through called functions; declaration order among the eligible; cycles are errors; safe code may not access a global whose completed initialization cannot be established (ruled)](2026-10-30-D175-runtime-globals-initialize-in-dependency-order.md)
 - [D174 — A view that cannot outlive its statement establishes an owned-value demand: an unannotated binding or return of a view into a statement temporary takes an independent Copy, else is refused; a declared `&T` stays a view (ruled; amends D22)](2026-10-30-D174-a-view-that-cannot-outlive-its-statement-establishes-an-owned-demand-d22-amendment.md)
 - [D173 — A name resolves lexically, once: a local shadows a module-scope function for every use; a call of a non-callable local is an error, never a fallback (ruled)](2026-10-30-D173-a-name-resolves-lexically-once-a-non-callable-local-is-an-error-when-called.md)
