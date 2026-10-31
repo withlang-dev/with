@@ -14,6 +14,6 @@ fn m2(): m1()
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     m2()
     print(r)

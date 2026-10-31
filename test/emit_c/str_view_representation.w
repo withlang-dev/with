@@ -20,7 +20,7 @@ use c_import("unsigned long strlen(const char *s);\n")
 
 fn mid(s: &str) -> &str: s[1..s.len() - 1]
 fn tail(s: &str) -> &str:
-    let t = s[2..]
+    let t: &str = s[2..]
     t
 
 fn main:

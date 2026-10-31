@@ -16,6 +16,6 @@ fn m2(): m1()
 
 fn main:
     G.insert("k", "v" ++ "!")
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     m2()
     print(r)

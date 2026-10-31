@@ -14,6 +14,6 @@ fn gm[T](x: T):
 
 fn main:
     G.insert("k", "v" ++ "!")
-    let r = G.get("k").unwrap()
+    let r: &str = G.get("k").unwrap()
     gm(1)
     print(r)

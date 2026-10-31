@@ -10,6 +10,6 @@ fn main:
     G.push("first" ++ "!")
     var fs: List[fn() -> Unit] = List.new()
     fs.push(move () => { for i in 0..64: G.push(f"item{i}") })
-    let r = G[0]
+    let r: &str = G[0]
     fs[0]()
     print(r)

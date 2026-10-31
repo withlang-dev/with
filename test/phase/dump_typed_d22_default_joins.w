@@ -16,7 +16,7 @@ fn early_return(carrier: Option[&i32], fallback: &i32) -> &i32:
 fn early_break(carrier: Option[&i32]) -> i32:
     var result = 0
     loop:
-        let view = carrier ?? break
+        let view: &i32 = carrier ?? break
         result = view
         break
     result
@@ -26,18 +26,18 @@ fn main:
     let right = 127
 
     let carrier1: Option[&i32] = Some(&left)
-    let borrowed_default = carrier1 ?? &right
+    let borrowed_default: &i32 = carrier1 ?? &right
     let carrier2: Option[&i32] = Some(&left)
     let owned_default = carrier2 ?? 128
     let carrier3: Option[&i32] = Some(&left)
     let pinned_default: i32 = carrier3 ?? &right
 
     let carrier4: Option[&i32] = Some(&left)
-    let borrowed_unwrap_or = carrier4.unwrap_or(&right)
+    let borrowed_unwrap_or: &i32 = carrier4.unwrap_or(&right)
     let carrier5: Option[&i32] = Some(&left)
     let owned_unwrap_or = carrier5.unwrap_or(129)
     let carrier6: Option[&i32] = Some(&left)
-    let borrowed_lazy = carrier6.unwrap_or_else(() => &right)
+    let borrowed_lazy: &i32 = carrier6.unwrap_or_else(() => &right)
     let carrier7: Option[&i32] = Some(&left)
     let owned_lazy = carrier7.unwrap_or_else(() => 130)
 

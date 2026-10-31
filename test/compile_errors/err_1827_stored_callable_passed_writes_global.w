@@ -13,7 +13,7 @@ fn grow():
     for i in 0..64: G.push(f"item{i}")
 
 fn apply(f: fn() -> Unit):
-    let r = G[0]
+    let r: &str = G[0]
     f()
     print(r)
 

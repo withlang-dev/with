@@ -10,6 +10,6 @@ type S { s: str }
 fn main:
     var x = S { s: "x" ++ "y" }
     let y = S { s: "u" ++ "v" }
-    let p = if args().len() > 0: x.s else: y.s
+    let p: &str = if args().len() > 0: x.s else: y.s
     x.s = "z".clone()
     print(p)

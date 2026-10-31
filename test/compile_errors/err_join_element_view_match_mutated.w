@@ -12,7 +12,7 @@ fn mkv() -> List[str]:
 
 fn g(o: Option[i32]):
     var v = mkv()
-    let x = match o:
+    let x: &str = match o:
         Some(i) => v[i]
         None => v[0]
     v[1] = "zzz".clone()

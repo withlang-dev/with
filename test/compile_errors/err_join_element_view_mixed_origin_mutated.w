@@ -10,7 +10,7 @@ fn mkv() -> List[str]:
 
 fn g(c: bool, r: &str):
     var v = mkv()
-    let x = if c: v[0] else: r
+    let x: &str = if c: v[0] else: r
     v.clear()
     print(x)
 

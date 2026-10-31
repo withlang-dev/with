@@ -19,7 +19,7 @@ type Holder:
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     {
         let h = Holder { t: Tok { n: 1 } }
         print(f"{h.t.n}")

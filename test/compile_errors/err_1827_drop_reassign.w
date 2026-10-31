@@ -17,7 +17,7 @@ impl Drop for Tok:
 fn main:
     G.push("first" ++ "!")
     var t = Tok { n: 1 }
-    let r = G[0]
+    let r: &str = G[0]
     t = Tok { n: 2 }
     print(f"{t.n}")
     print(r)

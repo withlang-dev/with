@@ -13,7 +13,7 @@ fn mkv() -> List[str]:
 
 fn g(c: bool):
     var v = mkv()
-    let x = if c: v[0] else: v[1]
+    let x: &str = if c: v[0] else: v[1]
     for i in 0..100:
         v.push("q".clone())
     print(x)

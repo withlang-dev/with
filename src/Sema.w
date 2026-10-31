@@ -1383,6 +1383,14 @@ type Sema {
     footprint_ns_check: i64,
     footprint_ns_note: i64,
     footprint_passes: i32,
+    // Ceremony census (#2857): per signature, how many `return`s and tails
+    // produce the literal 0 (predicate_zero_results) and 1 (predicate_one_results), and whether any
+    // produces something else (predicate_other_results). A function whose
+    // every result is a 0/1 literal and whose declared return is an integer
+    // is counted as `i32-predicate`: a yes/no stored in a number.
+    predicate_zero_results: HashMap[i32, i32],
+    predicate_one_results: HashMap[i32, i32],
+    predicate_other_results: HashMap[i32, i32],
     declared_from_checks: List[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
@@ -3755,6 +3763,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         footprint_ns_check: 0,
         footprint_ns_note: 0,
         footprint_passes: 0,
+        predicate_zero_results: HashMap.new(),
+        predicate_one_results: HashMap.new(),
+        predicate_other_results: HashMap.new(),
         declared_from_checks: List.new(),
         global_dispatchers: List.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
@@ -7052,6 +7063,10 @@ impl Sema:
         visited.push(resolved)
         let tk = self.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_FN:
+            return true
+        // A trait object is unsized: a `&dyn T` is the only form a binding
+        // can hold, so copying "the pointee" has no meaning (it trapped).
+        if tk == TypeKind.TY_TRAIT_OBJ:
             return true
         if self.type_is_ephemeral_value(resolved) != 0:
             return true

@@ -18,7 +18,7 @@ fn make(n: i32) -> Tok: Tok { n }
 
 fn main:
     G.push("first" ++ "!")
-    let r = G[0]
+    let r: &str = G[0]
     let n = make(1).n
     print(f"{n}")
     print(r)

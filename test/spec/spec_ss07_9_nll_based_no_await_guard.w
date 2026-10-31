@@ -42,7 +42,7 @@ fn test_derived_view_last_use_before_await:
 fn test_call_returned_view_last_use_before_await:
     let held = LocalGuard { value: 5 }
     let view = id_i32_ref(&held.value)
-    assert(*view == 5)
+    assert(view == 5)
     let task = work()
     assert(task.await == 42)
 

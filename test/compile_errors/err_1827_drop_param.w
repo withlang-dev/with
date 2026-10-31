@@ -19,6 +19,6 @@ fn consume(t: Tok): print(f"{t.n}")
 fn main:
     G.push("first" ++ "!")
     let t = Tok { n: 1 }
-    let r = G[0]
+    let r: &str = G[0]
     consume(t)
     print(r)
