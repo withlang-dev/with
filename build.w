@@ -3020,16 +3020,16 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     let pool_view_source =
         "use InternPool\n\n" ++
         "fn dangling(pool: &InternPool, sym: i32) -> str:\n" ++
-        "    let name = pool.resolve(sym)\n" ++
+        "    let name: &str = pool.resolve(sym)\n" ++
         "    pool.intern(\"fresh\")\n" ++
         "    name ++ \"!\"\n\n" ++
         "fn safe(pool: &InternPool, sym: i32) -> str:\n" ++
-        "    let name = pool.resolve(sym)\n" ++
+        "    let name: &str = pool.resolve(sym)\n" ++
         "    let owned = name ++ \"!\"\n" ++
         "    pool.intern(\"fresh\")\n" ++
         "    owned\n\n" ++
         "fn reads_only(pool: &InternPool, sym: i32) -> i32:\n" ++
-        "    let name = pool.resolve(sym)\n" ++
+        "    let name: &str = pool.resolve(sym)\n" ++
         "    let n = pool.symbol_count()\n" ++
         "    name.len() as i32 + n\n\n" ++
         "fn main:\n" ++
