@@ -53,6 +53,7 @@ spec.
 | `sed -E 's/\bit\b/x/g'` | `with -p 'line = /\bit\b/g.replace(line, "x")'` (the `g` flag replaces every match, as in sed; without it, the first) |
 | `sed '3i text'` | `with -n 'if nr == 3: print("text")` ⏎ `print(line)'` |
 | `awk 'NR % 2 == 0'` | `with -n 'if nr % 2 == 0: print(line)'` |
+| `awk 'NR % 2'` | `with -n 'if nr % 2: print(line)'` (an integer tests true when nonzero, §4.2a) |
 | `grep -i pat` | `with -n 'if line =~ /pat/i: print(line)'` |
 | `perl -ne 'print $1 if /(\d+)/'` | `with -n 'if line =~ /(\d+)/: print($1)'` |
 | `head -n 2` | `with -n 'if nr <= 2: print(line)'` |
