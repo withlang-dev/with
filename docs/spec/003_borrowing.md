@@ -347,6 +347,20 @@ value is a view of plain bits takes the value wherever the view came from
 (`m.get(k).unwrap()`), an iterator's `next().unwrap()`, a `&i32`
 parameter rebound. Only a written `&x` keeps the view.
 
+**Unannotated value bindings (D179, amends D144).** An unannotated binding
+whose initializer denotes a place or produces a view takes an owned value
+when the viewed type is plain-bits or `str`. For `str`, this uses its
+ordinary O(1), reference-counted copy semantics (§2, D111). For other
+types, the binding observes the place under D144. An explicitly requested
+view remains a view and retains the usual borrowing restrictions.
+
+```
+let s = parts[0]                      // a str; parts.push(...) after it is fine
+let name = self.pool_resolve(sym)     // a str, from a `&str` result
+let xs = groups[0]                    // observes the List (D144)
+let v = &parts[0]                     // a view, by request
+```
+
 When `T: Copy`, an expression of type `&T` may satisfy an independently
 established owned-value demand. The compiler copies the pointee, then applies
 ordinary value coercions. Thus an `&i32` may satisfy an owned `i32` or `i64`

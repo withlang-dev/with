@@ -79,4 +79,5 @@ value is a view of plain bits takes the value, wherever the view came
 from; only a written `&x` keeps the view (the spelling is the choice).
 Fixtures `behav_d144_join_of_places.w`, `behav_d144_view_of_plain_bits.w`.
 The sibling question — a view of `str`, a value under D111 but not plain
-bits — is open.
+bits — is ruled by D179: `str` joins the take-the-value rule; `List` keeps
+observing.
