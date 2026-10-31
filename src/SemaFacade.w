@@ -270,7 +270,7 @@ impl Sema:
     // status-returning out-parameter producer, or a status-returning `init`),
     // and whether that error can hold a failed-state resource `Failed<R>` (an
     // out-parameter producer: failure may still produce, ruling §18).
-    mut fn facade_projects_status(ri: i32) -> bool:
+    fn facade_projects_status(ri: i32) -> bool:
         if self.facade_resources[ri].ok_consts.len() == 0:
             return false
         let init_fn = self.facade_resources[ri].init
@@ -282,7 +282,7 @@ impl Sema:
     // A dependent resource has no failed state to own: its error is
     // `Failed | NothingProduced`, and a failure that still produced is
     // destroyed in the constructor (ruling §18; FacadeRender.w).
-    mut fn facade_has_failed_state(ri: i32) -> bool:
+    fn facade_has_failed_state(ri: i32) -> bool:
         if self.facade_resource_dependent(ri):
             return false
         if self.facade_resources[ri].ok_consts.len() == 0:
@@ -300,7 +300,7 @@ impl Sema:
     // `Database`), or -1: a failed-state resource admits only the operations
     // its facade marks `valid on failed` (§16.2b.4, ruling Amendment 1), and
     // method lookup names the clause when it admits none.
-    mut fn facade_failed_state_resource(type_name: &str) -> i32:
+    fn facade_failed_state_resource(type_name: &str) -> i32:
         for ri in 0..self.facade_resources.len() as i32:
             if self.facade_projects_status(ri) and self.facade_has_failed_state(ri):
                 let rname: str = self.pool_resolve(self.facade_resources[ri].name)
@@ -349,7 +349,7 @@ impl Sema:
     // The other declaration of a type named `name` visible from the current
     // module — beyond the one the rendering `rendered_file` makes — described
     // for a diagnostic, or "" when the name is the rendering's alone.
-    mut fn facade_generated_name_clash(name: &str, rendered_file: &str, except_ri: i32) -> str:
+    fn facade_generated_name_clash(name: &str, rendered_file: &str, except_ri: i32) -> str:
         let sym = self.pool_lookup_symbol(name)
         if sym == 0:
             return ""
@@ -498,7 +498,7 @@ impl Sema:
     // can hand C the parameter (FacadeRender.w facade_render_receiver): the
     // receiver `db.prepare(sql)` is a method of, beside the constructor
     // `Statement.prepare(db, sql)` — or -1.
-    mut fn facade_receiver_of(f: i32) -> i32:
+    fn facade_receiver_of(f: i32) -> i32:
         let recv = self.facade_param_receives(f, 0)
         if recv.len() != 1 or not self.facade_received_presentable(recv[0], f, 0):
             return -1
@@ -507,7 +507,7 @@ impl Sema:
     // The signatures a producer of `ri` was rendered under: its
     // constructor, and the receiver method on the parent its first
     // parameter receives (a `from` producer, never the in-place `init`).
-    mut fn facade_producer_sigs(ri: i32, owner: i32, f: i32) -> List[i32]:
+    fn facade_producer_sigs(ri: i32, owner: i32, f: i32) -> List[i32]:
         let out: List[i32] = List.new()
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let pn: str = self.pool_resolve(f)
@@ -1895,7 +1895,7 @@ impl Sema:
     // The name of parameter `pi` as the declaration spells it, or 0 — read
     // through the fn meta record, as named-argument matching does, so a
     // c_import wrapper `fn` and a plain `extern fn` answer alike.
-    mut fn facade_decl_param_name(fn_sym: i32, pi: i32) -> i32:
+    fn facade_decl_param_name(fn_sym: i32, pi: i32) -> i32:
         let decl = self.facade_fn_decl_node(fn_sym)
         if decl == 0:
             return 0
@@ -1908,7 +1908,7 @@ impl Sema:
     // parsed with their own InternPool, so a c_import declaration's symbol is
     // not the facade's symbol for the same name: when the symbol lookup
     // misses, find the declaration by its text, as the raw-ABI classifier does.
-    mut fn facade_fn_decl_node(fn_sym: i32) -> i32:
+    fn facade_fn_decl_node(fn_sym: i32) -> i32:
         let direct = self.fn_symbol_decl_node(fn_sym)
         if direct != 0:
             return direct
@@ -1925,7 +1925,7 @@ impl Sema:
     // The C spelling of a parameter name: c_import declares `p` as
     // `__param_p` (CImport.w) so no C name can collide with a With keyword;
     // a facade names the parameter as the header does.
-    mut fn facade_param_c_name(fn_sym: i32, pi: i32) -> str:
+    fn facade_param_c_name(fn_sym: i32, pi: i32) -> str:
         let sym = self.facade_decl_param_name(fn_sym, pi)
         if sym == 0:
             return ""
@@ -1935,7 +1935,7 @@ impl Sema:
         spelled
 
     // §57: every positional diagnostic prints the resolved C parameter.
-    mut fn facade_param_display(fn_sym: i32, sig: i32, pi: i32) -> str:
+    fn facade_param_display(fn_sym: i32, sig: i32, pi: i32) -> str:
         let pname = self.facade_param_c_name(fn_sym, pi)
         let tn: str = self.type_name(self.sig_param_type(sig, pi))
         f"param {pi}: {tn} {pname}"
@@ -2034,7 +2034,7 @@ impl Sema:
 
     // A `void *` parameter that receives no modeled resource: the untyped
     // userdata slot of a callback contract (ruling §24, §45).
-    mut fn facade_param_is_userdata(fn_sym: i32, sig: i32, pi: i32) -> bool:
+    fn facade_param_is_userdata(fn_sym: i32, sig: i32, pi: i32) -> bool:
         self.facade_type_is_void_ptr(self.sig_param_type(sig, pi)) and self.facade_param_receives(fn_sym, pi).len() == 0
 
     fn facade_type_is_void_ptr(tid: i32) -> bool:
@@ -2533,7 +2533,7 @@ impl Sema:
     // An fn item covers its parameters, except the one a `destroys` item
     // destroys and any that takes a resource's representation (or a pointer
     // to it): those are reached through the resource, never as a raw value.
-    mut fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
+    fn facade_covers_param(fn_sym: i32, pi: i32) -> bool:
         let ci = self.facade_contract_for(fn_sym)
         if ci < 0:
             return false
@@ -2571,7 +2571,7 @@ impl Sema:
                 return i as i32
         -1
 
-    mut fn facade_param_takes_resource(fn_sym: i32, pi: i32) -> bool:
+    fn facade_param_takes_resource(fn_sym: i32, pi: i32) -> bool:
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi >= self.sig_get_param_count(sig):
             return false
@@ -2589,7 +2589,7 @@ impl Sema:
     // and, for a producer, the return it produces: the rendered method or
     // constructor exposes every other parameter safely, so any of those that
     // is still raw is a shape the facade must describe (§16.2b.5).
-    mut fn facade_op_raw_beyond(fn_sym: i32, repr_param: i32, skip_return: bool) -> bool:
+    fn facade_op_raw_beyond(fn_sym: i32, repr_param: i32, skip_return: bool) -> bool:
         let sig = self.get_sig(fn_sym)
         if sig < 0:
             return self.ci_function_requires_raw_abi(fn_sym) != 0
@@ -2636,7 +2636,7 @@ impl Sema:
     // handle or an in-place resource's storage, by value or by address — the
     // line facade_param_takes_resource draws. A by-value token is not
     // recognized by its type (`int` is an `Fd` and every other integer).
-    mut fn facade_param_receives(fn_sym: i32, pi: i32) -> List[i32]:
+    fn facade_param_receives(fn_sym: i32, pi: i32) -> List[i32]:
         let out: List[i32] = List.new()
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
@@ -2661,7 +2661,7 @@ impl Sema:
     // declares (FacadeRender.w facade_render_received_arg): the
     // representation of a pointer resource or by-value token, the cell of a
     // pinned in-place resource, or a movable one through a const pointer.
-    mut fn facade_received_presentable(ri: i32, fn_sym: i32, pi: i32) -> bool:
+    fn facade_received_presentable(ri: i32, fn_sym: i32, pi: i32) -> bool:
         let sig = self.get_sig(fn_sym)
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
@@ -2675,7 +2675,7 @@ impl Sema:
         self.get_type_d1(p) == 0
 
     // Why a borrow cannot present that parameter, for the diagnostic.
-    mut fn facade_received_unpresentable_reason(ri: i32, fn_sym: i32, pi: i32) -> str:
+    fn facade_received_unpresentable_reason(ri: i32, fn_sym: i32, pi: i32) -> str:
         let sig = self.get_sig(fn_sym)
         let p = self.resolve_alias(self.sig_param_type(sig, pi) as TypeId)
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
@@ -2686,7 +2686,7 @@ impl Sema:
             return f"it points at '{rname}''s handle, through which C could replace or release it"
         f"it is a mutable pointer to '{rname}''s movable representation, which a shared borrow cannot hand out"
 
-    mut fn facade_param_presentable(fn_sym: i32, pi: i32) -> bool:
+    fn facade_param_presentable(fn_sym: i32, pi: i32) -> bool:
         let recv = self.facade_param_receives(fn_sym, pi)
         recv.len() == 1 and self.facade_received_presentable(recv[0], fn_sym, pi)
 
@@ -2698,7 +2698,7 @@ impl Sema:
     // resource only after the facade assigns it"). Several left means the
     // facade has not assigned it (verify_facade_assignments); an `of`
     // naming a resource the parameter does not receive is that error too.
-    mut fn facade_method_host(fn_sym: i32) -> List[i32]:
+    fn facade_method_host(fn_sym: i32) -> List[i32]:
         let recv = self.facade_param_receives(fn_sym, 0)
         let ci = self.facade_contract_for(fn_sym)
         // A by-value token is never recognized by its type (`int` is an `Fd`
@@ -2724,7 +2724,7 @@ impl Sema:
     // parameter takes its representation — by value, or by address, which C
     // writes through — or -1 (§16.2b.3; FacadeRender.w
     // facade_render_lend_hosted draws the same line).
-    mut fn facade_by_value_of_host(fn_sym: i32) -> i32:
+    fn facade_by_value_of_host(fn_sym: i32) -> i32:
         let ci = self.facade_contract_for(fn_sym)
         if ci < 0 or self.foreign_contracts[ci].of_resource == 0 or not self.facade_resource_index.contains(self.foreign_contracts[ci].of_resource):
             return -1
@@ -2951,7 +2951,7 @@ impl Sema:
             presented = presented + 1
         -1
 
-    mut fn facade_presented_touch_mask(fn_sym: i32, ci: i32) -> i32:
+    fn facade_presented_touch_mask(fn_sym: i32, ci: i32) -> i32:
         let raw = self.facade_touch_params_mask(fn_sym, ci, 0)
         let sig = self.get_sig(fn_sym)
         if sig < 0: return 0
@@ -2966,7 +2966,7 @@ impl Sema:
     // though invalidation applies to its projected With argument.
     // A producer's projection is recorded on its effect (#1977: it read as
     // the identity, so `d.st_new(flags, o)`'s `o` named C's `flags`).
-    mut fn facade_effect_source_param(fx: i32, presented: i32) -> i32:
+    fn facade_effect_source_param(fx: i32, presented: i32) -> i32:
         let effect = &self.facade_call_effects[fx]
         if presented >= 0 and presented < effect.param_sources.len() and effect.param_sources[presented] >= 0:
             return effect.param_sources[presented]
@@ -3013,7 +3013,7 @@ impl Sema:
         let name: str = self.pool_resolve(if c.rename != 0: c.rename else: c.fn_sym)
         name
 
-    mut fn facade_bridge_redirect(fn_sym: i32) -> i32:
+    fn facade_bridge_redirect(fn_sym: i32) -> i32:
         if self.facade_bridge_of.len() == 0:
             return fn_sym
         let name: str = self.pool_resolve(fn_sym)
@@ -3174,7 +3174,7 @@ impl Sema:
     // The parameters producer `owner`'s result depends on (spec §16.2b.6):
     // none under `independent`, the ones its `borrows` clauses name, and
     // otherwise every parameter receiving a resource.
-    mut fn facade_producer_parents(ri: i32, owner: i32) -> List[i32]:
+    fn facade_producer_parents(ri: i32, owner: i32) -> List[i32]:
         let out: List[i32] = List.new()
         if self.facade_resources[ri].independent != 0:
             return out
@@ -3195,7 +3195,7 @@ impl Sema:
                 out.push(pi)
         out
 
-    mut fn facade_resource_dependent(ri: i32) -> bool:
+    fn facade_resource_dependent(ri: i32) -> bool:
         let owners = self.facade_owners(ri)
         for oi in 0..owners.len():
             if self.facade_owner_fn(ri, owners[oi]) != 0 and self.facade_producer_parents(ri, owners[oi]).len() > 0:
@@ -3312,7 +3312,7 @@ impl Sema:
                     self.facade_declare_view_of_param(sig, pi)
 
     // The signature of a rendered constructor `R.p`, or -1.
-    mut fn facade_constructor_sig(want: &str) -> i32:
+    fn facade_constructor_sig(want: &str) -> i32:
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == want:
@@ -3397,7 +3397,7 @@ impl Sema:
 
     // A facade `param` reference as written: `param 0`, `param db`,
     // `param type *mut sqlite3`.
-    mut fn facade_param_ref_text(ref_node: i32, f: i32, pi: i32) -> str:
+    fn facade_param_ref_text(ref_node: i32, f: i32, pi: i32) -> str:
         let rk = self.ast.get_data0(ref_node)
         if rk == FACADE_PARAM_REF_INDEX or rk == FACADE_PARAM_REF_NAME:
             let t: str = self.pool_resolve(self.ast.get_data1(ref_node))
@@ -3408,7 +3408,7 @@ impl Sema:
     // parent, the producer receiving it with the resolved C parameter, and
     // the evidence — the facade clause stating it, or the conservative
     // default.
-    mut fn facade_dependency_notes(ri: i32) -> List[str]:
+    fn facade_dependency_notes(ri: i32) -> List[str]:
         let out: List[str] = List.new()
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         let fname: str = self.pool_resolve(self.facade_resources[ri].facade)
@@ -3436,7 +3436,7 @@ impl Sema:
     // The fix a conservative dependency admits (§8: "declare this producer
     // independent if the C API guarantees independence"), or "" when every
     // dependency is stated by `borrows`.
-    mut fn facade_dependency_help(ri: i32) -> str:
+    fn facade_dependency_help(ri: i32) -> str:
         let owners = self.facade_owners(ri)
         for oi in 0..owners.len():
             let parents = self.facade_producer_parents(ri, owners[oi])
@@ -3567,7 +3567,7 @@ impl Sema:
         self.diags.emit(move diag)
 
     // `'Database'`, or `'Database' and 'Cache'`: the resources `ri` depends on.
-    mut fn facade_parent_names(ri: i32) -> str:
+    fn facade_parent_names(ri: i32) -> str:
         var out = ""
         let seen: List[i32] = List.new()
         let owners = self.facade_owners(ri)
@@ -3589,7 +3589,7 @@ impl Sema:
                 out = out ++ (if out.len() > 0: " and " else: "") ++ "'" ++ pn ++ "'"
         out
 
-    mut fn facade_is_parent_of(ri: i32, parent: i32) -> bool:
+    fn facade_is_parent_of(ri: i32, parent: i32) -> bool:
         let owners = self.facade_owners(ri)
         for oi in 0..owners.len():
             let f = self.facade_owner_fn(ri, owners[oi])
@@ -3722,7 +3722,7 @@ impl Sema:
     // The c_import-translated struct type named `sym`, or 0: an imported
     // record a `returns borrow T` clause may name. Matched by name — the
     // facade's symbol and the translation's may be two ids for one text.
-    mut fn facade_imported_record_type(sym: i32) -> i32:
+    fn facade_imported_record_type(sym: i32) -> i32:
         let want: str = self.pool_resolve(sym)
         for di in 0..self.ast.decl_count():
             if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0:
@@ -4071,7 +4071,7 @@ impl Sema:
     // The signatures of the free renderings presenting contract `ci`: its
     // D64 bridge under the C name, or the case functions of its variadic
     // contract (D66) — under the C name or the item's `rename`.
-    mut fn facade_free_bridge_sigs(ci: i32) -> List[i32]:
+    fn facade_free_bridge_sigs(ci: i32) -> List[i32]:
         let out: List[i32] = List.new()
         if self.facade_method_host(self.foreign_contracts[ci].fn_sym).len() == 1:
             return out
@@ -4143,7 +4143,7 @@ impl Sema:
 
     // The parameters of `fn_sym` (from `first`) that receive one modeled
     // resource and are not preserved by its fn item, as origin bits.
-    mut fn facade_touch_params_mask(fn_sym: i32, ci: i32, first: i32) -> i32:
+    fn facade_touch_params_mask(fn_sym: i32, ci: i32, first: i32) -> i32:
         let sig = self.get_sig(fn_sym)
         if sig < 0:
             return 0
@@ -4198,7 +4198,7 @@ impl Sema:
     // describes imported declarations (§16.2b.13), so an import wins over a
     // same-named With extern elsewhere (std.libc's `strerror`), whose file
     // would put the domain in the wrong library.
-    mut fn facade_fn_file(fn_sym: i32) -> i32:
+    fn facade_fn_file(fn_sym: i32) -> i32:
         let want: str = self.safe_symbol_text(fn_sym)
         for di in 0..self.ast.decl_count():
             if di >= self.decl_is_c_import.len() or self.decl_is_c_import[di] == 0:
@@ -4497,7 +4497,7 @@ impl Sema:
     // Whether the failed state of resource `ri` carries operation `cname`:
     // its fn item states `valid on failed` (the unknown-method diagnostic
     // names the rule, SemaCheck.w).
-    mut fn facade_resource_has_failed_state_items(ri: i32) -> bool:
+    fn facade_resource_has_failed_state_items(ri: i32) -> bool:
         for ci in 0..self.foreign_contracts.len():
             if self.foreign_contracts[ci].valid_on_failed == 0:
                 continue
@@ -4644,7 +4644,7 @@ impl Sema:
         ci >= 0 and self.foreign_contracts[ci].returns_borrow_parent != 0
 
     // §8, §57: what a borrowed value is borrowed from, and the clause.
-    mut fn facade_borrowed_note(ci: i32) -> str:
+    fn facade_borrowed_note(ci: i32) -> str:
         let fn_sym = self.foreign_contracts[ci].fn_sym
         let fname: str = self.pool_resolve(fn_sym)
         let rn: str = self.pool_resolve(self.foreign_contracts[ci].returns_borrow_resource)
@@ -4682,7 +4682,7 @@ impl Sema:
 
 impl Sema:
     // Whether the fn item is a callback contract.
-    mut fn facade_contract_is_callback_item(ci: i32) -> bool:
+    fn facade_contract_is_callback_item(ci: i32) -> bool:
         if self.foreign_contracts[ci].destroys != 0:
             return false
         if self.foreign_contracts[ci].callback_userdata_cb.len() > 0 or self.foreign_contracts[ci].callback_thread_any != 0 or self.foreign_contracts[ci].user_data_node != 0 or self.foreign_contracts[ci].argv_cb.len() > 0:
@@ -4701,7 +4701,7 @@ impl Sema:
     // The userdata parameter of a callback contract (C index), or -1: the
     // one consumed with a destroy callback, retained, or paired with a
     // callback. One per item (a second is not modeled).
-    mut fn facade_contract_userdata_param(ci: i32) -> i32:
+    fn facade_contract_userdata_param(ci: i32) -> i32:
         let fn_sym = self.foreign_contracts[ci].fn_sym
         let sig = self.get_sig(fn_sym)
         if sig < 0:
@@ -4717,7 +4717,7 @@ impl Sema:
         -1
 
     // Whether the item's userdata is retained by the resource / consumed.
-    mut fn facade_contract_userdata_retained(ci: i32) -> bool:
+    fn facade_contract_userdata_retained(ci: i32) -> bool:
         let fn_sym = self.foreign_contracts[ci].fn_sym
         let sig = self.get_sig(fn_sym)
         for k in 0..self.foreign_contracts[ci].retains.len():
@@ -4740,7 +4740,7 @@ impl Sema:
     // under `user_data from <fn> as &U` — every callable parameter but the
     // destroy callback whose own parameters include the handle the accessor
     // reads, since that handle is how the wrapper finds the registration.
-    mut fn facade_contract_wrapped_callbacks(ci: i32) -> List[i32]:
+    fn facade_contract_wrapped_callbacks(ci: i32) -> List[i32]:
         let out: List[i32] = List.new()
         let h = self.foreign_contracts[ci].user_data_handle
         let sig = self.get_sig(self.foreign_contracts[ci].fn_sym)
@@ -4942,7 +4942,7 @@ impl Sema:
             self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
 
     // The callback method a symbol names, or -1.
-    mut fn facade_callback_method_for(fn_sym: i32) -> i32:
+    fn facade_callback_method_for(fn_sym: i32) -> i32:
         if self.facade_callback_methods.len() == 0 or fn_sym == 0:
             return -1
         let node = self.generic_fn_node_for_symbol(fn_sym)
@@ -5135,7 +5135,7 @@ impl Sema:
     // The argument index of a pair callback setter's callback (its last)
     // at a method call `recv.field(…)` (SemaCheck.w check_method_call_parts,
     // `field` already retargeted to the case), or -1.
-    mut fn facade_pair_callback_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
+    fn facade_pair_callback_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
         if self.facade_pair_setter_contract.len() == 0 or recv_type == 0 or field == 0 or arg_count == 0:
             return -1
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
@@ -5154,7 +5154,7 @@ impl Sema:
 
     // The argument index of a pair userdata setter's userdata (its last) at
     // a method call, or -1.
-    mut fn facade_pair_userdata_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
+    fn facade_pair_userdata_arg(recv_type: i32, field: i32, arg_count: i32) -> i32:
         if self.facade_pair_setter_contract.len() == 0 or recv_type == 0 or field == 0 or arg_count == 0:
             return -1
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
@@ -5395,7 +5395,7 @@ impl Sema:
         mi >= 0 and self.facade_callback_methods[mi].wrapped_params.contains(ai)
 
     // The callback method a method call `recv.field(…)` names, or -1.
-    mut fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
+    fn facade_callback_method_for_call(recv_type: i32, field: i32) -> i32:
         if self.facade_callback_methods.len() == 0 or recv_type == 0 or field == 0:
             return -1
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
@@ -5498,7 +5498,7 @@ impl Sema:
     // when that record is a view type — one a `returns borrow T` clause
     // names and no resource wraps a pointer to — or 0. A parameter that
     // receives a resource is that resource's (facade_param_receives).
-    mut fn facade_param_receives_record(fn_sym: i32, pi: i32) -> i32:
+    fn facade_param_receives_record(fn_sym: i32, pi: i32) -> i32:
         let sig = self.get_sig(fn_sym)
         if sig < 0 or pi < 0 or pi >= self.sig_get_param_count(sig):
             return 0
@@ -5526,7 +5526,7 @@ impl Sema:
 
     // The record view an fn item's operation is a method of (its first
     // parameter takes the view's pointer and no resource hosts it), or 0.
-    mut fn facade_record_host(fn_sym: i32) -> i32:
+    fn facade_record_host(fn_sym: i32) -> i32:
         let ci = self.facade_contract_for(fn_sym)
         if ci < 0 or self.facade_method_host(fn_sym).len() == 1:
             return 0

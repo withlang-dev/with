@@ -1378,7 +1378,7 @@ impl CCodegen:
             return out ++ "__with"
         out
 
-    mut fn type_is_payload_enum(tid: i32) -> i32:
+    fn type_is_payload_enum(tid: i32) -> i32:
         let base_tid = self.sema.type_reflection_variant_base(tid)
         if base_tid == 0:
             return 0
@@ -1419,7 +1419,7 @@ impl CCodegen:
     // The member path from an enum value to payload field `field_idx` of
     // `variant_index`: the variant's member itself when it has one field,
     // else that field of the variant's payload struct (#2017).
-    mut fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
+    fn payload_enum_field_path(enum_tid: i32, variant_index: i32, field_idx: i32) -> str:
         let member = self.enum_payload_member(enum_tid, variant_index)
         if self.sema.type_reflection_variant_payload_count(enum_tid, variant_index) == 1: member else: member ++ "." ++ cc_payload_struct_field(field_idx)
 
@@ -1436,7 +1436,7 @@ impl CCodegen:
         if self.option_is_nullable_pointer(enum_tid): "" else: "." ++ self.payload_enum_variant_field(variant_index)
 
     // The discriminant of the enum value `expr`.
-    mut fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
+    fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
         // An enum with no payloads is its discriminant (an int32_t).
         if self.type_is_payload_enum(enum_tid) == 0:
             return "(" ++ expr ++ ")"
@@ -1446,7 +1446,7 @@ impl CCodegen:
         let none_disc = self.sema.type_reflection_variant_discriminant(enum_tid, self.payload_enum_named_variant(enum_tid, self.sema.syms.none))
         f"((" ++ expr ++ f") != 0 ? {some_disc} : {none_disc})"
 
-    mut fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
+    fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -1476,7 +1476,7 @@ impl CCodegen:
                 found = vi
         found
 
-    mut fn payload_enum_single_payload_variant(enum_tid: i32) -> i32:
+    fn payload_enum_single_payload_variant(enum_tid: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -1489,7 +1489,7 @@ impl CCodegen:
             found = vi
         found
 
-    mut fn payload_enum_single_unit_variant(enum_tid: i32) -> i32:
+    fn payload_enum_single_unit_variant(enum_tid: i32) -> i32:
         if self.type_is_payload_enum(enum_tid) == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
@@ -2547,7 +2547,7 @@ impl CCodegen:
     // and their instantiated types. The containers the C backend models
     // itself (List, HashMap, HashSet, SlotMap, the synthetic structs above)
     // and payload enums have their own representations (#1562).
-    mut fn generic_inst_is_declared_struct(tid: i32) -> bool:
+    fn generic_inst_is_declared_struct(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.std_box_pointee_tid(resolved as i32) != 0:
             return false
@@ -2569,7 +2569,7 @@ impl CCodegen:
         self.sema.get_generic_inst_arg(resolved as i32, 0)
 
     // The instantiated type of a declared generic struct's field, or 0.
-    mut fn generic_struct_field_tid(tid: i32, field_sym: i32) -> i32:
+    fn generic_struct_field_tid(tid: i32, field_sym: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid) as i32
         for fi in 0..self.sema.type_reflection_field_count(resolved):
             if self.sema.type_reflection_field_name(resolved, fi) == field_sym:
@@ -2581,13 +2581,13 @@ impl CCodegen:
     // The struct a by-value member needs complete before its record: the
     // member's own, or a fixed array's element (`tab[265]` of a record); 0
     // when the member holds no struct by value.
-    mut fn c_value_member_struct_tid(tid: i32) -> i32:
+    fn c_value_member_struct_tid(tid: i32) -> i32:
         var cur = self.sema.resolve_alias(tid as TypeId) as i32
         while self.sema.get_type_kind(cur as TypeId) == TypeKind.TY_ARRAY:
             cur = self.sema.resolve_alias(self.sema.get_type_d0(cur as TypeId) as TypeId) as i32
         if self.tid_is_c_struct_value(cur): cur else: 0
 
-    mut fn tid_is_c_struct_value(tid: i32) -> bool:
+    fn tid_is_c_struct_value(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
         let kind = self.sema.get_type_kind(resolved as TypeId)
         if self.option_is_nullable_pointer(resolved):
@@ -2596,7 +2596,7 @@ impl CCodegen:
 
     // A field of a generic instance: a declared struct's own field, or a
     // field the backend synthesizes for a modeled container (List's ptr/len).
-    mut fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
+    fn generic_inst_field_tid(tid: i32, field_sym: i32) -> i32:
         if self.generic_inst_is_declared_struct(tid): self.generic_struct_field_tid(tid, field_sym) else: self.list_synthetic_field_tid(tid, field_sym)
 
     fn listslot_element_tid(tid: i32) -> i32:
@@ -11858,7 +11858,7 @@ impl CCodegen:
         out
 
     // A struct's C members, as emit_struct_type_defs declares them.
-    mut fn glue_field_syms(resolved: i32) -> List[i32]:
+    fn glue_field_syms(resolved: i32) -> List[i32]:
         var out: List[i32] = List.new()
         if self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_STRUCT:
             let start = self.sema.get_type_d1(resolved as TypeId)
@@ -11870,7 +11870,7 @@ impl CCodegen:
                 out.push(self.sema.type_reflection_field_name(resolved, fi))
         out
 
-    mut fn glue_field_names(resolved: i32) -> List[str]:
+    fn glue_field_names(resolved: i32) -> List[str]:
         var out: List[str] = List.new()
         for sym in self.glue_field_syms(resolved):
             out.push(cc_member(cc_intern_resolve(self.intern, sym)))

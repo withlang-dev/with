@@ -2628,7 +2628,7 @@ fn sema_debug_borrows_enabled -> i32:
 fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS").len() > 0
 
 impl Sema:
-    mut fn debug_unknown_type(sym: i32, node: i32, context: &str):
+    fn debug_unknown_type(sym: i32, node: i32, context: &str):
         if sema_debug_stage1_enabled() == 0:
             return
         let name = self.pool_resolve_symbol(sym)
@@ -2858,7 +2858,7 @@ impl Sema:
             return 0
         self.type_symbol_is_std_box(self.get_type_d0(resolved))
 
-    mut fn fn_symbol_is_std_box_member(fn_sym: i32) -> i32:
+    fn fn_symbol_is_std_box_member(fn_sym: i32) -> i32:
         sema_path_is_std_box_module(self.fn_symbol_source_path(fn_sym))
 
     fn type_symbol_is_std_rc_owner(sym: i32) -> i32:
@@ -4808,7 +4808,7 @@ impl Sema:
     // §18.2 tier 3 under Eric's #1221 ruling: of the candidates an explicit
     // import of the current module provides, the one whose import is written
     // last. -1 when no explicit import provides the name.
-    mut fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
+    fn last_import_provider(sym: i32, cands: &List[i32], paths: &List[str], pubs: &List[i32]) -> i32:
         let name: str = with_str_clone_ref(self.pool_resolve(sym))
         var best: i32 = -1
         var best_pos = -1
@@ -4823,7 +4823,7 @@ impl Sema:
     // candidate `c` is written (its byte offset), or -1 when none does. A
     // c_import's declarations are provided by that `use c_import` of their
     // importing module (Zcu records its offset in decl_is_c_import).
-    mut fn import_position_of(c: i32, path: &str, is_pub: i32, name: &str) -> i32:
+    fn import_position_of(c: i32, path: &str, is_pub: i32, name: &str) -> i32:
         if self.ci_syms.contains(c):
             if path != self.current_module_path:
                 return -1
@@ -4999,7 +4999,7 @@ impl Sema:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
         if sema_tier_path_is_std_implementation(path) != 0: "<std>" else: "<program>"
 
-    mut fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
+    fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
             return 1
         if self.current_module_path.len() == 0:
@@ -5049,7 +5049,7 @@ impl Sema:
     //      only through an explicit import path (never the synthetic prelude
     //      edge), or through the fallback bridge (std_fallback_bridge_path).
     //      Replaced by the §18.2 fallback tier (#752, after #751).
-    mut fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
+    fn decl_visible_from_current_gated(target_path: &str, is_pub: i32, sym: i32) -> i32:
         if target_path.len() == 0:
             return 1
         if self.current_module_path.len() == 0:
@@ -5202,7 +5202,7 @@ impl Sema:
     // engine corpus module is entered only from the start module itself or
     // from its own corpus (#1362): importing a facade over it (std.zlib)
     // does not import it.
-    mut fn module_visible_no_prelude(target_path: &str) -> i32:
+    fn module_visible_no_prelude(target_path: &str) -> i32:
         if self.current_module_path.len() == 0:
             return 1
         if target_path == self.current_module_path:
@@ -5286,7 +5286,7 @@ impl Sema:
     fn module_in_bundle_corpus(module_idx: i32) -> bool:
         self.bundle_corpus.len() > 0 and module_idx >= 0 and module_idx < self.module_paths.len() and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(self.module_paths[module_idx]))
 
-    mut fn symbol_visible_from_current(sym: i32) -> i32:
+    fn symbol_visible_from_current(sym: i32) -> i32:
         let symbol_name = self.pool_resolve(sym)
         if symbol_name.starts_with("with_") or symbol_name.starts_with("rt_") or symbol_name.starts_with("wl_"):
             return 1
@@ -5322,7 +5322,7 @@ impl Sema:
     // the engine leak never turns such a program into an error; a name
     // with no engine twin keeps the prelude gate (#750). Returns that
     // declaration's module path, "" when the bridge does not apply.
-    mut fn std_fallback_bridge_path(sym: i32) -> str:
+    fn std_fallback_bridge_path(sym: i32) -> str:
         if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path) != 0:
             return ""
         let paths = sema_new_list_str()
@@ -5369,7 +5369,7 @@ impl Sema:
         // nothing displaces resolves (or not) through the gate alone.
         if engine_twin.len() > 0 and modules.len() == 1: sema_owned_text(modules[0]) else: ""
 
-    mut fn decl_node_visible_from_current(node: i32) -> i32:
+    fn decl_node_visible_from_current(node: i32) -> i32:
         if node == 0:
             return 1
         let record = self.decl_visibility_node_index.get(node)
@@ -5385,7 +5385,7 @@ impl Sema:
     fn has_extern_var_decl(sym: i32) -> i32:
         if self.extern_var_texts.contains(self.pool_resolve(sym)): 1 else: 0
 
-    mut fn private_symbol_path_from_current(sym: i32) -> str:
+    fn private_symbol_path_from_current(sym: i32) -> str:
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
             let path = self.decl_visibility_paths[i]
@@ -5481,7 +5481,7 @@ impl Sema:
         else:
             self.emit_error("symbol '" ++ name ++ "' is not visible from this module", node)
 
-    mut fn module_is_visible_from_current(target_path: &str) -> i32:
+    fn module_is_visible_from_current(target_path: &str) -> i32:
         if target_path.len() == 0:
             return 1
         if self.global_visible_module_paths.contains(target_path):
@@ -5555,13 +5555,13 @@ impl Sema:
             i = self.named_type_candidate_next[i]
         ""
 
-    mut fn lookup_named_type_visible(sym: i32) -> i32:
+    fn lookup_named_type_visible(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 1)
 
     // Ambient lookup for compiler-demand resolutions (regex literals, async
     // Task synthesis, dyn boxing): lowerings the user never spelled bypass
     // the D29 prelude gate, but still honor module privacy.
-    mut fn lookup_named_type_ambient(sym: i32) -> i32:
+    fn lookup_named_type_ambient(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 0)
 
     // D29 scaffolding (#750): registration-truth lookup for codegen. Picks the
@@ -5594,7 +5594,7 @@ impl Sema:
     // visible candidates §18.2's precedence decides (#2520): the module's
     // own declaration, then another program module's, then std's (the
     // prelude tier), so a program's `trait One` is the One it means.
-    mut fn lookup_trait_visible(sym: i32) -> i32:
+    fn lookup_trait_visible(sym: i32) -> i32:
         self.trait_by_precedence(sym, self.current_module_path, true)
 
     // The trait a written `dyn Name` denotes: the visible one by
@@ -5602,17 +5602,17 @@ impl Sema:
     // trait the program reaches with no import (`dyn Error`) is. One answer
     // in every context, so a signature's `&dyn Error` and a body's are one
     // type.
-    mut fn lookup_trait_named(sym: i32) -> i32:
+    fn lookup_trait_named(sym: i32) -> i32:
         let visible = self.lookup_trait_visible(sym)
         if visible >= 0: visible else: self.trait_lookup.get(sym) ?? -1
 
     // The identity symbol of the trait `sym` names in the module that
     // holds `node`, for a pass after Sema holding a written `dyn Name`.
-    mut fn trait_identity_symbol_named_at(sym: i32, node: i32):
+    fn trait_identity_symbol_named_at(sym: i32, node: i32):
         let ti = self.trait_by_precedence(sym, self.node_module_path_view(node), false)
         if ti >= 0: self.trait_identity_symbol(ti) else: sym
 
-    mut fn trait_by_precedence(sym: i32, module_path: &str, visible_only: bool):
+    fn trait_by_precedence(sym: i32, module_path: &str, visible_only: bool):
         var i = self.trait_candidate_head(sym)
         if i < 0:
             if self.trait_lookup.contains(sym): return self.trait_lookup.get(sym).unwrap() else: return -1
@@ -5692,7 +5692,7 @@ impl Sema:
     fn scoped_type_binding(sym: i32, named_tid: i32, saw_recorded: i32, saw_named_tid: i32) -> i32:
         if named_tid != 0 and (saw_recorded == 0 or saw_named_tid == 0): named_tid else: 0
 
-    mut fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
+    fn lookup_named_type_filtered(sym: i32, gated: i32) -> i32:
         let named_tid = if self.named_types.contains(sym): self.named_types.get(sym).unwrap() else: 0
         var global_tid: i32 = 0
         var saw_recorded: i32 = 0
@@ -5759,19 +5759,19 @@ impl Sema:
             return global_tid
         0
 
-    mut fn has_named_type_visible(sym: i32) -> i32:
+    fn has_named_type_visible(sym: i32) -> i32:
         if self.lookup_named_type_visible(sym) != 0:
             return 1
         0
 
-    mut fn typeinfo_builtin_shadowed(sym: i32) -> i32:
+    fn typeinfo_builtin_shadowed(sym: i32) -> i32:
         if self.scope_lookup(sym) >= 0:
             return 1
         if self.has_named_type_visible(sym) != 0:
             return 1
         0
 
-    mut fn typeinfo_module_field(callee: i32) -> i32:
+    fn typeinfo_module_field(callee: i32) -> i32:
         var access = callee
         let kind = self.ast.kind(callee)
         if kind == NodeKind.NK_INDEX:
@@ -6810,7 +6810,7 @@ impl Sema:
 
     // A generic inst whose template reflects fields/variants now but whose
     // caches were filled when it reflected none (see eager_type_caches_pass).
-    mut fn generic_inst_prereg_pending(tid: i32) -> i32:
+    fn generic_inst_prereg_pending(tid: i32) -> i32:
         if self.type_reflection_field_count(tid) > 0 and not self.generic_struct_field_index_type_cache.contains(sema_pair_key(tid, 0)):
             return 1
         if self.type_reflection_variant_count(tid) > 0:
@@ -7138,7 +7138,7 @@ impl Sema:
     // the one recorded when the instance was resolved, else the symbol's
     // template as reflection finds it (an instance minted without a type
     // expression — an intrinsic's result, a builtin container).
-    mut fn generic_inst_template_tid(tid: i32) -> i32:
+    fn generic_inst_template_tid(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.get_type_kind(resolved as TypeId) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -7168,7 +7168,7 @@ impl Sema:
     // template's identity first; the flat symbol-keyed map (the newest
     // declaration of that name in any module) only for an instance with no
     // recorded template.
-    mut fn generic_inst_decl_node(tid: i32) -> i32:
+    fn generic_inst_decl_node(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let template = self.generic_inst_template_tid(resolved)
         if template != 0:
@@ -7189,7 +7189,7 @@ impl Sema:
     // `Handle[T]`, whose T a facade Handle's generic method call then
     // tried to infer. The flat map only for an owner with no type
     // (a builtin owner, #959).
-    mut fn owner_decl_node_for_type(owner_sym: i32, owner_type: i32) -> i32:
+    fn owner_decl_node_for_type(owner_sym: i32, owner_type: i32) -> i32:
         if owner_type != 0:
             let resolved = self.resolve_alias(owner_type as TypeId) as i32
             if self.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST:
@@ -8022,7 +8022,7 @@ impl Sema:
         if existing_kind == GLOBAL_VALUE_DECL_EXTERN and decl_kind != GLOBAL_VALUE_DECL_EXTERN:
             self.global_value_decl_kinds.insert(sym, decl_kind)
 
-    mut fn scope_lookup(sym: i32) -> i32:
+    fn scope_lookup(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_types[opt.unwrap()]
@@ -9054,7 +9054,7 @@ impl Sema:
     // changed.
     // The declaration node whose fields decide tid's liveness byte: the
     // laid-out type's own, by identity (see liveness_byte_decl_cache).
-    mut fn struct_decl_node_for_liveness(name_sym: i32, tid: i32) -> i32:
+    fn struct_decl_node_for_liveness(name_sym: i32, tid: i32) -> i32:
         var decl = if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_GENERIC_INST: self.generic_inst_decl_node(tid) else: 0
         if decl == 0 and self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
             decl = self.type_decl_nodes_by_tid.get(self.resolve_alias(tid as TypeId) as i32).unwrap()
@@ -9096,7 +9096,7 @@ impl Sema:
     // The frozen verdict for the type `tid` itself denotes: its own
     // declaration's row, the name row only when no declaration row was
     // recorded (a builtin recorded before any module existed).
-    mut fn struct_liveness_byte_frozen_tid(name_sym: i32, tid: i32) -> i32:
+    fn struct_liveness_byte_frozen_tid(name_sym: i32, tid: i32) -> i32:
         let decl = self.struct_decl_node_for_liveness(name_sym, tid)
         if decl != 0 and self.liveness_byte_decl_cache.contains(decl):
             return self.liveness_byte_decl_cache.get(decl).unwrap()
@@ -10350,7 +10350,7 @@ impl Sema:
             if self.sig_param_uses_value_ref_abi(callee_sig, callee_pi) != 0:
                 continue
 
-    mut fn get_sig(name: i32) -> i32:
+    fn get_sig(name: i32) -> i32:
         // An extern declaration is its module's view of a C symbol, as a C
         // prototype is a translation unit's: a module that declares `strlen`
         // calls it through its own signature whatever other modules declare
@@ -10374,7 +10374,7 @@ impl Sema:
     // module it imports directly (a corpus's `defs`), else one it reaches
     // through its imports (the walk is cached). Symbols are matched by text:
     // every imported module's names live in its own pool.
-    mut fn extern_view_sig(text: &str) -> i32:
+    fn extern_view_sig(text: &str) -> i32:
         if not self.extern_fn_texts.contains(text): return -1
         let own = self.extern_decl_sites.get(self.current_module_path ++ "\n" ++ text)
         if own.is_some() and own.unwrap() >= 0: return own.unwrap()
@@ -10392,7 +10392,7 @@ impl Sema:
             i = self.extern_chain_prev.get(i) ?? -1
         -1
 
-    mut fn get_visible_sig(name: i32) -> i32:
+    fn get_visible_sig(name: i32) -> i32:
         let direct = self.get_sig(name)
         if direct >= 0:
             return direct
@@ -10431,7 +10431,7 @@ impl Sema:
             return 1
         0
 
-    mut fn fn_node_is_generic_template(node: i32, sym: i32) -> i32:
+    fn fn_node_is_generic_template(node: i32, sym: i32) -> i32:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_FN_DECL:
             return 0
         let meta = self.ast.find_fn_meta(node)
@@ -10517,7 +10517,7 @@ impl Sema:
                 return 1
         0
 
-    mut fn generic_fn_node_for_symbol(sym: i32) -> i32:
+    fn generic_fn_node_for_symbol(sym: i32) -> i32:
         if sym == 0:
             return 0
         let target = self.pool_resolve_symbol(sym)

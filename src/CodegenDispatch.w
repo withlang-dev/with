@@ -844,7 +844,7 @@ impl Codegen:
         for ai in 0..count:
             self.mir_scan_operand_for_value_local(body, body.call_arg_operands[(start + ai)], use_bb, use_order, scan)
 
-    mut fn mir_call_has_generic_ref_self_param0(body: &MirBody, callee_operand: i32, args_id: i32) -> bool:
+    fn mir_call_has_generic_ref_self_param0(body: &MirBody, callee_operand: i32, args_id: i32) -> bool:
         if args_id < 0 or args_id >= body.call_arg_starts.len():
             return false
         if body.call_intrinsic(args_id) != MirIntrinsic.GENERIC_CALL:
@@ -1112,7 +1112,7 @@ impl Codegen:
         true
 
 
-    mut fn mir_resolve_field_index(agg_ty: i64, field_token: i32, source_type: i32 = 0):
+    fn mir_resolve_field_index(agg_ty: i64, field_token: i32, source_type: i32 = 0):
         // Arrays use direct numeric index
         if wl_get_type_kind(agg_ty) == wl_array_type_kind():
             if field_token >= 0 and field_token < wl_get_array_length(agg_ty):
@@ -1191,7 +1191,7 @@ impl Codegen:
     // indices are positional already.
     // An aggregate's named field operand: its position in the struct
     // declaration of the aggregate's Sema type (Sema's record).
-    mut fn mir_sema_field_index(source_type: i32, field_token: i32) -> i32:
+    fn mir_sema_field_index(source_type: i32, field_token: i32) -> i32:
         var text = with_str_clone_ref(self.intern.resolve(field_token))
         if text.len() == 0: text = self.sema_symbol_text(field_token)
         let sema_field = if text.len() > 0: self.sema.pool_lookup_symbol(text) else: 0
@@ -2351,7 +2351,7 @@ impl Codegen:
             return self.current_method_owner_sym
         self.fn_method_owner_cg_sym(self.current_function_name_sym)
 
-    mut fn mir_current_owner_projected_nominal_sym(body: &MirBody, place_id: i32) -> i32:
+    fn mir_current_owner_projected_nominal_sym(body: &MirBody, place_id: i32) -> i32:
         if place_id < 0 or place_id >= body.place_locals.len():
             return 0
         let p_count = body.place_proj_counts[place_id]
@@ -8916,7 +8916,7 @@ impl Codegen:
         if self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(resolved as i32)) == self.sym_option: self.option_some_index else: 0
 
     // The tag of that variant: Option's Some tag, or Ok's discriminant.
-    mut fn mir_success_variant_tag(sema_ty: i32) -> i64:
+    fn mir_success_variant_tag(sema_ty: i32) -> i64:
         let resolved = self.sema.resolve_alias(sema_ty as TypeId)
         if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema_sym_to_codegen_sym(self.sema.get_generic_inst_base(resolved as i32)) == self.sym_option:
             return self.option_tag(true)
@@ -8930,7 +8930,7 @@ impl Codegen:
             return 0
         self.mir_sema_type_to_llvm(payload_sema)
 
-    mut fn mir_enum_payload_sema_type(enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i32:
+    fn mir_enum_payload_sema_type(enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i32:
         if enum_sema_ty <= 0 or variant_idx < 0 or field_idx < 0:
             return 0
         let builtin_payload = self.mir_builtin_variant_payload_sema_type(enum_sema_ty, variant_idx)

@@ -206,15 +206,15 @@ impl Sema:
     // owner's name is declared in more than one file. The declaration's own
     // module's type first (§18.1); an impl of a same-named type imported from
     // elsewhere resolves it the way the impl's module sees it.
-    mut fn method_decl_owner_key_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
+    fn method_decl_owner_key_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
         self.owner_key_symbol_from(self.method_decl_owner_symbol(decl, parsed_fn_sym), decl)
 
     // The owner key of an impl declaration's methods (inherent, trait and
     // default ones alike): the same rule as a method declaration's.
-    mut fn impl_owner_key_symbol(impl_node: i32) -> i32:
+    fn impl_owner_key_symbol(impl_node: i32) -> i32:
         self.owner_key_symbol_from(self.ast.get_data0(impl_node), impl_node)
 
-    mut fn owner_key_symbol_from(owner: i32, decl: i32) -> i32:
+    fn owner_key_symbol_from(owner: i32, decl: i32) -> i32:
         if owner == 0 or not self.colliding_type_names.contains(owner):
             return owner
         let own_path: str = self.decl_source_path_for_node(decl)
@@ -382,7 +382,7 @@ impl Sema:
             return 1
         return 0
 
-    mut fn should_skip_trait_method(decl_idx: i32, fn_sym: i32) -> i32:
+    fn should_skip_trait_method(decl_idx: i32, fn_sym: i32) -> i32:
         let decl = self.ast.get_decl(decl_idx)
         let semantic = self.method_decl_base_symbol(decl, fn_sym)
         if self.is_method_symbol(semantic) == 0:
@@ -1073,7 +1073,7 @@ fn sema_string_literal_has_nul(raw: &str) -> bool:
     false
 
 impl Sema:
-    mut fn ci_function_requires_raw_abi(fn_sym: i32) -> i32:
+    fn ci_function_requires_raw_abi(fn_sym: i32) -> i32:
         let sig_idx = self.get_sig(fn_sym)
         if sig_idx < 0:
             let fn_node = self.fn_symbol_decl_node(fn_sym)
@@ -2596,7 +2596,7 @@ impl Sema:
     // (#2520) — two traits giving one type the same method name previously
     // minted one symbol and collided in the body map.
     // The two spellings below differ only in whether the text is interned.
-    mut fn method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
+    fn method_decl_base_symbol(decl: i32, parsed_fn_sym: i32) -> i32:
         let in_impl = self.impl_owner_type_sym_for_decl(decl) != 0
         let owner = self.method_decl_owner_symbol(decl, parsed_fn_sym)
         let key = self.method_decl_owner_key_symbol(decl, parsed_fn_sym)
@@ -2842,7 +2842,7 @@ impl Sema:
                     return 1
         0
 
-    mut fn trait_default_method_sig_exists(type_sym: i32, method_sym: i32) -> i32:
+    fn trait_default_method_sig_exists(type_sym: i32, method_sym: i32) -> i32:
         if self.lookup_method_sig(type_sym, method_sym) >= 0:
             return 1
         0
@@ -3197,7 +3197,7 @@ impl Sema:
     // The type-parameter count of the declaration `type_name` denotes
     // from the current module; the flat map only when no candidate is
     // visible (a builtin recorded before any module existed).
-    mut fn type_decl_type_param_count(type_name: i32) -> i32:
+    fn type_decl_type_param_count(type_name: i32) -> i32:
         let visible = self.lookup_named_type_visible(type_name)
         if visible != 0 and self.type_decl_nodes_by_tid.contains(self.resolve_alias(visible as TypeId) as i32):
             return self.type_tid_decl_tp_count(visible)
@@ -4174,7 +4174,7 @@ impl Sema:
                     return
             pos = pos + 2 + bound_count
 
-    mut fn primitive_type_by_sym(sym: i32) -> i32:
+    fn primitive_type_by_sym(sym: i32) -> i32:
         let named_tid = self.lookup_named_type_visible(sym)
         if named_tid != 0:
             let named_resolved = self.resolve_alias(named_tid)
@@ -4251,7 +4251,7 @@ impl Sema:
         tid  // fallback: return original
 
     // Resolve the Order enum type for Atomic[T] method argument type propagation.
-    mut fn resolve_atomic_order_type(obj_type: i32) -> i32:
+    fn resolve_atomic_order_type(obj_type: i32) -> i32:
         if obj_type == 0: return 0
         let resolved = self.resolve_alias(obj_type as TypeId)
         let name_sym = self.get_type_name(resolved as i32)

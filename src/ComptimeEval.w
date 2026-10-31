@@ -2217,7 +2217,7 @@ fn comptime_effect_resolve_executable(exe: &str) -> str:
     ""
 
 impl ComptimeEvaluator:
-    mut fn effect_env_text_from_process_env_value(value: &ComptimeValue) -> str:
+    fn effect_env_text_from_process_env_value(value: &ComptimeValue) -> str:
         if value.kind != ComptimeValueKind.CV_STRUCT:
             return ""
         let vars = self.struct_field_value_by_name(value, "vars")
@@ -2297,7 +2297,7 @@ impl ComptimeEvaluator:
     // imports; `comptime match Target.os` through a corpus-private std.os on
     // one compiler generation and not the other). Sema's gate decides, from
     // the module being evaluated, and the message is the runtime use's.
-    mut fn module_let_visible(decl: i32) -> i32: self.sema.decl_node_visible_from_current(decl)
+    fn module_let_visible(decl: i32) -> i32: self.sema.decl_node_visible_from_current(decl)
 
     fn invisible_name_message(sym: i32) -> str:
         let name = self.pool.resolve(sym)
@@ -2364,7 +2364,7 @@ impl ComptimeEvaluator:
             di = di - 1
         0
 
-    mut fn find_fn_decl_node(sym: i32) -> i32:
+    fn find_fn_decl_node(sym: i32) -> i32:
         if self.sema.fn_decl_nodes.contains(sym):
             return self.sema.fn_decl_nodes.get(sym).unwrap()
         let generic = self.sema.generic_fn_node_for_symbol(sym)
@@ -2986,7 +2986,7 @@ impl ComptimeEvaluator:
                 return 0
         self.static_type_expr(node)
 
-    mut fn struct_field_index(type_id: i32, field_sym: i32) -> i32:
+    fn struct_field_index(type_id: i32, field_sym: i32) -> i32:
         let field_count = self.sema.type_reflection_field_count(type_id)
         for fi in 0..field_count:
             if self.sema.type_reflection_field_name(type_id, fi) == field_sym:
@@ -4063,7 +4063,7 @@ impl ComptimeEvaluator:
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
-    mut fn struct_field_value_by_name(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
+    fn struct_field_value_by_name(value: &ComptimeValue, field_name: &str) -> ComptimeValue:
         if value.kind != ComptimeValueKind.CV_STRUCT:
             return comptime_value_invalid()
         let field_sym = self.pool.intern(field_name) as i32
@@ -4181,7 +4181,7 @@ impl ComptimeEvaluator:
         let clean_root = if root.ends_with("/"): root.slice(0, root.len() - 1) else: with_str_clone_ref(root)
         clean_root ++ "/" ++ path
 
-    mut fn workspace_str_list_field(options: &ComptimeValue, field_name: &str) -> List[str]:
+    fn workspace_str_list_field(options: &ComptimeValue, field_name: &str) -> List[str]:
         let out: List[str] = List.new()
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind != ComptimeValueKind.CV_LIST and value.kind != ComptimeValueKind.CV_ARRAY:
@@ -4192,14 +4192,14 @@ impl ComptimeEvaluator:
                 out.push(with_str_clone_ref(item.text))
         out
 
-    mut fn workspace_str_option(options: &ComptimeValue, field_name: &str) -> str:
+    fn workspace_str_option(options: &ComptimeValue, field_name: &str) -> str:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_STR:
             // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
             return value.text.clone()
         ""
 
-    mut fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
+    fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
         let value = self.struct_field_value_by_name(options, field_name)
         if comptime_value_is_intlike(value) != 0:
             return value.data0 as i32
@@ -4212,20 +4212,20 @@ impl ComptimeEvaluator:
                     return self.sema.enum_variant_discriminant_for_type(enum_resolved as i32, sym) as i32
         default_value
 
-    mut fn workspace_bool_option(options: &ComptimeValue, field_name: &str, default_value: bool) -> bool:
+    fn workspace_bool_option(options: &ComptimeValue, field_name: &str, default_value: bool) -> bool:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_BOOL:
             return value.data0 != 0
         default_value
 
-    mut fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
+    fn workspace_path_list_field(root: &str, options: &ComptimeValue, field_name: &str) -> List[str]:
         let raw = self.workspace_str_list_field(options, field_name)
         let out: List[str] = List.new()
         for i in 0..raw.len():
             out.push(self.workspace_path(root, raw[i]))
         out
 
-    mut fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
+    fn workspace_exclude_basenames_field(options: &ComptimeValue) -> str:
         let excludes = self.workspace_str_list_field(options, "exclude_basenames")
         var out = ""
         for i in 0..excludes.len():

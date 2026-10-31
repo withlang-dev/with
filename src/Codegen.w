@@ -1514,7 +1514,7 @@ impl Codegen:
     // The declaration a specialization's body came from: its concrete
     // specialization node, else the symbol's declaration (the generic
     // template), else 0.
-    mut fn debug_decl_node_for(sym: i32) -> i32:
+    fn debug_decl_node_for(sym: i32) -> i32:
         if sym == 0:
             return 0
         let spec = self.sema.concrete_specialization_by_sym.get(sym)
@@ -3577,7 +3577,7 @@ impl Codegen:
         // Unsupported
         0
 
-    mut fn resolve_named_type(sym: i32) -> i64:
+    fn resolve_named_type(sym: i32) -> i64:
         // Resolve Self to current method owner type
         if sym == self.sym_Self and self.current_method_owner_sym != 0:
             return self.resolve_user_named_type(self.split_owner_sym(self.shadow_lookup_sym(self.current_method_owner_sym)))
@@ -4506,10 +4506,10 @@ impl Codegen:
 
     // The method symbol text an impl declaration's methods carry: the owner
     // key Sema registered them under (#1457) plus the method name.
-    mut fn impl_method_name_text(impl_node: i32, method_name: &str) -> str:
+    fn impl_method_name_text(impl_node: i32, method_name: &str) -> str:
         self.sema_symbol_text(self.sema.impl_owner_key_symbol(impl_node)) ++ "." ++ method_name
 
-    mut fn split_owner_sym(owner_sym: i32) -> i32:
+    fn split_owner_sym(owner_sym: i32) -> i32:
         if not self.nominal_split_names.contains(owner_sym):
             return owner_sym
         let sema_owner = self.codegen_sema_sym_for(owner_sym)

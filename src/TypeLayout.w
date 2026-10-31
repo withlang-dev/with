@@ -88,7 +88,7 @@ impl Sema:
             return type_decl_sub_kind(self.ast.get_data2(decl))
         TypeDeclKind.Struct
 
-    mut fn type_layout_generic_struct_field_count(tid: i32) -> i32:
+    fn type_layout_generic_struct_field_count(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
             return 0
@@ -133,7 +133,7 @@ impl Sema:
 
     // §16.4: the alignment every field of a struct is capped at — 1 under
     // `repr(packed)`, N under `repr(packed(N))` — or 0 when uncapped.
-    mut fn type_layout_pack_cap(tid: i32) -> i64:
+    fn type_layout_pack_cap(tid: i32) -> i64:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         if self.packed_types.contains(resolved):
             return 1
@@ -150,7 +150,7 @@ impl Sema:
         type_decl_pack_cap(packed) as i64
 
     // A field's alignment under its struct's cap (§16.4).
-    mut fn type_layout_capped(tid: i32, align: i64) -> i64:
+    fn type_layout_capped(tid: i32, align: i64) -> i64:
         let cap = self.type_layout_pack_cap(tid)
         if cap > 0 and align > cap: cap else: align
 
@@ -216,7 +216,7 @@ impl Sema:
     // base name in the visible scope: `chan[T]` builds `Sender[T]` and
     // `Receiver[T]` whether or not std.channel is imported, and the D29
     // import gate hid their template, sizing them 0 (#1964).
-    mut fn type_layout_generic_template_kind(tid: i32) -> i32:
+    fn type_layout_generic_template_kind(tid: i32) -> i32:
         let template = self.generic_inst_template_tid(tid)
         if template == 0:
             return 0

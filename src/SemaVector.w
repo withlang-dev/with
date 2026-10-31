@@ -181,9 +181,9 @@ impl Sema:
             return lane_name ++ f"x{n}"
         f"Vector[{lane_name}, {n}]"
 
-    mut fn is_vector_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Vector"
+    fn is_vector_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Vector"
 
-    mut fn is_mask_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Mask"
+    fn is_mask_symbol(sym: i32) -> bool: self.lookup_named_type_visible(sym) == 0 and self.pool_resolve_symbol(sym) == "Mask"
 
     // The lane count argument of `Vector[T, N]` / `Mask[N, W]`: a
     // compile-time integer constant ≥ 1, or -1 after a diagnostic.

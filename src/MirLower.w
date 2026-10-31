@@ -491,7 +491,7 @@ impl MirBuilder:
     // #1985 (§14.3): a call through a callable value or a `dyn` method, or
     // one that hands a callable over, may too: Sema's settled call-site fact
     // for the call's AST node.
-    mut fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
+    fn call_may_cancel_return(callee_op: i32, call_id: i32) -> bool:
         let intrinsic = self.body.call_intrinsic(call_id)
         if intrinsic != MirIntrinsic.NONE and intrinsic != MirIntrinsic.GENERIC_CALL and intrinsic != MirIntrinsic.DYN_CALL:
             return false
@@ -705,7 +705,7 @@ impl MirBuilder:
         if self.pattern_subject_observed != 0 and self.sema.is_copy_frozen(read_ty as TypeId) != 0: OperandKind.OK_COPY else: self.carrier_read_kind(read_ty, carrier_ty)
 
     // The whole subject bound by name (`s =>`, `s @ ...`): same rule.
-    mut fn pattern_whole_read_kind(ty: i32) -> i32:
+    fn pattern_whole_read_kind(ty: i32) -> i32:
         if self.type_needs_value_drop(ty) == 0 or (self.pattern_subject_observed != 0 and self.sema.is_copy_frozen(ty as TypeId) != 0): OperandKind.OK_COPY else: OperandKind.OK_MOVE
 
     mut fn mark_carrier_consumed(local: i32):
@@ -876,7 +876,7 @@ impl MirBuilder:
                 self.remove_moved_field_entry(i)
             i = i - 1
 
-    mut fn partial_drop_field_count(sema_ty: i32) -> i32:
+    fn partial_drop_field_count(sema_ty: i32) -> i32:
         if sema_ty <= 0:
             return 0
         let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
@@ -885,7 +885,7 @@ impl MirBuilder:
             return self.sema.get_type_d1(resolved as TypeId)
         self.sema.type_reflection_field_count(resolved)
 
-    mut fn partial_drop_field_token(sema_ty: i32, field_index: i32) -> i32:
+    fn partial_drop_field_token(sema_ty: i32, field_index: i32) -> i32:
         if sema_ty <= 0 or field_index < 0:
             return 0
         let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
@@ -893,7 +893,7 @@ impl MirBuilder:
             return field_index
         self.sema.type_reflection_field_name(resolved, field_index)
 
-    mut fn partial_drop_field_type(sema_ty: i32, field_index: i32) -> i32:
+    fn partial_drop_field_type(sema_ty: i32, field_index: i32) -> i32:
         if sema_ty <= 0 or field_index < 0:
             return 0
         let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
@@ -975,7 +975,7 @@ impl MirBuilder:
         self.stmt_reset_temp_starts.push(self.pending_move_temp_locals.len() as i32)
         depth
 
-    mut fn stmt_temp_needs_drop(type_id: i32) -> i32:
+    fn stmt_temp_needs_drop(type_id: i32) -> i32:
         if type_id == 0 or type_id == self.sema.ty_void as i32 or type_id == self.sema.ty_never as i32:
             return 0
         if self.type_is_channel_endpoint(type_id) != 0:
@@ -986,7 +986,7 @@ impl MirBuilder:
             return 0
         1
 
-    mut fn type_is_channel_endpoint(type_id: i32) -> i32:
+    fn type_is_channel_endpoint(type_id: i32) -> i32:
         if type_id == 0:
             return 0
         let resolved = self.sema.resolve_alias(type_id)
@@ -1000,7 +1000,7 @@ impl MirBuilder:
     // holding one, is Copy with drop glue: every holder is dropped.
     fn copy_is_bits(ty: i32) -> bool: self.sema.is_copy_frozen(ty as TypeId) != 0 and self.sema.type_needs_drop_frozen(ty) == 0
 
-    mut fn type_needs_value_drop(type_id: i32) -> i32:
+    fn type_needs_value_drop(type_id: i32) -> i32:
         if self.type_is_channel_endpoint(type_id) != 0:
             return 1
         if not self.copy_is_bits(type_id):
@@ -2404,7 +2404,7 @@ impl MirBuilder:
             return 1
         0
 
-    mut fn enum_payload_type(enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
+    fn enum_payload_type(enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
         let resolved = self.sema.resolve_alias(enum_tid)
         let tk = self.sema.get_type_kind(resolved)
         if variant_idx < 0 or field_idx < 0:
@@ -2814,7 +2814,7 @@ impl MirBuilder:
             return self.sema.variant_lookup.get(variant_sym).unwrap()
         0
 
-    mut fn enum_variant_index_for_type(enum_ty: i32, variant_sym: i32) -> i32:
+    fn enum_variant_index_for_type(enum_ty: i32, variant_sym: i32) -> i32:
         let index = self.sema.enum_variant_index_for_type(enum_ty, variant_sym)
         if index >= 0:
             return index
@@ -2823,7 +2823,7 @@ impl MirBuilder:
 
     // A discriminant is any i64 (`B = -3`); whether `enum_ty` declares the
     // variant is asked of its index (#1451).
-    mut fn enum_variant_discriminant_for_type(enum_ty: i32, variant_sym: i32) -> i64:
+    fn enum_variant_discriminant_for_type(enum_ty: i32, variant_sym: i32) -> i64:
         if self.sema.enum_variant_index_for_type(enum_ty, variant_sym) >= 0:
             return self.sema.enum_variant_discriminant_for_type(enum_ty, variant_sym)
         self.trace_variant_fallback("discriminant", enum_ty, variant_sym)
@@ -6561,10 +6561,10 @@ impl MirBuilder:
             return 0
         self.sema.get_generic_inst_base(resolved as i32)
 
-    mut fn is_btreeset_base_sym(sym: i32) -> i32:
+    fn is_btreeset_base_sym(sym: i32) -> i32:
         if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeSet: 1 else: 0
 
-    mut fn is_btreemap_base_sym(sym: i32) -> i32:
+    fn is_btreemap_base_sym(sym: i32) -> i32:
         if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeMap: 1 else: 0
 
     // The collection a literal or comprehension fills: the type's own
@@ -12781,7 +12781,7 @@ impl MirBuilder:
         self.consume_moved_operand(mv)
         self.unit_operand()
 
-    mut fn call_sig_for_sym(sym: i32) -> i32:
+    fn call_sig_for_sym(sym: i32) -> i32:
         if sym == 0:
             return -1
         let direct = self.sema.get_sig(sym)
@@ -12796,9 +12796,9 @@ impl MirBuilder:
     // D65 phase 5 (#1647): whether a MIR callee symbol names a generic
     // template, by Sema's identity for the symbol (the same name in Sema's
     // pool), never by probing Sema's tables with a MIR-pool integer.
-    mut fn sym_is_generic_fn(sym: i32): self.generic_fn_node_for_sym(sym) != 0
+    fn sym_is_generic_fn(sym: i32): self.generic_fn_node_for_sym(sym) != 0
 
-    mut fn generic_fn_node_for_sym(sym: i32) -> i32:
+    fn generic_fn_node_for_sym(sym: i32) -> i32:
         if sym == 0:
             return 0
         let name = self.pool.resolve_symbol(sym)
@@ -12807,7 +12807,7 @@ impl MirBuilder:
             return 0
         self.sema.generic_fn_node_for_symbol(sema_sym)
 
-    mut fn callee_has_move_self(fn_sym: i32) -> bool:
+    fn callee_has_move_self(fn_sym: i32) -> bool:
         var fn_node: i32 = 0
         if self.sema.fn_decl_nodes.contains(fn_sym):
             fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
@@ -12824,7 +12824,7 @@ impl MirBuilder:
     // §9.5/#641a: a `mut self: Self` receiver is a non-consuming mutable borrow of
     // the caller's place; the caller must pass it as OK_COPY of the place, never
     // OK_MOVE + consume.
-    mut fn callee_has_mut_self(fn_sym: i32) -> bool:
+    fn callee_has_mut_self(fn_sym: i32) -> bool:
         var fn_node: i32 = 0
         if self.sema.fn_decl_nodes.contains(fn_sym):
             fn_node = self.sema.fn_decl_nodes.get(fn_sym).unwrap()
@@ -12859,7 +12859,7 @@ impl MirBuilder:
             return 0
         resolved
 
-    mut fn call_sig_for_expr(fn_expr: i32, call_node: i32) -> i32:
+    fn call_sig_for_expr(fn_expr: i32, call_node: i32) -> i32:
         if fn_expr == 0 or self.ast.kind(fn_expr) != NodeKind.NK_IDENT or self.sema.call_callee_kind(call_node) == CallCalleeKind.Callable:
             return -1
         self.call_sig_for_sym(self.ast.get_data0(fn_expr))
@@ -16255,7 +16255,7 @@ impl MirBuilder:
             return 0
         self.sema.get_generic_inst_arg(resolved as i32, index)
 
-    mut fn option_some_index(option_ty: i32) -> i32:
+    fn option_some_index(option_ty: i32) -> i32:
         let idx = self.enum_variant_index_for_type(option_ty, self.sema.syms.some)
         if idx < 0:
             sema_phase_bug(f"BUG: type {option_ty} is used as an Option and declares no Some")
@@ -16363,7 +16363,7 @@ impl MirBuilder:
     // specialization contract): a machinery receiver type, or a call Sema
     // recorded as a machinery builtin (#2043: CallBuiltin, never the
     // method's spelling).
-    mut fn generic_call_uses_codegen_dispatch(node: i32, has_recorded_sig: bool, recv_ty: i32) -> bool:
+    fn generic_call_uses_codegen_dispatch(node: i32, has_recorded_sig: bool, recv_ty: i32) -> bool:
         if recv_ty != 0:
             if self.sema.type_is_task(recv_ty) != 0 or self.sema.type_is_scoped_task(recv_ty) != 0 or self.sema.type_is_scoped_join_handle(recv_ty) != 0 or self.type_is_channel_endpoint(recv_ty) != 0:
                 return true
