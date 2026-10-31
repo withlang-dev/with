@@ -2142,6 +2142,11 @@ type Sema {
     // &T clamp drops from the effects callers see, kept so the receiver
     // requirement names the `mut fn` the method is (D172).
     receiver_write_demand_sigs: HashMap[i32, i32],
+    // D177 (§4.2a): an integer expression in a boolean-test context — a
+    // condition, the operand of `not`, an operand of `and`/`or` — keyed by
+    // its node, with its integer type. Nonzero tests true; MIR materializes
+    // the compare. The expression's own type is unchanged.
+    truth_test_exprs: HashMap[i32, i32],
     current_fn_param_direct_effs: List[i32], // body-local effects, excluding propagated calls
     current_fn_raw_derefs: i32,              // the body dereferenced a raw pointer
     sig_raw_deref_bodies: HashMap[i32, i32], // sig -> 1: its body reads through a raw pointer (§21.1 rule 6)
@@ -4093,6 +4098,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         current_fn_param_syms: List.new(),
         current_fn_param_effs: List.new(),
         receiver_write_demand_sigs: HashMap.new(),
+        truth_test_exprs: HashMap.new(),
         current_fn_param_direct_effs: List.new(),
         current_fn_raw_derefs: 0,
         sig_raw_deref_bodies: sema_new_map_i32_i32(),
