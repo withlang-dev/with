@@ -1084,7 +1084,7 @@ impl Codegen:
             self.mir_local_types.insert(local_id, llvm_ty)
         llvm_ty
 
-    mut fn mir_try_init_const_local(body: &MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
+    fn mir_try_init_const_local(body: &MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
         if local_id < 0 or local_id >= body.local_names.len():
             return false
         let sym = body.local_names[local_id]
@@ -2264,7 +2264,7 @@ impl Codegen:
         let kind = self.mir_type_kind_at(resolved)
         kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
 
-    mut fn mir_coerce_value_to_sema_type(val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
+    fn mir_coerce_value_to_sema_type(val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
         if val == 0 or target_ty == 0:
             return val
         let val_ty = wl_type_of(val)
@@ -2639,7 +2639,7 @@ impl Codegen:
 
     // Continue only where `equal` holds: the walk returns false at the first
     // part that differs.
-    mut fn mir_eq_require(equal: i64, differ: i64):
+    fn mir_eq_require(equal: i64, differ: i64):
         let next = wl_append_bb(self.context, self.current_function, "eq.next")
         wl_build_cond_br(self.builder, equal, next, differ)
         wl_position_at_end(self.builder, next)
@@ -2941,14 +2941,14 @@ impl Codegen:
         walk
 
     // Continue only where `order` is 0; otherwise it is the walk's answer.
-    mut fn mir_cmp_require(order: i64, decided: i64, result_slot: i64):
+    fn mir_cmp_require(order: i64, decided: i64, result_slot: i64):
         wl_build_store(self.builder, order, result_slot)
         let next = wl_append_bb(self.context, self.current_function, "cmp.next")
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), order, wl_const_int(wl_type_of(order), 0, 0)), decided, next)
         wl_position_at_end(self.builder, next)
 
     // Decide the walk with a constant answer.
-    mut fn mir_cmp_decide(answer: i64, decided: i64, result_slot: i64):
+    fn mir_cmp_decide(answer: i64, decided: i64, result_slot: i64):
         wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), answer, 1), result_slot)
         wl_build_br(self.builder, decided)
 
@@ -4091,7 +4091,7 @@ impl Codegen:
     // One 64-bit word of a 128-bit integer: the runtime's 128-bit formatters
     // take the low and high words, so no target's i128 convention is
     // involved (#1922).
-    mut fn int128_word(val: i64, high: bool) -> i64:
+    fn int128_word(val: i64, high: bool) -> i64:
         let i64_ty = wl_i64_type(self.context)
         if not high: return wl_build_trunc(self.builder, val, i64_ty)
         let shifted = wl_build_lshr(self.builder, val, wl_const_int(wl_type_of(val), 64, 0))
@@ -6410,7 +6410,7 @@ impl Codegen:
         wl_position_at_end(self.builder, done_bb)
 
     // A runtime helper with the runtime's real prototype (rt/rt_core.w).
-    mut fn mir_list_helper_call(name: &str, params: &List[i64], args: &List[i64]) -> i64:
+    fn mir_list_helper_call(name: &str, params: &List[i64], args: &List[i64]) -> i64:
         var f = wl_get_named_function(self.llmod, name)
         let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), params.len() as i32, 0)
         if f == 0:
@@ -8580,7 +8580,7 @@ impl Codegen:
 
     // #1810: the `&T` of a runtime slot's address. A thin reference is the
     // address; a `&str` view is `{ptr, len}` read out of the slot.
-    mut fn mir_ref_from_slot_ptr(slot_ptr: i64, ref_sema_ty: i32) -> i64:
+    fn mir_ref_from_slot_ptr(slot_ptr: i64, ref_sema_ty: i32) -> i64:
         if self.sema.type_layout_is_str_view(ref_sema_ty):
             return wl_build_load(self.builder, self.str_llvm_type(), slot_ptr)
         slot_ptr
@@ -17221,7 +17221,7 @@ impl Codegen:
 
     // ── While loop ────────────────────────────────────────────────────
 
-    mut fn build_variant_payload_val(payload_ty: i64, args: &List[i64], arg_count: i32) -> i64:
+    fn build_variant_payload_val(payload_ty: i64, args: &List[i64], arg_count: i32) -> i64:
         if arg_count <= 0:
             return wl_get_undef(wl_i32_type(self.context))
         if payload_ty == 0:
@@ -17240,7 +17240,7 @@ impl Codegen:
             return payload
         self.coerce_value_to_type(args[0], payload_ty)
 
-    mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
+    fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
         let variant_name = self.intern.resolve(variant_sym)
         for ei in 0..self.enum_llvm_types.len():
             let enum_ty: i64 = self.enum_llvm_types[ei]
@@ -17356,7 +17356,7 @@ impl Codegen:
     // drop(f) for a callable value at `pair_ptr`: an owned cell is handed to
     // its drop fn (which drops the captures and frees the cell) and the
     // context word is cleared so a second drop of the same place is a no-op.
-    mut fn mir_emit_closure_drop_ptr(pair_ptr: i64):
+    fn mir_emit_closure_drop_ptr(pair_ptr: i64):
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
         let pair_ty = self.closure_pair_llvm_type()
@@ -17441,7 +17441,7 @@ impl Codegen:
     // indirect local (a by-place capture or a place parameter) holds a pointer
     // to its value in its slot; the capture takes that pointer, not the slot.
     // The storage a by-place capture of `parent`'s local `local_id` points at.
-    mut fn mir_capture_source_ptr(parent: &MirBody, local_id: i32) -> i64:
+    fn mir_capture_source_ptr(parent: &MirBody, local_id: i32) -> i64:
         if local_id < 0:
             return 0
         let slot_opt = self.mir_local_ptrs.get(local_id)

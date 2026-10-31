@@ -8745,7 +8745,7 @@ impl ComptimeEvaluator:
         self.unsupported(node)
 
 impl Sema:
-    mut fn force_eval_comptime_expr(node: i32) -> i32:
+    fn force_eval_comptime_expr(node: i32) -> i32:
         let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
         comptime_value_is_valid(value)
 

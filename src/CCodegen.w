@@ -5039,7 +5039,7 @@ impl CCodegen:
         let first_arg_tid = self.operand_tid(body, first_arg)
         self.sema.resolve_alias(first_arg_tid as TypeId) as i32
 
-    mut fn type_owner_text(tid: i32) -> str:
+    fn type_owner_text(tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid)
         if resolved == 0:
             return ""
@@ -10967,7 +10967,7 @@ impl CCodegen:
     // or not; `move ||` owns its environment — inline in the context word
     // when every capture is Copy and the environment fits, else a heap
     // cell. The C struct layout is computed the way C lays it out.
-    mut fn closure_env_kind_for(body: &MirBody, node: i32) -> i32:
+    fn closure_env_kind_for(body: &MirBody, node: i32) -> i32:
         let count = body.anonymous_capture_count
         if count == 0:
             return CC_CLOSURE_ENV_NONE
@@ -12110,7 +12110,7 @@ impl CCodegen:
         self.hold_texts.get(operand_id).unwrap()
 
     // A statement or terminator's text with its holds in front of it.
-    mut fn with_holds(text: &str) -> str:
+    fn with_holds(text: &str) -> str:
         if self.hold_pre.len() == 0:
             return text
         "    " ++ cc_lbrace() ++ self.hold_pre ++ "\n" ++ text ++ "\n    " ++ cc_rbrace()

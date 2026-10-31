@@ -697,7 +697,7 @@ impl Compilation:
     // Install the --target selection (§18.5) before any parse or
     // codegen: @[target] guards, comptime sysinfo, C-ABI decisions,
     // LLVM triple, and the link stage all read the active target.
-    mut fn set_target_kind(kind: i32):
+    fn set_target_kind(kind: i32):
         target_spec_set_active(kind)
         wl_set_active_target_triple(target_spec_llvm_triple())
 
@@ -1484,7 +1484,7 @@ impl Compilation:
     // interface check; never a prelude or std module the object happens to
     // contain). build.w adds the bundle name, the key, and the corpus hash
     // it computed.
-    mut fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, model: &BundleInterfaceModel) -> bool:
+    fn write_bundle_manifest(obj_path: &str, fingerprint: &str, interface_sha: &str, model: &BundleInterfaceModel) -> bool:
         if not compiler_abi_sha_is_stamped():
             with_eprint("error: --emit-bundle-manifest: this compiler carries no ABI stamp (unstamped binary); a bundle key needs one")
             return false

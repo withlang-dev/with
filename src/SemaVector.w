@@ -663,7 +663,7 @@ impl Sema:
         if not self.is_mask_type(expected): return 0
         expected
 
-    mut fn vector_literal_context_lane(node: i32) -> i32:
+    fn vector_literal_context_lane(node: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0: return 0
         let expected = self.expected_expr_type as i32
         if not self.is_vector_type(expected): return 0

@@ -1399,7 +1399,7 @@ impl Sema:
     // ("`??` expression of type `str` cannot produce `&str`") where
     // `peek(make())` is accepted. A view payload keeps the reference demand:
     // that join is a view, its origins the carrier's.
-    mut fn default_join_demand(expected: i32, payload_ty: i32) -> i32:
+    fn default_join_demand(expected: i32, payload_ty: i32) -> i32:
         if expected == 0 or payload_ty == 0:
             return expected
         let er = self.resolve_alias(expected as TypeId)
@@ -1561,7 +1561,7 @@ impl Sema:
     // struct field, as at an annotated binding (check_binding_annotation,
     // #1354). The demand may also auto-reference the value (`&T` from `T`),
     // materialize a Copy view (`T` from `&T`), or pass a view along.
-    mut fn value_aggregate_repr_differs(expected: i32, actual: i32) -> bool:
+    fn value_aggregate_repr_differs(expected: i32, actual: i32) -> bool:
         if expected == 0 or actual == 0:
             return false
         if self.aggregate_repr_differs(expected as TypeId, actual as TypeId, 0) != 0:
@@ -1810,6 +1810,12 @@ impl Sema:
         let full = self.pool_resolve(self.current_fn_symbol)
         let dot = full.rfind(".")
         let fn_name = if dot >= 0: full.slice(dot + 1, full.len()) else: full
+        // A mutable `self` is not what refuses the write: a read-only view
+        // along the path is (`self.sema.f()` where `sema: &Sema`), and no
+        // receiver mode changes that.
+        let link = self.read_only_view_link(recv)
+        if link != 0:
+            return f"`{self.call_node_text(link)}` is a read-only view (`{self.type_name(self.typed_expr_types.get(link) ?? 0)}`), so `{self.call_node_text(self.ast.get_data0(call_node))}` cannot mutate through it"
         if self.pool_resolve(root) == "self":
             let source = self.source_text_view_for_file_id(self.local_file_id)
             var line = 1
@@ -1834,6 +1840,24 @@ impl Sema:
             let pointee = if written.starts_with("&"): written.slice(1, written.len()).trim() else: written
             return f"`{self.pool_resolve(root)}` is a read-only view; to let `{fn_name}` mutate it, declare the parameter `mut {self.pool_resolve(root)}: {pointee}`"
         ""
+
+    // The outermost projection on `node`'s place path whose type is a
+    // read-only view (`&T`, `*const T`); 0 when none is. An identifier root
+    // is not a link: its mode is the binding's, reported by its own message.
+    fn read_only_view_link(node: i32) -> i32:
+        var at = node
+        while at != 0:
+            let kind = self.ast.kind(at)
+            if kind == NodeKind.NK_IDENT:
+                return 0
+            let resolved = self.resolve_alias((self.typed_expr_types.get(at) ?? 0) as TypeId)
+            let tk = self.get_type_kind(resolved)
+            if (tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR) and self.get_type_d1(resolved) == 0:
+                return at
+            if kind != NodeKind.NK_FIELD_ACCESS and kind != NodeKind.NK_COMPUTED_FIELD_ACCESS and kind != NodeKind.NK_GROUPED:
+                return 0
+            at = self.ast.get_data0(at)
+        0
 
     // A `mut` parameter's argument is the place itself: its type is the
     // parameter's, an element's view (D27) standing for the element.
@@ -34731,7 +34755,7 @@ impl Sema:
             return 0
         self.get_generic_inst_arg(resolved as i32, 0)
 
-    mut fn method_may_suspend_current_fiber(recv_type: i32, field: i32) -> i32:
+    fn method_may_suspend_current_fiber(recv_type: i32, field: i32) -> i32:
         if recv_type == 0:
             return 0
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as i32
@@ -34767,7 +34791,7 @@ impl Sema:
                 return self.place_root_sym(self.ast.get_data0(callee))
         self.place_root_sym(source)
 
-    mut fn condvar_wait_releases_associated_guard(obj_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
+    fn condvar_wait_releases_associated_guard(obj_type: i32, field: i32, extra_start: i32, arg_count: i32) -> i32:
         if obj_type == 0 or arg_count <= 0:
             return 0
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type as TypeId)) as i32
@@ -40215,7 +40239,7 @@ impl Sema:
         self.suppress_errors = self.suppress_errors - 1
         if unpack_place_kind(packed) == PlaceKind.PK_NotPlace: 1 else: 0
 
-    mut fn d32_temporary_base_help(fa_node: i32, place: str, named: i32) -> str:
+    fn d32_temporary_base_help(fa_node: i32, place: str, named: i32) -> str:
         var base = self.ast.get_data0(fa_node)
         while base != 0 and self.ast.kind(base) == NodeKind.NK_GROUPED:
             base = self.ast.get_data0(base)

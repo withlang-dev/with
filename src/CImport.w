@@ -20194,7 +20194,7 @@ impl CiStmtPool:
         self.block(start, ids.len() as i32)
 
 impl CiStackEmitContext:
-    mut fn leaf(stmts: CiStmtPool, block: i32) -> CiStmtId:
+    fn leaf(stmts: CiStmtPool, block: i32) -> CiStmtId:
         let ids: List[i32] = List.new()
         var i: i64 = 0
         while i < self.cfg.stmt_ids.len():

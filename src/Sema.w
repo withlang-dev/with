@@ -949,7 +949,7 @@ type Sema {
     fn_clause_body_dispatch: HashMap[i32, i32],
     // Memoized §14.22 by-value Task parameter disposition:
     // key(fn_sym,param_i) -> 1 when the parameter is proven consumed in scope.
-    task_param_consumed_memo: HashMap[i64, i32],
+    task_param_consumed_memo: Memo[i64, i32],
     task_param_consumed_visiting: HashMap[i64, i32],
     detached_task_stmt_nodes: HashMap[i32, i32],
     // Generic function node indices by name. The map preserves the first
@@ -1073,7 +1073,7 @@ type Sema {
     // callable, 0 not; and for a refusal, the chain of calls to the first
     // forbidden operation (`helper -> print (I/O)`). Plain functions called
     // at compile time are judged by the evaluator instead.
-    comptime_callable_memo: HashMap[i32, i32],
+    comptime_callable_memo: Memo[i32, i32],
     comptime_callable_chain: HashMap[i32, str],
     comptime_callable_visiting: HashSet[i32],
     // §4.9a (D103): expressions a demanded Option[T] converts to Some(expression);
@@ -1381,12 +1381,12 @@ type Sema {
     drop_method_cache: Memo[i32, i32],
     // D72 (§2.5.1, #1431): struct name sym -> 1 when the struct carries the
     // hidden liveness byte (struct_needs_liveness_byte), 0 otherwise.
-    liveness_byte_cache: HashMap[i32, i32],
+    liveness_byte_cache: Memo[i32, i32],
     // The same verdict keyed by declaration node (#750 follow-up): two
     // same-named structs (std's generic Handle[T], a user's Handle) are
     // two layouts, and the name key let the first one laid out answer
     // for both.
-    liveness_byte_decl_cache: HashMap[i32, i32],
+    liveness_byte_decl_cache: Memo[i32, i32],
     // is_copy cycle guard — HashSet (heap handle) so is_copy can be `&Self` and
     // mutate it through a copied handle (D7 interior-mutability recipe).
     copy_visit_stack: HashSet[i32],
@@ -1394,7 +1394,7 @@ type Sema {
     // type once it is exact (no unresolved field, no cycle met); without it
     // every query walked every field of every struct (type_needs_drop stops
     // at the first droppable field; this walk must see them all).
-    struct_copy_cache: HashMap[i32, i32],
+    struct_copy_cache: Memo[i32, i32],
     copy_walk_incomplete: i32,
     copy_cycle_hits: i32,
     // type_needs_drop cycle guard — HashSet (heap handle) for `&Self` interior mut.
@@ -2031,7 +2031,7 @@ type Sema {
     // Generic substitution map + specialization cache
     generic_subst_param_syms: List[i32],
     generic_subst_type_ids: List[i32],
-    generic_specialization_cache: HashMap[str, i32],
+    generic_specialization_cache: Memo[str, i32],
     // The specializations whose bodies are being checked, by key: a
     // generic function that calls itself meets its own instance in flight.
     generic_specializations_in_check: HashMap[str, i32],
@@ -2099,14 +2099,14 @@ type Sema {
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
     // consumers read answers via &Self twins instead of re-deriving them through the
     // mutating checker. is_copy_cache[tid] = 0/1 copy-ness.
-    layout_size_cache: HashMap[i32, i64],
-    layout_align_cache: HashMap[i32, i64],
-    layout_field_offset_cache: HashMap[i64, i64],
-    is_copy_cache: HashMap[i32, i32],
-    needs_drop_result_cache: HashMap[i32, i32],
-    unwrapped_type_cache: HashMap[i32, i32],
-    generic_struct_field_type_cache: HashMap[i64, i32],
-    generic_struct_field_index_type_cache: HashMap[i64, i32],
+    layout_size_cache: Memo[i32, i64],
+    layout_align_cache: Memo[i32, i64],
+    layout_field_offset_cache: Memo[i64, i64],
+    is_copy_cache: Memo[i32, i32],
+    needs_drop_result_cache: Memo[i32, i32],
+    unwrapped_type_cache: Memo[i32, i32],
+    generic_struct_field_type_cache: Memo[i64, i32],
+    generic_struct_field_index_type_cache: Memo[i64, i32],
     generic_enum_payload_cache_starts: HashMap[i64, i32],
     generic_enum_payload_cache_counts: HashMap[i64, i32],
     generic_enum_payload_cache_values: List[i32],
@@ -2535,7 +2535,7 @@ type Sema {
     global_visible_module_paths: HashMap[str, i32], // prelude-visible modules
     engine_module_corpus: HashMap[str, i32], // #1362: engine corpus module path -> corpus id
     corpus_private_modules: HashMap[str, i32], // #2248: std modules loaded only through a corpus's own imports
-    module_visibility_cache: HashMap[str, i32], // "from->to" -> visibility
+    module_visibility_cache: Memo[str, i32], // "from->to" -> visibility
     named_type_candidate_syms: List[i32],       // every registered named type symbol
     named_type_candidate_tids: List[i32],       // parallel type id for candidate
     named_type_candidate_paths: List[str],      // defining module path or "" for global
@@ -3015,15 +3015,15 @@ impl Sema:
         self.rebuild_exact_type_cache()
         self.rebuild_named_type_candidate_index()
         self.generic_inst_cache = Memo.new()
-        self.layout_size_cache = HashMap.new()
-        self.layout_align_cache = HashMap.new()
-        self.layout_field_offset_cache = HashMap.new()
-        self.is_copy_cache = sema_new_map_i32_i32()
-        self.struct_copy_cache = HashMap.new()
-        self.needs_drop_result_cache = sema_new_map_i32_i32()
-        self.unwrapped_type_cache = sema_new_map_i32_i32()
-        self.generic_struct_field_type_cache = sema_new_map_i64_i32()
-        self.generic_struct_field_index_type_cache = sema_new_map_i64_i32()
+        self.layout_size_cache = Memo.new()
+        self.layout_align_cache = Memo.new()
+        self.layout_field_offset_cache = Memo.new()
+        self.is_copy_cache = Memo.new()
+        self.struct_copy_cache = Memo.new()
+        self.needs_drop_result_cache = Memo.new()
+        self.unwrapped_type_cache = Memo.new()
+        self.generic_struct_field_type_cache = Memo.new()
+        self.generic_struct_field_index_type_cache = Memo.new()
         self.generic_enum_payload_cache_starts = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_counts = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_values = List.new()
@@ -3094,7 +3094,7 @@ impl Sema:
         self.module_import_offsets = sema_new_list_i32()
         self.module_index_by_path = sema_new_map_str_i32()
         self.global_visible_module_paths = sema_new_map_str_i32()
-        self.module_visibility_cache = sema_new_map_str_i32()
+        self.module_visibility_cache = Memo.new()
 
         for mi in 0..src_module_paths.len():
             let source_path = src_module_paths[mi]
@@ -3369,8 +3369,6 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let extension_method_paths = sema_new_list_str()
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
     let drop_method_cache: Memo[i32, i32] = Memo.new()
-    let liveness_byte_cache = sema_new_map_i32_i32()
-    let liveness_byte_decl_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
     let typed_binding_types = sema_new_map_i32_i32()
     let call_callable_types = sema_new_map_i32_i32()
@@ -3386,18 +3384,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let typed_binding_muts = sema_new_map_i32_i32()
     let ephemeral_task_binding_nodes = sema_new_map_i32_i32()
     let typed_dump_seen_nodes = sema_new_map_i32_i32()
-    let generic_specialization_cache = sema_new_map_str_i32()
     let generic_specializations_in_check = sema_new_map_str_i32()
     let specialization_source_paths: HashMap[i32, str] = HashMap.new()
     let generic_inst_cache: Memo[i64, i32] = Memo.new()
-    let layout_size_cache: HashMap[i32, i64] = HashMap.new()
-    let layout_align_cache: HashMap[i32, i64] = HashMap.new()
-    let layout_field_offset_cache: HashMap[i64, i64] = HashMap.new()
-    let is_copy_cache = sema_new_map_i32_i32()
-    let needs_drop_result_cache = sema_new_map_i32_i32()
-    let unwrapped_type_cache = sema_new_map_i32_i32()
-    let generic_struct_field_type_cache = sema_new_map_i64_i32()
-    let generic_struct_field_index_type_cache = sema_new_map_i64_i32()
     let generic_enum_payload_cache_starts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_counts = sema_new_map_i64_i32()
     let generic_enum_payload_cache_values: List[i32] = List.new()
@@ -3502,7 +3491,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         fn_clause_group_counts: List.new(),
         fn_clause_group_decls: List.new(),
         fn_clause_body_dispatch,
-        task_param_consumed_memo: sema_new_map_i64_i32(),
+        task_param_consumed_memo: Memo.new(),
         task_param_consumed_visiting: sema_new_map_i64_i32(),
         detached_task_stmt_nodes: sema_new_map_i32_i32(),
         generic_fn_nodes,
@@ -3569,7 +3558,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         type_decl_nodes_by_tid: HashMap.new(),
         pub_field_keys: HashSet[i64].new(),
         zeroed_call_nodes: HashSet[i32].new(),
-        comptime_callable_memo: HashMap.new(),
+        comptime_callable_memo: Memo.new(),
         comptime_callable_chain: HashMap.new(),
         comptime_callable_visiting: HashSet[i32].new(),
         value_to_option_nodes: HashMap.new(),
@@ -3712,10 +3701,10 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         method_symbol_flags,
         method_lookup,
         drop_method_cache,
-        liveness_byte_cache,
-        liveness_byte_decl_cache,
+        liveness_byte_cache: Memo.new(),
+        liveness_byte_decl_cache: Memo.new(),
         copy_visit_stack: HashSet.new(),
-        struct_copy_cache: HashMap.new(),
+        struct_copy_cache: Memo.new(),
         copy_walk_incomplete: 0,
         copy_cycle_hits: 0,
         needs_drop_visit: HashSet.new(),
@@ -4035,7 +4024,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         typed_dump_visit_budget: 0,
         generic_subst_param_syms: List.new(),
         generic_subst_type_ids: List.new(),
-        generic_specialization_cache,
+        generic_specialization_cache: Memo.new(),
         generic_specializations_in_check,
         specialization_source_paths,
         concrete_specialization_by_sym: sema_new_map_i32_i32(),
@@ -4074,14 +4063,14 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         param_view_fact_files: List.new(),
         concrete_key_mono_syms: sema_new_map_i32_i32(),
         generic_inst_cache,
-        layout_size_cache,
-        layout_align_cache,
-        layout_field_offset_cache,
-        is_copy_cache,
-        needs_drop_result_cache,
-        unwrapped_type_cache,
-        generic_struct_field_type_cache,
-        generic_struct_field_index_type_cache,
+        layout_size_cache: Memo.new(),
+        layout_align_cache: Memo.new(),
+        layout_field_offset_cache: Memo.new(),
+        is_copy_cache: Memo.new(),
+        needs_drop_result_cache: Memo.new(),
+        unwrapped_type_cache: Memo.new(),
+        generic_struct_field_type_cache: Memo.new(),
+        generic_struct_field_index_type_cache: Memo.new(),
         generic_enum_payload_cache_starts,
         generic_enum_payload_cache_counts,
         generic_enum_payload_cache_values,
@@ -4281,7 +4270,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         global_visible_module_paths: sema_new_map_str_i32(),
         engine_module_corpus: sema_new_map_str_i32(),
         corpus_private_modules: sema_new_map_str_i32(),
-        module_visibility_cache: sema_new_map_str_i32(),
+        module_visibility_cache: Memo.new(),
         named_type_candidate_syms: List.new(),
         named_type_candidate_tids: List.new(),
         named_type_candidate_paths: sema_new_list_str(),
@@ -4872,7 +4861,7 @@ impl Sema:
                 best = self.module_import_offsets[idx]
         best
 
-    mut fn bind_displaced_global_ident(sym: i32, node: i32, chosen: i32) -> i32:
+    fn bind_displaced_global_ident(sym: i32, node: i32, chosen: i32) -> i32:
         if chosen != sym and node != 0 and self.ast.kind(node) == NodeKind.NK_IDENT and self.ast.get_data0(node) == sym:
             self.ast.set_data0(node as NodeId, chosen)
         chosen
@@ -4963,7 +4952,7 @@ impl Sema:
         var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0})\n"
         self.visibility_explain_log = sema_new_list_str()
         self.visibility_explain_on = 1
-        self.module_visibility_cache = sema_new_map_str_i32()
+        self.module_visibility_cache = Memo.new()
         let verdict = self.decl_visible_from_current_gated(path, is_pub, sym)
         self.visibility_explain_on = 0
         for line in self.visibility_explain_log: out = out ++ "    " ++ line ++ "\n"
@@ -8481,7 +8470,7 @@ impl Sema:
             out.push(self.bind_provenance[i].poisoned_origin_node)
         out
 
-    mut fn restore_poison(path_syms: &List[i32], nodes: &List[i32]):
+    fn restore_poison(path_syms: &List[i32], nodes: &List[i32]):
         for i in 0..path_syms.len():
             if i >= self.bind_provenance.len():
                 break
@@ -10334,7 +10323,7 @@ impl Sema:
     // (an rvalue is consumed directly and needs nothing). Runs after
     // declared parameter modes (D5 superseded) — never mis-classifying a
     // forward-reference owned param as a borrow.
-    mut fn finalize_call_site_ownership():
+    fn finalize_call_site_ownership():
         let n = self.consume_call_sites.len()
         var i = 0
         while i + 8 < n:

@@ -1880,7 +1880,7 @@ impl Codegen:
     // are emitted by passes shared across units). Deterministic module walk;
     // renamed __wcu$ fns are owner-defined already, internal/private fns are
     // legitimately per-unit (trampolines), declarations are untouched.
-    mut fn unit_demote_foreign_definitions():
+    fn unit_demote_foreign_definitions():
         if self.unit_total <= 1 or self.unit_index == 0:
             return
         var f = wl_get_first_function(self.llmod)
@@ -2032,7 +2032,7 @@ impl Codegen:
         // to pass to LLVMConstIntGetSExtValue.
         val != 0 and wl_get_value_kind(val) == 18
 
-    mut fn coerce_value_to_type(val: i64, target_ty: i64) -> i64:
+    fn coerce_value_to_type(val: i64, target_ty: i64) -> i64:
         if val == 0 or target_ty == 0:
             return val
         let val_ty = wl_type_of(val)
@@ -3394,7 +3394,7 @@ impl Codegen:
     // clang expands va_arg — the LLVM va_arg instruction is not lowered for
     // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
 
-    mut fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
+    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
         let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         let ft = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
@@ -3408,7 +3408,7 @@ impl Codegen:
     // The next argument of the list at `list_ptr` as `ty` — an integer at
     // least as wide as C's int, a double or a pointer (Sema refused every
     // other T) — with the list advanced past it.
-    mut fn emit_c_va_arg(list_ptr: i64, ty: i64) -> i64:
+    fn emit_c_va_arg(list_ptr: i64, ty: i64) -> i64:
         let kind = type_layout_c_va_list_kind()
         let is_fp = wl_get_type_kind(ty) == wl_double_type_kind()
         var addr: i64 = 0

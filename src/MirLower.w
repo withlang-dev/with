@@ -6366,7 +6366,7 @@ impl MirBuilder:
         self.body.note_index_place(node, place, base)
         place
 
-    mut fn lower_call_place(node: i32) -> i32:
+    fn lower_call_place(node: i32) -> i32:
         // D27 E2: `xs.get(i)` is no longer a place-former — it observes,
         // returning &T through VEC_GET_REF, and the ref-deref walk in field
         // lowering handles projections off the result. The element-place

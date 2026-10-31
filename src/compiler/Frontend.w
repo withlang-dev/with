@@ -798,7 +798,7 @@ impl Zcu:
     // item stays, and the project's blocks are left empty. One block renders
     // the whole facade in one module, so a written item that names a type
     // the project's resource renders (a borrow of it) resolves.
-    mut fn merge_fetched_facades_frontend(pool: AstPool) -> AstPool:
+    fn merge_fetched_facades_frontend(pool: AstPool) -> AstPool:
         var out = pool
         let count = out.decl_count()
         for i in 0..count:

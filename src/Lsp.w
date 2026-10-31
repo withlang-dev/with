@@ -576,7 +576,7 @@ impl LspState:
                 return i as i32
         -1
 
-    mut fn ensure_doc_parsed(idx: i32):
+    fn ensure_doc_parsed(idx: i32):
         if idx < 0:
             return
         // Never get-mutate-set an owning element: the read is a bit-copy that
@@ -593,7 +593,7 @@ impl LspState:
         with self.documents.slot(parsed_slot_idx) as mut slot:
             slot.set(move reparsed)
 
-    mut fn ensure_doc_analyzed(idx: i32):
+    fn ensure_doc_analyzed(idx: i32):
         if idx < 0:
             return
         let analyzed_view = &self.documents[idx]
@@ -668,7 +668,7 @@ fn lsp_line_col_to_offset(text: &str, line: i32, col: i32) -> i32:
 // ── Diagnostics ──────────────────────────────────────────────
 
 impl LspState:
-    mut fn publish_diagnostics(uri: &str, text: &str):
+    fn publish_diagnostics(uri: &str, text: &str):
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
@@ -709,7 +709,7 @@ impl LspState:
 
     // ── Go to definition ─────────────────────────────────────────
 
-    mut fn definition(id: i32, uri: &str, text: &str, line: i32, col: i32):
+    fn definition(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         var lexer = Lexer.init(text, 0)
@@ -815,7 +815,7 @@ fn lsp_extract_doc_comment(text: &str, decl_start: i32) -> str:
     result
 
 impl LspState:
-    mut fn hover(id: i32, uri: &str, text: &str, line: i32, col: i32):
+    fn hover(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         var lexer = Lexer.init(text, 0)
@@ -884,7 +884,7 @@ impl LspState:
 
     // ── Dot completion ───────────────────────────────────────────
 
-    mut fn dot_completion(id: i32, uri: &str, text: &str, offset: i32, dot_pos: i32):
+    fn dot_completion(id: i32, uri: &str, text: &str, offset: i32, dot_pos: i32):
         // Find the receiver identifier before the dot
         var recv_end = dot_pos
         var recv_start = recv_end - 1
@@ -1125,7 +1125,7 @@ fn lsp_type_node_to_name(pool: &AstPool, intern: &InternPool, type_node: i32) ->
 // ── Completion ───────────────────────────────────────────────
 
 impl LspState:
-    mut fn completion(id: i32, uri: &str, text: &str, line: i32, col: i32):
+    fn completion(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Find the line text up to cursor to detect context
@@ -1490,7 +1490,7 @@ fn lsp_keywords() -> List[str]:
 // ── Signature help ───────────────────────────────────────────
 
 impl LspState:
-    mut fn signature_help(id: i32, uri: &str, text: &str, line: i32, col: i32):
+    fn signature_help(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Walk tokens backward from cursor to find the opening ( and function name.
@@ -1591,7 +1591,7 @@ impl LspState:
 
     // ── Find references ──────────────────────────────────────────
 
-    mut fn find_references(id: i32, uri: &str, text: &str, line: i32, col: i32):
+    fn find_references(id: i32, uri: &str, text: &str, line: i32, col: i32):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Find the identifier at cursor
@@ -1705,7 +1705,7 @@ impl LspState:
 
     // ── Document symbols ─────────────────────────────────────────
 
-    mut fn document_symbols(id: i32, uri: &str, text: &str):
+    fn document_symbols(id: i32, uri: &str, text: &str):
         let idx = self.find_doc(uri)
         if idx >= 0:
             self.ensure_doc_analyzed(idx)
@@ -1770,7 +1770,7 @@ fn lsp_is_valid_ident(name: &str) -> bool:
     true
 
 impl LspState:
-    mut fn rename(id: i32, uri: &str, text: &str, line: i32, col: i32, new_name: &str):
+    fn rename(id: i32, uri: &str, text: &str, line: i32, col: i32, new_name: &str):
         let offset = lsp_line_col_to_offset(text, line, col)
 
         // Find the identifier at cursor
