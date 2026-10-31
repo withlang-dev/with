@@ -69,3 +69,11 @@ annotations and the `clone-call` allowance come out in the landing PR.
 **Reopen if:** footprint inference proves unsound in a case the
 second-class reference rule (§3.3) was expected to rule out, or a body
 change relaxing a footprint is found to change a public contract.
+
+**Implementation bound (2026-10-31).** A footprint that grows past 64 paths
+is read as the whole place (sound: the whole place contains every path).
+The compiler's own `Sema` methods transitively write hundreds of fields;
+closing those paths over every caller was quadratic (540k entries, 54M
+path elements, a stage2 timeout) and a view of a sibling field never
+survives such a method anyway. `WITH_PROFILE=1` prints the fixpoint's time,
+passes, edges and entries.
