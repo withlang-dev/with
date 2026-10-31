@@ -7686,7 +7686,11 @@ impl CiExprPool:
             let zero_e = self.add(CiExprKind.CIE_FLOAT_LIT, zero_idx, 0, 0, 0)
             return self.binary(CiBinOp.CIBO_NEQ, value_id, zero_e, 0)
         // D177 (§4.2a): an integer in a boolean-test context is true when
-        // nonzero, as it is in C; the test migrates as written.
+        // nonzero, as it is in C; the test migrates as written. A literal
+        // (`while (1)`, `if (0)`) is the bool it means.
+        if self.kind(value_id) == CiExprKind.CIE_INT_LIT:
+            let text: str = self.get_string(self.get_d0(value_id))
+            return self.bool_lit(if text == "0": 0 else: 1, 0)
         value_id
 
     fn bool_value_expr_ir(session: i64, cursor: i32, bool_expr_id: CiExprId, types: CiTypePool) -> CiExprId:

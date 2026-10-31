@@ -11188,6 +11188,11 @@ impl Sema:
             return self.condition_is_static_true(self.ast.get_data0(node))
         if self.bool_literal_is_true(node) != 0:
             return 1
+        // D177 (§4.2a): an integer tests true when nonzero, so `while 1:` is
+        // the constant-true loop `while true:` is.
+        let lit = self.int_literal_i64_value(node)
+        if lit.ok != 0 and lit.value != 0:
+            return 1
         if node == 0 or self.ast.kind(node) != NodeKind.NK_BINARY:
             return 0
         let op = self.ast.get_data0(node)
