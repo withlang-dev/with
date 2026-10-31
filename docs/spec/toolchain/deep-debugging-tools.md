@@ -153,6 +153,17 @@ binding with its dependency count and the borrow table at each read and
 mutation check: a binding whose dependency is itself, or a local where a
 parameter was expected, names the lost origin in one run (#2187).
 
+For a `mut` call refused, or accepted, under a view of a *sibling* field
+(D178 footprints): `WITH_TRACE_FOOTPRINTS=1 with check repro.w` prints
+every signature's footprint (the field paths its receiver or `mut`
+parameters are written through, or "the whole place" with the reason and
+source line), every edge a `mut` call recorded to its callee, and each
+kept conflict's judgment: the receiver's path, the view's path, and
+whether each path the callee writes overlaps it. A method shown as
+writing the whole place for "the place itself, no callee" was reached
+through a call Sema did not name (the edge is missing); one shown with
+too few paths has a write the collector did not see.
+
 ### A `with build :fixpoint` failure
 
 `with build :fixpoint-diff`, then `cat out/fixpoint-diff/report.txt`. The
@@ -1132,6 +1143,7 @@ Environment switches (set on the compiler's run unless noted):
 | `WITH_DEBUG_IMPORTS=1` | frontend | every module file the loader registers, the key it dedups on and the identity a std module is one source under (two files under one identity is the refused "loaded from two files" case) |
 | `WITH_TRACE_INST=1` | Sema | every generic instance added, and the eager pass's preregistration |
 | `WITH_DEBUG_BORROWS=1` | Sema | each view binding's dependencies and the borrow table at every read and mutation check |
+| `WITH_TRACE_FOOTPRINTS=1` | Sema | every signature's footprint, every `mut`-call edge, and each kept conflict's judgment (D178) |
 | `WITH_DEBUG_MOVE=1` | Sema | move state per binding (`[state]`) and non-Copy classifications |
 | `WITH_D32_DEBUG=1` | Sema | the D32 implicit-field-move arm and the field type it saw |
 | `WITH_DEBUG_DEREF=1` | Sema | the auto-deref steps recorded for an expression |
