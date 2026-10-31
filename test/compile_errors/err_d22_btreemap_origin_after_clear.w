@@ -11,6 +11,6 @@ use std.collections.BTreeMap
 fn main:
     var map: BTreeMap[i32, i32] = BTreeMap.new()
     map.insert(1, 86)
-    let view = map.get(1).unwrap()
+    let view: &i32 = map.get(1).unwrap()
     map.clear()
     assert(view == 86)

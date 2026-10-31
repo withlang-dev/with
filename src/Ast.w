@@ -1000,7 +1000,7 @@ impl AstPool:
         st.frozen = 1
 
     // Add a node to the pool, returns the node index.
-    fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
+    mut fn add_node(kind: i32, start: i32, end: i32, d0: i32, d1: i32, d2: i32) -> NodeId:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_node called after freeze")
         let idx = self.state.kinds.len()
@@ -1017,7 +1017,7 @@ impl AstPool:
         idx as NodeId
 
     // Add extra data, returns the index in the extra array.
-    fn add_extra(value: i32) -> i32:
+    mut fn add_extra(value: i32) -> i32:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_extra called after freeze")
         let idx = self.state.extra.len() as i32
@@ -1025,7 +1025,7 @@ impl AstPool:
         idx
 
     // Add a string to the string table, returns the string index.
-    fn add_string(s: &str) -> i32:
+    mut fn add_string(s: &str) -> i32:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_string called after freeze")
         let idx = self.state.strings.len() as i32
@@ -1513,7 +1513,7 @@ impl AstPool:
             meta = meta + 3
         false
 
-    fn mark_compiler_hook_fn(node: NodeId, phase_sym: i32):
+    mut fn mark_compiler_hook_fn(node: NodeId, phase_sym: i32):
         self.state.compiler_hook_fn_nodes.push(node as i32)
         self.state.compiler_hook_phase_syms.push(phase_sym)
         self.state.compiler_hook_fn_set.insert(node as i32, 1)
@@ -1536,7 +1536,7 @@ impl AstPool:
     fn compiler_hook_phase_at(idx: isize) -> i32:
         self.state.compiler_hook_phase_syms[idx]
 
-    fn mark_global_allocator_decl(node: NodeId):
+    mut fn mark_global_allocator_decl(node: NodeId):
         self.state.global_allocator_decl_nodes.push(node as i32)
         self.state.global_allocator_decl_set.insert(node as i32, 1)
 
@@ -1582,7 +1582,7 @@ impl AstPool:
         if self.state != other.state:
             ast_pool_phase_bug("BUG: mismatched AstPool storage at " ++ context)
 
-    fn add_decl(node_idx: NodeId) -> Unit:
+    mut fn add_decl(node_idx: NodeId) -> Unit:
         if self.state.frozen != 0:
             ast_pool_phase_bug("BUG: AstPool.add_decl called after freeze")
         self.state.decls.push(node_idx as i32)
@@ -1657,7 +1657,7 @@ impl AstPool:
     fn default_body_clone_origin(index: i32) -> i32: self.state.default_body_clone_origins[index]
     fn default_body_clone(index: i32) -> i32: self.state.default_body_clones[index]
 
-    fn set_use_alias(node: NodeId, alias: i32):
+    mut fn set_use_alias(node: NodeId, alias: i32):
         self.state.use_alias_map.insert(node as i32, alias)
 
     // The `as` name of an import decl, 0 when it has none.
@@ -1704,14 +1704,14 @@ impl AstPool:
         let st = self.state
         st.ends[(idx as i32)] = val
 
-    fn set_implicit_it_slot(node: i32, slot: i32): self.state.implicit_it_slots.insert(node, slot)
-    fn set_implicit_it_parent(node: i32, parent: i32): self.state.implicit_it_parents.insert(node, parent)
+    mut fn set_implicit_it_slot(node: i32, slot: i32): self.state.implicit_it_slots.insert(node, slot)
+    mut fn set_implicit_it_parent(node: i32, parent: i32): self.state.implicit_it_parents.insert(node, parent)
     // -1 when `node` is no call argument holding an implicit `it` closure.
     fn implicit_it_slot(node: i32): self.state.implicit_it_slots.get(node) ?? -1
     fn implicit_it_parent(node: i32): self.state.implicit_it_parents.get(node) ?? 0
 
     // Store fn decl metadata: [node, flags, ret_type, param_start, param_count, tp_start, tp_count]
-    fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
+    mut fn add_fn_meta(node: NodeId, flags: i32, ret: i32, ps: i32, pc: i32, ts: i32, tc: i32):
         let idx = self.state.fn_meta.len() as i32
         self.state.fn_meta.push(node as i32)
         self.state.fn_meta.push(flags)
@@ -1722,7 +1722,7 @@ impl AstPool:
         self.state.fn_meta.push(tc)
         self.state.fn_meta_map.insert(node as i32, idx)
 
-    fn add_fn_effect_pin(node: NodeId, param_sym: i32, bits: i32):
+    mut fn add_fn_effect_pin(node: NodeId, param_sym: i32, bits: i32):
         let n = node as i32
         if not self.state.fn_effect_pin_starts.contains(n):
             self.state.fn_effect_pin_starts.insert(n, self.state.fn_effect_pin_params.len() as i32)
@@ -1753,7 +1753,7 @@ impl AstPool:
         self.state.fn_effect_pin_bits[(start + idx)]
 
     // §21.1 rule 1: one global a function's write clause declares.
-    fn add_fn_global_write(node: NodeId, path_sym: i32, name_sym: i32):
+    mut fn add_fn_global_write(node: NodeId, path_sym: i32, name_sym: i32):
         let n = node as i32
         if not self.state.fn_global_write_starts.contains(n):
             self.state.fn_global_write_starts.insert(n, self.state.fn_global_write_paths.len() as i32)
@@ -1772,7 +1772,7 @@ impl AstPool:
         self.state.fn_global_write_names[self.state.fn_global_write_starts.get(node as i32).unwrap() + idx]
 
     // §21.1 rule 6 (#1903): one origin a function's `from` clause declares.
-    fn add_fn_view_origin(node: NodeId, path_sym: i32, name_sym: i32):
+    mut fn add_fn_view_origin(node: NodeId, path_sym: i32, name_sym: i32):
         let n = node as i32
         if not self.state.fn_view_origin_starts.contains(n):
             self.state.fn_view_origin_starts.insert(n, self.state.fn_view_origin_paths.len() as i32)
@@ -1791,7 +1791,7 @@ impl AstPool:
         self.state.fn_view_origin_names[self.state.fn_view_origin_starts.get(node as i32).unwrap() + idx]
 
     // Record the extra-array slot holding the `contains` argument for an `in` node.
-    fn set_membership_arg(node: NodeId, slot: i32):
+    mut fn set_membership_arg(node: NodeId, slot: i32):
         self.state.membership_arg_map.insert(node as i32, slot)
 
     // Get the pre-reserved `contains` argument slot for an `in` node, or -1.
@@ -1832,7 +1832,7 @@ impl AstPool:
     // after the full imported AST is assembled, so inherit the trait receiver
     // here, before freeze, rather than guessing while an individual file parses.
     // Associated trait methods have no receiver and remain unchanged.
-    fn inherit_trait_impl_receivers(intern: &InternPool):
+    mut fn inherit_trait_impl_receivers(intern: &InternPool):
         let st = self.state
         if st.frozen != 0:
             ast_pool_phase_bug("BUG: trait impl receiver inheritance ran after AstPool.freeze")
@@ -1945,7 +1945,7 @@ impl AstPool:
     // c_import's declarations and the types and methods a `c facade`
     // renders (`generated_files`) are the compiler's text, not a module
     // anyone wrote: their C parameter names stand.
-    fn resolve_receiver_field_names(intern: &InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
+    mut fn resolve_receiver_field_names(intern: &InternPool, decl_is_c_import: &List[i32], generated_files: &List[i32]):
         let st = self.state
         if st.frozen != 0:
             ast_pool_phase_bug("BUG: receiver field-name resolution ran after AstPool.freeze")
@@ -1996,7 +1996,7 @@ impl AstPool:
             return 0
         decl
 
-    fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
+    mut fn resolve_method_receiver_field_names(fn_node: NodeId, owner: i32, self_sym: i32, decl_nodes: &HashMap[i32, i32]):
         let st = self.state
         st.receiver_field_methods.insert(fn_node as i32, owner)
         let fields_ex = self.get_data1(owner as NodeId)
@@ -2080,7 +2080,7 @@ impl AstPool:
     fn receiver_type_has_field(owner: i32, sym: i32) -> bool: self.state.receiver_field_keys.contains(ast_pair_key(owner, sym))
 
     // §18.1: `module a.b.c` in file `file` names the module `c`.
-    fn record_module_header(file: i32, name_sym: i32):
+    mut fn record_module_header(file: i32, name_sym: i32):
         self.state.module_header_files.push(file)
         self.state.module_header_names.push(name_sym)
 
@@ -2108,7 +2108,7 @@ impl AstPool:
     fn fn_param_flags(param_start: i32, param_idx: isize) -> i32:
         self.get_extra(param_start + param_idx * FN_PARAM_STRIDE + 2)
 
-    fn set_fn_param_default(param_start: i32, param_idx: i32, default_node: i32):
+    mut fn set_fn_param_default(param_start: i32, param_idx: i32, default_node: i32):
         let key = (param_start as i64) * 1000 + (param_idx as i64)
         self.state.fn_param_defaults.insert(key, default_node)
 
@@ -2118,7 +2118,7 @@ impl AstPool:
             return self.state.fn_param_defaults.get(key).unwrap()
         0
 
-    fn set_call_named_args(call_node: NodeId, names_extra_start: i32):
+    mut fn set_call_named_args(call_node: NodeId, names_extra_start: i32):
         self.state.call_named_args.insert(call_node as i32, names_extra_start)
 
     fn get_call_named_arg(call_node: NodeId, arg_idx: i32) -> i32:
@@ -2130,7 +2130,7 @@ impl AstPool:
     fn has_call_named_args(call_node: NodeId) -> i32:
         if self.state.call_named_args.contains(call_node as i32): 1 else: 0
 
-    fn add_type_meta(node: NodeId, derive_start: i32, derive_count: i32):
+    mut fn add_type_meta(node: NodeId, derive_start: i32, derive_count: i32):
         let idx = self.state.type_meta.len() as i32
         self.state.type_meta.push(node as i32)
         self.state.type_meta.push(derive_start)
@@ -2149,7 +2149,7 @@ impl AstPool:
     fn type_meta_derive_count(meta: i32) -> i32:
         self.state.type_meta[(meta + 2)]
 
-    fn add_pattern_qualifier(node: NodeId, type_sym: i32):
+    mut fn add_pattern_qualifier(node: NodeId, type_sym: i32):
         let idx = self.state.pattern_qualifiers.len() as i32
         self.state.pattern_qualifiers.push(node as i32)
         self.state.pattern_qualifiers.push(type_sym)
@@ -2161,7 +2161,7 @@ impl AstPool:
             return self.state.pattern_qualifiers[(opt.unwrap() + 1)]
         0
 
-    fn mark_must_use_type(node: NodeId):
+    mut fn mark_must_use_type(node: NodeId):
         self.state.must_use_type_nodes.push(node as i32)
         self.state.must_use_type_set.insert(node as i32, 1)
 
@@ -2169,7 +2169,7 @@ impl AstPool:
         if self.state.must_use_type_set.contains(node as i32): return 1
         0
 
-    fn mark_no_await_guard_type(node: NodeId):
+    mut fn mark_no_await_guard_type(node: NodeId):
         self.state.no_await_guard_type_nodes.push(node as i32)
         self.state.no_await_guard_type_set.insert(node as i32, 1)
 
@@ -2177,7 +2177,7 @@ impl AstPool:
         if self.state.no_await_guard_type_set.contains(node as i32): return 1
         0
 
-    fn mark_no_alloc_fn(node: NodeId):
+    mut fn mark_no_alloc_fn(node: NodeId):
         self.state.no_alloc_fn_nodes.push(node as i32)
         self.state.no_alloc_fn_set.insert(node as i32, 1)
 
@@ -2185,7 +2185,7 @@ impl AstPool:
         if self.state.no_alloc_fn_set.contains(node as i32): return 1
         0
 
-    fn mark_fn_target_arch(node: NodeId, arch_sym: i32):
+    mut fn mark_fn_target_arch(node: NodeId, arch_sym: i32):
         self.state.fn_target_arch.insert(node as i32, arch_sym)
 
     // Returns the @[target("arch")] arch name sym for a fn node, or 0 if none.
@@ -2194,10 +2194,10 @@ impl AstPool:
         if v.is_some(): v.unwrap() else: 0
 
     // §16.11: mark an NK_TYPE_FN/NK_TYPE_EXTERN_FN node as `unsafe fn(...)`.
-    fn mark_unsafe_fn_type(node: NodeId):
+    mut fn mark_unsafe_fn_type(node: NodeId):
         self.state.unsafe_fn_type_nodes.insert(node as i32, 1)
 
-    fn mark_variadic_fn_type(node: NodeId):
+    mut fn mark_variadic_fn_type(node: NodeId):
         self.state.variadic_fn_type_nodes.insert(node as i32, 1)
 
     fn is_variadic_fn_type_node(node: NodeId) -> bool: self.state.variadic_fn_type_nodes.contains(node as i32)
@@ -2206,7 +2206,7 @@ impl AstPool:
         if self.state.unsafe_fn_type_nodes.contains(node as i32): return 1
         0
 
-    fn mark_iter_of_self_fn(node: NodeId):
+    mut fn mark_iter_of_self_fn(node: NodeId):
         self.state.iter_of_self_fn_nodes.push(node as i32)
         self.state.iter_of_self_fn_set.insert(node as i32, 1)
 
@@ -2214,7 +2214,7 @@ impl AstPool:
         if self.state.iter_of_self_fn_set.contains(node as i32): return 1
         0
 
-    fn mark_sealed_trait(node: NodeId):
+    mut fn mark_sealed_trait(node: NodeId):
         self.state.sealed_trait_nodes.push(node as i32)
         self.state.sealed_trait_set.insert(node as i32, 1)
 
@@ -2222,7 +2222,7 @@ impl AstPool:
         if self.state.sealed_trait_set.contains(node as i32): return 1
         0
 
-    fn mark_generated_debug_type(type_sym: i32):
+    mut fn mark_generated_debug_type(type_sym: i32):
         if not self.is_generated_debug_type(type_sym):
             self.state.generated_debug_type_syms.push(type_sym)
 
@@ -2232,7 +2232,7 @@ impl AstPool:
                 return true
         false
 
-    fn mark_extend_impl(node: NodeId):
+    mut fn mark_extend_impl(node: NodeId):
         self.state.extend_impl_nodes.push(node as i32)
         self.state.extend_impl_set.insert(node as i32, 1)
 
@@ -2240,7 +2240,7 @@ impl AstPool:
         if self.state.extend_impl_set.contains(node as i32): return 1
         0
 
-    fn mark_comptime_decl(node: NodeId):
+    mut fn mark_comptime_decl(node: NodeId):
         self.state.comptime_decl_nodes.push(node as i32)
         self.state.comptime_decl_set.insert(node as i32, 1)
 
@@ -2248,11 +2248,11 @@ impl AstPool:
         if self.state.comptime_decl_set.contains(node as i32): return 1
         0
 
-    fn mark_const_decl(node: NodeId):
+    mut fn mark_const_decl(node: NodeId):
         self.state.const_decl_nodes.push(node as i32)
         self.state.const_decl_set.insert(node as i32, 1)
 
-    fn set_untyped_const_init(decl: NodeId, init: NodeId):
+    mut fn set_untyped_const_init(decl: NodeId, init: NodeId):
         self.state.untyped_const_inits.insert(decl as i32, init as i32)
 
     fn untyped_const_init_of(decl: NodeId) -> i32:
@@ -2263,7 +2263,7 @@ impl AstPool:
         if self.state.const_decl_set.contains(node as i32): return 1
         0
 
-    fn mark_move_closure(node: NodeId):
+    mut fn mark_move_closure(node: NodeId):
         self.state.move_closure_nodes.push(node as i32)
         self.state.move_closure_set.insert(node as i32, 1)
 
@@ -2271,18 +2271,18 @@ impl AstPool:
         if self.state.move_closure_set.contains(node as i32): return 1
         0
 
-    fn mark_mut_arg(node: NodeId):
+    mut fn mark_mut_arg(node: NodeId):
         self.state.mut_arg_nodes.push(node as i32)
         self.state.mut_arg_set.insert(node as i32, 1)
 
     fn is_mut_arg(node: NodeId) -> bool: self.state.mut_arg_set.contains(node as i32)
 
-    fn mark_non_escaping_closure(node: NodeId):
+    mut fn mark_non_escaping_closure(node: NodeId):
         if self.state.non_escaping_closure_set.contains(node as i32): return
         self.state.non_escaping_closure_nodes.push(node as i32)
         self.state.non_escaping_closure_set.insert(node as i32, 1)
 
-    fn unmark_non_escaping_closure(node: NodeId):
+    mut fn unmark_non_escaping_closure(node: NodeId):
         self.state.non_escaping_closure_set.remove(node as i32)
         for i in 0..self.state.non_escaping_closure_nodes.len():
             if self.state.non_escaping_closure_nodes[i] == node as i32:
@@ -2293,7 +2293,7 @@ impl AstPool:
         if self.state.non_escaping_closure_set.contains(node as i32): return 1
         0
 
-    fn mark_by_place_closure(node: NodeId):
+    mut fn mark_by_place_closure(node: NodeId):
         self.state.by_place_closure_nodes.push(node as i32)
         self.state.by_place_closure_set.insert(node as i32, 1)
 
@@ -2303,14 +2303,14 @@ impl AstPool:
 
     // §12 (#1508): the type node of a closure's `-> T`, which Sema checks
     // like a declared return type; 0 when the closure states none.
-    fn set_closure_ret_type(node: NodeId, type_node: i32):
+    mut fn set_closure_ret_type(node: NodeId, type_node: i32):
         self.state.closure_ret_type_nodes.push(node as i32)
         self.state.closure_ret_type_nodes.push(type_node)
         self.state.closure_ret_type_map.insert(node as i32, type_node)
 
     fn closure_ret_type(node: NodeId) -> i32: self.state.closure_ret_type_map.get(node as i32) ?? 0
 
-    fn add_where_meta(fn_node: NodeId, extra_start: i32, clause_count: i32):
+    mut fn add_where_meta(fn_node: NodeId, extra_start: i32, clause_count: i32):
         let idx = self.state.where_meta.len() as i32
         self.state.where_meta.push(fn_node as i32)
         self.state.where_meta.push(extra_start)
@@ -2323,7 +2323,7 @@ impl AstPool:
             return opt.unwrap()
         -1
 
-    fn add_impl_type_params(impl_node: NodeId, tp_start: i32, tp_count: i32):
+    mut fn add_impl_type_params(impl_node: NodeId, tp_start: i32, tp_count: i32):
         let idx = self.state.impl_type_params.len() as i32
         self.state.impl_type_params.push(impl_node as i32)
         self.state.impl_type_params.push(tp_start)
@@ -2339,7 +2339,7 @@ impl AstPool:
     fn impl_type_params_start(meta: i32) -> i32: self.state.impl_type_params[(meta + 1)]
     fn impl_type_params_count(meta: i32) -> i32: self.state.impl_type_params[(meta + 2)]
 
-    fn add_impl_target_type_node(impl_node: NodeId, type_node: NodeId):
+    mut fn add_impl_target_type_node(impl_node: NodeId, type_node: NodeId):
         self.state.impl_target_type_nodes.push(impl_node as i32)
         self.state.impl_target_type_nodes.push(type_node as i32)
         self.state.impl_target_type_nodes_map.insert(impl_node as i32, type_node as i32)
@@ -2355,7 +2355,7 @@ impl AstPool:
             i = i + 2
         0 as NodeId
 
-    fn add_impl_trait_type_args(impl_node: NodeId, args_start: i32, args_count: i32):
+    mut fn add_impl_trait_type_args(impl_node: NodeId, args_start: i32, args_count: i32):
         let idx = self.state.impl_trait_type_args.len() as i32
         self.state.impl_trait_type_args.push(impl_node as i32)
         self.state.impl_trait_type_args.push(args_start)
@@ -2371,7 +2371,7 @@ impl AstPool:
     // A type-parameter bound's trait arguments, keyed by the extra index
     // that holds the bound's trait symbol: `G: Gen[T]` records `[T]`, so a
     // call can infer T from the type G is bound to (#1732).
-    fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: List[i32]):
+    mut fn add_type_bound_args(bound_extra_idx: i32, arg_nodes: List[i32]):
         let idx = self.state.type_bound_args.len() as i32
         self.state.type_bound_args.push(bound_extra_idx)
         self.state.type_bound_args.push(self.state.type_bound_arg_nodes.len() as i32)
@@ -2396,13 +2396,13 @@ impl AstPool:
     fn fn_param_patterns_len() -> i32:
         self.state.fn_param_patterns.len() as i32
 
-    fn add_fn_param_pattern_value(node: NodeId) -> Unit:
+    mut fn add_fn_param_pattern_value(node: NodeId) -> Unit:
         self.state.fn_param_patterns.push(node as i32)
 
     fn fn_param_pattern_value(idx: i32) -> NodeId:
         (self.state.fn_param_patterns[idx]) as NodeId
 
-    fn add_fn_param_pattern_meta(node: NodeId, start: i32, count: i32):
+    mut fn add_fn_param_pattern_meta(node: NodeId, start: i32, count: i32):
         let idx = self.state.fn_param_pattern_meta.len() as i32
         self.state.fn_param_pattern_meta.push(node as i32)
         self.state.fn_param_pattern_meta.push(start)
@@ -2421,7 +2421,7 @@ impl AstPool:
     fn fn_param_pattern_meta_count(meta: i32) -> i32:
         self.state.fn_param_pattern_meta[(meta + 2)]
 
-    fn add_for_meta(node: NodeId, index_binding: i32, label: i32):
+    mut fn add_for_meta(node: NodeId, index_binding: i32, label: i32):
         let idx = self.state.for_meta.len() as i32
         self.state.for_meta.push(node as i32)
         self.state.for_meta.push(index_binding)
@@ -2443,7 +2443,7 @@ impl AstPool:
     // §13.6a: a one-clause `for` over an Option or Result is a comprehension,
     // not a loop, and only Sema knows the iterable's type. The parser records
     // the comprehension reading beside the loop; Sema adopts it for a carrier.
-    fn add_for_carrier_alt(node: NodeId, alt: NodeId):
+    mut fn add_for_carrier_alt(node: NodeId, alt: NodeId):
         self.state.for_carrier_alts.push(node)
         self.state.for_carrier_alts.push(alt)
         self.state.for_carrier_alt_map.insert(node, alt)
@@ -2453,7 +2453,7 @@ impl AstPool:
     // The one-clause reading of `for PAT in EXPR: BODY` (build_comprehension_match
     // over one clause, the yield form when BODY is exactly `yield E`), built
     // over this for node's own children.
-    fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
+    mut fn build_for_carrier_alt(for_node: i32, binding_is_pat: bool, payload_sym: i32, fail_sym: i32) -> NodeId:
         let start = self.get_start(for_node)
         let binding = self.get_data0(for_node)
         let pats: List[i32] = List.new()
@@ -2480,7 +2480,7 @@ impl AstPool:
     // the failure arm `{}` in the statement form. The innermost value is
     // `body`, wrapped in `_Payload(...)` in the yield form. Sema resolves the
     // placeholders against each clause's carrier.
-    fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &List[i32], pats: &List[i32], exprs: &List[i32], kinds: &List[i32], body: i32, has_yield: bool) -> NodeId:
+    mut fn build_comprehension_match(start: i32, end: i32, payload_sym: i32, empty_sym: i32, fail_syms: &List[i32], pats: &List[i32], exprs: &List[i32], kinds: &List[i32], body: i32, has_yield: bool) -> NodeId:
         var inner = body
         if has_yield:
             let some_callee = self.add_node(NodeKind.NK_IDENT, start, start, payload_sym, 0, 0)
@@ -2511,7 +2511,7 @@ impl AstPool:
             bi = bi - 1
         inner
 
-    fn add_block_meta(node: NodeId, label: i32):
+    mut fn add_block_meta(node: NodeId, label: i32):
         let idx = self.state.block_meta.len() as i32
         self.state.block_meta.push(node as i32)
         self.state.block_meta.push(label)
@@ -2593,10 +2593,10 @@ impl AstPool:
     // to overlap numerically (#660: interning one new symbol in Sema.w
     // flipped a plain for-binding in CodegenTraits.w into a pattern match,
     // unbinding the loop variable).
-    fn mark_pattern_binding(parent: NodeId, binding: i32):
+    mut fn mark_pattern_binding(parent: NodeId, binding: i32):
         self.mark_pattern_binding_pair(ast_pattern_binding_key(parent as i32, binding))
 
-    fn mark_pattern_binding_pair(pair: i64):
+    mut fn mark_pattern_binding_pair(pair: i64):
         if self.state.pattern_binding_keys.contains(pair):
             return
         self.state.pattern_binding_keys.insert(pair, 1)

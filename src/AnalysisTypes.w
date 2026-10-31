@@ -220,12 +220,12 @@ impl AnalysisFact:
         }
 
 impl AnalysisReport:
-    fn add(fact: AnalysisFact): self.facts.push(move fact)
-    fn fail(message: &str): self.violations.push(with_str_clone_ref(message))
-    fn note(message: &str): self.notes.push(with_str_clone_ref(message))
+    mut fn add(fact: AnalysisFact): self.facts.push(move fact)
+    mut fn fail(message: &str): self.violations.push(with_str_clone_ref(message))
+    mut fn note(message: &str): self.notes.push(with_str_clone_ref(message))
     fn ok(): self.violations.len() == 0
 
-    fn merge(other: &AnalysisReport):
+    mut fn merge(other: &AnalysisReport):
         for i in 0..other.facts.len():
             let fact = other.facts[i]
             self.facts.push(fact.owned_copy())

@@ -26,7 +26,7 @@ fn observe_after_mutation() -> Probe[i32]:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 43)
     let carrier: Probe[&i32] = Probe.Good(map.get(1).unwrap())
-    let view = carrier?
+    let view: &i32 = carrier?
     map.clear()
     Probe.Good(view)
 

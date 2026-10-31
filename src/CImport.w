@@ -19472,7 +19472,7 @@ impl CiGotoCfgContext:
             return
         self.state.current = block
 
-    fn append_stmt(stmts: CiStmtPool, stmt_id: CiStmtId) -> Unit:
+    mut fn append_stmt(stmts: CiStmtPool, stmt_id: CiStmtId) -> Unit:
         if not self.state.ok or self.state.current < 0 or stmt_id == 0:
             return
         let kind = stmts.kind(stmt_id)
@@ -19561,17 +19561,17 @@ fn ci_goto_cfg_target_label_from_goto(session: i64, cursor: i32) -> str:
     with_ci_cursor_spelling(session, cursor)
 
 impl CiGotoCfgContext:
-    fn push_break_target(target: i32) -> Unit:
+    mut fn push_break_target(target: i32) -> Unit:
         self.state.break_targets.push(target)
 
-    fn pop_break_target():
+    mut fn pop_break_target():
         if self.state.break_targets.len() > 0:
             let _ = self.state.break_targets.pop()
 
-    fn push_continue_target(target: i32) -> Unit:
+    mut fn push_continue_target(target: i32) -> Unit:
         self.state.continue_targets.push(target)
 
-    fn pop_continue_target():
+    mut fn pop_continue_target():
         if self.state.continue_targets.len() > 0:
             let _ = self.state.continue_targets.pop()
 
@@ -19876,7 +19876,7 @@ fn ci_goto_switch_case_new() -> CiGotoSwitchCase:
     CiGotoSwitchCase { state: ptr }
 
 impl CiGotoSwitchCase:
-    fn record_case(value: CiExprId, block: i32) -> Unit:
+    mut fn record_case(value: CiExprId, block: i32) -> Unit:
         self.state.values.push(value as i32)
         self.state.blocks.push(block)
 
@@ -20194,7 +20194,7 @@ impl CiStmtPool:
         self.block(start, ids.len() as i32)
 
 impl CiStackEmitContext:
-    mut fn leaf(stmts: CiStmtPool, block: i32) -> CiStmtId:
+    fn leaf(stmts: CiStmtPool, block: i32) -> CiStmtId:
         let ids: List[i32] = List.new()
         var i: i64 = 0
         while i < self.cfg.stmt_ids.len():

@@ -101,7 +101,7 @@ impl Codegen:
             let cg_sym = self.codegen_sym_for_sema_sym(raw_sym)
             self.gen_function_mir_mono(cg_sym, 0, body)
 
-    fn mir_type_to_live_sema_type(sema_ty: i32) -> i32:
+    mut fn mir_type_to_live_sema_type(sema_ty: i32) -> i32:
         if sema_ty <= 0:
             return 0
         let resolved = self.mir_resolve_alias_at(sema_ty)
@@ -518,7 +518,7 @@ impl Codegen:
             return true
         false
 
-    fn mir_mark_memory_local_for_place(body: &MirBody, place_id: i32):
+    mut fn mir_mark_memory_local_for_place(body: &MirBody, place_id: i32):
         if place_id < 0 or place_id >= body.place_locals.len():
             return
         let local_id = body.place_locals[place_id]
@@ -870,7 +870,7 @@ impl Codegen:
         let param_start = self.pool.fn_meta_param_start(meta)
         fn_param_is_ref_self(self.pool.fn_param_flags(param_start, 0)) != 0
 
-    fn mir_mark_generic_ref_self_receiver_memory(body: &MirBody, callee_operand: i32, args_id: i32, scan: MirValueScan):
+    mut fn mir_mark_generic_ref_self_receiver_memory(body: &MirBody, callee_operand: i32, args_id: i32, scan: MirValueScan):
         if not self.mir_call_has_generic_ref_self_param0(body, callee_operand, args_id):
             return
         let start = body.call_arg_starts[args_id]
@@ -895,7 +895,7 @@ impl Codegen:
         for fi in 0..count:
             self.mir_scan_operand_for_value_local(body, body.agg_field_operands[(start + fi)], use_bb, use_order, scan)
 
-    fn mir_scan_rvalue_for_value_local(body: &MirBody, rval_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
+    mut fn mir_scan_rvalue_for_value_local(body: &MirBody, rval_id: i32, use_bb: i32, use_order: i32, scan: MirValueScan):
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return
         let kind = body.rval_kinds[rval_id]
@@ -1084,7 +1084,7 @@ impl Codegen:
             self.mir_local_types.insert(local_id, llvm_ty)
         llvm_ty
 
-    mut fn mir_try_init_const_local(body: &MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
+    fn mir_try_init_const_local(body: &MirBody, local_id: i32, ptr: i64, llvm_ty: i64) -> bool:
         if local_id < 0 or local_id >= body.local_names.len():
             return false
         let sym = body.local_names[local_id]
@@ -2264,7 +2264,7 @@ impl Codegen:
         let kind = self.mir_type_kind_at(resolved)
         kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF
 
-    mut fn mir_coerce_value_to_sema_type(val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
+    fn mir_coerce_value_to_sema_type(val: i64, target_ty: i64, target_sema_ty: i32, src_unsigned: bool) -> i64:
         if val == 0 or target_ty == 0:
             return val
         let val_ty = wl_type_of(val)
@@ -2504,7 +2504,7 @@ impl Codegen:
         0
 
     // The live Sema type a comparison's operand type names, alias-resolved.
-    fn mir_eq_live_type(sema_ty: i32) -> i32:
+    mut fn mir_eq_live_type(sema_ty: i32) -> i32:
         let live = self.mir_type_to_live_sema_type(sema_ty)
         self.sema.resolve_alias((if live > 0: live else: sema_ty) as TypeId) as i32
 
@@ -2639,7 +2639,7 @@ impl Codegen:
 
     // Continue only where `equal` holds: the walk returns false at the first
     // part that differs.
-    mut fn mir_eq_require(equal: i64, differ: i64):
+    fn mir_eq_require(equal: i64, differ: i64):
         let next = wl_append_bb(self.context, self.current_function, "eq.next")
         wl_build_cond_br(self.builder, equal, next, differ)
         wl_position_at_end(self.builder, next)
@@ -2941,14 +2941,14 @@ impl Codegen:
         walk
 
     // Continue only where `order` is 0; otherwise it is the walk's answer.
-    mut fn mir_cmp_require(order: i64, decided: i64, result_slot: i64):
+    fn mir_cmp_require(order: i64, decided: i64, result_slot: i64):
         wl_build_store(self.builder, order, result_slot)
         let next = wl_append_bb(self.context, self.current_function, "cmp.next")
         wl_build_cond_br(self.builder, wl_build_icmp(self.builder, wl_int_ne(), order, wl_const_int(wl_type_of(order), 0, 0)), decided, next)
         wl_position_at_end(self.builder, next)
 
     // Decide the walk with a constant answer.
-    mut fn mir_cmp_decide(answer: i64, decided: i64, result_slot: i64):
+    fn mir_cmp_decide(answer: i64, decided: i64, result_slot: i64):
         wl_build_store(self.builder, wl_const_int(wl_i32_type(self.context), answer, 1), result_slot)
         wl_build_br(self.builder, decided)
 
@@ -3099,7 +3099,7 @@ impl Codegen:
     // integer, a bool, a raw pointer); 1, as a `str`; 2, by the functions
     // generated here. The hash is the runtime's keyed hasher, fed the key's
     // parts in the order its `==` compares them, so equal keys hash alike.
-    fn mir_map_key_kind(key_sema: i32) -> i32:
+    mut fn mir_map_key_kind(key_sema: i32) -> i32:
         if key_sema <= 0:
             return 0
         let resolved = self.mir_eq_live_type(key_sema)
@@ -3482,7 +3482,7 @@ impl Codegen:
         let sign_fill = wl_build_ashr(self.builder, lhs, sign_count)
         wl_build_select(self.builder, too_big, sign_fill, shifted)
 
-    fn mir_build_saturating_bin_op(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
+    mut fn mir_build_saturating_bin_op(op: i32, l: i64, r: i64, wider_ty: i64, is_unsigned: bool) -> i64:
         if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT or op == BinaryOp.OP_SUB or op == BinaryOp.OP_SUB_SAT:
             let sat_width = wl_get_int_type_width(wider_ty)
             let sat_prefix = if op == BinaryOp.OP_ADD or op == BinaryOp.OP_ADD_SAT: if is_unsigned: "llvm.uadd.sat.i" else: "llvm.sadd.sat.i" else if is_unsigned: "llvm.usub.sat.i" else: "llvm.ssub.sat.i"
@@ -4044,7 +4044,7 @@ impl Codegen:
     // discriminant (D65). Codegen kept its own table for repr enums and used
     // the index for every other enum, which WITH_DEBUG_PERMUTE_TAGS showed
     // disagreeing with the tags Sema hands out.
-    fn mir_enum_variant_discriminant(enum_sema_ty: i32, variant_idx: i32) -> i64:
+    mut fn mir_enum_variant_discriminant(enum_sema_ty: i32, variant_idx: i32) -> i64:
         if enum_sema_ty <= 0 or variant_idx < 0:
             sema_phase_bug(f"BUG: a tag asked of type {enum_sema_ty} variant {variant_idx}")
         let live = self.mir_type_to_live_sema_type(enum_sema_ty)
@@ -4091,7 +4091,7 @@ impl Codegen:
     // One 64-bit word of a 128-bit integer: the runtime's 128-bit formatters
     // take the low and high words, so no target's i128 convention is
     // involved (#1922).
-    mut fn int128_word(val: i64, high: bool) -> i64:
+    fn int128_word(val: i64, high: bool) -> i64:
         let i64_ty = wl_i64_type(self.context)
         if not high: return wl_build_trunc(self.builder, val, i64_ty)
         let shifted = wl_build_lshr(self.builder, val, wl_const_int(wl_type_of(val), 64, 0))
@@ -6410,7 +6410,7 @@ impl Codegen:
         wl_position_at_end(self.builder, done_bb)
 
     // A runtime helper with the runtime's real prototype (rt/rt_core.w).
-    mut fn mir_list_helper_call(name: &str, params: &List[i64], args: &List[i64]) -> i64:
+    fn mir_list_helper_call(name: &str, params: &List[i64], args: &List[i64]) -> i64:
         var f = wl_get_named_function(self.llmod, name)
         let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), params.len() as i32, 0)
         if f == 0:
@@ -7516,7 +7516,7 @@ impl Codegen:
     // including inter-field struct padding, unlike an aggregate zeroinitializer
     // store. Used so a reset-on-move sentinel is reliably all-zero for the guarded
     // drop's rt_value_is_zero check regardless of struct layout.
-    fn emit_memset_zero(ptr: i64, size_bytes: i64) -> Unit:
+    mut fn emit_memset_zero(ptr: i64, size_bytes: i64) -> Unit:
         let ms_sym = self.intern.intern("llvm.memset.p0.i64")
         let ms_func = self.ensure_llvm_memset_declared()
         let ms_ft = self.fn_fn_types.get(ms_sym).unwrap() as i64
@@ -7822,7 +7822,7 @@ impl Codegen:
             return 0
         self.sema.get_generic_inst_arg(resolved, 0)
 
-    fn mir_default_unreachable_bb_value() -> i64:
+    mut fn mir_default_unreachable_bb_value() -> i64:
         if self.mir_default_unreachable_bbs.len() > 0:
             return self.mir_default_unreachable_bbs[0]
         let bb = wl_append_bb(self.context, self.current_function, "mir.default.unreachable")
@@ -8580,7 +8580,7 @@ impl Codegen:
 
     // #1810: the `&T` of a runtime slot's address. A thin reference is the
     // address; a `&str` view is `{ptr, len}` read out of the slot.
-    mut fn mir_ref_from_slot_ptr(slot_ptr: i64, ref_sema_ty: i32) -> i64:
+    fn mir_ref_from_slot_ptr(slot_ptr: i64, ref_sema_ty: i32) -> i64:
         if self.sema.type_layout_is_str_view(ref_sema_ty):
             return wl_build_load(self.builder, self.str_llvm_type(), slot_ptr)
         slot_ptr
@@ -8930,7 +8930,7 @@ impl Codegen:
             return 0
         self.mir_sema_type_to_llvm(payload_sema)
 
-    mut fn mir_enum_payload_sema_type(enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i32:
+    fn mir_enum_payload_sema_type(enum_sema_ty: i32, variant_idx: i32, field_idx: i32) -> i32:
         if enum_sema_ty <= 0 or variant_idx < 0 or field_idx < 0:
             return 0
         let builtin_payload = self.mir_builtin_variant_payload_sema_type(enum_sema_ty, variant_idx)
@@ -17221,7 +17221,7 @@ impl Codegen:
 
     // ── While loop ────────────────────────────────────────────────────
 
-    mut fn build_variant_payload_val(payload_ty: i64, args: &List[i64], arg_count: i32) -> i64:
+    fn build_variant_payload_val(payload_ty: i64, args: &List[i64], arg_count: i32) -> i64:
         if arg_count <= 0:
             return wl_get_undef(wl_i32_type(self.context))
         if payload_ty == 0:
@@ -17240,7 +17240,7 @@ impl Codegen:
             return payload
         self.coerce_value_to_type(args[0], payload_ty)
 
-    mut fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
+    fn gen_enum_variant_call_val(enum_owner_sym: i32, variant_sym: i32, args: &List[i64], arg_count: i32) -> i64:
         let variant_name = self.intern.resolve(variant_sym)
         for ei in 0..self.enum_llvm_types.len():
             let enum_ty: i64 = self.enum_llvm_types[ei]
@@ -17356,7 +17356,7 @@ impl Codegen:
     // drop(f) for a callable value at `pair_ptr`: an owned cell is handed to
     // its drop fn (which drops the captures and frees the cell) and the
     // context word is cleared so a second drop of the same place is a no-op.
-    mut fn mir_emit_closure_drop_ptr(pair_ptr: i64):
+    fn mir_emit_closure_drop_ptr(pair_ptr: i64):
         let ptr_ty = wl_ptr_type(self.context)
         let i64_ty = wl_i64_type(self.context)
         let pair_ty = self.closure_pair_llvm_type()
@@ -17441,7 +17441,7 @@ impl Codegen:
     // indirect local (a by-place capture or a place parameter) holds a pointer
     // to its value in its slot; the capture takes that pointer, not the slot.
     // The storage a by-place capture of `parent`'s local `local_id` points at.
-    mut fn mir_capture_source_ptr(parent: &MirBody, local_id: i32) -> i64:
+    fn mir_capture_source_ptr(parent: &MirBody, local_id: i32) -> i64:
         if local_id < 0:
             return 0
         let slot_opt = self.mir_local_ptrs.get(local_id)
@@ -18104,7 +18104,7 @@ impl Codegen:
 
     // ── Async expressions ─────────────────────────────────────────────
 
-    fn collect_captures(node: i32):
+    mut fn collect_captures(node: i32):
         // Walk the AST and collect captured locals into self.async_block_captures.
         if node == 0: return
         let kind = self.pool.kind(node)
@@ -18691,7 +18691,7 @@ impl Codegen:
         let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
         if owner != 0 and self.sema.concrete_specialization_by_sym.contains(owner): owner else: 0
 
-    fn sema_type_level_arg(type_node: i32) -> i32:
+    mut fn sema_type_level_arg(type_node: i32) -> i32:
         let owner = if self.current_body_owner_sym != 0: self.sema.pool_lookup_symbol(self.intern.resolve(self.current_body_owner_sym)) else: 0
         self.sema.type_level_arg_in_body(owner, type_node)
 

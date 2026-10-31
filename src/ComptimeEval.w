@@ -1852,7 +1852,7 @@ impl ComptimeEvaluator:
                 return comptime_value_enum(resolved as i32, self.sema.syms.ok, start, 1)
         self.unsupported_default_value(resolved as i32, node)
 
-    fn comptime_fn_return_type(fn_sym: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> i32:
+    mut fn comptime_fn_return_type(fn_sym: i32, tp_syms: &List[i32], tp_tys: &List[i32]) -> i32:
         let sig_idx = self.sema.get_sig(fn_sym)
         if sig_idx < 0:
             return 0
@@ -2060,10 +2060,10 @@ impl ComptimeEvaluator:
             return 0
         1
 
-    fn push_scope() -> Unit:
+    mut fn push_scope() -> Unit:
         self.scope_starts.push(self.slot_syms.len() as i32)
 
-    fn pop_scope():
+    mut fn pop_scope():
         if self.scope_starts.len() == 0:
             return
         let start = self.scope_starts[(self.scope_starts.len() - 1)]
@@ -2073,7 +2073,7 @@ impl ComptimeEvaluator:
             self.slot_muts.pop()
         self.scope_starts.pop()
 
-    fn bind_value(sym: i32, value: ComptimeValue, is_mut: i32) -> Unit:
+    mut fn bind_value(sym: i32, value: ComptimeValue, is_mut: i32) -> Unit:
         self.slot_syms.push(sym)
         self.slot_values.push(value)
         self.slot_muts.push(is_mut)
@@ -2083,7 +2083,7 @@ impl ComptimeEvaluator:
         with self.slot_values.slot(slot_index) as mut slot:
             slot.set(move value)
 
-    fn record_runtime_env_set(name: &str) -> Unit:
+    mut fn record_runtime_env_set(name: &str) -> Unit:
         for i in 0..self.runtime_env_names.len():
             if self.runtime_env_names[i] == name:
                 return
@@ -2171,7 +2171,7 @@ impl ComptimeEvaluator:
                 parts.push(with_str_clone_ref(item.text))
         parts
 
-    fn effect_tool_identity(parts: &List[str]) -> str:
+    mut fn effect_tool_identity(parts: &List[str]) -> str:
         if parts.len() == 0:
             return ""
         let exe = parts[0]
@@ -2439,7 +2439,7 @@ impl ComptimeEvaluator:
                 return text
         with_str_clone_ref(self.sema.source_text)
 
-    fn push_extra_value(value: ComptimeValue) -> Unit:
+    mut fn push_extra_value(value: ComptimeValue) -> Unit:
         self.extra_values.push(value)
 
     fn binding_sym(node: i32) -> i32:
@@ -2452,16 +2452,16 @@ impl ComptimeEvaluator:
             return self.binding_sym(self.ast.get_data0(node))
         0
 
-    fn copy_extra_slice(start: i32, count: i32) -> i32:
+    mut fn copy_extra_slice(start: i32, count: i32) -> i32:
         let new_start = self.extra_values.len() as i32
         for i in 0..count:
             self.extra_values.push(self.extra_snapshot_value_at((start + i) as i64))
         new_start
 
-    fn copy_list_snapshot(value: &ComptimeValue) -> i32:
+    mut fn copy_list_snapshot(value: &ComptimeValue) -> i32:
         self.copy_extra_slice(value.extra_start, value.extra_count)
 
-    fn copy_map_snapshot(value: &ComptimeValue) -> i32:
+    mut fn copy_map_snapshot(value: &ComptimeValue) -> i32:
         self.copy_extra_slice(value.extra_start, value.extra_count * 2)
 
     mut fn rebind_collection_receiver(recv_node: i32, value: ComptimeValue, node: i32) -> ComptimeControl:
@@ -2743,7 +2743,7 @@ impl ComptimeEvaluator:
             return self.sema.ty_i64 as i32
         fallback
 
-    fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
+    mut fn comptime_value_semantic_type(value: &ComptimeValue) -> i32:
         if value.type_id != 0:
             return value.type_id
         if value.kind == ComptimeValueKind.CV_INT:
@@ -3669,7 +3669,7 @@ impl ComptimeEvaluator:
             arg_types.push(self.comptime_value_semantic_type(arg_signal.value))
             arg_values.push(move arg_signal.value)
 
-        let resolved_recv = self.sema.auto_deref_method_type_frozen(recv_value.type_id as TypeId, method)
+        let resolved_recv = self.sema.auto_deref_method_type(recv_value.type_id as TypeId, method, 0, 0)
         let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
         if owner == 0:
             return self.fail(node, "method receiver type is unavailable in comptime")
@@ -3788,7 +3788,7 @@ impl ComptimeEvaluator:
         if self.sema.pipeline_carrier_kinds.contains(node):
             threads_receiver = self.sema.pipeline_carrier_kinds.get(node).unwrap()
         else if recv.type_id != 0:
-            let resolved_recv = self.sema.auto_deref_method_type_frozen(recv.type_id as TypeId, method)
+            let resolved_recv = self.sema.auto_deref_method_type(recv.type_id as TypeId, method, 0, 0)
             let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
             let call_ret = self.sema.builtin_intrinsic_method_return_type(resolved_recv as i32, owner, method)
             if call_ret != 0 and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void and self.sema.pipeline_method_has_mut_receiver(node, recv.type_id, method) != 0:
@@ -4057,7 +4057,7 @@ impl ComptimeEvaluator:
             self.extra_values.push(comptime_value_str(values[i]))
         comptime_value_list(list_type, start, values.len() as i32)
 
-    fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
+    mut fn str_list_value_with_type(list_type: i32, values: &List[str]) -> ComptimeValue:
         let start = self.extra_values.len() as i32
         for i in 0..values.len():
             self.extra_values.push(comptime_value_str(values[i]))
@@ -8745,7 +8745,7 @@ impl ComptimeEvaluator:
         self.unsupported(node)
 
 impl Sema:
-    mut fn force_eval_comptime_expr(node: i32) -> i32:
+    fn force_eval_comptime_expr(node: i32) -> i32:
         let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
         comptime_value_is_valid(value)
 

@@ -7,7 +7,7 @@
 fn main:
     var v: List[i32] = List.new()
     v.push(1)
-    let r = first(v)
+    let r: &i32 = first(v)
     v.push(2)
     print(f"{r}")
 fn first(xs: &List[i32]) -> &i32: &xs[0]

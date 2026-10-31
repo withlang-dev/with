@@ -22,19 +22,19 @@ type ForeignPairState {
 fn foreign_pair_alternative_equal(a: &ForeignPairAlternative, b: &ForeignPairAlternative) -> bool:
     a.callback_type == b.callback_type and a.userdata_type == b.userdata_type and a.userdata_origin == b.userdata_origin and a.guard == b.guard and a.succeeded == b.succeeded
 
-fn foreign_pair_add(state: &ForeignPairState, alternative: ForeignPairAlternative):
+fn foreign_pair_add(mut state: ForeignPairState, alternative: ForeignPairAlternative):
     for i in 0..state.alternatives.len():
         if foreign_pair_alternative_equal(state.alternatives[i], alternative): return
     state.alternatives.push(alternative)
 
 fn foreign_pair_initial(defaults: bool) -> ForeignPairState:
-    let state = ForeignPairState { alternatives: List.new() }
+    var state = ForeignPairState { alternatives: List.new() }
     let ty: i32 = if defaults: 0 else: -1
     foreign_pair_add(state, ForeignPairAlternative { callback_type: ty, userdata_type: ty, userdata_origin: -1, guard: -1, succeeded: true })
     state
 
 fn foreign_pair_join(a: &ForeignPairState, b: &ForeignPairState) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: List.new() }
+    var result = ForeignPairState { alternatives: List.new() }
     for i in 0..a.alternatives.len(): foreign_pair_add(result, a.alternatives[i])
     for i in 0..b.alternatives.len(): foreign_pair_add(result, b.alternatives[i])
     result
@@ -52,7 +52,7 @@ fn foreign_pair_equal(a: &ForeignPairState, b: &ForeignPairState) -> bool:
 // contract explicitly supplies that guarantee. Otherwise both components
 // become unknown/incompatible and a modeled reset is required.
 fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i32, guard: i32, can_fail: bool, preserves_on_failure: bool) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: List.new() }
+    var result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let previous = &state.alternatives[i]
         foreign_pair_add(result, ForeignPairAlternative {
@@ -76,7 +76,7 @@ fn foreign_pair_set(state: &ForeignPairState, callback: bool, ty: i32, origin: i
     result
 
 fn foreign_pair_on_edge(state: &ForeignPairState, guard: i32, succeeded: bool) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: List.new() }
+    var result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         let alternative = &state.alternatives[i]
         if guard < 0 or alternative.guard != guard or alternative.succeeded == succeeded:
@@ -109,7 +109,7 @@ pub const FOREIGN_PAIR_CREATE: i32 = 6
 pub const FOREIGN_PAIR_UNKNOWN: i32 = 7
 
 fn foreign_pair_unknown(state: &ForeignPairState) -> ForeignPairState:
-    let result = ForeignPairState { alternatives: List.new() }
+    var result = ForeignPairState { alternatives: List.new() }
     for i in 0..state.alternatives.len():
         foreign_pair_add(result, ForeignPairAlternative { callback_type: -2, userdata_type: -3, userdata_origin: state.alternatives[i].userdata_origin, guard: -1, succeeded: true })
     result
@@ -122,7 +122,7 @@ fn foreign_pair_retains_any(state: &ForeignPairState) -> bool:
     false
 
 fn foreign_pair_absent() -> ForeignPairState:
-    let state = ForeignPairState { alternatives: List.new() }
+    var state = ForeignPairState { alternatives: List.new() }
     foreign_pair_add(state, ForeignPairAlternative { callback_type: -4, userdata_type: -4, userdata_origin: -1, guard: -1, succeeded: true })
     state
 

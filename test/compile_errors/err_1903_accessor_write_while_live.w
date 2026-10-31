@@ -13,6 +13,6 @@ fn peek() -> &Config: &CONFIG
 fn set(n: i32): CONFIG = Config { limit: n }
 
 fn main:
-    let d = peek()
+    let d: &Config = peek()
     set(6)
     print(d.limit)

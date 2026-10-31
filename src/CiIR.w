@@ -1200,7 +1200,7 @@ fn CiProject.new -> CiProject:
     }
 
 impl CiProject:
-    fn ensure_module(path: &str) -> i32:
+    mut fn ensure_module(path: &str) -> i32:
         var i: i32 = 0
         while i < self.module_paths.len():
             if self.module_paths[i] == path:

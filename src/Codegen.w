@@ -704,11 +704,11 @@ impl Codegen:
         self.analysis_enabled = 1
         self.analysis_query = with_str_clone_ref(query)
 
-    fn analysis_add(fact: AnalysisFact):
+    mut fn analysis_add(fact: AnalysisFact):
         if self.analysis_enabled != 0:
             self.analysis_report.add(move fact)
 
-    fn analysis_fail(message: &str):
+    mut fn analysis_fail(message: &str):
         if self.analysis_enabled != 0:
             self.analysis_report.fail(message)
 
@@ -806,7 +806,7 @@ impl Codegen:
     // emitted as LLVM void without sret means callers read a value the callee
     // never produces (#653 declaration shape). Extern, async (Task-wrapped),
     // generator, and sret signatures lower their returns deliberately.
-    fn audit_return_shape_contracts():
+    mut fn audit_return_shape_contracts():
         if self.analysis_enabled == 0:
             return
         for si in 0..self.sema.sig_names.len() as i32:
@@ -1039,14 +1039,14 @@ impl Codegen:
         if selected and share and not callee_is_extern and strategy_temp_copy:
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: addressable share-place operand was copied into a temporary")
 
-    fn record_codegen_param_binding(body: &MirBody, fn_sym: i32, param_index: i32, strategy: AnalysisMarshalStrategy, incoming: i64, storage: i64):
+    mut fn record_codegen_param_binding(body: &MirBody, fn_sym: i32, param_index: i32, strategy: AnalysisMarshalStrategy, incoming: i64, storage: i64):
         if self.analysis_enabled == 0:
             return
         let sig = self.sema.get_sig(fn_sym)
         let share = sig >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         let ref_table = self.is_ref_param(fn_sym, param_index)
         let incoming_ptr = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
-        let name = self.sema.pool_resolve(fn_sym)
+        let name: str = self.sema.pool_resolve(fn_sym)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Parameter)
         fact.id = param_index
         fact.parent = sig
@@ -1666,7 +1666,7 @@ impl Codegen:
             self.di_current_scope = fn_scope
             self.debug_push_lexical_block(first_span)
 
-    fn debug_get_di_type(sema_tid: i32) -> i64:
+    mut fn debug_get_di_type(sema_tid: i32) -> i64:
         let cached = self.di_type_cache.get(sema_tid)
         if cached.is_some():
             return cached.unwrap() as i64
@@ -1674,7 +1674,7 @@ impl Codegen:
         self.di_type_cache.insert(sema_tid, di_ty)
         di_ty
 
-    fn debug_create_di_type(sema_tid: i32) -> i64:
+    mut fn debug_create_di_type(sema_tid: i32) -> i64:
         let kind = self.sema.get_type_kind(sema_tid)
         if kind == 3:
             // TypeKind.TY_BOOL
@@ -1880,7 +1880,7 @@ impl Codegen:
     // are emitted by passes shared across units). Deterministic module walk;
     // renamed __wcu$ fns are owner-defined already, internal/private fns are
     // legitimately per-unit (trampolines), declarations are untouched.
-    mut fn unit_demote_foreign_definitions():
+    fn unit_demote_foreign_definitions():
         if self.unit_total <= 1 or self.unit_index == 0:
             return
         var f = wl_get_first_function(self.llmod)
@@ -1916,7 +1916,7 @@ impl Codegen:
                 return true
         false
 
-    fn dyn_trait_from_type_node(type_node: i32) -> i32:
+    mut fn dyn_trait_from_type_node(type_node: i32) -> i32:
         if type_node == 0:
             return 0
         let tk = self.pool.kind(type_node)
@@ -2032,7 +2032,7 @@ impl Codegen:
         // to pass to LLVMConstIntGetSExtValue.
         val != 0 and wl_get_value_kind(val) == 18
 
-    mut fn coerce_value_to_type(val: i64, target_ty: i64) -> i64:
+    fn coerce_value_to_type(val: i64, target_ty: i64) -> i64:
         if val == 0 or target_ty == 0:
             return val
         let val_ty = wl_type_of(val)
@@ -2300,7 +2300,7 @@ impl Codegen:
             return sym
         self.intern.intern(text)
 
-    fn record_local(sym: i32, local_ptr: i64, ty: i64, is_mut: i32):
+    mut fn record_local(sym: i32, local_ptr: i64, ty: i64, is_mut: i32):
         self.local_allocas.insert(sym, local_ptr)
         self.local_types.insert(sym, ty)
         self.local_muts.insert(sym, is_mut)
@@ -2320,7 +2320,7 @@ impl Codegen:
             msg = msg ++ f" ty={self.llvm_type_mangle(ty)}"
             with_eprint(msg)
 
-    fn record_local_sema_type(sym: i32, sema_ty: i32):
+    mut fn record_local_sema_type(sym: i32, sema_ty: i32):
         if sym == 0 or sema_ty == 0:
             return
         self.local_sema_types.insert(sym, sema_ty)
@@ -2328,19 +2328,19 @@ impl Codegen:
         if canon != 0 and canon != sym:
             self.local_sema_types.insert(canon, sema_ty)
 
-    fn record_local_pointee_struct(sym: i32, pointee_sym: i32):
+    mut fn record_local_pointee_struct(sym: i32, pointee_sym: i32):
         self.local_pointee_structs.insert(sym, pointee_sym)
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
             self.local_pointee_structs.insert(canon, pointee_sym)
 
-    fn record_trait_local(sym: i32, trait_sym: i32):
+    mut fn record_trait_local(sym: i32, trait_sym: i32):
         self.trait_locals.insert(sym, trait_sym)
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
             self.trait_locals.insert(canon, trait_sym)
 
-    fn record_trait_local_concrete(sym: i32, type_sym: i32):
+    mut fn record_trait_local_concrete(sym: i32, type_sym: i32):
         self.trait_local_concrete_types.insert(sym, type_sym)
         let canon = self.canonical_local_sym(sym)
         if canon != 0 and canon != sym:
@@ -3394,7 +3394,7 @@ impl Codegen:
     // clang expands va_arg — the LLVM va_arg instruction is not lowered for
     // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
 
-    mut fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
+    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
         let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         let ft = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
@@ -3408,7 +3408,7 @@ impl Codegen:
     // The next argument of the list at `list_ptr` as `ty` — an integer at
     // least as wide as C's int, a double or a pointer (Sema refused every
     // other T) — with the list advanced past it.
-    mut fn emit_c_va_arg(list_ptr: i64, ty: i64) -> i64:
+    fn emit_c_va_arg(list_ptr: i64, ty: i64) -> i64:
         let kind = type_layout_c_va_list_kind()
         let is_fp = wl_get_type_kind(ty) == wl_double_type_kind()
         var addr: i64 = 0
@@ -4265,7 +4265,7 @@ impl Codegen:
 
     // ── Builtin str type ──────────────────────────────────────────────
 
-    fn declare_builtin_str_type():
+    mut fn declare_builtin_str_type():
         let str_sym = self.intern.intern("str")
         // str = { i8*, i64 }
         let str_type = wl_struct_create_named(self.context, "str")
@@ -4292,7 +4292,7 @@ impl Codegen:
 
         self.struct_type_map.insert(str_sym, idx)
 
-    fn declare_builtin_cstr_type():
+    mut fn declare_builtin_cstr_type():
         let cstr_sym = self.intern.intern("CStr")
         if self.struct_type_map.get(cstr_sym).is_some():
             return
@@ -4320,7 +4320,7 @@ impl Codegen:
 
         self.struct_type_map.insert(cstr_sym, idx)
 
-    fn predeclare_struct_type(name_sym: i32):
+    mut fn predeclare_struct_type(name_sym: i32):
         if self.struct_type_map.get(name_sym).is_some():
             return
         let name_str = self.intern.resolve(name_sym)
@@ -4595,7 +4595,7 @@ impl Codegen:
 
     // D69 (§13.4): a generator value is a compiler-generated struct of its gen
     // fn's arguments, declared here because it has no type declaration.
-    fn predeclare_generator_state_types():
+    mut fn predeclare_generator_state_types():
         for si in 0..self.sema.sig_names.len():
             let fn_sym = self.sema.sig_names[si]
             if not self.sema.generator_fn_state_types.contains(fn_sym):
@@ -4651,7 +4651,7 @@ impl Codegen:
             if self.sema.generator_fn_state_types.contains(fn_sym):
                 self.declare_generator_state_type(self.sema.generator_fn_state_types.get(fn_sym).unwrap())
 
-    fn predeclare_enum_type(name_sym: i32):
+    mut fn predeclare_enum_type(name_sym: i32):
         if self.enum_type_map.get(name_sym).is_some():
             return
         let name_str = self.intern.resolve(name_sym)
@@ -5992,7 +5992,7 @@ impl Codegen:
         let resolved = self.sema.resolve_alias(ty)
         self.sema.get_type_kind(resolved) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(resolved as i32)
 
-    fn sig_abi_param_flags(sig_idx: i32, pi: i32) -> i32:
+    mut fn sig_abi_param_flags(sig_idx: i32, pi: i32) -> i32:
         self.sema.sig_param_uses_value_ref_abi(sig_idx, pi) |
             (if self.sig_param_is_explicit_ref(sig_idx, pi): 2 else: 0) |
             (if pi == 0 and self.sema.sig_is_drop_body(sig_idx): 4 else: 0)
@@ -6189,7 +6189,7 @@ impl Codegen:
     fn fn_abi_byval_attr_types(abi: i32) -> List[i64]:
         if self.fn_abi_byval(abi): self.fn_abi_byval_types(abi) else: list_zeros_i64(self.fn_abis[abi].arg_count)
 
-    fn bind_fn_abi_owned_place(body: &MirBody, sym: i32, pi: i32, name: i32, incoming: i64) -> bool:
+    mut fn bind_fn_abi_owned_place(body: &MirBody, sym: i32, pi: i32, name: i32, incoming: i64) -> bool:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0 or not self.fn_abi_arg(index, pi).owned_place: return false
         let arg = self.fn_abi_arg(index, pi)
@@ -6207,7 +6207,7 @@ impl Codegen:
             result.push(if arg.pass == PM_DIRECT and arg.llvm_ty != arg.source_ty: arg.source_ty else: 0)
         result
 
-    fn bind_fn_abi(sym: i32, index: i32, function: i64):
+    mut fn bind_fn_abi(sym: i32, index: i32, function: i64):
         if sym == 0: return
         self.fn_abi_symbols.insert(sym, index)
         if function != 0: self.fn_abi_values.insert(function, index)
@@ -6766,7 +6766,7 @@ impl Codegen:
     // builds memmove/memset; MemCpyOpt turns a memmove into memcpy), and a
     // second declaration under the same name gets a `.N` suffix the verifier
     // rejects — so an existing declaration is reused, never re-added.
-    fn ensure_llvm_mem_intrinsic(name: &str, second: i64) -> i64:
+    mut fn ensure_llvm_mem_intrinsic(name: &str, second: i64) -> i64:
         let sym = self.intern.intern(name)
         let cached = self.fn_values.get(sym)
         if cached.is_some():
@@ -6784,10 +6784,10 @@ impl Codegen:
         self.fn_fn_types.insert(sym, fn_ty)
         fn_val
 
-    fn ensure_llvm_memcpy_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memcpy.p0.p0.i64", wl_ptr_type(self.context))
-    fn ensure_llvm_memset_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memset.p0.i64", wl_i8_type(self.context))
+    mut fn ensure_llvm_memcpy_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memcpy.p0.p0.i64", wl_ptr_type(self.context))
+    mut fn ensure_llvm_memset_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memset.p0.i64", wl_i8_type(self.context))
 
-    fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
+    mut fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
         let fn_val = self.ensure_llvm_memcpy_declared()
         let fn_ty = wl_global_get_value_type(fn_val)
         let args: List[i64] = List.new()
@@ -6870,7 +6870,7 @@ impl Codegen:
                 continue
             wl_add_param_byval_attr(self.context, function, pi + param_offset, byval_ty)
 
-    fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_types: &List[i64], original_arg_count: i32, arg_prefix_count: i32):
+    mut fn apply_c_abi_call_attrs(call_val: i64, has_sret: i32, sret_ty: i64, byval_types: &List[i64], original_arg_count: i32, arg_prefix_count: i32):
         if call_val == 0:
             return
         var byval_offset = arg_prefix_count
@@ -7080,7 +7080,7 @@ impl Codegen:
 
     // ── Detect drop functions ─────────────────────────────────────────
 
-    fn detect_drop_functions():
+    mut fn detect_drop_functions():
         for i in 0..self.pool.decl_count():
             if self.sema.decl_is_lazy_skipped(i):
                 continue
@@ -7260,7 +7260,7 @@ impl Codegen:
     // structs and the call-site store rejects it. The structural key (the
     // element llvm type handle, a pointer, so it cannot collide with small
     // tid keys) unifies them; a tid hit stays the fast path.
-    fn get_or_create_list_type(sema_tid: i32, elem_ty: i64) -> i64:
+    mut fn get_or_create_list_type(sema_tid: i32, elem_ty: i64) -> i64:
         if sema_tid > 0:
             let tid_hit = self.list_cache_map.get(sema_tid as i64)
             if tid_hit.is_some():
@@ -7283,7 +7283,7 @@ impl Codegen:
         self.cache_list_type(sema_tid, elem_ty, list_ty)
         list_ty
 
-    fn cache_list_type(sema_tid: i32, elem_ty: i64, list_ty: i64) -> i64:
+    mut fn cache_list_type(sema_tid: i32, elem_ty: i64, list_ty: i64) -> i64:
         let struct_hit = self.list_cache_map.get(elem_ty)
         if struct_hit.is_some():
             let existing: i64 = struct_hit.unwrap()
@@ -7296,7 +7296,7 @@ impl Codegen:
         self.list_is_list.insert(list_ty, 1)
         list_ty
 
-    fn get_or_create_hashmap_type(sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
+    mut fn get_or_create_hashmap_type(sema_tid: i32, key_ty: i64, val_ty: i64) -> i64:
         let struct_key = (key_ty *% 65537) +% val_ty
         if sema_tid > 0:
             let tid_hit = self.hm_cache_map.get(sema_tid as i64)
@@ -7320,7 +7320,7 @@ impl Codegen:
         self.cache_hashmap_type(sema_tid, key_ty, val_ty, hm_ty)
         hm_ty
 
-    fn cache_hashmap_type(sema_tid: i32, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
+    mut fn cache_hashmap_type(sema_tid: i32, key_ty: i64, val_ty: i64, hm_ty: i64) -> i64:
         let struct_key = (key_ty *% 65537) +% val_ty
         let cached = self.hm_cache_map.get(struct_key)
         if cached.is_some():
@@ -7335,7 +7335,7 @@ impl Codegen:
             self.hm_cache_map.insert(sema_tid as i64, hm_ty)
         hm_ty
 
-    fn get_or_create_hashset_type(sema_tid: i32, elem_ty: i64) -> i64:
+    mut fn get_or_create_hashset_type(sema_tid: i32, elem_ty: i64) -> i64:
         if sema_tid > 0:
             let tid_hit = self.hs_cache_map.get(sema_tid as i64)
             if tid_hit.is_some():
@@ -7356,7 +7356,7 @@ impl Codegen:
             self.hs_cache_map.insert(sema_tid as i64, hs_ty)
         hs_ty
 
-    fn get_or_create_slotmap_type(sema_tid: i32, elem_ty: i64) -> i64:
+    mut fn get_or_create_slotmap_type(sema_tid: i32, elem_ty: i64) -> i64:
         if sema_tid > 0:
             let tid_hit = self.slotmap_cache_map.get(sema_tid as i64)
             if tid_hit.is_some():

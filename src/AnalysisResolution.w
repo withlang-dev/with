@@ -152,7 +152,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
         return answer
     answer
 
-fn resolution_violation(report: &AnalysisReport, sema: &Sema, site: &ResolutionSite, body: &MirBody, bb: i32, node: i32, fn_name: &str, message: &str):
+fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &ResolutionSite, body: &MirBody, bb: i32, node: i32, fn_name: &str, message: &str):
     var fact = AnalysisFact.new(AnalysisStage.Mir, AnalysisFactKind.Invariant)
     fact.id = bb
     fact.node = node
@@ -170,7 +170,7 @@ fn resolution_violation(report: &AnalysisReport, sema: &Sema, site: &ResolutionS
     report.fail("resolution: " ++ fn_name ++ " at " ++ resolution_where(sema, site, node) ++ ": " ++ message)
 
 // Rule 1–4: every MIR call terminator against Sema's answer for its node.
-fn resolution_audit_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
@@ -239,7 +239,7 @@ fn resolution_span_key(file: i32, offset: i32) -> i64: ((file as i64) << 32) | (
 // declarations locate the enclosing body (uninstantiated generic templates
 // have no body and are not judged); the nodes of a body's closures are
 // inside its span and their calls are in the module's call facts.
-fn resolution_audit_unlowered_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     let lowered_nodes: HashMap[i32, i32] = HashMap.new()
     let elided_nodes: HashMap[i32, i32] = HashMap.new()
     var elided = 0
@@ -351,7 +351,7 @@ fn resolution_field_base_type(sema: &Sema, base_expr: i32) -> i32:
 // expression has after Sema's autoderef (the module-identity and payload
 // class of #1446/#1442). A disagreement means MIR picked a place from its
 // own lookup.
-fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_field_places(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var decls = 0
     var unrecorded = 0
@@ -406,7 +406,7 @@ fn resolution_audit_field_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // there) aliases that place in MIR, and one Sema made an owner owns a local.
 // An owning local over a view is a second owner of the place's value (the
 // #747 field move); an alias over an owner leaves a value nobody drops.
-fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_let_bindings(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var aliases = 0
     var views = 0
@@ -437,7 +437,7 @@ fn resolution_audit_let_bindings(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // body reads its own instance's record (index_element_in_body), never the
 // one type per node typed_expr_types keeps; a node Sema never checked as a
 // positional index in that body is itself a violation.
-fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_index_places(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var in_specializations = 0
     for bi in 0..mir_mod.bodies.len():
@@ -471,7 +471,7 @@ fn resolution_audit_index_places(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // Every aliasing `let` names a place rooted at a binding Sema recorded as
 // an origin of the view it binds (expr_view_dep_*): MIR materializes the
 // view Sema proved, it does not pick another place by its own lookup.
-fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_view_origins(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var with_origins = 0
     for bi in 0..mir_mod.bodies.len():
@@ -502,7 +502,7 @@ fn resolution_audit_view_origins(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // Every closure capture MIR materialized as a snapshot or as a reference
 // to an alias place agrees with Sema's capture mode, and a closure has the
 // captures Sema recorded (D62/D63: the capture record is Sema's).
-fn resolution_audit_captures(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_captures(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
@@ -533,7 +533,7 @@ fn resolution_audit_captures(report: &AnalysisReport, sema: &Sema, mir_mod: &Mir
 // Phase 4: every call argument that reads a named owned binding transfers
 // it the way Sema's signature says (D5/D65): a share-place parameter or an
 // extern bit-copy parameter borrows, any other non-Copy parameter consumes.
-fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_call_effects(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var judged = 0
     var judged_borrows = 0
@@ -581,7 +581,7 @@ fn resolution_audit_call_effects(report: &AnalysisReport, sema: &Sema, mir_mod: 
 // type. An enum argument into an `&i64` reached the call as the enum (Sema
 // accepted the conversion, MIR recorded no auto-reference) and the callee
 // read eight bytes from four, while every audit here passed.
-fn resolution_audit_ref_params(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_ref_params(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
@@ -616,7 +616,7 @@ fn resolution_audit_ref_params(report: &AnalysisReport, sema: &Sema, mir_mod: &M
 // callee is a bare name carries Sema's record of what the name resolved to
 // (CallCalleeKind); MirLower dispatches on it and nothing else. A call with
 // no record is a call MIR lowered by its own reading of the name.
-fn resolution_audit_callee_kinds(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_callee_kinds(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var builtins = 0
     var method_builtins = 0
@@ -713,7 +713,7 @@ fn resolution_converted(sema: &Sema, pool: &InternPool, body: &MirBody, place: i
 // its own reading of the spelling — the raw C declaration, the pointer as
 // the value — disagrees here (red before: a facade call in a pipeline
 // stage, which MirLower's facade tables never reached).
-fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_resolved_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var foreign = 0
     var redirected = 0
@@ -767,7 +767,7 @@ fn resolution_audit_resolved_calls(report: &AnalysisReport, sema: &Sema, mir_mod
 // own bytes (a distinct's `.value` typed as the wrapper) or a call folded to
 // a bare constant (`TotalF64(1.0)` as an `f64`) reaches codegen with the
 // wrong type, and codegen picks its formatter, comparison or ABI from it.
-fn resolution_audit_expr_operands(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_expr_operands(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     var disagree = 0
     for bi in 0..mir_mod.bodies.len():
@@ -790,7 +790,7 @@ fn resolution_audit_expr_operands(report: &AnalysisReport, sema: &Sema, mir_mod:
     report.note(f"resolution-audit: expression-operands judged={checked} disagree={disagree}")
     checked
 
-fn analysis_audit_resolution(report: &AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
+fn analysis_audit_resolution(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str):
     let calls = resolution_audit_calls(report, sema, mir_mod, pool, source_path, source_text)
     let field_places = resolution_audit_field_places(report, sema, mir_mod, pool, source_path, source_text)
     let lets = resolution_audit_let_bindings(report, sema, mir_mod, pool, source_path, source_text)

@@ -11,7 +11,7 @@ use std.collections.HashMap
 fn observe_after_mutation() -> Option[i32]:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 43)
-    let view = map.get(1)?
+    let view: &i32 = map.get(1)?
     map.clear()
     Some(view)
 

@@ -43,6 +43,6 @@ c facade stp:
 fn main:
     let d = Database.new().unwrap()
     let o = Other.new().unwrap()
-    let v = o.view().unwrap()
+    let v: &Value = o.view().unwrap()
     let s = d.st_new(1, o)
     print(f"{v.n}")

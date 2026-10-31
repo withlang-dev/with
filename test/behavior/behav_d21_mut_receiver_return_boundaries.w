@@ -42,5 +42,5 @@ fn main:
 
     var viewed = Viewed { value: 42 }
     let view = viewed.value_ref()
-    assert(*view == 42)
+    assert(view == 42)
     print("ok")

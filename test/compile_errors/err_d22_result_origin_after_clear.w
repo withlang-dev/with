@@ -14,6 +14,6 @@ fn carry(map: &HashMap[i32, i32]) -> Result[&i32, str]:
 fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 74)
-    let view = carry(&map).unwrap()
+    let view: &i32 = carry(&map).unwrap()
     map.clear()
     assert(view == 74)

@@ -6,6 +6,6 @@ use std.collections.priority_queue.PriorityQueue
 fn main:
     var m: PriorityQueue[i32] = PriorityQueue.new()
     m.push(86)
-    let view = m.peek().unwrap()
+    let view: &i32 = m.peek().unwrap()
     m.pop()
     print(*view)

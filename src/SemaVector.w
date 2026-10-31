@@ -45,9 +45,9 @@ impl Sema:
                 let n = total / w
                 self.register_prim(f"m{w}x{n}", self.mask_type(w, n))
 
-    fn vector_type(lane: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_VECTOR, lane, n, 0) as i32
+    mut fn vector_type(lane: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_VECTOR, lane, n, 0) as i32
 
-    fn mask_type(w: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_MASK, w, n, 0) as i32
+    mut fn mask_type(w: i32, n: i32) -> i32: self.ensure_exact_type(TypeKind.TY_MASK, w, n, 0) as i32
 
     fn is_vector_type(tid: i32) -> bool:
         tid > 0 and self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VECTOR
@@ -121,13 +121,15 @@ impl Sema:
 
     // §4.3d: what a lane-wise comparison of `tid` yields,
     // Mask[N, width(T)].
-    fn vector_compare_mask_type(tid: i32) -> i32:
+    mut fn vector_compare_mask_type(tid: i32) -> i32:
         self.mask_type(self.vector_lane_bits(self.vector_lane_type(tid)), self.vector_lane_count(tid))
 
     // §4.3d: `.bits()` — the unsigned integer vector of the same lane width.
-    fn vector_bits_type(tid: i32) -> i32:
+    mut fn vector_bits_type(tid: i32) -> i32:
         let bits = self.vector_lane_bits(self.vector_lane_type(tid))
-        let lane = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
+        // SEED-BOUND (D144): the pinned seed binds a join of plain-bits
+        // fields as a view; the annotation goes at the next seed.
+        let lane: TypeId = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
         self.vector_type(lane as i32, self.vector_lane_count(tid))
 
     // §4.3d: T is a primitive integer (§4.1: i8…i128, u8…u128) or floating
@@ -143,7 +145,7 @@ impl Sema:
 
     // §4.3d: the compile-time integer a generic lane count `N` is bound to
     // (`fn dot[N](a: Vector[f32, N])`), as a generic substitution.
-    fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
+    mut fn const_int_type(value: i32) -> i32: self.ensure_exact_type(TypeKind.TY_CONST_INT, value, 0, 0) as i32
 
     fn const_int_value(tid: i32) -> i32:
         if tid <= 0 or self.get_type_kind(self.resolve_alias(tid as TypeId)) != TypeKind.TY_CONST_INT: return -1
@@ -663,7 +665,7 @@ impl Sema:
         if not self.is_mask_type(expected): return 0
         expected
 
-    mut fn vector_literal_context_lane(node: i32) -> i32:
+    fn vector_literal_context_lane(node: i32) -> i32:
         if self.has_expected_type == 0 or self.expected_expr_type == 0: return 0
         let expected = self.expected_expr_type as i32
         if not self.is_vector_type(expected): return 0

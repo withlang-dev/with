@@ -145,7 +145,7 @@ fn facade_profile_explicit_fn_item(pool: &AstPool, intern: &InternPool, fn_name:
         if have == fn_name: return items[i]
     0
 
-fn facade_profile_record(pool: &AstPool, at: i32, rule: i32, status: i32, subject: i32, candidates: &List[i32]) -> i32:
+fn facade_profile_record(mut pool: AstPool, at: i32, rule: i32, status: i32, subject: i32, candidates: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     pool.add_extra(subject)
     pool.add_extra(candidates.len() as i32)
@@ -156,7 +156,7 @@ fn facade_profile_record(pool: &AstPool, at: i32, rule: i32, status: i32, subjec
 // pattern replaced by the matched function, the rule appended, the span the
 // `use convention` item's (a diagnostic about the clause points at the
 // adoption, in the facade's own file).
-fn facade_profile_clause(pool: &AstPool, at: i32, template: i32, fn_sym: i32, rule: i32) -> i32:
+fn facade_profile_clause(mut pool: AstPool, at: i32, template: i32, fn_sym: i32, rule: i32) -> i32:
     let kind = pool.get_data0(template as NodeId)
     let ops = pool.get_data1(template as NodeId)
     let count = pool.get_data2(template as NodeId)
@@ -168,7 +168,7 @@ fn facade_profile_clause(pool: &AstPool, at: i32, template: i32, fn_sym: i32, ru
     pool.add_node(NodeKind.NK_FACADE_CLAUSE, pool.get_start(at as NodeId), pool.get_end(at as NodeId), kind, extra_start, count + 1) as i32
 
 // Rewrites a node's extra list as `head ++ tail`.
-fn facade_profile_append_extras(pool: &AstPool, node: i32, head_start: i32, head_count: i32, tail: &List[i32]) -> i32:
+fn facade_profile_append_extras(mut pool: AstPool, node: i32, head_start: i32, head_count: i32, tail: &List[i32]) -> i32:
     let extra_start = pool.extra_len()
     for i in 0..head_count: pool.add_extra(pool.get_extra(head_start + i))
     for i in 0..tail.len(): pool.add_extra(tail[i])

@@ -110,7 +110,7 @@ fn contract_clause(sema: &Sema, item: i32, kind: i32, nth: i32) -> i32:
 // clauses (parallel to FacadeResource.producers).
 fn contract_from_clause(sema: &Sema, item: i32, pi: i32) -> i32: contract_clause(sema, item, FACADE_CLAUSE_FROM, pi)
 
-fn contract_fact(report: &AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, flags: i32, node: i32, symbol: i32, owner: i32, index: i32, name: &str, detail: &str) -> i32:
+fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, flags: i32, node: i32, symbol: i32, owner: i32, index: i32, name: &str, detail: &str) -> i32:
     var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.ForeignContract)
     fact.id = report.facts.len() as i32
     fact.parent = parent
@@ -133,7 +133,7 @@ fn contract_fact(report: &AnalysisReport, sema: &Sema, site: &ContractSite, pare
 
 // A fact row: `key: value  [provenance]`, flagged CONTRACT_DEFAULT when the
 // provenance is a conservative default rather than a clause.
-fn contract_row(report: &AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, class: i32, node: i32, symbol: i32, owner: i32, index: i32, key: &str, value: &str, provenance: &str) -> i32:
+fn contract_row(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, parent: i32, class: i32, node: i32, symbol: i32, owner: i32, index: i32, key: &str, value: &str, provenance: &str) -> i32:
     let flags = class | CONTRACT_FACT | (if provenance.starts_with("default:"): CONTRACT_DEFAULT else: 0)
     contract_fact(report, sema, site, parent, flags, node, symbol, owner, index, key, key ++ ": " ++ value ++ "  [" ++ provenance ++ "]")
 
@@ -189,7 +189,7 @@ fn contract_thread_caps(caps: i32) -> str:
 
 // ── resources ────────────────────────────────────────────────────────────
 
-fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, source_path: &str, source_text: &str):
+fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, source_path: &str, source_text: &str):
     let r = &sema.facade_resources[ri]
     let site = contract_site(sema, r.decl, source_path, source_text)
     let rname = contract_resource_name(sema, ri)
@@ -311,7 +311,7 @@ fn contract_collect_resource(report: &AnalysisReport, sema: &Sema, ri: i32, sour
 
 // ── fn items ─────────────────────────────────────────────────────────────
 
-fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_path: &str, source_text: &str):
+fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_path: &str, source_text: &str):
     let c = &sema.foreign_contracts[ci]
     let site = contract_site(sema, c.decl, source_path, source_text)
     let fname = sema.safe_symbol_text(c.fn_sym)
@@ -461,7 +461,7 @@ fn contract_collect_fn(report: &AnalysisReport, sema: &Sema, ci: i32, source_pat
         if not sema.facade_param_is_callable(sig, pi): continue
         contract_collect_callback(report, sema, ci, pi, &site)
 
-fn contract_collect_callback(report: &AnalysisReport, sema: &Sema, ci: i32, pi: i32, site: &ContractSite):
+fn contract_collect_callback(mut report: AnalysisReport, sema: &Sema, ci: i32, pi: i32, site: &ContractSite):
     let c = &sema.foreign_contracts[ci]
     let fname = sema.safe_symbol_text(c.fn_sym)
     let node = c.node
@@ -515,7 +515,7 @@ fn contract_collect_callback(report: &AnalysisReport, sema: &Sema, ci: i32, pi: 
 
 // ── domains and conventions ──────────────────────────────────────────────
 
-fn contract_collect_domain(report: &AnalysisReport, sema: &Sema, di: i32, source_path: &str, source_text: &str):
+fn contract_collect_domain(mut report: AnalysisReport, sema: &Sema, di: i32, source_path: &str, source_text: &str):
     let d = &sema.facade_domain_list[di]
     // A domain's block is the facade it was declared in; find that block's
     // declaration through a resource or item of the same facade, else the
@@ -562,7 +562,7 @@ fn contract_convention_site(sema: &Sema, item: i32, source_path: &str, source_te
     if di >= 0: return contract_site(sema, di, source_path, source_text)
     ContractSite { path: with_str_clone_ref(source_path), source: with_str_clone_ref(source_text) }
 
-fn contract_collect_conventions(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn contract_collect_conventions(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for k in 0..sema.facade_convention_nodes.len():
         let node = sema.facade_convention_nodes[k]
         let site = contract_convention_site(sema, node, source_path, source_text)
@@ -596,7 +596,7 @@ fn contract_collect_conventions(report: &AnalysisReport, sema: &Sema, source_pat
             else:
                 contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
 
-fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn analysis_collect_foreign_contracts(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.facade_domain_list.len():
         contract_collect_domain(report, sema, di as i32, source_path, source_text)
     for ri in 0..sema.facade_resources.len():
@@ -640,7 +640,7 @@ fn contract_name_resembles_destroyer(name: &str) -> str:
 
 fn contract_where(site: &ContractSite, sema: &Sema, node: i32) -> str: f"{site.path}:{contract_node_line(sema, site, node)}"
 
-fn analysis_audit_contract(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn analysis_audit_contract(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     var advisories = 0
     for ri in 0..sema.facade_resources.len():
         let r = &sema.facade_resources[ri]

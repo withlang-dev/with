@@ -12,7 +12,7 @@ fn observe(present: bool):
     var map: HashMap[i32, i32] = HashMap.new()
     if present:
         map.insert(1, 76)
-    let view = map.get(1) ?? return
+    let view: &i32 = map.get(1) ?? return
     map.clear()
     assert(view == 76)
 

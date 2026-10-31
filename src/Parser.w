@@ -385,7 +385,7 @@ impl Parser:
             return 1
         0
 
-    fn record_top_level_stmt(stmt: NodeId) -> Unit:
+    mut fn record_top_level_stmt(stmt: NodeId) -> Unit:
         if stmt != 0:
             self.top_level_stmts.push(stmt as i32)
 
@@ -606,12 +606,12 @@ impl Parser:
             return eff_bits
         return self.parse_effect_name_bit()
 
-    fn poisoned_expr() -> NodeId:
+    mut fn poisoned_expr() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
         self.pool.add_node(NodeKind.NK_POISONED_EXPR, start, end, 0, 0, 0)
 
-    fn poisoned_decl() -> NodeId:
+    mut fn poisoned_decl() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
         self.pool.add_node(NodeKind.NK_POISONED_DECL, start, end, 0, 0, 0)
@@ -2054,7 +2054,7 @@ impl Parser:
         self.emit_error("expected type body")
         0 as NodeId
 
-    fn queue_synthetic_copy_impl(type_name: i32, tp_start: i32, tp_count: i32, start: i32, end: i32) -> Unit:
+    mut fn queue_synthetic_copy_impl(type_name: i32, tp_start: i32, tp_count: i32, start: i32, end: i32) -> Unit:
         let copy_trait = self.intern.intern("Copy")
         let impl_extra = self.pool.extra_len()
         self.pool.add_extra(0)
@@ -5502,7 +5502,7 @@ impl Parser:
         let node = self.pool.add_node(NodeKind.NK_REGEX_LIT, start, end, pat_sym, flag_sym, 0)
         self.parse_postfix(node)
 
-    fn build_regex_match_call(lhs: NodeId, rhs: NodeId, start: i32, end: i32) -> NodeId:
+    mut fn build_regex_match_call(lhs: NodeId, rhs: NodeId, start: i32, end: i32) -> NodeId:
         let method_sym = self.intern.intern("is_match")
         let field = self.pool.add_node(NodeKind.NK_FIELD_ACCESS, start, end, rhs, method_sym, 0)
         let arg_start = self.pool.extra_len()
@@ -6202,7 +6202,7 @@ impl Parser:
                 return lhs
         lhs
 
-    fn maybe_wrap_implicit_it(expr: i32) -> NodeId:
+    mut fn maybe_wrap_implicit_it(expr: i32) -> NodeId:
         let it_sym = self.intern.intern("__it")
         let param_start = self.pool.extra_len()
         self.pool.add_extra(it_sym)
@@ -6850,7 +6850,7 @@ impl Parser:
         let operand = self.parse_primary()
         self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), UnaryOp.UOP_NOT, operand, 0)
 
-    fn build_unary_with_outer_cast(start: i32, op: i32, operand: i32) -> NodeId:
+    mut fn build_unary_with_outer_cast(start: i32, op: i32, operand: i32) -> NodeId:
         if operand == 0:
             return self.pool.add_node(NodeKind.NK_UNARY, start, self.prev_end(), op, operand, 0)
 

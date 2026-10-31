@@ -6,6 +6,6 @@ use std.collections.ordered_set.OrderedSet
 fn main:
     var m: OrderedSet[i32] = OrderedSet.new()
     m.insert(1)
-    let view = m.get(1).unwrap()
+    let view: &i32 = m.get(1).unwrap()
     m.clear()
     print(*view)

@@ -70,10 +70,10 @@ fn main:
     let a = pick(&x, false)
     let b = pick(&x, true)
     grow_other()
-    print(f"{*a} {*b}")
+    print(f"{a} {b}")
     let r = outer()
     grow_other()
-    print(*r)
+    print(r)
     let h = Holder { n: 2 }
     print(h.own_or_spare(false).n)
     print(*head())

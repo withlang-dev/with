@@ -11,6 +11,6 @@ use std.collections.HashMap
 fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 85)
-    let view = map.get(1).expect("present")
+    let view: &i32 = map.get(1).expect("present")
     map.clear()
     assert(view == 85)

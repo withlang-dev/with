@@ -12,6 +12,6 @@ fn head() -> &i32 from HIDDEN: &HIDDEN[0]
 
 fn main:
     HIDDEN.push(41)
-    let r = head()
+    let r: &i32 = head()
     grow()
     print(*r)

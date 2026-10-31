@@ -6,6 +6,6 @@ use std.collections.ordered_map.OrderedMap
 fn main:
     var m: OrderedMap[i32, i32] = OrderedMap.new()
     m.insert(1, 86)
-    let view = m.get(1).unwrap()
+    let view: &i32 = m.get(1).unwrap()
     m.remove(1)
     print(*view)

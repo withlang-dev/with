@@ -6,6 +6,6 @@ use std.collections.unordered_set.UnorderedSet
 fn main:
     var m: UnorderedSet[i32] = UnorderedSet.new()
     m.insert(1)
-    let view = m.get(1).unwrap()
+    let view: &i32 = m.get(1).unwrap()
     m.clear()
     print(*view)

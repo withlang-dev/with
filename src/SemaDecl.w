@@ -1528,7 +1528,7 @@ impl Sema:
     // the declaration holds by value (#1439: `Option[E]` holds E by value, so
     // `enum E: A(o: Option[E])` is infinite; `List[E]` / `Box[E]` hold it
     // behind a pointer and stay legal).
-    fn collect_value_type_deps(type_node: i32):
+    mut fn collect_value_type_deps(type_node: i32):
         if type_node == 0:
             return
         let kind = self.ast.kind(type_node)
@@ -1936,7 +1936,7 @@ impl Sema:
         params.push(yield_ty)
         self.ensure_fn_type(&params, 1, self.ty_bool) as i32
 
-    fn mark_generator_state_ephemeral(state_tid: i32):
+    mut fn mark_generator_state_ephemeral(state_tid: i32):
         if state_tid <= 0:
             return
         let resolved = self.resolve_alias(state_tid as TypeId)
@@ -2055,7 +2055,7 @@ impl Sema:
         let task_ty = self.ensure_generic_inst_type(self.pool_intern("Task"), task_args, 1)
         if task_ty != 0: task_ty else: declared_ret_type
 
-    fn record_fn_behavior_metadata(fn_name: i32, node: i32, flags: i32):
+    mut fn record_fn_behavior_metadata(fn_name: i32, node: i32, flags: i32):
         if (flags / FnFlags.MUST_USE) % 2 == 1:
             self.must_use_fns.insert(fn_name, 1)
         if (flags / FnFlags.ASYNC) % 2 == 1:

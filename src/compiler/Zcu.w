@@ -245,7 +245,7 @@ impl Zcu:
     // them panics (pcre2test over a migrated tree, with the prelude's
     // std.regex reaching the checked-in lib/std/engines/pcre2). Recorded here, emitted
     // once the graph is loaded (Frontend check_internal_imports_frontend).
-    fn add_imported_path(path: &str) -> Unit:
+    mut fn add_imported_path(path: &str) -> Unit:
         let key = resolve_canonical_module_key(path)
         self.imported_paths.push(zcu_owned_text(key))
         let identity = codegen_canonical_module_path(path)
@@ -291,13 +291,13 @@ impl Zcu:
             if not out.contains(path): out.insert(path.clone(), zcu_package_key(path))
         out
 
-    fn append_decl_source_paths(count: i32, path: &str, file_id: i32) -> Unit:
+    mut fn append_decl_source_paths(count: i32, path: &str, file_id: i32) -> Unit:
         for _ in 0..count:
             self.decl_source_paths.push(zcu_owned_text(path))
             self.decl_source_file_ids.push(file_id)
             self.decl_is_c_import.push(0)
 
-    fn append_c_import_decl_paths(count: i32, path: &str, file_id: i32) -> Unit:
+    mut fn append_c_import_decl_paths(count: i32, path: &str, file_id: i32) -> Unit:
         for _ in 0..count:
             self.decl_source_paths.push(zcu_owned_text(path))
             self.decl_source_file_ids.push(file_id)
@@ -333,7 +333,7 @@ impl Zcu:
                 return with_str_clone_ref(self.c_import_cache_values[i])
         ""
 
-    fn c_import_cache_store(key: &str, value: &str) -> Unit:
+    mut fn c_import_cache_store(key: &str, value: &str) -> Unit:
         self.c_import_cache_keys.push(with_str_clone_ref(key))
         self.c_import_cache_values.push(with_str_clone_ref(value))
 
@@ -346,7 +346,7 @@ impl Zcu:
         self.cli_diag_source_names = List.new()
         self.cli_diag_source_texts = List.new()
 
-    fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
+    mut fn add_cli_diag_mapping(gen_start: i32, gen_end: i32, source_name: &str, source_text: &str) -> Unit:
         self.cli_diag_gen_starts.push(gen_start)
         self.cli_diag_gen_ends.push(gen_end)
         self.cli_diag_source_names.push(with_str_clone_ref(source_name))
@@ -482,7 +482,7 @@ impl Zcu:
         self.extra_source_names = names
         self.extra_source_texts = texts
 
-    fn add_source_text_mapping(file_id: i32, name: &str, text: &str) -> Unit:
+    mut fn add_source_text_mapping(file_id: i32, name: &str, text: &str) -> Unit:
         self.source_text_file_ids.push(file_id)
         self.source_text_names.push(zcu_owned_text(name))
         self.source_texts.push(zcu_owned_text(text))

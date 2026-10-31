@@ -12,6 +12,6 @@ fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 110)
     let carried = map.get(1).map(value => value)
-    let view = carried.unwrap()
+    let view: &i32 = carried.unwrap()
     map.clear()
     assert(view == 110)

@@ -14,7 +14,7 @@ fn main:
     primary.insert(1, 112)
     fallback.insert(1, 113)
     let pick = 2
-    let view = match pick:
+    let view: &i32 = match pick:
         0 => primary.get(1).unwrap()
         1 => fallback.get(1).unwrap()
         2 => primary.get(1).unwrap()

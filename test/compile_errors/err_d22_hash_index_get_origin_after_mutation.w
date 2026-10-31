@@ -6,6 +6,6 @@ use std.collections.hash_index.HashIndex
 fn main:
     var m: HashIndex[i32, i32] = HashIndex.new()
     m.insert(1, 86)
-    let view = m.get(1).unwrap()
+    let view: &i32 = m.get(1).unwrap()
     m.clear()
     print(*view)

@@ -14,6 +14,6 @@ fn up(n: i32) -> &i32: down(n)
 
 fn main:
     G.push(1)
-    let r = up(3)
+    let r: &i32 = up(3)
     G.push(2)
     print(*r)
