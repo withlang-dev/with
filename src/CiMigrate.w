@@ -440,7 +440,7 @@ fn ci_migrate_add_import_once(imports: &str, module_path: &str) -> str:
         return with_str_clone_ref(imports)
     imports ++ line
 
-fn ci_migrate_project_imports_for_file(project_active: bool, project: &CiProject, input_path: &str) -> str:
+fn ci_migrate_project_imports_for_file(project_active: bool, mut project: CiProject, input_path: &str) -> str:
     if not project_active or not ci_migrate_shared_defs_active() or g_migrate_directory_input_dir.len() == 0:
         return ""
     let current_module = project.ensure_module(input_path)
@@ -1317,7 +1317,7 @@ fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bo
     g_ci_translate_migrate_mode = 0
     rc
 
-fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: bool, project: &CiProject) -> i32:
+fn ci_migrate_file_body(input_path: &str, output_path: &str, project_active: bool, mut project: CiProject) -> i32:
     if with_cimport_available() == 0:
         eprint("migrate: libclang not available")
         return 1

@@ -18319,7 +18319,7 @@ fn stack_literal_final(fwd: &List[i32], local: i32) -> i32:
     while fwd[at] >= 0: at = fwd[at]
     at
 
-fn cow_collection_of_sema(sema: &Sema, ty: i32) -> StdGeneric:
+fn cow_collection_of_sema(mut sema: Sema, ty: i32) -> StdGeneric:
     if ty <= 0: return StdGeneric.None
     let g = sema.std_generic_of(ty)
     if g != StdGeneric.List and g != StdGeneric.HashMap and g != StdGeneric.HashSet: return StdGeneric.None
@@ -18583,7 +18583,7 @@ fn cow_natural_loop_for_header(body: &MirBody, reachable: &List[i32], preds: &Li
         return List.new()
     in_loop
 
-fn mir_prove_cow_uniqueness(sema: &Sema, body: MirBody) -> MirBody:
+fn mir_prove_cow_uniqueness(mut sema: Sema, body: MirBody) -> MirBody:
     var out = body
     let local_count = out.local_count()
     var candidates: List[i32] = List.new()
@@ -18763,7 +18763,7 @@ fn cow_unwrap_ref_place(body: &MirBody, place_id: i32) -> i32:
         cur = target
     cur
 
-fn mir_body_cow_place_text(sema: &Sema, body: &MirBody, place_id: i32) -> str:
+fn mir_body_cow_place_text(mut sema: Sema, body: &MirBody, place_id: i32) -> str:
     let place = cow_unwrap_ref_place(body, place_id)
     if place < 0 or place >= body.place_locals.len():
         return "<unknown>"
@@ -18877,7 +18877,7 @@ fn mir_body_cow_check_reason(sema: &Sema, body: &MirBody, bb: i32) -> str:
 // the elements in the frame (as static data when they are constants nothing
 // writes in place), and the header owns no buffer (capacity 0, so
 // its drop frees nothing and a growth would copy out rather than free).
-fn mir_mark_stack_literals(sema: &Sema, body: MirBody) -> MirBody:
+fn mir_mark_stack_literals(mut sema: Sema, body: MirBody) -> MirBody:
     var out = body
     let local_count = out.local_count()
     // Per literal call: its first destination. Per local: the literal calls
@@ -19280,7 +19280,7 @@ fn lower_fn_with_sig(builder: MirBuilder, fn_node: i32, sig_idx: i32) -> Lowered
     owned_builder.body = mir_mark_stack_literals(owned_builder.sema, mir_prove_cow_uniqueness(owned_builder.sema, mir_mark_last_use_holds(owned_builder.sema, move owned_builder.body)))
     LoweredFunction { body: move owned_builder.body, anonymous_bodies: move owned_builder.anonymous_bodies }
 
-fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, group: i32) -> MirBody:
+fn lower_fn_clause_dispatcher(mut sema: Sema, ast_pool: &AstPool, pool: &InternPool, group: i32) -> MirBody:
     let dispatch_sym = sema.fn_clause_group_name(group)
     let sig_idx = sema.get_sig(dispatch_sym)
     let dispatch_body_sym = mir_symbol_for_pool(sema, pool, dispatch_sym)
@@ -19536,7 +19536,7 @@ fn specialization_builder(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, mo
 
 // `instance_sym`: the specialization a generic gen fn's producer belongs to
 // (0 for a non-generic one).
-fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
+fn lower_generator_functions(mut sema: Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, fn_sym: i32, body_sym: i32, sig_idx: i32, instance_sym: i32) -> LoweredFunction:
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     var producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
     producer_builder.body.instance_sym = instance_sym
@@ -19547,7 +19547,7 @@ fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
 
 // D69 (§13.4): the generator value's `move fn each(body)` hands its stored
 // arguments and `body` to the producer, which runs the gen fn's body.
-fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_sym: i32) -> MirBody:
+fn lower_generator_each_body(mut sema: Sema, ast_pool: &AstPool, pool: &InternPool, fn_sym: i32) -> MirBody:
     let each_sym: i32 = sema.generator_fn_each_syms.get(fn_sym).unwrap()
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     let state_tid: i32 = sema.generator_fn_state_types.get(fn_sym).unwrap()
@@ -19585,10 +19585,10 @@ fn lower_generator_each_body(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
     builder.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
     return move builder.body
 
-fn mir_fn_is_generic_template(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32) -> bool:
+fn mir_fn_is_generic_template(mut sema: Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32) -> bool:
     mir_fn_is_generic_template_at(sema, ast_pool, pool, fn_node, -1)
 
-fn mir_fn_is_generic_template_at(sema: &Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, decl_index: i32) -> bool:
+fn mir_fn_is_generic_template_at(mut sema: Sema, ast_pool: &AstPool, pool: &InternPool, fn_node: i32, decl_index: i32) -> bool:
     let meta = ast_pool.find_fn_meta(fn_node)
     if meta >= 0 and ast_pool.fn_meta_tp_count(meta) > 0:
         return true
@@ -19723,7 +19723,7 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPo
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)
     let lowered = if (ast_pool.get_data2(fn_node) / FnFlags.GEN) % 2 == 1:
-        lower_generator_functions(&sema, ast_pool, pool, fn_node, mono_sym, mono_sym, sig_idx, mono_sym)
+        lower_generator_functions(sema, ast_pool, pool, fn_node, mono_sym, mono_sym, sig_idx, mono_sym)
     else:
         lower_fn_with_sig(specialization_builder(&sema, ast_pool, pool, mono_sym), fn_node, sig_idx)
     sema.local_file_id = saved_file_id
@@ -19802,7 +19802,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
 
         let fn_sym = sema.fn_decl_semantic_symbol_at(decl as i32, ast_pool.get_data0(decl), di)
         let mir_fn_sym = mir_symbol_for_pool(&sema, pool, fn_sym)
-        if mir_fn_is_generic_template_at(&sema, ast_pool, pool, decl as i32, di):
+        if mir_fn_is_generic_template_at(sema, ast_pool, pool, decl as i32, di):
             continue
 
         sema.update_decl_source_context(di)
@@ -19811,7 +19811,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
             let sig_idx = sema.get_sig(fn_sym)
             if sig_idx < 0:
                 continue
-            mir_mod.add_lowered_function(lower_generator_functions(&sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx, 0))
+            mir_mod.add_lowered_function(lower_generator_functions(sema, ast_pool, pool, decl as i32, fn_sym, mir_fn_sym, sig_idx, 0))
             continue
         let sig_idx = sema.get_sig(fn_sym)
         var builder = MirBuilder.init(&sema, ast_pool, pool, mir_fn_sym)
@@ -19825,7 +19825,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
         let dispatch_sym = sema.fn_clause_group_name(gi)
         if sema.generic_fn_node_for_symbol(dispatch_sym) != 0:
             continue
-        mir_mod.add_body(lower_fn_clause_dispatcher(&sema, ast_pool, pool, gi))
+        mir_mod.add_body(lower_fn_clause_dispatcher(sema, ast_pool, pool, gi))
 
     // A global initializer that creates a closure or an async block is
     // lowered here, with the module: the bodies it creates join the module
@@ -20024,7 +20024,7 @@ fn mir_fn_is_tailrec(ast_pool: &AstPool, fn_sym: i32) -> i32:
         return 1
     0
 
-fn mir_tailrec_sig_compatible(sema: &Sema, ast_pool: &AstPool, fn_a: i32, fn_b: i32) -> i32:
+fn mir_tailrec_sig_compatible(mut sema: Sema, ast_pool: &AstPool, fn_a: i32, fn_b: i32) -> i32:
     let sig_a = sema.get_sig(fn_a)
     let sig_b = sema.get_sig(fn_b)
     if sig_a < 0 or sig_b < 0:
@@ -20098,7 +20098,7 @@ fn tailrec_drop_state_message(sema: &Sema, state: TailrecDropState) -> str:
         return "recursive call is not in tail position (Drop local '" ++ sema.pool_resolve(state.first_sym) ++ "' is live across the call)"
     "recursive call is not in tail position (a Drop local is live across the call)"
 
-fn tailrec_drop_binding_sym(sema: &Sema, node: i32) -> i32:
+fn tailrec_drop_binding_sym(mut sema: Sema, node: i32) -> i32:
     let kind = sema.ast.kind(node)
     if kind != NodeKind.NK_LET_BINDING and kind != NodeKind.NK_LET_DECL:
         return 0
@@ -20127,7 +20127,7 @@ fn tailrec_consumed_ident_sym(sema: &Sema, node: i32) -> i32:
         return tailrec_consumed_ident_sym(sema, sema.ast.get_data0(node))
     0
 
-fn tailrec_call_consumes_active_drop(sema: &Sema, node: i32, callee_sym: i32, state: TailrecDropState) -> bool:
+fn tailrec_call_consumes_active_drop(mut sema: Sema, node: i32, callee_sym: i32, state: TailrecDropState) -> bool:
     if state.count != 1 or state.first_sym == 0:
         return false
     let sig_idx = sema.get_sig(callee_sym)
@@ -20145,7 +20145,7 @@ fn tailrec_call_consumes_active_drop(sema: &Sema, node: i32, callee_sym: i32, st
             return true
     false
 
-fn tailrec_stmt_ends_drop_sym(sema: &Sema, node: i32) -> i32:
+fn tailrec_stmt_ends_drop_sym(mut sema: Sema, node: i32) -> i32:
     if node == 0:
         return 0
     let kind = sema.ast.kind(node)
@@ -20163,7 +20163,7 @@ fn tailrec_stmt_ends_drop_sym(sema: &Sema, node: i32) -> i32:
             return tailrec_consumed_ident_sym(sema, sema.ast.get_data1(node))
     0
 
-fn tailrec_verify_recursive_edges(sema: &Sema, node: i32, scc: &List[i32], in_tail: i32, active_cleanup: i32, active_drop: TailrecDropState) -> TailrecViolation:
+fn tailrec_verify_recursive_edges(mut sema: Sema, node: i32, scc: &List[i32], in_tail: i32, active_cleanup: i32, active_drop: TailrecDropState) -> TailrecViolation:
     if node == 0:
         return tailrec_no_violation()
     let kind = sema.ast.kind(node)
