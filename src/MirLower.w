@@ -5387,6 +5387,15 @@ impl MirBuilder:
             self.set_string_local_flags(temp, 2)
         self.body.new_operand(OperandKind.OK_COPY, place)
 
+    // D177 (§4.2a): Sema recorded `expr` as an integer in a boolean-test
+    // context; its value `op` is true when nonzero. Sema decided, this
+    // materializes the compare (Law 3). Any other expression passes through.
+    mut fn lower_truth_test(expr: i32, op: i32) -> i32:
+        if not self.sema.truth_test_exprs.contains(expr):
+            return op
+        let int_ty: i32 = self.sema.truth_test_exprs.get(expr).unwrap()
+        self.lower_bin_op_operand(BinaryOp.OP_NEQ, op, self.int_const_operand(0, int_ty), self.sema.ty_bool as i32, self.ast.get_start(expr))
+
     mut fn lower_not_operand(operand: i32, span: i32) -> i32:
         let rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, UnaryOp.UOP_NOT, operand, 0)
         self.lower_rvalue_to_temp(rv, self.sema.ty_bool as i32, span)
@@ -5593,7 +5602,7 @@ impl MirBuilder:
         // For `a and b`, evaluate a; if false, result is false, else: evaluate b.
         let result = self.new_temp(self.sema.ty_bool)
         let result_place = self.place_for_local(result)
-        let lhs = self.lower_expr(lhs_expr)
+        let lhs = self.lower_truth_test(lhs_expr, self.lower_expr(lhs_expr))
         let lhs_rv = self.body.new_rvalue(RvalueKind.RK_USE, lhs, 0, 0)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, lhs_rv, self.ast.get_start(node))
         let rhs_bb = self.new_block()
@@ -5628,7 +5637,7 @@ impl MirBuilder:
         let pending_move_temp_start = self.pending_move_temp_locals.len() as i32
         self.field_move_in_branch = self.field_move_in_branch + 1
         let rhs_temp_frame = self.push_stmt_temp_frame()
-        let rhs = self.lower_expr(rhs_expr)
+        let rhs = self.lower_truth_test(rhs_expr, self.lower_expr(rhs_expr))
         let rhs_rv = self.body.new_rvalue(RvalueKind.RK_USE, rhs, 0, 0)
         let result_place2 = self.place_for_local(result)
         self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place2, rhs_rv, self.ast.get_start(node))
@@ -5971,7 +5980,8 @@ impl MirBuilder:
                 if neg_words.ok != 0 and neg_words.overflow == 0:
                     return self.exact_int_const_operand(node, neg_ty)
 
-        let arg = self.lower_expr(expr)
+        // D177: `not n` on an integer negates its truth test.
+        let arg = if op == UnaryOp.UOP_NOT: self.lower_truth_test(expr, self.lower_expr(expr)) else: self.lower_expr(expr)
         let rv = self.body.new_rvalue(RvalueKind.RK_UN_OP, op, arg, 0)
         let ty = self.expr_type(node)
         let temp = self.new_temp(ty)
@@ -8162,7 +8172,7 @@ impl MirBuilder:
                 // it tested drops with the condition (a Some(Captures) leaked).
                 self.register_stmt_temp(mir_place_plain_local(&self.body, regex_captures_opt_place), self.regex_captures_option_type())
         else:
-            cond_op = self.lower_expr(cond_expr)
+            cond_op = self.lower_truth_test(cond_expr, self.lower_expr(cond_expr))
         self.finish_stmt_temp_frame(cond_frame)
 
         let if_entry_bb = self.cur_bb as i32
@@ -8447,7 +8457,7 @@ impl MirBuilder:
                 // with the condition.
                 self.register_stmt_temp(mir_place_plain_local(&self.body, regex_captures_opt_place), self.regex_captures_option_type())
         else:
-            cond_op = self.lower_expr(cond_expr)
+            cond_op = self.lower_truth_test(cond_expr, self.lower_expr(cond_expr))
         self.finish_stmt_temp_frame(cond_frame)
         let vals: List[i64] = List.new()
         vals.push(1)
@@ -8511,7 +8521,7 @@ impl MirBuilder:
         self.terminate(TermKind.TK_GOTO, cond_bb, 0, 0, 0)
 
         self.switch_to(cond_bb)
-        let cond_op = self.lower_expr(cond_expr)
+        let cond_op = self.lower_truth_test(cond_expr, self.lower_expr(cond_expr))
         let vals: List[i64] = List.new()
         vals.push(1)
         let targets: List[i32] = List.new()

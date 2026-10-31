@@ -15617,9 +15617,10 @@ impl Sema:
 
         // Logical operators
         if op == BinaryOp.OP_AND or op == BinaryOp.OP_OR:
-            if lhs != self.ty_bool:
+            // D177 (§4.2a): an integer operand is a truth test; the result is bool.
+            if lhs != self.ty_bool and not self.record_truth_test(lhs_node, lhs as i32):
                 self.emit_error("left operand of logical operator must be bool", node)
-            if rhs != self.ty_bool:
+            if rhs != self.ty_bool and not self.record_truth_test(rhs_node, rhs as i32):
                 self.emit_error("right operand of logical operator must be bool", node)
             return self.ty_bool as i32
 
@@ -15995,6 +15996,9 @@ impl Sema:
             return operand as i32
         if op == UnaryOp.UOP_NOT:
             self.warn_negated_membership_lint(node, operand_node)
+            // D177 (§4.2a): `not n` on an integer tests it; the result is bool.
+            if self.resolve_alias(operand) != self.ty_bool and self.record_truth_test(operand_node, operand as i32):
+                return self.ty_bool as i32
             let not_pointee = self.shared_copy_pointee(operand as i32)
             if not_pointee != 0:
                 let _ = self.record_contextual_copy_adjustment(operand_node, self.ty_bool as i32, operand as i32)
@@ -17295,6 +17299,21 @@ impl Sema:
     // computed the type but callers discarded it, so `if unit_call():` or
     // `if some_i32:` checked green and branched on a non-bool at runtime (#654).
     // A diverging (Never) or already-errored condition is accepted silently.
+    // D177: `node` of type `t` stands where a `bool` is tested. An integer,
+    // or a view of one (`if counts[i]:`, copied out as a `bool` view is),
+    // is recorded as a truth test of its integer type; anything else is not.
+    mut fn record_truth_test(node: i32, t: i32) -> bool:
+        var int_ty = self.resolve_alias(t as TypeId)
+        if self.get_type_kind(int_ty) == TypeKind.TY_REF and self.get_type_d1(int_ty) == 0:
+            let pointee = self.resolve_alias(self.get_type_d0(int_ty) as TypeId)
+            if self.get_type_kind(pointee) != TypeKind.TY_INT or self.record_contextual_copy_adjustment(node, pointee as i32, t) == 0:
+                return false
+            int_ty = pointee
+        if self.get_type_kind(int_ty) != TypeKind.TY_INT:
+            return false
+        self.truth_test_exprs.insert(node, int_ty as i32)
+        true
+
     mut fn check_bool_condition(cond: i32, what: &str) -> TypeId:
         let t = self.check_expr(cond)
         if t == 0:
@@ -17308,6 +17327,10 @@ impl Sema:
         // so a `&bool` element or field view (`if v[i]:`, `if d.flags[i]:`)
         // materializes its pointee the way `let b: bool = v[i]` does.
         if self.record_contextual_copy_adjustment(cond, self.ty_bool as i32, t as i32) != 0:
+            return self.ty_bool
+        // D177 (§4.2a): an integer is a boolean test, nonzero true. Its type
+        // is unchanged (no `bool` demand reaches a literal); MIR compares.
+        if self.record_truth_test(cond, t as i32):
             return self.ty_bool
         if self.is_mask_type(t as i32):
             self.emit_error(f"{what} condition must be bool: a comparison of vectors yields a mask (`{self.type_name(t as i32)}`); reduce it with `.all()` or `.any()` (§4.3d)", cond)
