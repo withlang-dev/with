@@ -40,7 +40,9 @@ over it, a shared-representation value (`str`, slice) read from its
 fields, or the same place passed to a second parameter of either mode.
 Arguments to `mut` parameters naming structurally disjoint fields
 (§3.6) are not the same place. Exclusivity begins at call activation
-(§3.2a).
+(§3.2a). Within a package, a `mut` call mutates the field paths the
+callee's body writes (§3.6, D178); across packages it mutates the whole
+place.
 
 ### 3.2a Access Activation
 
@@ -176,6 +178,27 @@ disjoint if they diverge at any field access.
 
 **Array/slice index disjointness is NOT guaranteed at compile time.**
 Use `get_disjoint(i, j)` for safe simultaneous element access.
+
+**A call's footprint (D178).** Within a package, a `mut fn` call on a
+place, or a `mut` argument, mutates the static field paths of that place
+the callee's body writes: the paths it assigns to, a field path's `mut`
+call extended by that callee's footprint, and the callee's own footprint
+for a `mut` call on the place itself. An assignment to the place, a write
+through `unsafe` or a raw pointer, a call through a trait object or a
+callable value, a `move`, or a callee outside the package mutates the
+whole place. An index projection ends a path at the indexed field; an
+auto-deref through an owning pointer field continues it. A view of a path
+disjoint from every path in the footprint survives the call; a write to a
+path conflicts with a view of any prefix or extension of it. The
+footprint is inferred from the body and never spelled; across packages
+the declared mode is the contract and the call mutates the whole place.
+
+```
+mut fn step():
+    self.physics.positions.push(p)     // footprint: physics.positions
+let v = &world.physics.velocities      // disjoint path
+world.step()                           // OK within the package
+```
 
 **Disjoint capture in closures:** Closures capture only the
 specific fields they access, not the enclosing struct as a whole.
@@ -317,7 +340,12 @@ binding is a view of the place, so writing the place while it is live is
 refused like any other conflict with a live view. A plain-bits payload
 (`Some(n)` on an `Option[isize]`) takes the value; bindings are immutable
 unless declared `var`, so a write to it is refused rather than lost. This
-is D44's traversal rule stated once for every binding.
+is D44's traversal rule stated once for every binding. The rule is about
+the binding, not the spelling of its value: an unannotated binding whose
+value is a view of plain bits takes the value wherever the view came from
+— a join of places (`if c: self.a else: self.b`), a lookup's payload
+(`m.get(k).unwrap()`), an iterator's `next().unwrap()`, a `&i32`
+parameter rebound. Only a written `&x` keeps the view.
 
 When `T: Copy`, an expression of type `&T` may satisfy an independently
 established owned-value demand. The compiler copies the pointee, then applies

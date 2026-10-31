@@ -581,6 +581,28 @@ comparisons require each pairwise comparison to produce `bool`. If a
 type wants elementwise or non-boolean comparison results, write the
 pairwise comparisons explicitly and combine them yourself.
 
+### 4.2a Boolean Tests
+
+An integer expression may stand in a boolean-test context: the
+condition of `if`, `while` and `do`-`while`, the operand of `not`, and
+the operands of `and` and `or`. Zero tests false; every nonzero integer
+tests true. The test does not change the expression's type and
+establishes no `bool` demand. `and`, `or` and `not` produce `bool`.
+There is no conversion between `bool` and an integer in a binding, an
+assignment, a parameter, a return or generic inference. `bool as <int>`
+is 1 for `true` and 0 for `false`. An assignment expression may be
+tested; it tests the stored value. (D177.)
+
+```
+if count: process()
+while n: n -= 1
+if flags & READY: run()
+if not pending: finish()
+let b: bool = count          // error: no conversion
+fn ready -> bool: count      // error: no conversion
+let ones = flag as i32       // 1 or 0
+```
+
 ### 4.3 Structs
 
 Structs are declared with `type` using either inline braces or an

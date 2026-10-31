@@ -325,6 +325,7 @@ arbitrary statements and `goto` (§13.5a, §13.5b).
 - [§4. Types](004_types.md)
   - [§4.1 Primitive Types](004_types.md#41-primitive-types)
   - [§4.2 Arithmetic and Operators](004_types.md#42-arithmetic-and-operators)
+  - [§4.2a Boolean Tests](004_types.md#42a-boolean-tests)
   - [§4.3 Structs](004_types.md#43-structs)
   - [§4.3a Fixed-Size Arrays](004_types.md#43a-fixed-size-arrays)
   - [§4.3b Bitpacked Structs](004_types.md#43b-bitpacked-structs)
