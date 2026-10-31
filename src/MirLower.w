@@ -13065,7 +13065,7 @@ impl MirBuilder:
         var expected_ty: i32 = 0
         if recv_type != 0:
             let resolved_recv = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32
-            expected_ty = self.sema.method_expected_arg_type(resolved_recv, method_sym, arg_index)
+            expected_ty = self.sema.method_expected_arg_type_frozen(resolved_recv, method_sym, arg_index)
             if expected_ty != 0 and expected_ty != self.sema.ty_void as i32:
                 self.expected_type = expected_ty
         let autocopy_ref = self.lower_auto_copy_ref_call_arg(arg_node, expected_ty)
@@ -13411,7 +13411,7 @@ impl MirBuilder:
         var depth = 0
         while current_ty > 0 and depth < 32:
             let current = self.sema.resolve_alias(current_ty as TypeId)
-            if self.sema.autoderef_type_has_method(current, lookup_method) != 0:
+            if self.sema.autoderef_type_has_method_frozen(current, lookup_method) != 0:
                 let owner_sym = self.sema.method_owner_symbol_for_type(current as i32)
                 if owner_sym != 0 and self.sema.method_has_move_self_flag(owner_sym, lookup_method) != 0:
                     return self.body.new_operand(OperandKind.OK_MOVE, place)

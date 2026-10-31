@@ -2113,6 +2113,12 @@ type Sema {
     unwrapped_type_cache: Memo[i32, i32],
     generic_struct_field_type_cache: Memo[i64, i32],
     generic_struct_field_index_type_cache: Memo[i64, i32],
+    // A builtin method's return type at (receiver type, owner, method),
+    // settled while checking; MIR reads it frozen (D7).
+    builtin_method_return_memo: Memo[(i32, i32, i32), i32],
+    // A method argument's expected type at (resolved receiver, method,
+    // argument index), settled while checking; MIR reads it frozen.
+    method_expected_arg_memo: Memo[(i32, i32, i32), i32],
     generic_enum_payload_cache_starts: HashMap[i64, i32],
     generic_enum_payload_cache_counts: HashMap[i64, i32],
     generic_enum_payload_cache_values: List[i32],
@@ -4075,6 +4081,8 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         unwrapped_type_cache: Memo.new(),
         generic_struct_field_type_cache: Memo.new(),
         generic_struct_field_index_type_cache: Memo.new(),
+        builtin_method_return_memo: Memo.new(),
+        method_expected_arg_memo: Memo.new(),
         generic_enum_payload_cache_starts,
         generic_enum_payload_cache_counts,
         generic_enum_payload_cache_values,

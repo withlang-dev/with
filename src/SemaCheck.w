@@ -20607,14 +20607,14 @@ impl Sema:
                 return ret
         0
 
-    mut fn optional_chain_method_raw_result_type_frozen(payload: i32, member: i32) -> i32:
+    fn optional_chain_method_raw_result_type_frozen(payload: i32, member: i32) -> i32:
         if payload == 0:
             return 0
         let recv_type = self.auto_deref_ref_ptr_type(payload as TypeId) as i32
         if recv_type == 0:
             return 0
         let owner_sym = self.method_owner_symbol_for_type(recv_type)
-        let builtin_ret = self.builtin_intrinsic_method_return_type(recv_type, owner_sym, member)
+        let builtin_ret = self.builtin_intrinsic_method_return_type_frozen(recv_type, owner_sym, member)
         if builtin_ret != 0:
             return builtin_ret
         if owner_sym != 0:
@@ -20663,7 +20663,7 @@ impl Sema:
             return 0
         self.optional_chain_wrap_result_for_error_type(raw_ret, err_ty)
 
-    mut fn optional_chain_method_result_type_no_check_frozen(base: i32, member: i32) -> i32:
+    fn optional_chain_method_result_type_no_check_frozen(base: i32, member: i32) -> i32:
         let payload = self.optional_chain_payload_type(base)
         if payload != 0:
             let raw_ret = self.optional_chain_method_raw_result_type_frozen(payload, member)
@@ -21009,6 +21009,25 @@ impl Sema:
             return self.pipeline_generic_builtin_method_exists(owner, method)
         0
 
+    // autoderef_type_has_method after the types are frozen.
+    fn autoderef_type_has_method_frozen(ty: TypeId, method: i32) -> i32:
+        if self.get_type_kind(ty) == TypeKind.TY_REF:
+            return 0
+        if self.enum_accessor_variant_for_method(ty as i32, method) != 0:
+            return 1
+        let owner = self.method_owner_symbol_for_type(ty as i32)
+        if owner == 0:
+            return 0
+        if self.lookup_generic_method_fn(owner, method) != 0:
+            return 1
+        if self.lookup_method_sig(owner, method) >= 0:
+            return 1
+        if self.builtin_intrinsic_method_return_type_frozen(ty as i32, owner, method) != 0:
+            return 1
+        if self.get_type_kind(ty) == TypeKind.TY_GENERIC_INST:
+            return self.pipeline_generic_builtin_method_exists(owner, method)
+        0
+
     // One deref-walk step. At most one (fn, ty) step is produced per call;
     // returning it beats the old share-place vec out-params (D5 superseded).
     mut fn autoderef_next_type(current: TypeId, node: i32, expr: i32) -> AutoderefStep:
@@ -21091,12 +21110,12 @@ impl Sema:
             return current
         self.resolve_alias(deref_info.result_ref_ty as TypeId)
 
-    mut fn auto_deref_method_type_frozen(tid: TypeId, method: i32) -> TypeId:
+    fn auto_deref_method_type_frozen(tid: TypeId, method: i32) -> TypeId:
         var current = self.resolve_alias(tid)
         let seen: List[i32] = List.new()
         var depth = 0
         while depth < 32:
-            if self.autoderef_type_has_method(current, method) != 0:
+            if self.autoderef_type_has_method_frozen(current, method) != 0:
                 return current
             if sema_autoderef_seen_type(&seen, current as i32) != 0:
                 sema_phase_bug("BUG: auto_deref_method_type_frozen cycle through Deref implementation")
@@ -34082,12 +34101,33 @@ impl Sema:
         let resolved = self.resolve_alias(elem as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_REF: self.get_type_d0(resolved) as i32 else: elem
 
+    // A builtin method's return type, built (an Option of the element, a
+    // tuple of Lists) and remembered: a read path asks it again after the
+    // types are frozen (builtin_intrinsic_method_return_type_frozen).
     mut fn builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
         if recv_type == 0:
             return 0
+        let key = (recv_type, owner_sym, field)
+        if let Some(known) = self.builtin_method_return_memo.get(key):
+            return known
+        let ret = self.compute_builtin_intrinsic_method_return_type(recv_type, owner_sym, field)
+        self.builtin_method_return_memo.insert(key, ret)
+        ret
+
+    // The answer checking settled for the same question; a question it never
+    // asked is a phase bug, not a guess.
+    fn builtin_intrinsic_method_return_type_frozen(recv_type: i32, owner_sym: i32, field: i32) -> i32:
+        if recv_type == 0:
+            return 0
+        if let Some(known) = self.builtin_method_return_memo.get((recv_type, owner_sym, field)):
+            return known
+        sema_phase_bug(f"BUG: builtin method `{self.pool_resolve(field)}` of type {recv_type} was never typed while checking")
+
+    mut fn compute_builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
         let resolved = self.resolve_alias(recv_type as TypeId)
         let tk = self.get_type_kind(resolved)
-        let method_name = self.pool_resolve(field)
+        // Owned: the pool may grow while the return type is built.
+        let method_name: str = self.pool_resolve(field)
         let len_method_ret = self.collection_len_method_return_type(method_name)
 
         let iter_elem_ty = self.iterator_element_type(recv_type)
@@ -34344,7 +34384,28 @@ impl Sema:
         // identifier arguments).
         self.resolve_parameter_type_expr(ty_node) as i32
 
+    // A method argument's expected type (a closure parameter's fn type, the
+    // receiver's numeric type), built and remembered for the frozen read.
     mut fn method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
+        if recv_type == 0:
+            return 0
+        let key = (self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as i32, field, arg_index)
+        if let Some(known) = self.method_expected_arg_memo.get(key):
+            return known
+        let expected = self.compute_method_expected_arg_type(recv_type, field, arg_index)
+        self.method_expected_arg_memo.insert(key, expected)
+        expected
+
+    // The expected type checking settled for this argument; a question it
+    // never asked is a phase bug, not a guess.
+    fn method_expected_arg_type_frozen(recv_type: i32, field: i32, arg_index: i32) -> i32:
+        if recv_type == 0:
+            return 0
+        if let Some(known) = self.method_expected_arg_memo.get((self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as i32, field, arg_index)):
+            return known
+        sema_phase_bug(f"BUG: argument {arg_index} of method `{self.pool_resolve(field)}` on type {recv_type} was never typed while checking")
+
+    mut fn compute_method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
             return 0
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
@@ -35732,7 +35793,8 @@ impl Sema:
     // MirLower's method dispatch reads. `raw` and `recv` are the receiver
     // type before and after auto-deref.
     mut fn method_lowering_kind(raw: i32, recv: i32, expr: i32, field: i32, arg_count: i32, intrinsic: MirIntrinsic) -> MethodLowering:
-        let name = self.pool_resolve(field)
+        // Owned: the pool may grow while the receiver type is resolved.
+        let name: str = self.pool_resolve(field)
         if name == "as_option" and raw > 0 and self.get_type_kind(self.resolve_alias(raw as TypeId)) == TypeKind.TY_PTR:
             return MethodLowering.PtrAsOption
         if name == "drop" and arg_count == 0 and not self.receiver_names_type(expr) and recv != 0 and self.type_has_drop_impl(recv) != 0:
