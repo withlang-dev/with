@@ -16,6 +16,6 @@ fn first(p: &List[i32]) -> &i32: &HIDDEN[0]
 fn main:
     HIDDEN.push(41)
     let x: List[i32] = List.new()
-    let r = first(&x)
+    let r: &i32 = first(&x)
     grow()
     print(*r)

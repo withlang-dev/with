@@ -4592,13 +4592,15 @@ impl Sema:
             return "a callable"
         if body < 0 or body >= self.sig_names.len():
             return "a callable"
-        // A specialization's symbol is its template's name, `__sema__` or
-        // `__receiver__`, then its key; an extension method's carries
-        // `$ext$` and its extension's key, a displaced name `$in$` and its
-        // module (#1703).
-        let full: str = with_str_clone_ref(self.pool_resolve(self.sig_names[body]))
-        let parts = full.split("__sema__")[0].split("__receiver__")[0].split("$ext$")[0].split("$in$")
-        "`" ++ parts[0] ++ "`"
+        "`" ++ self.sig_source_name(body) ++ "`"
+
+    // The name a signature has in the source. A specialization's symbol is
+    // its template's name, `__sema__` or `__receiver__`, then its key; an
+    // extension method's carries `$ext$` and its extension's key, a
+    // displaced name `$in$` and its module (#1703).
+    fn sig_source_name(sig: i32) -> str:
+        let full: str = with_str_clone_ref(self.pool_resolve(self.sig_names[sig]))
+        full.split("__sema__")[0].split("__receiver__")[0].split("$ext$")[0].split("$in$")[0]
 
     // A callable parameter's name (callable_param_body).
     fn global_param_body_name(param_body: i32) -> str:
@@ -9032,6 +9034,13 @@ impl Sema:
             return -1
         if self.builtin_sig_modes.len() == 0:
             self.load_builtin_sigs()
+        self.builtin_sig_row_lookup(recv_type, method)
+
+    // The row lookup once the rows are loaded (every check loads them before
+    // its first call; a frozen read finds them loaded).
+    fn builtin_sig_row_lookup(recv_type: i32, method: i32) -> i32:
+        if recv_type == 0 or self.builtin_sig_modes.len() == 0:
+            return -1
         let resolved = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
         let tk = self.get_type_kind(resolved)
         let named = if tk == TypeKind.TY_STR or tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT: -(tk as i32) else: self.get_type_name(resolved)
@@ -9044,7 +9053,7 @@ impl Sema:
             Some(row) => row
             None =>
                 // `FixedString[N]` instances are named `FixedString__N`.
-                let fixed = self.pool_intern("FixedString")
+                let fixed = self.pool_lookup_symbol("FixedString")
                 if self.builtin_sig_index.contains((fixed, method)) and self.pool_resolve(named).starts_with("FixedString"): self.builtin_sig_index.get((fixed, method)) ?? &-1 else: -1
 
     // D110: resolve builtin call `node` to its declared signature once, when
@@ -17103,26 +17112,24 @@ impl Sema:
         // D144: a binding from a place of plain bits takes the value — an
         // element as a field (`let k = self.starts[i]` is the i32, as `let k
         // = self.idx` is the isize), so a later write of the list is fine.
-        // The element read as its view (D27) and kept the binding a view.
+        // The same wherever the value is a view of plain bits: a join of
+        // such places (`if c: self.a else: self.b`), a lookup's payload
+        // (`m.get(k).unwrap()`), an iterator's `next().unwrap()`, a `&i32`
+        // parameter rebound. A view of plain bits has no use a value lacks,
+        // and holding one blocked every later write of its root. Only a
+        // written `&x` keeps the view: that spelling is the choice.
         if ann_type == 0 and val_type != 0:
             var elem_core = value
-            while elem_core != 0 and self.ast.kind(elem_core) == NodeKind.NK_GROUPED:
-                elem_core = self.ast.get_data0(elem_core)
-            // A built-in element place (D27); a user IndexGet is a call
-            // returning its view (#2560), not a place.
-            if elem_core != 0 and self.ast.kind(elem_core) == NodeKind.NK_INDEX and not self.index_place_get_fns.contains(elem_core):
-                let elem_view = self.resolve_alias(val_type)
-                if self.get_type_kind(elem_view) == TypeKind.TY_REF and self.get_type_d1(elem_view) == 0:
-                    let elem_ty = self.get_type_d0(elem_view)
-                    if self.type_is_plain_bits(elem_ty) and self.record_contextual_copy_adjustment(value, elem_ty, val_type as i32) != 0:
-                        val_type = elem_ty as TypeId
-            // A join of such places (`if c: self.a else: self.b`) is one too.
-            else if elem_core != 0 and (self.ast.kind(elem_core) == NodeKind.NK_IF_EXPR or self.ast.kind(elem_core) == NodeKind.NK_MATCH) and self.join_yields_places(elem_core):
-                let join_view = self.resolve_alias(val_type)
-                if self.get_type_kind(join_view) == TypeKind.TY_REF and self.get_type_d1(join_view) == 0:
-                    let join_ty = self.get_type_d0(join_view)
-                    if self.type_is_plain_bits(join_ty) and self.record_contextual_copy_adjustment(value, join_ty, val_type as i32) != 0:
-                        val_type = join_ty as TypeId
+            while elem_core != 0 and (self.ast.kind(elem_core) == NodeKind.NK_GROUPED or self.ast.kind(elem_core) == NodeKind.NK_UNSAFE_BLOCK or (self.ast.kind(elem_core) == NodeKind.NK_BLOCK and self.ast.get_data2(elem_core) != 0)):
+                elem_core = if self.ast.kind(elem_core) == NodeKind.NK_BLOCK: self.ast.get_data2(elem_core) else: self.ast.get_data0(elem_core)
+            // A written `&x`, or a cast to a reference (`p as &i32`), asks
+            // for the view (D179).
+            let written_ref = elem_core != 0 and ((self.ast.kind(elem_core) == NodeKind.NK_UNARY and self.ast.get_data0(elem_core) == UnaryOp.UOP_REF) or self.ast.kind(elem_core) == NodeKind.NK_CAST)
+            let bits_view = self.resolve_alias(val_type)
+            if not written_ref and self.get_type_kind(bits_view) == TypeKind.TY_REF and self.get_type_d1(bits_view) == 0:
+                let bits_ty = self.get_type_d0(bits_view)
+                if self.type_is_plain_bits(bits_ty) and self.record_contextual_copy_adjustment(value, bits_ty, val_type as i32) != 0:
+                    val_type = bits_ty as TypeId
             // A view into a statement temporary has one meaning left as a
             // binding: the Copy value, copied as an owned demand copies it
             // (D22 §6.2); `let p = args()[1]` needs no `: str`.
@@ -21029,11 +21036,22 @@ impl Sema:
             return 1
         if self.lookup_method_sig(owner, method) >= 0:
             return 1
-        if self.builtin_intrinsic_method_return_type_frozen(ty as i32, owner, method) != 0:
+        if self.builtin_method_exists_frozen(ty as i32, owner, method):
             return 1
         if self.get_type_kind(ty) == TypeKind.TY_GENERIC_INST:
             return self.pipeline_generic_builtin_method_exists(owner, method)
         0
+
+    // Whether a builtin method exists on a type, asked after the freeze: the
+    // answer checking remembered when it asked this, else the builtin's
+    // declared signature row or intrinsic (D110), which name the method
+    // without building its return type. A probe along a deref chain checking
+    // never walked (a scope handle's `track`, a receiver inferred late) is a
+    // yes/no question; only the type it returns is checking's alone.
+    fn builtin_method_exists_frozen(recv_type: i32, owner_sym: i32, field: i32) -> bool:
+        if let Some(known) = self.builtin_method_return_memo.get((recv_type, owner_sym, field)):
+            return known != 0
+        self.builtin_method_intrinsic(recv_type, self.pool_resolve(field)) != MirIntrinsic.NONE or self.builtin_sig_row_lookup(recv_type, field) >= 0
 
     // One deref-walk step. At most one (fn, ty) step is produced per call;
     // returning it beats the old share-place vec out-params (D5 superseded).
@@ -34414,12 +34432,12 @@ impl Sema:
 
     // The expected type checking settled for this argument; a question it
     // never asked is a phase bug, not a guess.
-    fn method_expected_arg_type_frozen(recv_type: i32, field: i32, arg_index: i32) -> i32:
+    fn method_expected_arg_type_frozen(recv_type: i32, field: i32, arg_index: i32, arg_node: i32) -> i32:
         if recv_type == 0:
             return 0
         if let Some(known) = self.method_expected_arg_memo.get((self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId)) as i32, field, arg_index)):
             return known
-        sema_phase_bug(f"BUG: argument {arg_index} of method `{self.pool_resolve(field)}` on type {recv_type} was never typed while checking")
+        sema_phase_bug(f"BUG: argument {arg_index} of method `{self.pool_resolve(field)}` on type {self.type_name(recv_type)} (line {self.node_line(arg_node)}) was never typed while checking")
 
     mut fn compute_method_expected_arg_type(recv_type: i32, field: i32, arg_index: i32) -> i32:
         if recv_type == 0:
@@ -36275,6 +36293,10 @@ impl Sema:
         let inferred_pending_receiver = self.infer_pending_generic_method_receiver(expr, field, arg_types, mc_resolved_arg_count, node)
         if inferred_pending_receiver != 0:
             obj_type = inferred_pending_receiver as TypeId
+            // D7: MIR lowers the arguments against the receiver's inferred
+            // type (`var out = List.new(); out.push(x)`); settled here.
+            for ai in 0..mc_resolved_arg_count:
+                self.method_expected_arg_type(obj_type as i32, field, ai)
 
         // Validate atomic ordering constraints (spec §14.17.1)
         if mc_order_type != 0:

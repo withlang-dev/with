@@ -6,8 +6,8 @@ pub fn sample_text() -> str:
 
 pub fn build_program() -> IRProgram:
     var prog = empty_program()
-    push_inst(&prog, ir_const_i32(0, 7))
-    push_inst(&prog, ir_const_f32(1, 1.25))
+    push_inst(prog, ir_const_i32(0, 7))
+    push_inst(prog, ir_const_f32(1, 1.25))
     prog
 
 pub fn first_float_ip(prog: &IRProgram) -> i32:

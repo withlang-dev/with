@@ -8,6 +8,6 @@ use issue1903.hidden
 fn main:
     seed(41)
     let x: List[i32] = List.new()
-    let r = first(&x)
+    let r: &i32 = first(&x)
     grow()
     print(*r)

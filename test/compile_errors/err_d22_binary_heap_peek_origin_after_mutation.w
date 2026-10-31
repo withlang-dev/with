@@ -6,6 +6,6 @@ use std.collections.binary_heap.BinaryHeap
 fn main:
     var m: BinaryHeap[i32] = BinaryHeap.new()
     m.push(86)
-    let view = m.peek().unwrap()
+    let view: &i32 = m.peek().unwrap()
     m.pop()
     print(*view)

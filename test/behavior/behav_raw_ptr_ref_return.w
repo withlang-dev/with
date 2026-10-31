@@ -31,7 +31,7 @@ fn main:
     var n: i64 = 41
     let np = &raw const n as i64
     let sv = scalar_view(np)
-    assert(*sv == 41)
+    assert(sv == 41)
 
     var m: i64 = 100
     let mp = &raw mut m as i64

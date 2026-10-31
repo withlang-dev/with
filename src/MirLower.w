@@ -13065,7 +13065,7 @@ impl MirBuilder:
         var expected_ty: i32 = 0
         if recv_type != 0:
             let resolved_recv = self.sema.auto_deref_ref_ptr_type(recv_type as TypeId) as i32
-            expected_ty = self.sema.method_expected_arg_type_frozen(resolved_recv, method_sym, arg_index)
+            expected_ty = self.sema.method_expected_arg_type_frozen(resolved_recv, method_sym, arg_index, arg_node)
             if expected_ty != 0 and expected_ty != self.sema.ty_void as i32:
                 self.expected_type = expected_ty
         let autocopy_ref = self.lower_auto_copy_ref_call_arg(arg_node, expected_ty)
@@ -13634,8 +13634,13 @@ impl MirBuilder:
         // is not the one the spelling names (method_call_fields).
         let method_sym: i32 = self.sema.method_call_fields.get(node) ?? method_sym0
         // Lower method calls as normal calls with receiver inserted as first arg.
+        // D65: a scope handle's `track`/`spawn` is the builtin Sema decided;
+        // there is no method on the handle to resolve.
+        let scope_builtin = self.sema.call_builtin(node)
         var callee_sym = if self.sema.comp_resolved.contains(node):
             self.sema.comp_resolved.get(node).unwrap()
+        else if scope_builtin == CallBuiltin.ScopeTrack or scope_builtin == CallBuiltin.ScopeSpawn:
+            method_sym
         else:
             self.resolve_method_callee_sym(self_expr, method_sym)
 
@@ -13683,7 +13688,8 @@ impl MirBuilder:
             callee_sym = method_sym
         if self.receiver_is_static_type_expr(self_expr) != 0 and recv_type != 0 and self.sema.enum_has_variant(recv_type, method_sym) != 0:
             return self.lower_static_enum_variant_call(recv_type, method_sym, arg_start, arg_count, node)
-        let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32: self.autoderef_result_type_for_method(recv_type, method_sym) else: recv_type
+        let scope_handle_call = scope_builtin == CallBuiltin.ScopeTrack or scope_builtin == CallBuiltin.ScopeSpawn
+        let enum_accessor_recv_type = if recv_type != 0 and recv_type != self.sema.ty_void as i32 and not scope_handle_call: self.autoderef_result_type_for_method(recv_type, method_sym) else: recv_type
         let enum_accessor_variant = self.sema.enum_accessor_variant_for_method(enum_accessor_recv_type, method_sym)
         if enum_accessor_variant != 0:
             return self.lower_enum_accessor_call(self_expr, method_sym, node)
