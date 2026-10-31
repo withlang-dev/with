@@ -25,6 +25,7 @@ use AnalysisTypes
 use MirCore
 use SemaTypes
 use std.collections.HashMap
+use std.memo
 use rt.rt_core
 use std.libc.exit
 
@@ -237,7 +238,7 @@ type Codegen {
     // symbols so both layouts coexist in LLVM — the std-tier decl registers
     // under `name$std`, the user decl keeps the plain name. Populated during
     // type registration; read-only afterwards.
-    shadow_alias_map: HashMap[i32, i32],
+    shadow_alias_map: Memo[i32, i32],
     // #1446: two modules may each declare a type with the same name. Sema
     // keeps one TypeId per declaration; the first declaration of a name keeps
     // the plain codegen symbol and every later one registers under
@@ -1141,7 +1142,7 @@ fn Codegen.init_with_opt(module_name: &str, opt_level: i32) -> Codegen:
         fn_abi_values: HashMap.new(),
         analysis_call_abis: HashMap.new(),
         struct_type_map: HashMap.new(),
-        shadow_alias_map: HashMap.new(),
+        shadow_alias_map: Memo.new(),
         nominal_alias_by_tid: HashMap.new(),
         nominal_split_names: HashMap.new(),
         struct_llvm_types: List.new(),
@@ -4359,15 +4360,12 @@ impl Codegen:
         if sema_tier_path_is_std_implementation(self.sema.decl_index_source_path(decl_index)) == 0:
             return name_sym
         let alias = self.intern.intern(self.intern.resolve(name_sym) ++ "$std")
-        let map = &raw const self.shadow_alias_map as *const HashMap[i32, i32] as *mut HashMap[i32, i32]
-        unsafe { (*map).insert(name_sym, alias) }
+        self.shadow_alias_map.insert(name_sym, alias)
         alias
 
     // Lookup side: reads the alias recorded at registration; never interns.
     fn shadow_alias_for(name_sym: i32) -> i32:
-        if self.shadow_alias_map.contains(name_sym):
-            return self.shadow_alias_map.get(name_sym).unwrap()
-        name_sym
+        self.shadow_alias_map.get(name_sym) ?? name_sym
 
     // ── #1446: one codegen symbol per type declaration ─────────────────
 

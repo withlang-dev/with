@@ -17149,6 +17149,7 @@ impl Sema:
         if self.type_carries_callable(bind_type as i32):
             self.callable_let_decls.insert(node, 1)
             self.note_callable_binding_value(node, value)
+        self.reject_interior_constant(node, name, bind_type as i32)
         self.typed_binding_types.insert(node, bind_type as i32)
         self.typed_binding_names.insert(node, name)
         self.typed_binding_muts.insert(node, is_mut)
@@ -31234,8 +31235,7 @@ impl Sema:
         if self.blanket_guard_contains(key) != 0:
             return 0
         var found: i32 = 0
-        let guard = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
-        unsafe { (*guard).insert(key) }
+        self.blanket_guard.insert(key, true)
         for bi in 0..self.blanket_trait_syms.len():
             if self.blanket_trait_syms[bi] != trait_sym:
                 continue
@@ -31253,14 +31253,13 @@ impl Sema:
                     all_satisfied = 0
             if all_satisfied != 0:
                 found = 1
-        let guard_out = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
-        let _ = unsafe { (*guard_out).remove(key) }
+        self.blanket_guard.remove(key)
         found
 
     fn select_trait_impl(type_sym: i32, trait_sym: i32) -> i32:
         let key = self.selection_cache_key(type_sym, trait_sym)
-        if self.selection_cache.contains(key):
-            return self.selection_cache.get(key).unwrap()
+        if let Some(cached) = self.selection_cache.get(key):
+            return cached
 
         // Cycle guard: if already resolving this pair, assume not found
         if self.blanket_guard_contains(key) != 0:
@@ -31278,10 +31277,7 @@ impl Sema:
 
         // Check blanket impls: impl[T: Bound] Trait for T
         if found == 0:
-            // Interior query bookkeeping must mutate the one Sema-owned set;
-            // copying an owning D22 HashSet handle would duplicate its owner.
-            let guard = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
-            unsafe { (*guard).insert(key) }
+            self.blanket_guard.insert(key, true)
             for bi in 0..self.blanket_trait_syms.len():
                 if self.blanket_trait_syms[bi] != trait_sym:
                     continue
@@ -31303,11 +31299,9 @@ impl Sema:
                         all_satisfied = 0
                 if all_satisfied != 0:
                     found = 1
-            let guard_out = &raw const self.blanket_guard as *const HashSet[i64] as *mut HashSet[i64]
-            let _ = unsafe { (*guard_out).remove(key) }
+            self.blanket_guard.remove(key)
 
-        let cache = &raw const self.selection_cache as *const HashMap[i64, i32] as *mut HashMap[i64, i32]
-        unsafe { (*cache).insert(key, found) }
+        self.selection_cache.insert(key, found)
         found
 
     fn subst_list_lookup(names: &List[i32], types: &List[i32], name: i32) -> i32:
@@ -31553,38 +31547,21 @@ impl Sema:
         let base_tid = self.generic_inst_template_tid(resolved as i32)
         if base_tid == 0:
             return 0
-        let tp_start = self.type_decl_tp_start(decl)
-        let tp_count = self.type_decl_tp_count(decl)
-        let subst_syms: List[i32] = List.new()
-        let subst_tids: List[i32] = List.new()
-        var pos = tp_start
-        for ti in 0..tp_count:
-            let tp_name = self.ast.get_extra(pos)
-            let bound_count = self.ast.get_extra(pos + 1)
-            subst_syms.push(tp_name)
-            subst_tids.push(self.get_generic_inst_arg(resolved as i32, ti))
-            pos = pos + 2 + bound_count
-
-        let base_resolved = self.resolve_alias(base_tid)
-        let tk = self.get_type_kind(base_resolved)
+        // The instance's own field and payload types. The template records
+        // 0 for one spelled by a type parameter (`x: T`), and substituting
+        // 0 made every generic struct with such a field neither Send nor
+        // Sync, whatever its arguments.
+        let tk = self.get_type_kind(self.resolve_alias(base_tid))
         if tk == TypeKind.TY_STRUCT:
-            let te_start = self.get_type_d1(base_resolved)
-            let field_count = self.get_type_d2(base_resolved)
-            for fi in 0..field_count:
-                let field_ty = self.substitute_type(self.type_extra[(te_start + fi * 3 + 1)], subst_syms, subst_tids, tp_count)
-                if self.type_satisfies_thread_trait(field_ty, trait_sym) == 0:
+            for fi in 0..self.type_reflection_field_count(resolved as i32):
+                if self.type_satisfies_thread_trait(self.type_reflection_field_type(resolved as i32, fi), trait_sym) == 0:
                     return 0
             return 1
         if tk == TypeKind.TY_ENUM:
-            let variant_count = self.get_type_d2(base_resolved)
-            var epos = self.get_type_d1(base_resolved)
-            for vi in 0..variant_count:
-                let payload_count: i32 = self.type_extra[(epos + 1)]
-                for pi in 0..payload_count:
-                    let payload_ty = self.substitute_type(self.type_extra[(epos + 2 + pi)], subst_syms, subst_tids, tp_count)
-                    if self.type_satisfies_thread_trait(payload_ty, trait_sym) == 0:
+            for vi in 0..self.type_reflection_variant_count(resolved as i32):
+                for pi in 0..self.type_reflection_variant_payload_count(resolved as i32, vi):
+                    if self.type_satisfies_thread_trait(self.type_reflection_variant_payload_type(resolved as i32, vi, pi), trait_sym) == 0:
                         return 0
-                epos = epos + 2 + payload_count
             return 1
         0
 
@@ -31592,6 +31569,13 @@ impl Sema:
         let resolved = self.resolve_alias(tid)
         let base = self.get_generic_inst_base(resolved as i32)
         let base_name = self.pool_resolve_symbol(base)
+        // §19.1: the marker's contents change through a shared view with no
+        // synchronization, so a view of it never crosses threads; the value
+        // itself moves as its contents do.
+        if base_name == "Interior" and self.type_decl_is_interior_marker(self.generic_inst_decl_node(resolved as i32)):
+            if trait_sym == self.syms.sync_trait or self.get_generic_inst_arg_count(resolved as i32) != 1:
+                return 0
+            return self.type_satisfies_thread_trait(self.get_generic_inst_arg(resolved as i32, 0), trait_sym)
         if base_name == "Rc" and self.type_symbol_is_std_rc_owner(base) != 0:
             return 0
         if base_name == "Arc" and self.type_symbol_is_std_rc_owner(base) != 0:
@@ -31641,6 +31625,8 @@ impl Sema:
         if tk == TypeKind.TY_ERR or tk == TypeKind.TY_INT or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_VOID or tk == TypeKind.TY_NEVER or tk == TypeKind.TY_STR:
             return 1
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE:
+            // A view of marker storage would let two threads write it (§19.1).
+            if self.type_holds_interior(self.get_type_d0(resolved)): return 0
             return if trait_sym == self.syms.scoped_send_trait: 1 else: 0
         if tk == TypeKind.TY_PTR:
             return 0
@@ -39129,6 +39115,12 @@ impl Sema:
                 if self.expr_uses_symbol(worker_body, cap_sym) != 0:
                     if self.type_is_scoped_send(self.scope_lookup(cap_sym)) == 0:
                         self.emit_error("scoped thread worker captures non-ScopedSend value `" ++ self.pool_resolve(cap_sym) ++ "`", worker)
+                        continue
+                    // A capture is a view the worker shares with this thread
+                    // and every other worker; the marker's contents change
+                    // through such a view unsynchronized (§19.1).
+                    if self.type_holds_interior(self.scope_lookup(cap_sym)):
+                        self.emit_error(f"scoped thread worker shares `{self.pool_resolve(cap_sym)}`, whose contents change through a shared view; it is not `Sync` (§19.1)", worker)
                         continue
                     let mutating_capture = self.expr_mutates_place(worker_body, cap_sym)
                     self.check_sync_scope_capture_rest(cap_sym, mutating_capture, handle_sym, extra_start, stmt_count, next_stmt_index, tail, worker)

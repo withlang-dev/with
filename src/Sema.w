@@ -23,6 +23,7 @@ use SemaDecl
 use SemaVector
 use std.collections.HashMap
 use std.collections.HashSet
+use std.memo
 use compiler.Runtime
 use rt.rt_core
 use std.libc.abort
@@ -1120,13 +1121,13 @@ type Sema {
     obligation_trait_syms: List[i32],
     obligation_type_syms: List[i32],
     obligation_nodes: List[i32],
-    selection_cache: HashMap[i64, i32],
+    selection_cache: Memo[i64, i32],
     // Blanket impl recursion guard: keys currently being resolved
     // Cycle-detection guard for select_trait_impl. A HashSet (heap handle), not a
     // List, so it can be mutated through a copied handle from a `&Self` query method
     // (D7: query methods are read; the guard is interior bookkeeping). See
     // project_enforce_receiver_modes.
-    blanket_guard: HashSet[i64],
+    blanket_guard: Memo[i64, bool],
 
     // Local trait/type names
     local_trait_names: HashMap[i32, i32],
@@ -1377,7 +1378,7 @@ type Sema {
     method_has_inherent: HashMap[i32, i32],
     method_symbol_flags: HashMap[i32, i32],
     method_lookup: SemaMethodLookup,
-    drop_method_cache: HashMap[i32, i32],
+    drop_method_cache: Memo[i32, i32],
     // D72 (§2.5.1, #1431): struct name sym -> 1 when the struct carries the
     // hidden liveness byte (struct_needs_liveness_byte), 0 otherwise.
     liveness_byte_cache: HashMap[i32, i32],
@@ -2091,7 +2092,7 @@ type Sema {
     param_view_fact_nodes: List[i32],
     param_view_fact_files: List[i32],
     concrete_key_mono_syms: HashMap[i32, i32],
-    generic_inst_cache: HashMap[i64, i32],
+    generic_inst_cache: Memo[i64, i32],
     // D7: eager tables filled in preregister_mir_types (before freeze) so the frozen
     // consumers read answers via &Self twins instead of re-deriving them through the
     // mutating checker. is_copy_cache[tid] = 0/1 copy-ness.
@@ -2751,7 +2752,81 @@ fn sema_path_is_std_rc_module(path: &str) -> i32:
         return 1
     0
 
+fn sema_path_is_std_memo_module(path: &str) -> bool:
+    path == "lib/std/memo.w" or path == "<embedded-std>/std/memo.w" or path.ends_with("/lib/std/memo.w") or path.ends_with("\\lib\\std\\memo.w")
+
 impl Sema:
+    // D172 (§19.1): `std.memo`'s `Interior` is the one type whose contents
+    // may change through a shared view.
+    fn type_decl_is_interior_marker(decl: i32) -> bool:
+        if decl == 0 or self.pool_resolve(self.ast.get_data0(decl as NodeId)) != "Interior":
+            return false
+        let di = self.find_decl_index(decl)
+        di >= 0 and di < self.decl_source_paths.len() and sema_path_is_std_memo_module(self.decl_source_paths[di])
+
+    // Whether a value of `tid` holds the marker in its own storage, so a
+    // view of it must not be treated as read-only memory (§19.1). Storage
+    // behind a pointer, a reference or a container's buffer is not the
+    // value's own. A generic instance counts when its template's fields or
+    // any argument do: conservative, which can only cost an optimization.
+    fn type_contains_interior(tid: i32) -> bool:
+        if self.pool_lookup_symbol("Interior") == 0:
+            return false
+        var visited: List[i32] = List.new()
+        self.type_contains_interior_from(tid, mut visited)
+
+    fn type_contains_interior_from(tid: i32, mut visited: List[i32]) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if visited.contains(resolved):
+            return false
+        visited.push(resolved)
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_ARRAY:
+            return self.type_contains_interior_from(self.get_type_d0(resolved as TypeId), mut visited)
+        if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved as TypeId)
+            for ei in 0..self.get_type_d1(resolved as TypeId):
+                if self.type_contains_interior_from(self.type_extra[te_start + ei], mut visited): return true
+            return false
+        if tk == TypeKind.TY_STRUCT:
+            let te_start = self.get_type_d1(resolved as TypeId)
+            for fi in 0..self.get_type_d2(resolved as TypeId):
+                if self.type_contains_interior_from(self.type_extra[te_start + fi * 3 + 1], mut visited): return true
+            return false
+        if tk == TypeKind.TY_ENUM:
+            var pos = self.get_type_d1(resolved as TypeId)
+            for vi in 0..self.get_type_d2(resolved as TypeId):
+                let payload_count = self.type_extra[pos + 1]
+                for pi in 0..payload_count:
+                    if self.type_contains_interior_from(self.type_extra[pos + 2 + pi], mut visited): return true
+                pos = pos + 2 + payload_count
+            return false
+        if tk == TypeKind.TY_GENERIC_INST:
+            let decl = self.generic_inst_decl_node(resolved)
+            if self.type_decl_is_interior_marker(decl):
+                return true
+            for ai in 0..self.get_generic_inst_arg_count(resolved):
+                if self.type_contains_interior_from(self.get_generic_inst_arg(resolved, ai), mut visited): return true
+            // The instance's fields, once registered (before codegen); the
+            // template records 0 for a field spelled by a type parameter.
+            for fi in 0..self.type_reflection_field_count(resolved):
+                let field_ty = self.generic_struct_field_index_type_cache.get(sema_pair_key(resolved, fi)) ?? 0
+                if self.type_contains_interior_from(field_ty, mut visited): return true
+            let template = self.generic_inst_template_tid(resolved)
+            return template != 0 and self.type_contains_interior_from(template, mut visited)
+        false
+
+    // A constant is an immutable static (D127); the marker's contents
+    // change through a shared view, so no constant holds one (§19.1).
+    mut fn reject_interior_constant(decl: i32, name: i32, ty: i32):
+        if self.ast.is_const_decl_node(decl as NodeId) == 0 or not self.type_holds_interior(ty):
+            return
+        var diag = Diagnostic.err(f"constant `{self.pool_resolve(name)}` holds an `Interior`, whose contents change through a shared view; a constant is an immutable static (§19.1)", Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) })
+        diag.add_help("bind it with `let` instead of `const`")
+        self.diags.emit(diag)
+
     fn current_module_is_std_implementation() -> i32:
         sema_tier_path_is_std_implementation(self.current_module_path)
 
@@ -2932,7 +3007,7 @@ impl Sema:
         self.type_extra = sema_clone_i32_list(&self.type_extra)
         self.rebuild_exact_type_cache()
         self.rebuild_named_type_candidate_index()
-        self.generic_inst_cache = sema_new_map_i64_i32()
+        self.generic_inst_cache = Memo.new()
         self.layout_size_cache = HashMap.new()
         self.layout_align_cache = HashMap.new()
         self.layout_field_offset_cache = HashMap.new()
@@ -3222,7 +3297,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let trait_lookup = sema_new_map_i32_i32()
     let trait_candidate_heads = sema_new_map_i32_i32()
     let impl_lookup = sema_new_map_i32_i32()
-    let selection_cache = sema_new_map_i64_i32()
+    let selection_cache: Memo[i64, i32] = Memo.new()
     let local_trait_names = sema_new_map_i32_i32()
     let lang_trait_syms = sema_new_map_i32_i32()
     let local_type_names = sema_new_map_i32_i32()
@@ -3286,7 +3361,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let extension_method_sig_idxs = sema_new_list_i32()
     let extension_method_paths = sema_new_list_str()
     let qualified_extension_call_nodes = sema_new_map_i32_i32()
-    let drop_method_cache = sema_new_map_i32_i32()
+    let drop_method_cache: Memo[i32, i32] = Memo.new()
     let liveness_byte_cache = sema_new_map_i32_i32()
     let liveness_byte_decl_cache = sema_new_map_i32_i32()
     let typed_expr_types = sema_new_map_i32_i32()
@@ -3307,7 +3382,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     let generic_specialization_cache = sema_new_map_str_i32()
     let generic_specializations_in_check = sema_new_map_str_i32()
     let specialization_source_paths: HashMap[i32, str] = HashMap.new()
-    let generic_inst_cache = sema_new_map_i64_i32()
+    let generic_inst_cache: Memo[i64, i32] = Memo.new()
     let layout_size_cache: HashMap[i32, i64] = HashMap.new()
     let layout_align_cache: HashMap[i32, i64] = HashMap.new()
     let layout_field_offset_cache: HashMap[i64, i64] = HashMap.new()
@@ -3515,7 +3590,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         obligation_type_syms: List.new(),
         obligation_nodes: List.new(),
         selection_cache,
-        blanket_guard: HashSet.new(),
+        blanket_guard: Memo.new(),
         local_trait_names,
         lang_trait_syms,
         local_type_names,
@@ -6577,8 +6652,7 @@ fn sema_generic_inst_hash(base_sym: i32, args: &List[i32], arg_count: i32) -> i6
 impl Sema:
     fn find_generic_inst_type(base_sym: i32, args: &List[i32], arg_count: i32) -> TypeId:
         let key = sema_generic_inst_hash(base_sym, args, arg_count)
-        if self.generic_inst_cache.contains(key):
-            let cached = self.generic_inst_cache.get(key).unwrap()
+        if let Some(cached) = self.generic_inst_cache.get(key):
             if cached >= 0 and cached < self.type_kinds.len():
                 if self.type_kinds[cached] == TypeKind.TY_GENERIC_INST:
                     let cached_base = self.type_d0[cached]
@@ -6599,12 +6673,7 @@ impl Sema:
                 continue
             let te_start = self.type_d1[ti]
             if self.type_extra_matches(te_start, args, arg_count) != 0:
-                // Interior-mut cache memoization. HashMap is an owning D22
-                // handle, so copying the field would move it out of self (the
-                // old D7 handle-copy trick blanks the field under #691).
-                // Reborrow as an explicit raw place like drop_method_cache.
-                let gic = &raw const self.generic_inst_cache as *const HashMap[i64, i32] as *mut HashMap[i64, i32]
-                unsafe { (*gic).insert(key, ti as i32) }
+                self.generic_inst_cache.insert(key, ti as i32)
                 return ti as TypeId
         0 as TypeId
 
@@ -6847,6 +6916,113 @@ impl Sema:
             return 1
         0
 
+    // D172 (§19.1): `Memo[K, V]` is for ID-like keys and values. Its key
+    // hashes and compares as the compiler generates, so no `key()`
+    // projection anywhere in `K` runs inside the cache; its value is copied
+    // out, so it holds no view, raw pointer, `str`, slice or function value.
+    mut fn validate_memo_arguments(base_sym: i32, args: &List[i32], node: i32):
+        if self.pool_resolve_symbol(base_sym) != "Memo" or not sema_path_is_std_memo_module(self.type_decl_source_path(base_sym)) or args.len() != 2:
+            return
+        var visited: List[i32] = List.new()
+        let projected = self.type_with_key_projection(args[0], mut visited)
+        if projected != 0:
+            self.emit_error(f"`Memo`'s key `{self.type_name(args[0])}` compares through the key projection of `{self.type_name(projected)}`; a `Memo` key hashes and compares as the compiler generates (§19.1)", node)
+        var seen: List[i32] = List.new()
+        let held = self.memo_value_holds(args[1], mut seen)
+        if held.len() > 0:
+            self.emit_error(f"`Memo`'s value `{self.type_name(args[1])}` holds {held}; a `Memo` value is copied out and holds no view, raw pointer, `str`, slice or function value (§19.1)", node)
+
+    // The type within `tid`, itself included, that declares a key
+    // projection; 0 when none does.
+    mut fn type_with_key_projection(tid: i32, mut visited: List[i32]) -> i32:
+        if tid <= 0:
+            return 0
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if visited.contains(resolved):
+            return 0
+        visited.push(resolved)
+        let tk = self.get_type_kind(resolved as TypeId)
+        if (tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_has_key_projection(resolved):
+            return resolved
+        var parts: List[i32] = List.new()
+        self.type_inline_parts(resolved, mut parts)
+        for part in parts:
+            let found = self.type_with_key_projection(part, mut visited)
+            if found != 0: return found
+        0
+
+    // type_contains_interior while checking, before generic instances'
+    // field types are registered: it resolves each instance's own fields.
+    mut fn type_holds_interior(tid: i32) -> bool:
+        if self.pool_lookup_symbol("Interior") == 0:
+            return false
+        var visited: List[i32] = List.new()
+        self.type_holds_interior_from(tid, mut visited)
+
+    mut fn type_holds_interior_from(tid: i32, mut visited: List[i32]) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if visited.contains(resolved):
+            return false
+        visited.push(resolved)
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR or tk == TypeKind.TY_SLICE:
+            return false
+        if tk == TypeKind.TY_GENERIC_INST and self.type_decl_is_interior_marker(self.generic_inst_decl_node(resolved)):
+            return true
+        var parts: List[i32] = List.new()
+        self.type_inline_parts(resolved, mut parts)
+        for part in parts:
+            if self.type_holds_interior_from(part, mut visited): return true
+        false
+
+    // What in `tid` a `Memo` value may not hold, described; "" when nothing.
+    mut fn memo_value_holds(tid: i32, mut visited: List[i32]) -> str:
+        if tid <= 0:
+            return ""
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if visited.contains(resolved):
+            return ""
+        visited.push(resolved)
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_REF: return "a view"
+        if tk == TypeKind.TY_PTR: return "a raw pointer"
+        if tk == TypeKind.TY_STR: return "a `str`"
+        if tk == TypeKind.TY_SLICE: return "a slice"
+        if tk == TypeKind.TY_FN or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ: return "a function value"
+        var parts: List[i32] = List.new()
+        self.type_inline_parts(resolved, mut parts)
+        for part in parts:
+            let held = self.memo_value_holds(part, mut visited)
+            if held.len() > 0: return held
+        ""
+
+    // The types a value of `tid` is made of: an array's element, a
+    // tuple's elements, a struct's fields, an enum's payloads, a generic
+    // instance's fields, payloads and arguments.
+    mut fn type_inline_parts(resolved: i32, mut parts: List[i32]):
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_ARRAY:
+            parts.push(self.get_type_d0(resolved as TypeId))
+        else if tk == TypeKind.TY_TUPLE:
+            let te_start = self.get_type_d0(resolved as TypeId)
+            for ei in 0..self.get_type_d1(resolved as TypeId): parts.push(self.type_extra[te_start + ei])
+        else if tk == TypeKind.TY_STRUCT:
+            let te_start = self.get_type_d1(resolved as TypeId)
+            for fi in 0..self.get_type_d2(resolved as TypeId): parts.push(self.type_extra[te_start + fi * 3 + 1])
+        else if tk == TypeKind.TY_ENUM:
+            var pos = self.get_type_d1(resolved as TypeId)
+            for vi in 0..self.get_type_d2(resolved as TypeId):
+                let payload_count = self.type_extra[pos + 1]
+                for pi in 0..payload_count: parts.push(self.type_extra[pos + 2 + pi])
+                pos = pos + 2 + payload_count
+        else if tk == TypeKind.TY_GENERIC_INST:
+            for ai in 0..self.get_generic_inst_arg_count(resolved): parts.push(self.get_generic_inst_arg(resolved, ai))
+            for fi in 0..self.type_reflection_field_count(resolved): parts.push(self.type_reflection_field_type(resolved, fi))
+            for vi in 0..self.type_reflection_variant_count(resolved):
+                for pi in 0..self.type_reflection_variant_payload_count(resolved, vi): parts.push(self.type_reflection_variant_payload_type(resolved, vi, pi))
+
     mut fn validate_atomic_payload_type(base_sym: i32, args: &List[i32], arg_count: i32, node: i32) -> i32:
         if self.pool_resolve_symbol(base_sym) != "Atomic":
             return 1
@@ -6932,6 +7108,9 @@ impl Sema:
             gi_args.push(gi_arg_tid as i32)
         if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == 0:
             return 0
+        // A refused argument is reported and the instance kept, so its uses
+        // do not cascade into inference errors.
+        self.validate_memo_arguments(gi_base_sym, gi_args, node)
         let inst = self.ensure_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
         if inst != 0 and gi_base_tid != 0 and not self.generic_inst_templates.contains(inst):
             self.generic_inst_templates.insert(inst, gi_base_tid)
@@ -11478,16 +11657,11 @@ impl Sema:
     fn has_drop_method(type_name: i32) -> i32:
         if type_name <= 0:
             return 0
-        if self.drop_method_cache.contains(type_name):
-            return self.drop_method_cache.get(type_name).unwrap()
+        if let Some(cached) = self.drop_method_cache.get(type_name):
+            return cached
 
         let has = self.select_trait_impl(type_name, self.syms.drop)
-        // This read query memoizes into Sema's phase-local cache. HashMap is an
-        // owning D22 handle, so copying the field would create a second owner.
-        // Reborrow the field as an explicit raw place instead; Sema queries are
-        // single-threaded and no safe cache borrow crosses this mutation.
-        let cache = &raw const self.drop_method_cache as *const HashMap[i32, i32] as *mut HashMap[i32, i32]
-        unsafe { (*cache).insert(type_name, has) }
+        self.drop_method_cache.insert(type_name, has)
         has
 
     fn record_drop_consumed_field(owner_sym: i32, field_sym: i32):

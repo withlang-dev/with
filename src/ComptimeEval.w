@@ -8866,6 +8866,8 @@ impl Sema:
                     self.emit_error("type mismatch in binding", decl)
         let final_type = if ann_type != 0: ann_type else: val_type
         if final_type != 0:
+            // An annotated constant was judged at its declaration.
+            if ann_type == 0: self.reject_interior_constant(decl as i32, name, final_type as i32)
             self.typed_binding_types.insert(decl as i32, final_type as i32)
             self.scope_update_type(name, final_type as i32)
             let canonical_name = self.pool_lookup_symbol(self.pool_resolve(name))
