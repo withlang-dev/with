@@ -1445,6 +1445,9 @@ type Sema {
     discard_lets: HashMap[i32, i32],
     scope_starts: List[i32],
     scope_name_map: HashMap[i32, i32],
+    // A binding whose scope has ended: its name to its declaring node, so an
+    // undefined name that was bound in a block before its use says so.
+    ended_bindings: HashMap[i32, i32],
     pending_generic_binding_base: HashMap[i32, i32],
     pending_generic_binding_call: HashMap[i32, i32],
     pending_generic_binding_decl: HashMap[i32, i32],
@@ -3743,6 +3746,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         discard_lets: sema_new_map_i32_i32(),
         scope_starts: List.new(),
         scope_name_map: HashMap.new(),
+        ended_bindings: HashMap.new(),
         pending_generic_binding_base: sema_new_map_i32_i32(),
         pending_generic_binding_call: sema_new_map_i32_i32(),
         pending_generic_binding_decl: sema_new_map_i32_i32(),
@@ -7740,6 +7744,7 @@ impl Sema:
         while self.bind_names.len() > start:
             let removed_sym: i32 = self.bind_names[self.bind_names.len() - 1]
             let removed_node = self.binding_decl_node(removed_sym)
+            if removed_node > 0: self.ended_bindings.insert(removed_sym, removed_node)
             self.check_live_views_for_origin(removed_sym, removed_node)
             self.poison_live_views_for_origin(removed_sym, removed_node)
             if self.pending_generic_binding_base.contains(removed_sym):
