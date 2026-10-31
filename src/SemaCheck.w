@@ -17353,8 +17353,30 @@ impl Sema:
         self.truth_test_exprs.insert(node, int_ty as i32)
         true
 
+    // D177/D126: a condition whose every value is a soft numeric literal
+    // (`if (if c: 1 else: 0):`, as C migrates a comparison used as an
+    // integer) has no demand to type it; the test gives it `i32`, the
+    // literal's default, so the truth test sees an integer.
+    fn cond_is_soft_literal_join(node: i32) -> bool:
+        if node == 0:
+            return false
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
+            return self.cond_is_soft_literal_join(self.ast.get_data0(node))
+        if kind == NodeKind.NK_BLOCK:
+            return self.ast.get_data1(node) == 0 and self.cond_is_soft_literal_join(self.ast.get_data2(node))
+        if kind == NodeKind.NK_IF_EXPR:
+            return self.ast.get_data2(node) != 0 and self.cond_is_soft_literal_join(self.ast.get_data1(node)) and self.cond_is_soft_literal_join(self.ast.get_data2(node))
+        if kind == NodeKind.NK_MATCH:
+            for ai in 0..self.ast.get_data2(node):
+                let arm = self.ast.get_extra(self.ast.get_data1(node) + ai)
+                if arm <= 0 or self.ast.kind(arm) != NodeKind.NK_MATCH_ARM or not self.cond_is_soft_literal_join(self.ast.get_data1(arm)):
+                    return false
+            return self.ast.get_data2(node) > 0
+        kind == NodeKind.NK_INT_LIT and self.is_soft_numeric_literal(node) != 0
+
     mut fn check_bool_condition(cond: i32, what: &str) -> TypeId:
-        let t = self.check_expr(cond)
+        let t = if self.cond_is_soft_literal_join(cond): self.check_expr_with_expected(cond, self.ty_i32) else: self.check_expr(cond)
         if t == 0:
             return t
         let resolved = self.resolve_alias(t as TypeId)
