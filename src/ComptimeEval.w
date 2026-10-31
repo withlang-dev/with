@@ -3669,7 +3669,7 @@ impl ComptimeEvaluator:
             arg_types.push(self.comptime_value_semantic_type(arg_signal.value))
             arg_values.push(move arg_signal.value)
 
-        let resolved_recv = self.sema.auto_deref_method_type_frozen(recv_value.type_id as TypeId, method)
+        let resolved_recv = self.sema.auto_deref_method_type(recv_value.type_id as TypeId, method, 0, 0)
         let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
         if owner == 0:
             return self.fail(node, "method receiver type is unavailable in comptime")
@@ -3788,7 +3788,7 @@ impl ComptimeEvaluator:
         if self.sema.pipeline_carrier_kinds.contains(node):
             threads_receiver = self.sema.pipeline_carrier_kinds.get(node).unwrap()
         else if recv.type_id != 0:
-            let resolved_recv = self.sema.auto_deref_method_type_frozen(recv.type_id as TypeId, method)
+            let resolved_recv = self.sema.auto_deref_method_type(recv.type_id as TypeId, method, 0, 0)
             let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
             let call_ret = self.sema.builtin_intrinsic_method_return_type(resolved_recv as i32, owner, method)
             if call_ret != 0 and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void and self.sema.pipeline_method_has_mut_receiver(node, recv.type_id, method) != 0:

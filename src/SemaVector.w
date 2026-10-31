@@ -127,7 +127,9 @@ impl Sema:
     // §4.3d: `.bits()` — the unsigned integer vector of the same lane width.
     mut fn vector_bits_type(tid: i32) -> i32:
         let bits = self.vector_lane_bits(self.vector_lane_type(tid))
-        let lane = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
+        // SEED-BOUND (D144): the pinned seed binds a join of plain-bits
+        // fields as a view; the annotation goes at the next seed.
+        let lane: TypeId = if bits == 8: self.ty_u8 else if bits == 16: self.ty_u16 else if bits == 32: self.ty_u32 else if bits == 64: self.ty_u64 else: self.ty_u128
         self.vector_type(lane as i32, self.vector_lane_count(tid))
 
     // §4.3d: T is a primitive integer (§4.1: i8…i128, u8…u128) or floating

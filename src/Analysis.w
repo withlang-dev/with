@@ -1279,7 +1279,8 @@ fn analysis_audit_method_registrations(mut report: AnalysisReport, sema: &Sema):
         if fact.flags & (AnalysisMethodRegistrationFlag.Generic as i32) != 0: generic = generic + 1
         if fact.flags & (AnalysisMethodRegistrationFlag.Missing as i32) != 0:
             missing = missing + 1
-            report.fail(f"method registration missing at {fact.path}:{fact.line}: {fact.name} ({fact.detail})")
+            let message = f"method registration missing at {fact.path}:{fact.line}: {fact.name} ({fact.detail})"
+            report.fail(message)
     report.note(f"method-registration: methods={methods} inherent={inherent} extensions={extensions} generic={generic} missing={missing}")
 
 fn analysis_is_frozen_consumer(path: &str) -> bool:

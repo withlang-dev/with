@@ -1046,7 +1046,7 @@ impl Codegen:
         let share = sig >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         let ref_table = self.is_ref_param(fn_sym, param_index)
         let incoming_ptr = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
-        let name = self.sema.pool_resolve(fn_sym)
+        let name: str = self.sema.pool_resolve(fn_sym)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Parameter)
         fact.id = param_index
         fact.parent = sig

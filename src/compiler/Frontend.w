@@ -2336,9 +2336,11 @@ impl Zcu:
                     break
             if already:
                 continue
-            let text = frontend_normalize_source_text(module_source_read(mod.path).text)
+            let file_id = mod.file_id
+            let path: str = mod.path
+            let text = frontend_normalize_source_text(module_source_read(path).text)
             if text.len() > 0:
-                self.add_source_text_mapping(mod.file_id, mod.path, text)
+                self.add_source_text_mapping(file_id, path, text)
 
     mut fn merge_resolved_modules_frontend(root_pool: AstPool, root_path: &str) -> AstPool:
         var merged_pool = root_pool
@@ -2350,7 +2352,8 @@ impl Zcu:
             if mod.module_id == 0:
                 continue
 
-            let path = mod.path
+            let file_id = mod.file_id
+            let path: str = mod.path
             if path.len() == 0 or path == root_path:
                 continue
 
@@ -2364,16 +2367,16 @@ impl Zcu:
                 self.diagnostics.emit(Diagnostic.err("failed to read imported module", span))
                 continue
 
-            var lexer = Lexer.init(text, mod.file_id)
+            var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
             let before = merged_pool.decl_count()
-            var parser = Parser.init_with_pool(move tokens, text, mod.file_id, self.pool, move self.diagnostics, merged_pool)
+            var parser = Parser.init_with_pool(move tokens, text, file_id, self.pool, move self.diagnostics, merged_pool)
             if src.interface:
                 parser.enable_interface_mode()
             merged_pool = parser.parse_module()
             self.diagnostics = move parser.diags
-            self.add_source_text_mapping(mod.file_id, path, text)
-            self.append_decl_source_paths(merged_pool.decl_count() - before, path, mod.file_id)
+            self.add_source_text_mapping(file_id, path, text)
+            self.append_decl_source_paths(merged_pool.decl_count() - before, path, file_id)
 
         for ri in 0..refused_runtime.len():
             self.note_refused_runtime_source(refused_runtime[ri])

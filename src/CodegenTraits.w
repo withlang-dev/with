@@ -167,7 +167,7 @@ impl Codegen:
             if not decl.is_some():
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: missing AST declaration")
                 continue
-            let trait_node = decl.unwrap()
+            let trait_node: i32 = decl.unwrap()
             if self.pool.kind(trait_node) != NodeKind.NK_TRAIT_DECL:
                 self.analysis_fail(f"trait table {trait_name} index={trait_idx}: node={trait_node} is not a trait declaration")
                 continue

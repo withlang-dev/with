@@ -853,7 +853,7 @@ impl AstPool:
                 let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
                 let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
                 if self.has_call_named_args(node as NodeId) != 0:
-                    let old_names = self.state.call_named_args.get(node).unwrap()
+                    let old_names: i32 = self.state.call_named_args.get(node).unwrap()
                     let new_names = self.extra_len()
                     for ni in 0..count:
                         self.add_extra(self.get_extra(old_names + ni))

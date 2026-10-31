@@ -17116,6 +17116,13 @@ impl Sema:
                     let elem_ty = self.get_type_d0(elem_view)
                     if self.type_is_plain_bits(elem_ty) and self.record_contextual_copy_adjustment(value, elem_ty, val_type as i32) != 0:
                         val_type = elem_ty as TypeId
+            // A join of such places (`if c: self.a else: self.b`) is one too.
+            else if elem_core != 0 and (self.ast.kind(elem_core) == NodeKind.NK_IF_EXPR or self.ast.kind(elem_core) == NodeKind.NK_MATCH) and self.join_yields_places(elem_core):
+                let join_view = self.resolve_alias(val_type)
+                if self.get_type_kind(join_view) == TypeKind.TY_REF and self.get_type_d1(join_view) == 0:
+                    let join_ty = self.get_type_d0(join_view)
+                    if self.type_is_plain_bits(join_ty) and self.record_contextual_copy_adjustment(value, join_ty, val_type as i32) != 0:
+                        val_type = join_ty as TypeId
             // A view into a statement temporary has one meaning left as a
             // binding: the Copy value, copied as an owned demand copies it
             // (D22 §6.2); `let p = args()[1]` needs no `: str`.
@@ -22127,7 +22134,7 @@ impl Sema:
             args.push(key_ty)
             args.push(val_ty)
             // #1739: a generic destination that names the map picks it.
-            let map_base = if self.collection_literal_hints.contains(node): self.collection_literal_hints.get(node).unwrap() else: self.syms.hashmap
+            let map_base: i32 = if self.collection_literal_hints.contains(node): self.collection_literal_hints.get(node).unwrap() else: self.syms.hashmap
             target_ty = self.ensure_generic_inst_type(map_base, args, 2) as i32
         let target_base2 = if target_ty != 0 and self.get_type_kind(self.resolve_alias(target_ty as TypeId)) == TypeKind.TY_GENERIC_INST:
             self.get_generic_inst_base(self.resolve_alias(target_ty as TypeId) as i32)
@@ -26347,7 +26354,7 @@ impl Sema:
     // it. `str.parse[T]` at a bare `|> parse` stage has neither; a
     // non-generic or unresolved candidate keeps the existing route.
     mut fn pipeline_method_stage_instantiable(lhs_ty: i32, method: i32, node: i32) -> bool:
-        let resolved_recv = self.auto_deref_method_type_frozen(lhs_ty as TypeId, method)
+        let resolved_recv = self.auto_deref_method_type(lhs_ty as TypeId, method, 0, 0)
         let owner = self.method_owner_symbol_for_type(resolved_recv as i32)
         if owner == 0:
             return true
@@ -26511,7 +26518,7 @@ impl Sema:
         let resolved_sig = self.resolved_call_sigs.get(node)
         if resolved_sig.is_some():
             return if self.sig_receiver_mode(resolved_sig.unwrap()) == ReceiverMode.Mut: 1 else: 0
-        let resolved_recv = self.auto_deref_method_type_frozen(recv_type as TypeId, method)
+        let resolved_recv = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
         let owner = self.method_owner_symbol_for_type(resolved_recv as i32)
         if owner == 0:
             return 0
@@ -33001,7 +33008,7 @@ impl Sema:
     mut fn complete_pending_soft_binding(sym: i32) -> i32:
         if not self.pending_generic_binding_base.contains(sym):
             return 0
-        let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+        let base_sym: i32 = self.pending_generic_binding_base.get(sym).unwrap()
         let call_node = if self.pending_generic_binding_call.contains(sym): self.pending_generic_binding_call.get(sym).unwrap() else: 0
         if call_node == 0 or self.ast.kind(call_node) != NodeKind.NK_CALL:
             return 0
@@ -33219,7 +33226,7 @@ impl Sema:
         let sym = self.ast.get_data0(expr)
         if not self.pending_generic_binding_base.contains(sym):
             return 0
-        let base_sym = self.pending_generic_binding_base.get(sym).unwrap()
+        let base_sym: i32 = self.pending_generic_binding_base.get(sym).unwrap()
         let args: List[i32] = List.new()
         if base_sym == self.syms.list:
             if (field == self.syms.push or field == self.syms.contains) and arg_count >= 1:
@@ -34109,10 +34116,10 @@ impl Sema:
             return 0
         let key = (recv_type, owner_sym, field)
         if let Some(known) = self.builtin_method_return_memo.get(key):
-            return known
+            return self.builtin_constructor_in_context(recv_type, owner_sym, field, known)
         let ret = self.compute_builtin_intrinsic_method_return_type(recv_type, owner_sym, field)
         self.builtin_method_return_memo.insert(key, ret)
-        ret
+        self.builtin_constructor_in_context(recv_type, owner_sym, field, ret)
 
     // The answer checking settled for the same question; a question it never
     // asked is a phase bug, not a guess.
@@ -34120,8 +34127,17 @@ impl Sema:
         if recv_type == 0:
             return 0
         if let Some(known) = self.builtin_method_return_memo.get((recv_type, owner_sym, field)):
-            return known
+            return self.builtin_constructor_in_context(recv_type, owner_sym, field, known)
         sema_phase_bug(f"BUG: builtin method `{self.pool_resolve(field)}` of type {recv_type} was never typed while checking")
+
+    // A builtin constructor (`List.new()`, `List.with_capacity(n)`) remembers
+    // its receiver; the call's expected type completes a bare generic base
+    // (`let xs: List[i32] = List.new()`), an answer of the call, not of the
+    // method.
+    fn builtin_constructor_in_context(recv_type: i32, owner_sym: i32, field: i32, ret: i32) -> i32:
+        if ret != recv_type or (field != self.syms.new and self.pool_resolve(field) != "with_capacity"):
+            return ret
+        self.generic_constructor_return_type(owner_sym, recv_type)
 
     mut fn compute_builtin_intrinsic_method_return_type(recv_type: i32, owner_sym: i32, field: i32) -> i32:
         let resolved = self.resolve_alias(recv_type as TypeId)
@@ -34174,14 +34190,14 @@ impl Sema:
 
         if owner_sym == self.syms.list:
             if field == self.syms.new or method_name == "with_capacity":
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
             if field == self.syms.push or field == self.syms.clear:
                 return self.ty_void as i32
             if field == self.syms.pop and tk == TypeKind.TY_GENERIC_INST:
                 return self.ensure_option_type_for(self.get_generic_inst_arg(resolved as i32, 0))
         if owner_sym == self.syms.hashmap:
             if field == self.syms.new:
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
             if method_name == "increment" or method_name == "decrement" or method_name == "update":
                 return self.ty_void as i32
             if tk == TypeKind.TY_GENERIC_INST:
@@ -34192,10 +34208,10 @@ impl Sema:
                     return self.ensure_option_type_for(value_ty)
         if owner_sym == self.syms.hashset:
             if field == self.syms.new:
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
         if owner_sym == self.syms.fixed_string:
             if field == self.syms.new:
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
             if tk == TypeKind.TY_GENERIC_INST:
                 if len_method_ret != 0:
                     return len_method_ret
@@ -34213,7 +34229,7 @@ impl Sema:
                     return self.ty_str as i32
         if owner_sym == self.syms.slotmap:
             if field == self.syms.new:
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
             if tk == TypeKind.TY_GENERIC_INST:
                 let elem_ty = self.get_generic_inst_arg(resolved as i32, 0)
                 if field == self.syms.insert:
@@ -34256,7 +34272,7 @@ impl Sema:
                     return self.get_generic_inst_arg(resolved as i32, 0)
         if self.pool_resolve(owner_sym) == "Atomic":
             if field == self.syms.new:
-                return self.generic_constructor_return_type(owner_sym, recv_type)
+                return recv_type
             if method_name == "store":
                 return self.ty_void as i32
             if method_name == "load" or method_name == "swap" or method_name == "fetch_add" or method_name == "fetch_sub" or method_name == "fetch_and" or method_name == "fetch_or" or method_name == "fetch_xor" or method_name == "fetch_min" or method_name == "fetch_max":
@@ -35688,7 +35704,7 @@ impl Sema:
     // Returns the type it gave a builtin constructor call, or 0.
     mut fn record_method_lowering(expr: i32, field: i32, arg_count: i32, node: i32, ret: i32, known_recv_ty: i32) -> i32:
         let raw_recv = self.method_lowering_raw_recv_type(expr, ret, known_recv_ty)
-        let recv = if raw_recv != 0 and raw_recv != self.ty_void as i32: self.auto_deref_method_type_frozen(raw_recv as TypeId, field) as i32 else: raw_recv
+        let recv = if raw_recv != 0 and raw_recv != self.ty_void as i32: self.auto_deref_method_type(raw_recv as TypeId, field, 0, 0) as i32 else: raw_recv
         var intrinsic = self.builtin_method_intrinsic(recv, self.pool_resolve(field))
         let lowering = self.method_lowering_kind(raw_recv, recv, expr, field, arg_count, intrinsic)
         // A map or set hashes and compares its key (#2180); its slot walk
@@ -36057,9 +36073,10 @@ impl Sema:
         let mc_default_fn = if mc_owner_sym_for_effect != 0 and mc_sig_idx_for_effect < 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: mc_method_fn_for_resolution
         var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_default_fn, mc_param_offset_for_resolution, extra_start, arg_count)
         if self.has_resolved_call_args(node) == 0 and self.ast.has_call_named_args(node) == 0 and arg_count == 0:
+            let mc_unit_method_expected = self.method_expected_arg_type(obj_type as i32, field, 0)
             var mc_unit_expected = self.atomic_method_expected_arg_type(mc_order_type, field, 0)
             if mc_unit_expected == 0:
-                mc_unit_expected = self.method_expected_arg_type(obj_type as i32, field, 0)
+                mc_unit_expected = mc_unit_method_expected
             // §4.8 (#723): `unwrap_or`'s parameter is the payload type.
             // method_expected_arg_type leaves a given default untyped (it is
             // a join input), but with no argument there is no join, so a
@@ -36102,6 +36119,9 @@ impl Sema:
         if not mc_is_static_enum_variant:
             self.check_builtin_call_arity(node, mc_sig_row, obj_type as i32, field, mc_resolved_arg_count)
         for ai in 0..mc_resolved_arg_count:
+            // D7: MIR reads every argument's expected type frozen, an atomic
+            // ordering and a bound argument included; it is settled here.
+            let mc_method_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
             let mc_arg_node = if mc_has_resolved_args != 0: self.get_resolved_call_arg(node, ai) else: self.ast.get_extra(extra_start + ai)
             if mc_arg_node == 0:
                 arg_types.push(0)
@@ -36119,7 +36139,7 @@ impl Sema:
                 self.closure_direct_arg_depth = self.closure_direct_arg_depth + 1
             var mc_expected = self.atomic_method_expected_arg_type(mc_order_type, field, ai)
             if mc_expected == 0:
-                mc_expected = self.method_expected_arg_type(obj_type as i32, field, ai)
+                mc_expected = mc_method_expected
                 // §4.2.1 rule 8: a lazy default whose body is an untyped literal
                 // (`opt.unwrap_or_else(() => 130)`) is an arm beside the carrier's
                 // payload, viewed or not, and takes its number's type.
@@ -40522,6 +40542,30 @@ impl Sema:
         if root == 0 or self.scope_has(root) == 0:
             return 0
         leaf
+
+    // D144: every arm of a join that reaches its end yields a place — a
+    // field the join reads as its view, a built-in element (D27) — so a
+    // binding of the join is a binding from a place.
+    fn join_yields_places(node: i32) -> bool:
+        if node == 0 or self.body_can_fall_through(node) == 0:
+            return true
+        let leaf = self.join_arm_leaf(node)
+        if leaf == 0:
+            return false
+        let kind = self.ast.kind(leaf)
+        if kind == NodeKind.NK_FIELD_ACCESS:
+            return self.join_field_view_arms.contains(leaf)
+        if kind == NodeKind.NK_INDEX:
+            return not self.index_place_get_fns.contains(leaf)
+        if kind == NodeKind.NK_IF_EXPR:
+            return self.ast.get_data2(leaf) != 0 and self.join_yields_places(self.ast.get_data1(leaf)) and self.join_yields_places(self.ast.get_data2(leaf))
+        if kind == NodeKind.NK_MATCH:
+            for ai in 0..self.ast.get_data2(leaf):
+                let arm = self.ast.get_extra(self.ast.get_data1(leaf) + ai)
+                if arm <= 0 or self.ast.kind(arm) != NodeKind.NK_MATCH_ARM or not self.join_yields_places(self.ast.get_data1(arm)):
+                    return false
+            return true
+        false
 
     fn join_arm_leaf(arm: i32) -> i32:
         var n = arm
