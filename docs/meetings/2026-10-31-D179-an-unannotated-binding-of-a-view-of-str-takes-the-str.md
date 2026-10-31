@@ -59,3 +59,12 @@ under the debug allocator. Census pattern `str-view-copy-annotation` counts
 
 **Reopen if:** a `str` gains in-place mutation, or the retain cost on a
 hot path cannot be recovered by spelling the view.
+
+**Amendment (Eric, 2026-10-31, "carries a view clause is blessed").** A
+plain-bits type that itself carries a view — a slice, a pointer, an
+ephemeral value (a facade view token, an iterator), or a struct or payload
+holding one — is not taken by value: the copy would still view its origin.
+Found landing D172 PR B: applied literally, the rule copied a facade record
+view and a byte-buffer view out of their resource and the §16.2b.7
+invalidation checks went silent in five fixtures. Sema: `type_carries_view`
+(the binding stays a view). Spec words in §3.8.
