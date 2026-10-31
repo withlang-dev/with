@@ -7286,15 +7286,23 @@ impl CCodegen:
         if kind == CcBuiltin.MAP_NEW:
             var out = ""
             if has_ret != 0:
-                let dst_tid = self.call_dest_expected_tid(body, dest_place)
-                var key_tid = self.hashmap_key_tid(dst_tid)
-                if key_tid == 0 or self.is_void_tid(key_tid) != 0:
-                    key_tid = self.sema.ty_i64 as i32
-                var val_tid = self.hashmap_value_tid(dst_tid)
-                if val_tid == 0 or self.is_void_tid(val_tid) != 0:
-                    val_tid = self.sema.ty_i64 as i32
+                // The map's key and value types are its destination's MIR
+                // type, as the LLVM backend reads them
+                // (mir_intrinsic_dest_sema_type). The usage-hinted type
+                // missed a generic instance (`HashMap.new()` inside a
+                // generic constructor) and the key fell back to i64, so a
+                // `HashMap[i32, i64]` hashed 8-byte keys it was given 4 of.
+                let dst_local = self.place_local_id(body, dest_place)
+                let dst_tid = if dst_local >= 0 and dst_local < body.local_type_ids.len(): body.local_type_ids[dst_local] else: 0
+                let key_tid = self.hashmap_key_tid(dst_tid)
+                // A set's value is a present marker, i64 as a set literal's is.
+                let is_set = key_tid != 0 and self.generic_inst_base_name(self.sema.resolve_alias(dst_tid) as i32) == "HashSet"
+                let val_tid = self.hashmap_value_tid(dst_tid)
+                if key_tid == 0 or self.is_void_tid(key_tid) != 0 or (not is_set and (val_tid == 0 or self.is_void_tid(val_tid) != 0)):
+                    self.fail(f"emit-c: `HashMap.new()` in `{cc_intern_resolve(self.intern, body.fn_sym)}` has no map type at its destination (MIR type {dst_tid})")
+                    return ""
                 let key_ty = self.c_type(key_tid, 0)
-                let val_ty = self.c_type(val_tid, 0)
+                let val_ty = self.c_type(if is_set: self.sema.ty_i64 as i32 else: val_tid, 0)
                 out = out ++ "    " ++ self.place_text(body, dest_place) ++ " = (int64_t)(intptr_t)with_hashmap_new_keyed(sizeof(" ++ key_ty ++ "), sizeof(" ++ val_ty ++ "), " ++ self.map_key_args_text(key_tid) ++ ");\n"
             else:
                 out = out ++ "    (void)0;\n"
