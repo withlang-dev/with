@@ -556,7 +556,7 @@ impl BundleEmitter:
     // collects its methods and reads the row from last_fn_row).
     // `all_visibilities` prints a non-pub method too (a trait impl's methods
     // are the trait's contract).
-    mut fn fn_text(mut sema: Sema, di: i32, node: i32, in_impl: bool, all_visibilities: bool) -> str:
+    mut fn fn_text(sema: &Sema, di: i32, node: i32, in_impl: bool, all_visibilities: bool) -> str:
         self.last_fn_row = ""
         let ast = sema.ast
         let mod_path = with_str_clone_ref(self.decl_modules[di])
@@ -900,7 +900,7 @@ impl BundleEmitter:
                 self.warnings.push(self.context ++ ": declares a write of `" ++ declared[di] ++ "` its body never makes (a conservative contract: every caller treats it as written)")
 
 
-    mut fn emit_extern(mut sema: Sema, di: i32, node: i32):
+    mut fn emit_extern(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name_sym = ast.get_data0(node)
@@ -977,7 +977,7 @@ impl BundleEmitter:
 
     // The impl blocks of an exported type, printed with their methods nested
     // (impl→method association is span-based in Sema; nesting reproduces it).
-    mut fn emit_impls_of(mut sema: Sema, type_sym: i32, type_name: &str):
+    mut fn emit_impls_of(sema: &Sema, type_sym: i32, type_name: &str):
         let ast = sema.ast
         for ii in 0..self.impl_type_syms.len():
             if self.impl_type_syms[ii] != type_sym:
@@ -1052,7 +1052,7 @@ impl BundleEmitter:
             let export_name = type_name ++ "." ++ (if trait_sym != 0: trait_name.clone() else: "")
             self.push_export(BX_IMPL, mod_path, export_name, head ++ body, "impl\t" ++ mod_path ++ "\t" ++ type_name ++ "\t" ++ (if trait_sym != 0: trait_name else: "-") ++ "\n" ++ rows)
 
-    mut fn emit_type(mut sema: Sema, di: i32, node: i32):
+    mut fn emit_type(sema: &Sema, di: i32, node: i32):
         let ast = sema.ast
         let mod_path = with_str_clone_ref(self.decl_modules[di])
         let name_sym = ast.get_data0(node)
@@ -1241,7 +1241,7 @@ impl BundleEmitter:
         self.emit_impls_of(sema, name_sym, name)
 
     // ── The walk ──────────────────────────────────────────────────────
-    mut fn walk(mut sema: Sema):
+    mut fn walk(sema: &Sema):
         let ast = sema.ast
         let dc = ast.decl_count()
         if sema.decl_source_paths.len() != dc:
@@ -1451,7 +1451,7 @@ fn bundle_interface_render(sema: &Sema, model: &BundleInterfaceModel) -> BundleI
 // the bundle otherwise, so the text carries nothing that varies between
 // two Semas of one declaration (no ids, no spans). "" when this unit
 // declares no such symbol.
-fn bundle_symbol_contract(mut sema: Sema, name: &str) -> str:
+fn bundle_symbol_contract(sema: &Sema, name: &str) -> str:
     let name_sym = sema.pool_lookup_symbol(name)
     if name_sym == 0:
         return ""

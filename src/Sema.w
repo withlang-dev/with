@@ -4981,12 +4981,13 @@ impl Sema:
     // #2211: one resolved name use, for the analyzer's `reference` facts. The
     // referencing module is the current one; `node` is 0 for a type name
     // (resolved without a node).
-    mut fn record_name_use(node: i32, kind: &str, path: &str, name: &str):
+    mut fn record_name_use(node: i32, kind: &str, path: str, name_sym: i32):
         if path.len() == 0: return
+        let name: str = self.pool_resolve(name_sym)
         self.name_use_nodes.push(node)
-        self.name_use_kinds.push(with_str_clone_ref(kind))
-        self.name_use_paths.push(with_str_clone_ref(path))
-        self.name_use_names.push(with_str_clone_ref(name))
+        self.name_use_kinds.push(kind)
+        self.name_use_paths.push(path)
+        self.name_use_names.push(name)
         self.name_use_from.push(with_str_clone_ref(self.current_module_path))
 
     // The module path of the newest declaration of `sym`, "" when unknown.
@@ -7486,33 +7487,8 @@ impl Sema:
             return tid
         let kind = self.get_type_kind(tid as TypeId)
         let d0 = self.get_type_d0(tid as TypeId)
-        // Direct match: struct/enum/alias whose name matches a type param symbol
         if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
-            // A type its declaration made is never a type parameter, whatever
-            // its name: a program's own `type U` mapped through iter_map[T, U, I]
-            // was rewritten to the U the specialization binds, building
-            // Mapped[&i32, i32, ListIter[i32]] for a List of the struct and
-            // a field-type miss in MIR (#2772). A parameter's placeholder has
-            // no declaration.
-            if self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
-                return tid
-            for si in 0..count:
-                let subst_sym = subst_syms[si]
-                if subst_sym == d0:
-                    return subst_tids[si]
-            let d0_text = self.pool_resolve_symbol(d0)
-            if d0_text.len() == 0:
-                return tid
-            var found: i32 = 0
-            var found_count = 0
-            for si2 in 0..count:
-                let subst_sym2 = subst_syms[si2]
-                if self.pool_resolve_symbol(subst_sym2) == d0_text:
-                    found = subst_tids[si2]
-                    found_count = found_count + 1
-            if found_count == 1:
-                return found
-            return tid
+            return self.subst_param_match(tid, d0, subst_syms, subst_tids, count)
         // TypeKind.TY_GENERIC_INST: substitute each type arg
         if kind == TypeKind.TY_GENERIC_INST:
             let gi_ac = self.get_type_d2(tid as TypeId)
@@ -7563,6 +7539,81 @@ impl Sema:
             if t_changed == 0: return tid
             return self.ensure_tuple_type(tuple_elems, elem_count) as i32
         // All other kinds: return unchanged
+        tid
+
+    // A type parameter's replacement under the substitution, or `tid` when
+    // it names none: the struct/enum/alias case of substitute_type and
+    // substitute_type_frozen alike.
+    fn subst_param_match(tid: i32, d0: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+        // A type its declaration made is never a type parameter, whatever
+        // its name: a program's own `type U` mapped through iter_map[T, U, I]
+        // was rewritten to the U the specialization binds, building
+        // Mapped[&i32, i32, ListIter[i32]] for a List of the struct and
+        // a field-type miss in MIR (#2772). A parameter's placeholder has
+        // no declaration.
+        if self.type_decl_nodes_by_tid.contains(self.resolve_alias(tid as TypeId) as i32):
+            return tid
+        for si in 0..count:
+            let subst_sym = subst_syms[si]
+            if subst_sym == d0:
+                return subst_tids[si]
+        let d0_text = self.pool_resolve_symbol(d0)
+        if d0_text.len() == 0:
+            return tid
+        var found: i32 = 0
+        var found_count = 0
+        for si2 in 0..count:
+            let subst_sym2 = subst_syms[si2]
+            if self.pool_resolve_symbol(subst_sym2) == d0_text:
+                found = subst_tids[si2]
+                found_count = found_count + 1
+        if found_count == 1: found else: tid
+
+    // substitute_type over the current specialization's substitution. The
+    // lists are taken as values (O(1), D120): building a type can
+    // specialize, and a specialization replaces them while it runs
+    // (TypeLayout restores a saved frame), which a view would outlive.
+    mut fn substitute_current(tid: i32, count: i32) -> i32:
+        let subst_syms = self.generic_subst_param_syms.clone()
+        let subst_tids = self.generic_subst_type_ids.clone()
+        self.substitute_type(tid, subst_syms, subst_tids, count)
+
+    // substitute_type after the types are frozen (D7): every instance a
+    // substitution reaches was registered before the freeze, so it is found,
+    // never built; 0 when one is missing, as ensure_* answers when frozen.
+    fn substitute_type_frozen(tid: i32, subst_syms: &List[i32], subst_tids: &List[i32], count: i32) -> i32:
+        if tid <= 0 or count == 0:
+            return tid
+        let kind = self.get_type_kind(tid as TypeId)
+        let d0 = self.get_type_d0(tid as TypeId)
+        if kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_ENUM or kind == TypeKind.TY_ALIAS:
+            return self.subst_param_match(tid, d0, subst_syms, subst_tids, count)
+        if kind == TypeKind.TY_GENERIC_INST:
+            let gi_ac = self.get_type_d2(tid as TypeId)
+            var changed = false
+            var sub_args: List[i32] = List.new()
+            for ai in 0..gi_ac:
+                let orig = self.get_generic_inst_arg(tid, ai)
+                let subbed = self.substitute_type_frozen(orig, subst_syms, subst_tids, count)
+                if subbed != orig: changed = true
+                sub_args.push(subbed)
+            if not changed: return tid
+            return self.find_generic_inst_type(d0, sub_args, gi_ac) as i32
+        if kind == TypeKind.TY_PTR or kind == TypeKind.TY_REF or kind == TypeKind.TY_ARRAY or kind == TypeKind.TY_SLICE:
+            let subbed = self.substitute_type_frozen(d0, subst_syms, subst_tids, count)
+            if subbed == d0: return tid
+            return self.find_exact_type(kind, subbed, self.get_type_d1(tid as TypeId), 0) as i32
+        if kind == TypeKind.TY_TUPLE:
+            let elem_count = self.get_type_d1(tid as TypeId)
+            var changed = false
+            var elems: List[i32] = List.new()
+            for ei in 0..elem_count:
+                let orig = self.type_extra[d0 + ei]
+                let subbed = self.substitute_type_frozen(orig, subst_syms, subst_tids, count)
+                if subbed != orig: changed = true
+                elems.push(subbed)
+            if not changed: return tid
+            return self.find_tuple_type(elems, elem_count) as i32
         tid
 
     fn get_type_kind(tid: TypeId) -> i32:

@@ -36,6 +36,7 @@ use compiler.AbiStamp
 use compiler.LldDriver
 use InternPool
 use std.string.StringBuilder
+use std.memo
 // Frontend pipeline: lex -> parse -> import resolution -> sema.
 
 var frontend_cimport_compiler_fingerprint_ready: i32 = 0
@@ -284,7 +285,7 @@ impl Sema:
         self.ns_offsets = sema_new_list_i32()
         self.module_index_by_path = HashMap.new()
         self.global_visible_module_paths = HashMap.new()
-        self.module_visibility_cache = HashMap.new()
+        self.module_visibility_cache = Memo.new()
 
         for mi in 0..resolved.modules.len():
             let mod = resolved.modules[mi]

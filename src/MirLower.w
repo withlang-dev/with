@@ -2064,7 +2064,7 @@ impl MirBuilder:
         let subst_count = self.sema.generic_subst_param_syms.len() as i32
         if subst_count == 0:
             return type_id
-        self.sema.substitute_type(type_id, self.sema.generic_subst_param_syms, self.sema.generic_subst_type_ids, subst_count)
+        self.sema.substitute_type_frozen(type_id, self.sema.generic_subst_param_syms, self.sema.generic_subst_type_ids, subst_count)
 
     mut fn expr_type(node: i32) -> i32:
         if self.untyped_override_depth > 0:

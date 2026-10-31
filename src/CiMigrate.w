@@ -1311,7 +1311,7 @@ fn ci_migrate_decl_is_filtered(session: i64, idx: i32, name: &str):
 // the flag; migrate_c_directory (the build-driven pcre2/zlib migrations) ran
 // every mode-gated rule with it off — e.g. the c_import-only #799 callee
 // filter then killed zlib on its static adler32_combine_.
-fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bool, project: &CiProject) -> i32:
+fn ci_migrate_file_inner(input_path: &str, output_path: &str, project_active: bool, mut project: CiProject) -> i32:
     g_ci_translate_migrate_mode = 1
     let rc = ci_migrate_file_body(input_path, output_path, project_active, project)
     g_ci_translate_migrate_mode = 0
@@ -1526,7 +1526,7 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     project.resolve_header_definers()
     project.resolve_fn_ptr_nullability()
     project.export_fn_ptr_nullability(true)
-    let rc = ci_migrate_file_inner(input_path, output_path, false, &project)
+    let rc = ci_migrate_file_inner(input_path, output_path, false, project)
     if rc != 0: return rc
     ci_migrate_apply_writes_clauses()
 
@@ -1979,7 +1979,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
         project.resolve_ownership()
         project.resolve_contracts()
         if i == 0 and ci_migrate_write_contracts(&project) != 0: return 1
-        let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
+        let rc = ci_migrate_file_inner(file_path, out_path, true, project)
         if rc != 0:
             eprint(f"migrate: failed while migrating {base}")
             return rc
@@ -2205,7 +2205,7 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
 
         if g_migrate_directory_one_basename.len() == 0:
             ci_migrate_print_progress(file_path, fi + 1, total_files)
-        let rc = ci_migrate_file_inner(file_path, out_path, true, &project)
+        let rc = ci_migrate_file_inner(file_path, out_path, true, project)
         if rc == 0:
             files_migrated = files_migrated + 1
         fi = fi + 1

@@ -596,7 +596,7 @@ fn contract_collect_conventions(mut report: AnalysisReport, sema: &Sema, source_
             else:
                 contract_row(report, sema, &site, subject, CONTRACT_CONVENTION, recs[m], rule, 0, -1, "rule", f"{rname} ({template}) matched nothing" ++ (if subject_node != 0 and not sema.facade_rule_is_fn(rule): " for " ++ what else: ""), prov)
 
-fn analysis_collect_foreign_contracts(report: &AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
+fn analysis_collect_foreign_contracts(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.facade_domain_list.len():
         contract_collect_domain(report, sema, di as i32, source_path, source_text)
     for ri in 0..sema.facade_resources.len():

@@ -2239,7 +2239,7 @@ impl Sema:
                 // A use of a spelled type name, recorded where it is resolved
                 // (`with analyze` use facts); a lookup itself records nothing,
                 // so the compiler's own queries stay read-only (D172).
-                self.record_name_use(node, "type", self.named_type_use_path(sym, named_tid), self.pool_resolve(sym))
+                self.record_name_use(node, "type", self.named_type_use_path(sym, named_tid), sym)
                 return named_tid as TypeId
             let sym_text = self.pool_resolve_symbol(sym)
             let canonical_sym = if sym_text.len() > 0: self.pool_lookup_symbol(sym_text) else: 0
@@ -2255,7 +2255,7 @@ impl Sema:
                         return 0 as TypeId
                     if self.require_std_tier_for_symbol(canonical_sym, node) == 0:
                         return 0 as TypeId
-                    self.record_name_use(node, "type", self.named_type_use_path(canonical_sym, canonical_tid), self.pool_resolve(canonical_sym))
+                    self.record_name_use(node, "type", self.named_type_use_path(canonical_sym, canonical_tid), canonical_sym)
                     return canonical_tid as TypeId
                 if canonical_sym == self.syms.self_type:
                     return 0 as TypeId
@@ -12853,7 +12853,7 @@ impl Sema:
             if not is_local and self.global_value_decl_kind(sym) != 0 and not self.const_global_syms.contains(sym):
                 self.global_value_ident_nodes.insert(node, sym)
             if not is_local and self.global_value_decl_kind(sym) != 0:
-                self.record_name_use(node, "global", self.decl_path_of_symbol(sym), self.pool_resolve(sym))
+                self.record_name_use(node, "global", self.decl_path_of_symbol(sym), sym)
                 self.push_global_read_record(sym, node)
             if sym != self.assign_target_revive_sym:
                 self.record_global_data_race_access(sym, node, GLOBAL_RACE_ACCESS_READ)
@@ -12955,7 +12955,7 @@ impl Sema:
             // D75: a variadic definition's value would be a function pointer
             // whose calls pass no variable arguments and need no `unsafe`;
             // With has no variadic function-pointer type to give it.
-            self.record_name_use(node, "fn-value", self.fn_symbol_source_path(sym), self.pool_resolve(sym))
+            self.record_name_use(node, "fn-value", self.fn_symbol_source_path(sym), sym)
             if self.fn_decl_is_variadic_definition(self.fn_symbol_decl_node(sym)):
                 self.emit_error("`" ++ self.pool_resolve(sym) ++ "` is defined with `...`: it is called directly (under `unsafe`), never used as a value", node)
                 return 0
@@ -35240,7 +35240,7 @@ impl Sema:
             // Try substitute_type on the stored sig_ret first
             if sig_ret > 0:
                 let subst_count = self.generic_subst_param_syms.len() as i32
-                let result = self.substitute_type(sig_ret, self.generic_subst_param_syms, self.generic_subst_type_ids, subst_count)
+                let result = self.substitute_current(sig_ret, subst_count)
                 if result > 0:
                     out = result
             // Fallback: re-resolve from the method's return type AST node.
@@ -36648,7 +36648,7 @@ impl Sema:
                             let mc_stored_ty = self.sig_param_type(sig_idx, mc_sig_pi)
                             if mc_stored_ty <= 0:
                                 continue
-                            let exp_ty = self.substitute_type(mc_stored_ty, self.generic_subst_param_syms, self.generic_subst_type_ids, mc_subst_count)
+                            let exp_ty = self.substitute_current(mc_stored_ty, mc_subst_count)
                             let arg_ty = arg_types[mc_ai]
                             if exp_ty != 0 and arg_ty != 0:
                                 let exp_r = self.resolve_alias(exp_ty)
