@@ -29,3 +29,4 @@ bool-as-if-1-0	lib	0	23	#2857: new pattern, existing sites recorded at the resee
 bool-as-if-1-0	tools	0	6	#2857: new pattern, existing sites recorded at the reseed
 i32-predicate	src	0	503	#2857: a new census pattern (a function declared to return an integer whose every result is the literal 0 or 1, both occurring: a yes/no stored in a number, read as `!= 0` by every caller); the bar records the existing sites at the reseed, the review with judgment (some are a C ABI or a flag word) burns them down
 i32-predicate	lib	0	11	#2857: new pattern, existing sites recorded at the reseed
+str-view-copy-annotation	src	0	288	D179 (#2859): a new census pattern (`let s: str = <a view of str>`, the copy an unannotated binding takes anyway). Seed-blocked: the pinned seed compiles src/ without D179 and would bind the view, so tools/sweep_str_view_copies.w removes them once a seed with D179 is pinned, as D144's sweep did
