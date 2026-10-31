@@ -352,7 +352,7 @@ whose initializer denotes a place or produces a view takes an owned value
 when the viewed type is plain-bits or `str`. For `str`, this uses its
 ordinary O(1), reference-counted copy semantics (§2, D111). For other
 types, the binding observes the place under D144. An explicitly requested
-view remains a view and retains the usual borrowing restrictions.
+view remains a view and retains the usual borrowing restrictions. A plain-bits type that itself carries a view — a slice, a pointer, an ephemeral value, or a struct or payload holding one — is not taken by value: the copy would still view its origin.
 
 ```
 let s = parts[0]                      // a str; parts.push(...) after it is fine
