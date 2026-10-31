@@ -67,3 +67,16 @@ plain bits of exactly `T`; `tools/sweep_plain_bits_field_copies.w` removes
 them. Fixtures `behav_d144_binding_from_place.w`,
 `err_d144_observing_binding_immutable_subject.w`,
 `err_d144_assign_while_payload_live.w`. Spec words in §3.8.
+
+**Applied, 2026-10-31 (D172 PR B).** Four live-view sites the `fn`-receiver
+enforcement surfaced were this ruling unapplied: a binding of a *view* of
+plain bits that came from somewhere other than a direct field or element
+read — `if c: self.a else: self.b` (a join of places), `m.get(k).unwrap()`
+(a lookup's payload), `cursor.next().unwrap()`, a `&i32` parameter rebound.
+Each held the view and blocked every later write of its root. The
+implementation is now the rule's letter: an unannotated binding whose
+value is a view of plain bits takes the value, wherever the view came
+from; only a written `&x` keeps the view (the spelling is the choice).
+Fixtures `behav_d144_join_of_places.w`, `behav_d144_view_of_plain_bits.w`.
+The sibling question — a view of `str`, a value under D111 but not plain
+bits — is open.

@@ -12,6 +12,8 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D178 — A `mut fn` call mutates the field paths its body writes, at full depth, within a package; the whole receiver across packages (ruled; rules D172 point 6)](2026-10-31-D178-per-field-mutation-footprints-at-full-depth.md)
+- [D177 — An integer in a boolean-test context is true when nonzero; no conversion between `bool` and integers anywhere else; Law 11: the compiler guarantees safety, not correctness of intent (ruled)](2026-10-31-D177-an-integer-in-a-boolean-test-is-true-when-nonzero.md)
 - [D176 — D172's marker type is `std.memo`'s `Interior[T]`, beside `Memo[K, V]` (delegated)](2026-10-30-D176-the-marker-type-is-std-memo-interior.md)
 - [D175 — Runtime globals initialize in dependency order, transitively through called functions; declaration order among the eligible; cycles are errors; safe code may not access a global whose completed initialization cannot be established (ruled)](2026-10-30-D175-runtime-globals-initialize-in-dependency-order.md)
 - [D174 — A view that cannot outlive its statement establishes an owned-value demand: an unannotated binding or return of a view into a statement temporary takes an independent Copy, else is refused; a declared `&T` stays a view (ruled; amends D22)](2026-10-30-D174-a-view-that-cannot-outlive-its-statement-establishes-an-owned-demand-d22-amendment.md)
