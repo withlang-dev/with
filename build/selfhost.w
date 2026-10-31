@@ -10622,14 +10622,14 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // returns is a view of LEVEL: live across `raise`, refused; ended
     // before it, accepted. A consumer cannot name LEVEL itself.
     let raise_src = bs_join(case_dir, "view_across_raise.w")
-    rc = bs_write_fixture(ctx, raise_src, "use std.wi_demo\nfn main:\n    let r = level()\n    raise()\n    print(*r)\n", "view of a private origin global across a bundle function that declares writing it")
+    rc = bs_write_fixture(ctx, raise_src, "use std.wi_demo\nfn main:\n    let r: &i32 = level()\n    raise()\n    print(*r)\n", "view of a private origin global across a bundle function that declares writing it")
     if rc != 0: return rc
     let raise_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-refused", bs_bundle_build_args(raise_src, bundle, bs_join(case_dir, "view_across_raise"), false), 120000)
     if raise_build.rc == 0: return bs_fail(ctx, "a view `level` returns of LEVEL, live across `raise`, which declares `writes LEVEL`, was accepted")
     rc = bs_assert_contains(ctx, raise_build.stderr, "call to `raise` mutates global `LEVEL` while `r` is a live view into it", "view of a private origin global refused across its writer")
     if rc != 0: return rc
     let level_src = bs_join(case_dir, "level_ok.w")
-    rc = bs_write_fixture(ctx, level_src, "use std.wi_demo\nfn main:\n    let r = level()\n    print(*r)\n    raise()\n    print(*level())\n", "view of a private origin global ended before its writer")
+    rc = bs_write_fixture(ctx, level_src, "use std.wi_demo\nfn main:\n    let r: &i32 = level()\n    print(*r)\n    raise()\n    print(*level())\n", "view of a private origin global ended before its writer")
     if rc != 0: return rc
     let level_bin = bs_join(case_dir, "level_ok")
     let level_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-ok-build", bs_bundle_build_args(level_src, bundle, level_bin, false), 120000)
