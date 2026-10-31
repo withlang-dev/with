@@ -66,7 +66,7 @@ fn analysis_with_node_location(fact: AnalysisFact, sema: &Sema, node: i32, sourc
     located.column = analysis_column_for_offset(source_text, start)
     located
 
-fn analysis_sig_path(mut sema: Sema, sym: i32, fallback: &str) -> str:
+fn analysis_sig_path(sema: &Sema, sym: i32, fallback: &str) -> str:
     let found = sema.fn_decl_source_paths.get(sym)
     if found.is_some(): return with_str_clone_ref(found.unwrap())
     let spec = sema.specialization_source_paths.get(sym)
@@ -104,7 +104,7 @@ fn analysis_param_class(sema: &Sema, sig: i32, param: i32) -> str:
         return "share-place"
     "owned"
 
-fn analysis_collect_declarations(mut report: AnalysisReport, mut sema: Sema, source_path: &str, source_text: &str):
+fn analysis_collect_declarations(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.ast.decl_count():
         let node = sema.ast.get_decl(di)
         if sema.ast.kind(node) != NodeKind.NK_FN_DECL:
@@ -180,7 +180,7 @@ fn analysis_extension_registration_index(sema: &Sema, owner: i32, method: i32, f
 // Canonical declaration -> semantic method identity -> registry provenance.
 // This is intentionally derived from live Sema tables, not source spelling, so
 // it catches parser/collector/lookup drift before a method call reaches checking.
-fn analysis_collect_method_registrations(mut report: AnalysisReport, mut sema: Sema, source_path: &str, source_text: &str):
+fn analysis_collect_method_registrations(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     for di in 0..sema.ast.decl_count():
         let node = sema.ast.get_decl(di)
         if sema.ast.kind(node) != NodeKind.NK_FN_DECL:
@@ -555,7 +555,7 @@ fn analysis_collect_requested_node(mut report: AnalysisReport, sema: &Sema, requ
         return
     analysis_collect_ast_node_tree(report, sema, node, -1, "root", 4, source_path, source_text)
 
-fn analysis_collect_signatures(mut report: AnalysisReport, mut sema: Sema, source_path: &str):
+fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_path: &str):
     for si in 0..sema.sig_names.len() as i32:
         let sym = sema.sig_names[si]
         let name = sema.pool_resolve(sym)
@@ -715,7 +715,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         fact.detail = f"drop-type user-drop={fact.flags}"
         report.add(move fact)
 
-fn analysis_collect_specializations(mut report: AnalysisReport, mut sema: Sema, source_path: &str):
+fn analysis_collect_specializations(mut report: AnalysisReport, sema: &Sema, source_path: &str):
     for si in 0..sema.concrete_specialization_nodes.len():
         let node = sema.concrete_specialization_nodes[si]
         let mono = sema.concrete_specialization_syms[si]
@@ -874,7 +874,7 @@ fn analysis_collect_phase(mut report: AnalysisReport, sema: &Sema):
     fact.detail = f"symbols={sema.symbols_frozen} types={sema.types_frozen} type-count={fact.index}"
     report.add(move fact)
 
-fn analysis_collect_sema(mut report: AnalysisReport, mut sema: Sema, source_path: &str, source_text: &str):
+fn analysis_collect_sema(mut report: AnalysisReport, sema: &Sema, source_path: &str, source_text: &str):
     analysis_collect_phase(report, sema)
     analysis_collect_declarations(report, sema, source_path, source_text)
     analysis_collect_method_registrations(report, sema, source_path, source_text)
@@ -920,7 +920,7 @@ fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_
     if resolved: return sema.get_resolved_call_arg(call_node, source_index)
     sema.ast.get_extra(sema.ast.get_data1(call_node) + source_index)
 
-fn analysis_collect_mir_call(mut report: AnalysisReport, mir_mod: &MirModule, body: &MirBody, mut sema: Sema, pool: &InternPool, call_id: i32, source_path: &str, source_text: &str):
+fn analysis_collect_mir_call(mut report: AnalysisReport, mir_mod: &MirModule, body: &MirBody, sema: &Sema, pool: &InternPool, call_id: i32, source_path: &str, source_text: &str):
     let sig = body.call_sig_index(call_id)
     let mono = body.call_mono_sym(call_id)
     let start = body.call_arg_starts[call_id]
@@ -1287,7 +1287,7 @@ fn analysis_is_frozen_consumer(path: &str) -> bool:
         path.contains("/CodegenTraits.w") or path.contains("/CCodegen.w") or
         path.contains("/AsyncMir.w") or path.contains("/MirSuspendCheck.w")
 
-fn analysis_audit_frozen_calls(mut report: AnalysisReport, mut sema: Sema, mir_mod: &MirModule):
+fn analysis_audit_frozen_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule):
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
         let caller_path = analysis_sig_path(sema, body.fn_sym, "")
@@ -1446,7 +1446,7 @@ fn analysis_audit_receiver_surface(mut report: AnalysisReport, sema: &Sema):
     if explicit != 0:
         report.fail(f"receiver surface still contains {explicit} explicit `self` parameter(s) outside the D7 trait read carve-out; query kind=declaration,flags&={AnalysisDeclarationFlag.ExplicitReceiver as i32}")
 
-fn analysis_audit_phase(mut report: AnalysisReport, mut sema: Sema, mir_mod: &MirModule):
+fn analysis_audit_phase(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule):
     if sema.symbols_frozen == 0:
         report.fail("symbols are not frozen at the MIR analysis boundary")
     if sema.types_frozen == 0:
@@ -1713,7 +1713,7 @@ fn analysis_local_label(body: &MirBody, sema: &Sema, li: i32) -> str:
     if sym != 0: return "`" ++ sema.pool_resolve(sym) ++ f"` (_{li})"
     f"_{li}"
 
-fn analysis_audit_pool_views(mut report: AnalysisReport, mut sema: Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
+fn analysis_audit_pool_views(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str):
     let bodies = mir_mod.bodies.len()
     // 1. Producers and pool fields, to a fixpoint over wrapper chains.
     let fields: HashMap[i32, i32] = HashMap.new()
@@ -2159,7 +2159,7 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
             rows.push(path ++ f"\t{span}\t{fn_name}\tretained-unowned-copy\t{retained_by}\t_{want}\t" ++ sema.type_name(candidate_types[ci]) ++ "\n")
     rows
 
-fn analysis_seam_sites(mut sema: Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
+fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
     let _ = source_path
     var out = "path\toffset\tfn\tclass\ttier\tcontext\tplace\ttype\n"
     let report_lines: List[str] = List.new()
@@ -2560,7 +2560,7 @@ fn analysis_call_closure(report: &AnalysisReport, root: &str) -> str:
         lines.push("\n")
     lines.join("")
 
-fn analysis_cow_sites(mut sema: Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
+fn analysis_cow_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
     var out = ""
     var total = 0
     var through_field = 0
@@ -2667,7 +2667,7 @@ fn compiler_analysis_render(report: &AnalysisReport, request: &str) -> str:
     if request.starts_with("lldb:"): return analysis_lldb_recipe(report, analysis_slice(request, 5, request.len() as i32))
     "error: unknown analysis request '" ++ request ++ "'\n"
 
-fn compiler_analysis_run(mut sema: Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
+fn compiler_analysis_run(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str, request: &str, diagnostics: &DiagnosticList) -> CompilerAnalysisResult:
     var report = AnalysisReport.init()
     analysis_collect_sema(report, sema, source_path, source_text)
     // The frontend moved the diagnostics out of Sema. Read the current

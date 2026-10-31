@@ -39,7 +39,7 @@ impl MirModule:
     // name. A signature outranks a generic template of the same name (a
     // concrete specialization registers its own sig); a builtin never
     // shadows either.
-    mut fn snapshot_sema_callables(mut sema: Sema, pool: &InternPool):
+    mut fn snapshot_sema_callables(sema: &Sema, pool: &InternPool):
         for si in 0..sema.sig_names.len():
             let name = sema.pool_resolve(sema.sig_names[si])
             if name.len() > 0:
@@ -262,7 +262,7 @@ fn dump_mir_body(body: &MirBody, pool: &InternPool, sema: &Sema) -> str:
     out
 
 
-fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, mut sema: Sema) -> str:
+fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, sema: &Sema) -> str:
     let kind = body.stmt_kind(stmt_id)
     let d0 = body.stmt_data0(stmt_id)
     let d1 = body.stmt_data1(stmt_id)
@@ -283,7 +283,7 @@ fn mir_stmt_text(body: &MirBody, stmt_id: i32, pool: &InternPool, mut sema: Sema
     f"stmt<{kind}>({d0}, {d1});"
 
 
-fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, mut sema: Sema) -> str:
+fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, sema: &Sema) -> str:
     let kind = body.term_kind(bb)
     let d0 = body.term_data0(bb)
     let d1 = body.term_data1(bb)
@@ -355,7 +355,7 @@ fn mir_term_text(body: &MirBody, bb: i32, pool: &InternPool, mut sema: Sema) -> 
 // bug in a formatter. The raw mir_place_text stays the drop-state KEY
 // spelling — do not switch key/hot-path callers to this.
 
-fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, mut sema: Sema) -> str:
+fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if place_id < 0 or place_id >= body.place_locals.len():
         return "_?"
     let p_start = body.place_proj_starts[place_id]
@@ -416,7 +416,7 @@ fn mir_place_text_named(body: &MirBody, place_id: i32, pool: &InternPool, mut se
     out
 
 
-fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, mut sema: Sema) -> str:
+fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if rval_id < 0 or rval_id >= body.rval_kinds.len():
         return "<rvalue?>"
 
@@ -466,7 +466,7 @@ fn mir_rvalue_text(body: &MirBody, rval_id: i32, pool: &InternPool, mut sema: Se
     return f"rvalue<{k}>({d0}, {d1}, {d2})"
 
 
-fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, mut sema: Sema) -> str:
+fn mir_operand_text(body: &MirBody, operand_id: i32, pool: &InternPool, sema: &Sema) -> str:
     if operand_id < 0 or operand_id >= body.operand_kinds.len():
         return "<op?>"
 

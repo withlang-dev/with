@@ -169,13 +169,13 @@ fn suspend_type_owner_sym(sema: &Sema, tid: i32) -> i32:
         return 0
     sema.get_type_name(tid as TypeId)
 
-fn suspend_type_has_semantic_drop(mut sema: Sema, tid: i32) -> i32:
+fn suspend_type_has_semantic_drop(sema: &Sema, tid: i32) -> i32:
     let owner = suspend_type_owner_sym(sema, tid)
     if owner == 0:
         return 0
     sema.has_drop_method(owner)
 
-fn suspend_drop_is_semantic(mut sema: Sema, body: &MirBody, place_id: i32) -> i32:
+fn suspend_drop_is_semantic(sema: &Sema, body: &MirBody, place_id: i32) -> i32:
     let local = suspend_place_root_local(body, place_id)
     if local < 0 or local >= body.local_type_ids.len():
         return 0
@@ -564,7 +564,7 @@ fn suspend_prov_origins_from_rvalue(bits: SuspendBits, body: &MirBody, guard_loc
         return origins
     origins
 
-fn suspend_sig_for_callee(mut sema: Sema, body: &MirBody, callee_operand: i32) -> i32:
+fn suspend_sig_for_callee(sema: &Sema, body: &MirBody, callee_operand: i32) -> i32:
     let fn_sym = suspend_callee_sym(body, callee_operand)
     if fn_sym == 0:
         return -1
@@ -576,7 +576,7 @@ fn suspend_sig_for_callee(mut sema: Sema, body: &MirBody, callee_operand: i32) -
         return sema.get_sig(sema_sym)
     -1
 
-fn suspend_prov_origins_from_call(bits: SuspendBits, mut sema: Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> SuspendBits:
+fn suspend_prov_origins_from_call(bits: SuspendBits, sema: &Sema, body: &MirBody, guard_locals: &List[i32], guard_count: i32, callee_operand: i32, call_id: i32) -> SuspendBits:
     let origins = suspend_prov_origins_empty(guard_count)
     if call_id < 0 or call_id >= body.call_arg_starts.len():
         return origins
@@ -1113,7 +1113,7 @@ fn last_use_live_after(body: &MirBody, live_in: &List[i32], bb: i32, stmt_index:
             return true
     false
 
-fn last_use_type_can_hold_view(mut sema: Sema, tid: i32, from_normal_call: bool) -> bool:
+fn last_use_type_can_hold_view(sema: &Sema, tid: i32, from_normal_call: bool) -> bool:
     if tid <= 0:
         return false
     let resolved = sema.resolve_alias(tid as TypeId)
@@ -1134,7 +1134,7 @@ fn last_use_type_can_hold_view(mut sema: Sema, tid: i32, from_normal_call: bool)
 // destination list a "view" of the source, which kept every later handoff
 // of the source a retained copy: the stage 4 dataflow copied its state
 // vector at every statement of the compiler, 239,743 times per self-check).
-fn last_use_operand_can_carry_view(mut sema: Sema, body: &MirBody, op: i32) -> bool:
+fn last_use_operand_can_carry_view(sema: &Sema, body: &MirBody, op: i32) -> bool:
     let place = body.operand_d0[op]
     if place < 0 or place >= body.place_sema_types.len():
         return true
@@ -1142,7 +1142,7 @@ fn last_use_operand_can_carry_view(mut sema: Sema, body: &MirBody, op: i32) -> b
 
 // Directed edges `src -> dst` where `dst` may receive an unretained view
 // (reference, slice, iterator, or projection) into `src`'s buffer.
-fn last_use_build_view_edges(mut sema: Sema, body: &MirBody) -> List[List[i32]]:
+fn last_use_build_view_edges(sema: &Sema, body: &MirBody) -> List[List[i32]]:
     let local_count = body.local_count()
     var edges: List[List[i32]] = List.new()
     var ref_target: List[i32] = List.new()

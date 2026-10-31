@@ -84,7 +84,7 @@ fn resolution_where(sema: &Sema, site: &ResolutionSite, node: i32) -> str:
 // module-level function of the same name); then the callee symbol's
 // signature, its generic template, Sema's builtin classification of the
 // call node, a body of this module; else unresolved.
-fn resolution_sema_answer(mut sema: Sema, mir_mod: &MirModule, pool: &InternPool, body: &MirBody, bb: i32) -> CalleeResolution:
+fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, body: &MirBody, bb: i32) -> CalleeResolution:
     let callee_operand = body.term_data0(bb)
     let call_id = body.term_data1(bb)
     let node = body.call_ast_node(call_id)
@@ -170,7 +170,7 @@ fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &Resoluti
     report.fail("resolution: " ++ fn_name ++ " at " ++ resolution_where(sema, site, node) ++ ": " ++ message)
 
 // Rule 1–4: every MIR call terminator against Sema's answer for its node.
-fn resolution_audit_calls(mut report: AnalysisReport, mut sema: Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     var checked = 0
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
@@ -239,7 +239,7 @@ fn resolution_span_key(file: i32, offset: i32) -> i64: ((file as i64) << 32) | (
 // declarations locate the enclosing body (uninstantiated generic templates
 // have no body and are not judged); the nodes of a body's closures are
 // inside its span and their calls are in the module's call facts.
-fn resolution_audit_unlowered_calls(mut report: AnalysisReport, mut sema: Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
+fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &MirModule, pool: &InternPool, source_path: &str, source_text: &str) -> isize:
     let lowered_nodes: HashMap[i32, i32] = HashMap.new()
     let elided_nodes: HashMap[i32, i32] = HashMap.new()
     var elided = 0
@@ -320,7 +320,7 @@ fn resolution_audit_unlowered_calls(mut report: AnalysisReport, mut sema: Sema, 
     report.note(f"resolution-audit: drop-impl-calls-materialized-as-drops={drop_calls} calls-mir-states-elided={elided}")
     checked
 
-fn resolution_is_drop_impl_call(mut sema: Sema, node: i32) -> bool:
+fn resolution_is_drop_impl_call(sema: &Sema, node: i32) -> bool:
     if sema.ast.get_data2(node) != 0: return false
     let callee = sema.ast.get_data0(node)
     if callee <= 0 or callee >= sema.ast.node_count() or sema.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS: return false
