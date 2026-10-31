@@ -8931,7 +8931,7 @@ impl Sema:
             return 1
         if self.impl_extra_is_std[record_idx] == want_std: 1 else: 0
 
-    mut fn type_has_drop_impl(tid: i32) -> i32:
+    fn type_has_drop_impl(tid: i32) -> i32:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
@@ -11131,7 +11131,7 @@ impl Sema:
 
     // Frozen twin for MIR lowering; sema's acceptance of the coercion during
     // checking preregistered any generic-inst impl answer it needs.
-    mut fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> i32:
+    fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> i32:
         if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
             return 0
         let exp_pointee = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
@@ -11144,7 +11144,7 @@ impl Sema:
             return 0
         self.type_implements_trait_frozen(act_pointee, self.get_type_d0(exp_pointee))
 
-    mut fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
+    fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
         if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
             return 0
         let param_count = self.get_type_d1(expected)
@@ -11157,7 +11157,7 @@ impl Sema:
                 return 0
         self.types_compatible_frozen(self.get_type_d2(expected), self.get_type_d2(actual))
 
-    mut fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> i32:
+    fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> i32:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
@@ -11169,7 +11169,7 @@ impl Sema:
             return 0
         self.types_compatible_frozen(exp_pointee, self.get_type_d0(act_r))
 
-    mut fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:
+    fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:
         if expected == actual:
             return 1
         if expected == 0 or actual == 0:
@@ -11267,7 +11267,7 @@ impl Sema:
             return 0
         0
 
-    mut fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> i32:
+    fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> i32:
         if self.types_compatible_fast_frozen(expected, actual) != 0:
             return 1
 
@@ -11665,7 +11665,7 @@ impl Sema:
         if incomplete_before != 0: self.copy_walk_incomplete = 1
         out
 
-    mut fn has_drop_method(type_name: i32) -> i32:
+    fn has_drop_method(type_name: i32) -> i32:
         if type_name <= 0:
             return 0
         if let Some(cached) = self.drop_method_cache.get(type_name):

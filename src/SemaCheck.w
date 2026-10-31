@@ -411,7 +411,7 @@ impl Sema:
             return self.types_compatible(pointee, actual)
         0
 
-    mut fn can_auto_ref_arg_frozen(expected: i32, actual: i32) -> i32:
+    fn can_auto_ref_arg_frozen(expected: i32, actual: i32) -> i32:
         if expected == 0 or actual == 0:
             return 0
         let expected_resolved = self.resolve_alias(expected as TypeId)
@@ -2554,7 +2554,7 @@ impl Sema:
         args.push(storage_tid)
         self.find_generic_inst_type(self.syms.fixed_string, args, 1) as i32
 
-    mut fn resolve_generic_type_frozen(node: i32) -> i32:
+    fn resolve_generic_type_frozen(node: i32) -> i32:
         var gi_base_sym = self.ast.get_data0(node)
         if (self.is_vector_symbol(gi_base_sym) or self.is_mask_symbol(gi_base_sym)) and self.ast.get_data2(node) == 2:
             let vg_start = self.ast.get_data1(node)
@@ -2607,7 +2607,7 @@ impl Sema:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
         self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
 
-    mut fn resolve_type_expr_frozen(node: i32) -> TypeId:
+    fn resolve_type_expr_frozen(node: i32) -> TypeId:
         if node == 0:
             return 0 as TypeId
         let kind = self.ast.kind(node)
@@ -2704,7 +2704,7 @@ impl Sema:
             return self.ty_i32
         0 as TypeId
 
-    mut fn resolve_type_level_arg_expr_frozen(node: i32) -> i32:
+    fn resolve_type_level_arg_expr_frozen(node: i32) -> i32:
         if node == 0:
             return 0
         let kind = self.ast.kind(node)
@@ -13892,7 +13892,7 @@ impl Sema:
             return self.ensure_generic_inst_type(self.syms.option, opt_args, 1) as i32
         self.resolve_type_expr(type_node) as i32
 
-    mut fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    fn resolve_type_node_with_subst_frozen(type_node: i32, self_ty: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         if type_node == 0:
             return self.ty_void as i32
         let kind = self.ast.kind(type_node)
@@ -14030,7 +14030,7 @@ impl Sema:
             return SemaImplTargetMatch { 1, subst_names, subst_types }
         sema_impl_target_no_match()
 
-    mut fn impl_target_match_frozen(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
+    fn impl_target_match_frozen(impl_node: i32, carrier_ty: i32) -> SemaImplTargetMatch:
         let subst_names: List[i32] = List.new()
         let subst_types: List[i32] = List.new()
         let carrier_resolved = self.resolve_alias(carrier_ty as TypeId)
@@ -14137,7 +14137,7 @@ impl Sema:
                 return target_actual
         self.resolve_type_node_with_subst(arg_node, source_ty, subst_names, subst_types)
 
-    mut fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    fn resolve_impl_trait_arg_for_source_frozen(impl_node: i32, source_ty: i32, arg_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let arg_kind = self.ast.kind(arg_node)
         if arg_kind == NodeKind.NK_TYPE_NAMED or arg_kind == NodeKind.NK_IDENT:
             let arg_sym = self.ast.get_data0(arg_node)
@@ -14195,7 +14195,7 @@ impl Sema:
             return SemaDerefInfo { ok: 1, target_ty: concrete_target, result_ref_ty: concrete_result_ref, deref_fn }
         sema_deref_info_none()
 
-    mut fn resolve_user_deref_info_frozen(source_ty: i32) -> SemaDerefInfo:
+    fn resolve_user_deref_info_frozen(source_ty: i32) -> SemaDerefInfo:
         let deref_trait_name = "Deref"
         if source_ty == 0:
             return sema_deref_info_none()
@@ -20517,7 +20517,7 @@ impl Sema:
                     return raw_ret
         self.ensure_result_type_for(raw_ret, err_ty)
 
-    mut fn optional_chain_wrap_result_for_error_type_frozen(raw_ret: i32, err_ty: i32) -> i32:
+    fn optional_chain_wrap_result_for_error_type_frozen(raw_ret: i32, err_ty: i32) -> i32:
         let rr = self.resolve_alias(raw_ret as TypeId)
         if self.get_type_kind(rr) == TypeKind.TY_GENERIC_INST and self.get_type_d0(rr) == self.syms.result:
             if self.get_generic_inst_arg_count(rr as i32) == 2:
@@ -20556,7 +20556,7 @@ impl Sema:
             return base
         self.optional_chain_wrap_result_for_error_type(f, err_ty)
 
-    mut fn optional_chain_result_type_frozen(base: i32, member: i32) -> i32:
+    fn optional_chain_result_type_frozen(base: i32, member: i32) -> i32:
         if base == 0:
             return base
         let payload = self.optional_chain_payload_type(base)
@@ -20984,7 +20984,7 @@ impl Sema:
             return 1
         0
 
-    mut fn autoderef_type_has_field_frozen(ty: TypeId, field: i32) -> i32:
+    fn autoderef_type_has_field_frozen(ty: TypeId, field: i32) -> i32:
         if self.field_access_type_direct_frozen(ty, field) != 0:
             return 1
         if self.get_type_kind(ty) == TypeKind.TY_ENUM and self.enum_has_variant(ty as i32, field) != 0:
@@ -21079,7 +21079,7 @@ impl Sema:
         self.emit_error("auto-deref cycle through Deref implementation", node)
         current
 
-    mut fn autoderef_next_type_frozen(current: TypeId) -> TypeId:
+    fn autoderef_next_type_frozen(current: TypeId) -> TypeId:
         let tk = self.get_type_kind(current)
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             let inner = self.get_type_d0(current)
@@ -21343,7 +21343,7 @@ impl Sema:
         // this node to a normal NK_FIELD_ACCESS.
         0
 
-    mut fn index_expr_is_type_level(expr: i32) -> bool:
+    fn index_expr_is_type_level(expr: i32) -> bool:
         if expr == 0:
             return false
         let kind = self.ast.kind(expr)
@@ -23990,7 +23990,7 @@ impl Sema:
             out_variants.push(path_variants[(best_start + pi)])
         ErrorConversionChain { 1, ambiguous, best_first_variant, other_first_variant, out_types, out_variants }
 
-    mut fn error_conversion_chain_frozen(target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
+    fn error_conversion_chain_frozen(target_err_ty: i32, source_err_ty: i32) -> ErrorConversionChain:
         if target_err_ty <= 0 or source_err_ty <= 0:
             return error_conversion_chain_not_found()
         if self.error_conversion_type_matches(target_err_ty, source_err_ty) != 0:
@@ -29962,7 +29962,7 @@ impl Sema:
         self.has_expected_type = saved_has
         out
 
-    mut fn enum_has_variant(enum_tid: i32, variant_sym: i32) -> i32:
+    fn enum_has_variant(enum_tid: i32, variant_sym: i32) -> i32:
         let resolved = self.resolve_alias(enum_tid)
         let resolved_kind = self.get_type_kind(resolved)
         let bare_variant_sym = self.unqualified_enum_variant_sym(variant_sym)
@@ -31291,7 +31291,7 @@ impl Sema:
     // syms. Direct impl records must come from the tid's own tier; blanket
     // impls apply across tiers (a bound-generic impl is not name-keyed).
     // Uncached — the flat selection_cache would conflate the two meanings.
-    mut fn select_trait_impl_tiered(type_sym: i32, trait_sym: i32, want_std: i32) -> i32:
+    fn select_trait_impl_tiered(type_sym: i32, trait_sym: i32, want_std: i32) -> i32:
         if self.impl_lookup.contains(type_sym):
             let idx = self.impl_lookup.get(type_sym).unwrap()
             let start = self.impl_starts[idx]
@@ -31325,7 +31325,7 @@ impl Sema:
         self.blanket_guard.remove(key)
         found
 
-    mut fn select_trait_impl(type_sym: i32, trait_sym: i32) -> i32:
+    fn select_trait_impl(type_sym: i32, trait_sym: i32) -> i32:
         let key = self.selection_cache_key(type_sym, trait_sym)
         if let Some(cached) = self.selection_cache.get(key):
             return cached
@@ -31418,7 +31418,7 @@ impl Sema:
             pos = pos + 2 + bound_count
         1
 
-    mut fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
+    fn blanket_impl_type_bounds_satisfied_frozen(impl_node: i32, subst_names: &List[i32], subst_types: &List[i32]) -> i32:
         let tp_meta = self.ast.find_impl_type_params(impl_node)
         if tp_meta < 0:
             return 1
@@ -31554,7 +31554,7 @@ impl Sema:
     // Frozen read twin for codegen compatibility checks. Exact/direct trait answers are
     // read-only; generic blanket impl selection still depends on type-node resolution, so
     // hit that path loudly instead of silently guessing.
-    mut fn type_implements_trait_frozen(tid: i32, trait_sym: i32) -> i32:
+    fn type_implements_trait_frozen(tid: i32, trait_sym: i32) -> i32:
         if tid == 0 or trait_sym == 0:
             return 0
         let resolved = self.resolve_alias(tid)
@@ -39539,7 +39539,7 @@ fn unpack_place_mut(packed: i64) -> i32:
     (packed % 4294967296) as i32
 
 impl Sema:
-    mut fn type_is_index_place(tid: i32) -> i32:
+    fn type_is_index_place(tid: i32) -> i32:
         if tid == 0:
             return 0
         var resolved = self.resolve_alias(tid as TypeId)
@@ -40693,12 +40693,12 @@ impl Sema:
     // A method of an `impl Drop for T` block is T's drop body, whatever key
     // T's methods are registered under (§18.1: std's `CString.drop` beside
     // a user's own `CString`, whose name the function's text resolves to).
-    mut fn fn_node_is_drop_body(node: i32, fn_sym: i32) -> bool:
+    fn fn_node_is_drop_body(node: i32, fn_sym: i32) -> bool:
         let impl_node = self.impl_node_for_method_decl(node)
         if impl_node != 0 and self.ast.get_data2(impl_node) == self.syms.drop: return true
         self.drop_owner_for_fn_symbol(fn_sym) != 0
 
-    mut fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
+    fn drop_owner_for_fn_symbol(fn_sym: i32) -> i32:
         // #2520: owner and method come from the registration maps, not a
         // text split — a trait impl's symbol is `Owner.Drop.drop`, whose
         // first-dot split reads the method as "Drop.drop".

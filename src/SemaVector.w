@@ -243,7 +243,7 @@ impl Sema:
 
     // The frozen twin: every Vector/Mask type a MIR-era consumer names was
     // registered while checking.
-    mut fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
+    fn resolve_vector_generic_frozen(base_sym: i32, a0: i32, a1: i32) -> i32:
         if self.pool_resolve_symbol(base_sym) == "Mask":
             let n = self.vector_count_node_value(a0, self.vector_count_subst(a0))
             if n < 1: return 0
