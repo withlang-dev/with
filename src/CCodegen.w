@@ -2326,8 +2326,12 @@ impl CCodegen:
             var base = self.c_type(inner_tid, 0)
             if base == "void":
                 base = "uint8_t"
+            // A pointee that is itself a pointer is qualified after its `*`:
+            // `*const *const i8` is `const int8_t* const*`. A leading
+            // `const` qualified the innermost pointee twice and left the
+            // middle pointer mutable (`const const int8_t**`).
             if self.c_view_is_const(resolved):
-                return "const " ++ base ++ "*"
+                return if base.ends_with("*"): base ++ " const*" else: "const " ++ base ++ "*"
             return base ++ "*"
         if tk == TypeKind.TY_GENERIC_INST:
             // Generic instances: List[T] → with_vec, HashMap[K,V] → void* (opaque handle)

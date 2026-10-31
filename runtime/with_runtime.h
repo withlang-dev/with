@@ -77,7 +77,7 @@ void with_vec_append_bytes(uint8_t *v, with_str s);
 // D115 Amendment 1 step 1: sized helpers; the element size is static at
 // every call. D116: `++` and `++=`.
 void with_vec_push_es(with_vec *v, const void *elem, int64_t elem_size);
-void *with_vec_get_ptr_es(void *v, int64_t index, int64_t elem_size);
+void *with_vec_get_ptr_es(const void *v, int64_t index, int64_t elem_size);
 void with_vec_remove_es(with_vec *v, int64_t index, int64_t elem_size);
 void with_vec_extend_bits_es(uint8_t *v, const uint8_t *src, int64_t n, int64_t elem_size);
 void with_vec_extend_str(uint8_t *v, const uint8_t *src, int64_t n);
@@ -86,7 +86,7 @@ void with_vec_take_front_es(uint8_t *v, int64_t elem_size);
 void with_vec_restore_front_es(uint8_t *v, const uint8_t *elem, int64_t elem_size);
 void with_vec_shrink_to_fit_es(uint8_t *v, int64_t elem_size);
 void with_vec_free_buffer_at(void *p, int64_t cap, int64_t elem_size, int64_t start);
-int64_t with_vec_len(with_vec *v);
+int64_t with_vec_len(const with_vec *v);
 // D120: a List of values shares its buffer under a count (rt_core.w).
 void with_vec_retain(with_vec *v, int64_t elem_size);
 int64_t with_vec_release_last(with_vec *v, int64_t elem_size);

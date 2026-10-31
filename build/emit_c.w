@@ -94,7 +94,12 @@ fn emitc_push_c_compiler(argv: List[str], root: &str, compiler_path: &str) -> Li
     for part in emitc_c_compiler_argv(emitc_abs(root, compiler_path)): argv.push(part)
     argv
 
+// The emitted C states its types exactly: a qualifier written twice or one
+// a call discards is a wrong type in the backend's output (`const const
+// int8_t**` for `*const *const i8`), refused rather than warned past.
 fn emitc_push_c_source(argv: List[str], path: &str) -> List[str]:
+    argv |> push("-Werror=duplicate-decl-specifier")
+    argv |> push("-Werror=incompatible-pointer-types-discards-qualifiers")
     argv |> push("-x")
     argv |> push("c")
     argv |> push(emit_c_owned_text(path))
