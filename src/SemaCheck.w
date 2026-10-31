@@ -2236,6 +2236,10 @@ impl Sema:
                     return 0 as TypeId
                 if self.require_std_tier_for_symbol(sym, node) == 0:
                     return 0 as TypeId
+                // A use of a spelled type name, recorded where it is resolved
+                // (`with analyze` use facts); a lookup itself records nothing,
+                // so the compiler's own queries stay read-only (D172).
+                self.record_name_use(node, "type", self.named_type_use_path(sym, named_tid), self.pool_resolve(sym))
                 return named_tid as TypeId
             let sym_text = self.pool_resolve_symbol(sym)
             let canonical_sym = if sym_text.len() > 0: self.pool_lookup_symbol(sym_text) else: 0
@@ -2251,6 +2255,7 @@ impl Sema:
                         return 0 as TypeId
                     if self.require_std_tier_for_symbol(canonical_sym, node) == 0:
                         return 0 as TypeId
+                    self.record_name_use(node, "type", self.named_type_use_path(canonical_sym, canonical_tid), self.pool_resolve(canonical_sym))
                     return canonical_tid as TypeId
                 if canonical_sym == self.syms.self_type:
                     return 0 as TypeId

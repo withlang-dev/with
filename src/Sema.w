@@ -31,6 +31,12 @@ use std.libc.abort
 
 // WITH_PROFILE=1: one `[profile] sema.<phase>` line per check_module step,
 // the same switch and format as the frontend's phase lines.
+// `with analyze … explain:visible` (#2249): the trace one explain query
+// collects while the visibility rules run. It is process-wide debug output,
+// not a fact of the Sema, so the rules it narrates stay read-only (D172).
+var g_vis_explain_on = false
+var g_vis_explain_log: List[str] = []
+
 fn sema_profile_enabled() -> bool: with_getenv_str("WITH_PROFILE").len() > 0
 
 fn sema_profile_report(name: &str, t0: i64):
@@ -2569,8 +2575,6 @@ type Sema {
     decl_visibility_prev: List[i32],
     // #2249: the visibility explainer (`with analyze … explain:visible:<name>`):
     // every rule a verdict passed through, when on.
-    visibility_explain_on: i32,
-    visibility_explain_log: List[str],
     // #2248: the evaluator's own message for the last `comptime if`
     // condition that did not evaluate, so the report names the cause (an
     // unimported type) instead of "not comptime-evaluable".
@@ -4291,8 +4295,6 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         decl_visibility_pub: List.new(),
         decl_visibility_nodes: List.new(),
         decl_visibility_index: sema_new_map_i32_i32(),
-        visibility_explain_on: 0,
-        visibility_explain_log: sema_new_list_str(),
         comptime_truthy_error: "",
         decl_visibility_prev: List.new(),
         decl_visibility_node_index: sema_new_map_i32_i32(),
@@ -4900,8 +4902,8 @@ impl Sema:
 
     // D100: a module path's package; a path the Zcu never saw is the
     // program's (std's when it is a std path).
-    mut fn vis_note(text: &str):
-        if self.visibility_explain_on != 0: self.visibility_explain_log.push(with_str_clone_ref(text))
+    fn vis_note(text: &str):
+        if g_vis_explain_on: g_vis_explain_log.push(text)
 
     // `with analyze file.w 'explain:visible:<name>'` (#2249): every
     // declaration `name` could resolve to from the root module — values and
@@ -4939,23 +4941,23 @@ impl Sema:
         if candidates == 0: out = out ++ "  no declaration of that name in any loaded module\n"
         // The §18.2 fallback bridge: the module a bare, displaced std name
         // resolves to from user code, with the bridge's own reasoning.
-        self.visibility_explain_log = sema_new_list_str()
-        self.visibility_explain_on = 1
+        g_vis_explain_log = []
+        g_vis_explain_on = true
         let bridge = self.std_fallback_bridge_path(sym)
-        self.visibility_explain_on = 0
-        for line in self.visibility_explain_log: out = out ++ "  " ++ line ++ "\n"
+        g_vis_explain_on = false
+        for line in g_vis_explain_log: out = out ++ "  " ++ line ++ "\n"
         out = out ++ "  fallback bridge: " ++ (if bridge.len() > 0: "resolves the bare name to " ++ bridge else: "names no module (the bare name does not resolve through it)".to_owned()) ++ "\n"
         self.current_module_path = saved_module
         out
 
     mut fn explain_one_candidate(what: &str, sym: i32, path: &str, is_pub: i32) -> str:
         var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0})\n"
-        self.visibility_explain_log = sema_new_list_str()
-        self.visibility_explain_on = 1
+        g_vis_explain_log = []
+        g_vis_explain_on = true
         self.module_visibility_cache = Memo.new()
         let verdict = self.decl_visible_from_current_gated(path, is_pub, sym)
-        self.visibility_explain_on = 0
-        for line in self.visibility_explain_log: out = out ++ "    " ++ line ++ "\n"
+        g_vis_explain_on = false
+        for line in g_vis_explain_log: out = out ++ "    " ++ line ++ "\n"
         out ++ f"    verdict: {verdict}\n"
 
     // `with analyze file.w explain:modules`: why each module is in the
@@ -5544,6 +5546,15 @@ impl Sema:
         self.module_visibility_cache.insert(sema_owned_text(cache_key), 0)
         0
 
+    // The module that declares the named-type candidate `tid` of `sym`, ""
+    // when the name resolved through the scoped tier or a C import.
+    fn named_type_use_path(sym: i32, tid: i32) -> str:
+        var i = self.named_type_candidate_head(sym)
+        while i >= 0:
+            if self.named_type_candidate_tids[i] == tid: return with_str_clone_ref(self.named_type_candidate_paths[i])
+            i = self.named_type_candidate_next[i]
+        ""
+
     mut fn lookup_named_type_visible(sym: i32) -> i32:
         self.lookup_named_type_filtered(sym, 1)
 
@@ -5714,7 +5725,6 @@ impl Sema:
                 if global_tid == 0:
                     global_tid = candidate_tid
             else if candidate_visible != 0:
-                self.record_name_use(0, "type", candidate_path, self.pool_resolve(sym))
                 return candidate_tid
             i = self.named_type_candidate_next[i]
         // A module that uses c_import shares the program's C declarations,
