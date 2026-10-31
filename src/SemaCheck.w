@@ -145,6 +145,13 @@ fn sema_node_is_zero_int_literal(ast: &AstPool, node: i32) -> bool:
     let fast = ast.int_literal_fast_i64(node as NodeId)
     fast.ok != 0 and fast.value == 0
 
+// The literal `0` or `1`: a yes/no spelled as a number.
+fn sema_node_is_bit_int_literal(ast: &AstPool, node: i32) -> bool:
+    if node == 0 or ast.kind(node) != NodeKind.NK_INT_LIT:
+        return false
+    let fast = ast.int_literal_fast_i64(node as NodeId)
+    fast.ok != 0 and (fast.value == 0 or fast.value == 1)
+
 fn sema_regex_compile_options(flags: &str) -> i32:
     var options: i32 = 0
     var i: i64 = 0
@@ -5745,6 +5752,8 @@ impl Sema:
         // its findings over the declared ones lost the caller's view tie
         // whenever this body was checked before the caller — always, once
         // #1473 checks a view-returning function first.
+        // Census (#2857): the body's tails join its `return`s as results.
+        if sig_idx >= 0: self.note_predicate_tails(body)
         let facade_declared = sig_idx >= 0 and self.facade_declared_effect_sigs.contains(sig_idx)
         for pi in 0..self.current_fn_param_effs.len() as i32:
             var eff: i32 = self.current_fn_param_effs[pi]
@@ -19313,10 +19322,45 @@ impl Sema:
         if mut_args.len() > 0:
             self.check_call_activation(mut_args, 0, all_args, call_node)
 
+    // Census (#2857): one result of the function being checked — a `return`
+    // value or a body tail — is the literal 0 or 1, or something else.
+    mut fn note_predicate_result(value: i32):
+        let sig = self.current_fn_sig_idx
+        if sig < 0 or value == 0:
+            return
+        if sema_node_is_zero_int_literal(self.ast, value):
+            self.predicate_zero_results.insert(sig, 1)
+        else if sema_node_is_bit_int_literal(self.ast, value):
+            self.predicate_one_results.insert(sig, 1)
+        else if self.recorded_expr_type_or_zero(value) != self.ty_never as i32:
+            self.predicate_other_results.insert(sig, 1)
+
+    // The values a body yields at its tails, through blocks, `if`, `match`
+    // and the wrappers; a `return` is noted where it is checked.
+    mut fn note_predicate_tails(node: i32):
+        if node == 0:
+            return
+        let kind = self.ast.kind(node)
+        if kind == NodeKind.NK_BLOCK:
+            self.note_predicate_tails(self.ast.get_data2(node))
+        else if kind == NodeKind.NK_IF_EXPR:
+            self.note_predicate_tails(self.ast.get_data1(node))
+            self.note_predicate_tails(self.ast.get_data2(node))
+        else if kind == NodeKind.NK_MATCH:
+            for ai in 0..self.ast.get_data2(node):
+                let arm = self.ast.get_extra(self.ast.get_data1(node) + ai)
+                if arm > 0 and self.ast.kind(arm) == NodeKind.NK_MATCH_ARM:
+                    self.note_predicate_tails(self.ast.get_data1(arm))
+        else if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_COMPTIME:
+            self.note_predicate_tails(self.ast.get_data0(node))
+        else if kind != NodeKind.NK_RETURN:
+            self.note_predicate_result(node)
+
     mut fn check_return(node: i32) -> i32:
         if self.in_defer != 0:
             self.emit_error_code("return not allowed in defer", node, "E0901")
         let value = self.ast.get_data0(node)
+        self.note_predicate_result(value)
         if value != 0:
             let val_type = if self.current_return_type != 0: self.check_expr_with_owned_demand(value, self.current_return_type) else: self.check_expr(value)
             // #1827 (§2.4): the return drops every binding of the body, and

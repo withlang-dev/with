@@ -1370,6 +1370,14 @@ type Sema {
     footprint_edge_nodes: HashMap[i32, i32],
     footprint_pending_diags: List[Diagnostic],
     footprint_pending_data: List[i32],
+    // Ceremony census (#2857): per signature, how many `return`s and tails
+    // produce the literal 0 (predicate_zero_results) and 1 (predicate_one_results), and whether any
+    // produces something else (predicate_other_results). A function whose
+    // every result is a 0/1 literal and whose declared return is an integer
+    // is counted as `i32-predicate`: a yes/no stored in a number.
+    predicate_zero_results: HashMap[i32, i32],
+    predicate_one_results: HashMap[i32, i32],
+    predicate_other_results: HashMap[i32, i32],
     declared_from_checks: List[i32],
     // #1827: bodies a call runs that the running program chooses — every
     // impl of a dyn method, every callable of a callable type, every drop a
@@ -3737,6 +3745,9 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         footprint_edge_nodes: HashMap.new(),
         footprint_pending_diags: List.new(),
         footprint_pending_data: List.new(),
+        predicate_zero_results: HashMap.new(),
+        predicate_one_results: HashMap.new(),
+        predicate_other_results: HashMap.new(),
         declared_from_checks: List.new(),
         global_dispatchers: List.new(),
         global_dispatcher_heads: sema_new_map_i32_i32(),
