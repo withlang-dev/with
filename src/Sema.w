@@ -6267,7 +6267,7 @@ impl Sema:
         let di = self.find_decl_index(node)
         if di >= 0 and di < self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
-            let text = self.source_text_view_for_file_id(file_id)
+            let text: &str = self.source_text_view_for_file_id(file_id)
             if text.len() > 0:
                 return text
         // Body nodes never match a top-level decl, so the lookup above fails
@@ -6279,7 +6279,7 @@ impl Sema:
         // checker's per-decl context, which update_decl_source_context /
         // update_fn_source_context keep current for diagnostics.
         if self.local_file_id != 0:
-            let text = self.source_text_view_for_file_id(self.local_file_id)
+            let text: &str = self.source_text_view_for_file_id(self.local_file_id)
             if text.len() > 0:
                 return text
         &self.source_text

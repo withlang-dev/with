@@ -16586,6 +16586,16 @@ impl Sema:
     mut fn type_is_plain_bits(ty: i32) -> bool:
         ty != 0 and self.is_copy(ty as TypeId) != 0 and self.type_needs_drop(ty) == 0
 
+    // D179 (§3.8): an unannotated binding of a view of plain bits or of a
+    // `str` takes the value. A `str` is a value with no in-place mutation
+    // (D111: a copy is a count increment), so a copy and a view differ only
+    // in what a later write of the root may do; `List` keeps observing
+    // (D144: a lost `push` is the worst outcome).
+    mut fn type_takes_value_on_binding(ty: i32) -> bool:
+        if ty == 0:
+            return false
+        self.type_is_plain_bits(ty) or self.get_type_kind(self.resolve_alias(ty as TypeId)) == TypeKind.TY_STR
+
     // D144: the root of `expr`'s place is a mutable binding (a `var`, a
     // `mut self`), so an observing binding into it may be mutated through.
     fn place_root_is_mutable(expr: i32) -> bool:
@@ -17135,7 +17145,7 @@ impl Sema:
                 // A value that still views after the copy (a slice, a
                 // pointer, a facade view token, a struct of those) keeps the
                 // binding a view: the copy would not detach it.
-                if self.type_is_plain_bits(bits_ty) and not self.type_carries_view(bits_ty) and self.record_contextual_copy_adjustment(value, bits_ty, val_type as i32) != 0:
+                if self.type_takes_value_on_binding(bits_ty) and not self.type_carries_view(bits_ty) and self.record_contextual_copy_adjustment(value, bits_ty, val_type as i32) != 0:
                     val_type = bits_ty as TypeId
             // A view into a statement temporary has one meaning left as a
             // binding: the Copy value, copied as an owned demand copies it
