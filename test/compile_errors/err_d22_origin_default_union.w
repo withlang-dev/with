@@ -14,6 +14,6 @@ fn main:
     primary.insert(1, 44)
     fallback.insert(1, 45)
 
-    let view = primary.get(1) ?? fallback.get(1).unwrap()
+    let view: &i32 = primary.get(1) ?? fallback.get(1).unwrap()
     primary.clear()
     assert(view == 44)

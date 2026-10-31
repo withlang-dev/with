@@ -14,6 +14,6 @@ fn main:
     primary.insert(1, 91)
     fallback.insert(1, 92)
     let result: Result[&i32, str] = Ok(primary.get(1).unwrap())
-    let view = result.unwrap_or(fallback.get(1).unwrap())
+    let view: &i32 = result.unwrap_or(fallback.get(1).unwrap())
     primary.clear()
     assert(view == 91)

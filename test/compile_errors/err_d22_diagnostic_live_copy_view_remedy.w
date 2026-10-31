@@ -12,6 +12,6 @@ use std.collections.HashMap
 fn main:
     var counts: HashMap[str, i32] = HashMap.new()
     counts.insert("api", 119)
-    let count = counts.get("api").unwrap()
+    let count: &i32 = counts.get("api").unwrap()
     counts.clear()
     assert(count == 119)

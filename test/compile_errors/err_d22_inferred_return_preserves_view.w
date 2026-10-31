@@ -13,6 +13,6 @@ fn find(map: &HashMap[i32, i32]): map.get(1).unwrap()
 fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 82)
-    let view = find(&map)
+    let view: &i32 = find(&map)
     map.clear()
     assert(view == 82)

@@ -8,7 +8,7 @@ var G: List[i32] = List.new()
 
 fn deep(n: i32) -> &i32:
     if n > 0:
-        let r = deep(n - 1)
+        let r: &i32 = deep(n - 1)
         G.push(n)
         r
     else: &G[0]

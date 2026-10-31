@@ -16,7 +16,7 @@ fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 108)
     let carrier: D22Choice = D22Choice.Value(map.get(1).unwrap())
-    let view = match carrier:
+    let view: &i32 = match carrier:
         D22Choice.Value(value) => value
         D22Choice.Empty => return
     map.clear()

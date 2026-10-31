@@ -7,7 +7,7 @@ fn choose_many(p00: &Rule6ManyBox, p01: &Rule6ManyBox, p02: &Rule6ManyBox, p03: 
 
 fn main:
     let outer = Rule6ManyBox { n: 1 }
-    var view = choose_many(&outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer)
+    var view: &Rule6ManyBox = choose_many(&outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer)
     with Rule6ManyBox { n: 2 } as inner:
         view = choose_many(&outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &outer, &inner)
     assert(view.n == 2)

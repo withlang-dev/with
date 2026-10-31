@@ -11,7 +11,7 @@ use std.collections.HashMap
 fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 101)
-    let view = match map.get(1):
+    let view: &i32 = match map.get(1):
         Some(value) => value
         None => return
     map.clear()

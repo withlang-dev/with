@@ -24,7 +24,7 @@ fn ints():
     // `d[i]` is the element's view (IndexGet, #2560).
     assert(*d[0] == 1 and *d[1] == 2 and *d[2] == 3)
     let middle = d[1]
-    assert(*middle == 2 and d[0] < d[2])
+    assert(middle == 2 and d[0] < d[2])
     var cursor = d.iter()
     var seen: List[i32] = []
     while true:

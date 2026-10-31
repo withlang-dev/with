@@ -18,5 +18,5 @@ async fn main:
     let pair = (view, 42)
     let t = work()
     let value = t.await
-    let v0 = pair.0
+    let v0: &i32 = pair.0
     assert(*v0 == value - 41)

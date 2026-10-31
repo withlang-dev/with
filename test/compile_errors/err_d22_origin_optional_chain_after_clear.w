@@ -14,6 +14,6 @@ fn main:
     var map: HashMap[i32, i32] = HashMap.new()
     map.insert(1, 109)
     let carrier: Option[D22OptionalView] = Some(D22OptionalView { value: map.get(1).unwrap() })
-    let view = carrier?.value.unwrap()
+    let view: &i32 = carrier?.value.unwrap()
     map.clear()
     assert(view == 109)

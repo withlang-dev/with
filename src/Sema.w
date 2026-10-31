@@ -6968,6 +6968,34 @@ impl Sema:
             if found != 0: return found
         0
 
+    // D144/D179: a type whose value, once copied out of a view, still views
+    // something — a reference, a raw pointer, a slice, an ephemeral value
+    // (a facade view token, an iterator), or a struct or payload holding
+    // one. Copying such a value does not detach it from its origin, so a
+    // binding of a view of it stays a view; plain scalars and structs of
+    // scalars take the value.
+    mut fn type_carries_view(tid: i32) -> bool:
+        var visited: List[i32] = List.new()
+        self.type_carries_view_from(tid, mut visited)
+
+    mut fn type_carries_view_from(tid: i32, mut visited: List[i32]) -> bool:
+        if tid <= 0:
+            return false
+        let resolved = self.resolve_alias(tid as TypeId) as i32
+        if visited.contains(resolved):
+            return false
+        visited.push(resolved)
+        let tk = self.get_type_kind(resolved as TypeId)
+        if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_FN:
+            return true
+        if self.type_is_ephemeral_value(resolved) != 0:
+            return true
+        var parts: List[i32] = List.new()
+        self.type_inline_parts(resolved, mut parts)
+        for part in parts:
+            if self.type_carries_view_from(part, mut visited): return true
+        false
+
     // type_contains_interior while checking, before generic instances'
     // field types are registered: it resolves each instance's own fields.
     mut fn type_holds_interior(tid: i32) -> bool:

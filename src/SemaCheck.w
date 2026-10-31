@@ -17128,7 +17128,10 @@ impl Sema:
             let bits_view = self.resolve_alias(val_type)
             if not written_ref and self.get_type_kind(bits_view) == TypeKind.TY_REF and self.get_type_d1(bits_view) == 0:
                 let bits_ty = self.get_type_d0(bits_view)
-                if self.type_is_plain_bits(bits_ty) and self.record_contextual_copy_adjustment(value, bits_ty, val_type as i32) != 0:
+                // A value that still views after the copy (a slice, a
+                // pointer, a facade view token, a struct of those) keeps the
+                // binding a view: the copy would not detach it.
+                if self.type_is_plain_bits(bits_ty) and not self.type_carries_view(bits_ty) and self.record_contextual_copy_adjustment(value, bits_ty, val_type as i32) != 0:
                     val_type = bits_ty as TypeId
             // A view into a statement temporary has one meaning left as a
             // binding: the Copy value, copied as an owned demand copies it
