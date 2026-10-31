@@ -12,6 +12,8 @@
 //   vec-name         the identifier `Vec` (D118: it names no type; target 0)
 //   lit-ptr-len      `"…" as *const u8, N` — a literal cast to its bytes
 //                    with a hand-counted length (a literal is a str: pass it)
+//   bool-as-if-1-0   `if c: 1 else: 0` / `if c: 0 else: 1` — a bool spelled
+//                    as a number by hand (`c as i32` is the spelling, D177)
 // Typed patterns come from one compilation of src/main.w, which covers the
 // compiler and lib/std (`with check --ceremony-census`):
 //   str-clone              `.clone()` on a str
@@ -153,6 +155,10 @@ impl Census:
                 self.bump(f"lit-ptr-len\t{area}")
             else if tag == TokenKind.TK_IDENT and word(i) == "Vec":
                 self.bump(f"vec-name\t{area}")
+            else if tag == TokenKind.TK_COLON and i + 4 < n and tokens.get_tag(i + 1) == TokenKind.TK_INT_LIT and tokens.get_tag(i + 2) == TokenKind.TK_KW_ELSE and tokens.get_tag(i + 3) == TokenKind.TK_COLON and tokens.get_tag(i + 4) == TokenKind.TK_INT_LIT:
+                let a = word(i + 1)
+                let b = word(i + 4)
+                if (a == "1" and b == "0") or (a == "0" and b == "1"): self.bump(f"bool-as-if-1-0\t{area}")
 
 fn typed_sites(compiler: &str) -> str:
     var argv: List[str] = List.new()

@@ -258,6 +258,18 @@ impl Sema:
             let file_id = self.ast.file(node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
             out = out ++ f"{name}\t{path}\t{self.node_line(node)}\t{self.ast.get_start(node)}\t{self.ast.get_end(node)}\n"
+        // #2857: a function declared to return an integer whose every result
+        // is the literal 0 or 1 answers yes/no in a number; its callers write
+        // `!= 0`. Judged per signature once every body is checked.
+        // Both outcomes must occur: `fn one(): 1` is a constant, not a yes/no.
+        for (sig, _) in self.predicate_zero_results:
+            if not self.predicate_one_results.contains(sig) or self.predicate_other_results.contains(sig): continue
+            let ret = self.sig_return_type(sig)
+            if ret == 0 or self.get_type_kind(self.resolve_alias(ret as TypeId)) != TypeKind.TY_INT: continue
+            let decl = self.receiver_decl_node_for_sig(sig)
+            if decl == 0: continue
+            let path = paths.get(self.ast.file(decl as NodeId) as i32) ?? &""
+            out = out ++ f"i32-predicate\t{path}\t{self.node_line(decl)}\t{self.ast.get_start(decl)}\t{self.ast.get_end(decl)}\n"
         // `move` of a str binding (D111: passing a str copies, so the spelling
         // says nothing; a field `move` vacates the field, D82, and is not
         // counted). Read off the recorded types, off the checker's hot path.
