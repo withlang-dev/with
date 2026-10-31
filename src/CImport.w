@@ -7669,6 +7669,13 @@ impl CiExprPool:
             return 0
         if with_ci_type_is_bool(session, cursor) != 0:
             return value_id
+        // A C comparison used as an integer became `(if c: 1 else: 0)`
+        // (bool_value_expr_ir); tested again, it is `c`.
+        if self.kind(value_id) == CiExprKind.CIE_TERNARY:
+            let then_id = self.get_d1(value_id) as CiExprId
+            let else_id = self.get_d2(value_id) as CiExprId
+            if self.kind(then_id) == CiExprKind.CIE_INT_LIT and self.kind(else_id) == CiExprKind.CIE_INT_LIT and self.get_string(self.get_d0(then_id)) == "1" and self.get_string(self.get_d0(else_id)) == "0":
+                return self.get_d0(value_id) as CiExprId
         if with_ci_type_is_pointer(session, cursor) != 0:
             let null_e = self.null_ptr(0)
             let folded = self.fold_nonnull_fn_null_compare(session, types, value_id, null_e, false, true)
@@ -7678,9 +7685,9 @@ impl CiExprPool:
             let zero_idx = self.add_string("0.0")
             let zero_e = self.add(CiExprKind.CIE_FLOAT_LIT, zero_idx, 0, 0, 0)
             return self.binary(CiBinOp.CIBO_NEQ, value_id, zero_e, 0)
-        let zero_idx = self.add_string("0")
-        let zero_e = self.int_lit(zero_idx, 0)
-        self.binary(CiBinOp.CIBO_NEQ, value_id, zero_e, 0)
+        // D177 (§4.2a): an integer in a boolean-test context is true when
+        // nonzero, as it is in C; the test migrates as written.
+        value_id
 
     fn bool_value_expr_ir(session: i64, cursor: i32, bool_expr_id: CiExprId, types: CiTypePool) -> CiExprId:
         if bool_expr_id == 0:
@@ -13759,24 +13766,13 @@ impl CiExprPool:
                 if cond_id != 0 and then_id != 0 and (else_id as i32) != 0:
                     return self.add(CiExprKind.CIE_TERNARY, cond_id as i32, then_id as i32, else_id as i32, 0)
 
-        // Fallback: lower as a regular expression and wrap in the
-        // appropriate truthy comparison. Matches ci_bool_truthy_expr's
-        // type-aware zero/null fallback.
+        // Fallback: lower as a regular expression and test it as the one
+        // truth-test rule does (bool_expr_from_value_ir: a pointer against
+        // null, a float against 0.0, an integer as itself under D177).
         let inner_id = self.lower_expr_ir(session, cursor, types, scope)
         if inner_id == 0:
             return 0
-        if with_ci_type_is_bool(session, cursor) != 0:
-            return inner_id
-        if with_ci_type_is_pointer(session, cursor) != 0:
-            let null_e = self.null_ptr(0)
-            return self.binary(CiBinOp.CIBO_NEQ, inner_id, null_e, 0)
-        if with_ci_type_is_float(session, cursor) != 0:
-            let zero_fs = self.add_string("0.0")
-            let zero_f = self.add(CiExprKind.CIE_FLOAT_LIT, zero_fs, 0, 0, 0)
-            return self.binary(CiBinOp.CIBO_NEQ, inner_id, zero_f, 0)
-        let zero_is = self.add_string("0")
-        let zero_i = self.int_lit(zero_is, 0)
-        self.binary(CiBinOp.CIBO_NEQ, inner_id, zero_i, 0)
+        self.bool_expr_from_value_ir(session, cursor, inner_id, types)
 
 // ── Statement translator ────────────────────────────────────
 

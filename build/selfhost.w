@@ -5224,7 +5224,7 @@ fn bs_check_migrate_assignment_compat(ctx: &ActionCtx, compiler_path: &str, case
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "(__local_chunk = (__local_chunk -% 1))", "assignment_compat")
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, out_text, "if ((if __local_chunk != 0: 1 else: 0) != 0) {\n                continue", "assignment_compat")
+    rc = bs_assert_contains(ctx, out_text, "if (__local_chunk != 0) {\n                continue", "assignment_compat")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, out_text, "                continue\n            }\n            break", "assignment_compat")
     if rc != 0: return rc
