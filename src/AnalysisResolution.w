@@ -109,7 +109,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
         // fact. Any other place callee has no Sema resolution and is judged.
         if node_valid and sema.ast.kind(node) == NodeKind.NK_CALL and sema.typed_expr_types.contains(node):
             let argc = body.call_arg_counts[call_id]
-            let resolved = sema.has_resolved_call_args(node) != 0
+            let resolved = sema.has_resolved_call_args(node)
             let count = if resolved: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
             var first_callable: i32 = 0
             for ai in 0..count:
@@ -667,7 +667,7 @@ fn resolution_audit_callee_kinds(mut report: AnalysisReport, sema: &Sema, mir_mo
             // #2043: a builtin's arguments are its MIR operands; a call that
             // carries fewer leaves codegen reading another call's operands.
             if kind == CallCalleeKind.Intrinsic:
-                let source_argc = if sema.has_resolved_call_args(node) != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
+                let source_argc = if sema.has_resolved_call_args(node): sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
                 if body.call_arg_counts[call_id] != source_argc:
                     report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
     report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins} method-builtin-calls={method_builtins} method-intrinsic-calls={method_intrinsics} method-calls={method_calls} without-lowering-record={method_calls_unrecorded}")

@@ -891,10 +891,10 @@ unsafe fn emitted_name_slot(table: *mut *mut u8, cap: i32, name: *const u8) -> i
         i = (i + 1) % cap as i64
     0
 
-unsafe fn is_name_emitted(name: *const u8) -> i32:
-    if g_emitted_count == 0: return 0
+unsafe fn is_name_emitted(name: *const u8) -> bool:
+    if g_emitted_count == 0: return false
     let slot = emitted_name_slot(g_emitted_names, g_emitted_cap, name)
-    if *(slot as *const *const u8) as i64 != 0: 1 else: 0
+    if *(slot as *const *const u8) as i64 != 0: true else: false
 
 unsafe fn mark_name_emitted(name: *const u8):
     if (g_emitted_count + 1) * 2 > g_emitted_cap:
@@ -2110,9 +2110,9 @@ unsafe fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
 fn with_cimport_available() -> i32:
     1
 
-fn with_cimport_is_name_emitted(name: &str) -> i32:
+fn with_cimport_is_name_emitted(name: &str) -> bool:
     unsafe:
-        if name.len() <= 0: return 0
+        if name.len() <= 0: return false
         var buf: [512]u8 = [0 as u8; 512]
         let len = if name.len() < 511: name.len() else: 511
         if len > 0:
@@ -5750,20 +5750,20 @@ let CIC_BOOL_TO_FLOAT: i32 = 26
 let CIC_BITCAST: i32 = 28
 let CIC_INT_WIDEN_SIGN: i32 = 29
 
-unsafe fn is_int_kind(k: i32) -> i32:
-    if k >= CXType_Char_U and k <= CXType_UInt128: return 1
-    if k >= CXType_Char_S and k <= CXType_Int128: return 1
-    0
+unsafe fn is_int_kind(k: i32) -> bool:
+    if k >= CXType_Char_U and k <= CXType_UInt128: return true
+    if k >= CXType_Char_S and k <= CXType_Int128: return true
+    false
 
-unsafe fn is_float_kind(k: i32) -> i32:
-    if k == CXType_Float or k == CXType_Double or k == CXType_LongDouble: return 1
-    0
+unsafe fn is_float_kind(k: i32) -> bool:
+    if k == CXType_Float or k == CXType_Double or k == CXType_LongDouble: return true
+    false
 
-unsafe fn is_unsigned_kind(k: i32) -> i32:
+unsafe fn is_unsigned_kind(k: i32) -> bool:
     // Char_U is plain `char` where it is unsigned (AArch64/ARM Linux, wasm):
     // the `c_char` alias is u8 there (§16.1, #2176).
-    if k == CXType_Char_U or (k >= CXType_UChar and k <= CXType_UInt128): return 1
-    0
+    if k == CXType_Char_U or (k >= CXType_UChar and k <= CXType_UInt128): return true
+    false
 
 fn with_ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
     unsafe:
@@ -5787,9 +5787,9 @@ fn with_ci_implicit_cast_kind(session: i64, cursor_idx: i32) -> i32:
             if clang_getCursorKind(child_cursor) == 106:  // CXCursor_IntegerLiteral
                 return CIC_NULL_TO_PTR
         if sk == CXType_Bool:
-            if is_int_kind(dk) != 0: return CIC_BOOL_TO_INT
+            if is_int_kind(dk): return CIC_BOOL_TO_INT
         if dk == CXType_Bool:
-            if is_int_kind(sk) != 0: return CIC_INT_TO_BOOL
+            if is_int_kind(sk): return CIC_INT_TO_BOOL
             if sk == CXType_Enum: return CIC_INT_TO_BOOL
             if sk == CXType_Pointer: return CIC_PTR_TO_BOOL
         if dk == CXType_Bool and sk == CXType_Pointer: return CIC_PTR_TO_BOOL

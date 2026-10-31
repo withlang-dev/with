@@ -436,13 +436,13 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
 
 impl MirBuilder:
 
-    fn has_contextual_copy_adjustment(node: i32) -> i32:
+    fn has_contextual_copy_adjustment(node: i32) -> bool:
         self.sema.has_contextual_copy_adjustment_for_sig(self.contextual_fact_sig_idx, node)
 
     fn contextual_copy_adjustment(node: i32) -> ContextualCopyAdjustment:
         self.sema.contextual_copy_adjustment_for_sig(self.contextual_fact_sig_idx, node)
 
-    fn has_contextual_join_decision(node: i32) -> i32:
+    fn has_contextual_join_decision(node: i32) -> bool:
         self.sema.has_contextual_join_decision_for_sig(self.contextual_fact_sig_idx, node)
 
     fn contextual_join_decision(node: i32) -> ContextualJoinDecision:
@@ -2386,23 +2386,23 @@ impl MirBuilder:
                 return self.sema.get_type_d0(resolved)
         exact
 
-    mut fn is_user_index_place(base_ty: i32) -> i32:
+    mut fn is_user_index_place(base_ty: i32) -> bool:
         if base_ty == 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(base_ty) as i32
         let tk = self.sema.get_type_kind(resolved)
         // The compiler's own positional kinds (arrays, slices, SIMD vectors
         // and masks) have their own lowering; a user IndexPlace is a struct
         // or generic instance with the impl.
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_STR or tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_VECTOR or tk == TypeKind.TY_MASK:
-            return 0
+            return false
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.sema.get_generic_inst_base(resolved)
             if base_sym == self.sema.syms.list or base_sym == self.sema.syms.hashmap:
-                return 0
+                return false
         if self.sema.type_is_index_place(base_ty) != 0:
-            return 1
-        0
+            return true
+        false
 
     fn enum_payload_type(enum_tid: i32, variant_idx: i32, field_idx: i32) -> i32:
         let resolved = self.sema.resolve_alias(enum_tid)
@@ -2602,7 +2602,7 @@ impl MirBuilder:
             var ip_base_ty = base_ty
             while ip_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_base_ty)) == TypeKind.TY_REF:
                 ip_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_base_ty))
-            if self.is_user_index_place(ip_base_ty) != 0 and self.sema.index_place_get_sigs.contains(node):
+            if self.is_user_index_place(ip_base_ty) and self.sema.index_place_get_sigs.contains(node):
                 // Sema's specialized `get` for this subscript (#2560).
                 let ip_get_sig: i32 = self.sema.index_place_get_sigs.get(node).unwrap()
                 let ip_value_ty = self.sema.sig_return_type(ip_get_sig)
@@ -5784,14 +5784,14 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         self.operand_for_place(result_place, continue_ty)
 
-    mut fn is_runtime_pair_multi_index(node: i32) -> i32:
+    mut fn is_runtime_pair_multi_index(node: i32) -> bool:
         if self.ast.kind(node) != NodeKind.NK_INDEX:
-            return 0
+            return false
         if self.ast.get_data2(node) == 0:
-            return 0
+            return false
         if self.sema.index_expr_is_type_level(self.ast.get_data0(node)) != 0:
-            return 0
-        1
+            return false
+        true
 
     mut fn lower_multi_index_read(node: i32) -> i32:
         let base_op = self.lower_expr(self.ast.get_data0(node))
@@ -6571,18 +6571,18 @@ impl MirBuilder:
             return 0
         self.sema.get_generic_inst_base(resolved as i32)
 
-    fn is_btreeset_base_sym(sym: i32) -> i32:
-        if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeSet: 1 else: 0
+    fn is_btreeset_base_sym(sym: i32) -> bool:
+        if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeSet: true else: false
 
-    fn is_btreemap_base_sym(sym: i32) -> i32:
-        if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeMap: 1 else: 0
+    fn is_btreemap_base_sym(sym: i32) -> bool:
+        if self.sema.std_generic_of_base(sym, 0) == StdGeneric.BTreeMap: true else: false
 
     // The collection a literal or comprehension fills: the type's own
     // `new()`, specialized by Sema for this node (record_btree_new_contract),
     // called into `out_place`. MIR never builds the facade's layout (D65).
     mut fn emit_btree_new_into(out_place: i32, target_ty: i32, node: i32):
         let base = self.literal_target_base_sym(target_ty)
-        let owner = if self.is_btreeset_base_sym(base) != 0: self.sema.syms.btreeset else: self.sema.syms.btreemap
+        let owner = if self.is_btreeset_base_sym(base): self.sema.syms.btreeset else: self.sema.syms.btreemap
         let new_sym = self.sema.pool_lookup_symbol("new")
         let fn_sym = if new_sym != 0: self.sema.lookup_generic_method_fn(owner, new_sym) else: 0
         if fn_sym == 0 or not self.sema.btree_new_sigs.contains(node):
@@ -6881,13 +6881,13 @@ impl MirBuilder:
         let elem_count = self.ast.get_data1(node)
         let target_ty = self.expr_type(node)
         let target_base = self.literal_target_base_sym(target_ty)
-        if target_base != self.sema.syms.list and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == 0:
+        if target_base != self.sema.syms.list and target_base != self.sema.syms.hashset and self.is_btreeset_base_sym(target_base) == false:
             return -1
         var elem_ty: i32 = 0
         let resolved = self.sema.resolve_alias(target_ty)
         if self.sema.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved as i32) > 0:
             elem_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
-        if self.is_btreeset_base_sym(target_base) != 0:
+        if self.is_btreeset_base_sym(target_base):
             return self.lower_btree_seq_literal(node, elem_ty)
         let saved_expected = self.expected_type
         let args: List[i32] = List.new()
@@ -6982,7 +6982,7 @@ impl MirBuilder:
             key_ty = self.sema.get_generic_inst_arg(resolved as i32, 0)
             val_ty = self.sema.get_generic_inst_arg(resolved as i32, 1)
         let target_base = self.literal_target_base_sym(target_ty)
-        if self.is_btreemap_base_sym(target_base) != 0:
+        if self.is_btreemap_base_sym(target_base):
             return self.lower_btree_map_literal(node, key_ty, val_ty)
         let saved_expected = self.expected_type
         let args: List[i32] = List.new()
@@ -7172,7 +7172,7 @@ impl MirBuilder:
         if self.ast.kind(place_expr) == NodeKind.NK_INDEX and (self.sema.vector_ops.get(place_expr) ?? 0) == VectorOp.MASK_LANE as i32:
             return self.lower_mask_lane_write(place_expr, rhs_expr, read_back)
         // Multi-index assignment: a[i, j] = value → call multi_index_set
-        if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr) != 0:
+        if self.ast.kind(place_expr) == NodeKind.NK_MULTI_INDEX or self.is_runtime_pair_multi_index(place_expr):
             // Sema types a multi-index store Unit (check_assign), so it is
             // never a tail read.
             if read_back != 0:
@@ -7190,7 +7190,7 @@ impl MirBuilder:
             if self.cow_collection_of(ip_base_ty) != StdGeneric.None and (ip_base_kind == NodeKind.NK_IDENT or ip_base_kind == NodeKind.NK_FIELD_ACCESS or ip_base_kind == NodeKind.NK_INDEX):
                 let ip_list_place = self.lower_expr_place(ip_base_expr)
                 self.make_unique_before_mutation(ip_list_place)
-            if self.is_user_index_place(ip_base_ty) != 0:
+            if self.is_user_index_place(ip_base_ty):
                 // The store is the `set` Sema specialized for this subscript,
                 // a compound store reads through its `get` first (#2560, D65).
                 if not self.sema.index_place_set_fns.contains(place_expr):
@@ -7398,14 +7398,14 @@ impl MirBuilder:
                 self.assign_operand_to_place(p, op, self.ast.get_start(node))
                 self.register_stmt_temp(tmp, ty)
                 return p
-            if self.is_runtime_pair_multi_index(node) != 0:
+            if self.is_runtime_pair_multi_index(node):
                 return self.lower_multi_index_read(node)
             // A user IndexPlace subscript is its `get`'s value, not a place in
             // the receiver (#2560): materialize the read into a temp.
             var ip_pl_base_ty = self.expr_type(self.ast.get_data0(node))
             while ip_pl_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_pl_base_ty)) == TypeKind.TY_REF:
                 ip_pl_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_pl_base_ty))
-            if self.is_user_index_place(ip_pl_base_ty) != 0:
+            if self.is_user_index_place(ip_pl_base_ty):
                 let op = self.lower_expr(node)
                 let ty = self.expr_type(node)
                 let tmp = self.new_temp(ty)
@@ -9217,7 +9217,7 @@ impl MirBuilder:
             let val_op = self.move_into_comprehension_output(val_raw, val_ty)
             self.expected_type = saved_expected2
             let target_base = self.literal_target_base_sym(target_ty)
-            if self.is_btreemap_base_sym(target_base) != 0:
+            if self.is_btreemap_base_sym(target_base):
                 self.emit_btree_map_insert(out_place, key_op, val_op, key_expr)
                 return
             self.emit_map_insert(out_place, key_op, val_op, 0, self.ast.get_start(key_expr))
@@ -9232,7 +9232,7 @@ impl MirBuilder:
         self.expected_type = saved_expected
         let comp_ty = self.expr_type(comp_node)
         let target_base = self.literal_target_base_sym(comp_ty)
-        if self.is_btreeset_base_sym(target_base) != 0:
+        if self.is_btreeset_base_sym(target_base):
             self.emit_btree_set_insert(out_place, elem_op, expr)
             return
         if target_base == self.sema.syms.hashset:
@@ -9747,7 +9747,7 @@ impl MirBuilder:
         let out_place = self.place_for_local(out_local)
         if out_base == self.sema.syms.hashset or out_base == self.sema.syms.hashmap:
             self.emit_map_new_into(out_place, self.ast.get_start(comp_node))
-        else if self.is_btreeset_base_sym(out_base) != 0 or self.is_btreemap_base_sym(out_base) != 0:
+        else if self.is_btreeset_base_sym(out_base) or self.is_btreemap_base_sym(out_base):
             self.emit_btree_new_into(out_place, out_ty, comp_node)
         else:
             self.emit_list_new_into(out_place, self.ast.get_start(comp_node))
@@ -12507,7 +12507,7 @@ impl MirBuilder:
 
         let args: List[i32] = List.new()
         // Use sema-resolved arg order for named-arg and implicit-arg calls
-        if self.sema.has_resolved_call_args(node) != 0:
+        if self.sema.has_resolved_call_args(node):
             let resolved_count = self.sema.get_resolved_call_arg_count(node)
             for i in 0..resolved_count:
                 let arg_node = self.sema.get_resolved_call_arg(node, i)
@@ -12589,7 +12589,7 @@ impl MirBuilder:
         if lead != 0:
             arg_nodes.push(lead)
             arg_defaults.push(false)
-        if self.sema.has_resolved_call_args(node) != 0:
+        if self.sema.has_resolved_call_args(node):
             for i in 0..self.sema.get_resolved_call_arg_count(node):
                 arg_nodes.push(self.sema.get_resolved_call_arg(node, i))
                 arg_defaults.push(self.sema.resolved_call_arg_is_default(node, i) != 0)
@@ -12732,7 +12732,7 @@ impl MirBuilder:
         else if deferred_recv > 0:
             args.push(-1)
             arg_pos = 1
-        let default_offset = if self.sema.has_resolved_call_args(resolved_node) != 0: arg_node_list.len() - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
+        let default_offset = if self.sema.has_resolved_call_args(resolved_node): arg_node_list.len() - self.sema.get_resolved_call_arg_count(resolved_node) else: 0
         for i in 0..arg_node_list.len():
             let arg_node = arg_node_list[i]
             if arg_node < 0:
@@ -14698,30 +14698,30 @@ impl MirBuilder:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.body.new_operand(OperandKind.OK_MOVE, result_place)
 
-    fn is_option_or_result_type(type_id: i32) -> i32:
+    fn is_option_or_result_type(type_id: i32) -> bool:
         if type_id == 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(type_id as TypeId)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
+            return false
         let base = self.sema.get_generic_inst_base(resolved as i32)
-        if base == self.sema.syms.option or base == self.sema.syms.result: 1 else: 0
+        if base == self.sema.syms.option or base == self.sema.syms.result: true else: false
 
-    fn is_option_type(type_id: i32) -> i32:
+    fn is_option_type(type_id: i32) -> bool:
         if type_id == 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(type_id as TypeId)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.option: 1 else: 0
+            return false
+        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.option: true else: false
 
-    fn is_result_type(type_id: i32) -> i32:
+    fn is_result_type(type_id: i32) -> bool:
         if type_id == 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(type_id as TypeId)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.result: 1 else: 0
+            return false
+        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.result: true else: false
 
     // Field `i` of the tuple Sema typed `node` (D65: Sema owns the tuple's
     // type; an element's own type may be the view a field materializes), or
@@ -14735,13 +14735,13 @@ impl MirBuilder:
             return fallback
         self.sema.type_extra[(self.sema.get_type_d0(resolved) + i)]
 
-    fn is_list_type(type_id: i32) -> i32:
+    fn is_list_type(type_id: i32) -> bool:
         if type_id == 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(type_id as TypeId)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
-        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.list: 1 else: 0
+            return false
+        if self.sema.get_generic_inst_base(resolved as i32) == self.sema.syms.list: true else: false
 
     mut fn lower_owned_receiver_place(self_expr: i32, value_ty: i32) -> i32:
         let source_place = self.lower_expr_place(self_expr)
@@ -15777,7 +15777,7 @@ impl MirBuilder:
         self.operand_for_place(result_place, result_ty)
 
     mut fn lower_method_arg_or_unit(node: i32, arg_start: i32, arg_count: i32, idx: i32) -> i32:
-        if self.sema.has_resolved_call_args(node) != 0:
+        if self.sema.has_resolved_call_args(node):
             if idx >= self.sema.get_resolved_call_arg_count(node):
                 return self.unit_operand()
             let resolved_arg = self.sema.get_resolved_call_arg(node, idx)
@@ -15921,7 +15921,7 @@ impl MirBuilder:
         let uoe_scrut_local = self.retire_decomposed_carrier(value_place)
         let uoe_arm = self.begin_lazy_arm()
         let call_args: List[i32] = List.new()
-        if self.is_result_type(value_ty) != 0:
+        if self.is_result_type(value_ty):
             let err_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.result, 1)
             if err_ty == 0:
                 self.mark_unsupported()
@@ -16582,7 +16582,7 @@ impl MirBuilder:
         arg_nodes.push(lhs_expr)
         // #2024: the stage call's argument list as Sema filled it (its
         // defaults included), after the piped value.
-        if call_node != 0 and self.sema.has_resolved_call_args(call_node) != 0:
+        if call_node != 0 and self.sema.has_resolved_call_args(call_node):
             for i in 0..self.sema.get_resolved_call_arg_count(call_node):
                 arg_nodes.push(self.sema.get_resolved_call_arg(call_node, i))
         else:
@@ -17161,13 +17161,13 @@ impl MirBuilder:
             let list_ty = self.list_literal_type(node)
             if list_ty != 0:
                 return self.lower_list_literal(node, list_ty)
-            if self.is_runtime_pair_multi_index(node) != 0:
+            if self.is_runtime_pair_multi_index(node):
                 let mi_place = self.lower_multi_index_read(node)
                 return self.body.new_operand(OperandKind.OK_COPY, mi_place)
             var ip_rd_base_ty = self.expr_type(self.ast.get_data0(node))
             while ip_rd_base_ty > 0 and self.sema.get_type_kind(self.sema.resolve_alias(ip_rd_base_ty)) == TypeKind.TY_REF:
                 ip_rd_base_ty = self.sema.get_type_d0(self.sema.resolve_alias(ip_rd_base_ty))
-            if self.is_user_index_place(ip_rd_base_ty) != 0:
+            if self.is_user_index_place(ip_rd_base_ty):
                 // The subscript is the `get` Sema specialized for it (#2560,
                 // D65: the callee is Sema's, never re-derived from the name).
                 if not self.sema.index_place_get_fns.contains(node):
@@ -17386,7 +17386,7 @@ impl MirBuilder:
                     // is, or its scope-exit drop frees what the result now owns
                     // (#1605: `spawn_os` transmuted the closure and then freed
                     // the environment under the thread).
-                    if self.sema.is_transmute_call(callee) != 0:
+                    if self.sema.is_transmute_call(callee):
                         self.consume_moved_operand(gc_arg_op)
                     gc_args.push(gc_arg_op)
                 let gc_args_id = self.body.new_call_args(gc_args)
@@ -17562,7 +17562,7 @@ impl MirBuilder:
                 // The builtin's arguments are MIR operands like any call's;
                 // codegen reads them, never the AST (#2043).
                 let bu_args: List[i32] = List.new()
-                let bu_resolved = self.sema.has_resolved_call_args(node) != 0
+                let bu_resolved = self.sema.has_resolved_call_args(node)
                 let bu_count = if bu_resolved: self.sema.get_resolved_call_arg_count(node) else: self.ast.get_data2(node)
                 for bu_ai in 0..bu_count:
                     let bu_arg = if bu_resolved: self.sema.get_resolved_call_arg(node, bu_ai) else: self.ast.get_extra(self.ast.get_data1(node) + bu_ai)

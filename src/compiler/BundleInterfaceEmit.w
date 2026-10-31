@@ -509,7 +509,7 @@ impl BundleEmitter:
         let resolved_name = with_str_clone_ref(sema.pool_resolve(ast.get_data0(node)))
         let displaced_at = resolved_name.index_of("$in$")
         let name = if displaced_at >= 0: resolved_name.slice(0, displaced_at as i64) else: resolved_name
-        let is_const = ast.is_const_decl_node(node) != 0
+        let is_const = ast.is_const_decl_node(node)
         // A private global is printed only as a returned view's origin.
         let is_pub = (flags / 2) % 2 != 0
         if not is_pub and (is_const or not self.origin_global_names.contains(name)):
@@ -992,7 +992,7 @@ impl BundleEmitter:
             if trait_sym == sema.syms.copy_trait or trait_name == "Copy":
                 // Copy-ness is printed with the type (from is_copy_frozen).
                 continue
-            if ast.is_extend_impl_node(impl_node) != 0:
+            if ast.is_extend_impl_node(impl_node):
                 self.refuse("is an extension block; extensions do not cross a bundle boundary")
                 continue
             if ast.get_extra(ast.get_data1(impl_node)) > 0:

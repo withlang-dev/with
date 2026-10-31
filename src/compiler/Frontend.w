@@ -1844,7 +1844,7 @@ impl Zcu:
         if pc > 0:
             let pname = self.use_path_name_frontend(merged_pool, ps, pc)
             let fpath = self.resolve_module_path_frontend(pname, self.decl_source_dir_frontend(0))
-            if fpath.len() > 0 and self.has_imported_path(fpath) == 0:
+            if fpath.len() > 0 and self.has_imported_path(fpath) == false:
                 self.add_imported_path(fpath)
                 merged_pool = self.parse_imported_file_frontend(fpath, merged_pool)
             else if fpath.len() == 0:
@@ -1858,7 +1858,7 @@ impl Zcu:
                 if ppc > 0 and not self.use_decl_is_local_type_selector_frontend(merged_pool, decl):
                     let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
                     let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
-                    if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == 0:
+                    if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == false:
                         self.add_imported_path(ppfpath)
                         merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
                     else if ppfpath.len() == 0:
@@ -1887,7 +1887,7 @@ impl Zcu:
             if path.len() == 0:
                 self.diagnostics.emit(Diagnostic.err("rt-in-unit: runtime source not embedded: " ++ rel, Span { file: 0, start: 0, end: 0 }))
                 return merged_pool
-            if self.has_imported_path(path) == 0:
+            if self.has_imported_path(path) == false:
                 self.add_imported_path(path)
                 merged_pool = self.parse_imported_file_frontend(path, merged_pool)
         merged_pool
@@ -2767,7 +2767,7 @@ impl Zcu:
         let initial_count = merged_pool.decl_count()
         if initial_count > 0:
             let root_src_path = self.decl_source_path_frontend(0)
-            if root_src_path.len() > 0 and self.has_imported_path(root_src_path) == 0:
+            if root_src_path.len() > 0 and self.has_imported_path(root_src_path) == false:
                 self.add_imported_path(root_src_path)
         var prelude_ordered: List[i32] = List.new()
         var prelude_paths = frontend_new_list_str()
@@ -2791,7 +2791,7 @@ impl Zcu:
             if pc > 0:
                 let pname = self.use_path_name_frontend(merged_pool, ps, pc)
                 let fpath = self.resolve_module_path_frontend(pname, self.decl_source_dir_frontend(0))
-                if fpath.len() > 0 and self.has_imported_path(fpath) == 0:
+                if fpath.len() > 0 and self.has_imported_path(fpath) == false:
                     self.add_imported_path(fpath)
                     merged_pool = self.parse_imported_file_frontend(fpath, merged_pool)
                 else if fpath.len() == 0:
@@ -2825,7 +2825,7 @@ impl Zcu:
                     else:
                         let ppname = self.use_path_name_frontend(merged_pool, pps, ppc)
                         let ppfpath = self.resolve_module_path_frontend(ppname, self.decl_source_dir_frontend(pi))
-                        if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == 0:
+                        if ppfpath.len() > 0 and self.has_imported_path(ppfpath) == false:
                             self.add_imported_path(ppfpath)
                             merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
                         else if ppfpath.len() == 0:
@@ -2856,7 +2856,7 @@ impl Zcu:
                 else:
                     let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                     let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui))
-                    if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    if upfpath.len() > 0 and self.has_imported_path(upfpath) == false:
                         self.add_imported_path(upfpath)
                         merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
                     else if upfpath.len() == 0:
@@ -2885,7 +2885,7 @@ impl Zcu:
                 else:
                     let upname = self.use_path_name_frontend(merged_pool, ups, upc)
                     let upfpath = self.resolve_module_path_frontend(upname, self.decl_source_dir_frontend(ui2))
-                    if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                    if upfpath.len() > 0 and self.has_imported_path(upfpath) == false:
                         self.add_imported_path(upfpath)
                         merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
                     else if upfpath.len() == 0:
@@ -3516,7 +3516,7 @@ impl Zcu:
                 else:
                     upfpath = self.resolve_module_path_frontend(upname, dir)
                     self.import_path_memo.insert(memo_key, with_str_clone_ref(upfpath))
-                if upfpath.len() > 0 and self.has_imported_path(upfpath) == 0:
+                if upfpath.len() > 0 and self.has_imported_path(upfpath) == false:
                     self.add_imported_path(upfpath)
                     out = self.parse_imported_file_frontend(upfpath, out)
             return out

@@ -230,12 +230,12 @@ impl Zcu:
     // #592: import dedup compares CANONICAL keys, so different spellings of the
     // same file (root vs import-resolved, ./-prefixed, absolute, via ..) collapse
     // to one import and the loader never parses a file twice.
-    fn has_imported_path(path: &str) -> i32:
+    fn has_imported_path(path: &str) -> bool:
         let key = resolve_canonical_module_key(path)
         for i in 0..self.imported_paths.len():
             if self.imported_paths[i] == key:
-                return 1
-        0
+                return true
+        false
 
     // A `std` module has ONE source in a compilation. Its identity is the
     // canonical module path (`<embedded-std>/std/engines/pcre2/defs.w`, the spelling

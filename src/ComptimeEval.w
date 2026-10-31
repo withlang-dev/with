@@ -2381,7 +2381,7 @@ impl ComptimeEvaluator:
     fn fn_decl_node_is_comptime(fn_node: i32) -> i32:
         if fn_node == 0:
             return 0
-        if self.ast.is_comptime_decl_node(fn_node) != 0:
+        if self.ast.is_comptime_decl_node(fn_node):
             return 1
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
@@ -6799,7 +6799,7 @@ impl ComptimeEvaluator:
         // `const` — a local `let` is a runtime value.
         if self.sema.binding_decl_nodes.contains(sym) and self.sema.binding_value_nodes.contains(sym):
             let local_decl: i32 = self.sema.binding_decl_nodes.get(sym).unwrap()
-            if self.ast.is_const_decl_node(local_decl as NodeId) != 0:
+            if self.ast.is_const_decl_node(local_decl as NodeId):
                 return self.eval_expr(self.sema.binding_value_nodes.get(sym).unwrap())
         let decl = self.find_module_let_decl(sym)
         if decl != 0:

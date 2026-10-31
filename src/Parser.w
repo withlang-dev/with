@@ -104,8 +104,8 @@ type Parser {
     suppress_fat_arrow_closure: i32,
     pending_post_decls: List[i32],
     implicit_main_mode: i32,
-    implicit_main_has_main_hint: i32,
-    implicit_main_has_exec_stmt: i32,
+    implicit_main_has_main_hint: bool,
+    implicit_main_has_exec_stmt: bool,
     top_level_stmts: List[i32],
     explicit_main_decl: i32,
     // §18.5b (D74): the imported module this parse is of, "" for an entry
@@ -218,8 +218,8 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         suppress_fat_arrow_closure: 0,
         pending_post_decls: List.new(),
         implicit_main_mode: 0,
-        implicit_main_has_main_hint: 0,
-        implicit_main_has_exec_stmt: 0,
+        implicit_main_has_main_hint: false,
+        implicit_main_has_exec_stmt: false,
         top_level_stmts: List.new(),
         explicit_main_decl: 0,
         module_label: "",
@@ -240,7 +240,7 @@ impl Parser:
     // `let`s stays a module of globals.
     mut fn enable_statement_main_mode():
         self.enable_implicit_main_mode()
-        self.implicit_main_has_exec_stmt = 1
+        self.implicit_main_has_exec_stmt = true
 
     // §18.5b (D74): a file is an entry source when its top level holds an
     // executable statement other than a `let`/`var`. A `let`/`var` alone is
@@ -248,7 +248,7 @@ impl Parser:
     // only in an entry source do the top-level `let`/`var`s become `main`'s
     // locals. Without this, `var G = 0` beside a `comptime fn` became a
     // local of a synthesized main and the fn saw "undefined variable".
-    fn has_top_level_exec_stmt() -> i32:
+    fn has_top_level_exec_stmt() -> bool:
         var brace_depth = 0
         var p: i32 = 0
         while p < self.tokens.len():
@@ -270,11 +270,11 @@ impl Parser:
                 continue
             if tag == TokenKind.TK_IDENT:
                 if not (self.token_text_is(p, "c") and (self.token_text_is(p + 1, "facade") or self.token_text_is(p + 1, "convention"))):
-                    return 1
+                    return true
             else if tag == TokenKind.TK_INT_LIT or tag == TokenKind.TK_STRING_LIT or tag == TokenKind.TK_FLOAT_LIT or tag == TokenKind.TK_KW_IF or tag == TokenKind.TK_KW_MATCH or tag == TokenKind.TK_KW_FOR or tag == TokenKind.TK_KW_WHILE or tag == TokenKind.TK_KW_LOOP or tag == TokenKind.TK_KW_RETURN or tag == TokenKind.TK_KW_WITH or tag == TokenKind.TK_KW_DEFER or tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_MINUS or tag == TokenKind.TK_KW_NOT or tag == TokenKind.TK_BANG:
-                return 1
+                return true
             p = p + 1
-        0
+        false
 
     mut fn enable_interface_mode(): self.interface_mode = 1
 
@@ -322,7 +322,7 @@ impl Parser:
         let e = self.tokens.get_end(at)
         self.source.slice(s as i64, e as i64)
 
-    fn has_top_level_main_decl() -> i32:
+    fn has_top_level_main_decl() -> bool:
         var brace_depth = 0
         var p: i32 = 0
         while p < self.tokens.len():
@@ -354,9 +354,9 @@ impl Parser:
                 q = q + 1
             if q + 1 < self.tokens.len() and self.tokens.get_tag(q) == TokenKind.TK_KW_FN and self.tokens.get_tag(q + 1) == TokenKind.TK_IDENT:
                 if self.token_text_at(q + 1) == "main":
-                    return 1
+                    return true
             p = p + 1
-        0
+        false
 
     fn top_level_starts_decl() -> i32:
         let t = self.peek()
@@ -380,7 +380,7 @@ impl Parser:
                     return 1
             return 0
         if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
-            if self.implicit_main_mode != 0 and self.implicit_main_has_main_hint == 0 and self.implicit_main_has_exec_stmt != 0:
+            if self.implicit_main_mode != 0 and not self.implicit_main_has_main_hint and self.implicit_main_has_exec_stmt:
                 return 0
             return 1
         0
@@ -6374,24 +6374,24 @@ impl Parser:
         let field = self.expect_ident_or_keyword()
         self.pool.add_node(NodeKind.NK_FIELD_ACCESS, self.pool.get_start(lhs), self.prev_end(), lhs, field, 0)
 
-    fn is_positional_struct_literal() -> i32:
+    fn is_positional_struct_literal() -> bool:
         if self.peek() == TokenKind.TK_R_BRACE:
-            return 0
+            return false
         if self.peek() != TokenKind.TK_IDENT:
-            return 1
+            return true
         if self.pos + 1 >= self.tokens.len():
-            return 0
+            return false
         let next = self.tokens.get_tag(self.pos + 1)
         if next == TokenKind.TK_COLON or next == TokenKind.TK_COMMA or next == TokenKind.TK_R_BRACE:
-            return 0
-        1
+            return false
+        true
 
     mut fn parse_struct_literal(lhs: i32) -> NodeId:
         let struct_name = self.pool.get_data0(lhs)
         self.advance()  // consume {
         self.skip_newlines()
 
-        if self.is_positional_struct_literal() != 0:
+        if self.is_positional_struct_literal():
             return self.parse_positional_struct_literal(lhs, struct_name)
 
         var fields: List[i32] = List.new()
@@ -6904,16 +6904,16 @@ impl Parser:
 // ── Control flow expressions ─────────────────────────────────────
 
 // Returns 1 if the token at `pos` is the first non-whitespace on its line.
-fn is_first_on_line(source: &str, pos: i32) -> i32:
+fn is_first_on_line(source: &str, pos: i32) -> bool:
     var p = pos - 1
     while p >= 0:
         let ch = source[p]
         if ch == 10:
-            return 1
+            return true
         if ch != 32 and ch != 9:
-            return 0
+            return false
         p = p - 1
-    1
+    true
 
 impl Parser:
     mut fn parse_if_else_body(chain_col: i32, chain_is_stmt: i32) -> NodeId:
@@ -6930,7 +6930,7 @@ impl Parser:
         // (#629).
         let start = self.current_start()
         let chain_col = column_of(self.source, start)
-        let chain_is_stmt: i32 = if is_first_on_line(self.source, start) != 0: 1 else: 0
+        let chain_is_stmt: i32 = if is_first_on_line(self.source, start): 1 else: 0
         self.parse_if_chain_arm(chain_col, chain_is_stmt)
 
     mut fn parse_if_chain_arm(chain_col: i32, chain_is_stmt: i32) -> NodeId:
@@ -7469,7 +7469,7 @@ impl Parser:
         self.skip_newlines()
         if self.peek() == TokenKind.TK_KW_WHILE:
             let while_col = column_of(self.source, self.current_start())
-            if while_col == do_col or not (is_first_on_line(self.source, self.current_start()) != 0):
+            if while_col == do_col or not (is_first_on_line(self.source, self.current_start())):
                 self.advance()
                 self.skip_newlines()
                 let cond = self.parse_expr()
@@ -7702,7 +7702,7 @@ impl Parser:
         block
 
     fn label_declaration_starts_statement(start: i32) -> i32:
-        if is_first_on_line(self.source, start) != 0:
+        if is_first_on_line(self.source, start):
             return 1
         if self.pos <= 0:
             return 1
@@ -7735,7 +7735,7 @@ impl Parser:
             return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
         if t == TokenKind.TK_KW_DO:
             let do_start = self.current_start()
-            let stmt_start = if is_first_on_line(self.source, do_start) != 0: do_start else: start
+            let stmt_start = if is_first_on_line(self.source, do_start): do_start else: start
             stmt = self.parse_do_while(label_sym, stmt_start)
             return self.pool.add_node(NodeKind.NK_LABEL, start, self.pool.get_end(stmt), label_sym, stmt, 0)
         if t == TokenKind.TK_KW_LOOP:
