@@ -8,8 +8,15 @@
 #
 # `<asset>.version=` pins one platform to another release while it cannot
 # bootstrap the newest seed; say which issue, and remove it when fixed.
-version=nightly-20261030-local-3-6a97f6cdb94a
-with-darwin-aarch64=ede036ee5c9e3377bbf6c49d6666aa972529b359b905fd5f79883f625c344432
+version=nightly-20261101-local-1-6661a67e0677
+with-darwin-aarch64=9ee3cfa547430cb5681cfd2f90a5088426be3294de94887531c6b8f3bd27462b
+# The four gating platforms are cut from main 6661a67e0 (2026-11-01), each to a
+# stage2 == stage3 fixpoint with :release-checks green: darwin on the laptop,
+# linux-x86_64 on eric-5090, windows-x86_64 on win10, linux-aarch64 in
+# tools/docker/linux-aarch64. The first seeds whose test-lane driver gives a
+# test file the thirty-minute hang guard instead of a 300 s ceiling (#2902,
+# #2362): the CI Windows lanes timed out the heaviest internals tests under
+# the previous seeds. The seeds before them:
 # The four gating platforms are cut from main 6a97f6cdb (2026-10-30), each to a
 # stage2 == stage3 fixpoint with :release-checks green: darwin on the laptop,
 # linux-x86_64 on eric-5090, windows-x86_64 on win10 (published from the
@@ -96,10 +103,10 @@ with-darwin-aarch64=ede036ee5c9e3377bbf6c49d6666aa972529b359b905fd5f79883f625c34
 # The linux and windows legs of nightly-20261023-local-1 wait for their
 # hosts (eric-5090 and win10 were unreachable on 2026-10-23); these four stay
 # on local-3 until the legs are cut (issue below).
-with-linux-x86_64=a51aaf388a663219618bdc16afd1df54fa25b38146fcd95486f8c7e1957d2f5f
+with-linux-x86_64=9b4f8bae497939e69fe58a7c6daf63c7b9c0c3906df1ab6546e93388d89a8c88
 # linux-aarch64: the D155 builtins make c_char the target's u8 there; the lane
 # pool in the 7.7 GiB container needs WITH_BUILD_JOBS=3 (#2603).
-with-linux-aarch64=f5ae7ce8d50f816360d20a79eca07c7e37887f698a894b2a5ade6a640f3965b8
+with-linux-aarch64=dc0aec738728ee08365e61157b4d37c3241b2b3413c0b633cefa92dbac9fca19
 # windows-x86_64 is win-self-contained bd6e00d1 (#1915, D81): the first seed
 # that carries its own linker (lld), dlltool, C runtime, clang resource
 # directory and cmake/ninja, so a fresh Windows checkout runs :seed, :deps
@@ -107,9 +114,10 @@ with-linux-aarch64=f5ae7ce8d50f816360d20a79eca07c7e37887f698a894b2a5ade6a640f396
 # clone by the previous seed (6cd934e8) with the windows-gnu SDK of sdk.lock;
 # stage2 == stage3 over all 16 units, and the published binary is that
 # build's fixpoint-verified release compiler. windows-aarch64 is cross-built
-# from main 35afb3a7a (#2305, #2470, #2471) by seed-windows-aarch64 run
-# 39288117180 against the windows-gnu SDK, an intermediate seed the native
-# windows-aarch64 lane bootstraps and verifies.
-with-windows-x86_64.exe=60d94692ff8f669f6848cdaad1926782555ec3c6633f4c9e8063a9f20dd31d7c
+# from main 6661a67e0 (2026-11-01) by seed-windows-aarch64 run 41330887229
+# against the windows-gnu SDK, an intermediate seed the native
+# windows-aarch64 lane bootstraps and verifies (before it: run 39288117180
+# from main 35afb3a7a).
+with-windows-x86_64.exe=5ac498b41e4e8b736d0b00a586f07fd0174c8e9c1135d66385125e1eede170e2
 with-windows-aarch64.exe.version=seed-windows-aarch64
-with-windows-aarch64.exe=b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
+with-windows-aarch64.exe=63a571ef195d24d23e98f4e38fb4333c18b554cad495b615c86adebe4d9b2a69

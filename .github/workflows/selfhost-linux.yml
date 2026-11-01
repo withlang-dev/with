@@ -32,8 +32,8 @@ jobs:
       # Fixpoint-verified stable release seed for this platform.
       WITH_SEED_REPO: withlang-dev/with
       WITH_SEED_ASSET: with-linux-x86_64
-      WITH_SEED_VERSION: nightly-20261030-local-3-6a97f6cdb94a
-      WITH_SEED_SHA256: a51aaf388a663219618bdc16afd1df54fa25b38146fcd95486f8c7e1957d2f5f
+      WITH_SEED_VERSION: nightly-20261101-local-1-6661a67e0677
+      WITH_SEED_SHA256: 9b4f8bae497939e69fe58a7c6daf63c7b9c0c3906df1ab6546e93388d89a8c88
       WITH_SDK_REPO: withlang-dev/with
       # Built from build/sdk.w at 6f039463: the With linux sysroot, its own
       # compiler-rt and static libc++, no libxml2 (#1915, D81).
