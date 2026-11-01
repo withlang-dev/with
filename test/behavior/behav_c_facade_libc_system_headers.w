@@ -42,8 +42,8 @@ fn read_back() -> c_int:
     unsafe { fputs("with-libc-facade\n", f.repr) }
     unsafe { rewind(f.repr) }
     var buf: [64]u8 = [0u8; 64]
-    let got = unsafe { fgets(&raw mut buf[0] as *mut i8, 64, f.repr) }
-    let same = got != null and strncmp(&raw const buf[0] as *const i8, "with-libc-facade\n", 17) == 0
+    let got = unsafe { fgets(&raw mut buf[0] as *mut c_char, 64, f.repr) }
+    let same = got != null and strncmp(&raw const buf[0] as *const c_char, "with-libc-facade\n", 17) == 0
     print(f"line {if same: \"ok\" else: \"bad\"}")
     fd
 

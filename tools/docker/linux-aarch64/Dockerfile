@@ -17,6 +17,7 @@ FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
         ca-certificates curl git gh xz-utils strace bubblewrap \
+        libbz2-dev libsqlite3-dev libcurl4-openssl-dev zlib1g-dev \
         xvfb xauth libgl1-mesa-dri libgl-dev libx11-dev libxext-dev libxfixes-dev \
         libxi-dev libxinerama-dev libxrandr-dev libxcursor-dev \
     && rm -rf /var/lib/apt/lists/*

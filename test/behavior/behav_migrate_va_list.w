@@ -24,7 +24,7 @@ fn main:
     let shape_source = read_file(p7_join(case_dir, "lib/macro_shapes.w")).unwrap()
     assert(shape_source.contains("PROJECT_TEXT: [c_char; 7]"))
     assert(shape_source.contains("PROJECT_NULL: *mut c_void = null"))
-    p7_write(case_dir, "src/main.w", "use va_sample\nfn main:\n    var buffer: [128]i8 = [0; 128]\n    let expected = \"17 2.5 23 31 41 43 47 53 59 61\"\n    unsafe:\n        assert(counter() == 7)\n        assert(format_text(&raw mut buffer as *mut i8, \"%d %.1f %d %d %d %d %d %d %d %d\\0\" as *const i8, 17, 2.5 as f64, 23, 31, 41, 43, 47, 53, 59, 61) == expected.len())\n    for i in 0..expected.len() as i32:\n        assert(buffer[i] == expected[i] as i8)\n    assert(buffer[expected.len() as i32] == 0)\n    assert(alignof[c_va_list]() == 8)\n    print(\"formatted ok\")\n")
+    p7_write(case_dir, "src/main.w", "use va_sample\nfn main:\n    var buffer: [128]c_char = [0; 128]\n    let expected = \"17 2.5 23 31 41 43 47 53 59 61\"\n    unsafe:\n        assert(counter() == 7)\n        assert(format_text(&raw mut buffer as *mut c_char, \"%d %.1f %d %d %d %d %d %d %d %d\\0\" as *const c_char, 17, 2.5 as f64, 23, 31, 41, 43, 47, 53, 59, 61) == expected.len())\n    for i in 0..expected.len() as i32:\n        assert(buffer[i] == expected[i] as i8)\n    assert(buffer[expected.len() as i32] == 0)\n    assert(alignof[c_va_list]() == 8)\n    print(\"formatted ok\")\n")
     let executed = p7_run(case_dir, "va_list_run", "run\0src/main.w\0")
     p7_assert_success(executed, "run migrated va_list across pointer and value calls")
     assert(executed.stdout.contains("formatted ok"))

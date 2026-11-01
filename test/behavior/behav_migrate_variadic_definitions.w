@@ -29,7 +29,7 @@ fn main:
     assert(not source.contains("fn stop(...)"))
     assert(not source.contains("va_end"))
     assert(not source.contains("with_va_"))
-    p7_write(case_dir, "src/main.w", "use va_defs\nfn main:\n    var buffer: [64]i8 = [0; 64]\n    unsafe:\n        assert(sum(4, 1, 2, 3, 36) == 42)\n        assert(mean(4, 1.0, 2.0, 3.0, 6.0) == 3.0)\n        assert(pick(1, \"a\\0\" as *const i8, 5 as i64, \"b\\0\" as *const i8, 9 as i64) == 91)\n        assert(format_into(&raw mut buffer as *mut i8, 64, \"%d-%s-%.2f\\0\" as *const i8, 42, \"x\\0\" as *const i8, 0.5) == 9)\n    stop()\n    print(\"variadic ok\")\n")
+    p7_write(case_dir, "src/main.w", "use va_defs\nfn main:\n    var buffer: [64]c_char = [0; 64]\n    unsafe:\n        assert(sum(4, 1, 2, 3, 36) == 42)\n        assert(mean(4, 1.0, 2.0, 3.0, 6.0) == 3.0)\n        assert(pick(1, \"a\\0\" as *const c_char, 5 as i64, \"b\\0\" as *const c_char, 9 as i64) == 91)\n        assert(format_into(&raw mut buffer as *mut c_char, 64, \"%d-%s-%.2f\\0\" as *const c_char, 42, \"x\\0\" as *const c_char, 0.5) == 9)\n    stop()\n    print(\"variadic ok\")\n")
     let executed = p7_run(case_dir, "va_defs_run", "run\0src/main.w\0")
     p7_assert_success(executed, "run the migrated variadic definitions")
     assert(executed.stdout.contains("variadic ok"))

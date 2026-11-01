@@ -1,7 +1,7 @@
 //! expect-stdout: hosted: 3 5
 //! expect-stdout: after age: 5
 //! expect-stdout: none: true
-//! expect-stdout: c locale: 127
+//! expect-stdout: c locale: CHAR_MAX
 //! expect-stdout: ok
 //! skip-on: windows issue #800: action/capability/net/process/fs OS-surface fails on native Windows
 
@@ -45,5 +45,9 @@ fn main:
     let none = Hold.new(-1).unwrap()
     print(f"none: {none.rec().is_none()}")
     let lc = localeconv().unwrap()
-    print(f"c locale: {lc.int_frac_digits as i32}")
+    // CHAR_MAX is the target's (255 where char is unsigned, linux-aarch64):
+    // print the fact, not the number.
+    let char_max = if (255 as c_char) as i32 == 255: 255 else: 127
+    let digits = lc.int_frac_digits as i32
+    print(if digits == char_max: "c locale: CHAR_MAX" else: f"c locale: {digits}")
     print("ok")
