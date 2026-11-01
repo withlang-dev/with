@@ -1011,7 +1011,7 @@ impl Sema:
 
         var final_type = expected
         let expected_resolved = if expected != 0: self.resolve_alias(expected as TypeId) else: 0 as TypeId
-        let expected_is_owned_anchor: i32 = if expected != 0 and self.get_type_kind(expected_resolved) != TypeKind.TY_REF: 1 else: 0
+        let expected_is_owned_anchor = (expected != 0 and self.get_type_kind(expected_resolved) != TypeKind.TY_REF) as i32
         var reaching_count = 0
         var owned_candidate: i32 = 0
         var owned_arm_node: i32 = 0
@@ -1278,7 +1278,7 @@ impl Sema:
                 resolved_arm_types[ai] = final_type
 
         let final_resolved = self.resolve_alias(final_type as TypeId)
-        let final_is_ref = if self.get_type_kind(final_resolved) == TypeKind.TY_REF: 1 else: 0
+        let final_is_ref = self.get_type_kind(final_resolved) == TypeKind.TY_REF
         let arm_start = self.contextual_join_arm_types.len() as i32
         var owned_anchor_count: i32 = 0
         var materialized_count: i32 = 0
@@ -1299,7 +1299,7 @@ impl Sema:
                     diverging_count = diverging_count + 1
                 else if arm_node > 0 and self.body_can_fall_through(arm_node) == 0:
                     diverging_count = diverging_count + 1
-                else if final_is_ref != 0:
+                else if final_is_ref:
                     if (self.get_type_kind(resolved) != TypeKind.TY_REF or self.types_compatible(final_type as TypeId, arm_ty as TypeId) == false) and not deferred_arms.contains(arm_node):
                         self.emit_contextual_join_mismatch(join_name, final_type, arm_ty, report_node, arm_node)
                         return 0
@@ -1390,7 +1390,7 @@ impl Sema:
             let decision_index = self.contextual_join_decisions.len() as i32
             self.contextual_join_decisions.push(move decision)
             self.contextual_join_decision_indices.insert(context_key, decision_index)
-        if final_is_ref != 0:
+        if final_is_ref:
             self.set_expr_view_deps(report_node, origin_mask, gathered_origins)
         else:
             let empty_origins: List[i32] = List.new()
@@ -4881,12 +4881,12 @@ impl Sema:
         self.diags.emit(move diag)
 
     mut fn validate_global_data_race_accesses():
-        let proof_failed = if self.global_race_concurrency_node != 0: 1 else: 0
+        let proof_failed = self.global_race_concurrency_node != 0
         for i in 0..self.global_race_access_syms.len() as i32:
             if self.global_data_race_access_needs_proof(i) == false:
                 continue
             let in_unsafe: i32 = self.global_race_access_unsafe[i]
-            if proof_failed != 0:
+            if proof_failed:
                 if in_unsafe == 0:
                     self.emit_global_data_race_error(i)
             else if in_unsafe != 0:
@@ -5402,7 +5402,7 @@ impl Sema:
                 // semantics match plain local reassignment exactly, including
                 // the provisional A5/#608 POD-container non-freeing (#691
                 // retires that for both paths at once).
-                let p_is_mut: i32 = if fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0: 1 else: 0
+                let p_is_mut = (fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0) as i32
                 let p_type_node = self.ast.fn_param_type(param_start, pi)
                 self.scope_put_at(p_name, p_tid, p_is_mut, if p_type_node != 0: p_type_node else: node)
                 if fn_param_is_implicit(self.ast.fn_param_flags(param_start, pi)) != 0:
@@ -6120,7 +6120,7 @@ impl Sema:
         for pi in 0..param_count:
             let p_name = self.ast.fn_param_name(param_start, pi)
             // D12: `mut self` binds mutable — see check_fn_body_with_sig_at.
-            let p_is_mut: i32 = if fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0: 1 else: 0
+            let p_is_mut = (fn_param_is_mut_self(self.ast.fn_param_flags(param_start, pi)) != 0) as i32
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             self.scope_put_at(p_name, self.sig_param_type(sig_idx, pi), p_is_mut, if p_type_node != 0: p_type_node else: body)
 
@@ -10049,7 +10049,7 @@ impl Sema:
         self.task_param_consumed_visiting.insert(key, 1)
         let disp = self.task_param_expr_disposition(self.ast.get_data1(fn_node), target_sym)
         self.task_param_consumed_visiting.remove(key)
-        let result: i32 = if disp == 1: 1 else: 0
+        let result = (disp == 1) as i32
         self.task_param_consumed_memo.insert(key, result)
         result
 
@@ -11852,7 +11852,7 @@ impl Sema:
             self.drop_control_flow_depth = saved_drop_cf
             if pushed_regex_capture_scope != 0:
                 self.pop_scope()
-            let while_body_diverges: i32 = if self.get_type_kind(self.resolve_alias(while_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
+            let while_body_diverges = (self.get_type_kind(self.resolve_alias(while_body_type as TypeId)) == TypeKind.TY_NEVER) as i32
             self.finalize_loop_move_state(&while_entry_states, while_frame_idx, while_body_diverges, 1, node)
             self.pop_label_frame()
             self.pop_live_loop()
@@ -11878,7 +11878,7 @@ impl Sema:
             self.leave_body_scope(dw_scoped)
             self.pop_move_control_flow_context()
             self.drop_control_flow_depth = saved_drop_cf_dw
-            let dw_body_diverges: i32 = if self.get_type_kind(self.resolve_alias(dw_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
+            let dw_body_diverges = (self.get_type_kind(self.resolve_alias(dw_body_type as TypeId)) == TypeKind.TY_NEVER) as i32
             self.finalize_loop_move_state(&dw_entry_states, dw_frame_idx, dw_body_diverges, 1, node)
             self.pop_label_frame()
             self.pop_live_loop()
@@ -11904,7 +11904,7 @@ impl Sema:
             self.drop_control_flow_depth = saved_drop_cf_loop
             // `loop` exits only via break (has_condition_exit = 0): the fall-through is
             // the back-edge, not an exit.
-            let loop_body_diverges: i32 = if self.get_type_kind(self.resolve_alias(loop_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
+            let loop_body_diverges = (self.get_type_kind(self.resolve_alias(loop_body_type as TypeId)) == TypeKind.TY_NEVER) as i32
             self.finalize_loop_move_state(&loop_entry_states, loop_frame_idx, loop_body_diverges, 0, node)
             let result_ty = if loop_frame_idx >= 0: self.label_break_value_types[loop_frame_idx] else: 0
             self.pop_label_frame()
@@ -12089,11 +12089,11 @@ impl Sema:
                     self.emit_error("unsafe is not allowed in comptime", node)
             let is_prefix = self.ast.get_data1(node) == UNSAFE_KIND_PREFIX
             let is_fn_body = self.ast.get_data2(node) == UNSAFE_ORIGIN_FN_BODY
-            let tracks_use = if is_prefix or is_fn_body: 0 else: 1
+            let tracks_use = not (is_prefix or is_fn_body)
             let saved_unsafe: i32 = self.in_unsafe
             if is_prefix and saved_unsafe != 0:
                 self.emit_warning("redundant unsafe prefix inside unsafe context", node)
-            if tracks_use != 0:
+            if tracks_use:
                 self.unsafe_scope_used.push(0)
                 self.unsafe_scope_nodes.push(node)
             self.in_unsafe = 1
@@ -12101,7 +12101,7 @@ impl Sema:
             // Propagate expected type through unsafe block
             let unsafe_result = if self.has_expected_type != 0: self.check_expr_with_expected(body, self.expected_expr_type) else: self.check_expr(body)
             self.in_unsafe = saved_unsafe
-            if tracks_use != 0:
+            if tracks_use:
                 let used_idx = self.unsafe_scope_used.len() - 1
                 let used = if used_idx >= 0: self.unsafe_scope_used[used_idx] else: 0
                 let _ = self.unsafe_scope_used.pop()
@@ -12413,12 +12413,12 @@ impl Sema:
                 // "move" as plain copies and stay ungated.
                 if fty != 0 and self.type_needs_drop(fty as i32) != 0 and self.d32_field_move_path_is_mutable(inner) == 0:
                     let d32_owner = self.drop_owner_for_field_access(inner)
-                    let d32_in_own_drop = if self.current_drop_type_sym != 0 and self.current_drop_type_sym == d32_owner: 1 else: 0
-                    if d32_in_own_drop == 0 and not self.field_move_diag_nodes.contains(node):
+                    let d32_in_own_drop = self.current_drop_type_sym != 0 and self.current_drop_type_sym == d32_owner
+                    if not d32_in_own_drop and not self.field_move_diag_nodes.contains(node):
                         self.field_move_diag_nodes.insert(node, 1)
                         let d32_place = render_expr(self.ast, self.pool, inner as NodeId, 0)
-                        let d32_named = if d32_place.len() > 0 and d32_place.len() < 60 and sema_str_contains_char(d32_place, 10) == false: 1 else: 0
-                        let d32_help = if d32_named != 0: "`move " ++ d32_place ++ "` needs a `var` base or a `mut fn` receiver; clone instead (`" ++ d32_place ++ ".clone()`) to keep the owner whole" else: "`move` on a field needs a `var` base or a `mut fn` receiver; clone the field instead to keep the owner whole" ++ ""
+                        let d32_named = d32_place.len() > 0 and d32_place.len() < 60 and sema_str_contains_char(d32_place, 10) == false
+                        let d32_help = if d32_named: "`move " ++ d32_place ++ "` needs a `var` base or a `mut fn` receiver; clone instead (`" ++ d32_place ++ ".clone()`) to keep the owner whole" else: "`move` on a field needs a `var` base or a `mut fn` receiver; clone the field instead to keep the owner whole" ++ ""
                         self.emit_error_with_help("cannot vacate a field through a read path — a vacate is a write (§2.2, D32)", node, d32_help)
                 // #782/§2.5.1: this is the EXPLICIT `move x.f` spelling —
                 // record it so later whole-value uses stay sanctioned.
@@ -14531,17 +14531,17 @@ impl Sema:
             lhs_candidate = self.operator_candidate_for(lhs, rhs, method_sym)
             rhs_candidate = if may_swap: self.operator_candidate_for(rhs, lhs, method_sym) else: sema_operator_candidate_none()
             derived = 1
-        let lhs_ok = if lhs_candidate.sig >= 0: 1 else: 0
-        let rhs_ok = if rhs_candidate.sig >= 0: 1 else: 0
-        if lhs_ok != 0 and rhs_ok != 0 and lhs_candidate.fn_sym != rhs_candidate.fn_sym:
+        let lhs_ok = lhs_candidate.sig >= 0
+        let rhs_ok = rhs_candidate.sig >= 0
+        if lhs_ok and rhs_ok and lhs_candidate.fn_sym != rhs_candidate.fn_sym:
             let op_text = sema_operator_symbol_text(op)
             self.emit_error("ambiguous operator '" ++ op_text ++ "': both operand types provide applicable implementations", node)
             return 0
         var selected = sema_operator_candidate_none()
         var reversed: i32 = 0
-        if lhs_ok != 0:
+        if lhs_ok:
             selected = lhs_candidate
-        else if rhs_ok != 0:
+        else if rhs_ok:
             selected = rhs_candidate
             reversed = 1
         else:
@@ -16074,7 +16074,7 @@ impl Sema:
                         self.emit_warning("`&raw const` requires a place; this expression is not a place", node)
                 else if op == UnaryOp.UOP_RAW_REF_MUT and raw_mut_state == PlaceMut.PM_ReadOnly:
                     self.emit_error("`&raw mut` requires a mutable place; this place is read-only (e.g., dereferenced &T or *const T) (§15.14)", node)
-                let raw_mut: i32 = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                let raw_mut = (op == UnaryOp.UOP_RAW_REF_MUT) as i32
                 if raw_mut != 0:
                     self.record_global_place_write(operand_node, node)
                 // §13/§3.8 — a raw pointer to a by-value non-Copy parameter can
@@ -17299,9 +17299,9 @@ impl Sema:
         self.scope_set_is_scoped_task(name, is_scoped_task_val)
         let is_ephemeral_task = self.expr_is_ephemeral_task(value)
         self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
-        let is_non_send_task: i32 = if is_task_val != 0 and (self.type_is_send(bind_type as i32) == false or self.expr_creates_non_send_task(value)): 1 else: 0
+        let is_non_send_task = (is_task_val != 0 and (self.type_is_send(bind_type as i32) == false or self.expr_creates_non_send_task(value))) as i32
         self.scope_set_is_non_send_task(name, is_non_send_task)
-        let is_ephemeral_value: i32 = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0: 1 else: 0
+        let is_ephemeral_value = (self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0) as i32
         self.scope_set_is_ephemeral_value(name, is_ephemeral_value)
         self.scope_set_effect_dep_sym(name, self.expr_transmute_source_param_sym(value))
         if is_task_val != 0 and is_ephemeral_task != 0:
@@ -17497,7 +17497,7 @@ impl Sema:
         self.drop_control_flow_depth = saved_drop_cf_then
         if pushed_regex_capture_scope != 0:
             self.pop_scope()
-        let then_is_never: i32 = if self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
+        let then_is_never = (self.get_type_kind(self.resolve_alias(then_type as TypeId)) == TypeKind.TY_NEVER) as i32
         let then_exit_states = self.save_scope_states()
         let then_exit_mf = self.save_moved_field_state()   // #695
         // Re-analyze the else branch from the entry move-state, not the then residual.
@@ -19717,9 +19717,9 @@ impl Sema:
             self.scope_set_is_task(target_sym, self.expr_is_task_value(value))
             self.scope_set_is_scoped_task(target_sym, self.expr_is_scoped_task_value(value))
             self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
-            let assigned_non_send_task: i32 = if self.expr_is_task_value(value) != 0 and (self.type_is_send(target_type as i32) == false or self.expr_creates_non_send_task(value)): 1 else: 0
+            let assigned_non_send_task = (self.expr_is_task_value(value) != 0 and (self.type_is_send(target_type as i32) == false or self.expr_creates_non_send_task(value))) as i32
             self.scope_set_is_non_send_task(target_sym, assigned_non_send_task)
-            let assigned_ephemeral_value: i32 = if self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0: 1 else: 0
+            let assigned_ephemeral_value = (self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0) as i32
             self.scope_set_is_ephemeral_value(target_sym, assigned_ephemeral_value)
             if self.ast.kind(value) == NodeKind.NK_CLOSURE:
                 self.binding_closure_nodes.insert(target_sym, value)
@@ -20002,7 +20002,7 @@ impl Sema:
         self.pop_live_loop()
         self.drop_control_flow_depth = saved_drop_cf_for
         // `for` exits when the iterable is exhausted (like a condition) → has_condition_exit = 1.
-        let for_body_diverges: i32 = if self.get_type_kind(self.resolve_alias(for_body_type as TypeId)) == TypeKind.TY_NEVER: 1 else: 0
+        let for_body_diverges = (self.get_type_kind(self.resolve_alias(for_body_type as TypeId)) == TypeKind.TY_NEVER) as i32
         self.finalize_loop_move_state(&for_entry_states, for_frame_idx, for_body_diverges, 1, node)
         self.pop_label_frame()
         self.loop_depth = self.loop_depth - 1
@@ -21472,15 +21472,15 @@ impl Sema:
             let te_start = self.get_type_d0(field_base)
             let elem_count = self.get_type_d1(field_base)
             let field_name: str = with_str_clone_ref(self.pool_resolve(field))
-            var valid_index = if field_name.len() > 0: 1 else: 0
+            var valid_index = field_name.len() > 0
             var idx = 0
             for vi in 0..field_name.len():
                 let ch = field_name[vi]
                 if ch >= 48 and ch <= 57:
                     idx = idx * 10 + ch - 48
                 else:
-                    valid_index = 0
-            if valid_index != 0 and idx < elem_count:
+                    valid_index = false
+            if valid_index and idx < elem_count:
                 return self.type_extra[(te_start + idx)]
             self.emit_error("unknown field '" ++ field_name ++ "' for type '" ++ self.type_name(field_base as i32) ++ "'", node)
             return 0
@@ -22967,7 +22967,7 @@ impl Sema:
             let type_sym = self.get_type_d0(self.resolve_alias(subject_type))
             if type_sym != 0 and self.must_use_types.contains(type_sym):
                 require_exhaustive = 1
-        let warn_partial_statement_match: i32 = if require_exhaustive == 0 and self.lint_partial_statement_match != 0: 1 else: 0
+        let warn_partial_statement_match = (require_exhaustive == 0 and self.lint_partial_statement_match != 0) as i32
         self.check_match_exhaustiveness(node, subject_type as i32, extra_start, arm_count, require_exhaustive, warn_partial_statement_match)
         if not match_is_value and require_exhaustive == 0 and result_type == self.ty_never:
             result_type = self.ty_void
@@ -26706,7 +26706,7 @@ impl Sema:
 
     mut fn finish_pipeline_method(node: i32, recv_type: i32, method: i32, call_ret: i32) -> i32:
         let resolved_ret = self.resolve_alias(call_ret as TypeId)
-        let carries_receiver: i32 = if resolved_ret == self.ty_void and self.pipeline_method_has_mut_receiver(node, recv_type, method) != 0: 1 else: 0
+        let carries_receiver = (resolved_ret == self.ty_void and self.pipeline_method_has_mut_receiver(node, recv_type, method) != 0) as i32
         let pipeline_ret = if carries_receiver != 0: recv_type else: call_ret
         self.pipeline_method_calls.insert(node, method)
         self.pipeline_call_return_types.insert(node, call_ret)
@@ -28519,7 +28519,7 @@ impl Sema:
             if callable_value_tid != 0:
                 self.emit_error("named arguments are not supported for closures or function pointers", node)
 
-        let param_offset: i32 = if self.in_pipeline_rhs != 0: 1 else: 0
+        let param_offset = (self.in_pipeline_rhs != 0) as i32
         // The piped value is this stage call's first argument, not that of
         // a call among its arguments: `x |> f(g())` passes `x` to `f` only.
         // (check_pipeline restores the flag after the stage.)
@@ -30472,30 +30472,30 @@ impl Sema:
         self.bind_type_params_from_bounds(tp_start, tp_count, call_node)
         self.ensure_generic_substitutions(tp_start, tp_count, param_start, param_count, call_node)
 
-        var matches = if self.diags.items.len() == saved_diag_count: 1 else: 0
+        var matches = self.diags.items.len() == saved_diag_count
         var score: i32 = 0
-        if matches != 0:
+        if matches:
             for pi2 in 0..arg_count:
                 let param_type = self.ast.fn_param_type(param_start, pi2)
                 if self.generic_param_accepts(param_type, arg_types[pi2], tp_start, tp_count) == false:
-                    matches = 0
+                    matches = false
                     break
                 score = score + self.generic_type_pattern_specificity(param_type, tp_start, tp_count)
-        if matches != 0 and self.generic_bound_set_accepts(tp_start, tp_count) == false:
-            matches = 0
-        if matches != 0:
+        if matches and self.generic_bound_set_accepts(tp_start, tp_count) == false:
+            matches = false
+        if matches:
             let where_idx = self.ast.find_where_meta(fn_node)
             if where_idx >= 0:
                 let where_start: i32 = self.ast.state.where_meta[(where_idx + 1)]
                 let where_count: i32 = self.ast.state.where_meta[(where_idx + 2)]
                 if self.generic_bound_set_accepts(where_start, where_count) == false:
-                    matches = 0
+                    matches = false
 
         while self.diags.items.len() > saved_diag_count:
             self.diags.items.pop()
         self.generic_subst_param_syms = saved_syms
         self.generic_subst_type_ids = saved_types
-        if matches != 0: score else: -1
+        if matches: score else: -1
 
     mut fn select_generic_fn_node(fn_sym: i32, arg_types: &List[i32], arg_count: i32, call_node: i32) -> i32:
         let fallback = self.generic_fn_node_for_symbol(fn_sym)
@@ -32818,7 +32818,7 @@ impl Sema:
         if owner_tp_count > 0:
             if is_static == 0 and param_count > 0:
                 self.bind_type_params_from_method_receiver_type(self.ast.fn_param_type(param_start, 0), owner_type, owner_tp_start, owner_tp_count, node)
-            var bind_param_offset = if is_static != 0: 0 else: 1
+            var bind_param_offset = (not (is_static != 0)) as i32
             for ai in 0..arg_count:
                 let pi = ai + bind_param_offset
                 if pi >= param_count:
@@ -32829,7 +32829,7 @@ impl Sema:
         if fn_tp_count > 0:
             if is_static == 0 and param_count > 0:
                 self.bind_type_params_from_method_receiver_type(self.ast.fn_param_type(param_start, 0), owner_type, fn_tp_start, fn_tp_count, node)
-            let bind_param_offset2: i32 = if is_static != 0: 0 else: 1
+            let bind_param_offset2 = (not (is_static != 0)) as i32
             let literal_params2: List[i32] = List.new()
             let literal_arg_types2: List[i32] = List.new()
             for ai2 in 0..arg_count:
@@ -32897,7 +32897,7 @@ impl Sema:
             self.generic_subst_type_ids = saved_generic_method_subst_tys
             return 0
 
-        let param_offset: i32 = if is_static != 0: 0 else: 1
+        let param_offset = (not (is_static != 0)) as i32
         // arg_count < 0: a compiler-synthesized call whose receiver alone
         // decides the specialization (D69's `for` over a generic Gen impl);
         // it has no argument nodes to check. #1973: the one arity rule.
@@ -32960,7 +32960,7 @@ impl Sema:
             // MIR/codegen must dispatch the exact same specialization.
             self.resolved_call_sigs.insert(node, concrete_sig)
             self.resolved_call_mono_syms.insert(node, self.sig_names[concrete_sig])
-            let recv_param_offset: i32 = if is_static != 0: 0 else: 1
+            let recv_param_offset = (not (is_static != 0)) as i32
             let receiver = if is_static != 0: 0 else: recv_node
             if receiver != 0 and self.sig_get_param_count(concrete_sig) > 0:
                 let exact_receiver_ty = self.recorded_expr_type_or_zero(receiver)
@@ -36246,7 +36246,7 @@ impl Sema:
         let arg_types: List[i32] = List.new()
         // mut.md Rev 8 §15.8 — see check_call.
         let mc_iter_borrow_idxs: List[i32] = List.new()
-        let mc_param_offset_for_resolution: i32 = if self.static_receiver_type_is_known(expr): 0 else: 1
+        let mc_param_offset_for_resolution = (not (self.static_receiver_type_is_known(expr))) as i32
         // #2002: a generic method has no signature; its declaration supplies the defaults.
         let mc_default_fn = if mc_owner_sym_for_effect != 0 and mc_sig_idx_for_effect < 0: self.lookup_generic_method_fn(mc_owner_sym_for_effect, field) else: mc_method_fn_for_resolution
         var mc_resolved_arg_count = self.resolve_method_implicit_default_args(node, mc_sig_idx_for_effect, mc_default_fn, mc_param_offset_for_resolution, extra_start, arg_count)
@@ -36776,7 +36776,7 @@ impl Sema:
                 self.call_builtins.insert(node, CallBuiltin.EnumFromInt as i32)
                 return opt_ty
 
-        let is_static_receiver: i32 = if static_type_sym != 0 and self.static_receiver_type_is_known(expr): 1 else: 0
+        let is_static_receiver = (static_type_sym != 0 and self.static_receiver_type_is_known(expr)) as i32
         // D17/#697: ONE computation of the static-vs-instance contract pairing.
         // Type checking, effect propagation, and view-origin recording must all
         // consult the same offset (mutability.md: "static method calls have no
@@ -36785,7 +36785,7 @@ impl Sema:
         // every static call's arguments with the wrong parameters' contracts.
         // (The arg-RESOLUTION offset above uses a deliberately looser
         // static predicate and is not unified here.)
-        let call_param_offset: i32 = if is_static_receiver != 0: 0 else: 1
+        let call_param_offset = (not (is_static_receiver != 0)) as i32
         let call_effect_recv = if is_static_receiver != 0: 0 else: expr
         if type_name_sym != 0:
             let generic_method_fn = self.lookup_generic_method_fn(type_name_sym, field)
@@ -36914,7 +36914,7 @@ impl Sema:
                         // Check argument types via substitute_type on stored sig param types
                         let mc_sig_pc = self.sig_get_param_count(sig_idx)
                         // sig params include self as first param; user args start at index 1
-                        let mc_sig_poff = if mc_sig_pc > 0: 1 else: 0
+                        let mc_sig_poff = (mc_sig_pc > 0) as i32
                         for mc_ai in 0..mc_resolved_arg_count:
                             let mc_sig_pi = mc_ai + mc_sig_poff
                             if mc_sig_pi >= mc_sig_pc:
@@ -40726,7 +40726,7 @@ impl Sema:
             return
         self.field_move_diag_nodes.insert(node, 1)
         let place = render_expr(self.ast, self.pool, node as NodeId, 0)
-        let named: i32 = if place.len() > 0 and place.len() < 60 and sema_str_contains_char(place, 10) == false: 1 else: 0
+        let named = (place.len() > 0 and place.len() < 60 and sema_str_contains_char(place, 10) == false) as i32
         var help = ""
         if self.d32_base_is_temporary(node):
             help = self.d32_temporary_base_help(node, place, named)
@@ -40994,7 +40994,7 @@ impl Sema:
                 if self.marking_explicit_move == 0:
                     if with_getenv_str("WITH_D32_DEBUG").len() > 0:
                         let d32_res = self.resolve_alias(field_ty as TypeId)
-                        let d32_copy = if self.is_copy(field_ty as TypeId) != 0: 1 else: 0
+                        let d32_copy = (self.is_copy(field_ty as TypeId) != 0) as i32
                         with_eprint(f"[d32] arm=consumed node={node} field_ty={field_ty} resolved={d32_res as i32} kind={self.get_type_kind(d32_res)} copy={d32_copy} name={self.type_name(field_ty)}")
                     self.d32_emit_implicit_field_move_error(node)
                     return
@@ -41313,7 +41313,7 @@ impl Sema:
         if owner_sym == 0 or method_sym == 0:
             return
         let key = sema_pair_key(owner_sym, method_sym)
-        let inherent = if self.method_lookup.sig_lookup.contains(key): 1 else: 0
+        let inherent = self.method_lookup.sig_lookup.contains(key)
         var total: i32 = 0
         var visible: i32 = 0
         for i in 0..self.extension_method_owner_syms.len():
@@ -41323,9 +41323,9 @@ impl Sema:
             if self.extension_candidate_visible(i as i32) != 0:
                 visible = visible + 1
         var flags: i32 = 0
-        if inherent != 0:
+        if inherent:
             flags = flags | 1
-        if sig_idx >= 0 and inherent == 0:
+        if sig_idx >= 0 and not inherent:
             flags = flags | 2
         if self.visible_extension_candidate_count(owner_sym, method_sym) > 1:
             flags = flags | 4

@@ -391,7 +391,7 @@ impl Codegen:
         let orig_param_count = wl_count_param_types(method_ft)
         if orig_param_count <= 0:
             return method_fn
-        let is_async_method = if impl_fn_sym != 0 and self.async_fn_ret_types.get(impl_fn_sym).is_some(): 1 else: 0
+        let is_async_method = impl_fn_sym != 0 and self.async_fn_ret_types.get(impl_fn_sym).is_some()
         // dyn_trait_method_fn_type applies the native win64 ABI: an aggregate
         // return >8B (an async Task {i32,ptr}, or a fat Option like
         // `Option[&dyn Error]` = {i32,{ptr,ptr}}) becomes a leading sret
@@ -405,7 +405,7 @@ impl Codegen:
         let dyn_ret_ty = wl_get_return_type(dyn_ft)
         let dyn_param_count = wl_count_param_types(dyn_ft)
         let has_sret = dyn_ret_ty == wl_void_type(self.context) and dyn_param_count == orig_param_count + 1
-        let base: i32 = if has_sret: 1 else: 0
+        let base = (has_sret) as i32
         // For the sret and async paths dyn_ft is authoritative (win64 aggregate
         // sret lowering / the reconstructed Task type). For a plain sync by-value
         // return the IMPL fn's actual monomorphized return is authoritative:
@@ -415,7 +415,7 @@ impl Codegen:
         // impl's i64). The wrapper body returns method_ft's value, so declaring
         // the wrapper with method_ft's return keeps producer and body consistent
         // and reproduces the pre-sret-fix behavior for this case.
-        let ret_ty = if has_sret or is_async_method != 0: dyn_ret_ty else: wl_get_return_type(method_ft)
+        let ret_ty = if has_sret or is_async_method: dyn_ret_ty else: wl_get_return_type(method_ft)
         let wrapper_param_types: List[i64] = List.new()
         if has_sret:
             wrapper_param_types.push(ptr_ty)
@@ -457,7 +457,7 @@ impl Codegen:
             pi = pi + 1
 
         var call_val: i64 = 0
-        if is_async_method != 0:
+        if is_async_method:
             var async_task_ty = ret_ty
             if has_sret:
                 let task_fields: List[i64] = List.new()
@@ -573,7 +573,7 @@ impl Codegen:
         let final_ret_ty = self.sema_type_to_llvm(self.sema.sig_return_type(sig_idx))
         let abi_index = self.compute_fn_abi(final_ret_ty, param_types, param_flags, FN_ABI_WITH, 0)
         let abi: FnAbi = self.fn_abis[abi_index]
-        let param_offset: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let param_offset = (abi.ret.pass == PM_INDIRECT) as i32
         let fn_ty = abi.llvm_ty
         if fn_ty == 0 or wl_get_type_kind(fn_ty) != wl_function_type_kind():
             return

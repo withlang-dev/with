@@ -906,7 +906,7 @@ impl Zcu:
             key = key ++ "|view:" ++ view_types[vi]
         // §16.2 selective/strict imports must not share cached output with a
         // permissive whole import of the same header.
-        let strict_flag = if self.c_import_is_strict_frontend(pool, decl): 1 else: 0
+        let strict_flag = (self.c_import_is_strict_frontend(pool, decl)) as i32
         key = key ++ "\n#strict:" ++ f"{strict_flag}" ++ "\n#only:"
         let only_count = self.c_import_only_count_frontend(pool, decl)
         for oi in 0..only_count:

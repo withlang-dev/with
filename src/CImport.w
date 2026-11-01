@@ -14806,7 +14806,7 @@ fn ci_drill_innermost_case_substmt(session: i64, case_cursor: i32) -> i32:
     while true:
         let ck = with_ci_cursor_kind(session, cur)
         let cnc = with_ci_num_children(session, cur)
-        let body_idx = if ck == CXK_CASE_STMT: 1 else: 0
+        let body_idx = (ck == CXK_CASE_STMT) as i32
         if cnc <= body_idx: return -1
         let body_child = with_ci_child(session, cur, body_idx)
         let bk = with_ci_cursor_kind(session, body_child)
@@ -18453,7 +18453,7 @@ fn ci_va_top_level_starts(session: i64, body: i32) -> str:
     keys
 
 fn ci_count_stdarg_calls(session: i64, cursor: i32, operation: &str) -> i32:
-    var count = if ci_stdarg_call_name(session, cursor) == operation: 1 else: 0
+    var count = (ci_stdarg_call_name(session, cursor) == operation) as i32
     let nc = with_ci_num_children(session, cursor)
     var i = 0
     while i < nc:

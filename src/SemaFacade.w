@@ -4923,7 +4923,7 @@ impl Sema:
             // contract names is withheld from the method — the compiler
             // supplies it.
             let cb = self.facade_contract_callback_param(ci)
-            let receiver_params: i32 = if hosted: 1 else: 0
+            let receiver_params = (hosted) as i32
             let ud_projected = self.facade_presented_param_index(ci, ud)
             let cb_projected = self.facade_presented_param_index(ci, cb)
             let ud_r = if ud_projected >= receiver_params: ud_projected - receiver_params else: -1
@@ -5001,7 +5001,7 @@ impl Sema:
             let mname = self.facade_presented(ri, fname)
             if mname.len() == 0:
                 continue
-            let invokes: i32 = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+            let invokes = (not (self.foreign_contracts[ci].callbacks_none != 0)) as i32
             if self.foreign_contracts[ci].variadic_node != 0:
                 for k in 0..self.foreign_contracts[ci].variadic_case_syms.len() as i32:
                     let mtext = host ++ "." ++ self.facade_variadic_case_name(mname, ci, k)
@@ -5096,7 +5096,7 @@ impl Sema:
         if ok_sym != 0:
             let decl = self.facade_const_decl(ok_sym)
             if decl != 0: guard_ok = self.facade_const_int_value(self.ast.get_data1(decl))
-        let invokes: i32 = if self.foreign_contracts[ci].callbacks_none != 0: 0 else: 1
+        let invokes = (not (self.foreign_contracts[ci].callbacks_none != 0)) as i32
         let action = if kind == FACADE_VARIADIC_CALLBACK: FOREIGN_PAIR_CALLBACK else: FOREIGN_PAIR_USERDATA
         self.facade_add_pair_op(sig, ci, self.foreign_contracts[ci].variadic_slots[slot].resource, action, slot, u_tid, guard_ok, invokes)
 

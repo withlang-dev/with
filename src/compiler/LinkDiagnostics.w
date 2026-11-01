@@ -13,7 +13,7 @@ fn link_missing_libraries(diagnostics: &str) -> List[str]:
             let parts = line.split(marker)
             if parts.len() < 2: continue
             let tail = parts[1]
-            var end = if tail.len() > 0 and tail[0] == 58: 1 else: 0
+            var end = (tail.len() > 0 and tail[0] == 58) as i32
             let start = end
             while end < tail.len() and link_diagnostic_name_byte(tail[end]): end += 1
             if end == start: continue

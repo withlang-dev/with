@@ -2698,7 +2698,7 @@ impl Sema:
             return
         let name = self.pool_resolve_symbol(sym)
         let prim = self.primitive_type_by_sym(sym)
-        let named = if self.named_types.contains(sym): 1 else: 0
+        let named = (self.named_types.contains(sym)) as i32
         with_eprint(f"[unknown-type] {context} sym={sym} name={name} prim={prim} named={named} collecting={self.collecting_types} node_kind={self.ast.kind(node)}")
 
     fn pool_resolve_symbol(sym: i32) -> &str:
@@ -5664,7 +5664,7 @@ impl Sema:
         while i >= 0:
             let path = self.named_type_candidate_paths[i]
             if path.len() > 0:
-                let cand_std = if sema_tier_path_is_std_implementation(path): 1 else: 0
+                let cand_std = (sema_tier_path_is_std_implementation(path)) as i32
                 if cand_std == want_std:
                     return self.named_type_candidate_tids[i]
             i = self.named_type_candidate_next[i]
@@ -5727,7 +5727,7 @@ impl Sema:
         while i >= 0:
             let path = self.trait_candidate_paths[i]
             if path.len() > 0:
-                let cand_std = if sema_tier_path_is_std_implementation(path): 1 else: 0
+                let cand_std = (sema_tier_path_is_std_implementation(path)) as i32
                 if cand_std == want_std:
                     return i
             i = self.trait_candidate_nexts[i]
@@ -11190,7 +11190,7 @@ fn sema_levenshtein(a: &str, b: &str, max: i32) -> i32:
         var cur: List[i32] = List.new()
         cur.push(i as i32)
         for j in 1..bl + 1:
-            let cost: i32 = if a[(i - 1)] == b[(j - 1)]: 0 else: 1
+            let cost = (not (a[(i - 1)] == b[(j - 1)])) as i32
             let del = prev[j] + 1
             let ins = cur[(j - 1)] + 1
             let sub = prev[(j - 1)] + cost

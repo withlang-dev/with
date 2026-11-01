@@ -2600,7 +2600,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // build(ctx) with live ToolFs effects; re-running them here would repeat
     // non-idempotent comptime filesystem mutations (e.g. extract_tar's symlink
     // -> EEXIST). Re-evaluate only to rebuild the declarative graph.
-    let suppress_side_effects: i32 = if build_action_worker_env_enabled() or build_test_worker_env_enabled(): 1 else: 0
+    let suppress_side_effects = (build_action_worker_env_enabled() or build_test_worker_env_enabled()) as i32
     var eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0, suppress_side_effects) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false

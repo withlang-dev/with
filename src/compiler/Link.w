@@ -355,14 +355,14 @@ fn link_stage_make_link_command(linker: &str, obj_path: &str, bin_path: &str, ex
     args.push("-o")
     args.push(with_str_clone_ref(bin_path))
     outputs.push(with_str_clone_ref(bin_path))
-    let cc_is_darwin: i32 = if runtime_sysinfo_os() == "Macos": 1 else: 0
-    let cc_is_elf = if runtime_sysinfo_os() == "Linux" and link_libs.len() > 0: 1 else: 0
-    if cc_is_elf != 0: args.push(link_stage_archive_group_marker(1, 1, 1))
+    let cc_is_darwin = (runtime_sysinfo_os() == "Macos") as i32
+    let cc_is_elf = runtime_sysinfo_os() == "Linux" and link_libs.len() > 0
+    if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 1))
     for i in 0..link_libs.len():
         let cc_la = link_stage_lib_args(link_libs[i], cc_is_darwin)
         for j in 0..cc_la.len():
             args.push(with_str_clone_ref(cc_la[j]))
-    if cc_is_elf != 0: args.push(link_stage_archive_group_marker(1, 1, 0))
+    if cc_is_elf: args.push(link_stage_archive_group_marker(1, 1, 0))
     for i in 0..link_args.len():
         args.push(with_str_clone_ref(link_args[i]))
     if runtime_sysinfo_os() == "Linux":

@@ -1819,7 +1819,7 @@ impl Parser:
             self.advance()
         // extern let NAME: TYPE  or  extern var NAME: TYPE
         if self.peek() == TokenKind.TK_KW_LET or self.peek() == TokenKind.TK_KW_VAR:
-            let is_mut: i32 = if self.peek() == TokenKind.TK_KW_VAR: 1 else: 0
+            let is_mut = (self.peek() == TokenKind.TK_KW_VAR) as i32
             self.advance()
             let ev_name = self.expect_ident()
             if ev_name == 0: return self.poisoned_expr()
@@ -5933,7 +5933,7 @@ impl Parser:
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
         offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start, &normalized.src)
-        let consumed_all: i32 = if sub_parser.peek() == TokenKind.TK_EOF: 1 else: 0
+        let consumed_all = (sub_parser.peek() == TokenKind.TK_EOF) as i32
         let had_errors: i32 = if use_shared_diags != 0: 0 else if sub_parser.diags.has_errors(): 1 else: 0
         InterpolatedExprParseAttempt {
             node: result,
@@ -5964,7 +5964,7 @@ impl Parser:
     mut fn parse_bool_literal() -> NodeId:
         let start = self.current_start()
         let end = self.current_end()
-        let val: i32 = if self.peek() == TokenKind.TK_TRUE: 1 else: 0
+        let val = (self.peek() == TokenKind.TK_TRUE) as i32
         self.advance()
         self.pool.add_node(NodeKind.NK_BOOL_LIT, start, end, val, 0, 0)
 
@@ -6930,7 +6930,7 @@ impl Parser:
         // (#629).
         let start = self.current_start()
         let chain_col = column_of(self.source, start)
-        let chain_is_stmt: i32 = if is_first_on_line(self.source, start): 1 else: 0
+        let chain_is_stmt = (is_first_on_line(self.source, start)) as i32
         self.parse_if_chain_arm(chain_col, chain_is_stmt)
 
     mut fn parse_if_chain_arm(chain_col: i32, chain_is_stmt: i32) -> NodeId:
@@ -8024,7 +8024,7 @@ impl Parser:
             // breaking match dispatch on every value >= 2^31).
             let val64 = self.pattern_int_value()
             if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
-                let inclusive: i32 = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
+                let inclusive = (self.peek() == TokenKind.TK_DOT_DOT_EQ) as i32
                 self.advance()
                 if self.peek() != TokenKind.TK_INT_LIT and self.peek() != TokenKind.TK_CHAR_LIT:
                     self.expect(TokenKind.TK_INT_LIT)
@@ -8071,7 +8071,7 @@ impl Parser:
             let val64_neg = 0 - parse_i64(text)
             let val = val64_neg as i32
             if self.peek() == TokenKind.TK_DOT_DOT or self.peek() == TokenKind.TK_DOT_DOT_EQ:
-                let inclusive: i32 = if self.peek() == TokenKind.TK_DOT_DOT_EQ: 1 else: 0
+                let inclusive = (self.peek() == TokenKind.TK_DOT_DOT_EQ) as i32
                 self.advance()
                 var eval: i32 = 0
                 if self.peek() == TokenKind.TK_MINUS:
@@ -9906,7 +9906,7 @@ fn parse_i64(text: &str) -> i64:
             if ch == 95:
                 i = i + 1
                 continue
-            let digit = if ch == 49: 1 else: 0
+            let digit = (ch == 49) as i32
             val = val * 2 + digit
             i = i + 1
         return val

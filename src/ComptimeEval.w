@@ -3443,7 +3443,7 @@ impl ComptimeEvaluator:
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
-        let is_some: i32 = if recv_value.data0 as i32 == self.sema.syms.some: 1 else: 0
+        let is_some = (recv_value.data0 as i32 == self.sema.syms.some) as i32
 
         if method == "is_some":
             if arg_count != 0:
@@ -3776,7 +3776,7 @@ impl ComptimeEvaluator:
             if resolved_sig.is_some():
                 let sig: i32 = resolved_sig.unwrap()
                 let call_ret = self.sema.sig_return_type(sig)
-                let threads_receiver: i32 = if self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void: 1 else: 0
+                let threads_receiver = (self.sema.sig_receiver_mode(sig) == ReceiverMode.Mut and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void) as i32
                 self.sema.pipeline_method_calls.insert(node, method)
                 self.sema.pipeline_call_return_types.insert(node, call_ret)
                 self.sema.pipeline_carrier_kinds.insert(node, threads_receiver)
@@ -4835,7 +4835,7 @@ impl ComptimeEvaluator:
                 return comptime_workspace_compile_plan_invalid()
             let migrate_source = self.workspace_path(capability.project_root, migrate_source_option)
             var migrate_output = self.workspace_str_option(migrate_options, "output_path")
-            let migrate_is_dir: i32 = if with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h"): 1 else: 0
+            let migrate_is_dir = (with_fs_is_dir(migrate_source) != 0 or (migrate_source.len() > 2 and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".c" and migrate_source.slice(migrate_source.len() - 2, migrate_source.len()) != ".h")) as i32
             if migrate_output.len() == 0:
                 if migrate_is_dir != 0:
                     migrate_output = migrate_source_option ++ "_migrated"
@@ -8373,9 +8373,9 @@ impl ComptimeEvaluator:
         let caller_fn_sym = if self.active_fn_syms.len() > 0: self.active_fn_syms[(self.active_fn_syms.len() - 1)] else: 0
 
         let saved_file: i32 = self.sema.local_file_id
-        let has_generic_subst = if tp_count > 0: 1 else: 0
+        let has_generic_subst = tp_count > 0
         let generic_snapshot =
-            if has_generic_subst != 0:
+            if has_generic_subst:
                 self.install_generic_substitutions(tp_syms, tp_tys, node)
             else:
                 ComptimeGenericSubstSnapshot {
@@ -8411,7 +8411,7 @@ impl ComptimeEvaluator:
                     self.active_fn_syms.pop()
                     self.sema.local_file_id = saved_file
                     if switch_ctx: self.sema.current_module_path = saved_path
-                    if has_generic_subst != 0:
+                    if has_generic_subst:
                         self.restore_generic_substitutions(generic_snapshot)
                     return self.fail(node, "wrong argument count in comptime call")
                 var default_signal = if self.default_arg_uses_call_site(default_node):
@@ -8423,7 +8423,7 @@ impl ComptimeEvaluator:
                     self.active_fn_syms.pop()
                     self.sema.local_file_id = saved_file
                     if switch_ctx: self.sema.current_module_path = saved_path
-                    if has_generic_subst != 0:
+                    if has_generic_subst:
                         self.restore_generic_substitutions(generic_snapshot)
                     return default_signal
                 self.bind_value(param_name, move default_signal.value, param_mut)
@@ -8445,7 +8445,7 @@ impl ComptimeEvaluator:
                             self.active_fn_syms.pop()
                             self.sema.local_file_id = saved_file
                             if switch_ctx: self.sema.current_module_path = saved_path
-                            if has_generic_subst != 0:
+                            if has_generic_subst:
                                 self.restore_generic_substitutions(generic_snapshot)
                             return self.fail(ppat, "comptime argument did not match parameter pattern")
 
@@ -8465,7 +8465,7 @@ impl ComptimeEvaluator:
         self.active_fn_syms.pop()
         self.sema.local_file_id = saved_file
         if switch_ctx: self.sema.current_module_path = saved_path
-        if has_generic_subst != 0:
+        if has_generic_subst:
             self.restore_generic_substitutions(generic_snapshot)
         self.last_call_has_mut_receiver = has_mut_receiver
         self.last_call_mut_receiver = final_mut_receiver
@@ -8831,7 +8831,7 @@ impl Sema:
             let t_asym = if t_an != 0 and t_ak == NodeKind.NK_TYPE_NAMED as i32: self.pool_resolve(self.ast.get_data0(t_an)) ++ "" else: "?".to_owned()
             with_eprint(f"[tll] di={di} decl={decl} name='{self.pool_resolve(name)}' value={value} vkind={self.ast.kind(value) as i32} ann_extra={t_ae} ann_node={t_an} ann_kind={t_ak} ann_name='{t_asym}' resolved={self.resolve_type_expr(t_an) as i32}")
         let errors_before = self.diags.count_by_severity(DiagSeverity.Error)
-        let is_comptime_value = if self.ast.kind(value) == NodeKind.NK_COMPTIME: 1 else: 0
+        let is_comptime_value = self.ast.kind(value) == NodeKind.NK_COMPTIME
         // #643: every top-level initializer must be checked, including a
         // plain annotated `let`/`var`. Skipping an initializer merely
         // because collection already knew its declared type left nested
@@ -8840,7 +8840,7 @@ impl Sema:
         // used as a raw-pointer index base became TY_VOID and reached LLVM
         // as a store of void. The annotation is the expected type, not a
         // substitute for checking the value.
-        let type_value = if is_comptime_value != 0 and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
+        let type_value = if is_comptime_value and self.ast.get_data0(value) != 0: self.ast.get_data0(value) else: value
         let ann_extra = self.top_level_let_type_ann_extra(flags)
         let ann_type = if ann_extra >= 0: self.resolve_type_expr(self.ast.get_extra(ann_extra)) else: 0 as TypeId
         // A global binding is a binding: its value is checked as a local
@@ -8882,5 +8882,5 @@ impl Sema:
             // ordinary literal/identifier, data0 is a symbol, not a node.
             if type_value != value:
                 self.typed_expr_types.insert(type_value, final_type as i32)
-        if is_comptime_value != 0 and self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
+        if is_comptime_value and self.diags.count_by_severity(DiagSeverity.Error) == errors_before:
             let _ = self.force_eval_comptime_expr(value)

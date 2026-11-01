@@ -413,7 +413,7 @@ fn conan_version_order(a: &str, b: &str) -> i32:
 // (`1.2` and `1.2.3` -> `1.3`, `1` -> `2`), its major for a caret (`1.2` -> `2`).
 fn conan_version_bump(base: &str, caret: bool) -> str:
     let parts = base.split(".")
-    let keep = if caret or parts.len() < 2: 0 else: 1
+    let keep = (not (caret or parts.len() < 2)) as i32
     var out = ""
     for i in 0..keep: out = out ++ parts[i] ++ "."
     let (_, n) = conan_parse_leading_int(parts[keep])

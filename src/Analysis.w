@@ -913,7 +913,7 @@ fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_
     if call_node <= 0 or call_node >= sema.ast.node_count() or sema.ast.kind(call_node) != NodeKind.NK_CALL: return 0
     let resolved = sema.has_resolved_call_args(call_node)
     let source_count = if resolved: sema.get_resolved_call_arg_count(call_node) else: sema.ast.get_data2(call_node)
-    let receiver_offset: i32 = if source_count + 1 == mir_count: 1 else: 0
+    let receiver_offset = (source_count + 1 == mir_count) as i32
     if receiver_offset == 1 and arg_index == 0: return analysis_call_receiver_node(sema, call_node)
     let source_index = arg_index - receiver_offset
     if source_index < 0 or source_index >= source_count: return 0
@@ -1018,7 +1018,7 @@ fn analysis_audit_call_contracts(mut report: AnalysisReport, sema: &Sema, mir_mo
                     let recv_ty = mir_validate_operand_type(mir_mod, body, body.call_arg_operands[start])
                     let recv_resolved = if recv_ty > 0: sema.resolve_alias(recv_ty as TypeId) else: 0
                     let recv_unwrapped = if recv_resolved > 0 and sema.get_type_kind(recv_resolved) == TypeKind.TY_REF: sema.resolve_alias(sema.get_type_d0(recv_resolved) as TypeId) else: recv_resolved
-                    let elem_idx = if intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT: 1 else: 0
+                    let elem_idx = (intrinsic == MirIntrinsic.ENTRY_GET or intrinsic == MirIntrinsic.ENTRY_OR_INSERT) as i32
                     let elem_ty = if recv_unwrapped > 0 and sema.get_type_kind(recv_unwrapped) == TypeKind.TY_GENERIC_INST: sema.get_generic_inst_arg(recv_unwrapped as i32, elem_idx) else: 0
                     if elem_ty > 0 and sema.is_copy_frozen(elem_ty as TypeId) == 0:
                         report.fail(f"body {body.fn_sym} call {ci}: extraction intrinsic {intrinsic as i32} copies non-Copy type {elem_ty}")
