@@ -250,7 +250,7 @@ impl CiProject:
                 // A handle the body accepts as NULL, or a corpus caller
                 // passes NULL (D107's evidence), is a nullable argument, not
                 // a receiver: a method's `self` is never NULL.
-                let nullable = (pi < self.symbols[si].param_tested.len() and self.symbols[si].param_tested[pi] != 0) or (pi < self.symbols[si].param_null_caller.len() and self.symbols[si].param_null_caller[pi].len() > 0)
+                let nullable = (pi < self.symbols[si].param_tested.len() and self.symbols[si].param_tested[pi] != 0) or (pi < self.symbols[si].param_null_caller.len() and self.symbols[si].param_null_caller[pi].len() > 0) or (pi < self.symbols[si].param_nullable.len() and self.symbols[si].param_nullable[pi] != 0)
                 if nullable:
                     out.push(f"unproved:{pi}:NULL is an accepted argument")
                     continue
@@ -330,10 +330,53 @@ impl CiProject:
     // corpus is scanned and D121's ownership proofs are in.
     mut fn resolve_contracts():
         self.resolve_param_mutation()
+        self.resolve_handle_nullability()
         for si in 0..self.symbols.len():
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             self.symbols[si].contract = self.ct_verdicts(si as i32)
         self.resolve_method_shapes()
+
+    // D107's closure for the handle (the first pointer parameter): it
+    // accepts NULL when its body tests it and continues, a corpus caller
+    // passes NULL, or it is forwarded untested to a corpus parameter that
+    // accepts NULL or to a function defined outside the corpus. Without
+    // the forwarding step the verdict depended on which program the unit
+    // was migrated with: c-algorithms' `sortedarray_remove` hands its
+    // handle to `sortedarray_remove_range`, which tests it; only the
+    // sortedarray test program passes NULL directly, so it was a method
+    // in every other program and a raw function in that one (the shared
+    // engine/ layout refused the corpus). The verdict is a function of the
+    // evidence alone, never of the order of units.
+    mut fn resolve_handle_nullability():
+        let n = self.symbols.len()
+        for si in 0..n:
+            if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].param_ty.len() == 0: continue
+            if not ct_is_pointer(self.symbols[si].param_ty[0]) or ct_record_pointee(self.symbols[si].param_ty[0]).len() == 0: continue
+            self.symbols[si].grow_params(1)
+            if self.symbols[si].param_fn_ptr[0] != 0: continue
+            if self.symbols[si].param_tested[0] != 0 or self.symbols[si].param_null_caller[0].len() > 0:
+                self.symbols[si].param_nullable[0] = 1
+        var changed = true
+        while changed:
+            changed = false
+            for si in 0..n:
+                if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].param_ty.len() == 0: continue
+                if not ct_is_pointer(self.symbols[si].param_ty[0]) or ct_record_pointee(self.symbols[si].param_ty[0]).len() == 0: continue
+                if self.symbols[si].param_fn_ptr[0] != 0 or self.symbols[si].param_nullable[0] != 0: continue
+                for sink in self.symbols[si].param_sinks[0].split(";"):
+                    if not sink.contains(":"): continue
+                    let kv = sink.split(":")
+                    let callee = self.find_symbol(CiProjectSymbolKind.CIPS_FN, kv[0])
+                    if callee < 0: continue   // a system prototype: D102 non-null
+                    let index = parse(kv[1])
+                    var accepts = self.symbols[callee].has_definition == 0
+                    if not accepts and index < self.symbols[callee].param_nullable.len():
+                        accepts = self.symbols[callee].param_nullable[index] != 0 or self.symbols[callee].param_tested[index] != 0 or self.symbols[callee].param_null_caller[index].len() > 0
+                    if accepts:
+                        self.symbols[si].param_nullable[0] = 1
+                        self.symbols[si].param_reason[0] = "NULL accepted: forwarded to " ++ kv[0] ++ f" param {index}"
+                        changed = true
+                        break
 
     // Whether a `return` of the body may hand back NULL.
     fn ct_returns_null(si: i32) -> bool:

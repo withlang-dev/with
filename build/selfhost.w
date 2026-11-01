@@ -4646,7 +4646,7 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         "struct item *eng_first(struct eng *e);\nvoid eng_bump(struct eng *e, int *out);\nint eng_find(struct eng *e, int key, int *out);\nvoid eng_fill(struct eng *e, struct pair *out);\n" ++
         "void eng_bump_twice(struct eng *e, int *out);\nvoid eng_free(struct eng *e);\nvoid eng_drop_user(struct eng *e);\nvoid eng_via(struct eng *e);\n" ++
         "int eng_take(struct eng *e, int *out);\nstruct eng *eng_touch(struct eng *e);\nint eng_use(struct eng *e);\nvoid eng_zero_all(struct eng *es, int n);\n" ++
-        "int *eng_count_place(struct eng *e);\nvoid eng_alias(struct eng *e);\nint eng_peek_cast(const struct eng *e);\nint eng_count_via(const struct eng *e);\nint eng_same(const struct eng *e, const struct eng *o);\n"
+        "int *eng_count_place(struct eng *e);\nvoid eng_alias(struct eng *e);\nint eng_peek_cast(const struct eng *e);\nint eng_count_via(const struct eng *e);\nint eng_same(const struct eng *e, const struct eng *o);\nint eng_maybe(struct eng *e);\nint eng_maybe_via(struct eng *e);\n"
     let unit = "#include <stdlib.h>\n#include <string.h>\n#include \"eng.h\"\n" ++
         "int *eng_count_place(struct eng *e) { return &e->count; }\n" ++
         "void eng_alias(struct eng *e) { struct eng *q = e; q->count = 1; }\n" ++
@@ -4655,6 +4655,8 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
         "int eng_same(const struct eng *e, const struct eng *o) { return memcmp(e, o, sizeof *e); }\n" ++
         "void eng_zero_all(struct eng *es, int n) { for (int i = 0; i < n; i++) es[i].count = 0; }\n" ++
         "void eng_zero_via(struct eng *es, int n) { eng_zero_all(es, n); }\n" ++
+        "int eng_maybe(struct eng *e) { if (e == NULL) return 0; e->count++; return 1; }\n" ++
+        "int eng_maybe_via(struct eng *e) { return eng_maybe(e); }\n" ++
         "void eng_init(struct eng *e) { e->count = 0; e->items = 0; e->user = 0; }\n" ++
         "void eng_push(struct eng *e, struct item *it) { it->next = e->items; e->items = it; e->count++; }\n" ++
         "void eng_set_user(struct eng *e, void *user) { e->user = user; }\n" ++
@@ -4740,6 +4742,14 @@ fn bs_check_migrate_contracts(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     rc = bs_file_contains(ctx, contracts, "eng_zero_all\tunproved:0:indexed as an array\n", "contracts indexed handle is no receiver")
     if rc != 0: return rc
     rc = bs_file_contains(ctx, contracts, "eng_zero_via\tunproved:0:indexed as an array\n", "contracts handle indexed by a callee is no receiver")
+    if rc != 0: return rc
+    // A handle the body accepts as NULL is no receiver; one forwarded
+    // untested to such a parameter accepts NULL as well (the verdict is the
+    // evidence's, never the program's: a test passing NULL elsewhere
+    // made the same unit migrate two ways).
+    rc = bs_file_contains(ctx, contracts, "eng_maybe\tunproved:0:NULL is an accepted argument\n", "contracts a NULL-tested handle is no receiver")
+    if rc != 0: return rc
+    rc = bs_file_contains(ctx, contracts, "eng_maybe_via\tunproved:0:NULL is an accepted argument\n", "contracts a handle forwarded to a NULL-accepting parameter accepts NULL")
     if rc != 0: return rc
     // #2602: a migration is byte-identical wherever it runs — its header
     // names the source by its path under the input directory, never the
@@ -10447,6 +10457,24 @@ fn bs_expect_bundle_global_omission(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     bs_assert_contains(ctx, wi_text, kept_line, "bundle global omission kept the rest " ++ name)
 
+// #2219, the positive side: a global whose initializer folds (here through
+// `XS.len()` of a literal sequence) is exported data — no omission, no
+// refusal of the body reading it.
+fn bs_expect_bundle_global_folded(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, global_name: &str, kept_line: &str) -> i32:
+    let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
+    var rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle folded global fixture " ++ name)
+    if rc != 0: return rc
+    let out = bs_join(case_dir, "fold/" ++ name)
+    let result = bs_build_bundle(ctx, compiler_path, "bundle-fold-" ++ name, src, "std/" ++ name, out ++ ".o", out ++ ".wi", out ++ ".fp", out ++ ".manifest")
+    if result.rc != 0:
+        return bs_fail(ctx, "a bundle whose global folds through a literal sequence's `.len()` must build: " ++ name ++ "\n" ++ result.stderr)
+    rc = bs_assert_not_contains(ctx, result.stderr, "without a compile-time initializer", "bundle folded global warned of an omission " ++ name)
+    if rc != 0: return rc
+    let wi_text = ctx.fs().read_text(out ++ ".wi")
+    rc = bs_assert_not_contains(ctx, wi_text, "not exported at Level 0 (no compile-time initializer): let " ++ global_name ++ "\n", "bundle folded global omitted from the interface " ++ name)
+    if rc != 0: return rc
+    bs_assert_contains(ctx, wi_text, kept_line, "bundle folded global kept the rest " ++ name)
+
 fn bs_expect_bundle_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, name: &str, needle: &str) -> i32:
     let src = bs_join(case_dir, "lib/std/" ++ name ++ ".w")
     let rc = bs_write_fixture(ctx, src, bs_bundle_interface_fixture(ctx, "lib/std/" ++ name ++ ".w"), "bundle refusal fixture " ++ name)
@@ -10711,6 +10739,8 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // #2219: a global whose initializer does not fold to data is omitted the
     // same way while nothing in the object reads it ...
     rc = bs_expect_bundle_global_omission(ctx, compiler_path, case_dir, "wi_omit_global_init", "LIMITS", "pub fn plain(x: i32) -> i32")
+    if rc != 0: return rc
+    rc = bs_expect_bundle_global_folded(ctx, compiler_path, case_dir, "wi_fold_len", "GROUP", "pub fn group_count() -> i32")
     if rc != 0: return rc
 
     // Refusals: each a loud error naming the declaration, no interface written.

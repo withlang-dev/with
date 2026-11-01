@@ -11746,6 +11746,9 @@ impl CiExprPool:
             let rhs = self.get_d2(cond) as CiExprId
             if self.kind(rhs) == CiExprKind.CIE_INT_LIT and self.get_string(self.get_d0(rhs)) == "0":
                 cond = self.get_d1(cond) as CiExprId
+        // D177: a literal truth test is the bool it means (bool_expr_from_value_ir).
+        if self.kind(cond) == CiExprKind.CIE_BOOL_LIT:
+            return if self.get_d0(cond) == 0: self.get_d2(id) as CiExprId else: self.get_d1(id) as CiExprId
         if self.kind(cond) != CiExprKind.CIE_INT_LIT: return id
         let text = self.get_string(self.get_d0(cond))
         if text == "0": self.get_d2(id) as CiExprId else: self.get_d1(id) as CiExprId
