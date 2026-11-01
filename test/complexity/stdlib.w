@@ -468,12 +468,33 @@ fn least(a: i64, b: i64, c: i64):
 fn sample(work: &fn(i32) -> i32, n: i32):
     least(elapsed(work, n), elapsed(work, n), elapsed(work, n))
 
-fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
+// One round of the measurement: both sizes sampled, the row printed, and
+// whether the large size kept within the linear bound.
+fn measure_round(name: &str, work: &fn(i32) -> i32, n: i32) -> bool:
     let small = sample(work, n)
     let large = sample(work, n * 4)
     let base = if small > 1000000: small else: 1000000
     let within_bound = large <= base * 6 + 1000000
     print(f"{name}\tn={n}\tsmall_ns={small}\tlarge_ns={large}\twithin_bound={within_bound}")
+    within_bound
+
+// A row is measured up to ROUNDS times and holds when any round keeps the
+// bound: the question is how the work grows, and another process on the
+// host (a release leg in the VM beside this one, #2911) can only inflate a
+// round, never shrink one. Work that is quadratic by construction misses the
+// bound in every round, so the control and an expected failure are judged
+// the same way, on their best round.
+const ROUNDS = 5
+
+fn within_bound_in_any_round(name: &str, work: &fn(i32) -> i32, n: i32) -> bool:
+    var attempt = 0
+    while attempt < ROUNDS:
+        if measure_round(name, work, n): return true
+        attempt = attempt + 1
+    false
+
+fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
+    let within_bound = within_bound_in_any_round(name, work, n)
     if issue == 0:
         assert(within_bound)
         print(f"PASS {name}")
