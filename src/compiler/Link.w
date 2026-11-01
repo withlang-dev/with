@@ -863,12 +863,45 @@ fn link_stage_windows_libc_root() -> str:
         return ""
     root
 
+// A path the build recorded in a metadata file (#2016: the SDK and the
+// darwin sysroot lie under the project root, and the records name them
+// relative to it so they are the same bytes in every worktree and the build
+// store can serve them). A program is linked from any directory — a UAT's
+// fresh directory, `with -e` in a user's folder with `out/` beside the
+// compiler — so a relative record resolves against the project the runtime
+// root belongs to (`<project>/out/lib`, `<project>/out/bootstrap/lib`,
+// `<project>/out/bootstrap-lib`, or WITH_OUT_DIR's owner), never the cwd.
+// A relative runtime root is the cwd's project already.
+fn link_stage_recorded_path(root: &str, recorded: &str) -> str:
+    if recorded.len() == 0 or link_stage_path_is_absolute(recorded): return recorded ++ ""
+    let project = link_stage_project_root_of(root)
+    if project.len() == 0: return recorded ++ ""
+    project ++ "/" ++ recorded
+
+fn link_stage_path_is_absolute(path: &str) -> bool:
+    if path.len() == 0: return false
+    if path[0] == 47 or path[0] == 92: return true // '/' or '\'
+    path.len() >= 3 and path[1] == 58 and (path[2] == 47 or path[2] == 92) // 'X:/' or 'X:\'
+
+// The project that owns a runtime root: the prefix before its `out`
+// segment. "" for a relative root (the cwd's project) and for a root with
+// no `out` segment (an installed layout carries no recorded paths).
+fn link_stage_project_root_of(root: &str) -> str:
+    if not link_stage_path_is_absolute(root): return ""
+    var i = root.len() - 5
+    while i >= 0:
+        let sep_before = root[i] == 47 or root[i] == 92
+        let sep_after = root[i + 4] == 47 or root[i + 4] == 92
+        if sep_before and sep_after and root.slice(i + 1, i + 4) == "out": return root.slice(0, i)
+        i -= 1
+    ""
+
 // The lld a link runs, as link_stage_link_with_extras_libs_args_plan
 // resolves it: the build's recorded llvm_ld, else (a native Windows link
 // before the metadata exists) the environment's. "" when there is none.
 fn link_stage_llvm_ld_path() -> str:
     let root = link_stage_resolve_runtime_root()
-    var ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+    var ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
     if ld_path.len() == 0 and runtime_sysinfo_os() == "Windows" and target_spec_is_native():
         ld_path = link_stage_windows_lld_from_env()
     ld_path
@@ -1278,7 +1311,7 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
     // LLVM linker plan, which dispatches on the active target.
     if runtime_sysinfo_os() == "Windows" or not target_spec_is_native():
         let root = link_stage_resolve_runtime_root()
-        var ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+        var ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
         // The `llvm_ld` metadata file only records the lld-link path; the lib
         // dirs and system libs come from the environment already
         // (link_stage_make_windows_llvm_link_command). So a NATIVE Windows
@@ -2531,7 +2564,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
             let root = link_stage_resolve_runtime_root()
             let variant = link_stage_runtime_variant_dir()
             let rsp_path = variant ++ "/llvm_ld.rsp"
-            let ld_path = link_stage_read_file_trimmed(root ++ "/llvm_ld")
+            let ld_path = link_stage_recorded_path(root, link_stage_read_file_trimmed(root ++ "/llvm_ld"))
             extras.push(static_bridge)
             // The build supplies the stage's embedding object independently
             // of the bridge/runtime root: stage2 needs populated bundle blobs
