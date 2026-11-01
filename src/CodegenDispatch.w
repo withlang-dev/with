@@ -472,7 +472,7 @@ impl Codegen:
             let reference = self.sema.get_type_kind(self.sema.resolve_alias(tid)) == TypeKind.TY_REF
             places.push(self.sema.callable_param_uses_value_ref_abi(resolved, pi) | (if reference: 2 else: 0))
         // #1832: a C variadic function pointer keeps the variadic convention.
-        let variadic: i32 = if kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved): 1 else: 0
+        let variadic = (kind == TypeKind.TY_EXTERN_FN and self.sema.fn_type_is_variadic(resolved)) as i32
         let index = self.compute_fn_abi(ret, sources, places, convention, variadic)
         self.fn_abi_callables.insert(key, index)
         index
@@ -4197,14 +4197,14 @@ impl Codegen:
         for pi in 0..param_count: places.push(0)
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, FN_ABI_WITH, 0)
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = abi.ret.pass == PM_INDIRECT
         let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
         let func = wl_add_function(self.llmod, name, fn_type)
-        if has_sret != 0:
+        if has_sret:
             wl_add_sret_attr(self.context, func, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(func, byval_types, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_c_abi_byval_attrs(func, byval_types, param_count, if has_sret: 1 else: 0)
         self.bind_fn_abi(sym, abi_index, func)
         self.fn_values.insert(sym, func)
         self.fn_fn_types.insert(sym, fn_type)
@@ -5092,9 +5092,9 @@ impl Codegen:
                         let ev_payload_ty = self.mir_enum_variant_payload_llvm_type(dest_sema_ty, ev_tag)
                         let ev_payload_sema = self.mir_enum_payload_sema_type(dest_sema_ty, ev_tag, 0)
                         let ev_payload_resolved = if ev_payload_sema > 0: self.mir_resolve_alias_at(ev_payload_sema) else: 0
-                        let ev_payload_is_unit = if ev_payload_resolved > 0 and self.mir_type_kind_at(ev_payload_resolved) == TypeKind.TY_VOID: 1 else: 0
+                        let ev_payload_is_unit = ev_payload_resolved > 0 and self.mir_type_kind_at(ev_payload_resolved) == TypeKind.TY_VOID
                         if ev_payload_ty == 0:
-                            if ev_payload_is_unit != 0:
+                            if ev_payload_is_unit:
                                 return wl_build_load(self.builder, struct_ty, ev_alloca)
                             with_eprint(f"error: aggregate enum payload missing destination payload type fn={self.intern.resolve(self.current_function_name_sym)} variant={ev_tag}")
                             self.had_error = 1
@@ -6476,7 +6476,7 @@ impl Codegen:
             new_args.push(out_ptr)
             new_args.push(wl_const_int(i64_ty, es, 0))
             let _ = wl_build_call(self.builder, new_ty, new_fn, list_data_i64(new_args), 2)
-        let first: i32 = if in_place: 1 else: 0
+        let first = (in_place) as i32
         for i in first..2:
             let op = body.call_arg_operands[(arg_start + i)]
             let src_sema = self.mir_unwrap_ref_like_sema_type(self.mir_operand_sema_type(body, op))
@@ -9009,15 +9009,15 @@ impl Codegen:
                 var field_text: str = with_str_clone_ref(self.intern.resolve(field_token))
                 if field_text.len() == 0:
                     field_text = self.sema_symbol_text(field_token)
-                var valid_index = if field_text.len() > 0: 1 else: 0
+                var valid_index = field_text.len() > 0
                 tuple_idx = 0
                 for vi in 0..field_text.len():
                     let ch = field_text[vi]
                     if ch >= 48 and ch <= 57:
                         tuple_idx = tuple_idx * 10 + (ch - 48) as i32
                     else:
-                        valid_index = 0
-                if valid_index == 0:
+                        valid_index = false
+                if not valid_index:
                     tuple_idx = -1
             if tuple_idx >= 0 and tuple_idx < elem_count:
                 return self.mir_type_extra_at(elem_start + tuple_idx)
@@ -9688,7 +9688,7 @@ impl Codegen:
                 return self.mir_emit_dyn_call_error("error: dyn trait sret destination could not be materialized", next_bb)
             call_args.push(sret_dst)
         call_args.push(data_ptr)
-        let sret_off: i32 = if has_sret: 1 else: 0
+        let sret_off = (has_sret) as i32
         var ai: i32 = 1
         while ai < arg_count:
             let op_id = body.call_arg_operands[(arg_start + ai)]
@@ -12312,7 +12312,7 @@ impl Codegen:
             let cas_val_ptr = wl_build_struct_gep(self.builder, cas_recv_ty, cas_recv_ptr, 0)
             let cas_success_order = if self.is_const_int_value(cas_success_raw): wl_const_int_sext_val(cas_success_raw) as i32 else: AtomicOrdering.SEQ_CST
             let cas_failure_order = if self.is_const_int_value(cas_failure_raw): wl_const_int_sext_val(cas_failure_raw) as i32 else: AtomicOrdering.SEQ_CST
-            let cas_is_weak: i32 = if intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK: 1 else: 0
+            let cas_is_weak = (intrinsic == MirIntrinsic.ATOMIC_CAS_WEAK) as i32
             let cas_result = wl_build_cmpxchg(self.builder, cas_val_ptr, cas_expected, cas_desired, cas_success_order, cas_failure_order, cas_is_weak)
             let cas_old = wl_extract_value(self.builder, cas_result, 0)
             let cas_ok = wl_extract_value(self.builder, cas_result, 1)
@@ -15500,7 +15500,7 @@ impl Codegen:
         let param_types: List[i64] = List.new()
         for pi in 0..param_count: param_types.push(0)
         if param_count > 0: wl_get_param_types(call_ft, list_data_i64(&param_types))
-        let abi_has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let abi_has_sret = (abi.ret.pass == PM_INDIRECT) as i32
         let abi_sret_ty = abi.ret.source_ty
         let abi_byval_types = self.fn_abi_byval_attr_types(call_abi)
         let abi_direct_ret_ty = if abi.ret.pass == PM_DIRECT and abi.ret.llvm_ty != abi.ret.source_ty: abi.ret.source_ty else: 0
@@ -15513,7 +15513,7 @@ impl Codegen:
         // try_ci_coercion keys on ci_syms, not on the calling convention).
         // Keying on the convention passed the str header's address to a
         // translated inline function (#1589).
-        let lends_c_strings: i32 = if abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym)): 1 else: 0
+        let lends_c_strings = (abi.convention == FN_ABI_C or (callee_raw_fn_sym != 0 and self.sema.ci_syms.contains(callee_raw_fn_sym))) as i32
         let args: List[i64] = List.new()
         let call_temp_cleanups: List[i64] = List.new()
         if is_indirect:
@@ -17514,7 +17514,7 @@ impl Codegen:
             // MIR's own, by place.
             let protocol = ci < closure_body.anonymous_capture_kinds.len() and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
             let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
-            let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == false, self.current_function_name_sym, node): 1 else: 0
+            let by_ref = (self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == false, self.current_function_name_sym, node)) as i32
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types

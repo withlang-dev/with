@@ -1362,7 +1362,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
     if ret_str as i64 == 0:
         ret_str = session_strdup(s, "Unit\0" as *const u8)
     let num_args = clang_getNumArgTypes(fn_type)
-    let is_variadic = if clang_isFunctionTypeVariadic(fn_type) != 0 and fn_type.kind != CXType_FunctionNoProto: 1 else: 0
+    let is_variadic = clang_isFunctionTypeVariadic(fn_type) != 0 and fn_type.kind != CXType_FunctionNoProto
     var params: [4096]u8 = [0 as u8; 4096]
     var pos: i64 = 0
     var i: i32 = 0
@@ -1380,7 +1380,7 @@ unsafe fn translate_fn_type(s: *mut CImportSession, fn_type: CXType, depth: i32)
             return arg_str
         buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, arg_str as *const u8)
         i = i + 1
-    if is_variadic != 0:
+    if is_variadic:
         if num_args > 0:
             buf_append_str(&raw mut params as *mut [4096]u8 as *mut u8, &raw mut pos, 4096, ", ...\0" as *const u8)
         else:
@@ -3230,7 +3230,7 @@ fn with_cimport_struct_field_type_translated(session: i64, idx: isize, field: is
         let cache = ((*s).caches as i64 + idx as i64 * sizeof[DeclCache]()) as *const DeclCache
         if field < 0 or field >= (*cache).field_count: return ""
         let fi = ((*cache).fields as i64 + field as i64 * sizeof[FieldInfo]()) as *const FieldInfo
-        let is_last: i32 = if field == (*cache).field_count - 1: 1 else: 0
+        let is_last = (field == (*cache).field_count - 1) as i32
         let result = option_wrapped(s, (*fi).clang_type, translate_type_recursive(s, (*fi).clang_type, 0, is_last))
         if result as i64 == 0: return ""
         session_make_str(s, result as *const u8)
@@ -3680,7 +3680,7 @@ unsafe fn macro_session_add_from_define_line(ms: *mut MacroSession, line_ptr: *c
     var name_end = define_start
     while *(name_end) != 0 and *(name_end) != 32 and *(name_end) != 9 and *(name_end) != 40 and *(name_end) != 10:
         name_end = (name_end as i64 + 1) as *const u8
-    let is_fn_like: i32 = if *(name_end) == 40: 1 else: 0
+    let is_fn_like = (*(name_end) == 40) as i32
     let name_len = name_end as i64 - define_start as i64
     if name_len <= 0:
         return

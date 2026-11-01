@@ -4376,7 +4376,7 @@ impl CCodegen:
         var out = "    " ++ cc_lbrace()
         if not in_place:
             out = out ++ " with_vec __with_cat; with_vec_new_out((uint8_t*)&__with_cat, " ++ es ++ ");"
-        let first: i32 = if in_place: 1 else: 0
+        let first = (in_place) as i32
         for i in first..2:
             let op = self.call_arg_operand(body, args_id, i)
             let text = self.operand_text(body, op)
@@ -5532,7 +5532,7 @@ impl CCodegen:
             if cc_str_ends_with(sym_text, wanted) == false:
                 continue
             let owner = cc_owner_prefix(sym_text)
-            let owner_matched = if preferred_owner.len() > 0 and owner == preferred_owner: 1 else: 0
+            let owner_matched = preferred_owner.len() > 0 and owner == preferred_owner
             let ret_tid = self.c_sig_return_type(si)
             if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
@@ -5543,7 +5543,7 @@ impl CCodegen:
                 if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if ai == 0 and owner_matched != 0:
+                if ai == 0 and owner_matched:
                     continue
                 if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
@@ -5551,7 +5551,7 @@ impl CCodegen:
             if params_ok == 0:
                 continue
             var score = 0
-            if owner_matched != 0:
+            if owner_matched:
                 score = score + 4
             if self.has_body_for_sym(sym):
                 score = score + 2
@@ -5822,7 +5822,7 @@ impl CCodegen:
                 1
             else:
                 0
-        let recv_is_listslot = if first_owner == "ListSlot": 1 else: 0
+        let recv_is_listslot = first_owner == "ListSlot"
 
         if method == "new":
             let concrete_new_sym = self.canonical_body_sym(callee_sym)
@@ -5867,10 +5867,10 @@ impl CCodegen:
                 1
             else:
                 0
-        let allow_place_kind_guess = if first_owner.len() == 0: 1 else: 0
-        let recv_kind_is_list = if recv_is_list != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.LIST): 1 else: 0
-        let recv_kind_is_map = if recv_is_map != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.HASHMAP): 1 else: 0
-        let recv_kind_is_opt = if recv_is_opt != 0 or (allow_place_kind_guess != 0 and place_kind == CcPlaceKind.OPTION): 1 else: 0
+        let allow_place_kind_guess = first_owner.len() == 0
+        let recv_kind_is_list = recv_is_list != 0 or (allow_place_kind_guess and place_kind == CcPlaceKind.LIST)
+        let recv_kind_is_map = recv_is_map != 0 or (allow_place_kind_guess and place_kind == CcPlaceKind.HASHMAP)
+        let recv_kind_is_opt = recv_is_opt != 0 or (allow_place_kind_guess and place_kind == CcPlaceKind.OPTION)
 
         if method == "load":
             if recv_is_atomic != 0:
@@ -5922,77 +5922,77 @@ impl CCodegen:
             return CcBuiltin.NONE
 
         if method == "slot":
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_SLOT
             return CcBuiltin.NONE
         if method == "get_disjoint":
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_GET_DISJOINT
             return CcBuiltin.NONE
 
         if method == "push":
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_PUSH
             return CcBuiltin.NONE
         if method == "clear":
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_CLEAR
             return CcBuiltin.NONE
         if method == "pop":
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_POP
             return CcBuiltin.NONE
         if method == "insert":
-            if recv_kind_is_map != 0:
+            if recv_kind_is_map:
                 return CcBuiltin.MAP_INSERT
             return CcBuiltin.NONE
         if method == "is_some":
-            if recv_kind_is_opt != 0:
+            if recv_kind_is_opt:
                 return CcBuiltin.OPT_IS_SOME
             return CcBuiltin.NONE
         if method == "unwrap":
-            if recv_kind_is_opt != 0:
+            if recv_kind_is_opt:
                 return CcBuiltin.OPT_UNWRAP
             return CcBuiltin.NONE
         if method == "expect":
-            if recv_kind_is_opt != 0:
+            if recv_kind_is_opt:
                 return CcBuiltin.OPT_EXPECT
             return CcBuiltin.NONE
 
         if method == "set":
-            if recv_is_listslot != 0:
+            if recv_is_listslot:
                 return CcBuiltin.VECSLOT_SET
             return CcBuiltin.NONE
 
         if method == "get":
-            if recv_is_listslot != 0:
+            if recv_is_listslot:
                 return CcBuiltin.VECSLOT_GET
-            if recv_kind_is_map != 0:
+            if recv_kind_is_map:
                 return CcBuiltin.MAP_GET
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_GET
             return CcBuiltin.NONE
 
         if method == "len":
             if first_tk == TypeKind.TY_STR:
                 return CcBuiltin.NONE
-            if recv_kind_is_map != 0:
+            if recv_kind_is_map:
                 return CcBuiltin.MAP_LEN
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_LEN
             return CcBuiltin.NONE
 
         if method == "contains":
             if first_tk == TypeKind.TY_STR:
                 return CcBuiltin.NONE
-            if recv_kind_is_map != 0:
+            if recv_kind_is_map:
                 return CcBuiltin.MAP_CONTAINS
             return CcBuiltin.NONE
 
         if method == "remove":
-            if recv_kind_is_map != 0:
+            if recv_kind_is_map:
                 return CcBuiltin.MAP_REMOVE
-            if recv_kind_is_list != 0:
+            if recv_kind_is_list:
                 return CcBuiltin.LIST_REMOVE
             return CcBuiltin.NONE
 
@@ -7392,7 +7392,7 @@ impl CCodegen:
                 return "    abort();"
             let recv = self.map_recv_text(body, args_id)
             let owner = self.call_first_arg_owner_text(body, args_id)
-            let recv_is_hashmap = if owner == "HashMap": 1 else: 0
+            let recv_is_hashmap = owner == "HashMap"
             let key_operand = self.call_arg_operand(body, args_id, 1)
             let key_text = self.operand_text(body, key_operand)
             let key_tid = self.map_call_key_tid(body, args_id, key_operand)
@@ -7409,7 +7409,7 @@ impl CCodegen:
                 key_drop = " " ++ self.drop_call_text("__with_sk", stored_key, true)
             let remove_call = if key_glue: "with_hashmap_remove_entry((void*)(intptr_t)(" ++ recv ++ "), &__with_k, &__with_sk, " else: "with_hashmap_remove((void*)(intptr_t)(" ++ recv ++ "), &__with_k, "
             let remove_tail = if key_glue: ")" else: ", " ++ is_str_key ++ ")"
-            if recv_is_hashmap != 0:
+            if recv_is_hashmap:
                 let dst = self.place_text(body, dest_place)
                 if self.type_is_payload_enum(ret_tid) == false:
                     self.fail("HashMap.remove Option result requires a payload enum")
@@ -8743,7 +8743,7 @@ impl CCodegen:
         let _ = bb
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
-        let has_ret: i32 = if self.is_void_tid(ret_tid) == false: 1 else: 0
+        let has_ret = (self.is_void_tid(ret_tid) == false) as i32
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.emit_c_variadic_call_term(body, kind, args_id, dest_place, next_bb)
 
@@ -8807,17 +8807,17 @@ impl CCodegen:
     mut fn rvalue_infer_tid(body: &MirBody, rval_id: i32) -> i32:
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return 0
-        let no_infer = if self.in_field_cache_build != 0: 1 else: 0
+        let no_infer = self.in_field_cache_build != 0
         let rk = body.rval_kinds[rval_id]
         let d0 = body.rval_d0[rval_id]
         let d1 = body.rval_d1[rval_id]
         let d2 = body.rval_d2[rval_id]
         if rk == RvalueKind.RK_USE:
-            if no_infer != 0:
+            if no_infer:
                 return self.operand_tid_no_infer(body, d0)
             return self.operand_tid(body, d0)
         if rk == RvalueKind.RK_ARRAY_FILL:
-            if no_infer != 0:
+            if no_infer:
                 return self.operand_tid_no_infer(body, d0)
             return self.operand_tid(body, d0)
         if rk == RvalueKind.RK_BIN_OP:
@@ -8825,10 +8825,10 @@ impl CCodegen:
                 return self.sema.ty_bool as i32
             if d0 == BinaryOp.OP_CONCAT:
                 return self.sema.ty_str as i32
-            let lt = if no_infer != 0: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
+            let lt = if no_infer: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
             if lt != 0 and self.is_void_tid(lt) == false:
                 return lt
-            if no_infer != 0:
+            if no_infer:
                 return self.operand_tid_no_infer(body, d2)
             return self.operand_tid(body, d2)
         if rk == RvalueKind.RK_STR_CONCAT_N:
@@ -8836,7 +8836,7 @@ impl CCodegen:
         if rk == RvalueKind.RK_UN_OP:
             if d0 == UnaryOp.UOP_NOT:
                 return self.sema.ty_bool as i32
-            if no_infer != 0:
+            if no_infer:
                 return self.operand_tid_no_infer(body, d1)
             return self.operand_tid(body, d1)
         if rk == RvalueKind.RK_CAST:
@@ -8849,7 +8849,7 @@ impl CCodegen:
             if count <= 0:
                 return 0
             let first = body.agg_field_operands[start]
-            if no_infer != 0:
+            if no_infer:
                 return self.operand_tid_no_infer(body, first)
             return self.operand_tid(body, first)
         if rk == RvalueKind.RK_LEN:

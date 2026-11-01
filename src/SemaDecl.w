@@ -1161,7 +1161,7 @@ impl Sema:
         if self.get_type_kind(tid as TypeId) == TypeKind.TY_ALIAS: return
         let resolved = self.resolve_alias(tid as TypeId) as i32
         self.type_decl_nodes_by_tid.insert(resolved, node)
-        let is_std: i32 = if sema_tier_path_is_std_implementation(self.current_module_path): 1 else: 0
+        let is_std = (sema_tier_path_is_std_implementation(self.current_module_path)) as i32
         self.type_tid_is_std.insert(resolved, is_std)
 
     // #1344: a variant name listed twice gave `E.A` two meanings and the
@@ -1223,10 +1223,10 @@ impl Sema:
         let extra_start = self.ast.get_data1(node)
         let packed_kind = self.ast.get_data2(node)
         let sub_kind = type_decl_sub_kind(packed_kind)
-        let decl_is_pub: i32 = if type_decl_is_pub(self.ast, extra_start, sub_kind): 1 else: 0
+        let decl_is_pub = (type_decl_is_pub(self.ast, extra_start, sub_kind)) as i32
         self.record_decl_visibility(name, node, decl_is_pub)
         let is_ephemeral = type_decl_is_ephemeral(packed_kind)
-        let is_generic_decl = if self.type_decl_tp_count(node) != 0: 1 else: 0
+        let is_generic_decl = self.type_decl_tp_count(node) != 0
         if is_ephemeral != 0:
             self.ephemeral_types.insert(name, 1)
         // D120 (§4.3): declared a resource, so never a value, whatever its
@@ -1260,7 +1260,7 @@ impl Sema:
                 let f_tid = self.resolve_type_expr(f_type_node)
                 if self.is_opaque_value_type(f_tid):
                     self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", f_type_node)
-                if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
+                if is_generic_decl and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral structs", f_type_node, f_tid as i32, node)
                 self.check_duplicate_field(name, &field_names, f_name, f_type_node)
                 field_names.push(f_name)
@@ -1327,7 +1327,7 @@ impl Sema:
                     let pt_tid = self.resolve_type_expr(pt_node)
                     if self.is_opaque_value_type(pt_tid):
                         self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
-                    if is_generic_decl != 0 and not is_ephemeral and pt_tid != 0 and self.type_is_ephemeral_value(pt_tid as i32) != 0:
+                    if is_generic_decl and not is_ephemeral and pt_tid != 0 and self.type_is_ephemeral_value(pt_tid as i32) != 0:
                         self.emit_ephemeral_storage_error("ephemeral values cannot be stored in enum payloads", pt_node, pt_tid as i32, node)
                     payload_tids.push(pt_tid as i32)
             let te_start = self.type_extra.len() as i32
@@ -1485,7 +1485,7 @@ impl Sema:
             let inner = self.resolve_type_expr(inner_node)
             if self.is_opaque_value_type(inner):
                 self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
-            if is_generic_decl != 0 and not is_ephemeral and inner != 0 and self.type_is_ephemeral_value(inner as i32) != 0:
+            if is_generic_decl and not is_ephemeral and inner != 0 and self.type_is_ephemeral_value(inner as i32) != 0:
                 self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node, inner as i32, node)
             // Distinct type: treat as single-field struct
             let te_start = self.type_extra.len() as i32
@@ -1519,7 +1519,7 @@ impl Sema:
                 let f_tid = self.resolve_type_expr(f_type_node)
                 if self.is_opaque_value_type(f_tid):
                     self.emit_error("opaque types cannot be stored in union fields; use a pointer or reference", f_type_node)
-                if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
+                if is_generic_decl and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral unions", f_type_node, f_tid as i32, node)
                 self.check_duplicate_field(name, &field_names, f_name, f_type_node)
                 field_names.push(f_name)
@@ -2123,7 +2123,7 @@ impl Sema:
         if is_local:
             self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
         let fn_flags = self.ast.get_data2(node)
-        let decl_is_pub: i32 = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
+        let decl_is_pub = ((fn_flags / FnFlags.PUB) % 2 == 1) as i32
         self.record_decl_visibility(fn_name, node, decl_is_pub)
         if method_owner_sym == 0:
             self.record_displaced_fn(fn_name, decl_is_pub)
@@ -2580,7 +2580,7 @@ impl Sema:
         if self.is_opaque_value_type(tid):
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
-        let is_mut: i32 = if self.ast.get_data2(node) != 0: 1 else: 0
+        let is_mut = (self.ast.get_data2(node) != 0) as i32
         if is_mut != 0:
             self.mutable_global_syms.insert(name, 1)
         self.register_top_level_global_decl(name, tid, is_mut, node, GLOBAL_VALUE_DECL_EXTERN)
@@ -3074,7 +3074,7 @@ impl Sema:
                 bind_name = self.extract_decl_name_after(node, "var")
             self.set_pretty_symbol(name, bind_name)
         let flags = self.ast.get_data2(node)
-        let decl_is_pub: i32 = if (flags / 2) % 2 == 1: 1 else: 0
+        let decl_is_pub = ((flags / 2) % 2 == 1) as i32
         self.record_decl_visibility(name, node, decl_is_pub)
         if self.record_displaced_fn(name, decl_is_pub):
             self.displaced_global_syms.insert(name, 1)
@@ -3197,7 +3197,7 @@ impl Sema:
         // #2520: record the (module, name) candidate the trait resolvers
         // walk; trait_lookup above stays the flat last-wins cache only
         // for existence questions that predate identity.
-        let trait_is_pub: i32 = if self.ast.get_data2(node) == Visibility.Public: 1 else: 0
+        let trait_is_pub = (self.ast.get_data2(node) == Visibility.Public) as i32
         self.trait_candidate_nexts.push(if self.trait_candidate_heads.contains(name): self.trait_candidate_heads.get(name).unwrap() else: -1)
         self.trait_candidate_heads.insert(name, trait_idx)
         self.trait_candidate_paths.push(with_str_clone_ref(self.current_module_path))
@@ -4243,7 +4243,7 @@ impl Sema:
         if nlen >= 2 and nlen <= 3:
             let first = name[0]
             if first == 117 or first == 105:  // 'u' or 'i'
-                let is_signed = if first == 105: 1 else: 0
+                let is_signed = (first == 105) as i32
                 var width: i32 = 0
                 var all_digits = true
                 for di in 1..nlen as i32:

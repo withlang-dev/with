@@ -2678,7 +2678,7 @@ impl MirBuilder:
             if uop == UnaryOp.UOP_RAW_REF_CONST or uop == UnaryOp.UOP_RAW_REF_MUT:
                 let inner_ty = self.expr_type(self.ast.get_data1(node))
                 if inner_ty != 0 and inner_ty != self.sema.ty_void as i32:
-                    let raw_mut: i32 = if uop == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                    let raw_mut = (uop == UnaryOp.UOP_RAW_REF_MUT) as i32
                     let ptr_ty = self.sema.find_exact_type(TypeKind.TY_PTR, inner_ty, raw_mut, 0) as i32
                     if ptr_ty != 0:
                         return ptr_ty
@@ -4814,10 +4814,10 @@ impl MirBuilder:
         let source_base = self.direct_place_local(source_place)
         if source_base < 0:
             return
-        let is_copy = if self.body.operand_kinds[operand_id] == OperandKind.OK_COPY: 1 else: 0
-        let source_named = if is_copy != 0: self.place_source_is_named(source_place) else: false
+        let is_copy = self.body.operand_kinds[operand_id] == OperandKind.OK_COPY
+        let source_named = if is_copy: self.place_source_is_named(source_place) else: false
         self.transfer_string_field_facts_between_bases(source_base, dest_base, source_named)
-        if is_copy != 0:
+        if is_copy:
             self.mark_string_base_fields_may_alias(source_base)
 
     mut fn update_string_alias_after_assignment(dest_place: i32, operand_id: i32):
@@ -7472,7 +7472,7 @@ impl MirBuilder:
         let rhs_expr = self.ast.get_data1(node)
         let flags = self.ast.get_data2(node)
         let mutable = flags % 2
-        let is_discard_binding = if name_sym != 0 and self.sema.sym_is_discard(self.sema_symbol_for_ast_symbol(name_sym)): 1 else: 0
+        let is_discard_binding = name_sym != 0 and self.sema.sym_is_discard(self.sema_symbol_for_ast_symbol(name_sym))
         let bind_ty = self.binding_type(node)
         if mutable == 0:
             // §2.4: a drop-body self-field let CONSUMES — never the alias
@@ -7506,7 +7506,7 @@ impl MirBuilder:
         if rhs_expr != 0 and self.sema.va_start_calls.contains(rhs_expr):
             let va_place = self.place_for_local(local_id)
             self.lower_va_start_into(va_place, rhs_expr)
-            if is_discard_binding != 0:
+            if is_discard_binding:
                 self.emit_drop_entry(local_id, DropKind.DK_VA_END)
                 return
             self.schedule_drop(local_id, DropKind.DK_VA_END)
@@ -7534,7 +7534,7 @@ impl MirBuilder:
             // free storage its arms merely read.
             if mutable == 0 and self.ast.kind(rhs_expr) == NodeKind.NK_IF_EXPR and self.last_if_result_view != 0:
                 rhs_is_view_if = 1
-        if is_discard_binding != 0:
+        if is_discard_binding:
             if not self.copy_is_bits(bind_ty) and rhs_is_view_if == 0:
                 self.emit_drop_entry(local_id, scheduled_drop_kind)
             else:
@@ -8992,7 +8992,7 @@ impl MirBuilder:
 
         // g.each(body)
         let closure_local = self.new_temp(body_fn_ty)
-        let in_loop: i32 = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let in_loop = (self.loop_break_bbs.len() > 0) as i32
         let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, key_node, body_sym, in_loop, body_fn_ty)
         let closure_const_op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let closure_rv = self.body.new_rvalue(RvalueKind.RK_USE, closure_const_op, 0, 0)
@@ -12260,9 +12260,9 @@ impl MirBuilder:
             self.flush_pending_resets_since(pending_reset_start, pending_reset_field_start, pending_move_temp_start)
 
         let result_ty = self.expr_type(node)
-        let result_is_void = if want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32: 1 else: 0
+        let result_is_void = want_result == 0 or result_ty == 0 or result_ty == self.sema.ty_void as i32
         var result_place: i32 = -1
-        if result_is_void == 0:
+        if not result_is_void:
             let result_local = self.new_temp(result_ty)
             result_place = self.place_for_local(result_local)
         let join_bb = self.new_block()
@@ -12364,7 +12364,7 @@ impl MirBuilder:
             // moved into the arm result is cancelled by assign_operand_to_place
             // before the frame closes.
             let arm_temp_frame = self.push_stmt_temp_frame()
-            if result_is_void != 0:
+            if result_is_void:
                 let _ = self.lower_expr_discard(body_node)
             else:
                 let saved_arm_expected = self.expected_type
@@ -12392,7 +12392,7 @@ impl MirBuilder:
 
         self.switch_to(join_bb)
         self.forget_string_flow_facts()
-        if result_is_void != 0:
+        if result_is_void:
             return self.unit_operand()
         if self.copy_is_bits(result_ty):
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
@@ -13873,7 +13873,7 @@ impl MirBuilder:
                     gc_args.push(gc_recv_op)
                 let gc_has_resolved_args = self.sema.has_resolved_call_args(node)
                 let gc_arg_count = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg_count(node) else: arg_count
-                let gc_param_offset: i32 = if gc_is_static: 0 else: 1
+                let gc_param_offset = (not (gc_is_static)) as i32
                 let gc_closure_ops: List[i32] = List.new()
                 for gc_mai in 0..gc_arg_count:
                     let gc_ma_node = if gc_has_resolved_args != 0: self.sema.get_resolved_call_arg(node, gc_mai) else: self.ast.get_extra(arg_start + gc_mai)
@@ -14319,7 +14319,7 @@ impl MirBuilder:
             let payload_ty = payloads[pi]
             let field_place = self.body.new_field_place(variant_place, pi as i32, payload_ty)
             if accessor_kind == 3 or accessor_kind == 4:
-                let ref_mut: i32 = if accessor_kind == 4: 1 else: 0
+                let ref_mut = (accessor_kind == 4) as i32
                 let elem_ty = if tuple_elem_start > 0: self.sema.type_extra[(tuple_elem_start + pi)] else: self.sema.find_exact_type(TypeKind.TY_REF, payload_ty, ref_mut, 0) as i32
                 let borrow_kind = if accessor_kind == 4: BorrowKind.EXCLUSIVE else: BorrowKind.SHARED
                 let ref_rv = self.body.new_rvalue(RvalueKind.RK_REF, borrow_kind, field_place, 0)
@@ -16748,7 +16748,7 @@ impl MirBuilder:
         // d2 = 1 when the closure expression sits inside a loop of this body:
         // one site then creates a closure per iteration, and codegen gives each
         // its own environment (#1471, §12.4 Copy capture copies at creation).
-        let in_loop: i32 = if self.loop_break_bbs.len() > 0: 1 else: 0
+        let in_loop = (self.loop_break_bbs.len() > 0) as i32
         let closure_const = self.body.new_const(ConstKind.CK_CLOSURE, node, body_sym, in_loop, ty)
         let op = self.body.new_operand(OperandKind.OK_CONSTANT, closure_const)
         let rv = self.body.new_rvalue(RvalueKind.RK_USE, op, 0, 0)
@@ -18484,7 +18484,7 @@ fn cow_compute_unique_dataflow(sema: &Sema, body: &MirBody, candidates: &List[i3
     var unique_in: List[i32] = List.with_capacity(bb_count * cand_count)
     var unique_out: List[i32] = List.with_capacity(bb_count * cand_count)
     for bb in 0..bb_count:
-        let active = if bb > 0 and reachable[bb] != 0: 1 else: 0
+        let active = (bb > 0 and reachable[bb] != 0) as i32
         for _ in 0..cand_count:
             unique_in.push(active)
             unique_out.push(active)

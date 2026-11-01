@@ -2643,7 +2643,7 @@ impl Codegen:
         let sret_opt = self.fn_abi_has_sret(fn_sym)
         let has_sret = if sret_opt.is_some(): sret_opt.unwrap() else: 0
         let descriptor = self.fn_abi_symbols.get(fn_sym) ?? -1
-        let param_offset = if has_sret != 0: 1 else: 0
+        let param_offset = (has_sret != 0) as i32
         for ai in 0..arg_count:
             var arg_val: i64 = args[ai]
             let actual_ai = ai + param_offset
@@ -3813,7 +3813,7 @@ impl Codegen:
                 if inner_ty > 0:
                     if op == UnaryOp.UOP_REF:
                         return self.sema.find_exact_type(TypeKind.TY_REF, inner_ty, 0, 0) as i32
-                    let is_mut: i32 = if op == UnaryOp.UOP_RAW_REF_MUT: 1 else: 0
+                    let is_mut = (op == UnaryOp.UOP_RAW_REF_MUT) as i32
                     return self.sema.find_exact_type(TypeKind.TY_PTR, inner_ty, is_mut, 0) as i32
         // Literal types
         if nk == NodeKind.NK_STRING_LIT:
@@ -4940,7 +4940,7 @@ impl Codegen:
                     let pad_size = max_align - remainder
                     padded_types.push(wl_array_type(wl_i8_type(self.context), pad_size))
 
-            let packed_flag: i32 = if use_packed: 1 else: 0
+            let packed_flag = (use_packed) as i32
             wl_struct_set_body(st_type, list_data_i64(&padded_types), padded_types.len() as i32, packed_flag)
             if max_align > self.abi_align_of(st_type):
                 self.struct_declared_align.insert(st_type, max_align)
@@ -5559,7 +5559,7 @@ impl Codegen:
         self.module_object_mode != 0 or self.path_is_bundle_provided(source_path)
 
     fn module_link_name_for_path(source_path: &str, base_name: &str) -> str:
-        let mode: i32 = if self.path_uses_module_link_names(source_path): 1 else: 0
+        let mode = (self.path_uses_module_link_names(source_path)) as i32
         fn_abi_module_link_name(mode, source_path, base_name)
 
     // D39: the prefixes of `--link-bundle` manifests join the embedded ones,
@@ -5823,7 +5823,7 @@ impl Codegen:
             places.push(self.sig_abi_param_flags(sema_sig_idx, api))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(uses_c_abi, is_variadic != 0), is_variadic)
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = abi.ret.pass == PM_INDIRECT
         let sret_ty: i64 = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
@@ -5885,12 +5885,12 @@ impl Codegen:
             wl_replace_all_uses_with(displaced_declaration, function)
             self.redirect_fn_value(displaced_declaration, function)
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
-        if has_sret != 0:
+        if has_sret:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
-        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret: 1 else: 0)
+        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret: 1 else: 0)
         if not uses_c_abi and is_variadic == 0:
-            self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, if has_sret != 0: 1 else: 0)
+            self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, if has_sret: 1 else: 0)
 
         // Whole-program codegen internalizes ordinary With functions, including
         // the stdlib: foreign archives can define the same bare names. Imported
@@ -6102,7 +6102,7 @@ impl Codegen:
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
         let args: List[i64] = List.new()
         var result_buf: i64 = 0
-        let has_sret: i32 = if target.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = (target.ret.pass == PM_INDIRECT) as i32
         if has_sret != 0:
             result_buf = self.create_entry_alloca(target.ret.source_ty)
             args.push(result_buf)
@@ -6239,7 +6239,7 @@ impl Codegen:
         for pi in 0..param_count: places.push(self.sig_abi_param_flags(sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
-        let has_sret: i32 = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = (abi.ret.pass == PM_INDIRECT) as i32
         let sret_ty: i64 = abi.ret.source_ty
         let fn_type: i64 = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a
@@ -6943,7 +6943,7 @@ impl Codegen:
             places.push(self.sig_abi_param_flags(sema_sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = abi.ret.pass == PM_INDIRECT
         let sret_ty: i64 = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
         let fn_type: i64 = abi.llvm_ty
@@ -6981,13 +6981,13 @@ impl Codegen:
             wl_add_fn_string_attr(self.context, function, "wasm-import-module", cc_name.slice(14, cc_name.len() as i64))
             wl_add_fn_string_attr(self.context, function, "wasm-import-name", link_name)
 
-        if has_sret != 0:
+        if has_sret:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret: 1 else: 0)
 
         self.bind_fn_abi(name_sym, abi_index, function)
 
-        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret != 0: 1 else: 0)
+        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret: 1 else: 0)
 
         // Apply calling convention or c_export if specified
         if cc_name.len() > 0:
@@ -7557,7 +7557,7 @@ impl Codegen:
             places.push(self.sig_abi_param_flags(sig_idx, pi))
         let abi_index = self.compute_fn_abi(ret_ty, sources, places, if is_async: FN_ABI_ASYNC else: FN_ABI_WITH, 0)
         let abi = self.fn_abis[abi_index]
-        let has_sret = if abi.ret.pass == PM_INDIRECT: 1 else: 0
+        let has_sret = abi.ret.pass == PM_INDIRECT
         let fn_type: i64 = abi.llvm_ty
         let name = self.intern.resolve(mono_sym)
         let function = wl_add_function(self.llmod, name, fn_type)
@@ -7569,7 +7569,7 @@ impl Codegen:
         // boundary).
         if self.module_object_mode != 0:
             wl_set_linkage(function, wl_internal_linkage())
-        if has_sret != 0:
+        if has_sret:
             wl_add_sret_attr(self.context, function, 0, ret_ty)
         self.bind_fn_abi(mono_sym, abi_index, function)
         let specialization = self.sema.concrete_specialization_by_sym.get(sema_sym)
@@ -7577,9 +7577,9 @@ impl Codegen:
             let fn_node = self.sema.concrete_specialization_nodes[specialization.unwrap()]
             let meta = self.pool.find_fn_meta(fn_node)
             if meta >= 0:
-                self.apply_noalias_param_attrs_with_offset(function, self.pool.fn_meta_param_start(meta), param_count, if has_sret != 0: 1 else: 0)
+                self.apply_noalias_param_attrs_with_offset(function, self.pool.fn_meta_param_start(meta), param_count, if has_sret: 1 else: 0)
         if not is_async:
-            self.apply_capture_param_attrs(function, sema_sym, sig_idx, param_count, if has_sret != 0: 1 else: 0)
+            self.apply_capture_param_attrs(function, sema_sym, sig_idx, param_count, if has_sret: 1 else: 0)
         self.fn_values.insert(mono_sym, function)
         self.fn_fn_types.insert(mono_sym, fn_type)
         if is_async:

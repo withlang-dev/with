@@ -1602,7 +1602,7 @@ impl PyInterp:
             // not known.
             let left = self.eval(self.nodes[node].a)
             let lt = self.truth(&left)
-            let decides = if kind == N_AND: 0 else: 1
+            let decides = (not (kind == N_AND)) as i32
             if lt == decides: return left
             let right = self.eval(self.nodes[node].b)
             if lt >= 0: return right
