@@ -159,6 +159,18 @@ fn with_cc_main() -> i32:
         if sdk.len() > 0 and not names_sysroot:
             args.push(if with_sysinfo_os() == "Linux": "--sysroot" else: "-isysroot")
             args.push(sdk.trim().to_owned())
+            // Linux (#2903): libc's headers are the sysroot's, and a header
+            // the sysroot does not carry (X11/Xlib.h, from a system package
+            // whose libraries HostLibs finds on the host at link time) is
+            // looked up in the host's include directories after every
+            // sysroot one, as c_import does (cimport_push_host_library_dirs).
+            // Without it a `with get` source build of glfw against
+            // xorg/system failed on every unit on linux-aarch64.
+            if linux:
+                args.push("-idirafter")
+                args.push("/usr/include/" ++ with_sysinfo_arch() ++ "-linux-gnu")
+                args.push("-idirafter")
+                args.push("/usr/include")
         // Windows x86_64 (#1915): C compiles for the same windows-gnu target
         // With's objects are, against the SDK's own libc, compiler-rt, libc++
         // and lld — never a host toolchain. The SDK's resource dir replaces

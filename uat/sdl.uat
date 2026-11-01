@@ -1,5 +1,10 @@
 scenario: SDL opens a window and draws from a fresh project
 requires: network, display
+platforms: darwin, windows, linux-x86_64
+# D171: only where with get provides the whole chain cleanly. SDL's Linux
+# chain requires dbus, a Conan Center binary on linux-x86_64 and a meson
+# build (Python, a host tool) on linux-aarch64, where Conan Center has no
+# armv8 binaries (#2903).
 
 new directory
 run: with init .

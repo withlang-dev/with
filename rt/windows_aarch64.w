@@ -34,6 +34,10 @@ extern fn GetCurrentProcess() -> i64
 extern fn K32GetProcessMemoryInfo(process: i64, counters: *mut u8, cb: u32) -> i32
 extern fn GetProcessTimes(process: i64, creation: *mut u64, exit: *mut u64, kernel: *mut u64, user: *mut u64) -> i32
 extern fn CreateProcessW(app: *const u16, cmd: *mut u16, proc_attrs: *mut u8, thread_attrs: *mut u8, inherit_handles: i32, flags: u32, env: *mut u8, cwd: *const u16, startup: *mut u8, proc_info: *mut u8) -> i32
+extern fn CreateJobObjectW(attrs: *mut u8, name: *const u16) -> i64
+extern fn AssignProcessToJobObject(job: i64, process: i64) -> i32
+extern fn TerminateJobObject(job: i64, code: u32) -> i32
+extern fn ResumeThread(thread: i64) -> u32
 extern fn GetEnvironmentVariableW(name: *const u16, buf: *mut u16, size: u32) -> u32
 extern fn SetEnvironmentVariableW(name: *const u16, value: *const u16) -> i32
 extern fn GetFileAttributesW(path: *const u16) -> u32
@@ -93,6 +97,7 @@ let PAGE_GUARD: u32 = 0x100 as u32
 let WAIT_OBJECT_0: u32 = 0 as u32
 let WAIT_TIMEOUT: u32 = 258 as u32
 let INFINITE: u32 = 0xffffffff as u32
+let CREATE_SUSPENDED: u32 = 4 as u32
 let PROCESS_TERMINATE: u32 = 1 as u32
 let PROCESS_QUERY_LIMITED_INFORMATION: u32 = 0x1000 as u32
 let SYNCHRONIZE: u32 = 0x00100000 as u32
@@ -132,6 +137,12 @@ var rt_handles: [256]i64 = [0 as i64; 256]
 var qpc_freq: i64 = 0
 var process_handles: [256]i64 = [0 as i64; 256]
 var process_ids: [256]i32 = [0 as i32; 256]
+// The job each spawned child runs in (0: none), the counterpart of the
+// process group the POSIX spawners give a child with setpgid: a capture
+// that times out takes the whole tree down with TerminateJobObject, as
+// kill(-pid) does, never the direct child alone (#2902: a terminated
+// `with run` left its program writing into the next test's capture file).
+var process_jobs: [256]i64 = [0 as i64; 256]
 var process_next_slot: i32 = 1
 
 fn win_error() -> i32:
@@ -1414,15 +1425,13 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     let wait_ms = if timeout_ms > 0: timeout_ms as u32 else: INFINITE
     let wr = WaitForSingleObject(h, wait_ms)
     if wr == WAIT_TIMEOUT:
-        let _term = TerminateProcess(h, CAPTURE_TIMEOUT_RC as u32)
+        let job = process_jobs[slot]
+        let _term = if job != 0: TerminateJobObject(job, CAPTURE_TIMEOUT_RC as u32) else: TerminateProcess(h, CAPTURE_TIMEOUT_RC as u32)
         let _wait = WaitForSingleObject(h, INFINITE)
         win_last_child_maxrss = win_process_peak_rss(h)
         let child_cpu = win_process_cpu_ns(h)
         if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
-        if consume:
-            let _close = CloseHandle(h)
-            process_handles[slot] = 0
-            process_ids[slot] = 0
+        if consume: win_process_release(slot)
         return CAPTURE_TIMEOUT_RC
     if wr != WAIT_OBJECT_0:
         return win_neg_error()
@@ -1431,11 +1440,17 @@ fn win_wait_process_slot(slot: i32, timeout_ms: i32, consume: bool) -> i32:
     win_last_child_maxrss = win_process_peak_rss(h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
-    if consume:
-        let _close = CloseHandle(h)
-        process_handles[slot] = 0
-        process_ids[slot] = 0
+    if consume: win_process_release(slot)
     code as i32
+
+// Frees a slot: its process handle and its job, when it has one.
+fn win_process_release(slot: i32):
+    let _close = CloseHandle(process_handles[slot])
+    if process_jobs[slot] != 0:
+        let _close_job = CloseHandle(process_jobs[slot])
+    process_handles[slot] = 0
+    process_ids[slot] = 0
+    process_jobs[slot] = 0
 
 fn win_append_utf16(dst: *mut u16, pos: i64, cap: i64, src: *const u16) -> i64:
     var out_pos = pos
@@ -1618,7 +1633,10 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
             old_pwd = with_str_from_cstr(prev)
         let _pwd = win_setenv("PWD", cwd)
         pwd_set = true
-    let ok = CreateProcessW(0 as *const u16, cmd as *mut u16, 0 as *mut u8, 0 as *mut u8, inherit, 0, 0 as *mut u8, cwdp, &raw mut startup as *mut [104]u8 as *mut u8, &raw mut proc_info as *mut [24]u8 as *mut u8)
+    // CREATE_SUSPENDED: the child joins its job before it runs a line, so
+    // nothing it spawns escapes the job (POSIX: setpgid in the forked child
+    // before exec).
+    let ok = CreateProcessW(0 as *const u16, cmd as *mut u16, 0 as *mut u8, 0 as *mut u8, inherit, CREATE_SUSPENDED, 0 as *mut u8, cwdp, &raw mut startup as *mut [104]u8 as *mut u8, &raw mut proc_info as *mut [24]u8 as *mut u8)
     if pwd_set:
         let _restore = win_setenv("PWD", old_pwd)
     with_free(cmd)
@@ -1630,11 +1648,21 @@ fn win_spawn_argv(args: &str, stdout_path: &str, stderr_path: &str, stdin_path: 
     let process_h = unsafe *((&raw const proc_info as i64 + 0) as *const i64)
     let thread_h = unsafe *((&raw const proc_info as i64 + 8) as *const i64)
     let pid = unsafe *((&raw const proc_info as i64 + 16) as *const i32)
+    // A job the assignment refuses (a host that forbids nested jobs) leaves
+    // the child ungrouped, as a failed setpgid would: the spawn still runs.
+    var job = CreateJobObjectW(0 as *mut u8, 0 as *const u16)
+    if job != 0 and AssignProcessToJobObject(job, process_h) == 0:
+        let _close_job = CloseHandle(job)
+        job = 0
+    let _resume = ResumeThread(thread_h)
     let _thread_close = CloseHandle(thread_h)
     let slot = win_process_alloc(process_h, pid)
     if slot < 0:
         let _close = CloseHandle(process_h)
+        if job != 0:
+            let _close_job = CloseHandle(job)
         return -1
+    process_jobs[slot] = job
     if wait:
         return win_wait_process_slot(slot, timeout_ms, true)
     slot
@@ -1713,9 +1741,7 @@ pub fn rt_compat_exec_try_wait(pid: i32) -> i32:
     win_last_child_maxrss = win_process_peak_rss(h)
     let child_cpu = win_process_cpu_ns(h)
     if child_cpu > 0: win_reaped_children_cpu_ns = win_reaped_children_cpu_ns + child_cpu
-    let _close = CloseHandle(h)
-    process_handles[pid] = 0
-    process_ids[pid] = 0
+    win_process_release(pid)
     code as i32
 
 // #679/#702 stubs: RSS accounting is POSIX-only for now (#807-adjacent).
@@ -2061,6 +2087,10 @@ c facade win32:
     fn K32GetProcessMemoryInfo
     fn GetProcessTimes
     fn CreateProcessW
+    fn CreateJobObjectW
+    fn AssignProcessToJobObject
+    fn TerminateJobObject
+    fn ResumeThread
     fn GetEnvironmentVariableW
     fn SetEnvironmentVariableW
     fn GetFileAttributesW
