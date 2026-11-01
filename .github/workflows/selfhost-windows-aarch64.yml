@@ -40,9 +40,9 @@ jobs:
       # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
       # to the seed-windows-aarch64 prerelease) — NOT a hand-uploaded asset. The
       # sha is pinned to the exact published seed.
-      WITH_SEED_VERSION: nightly-20261020-local-3-763d0e54c82a
+      WITH_SEED_VERSION: seed-windows-aarch64
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
+      WITH_SEED_SHA256: b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
