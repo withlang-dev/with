@@ -286,7 +286,7 @@ impl Parser:
     fn top_level_starts_stmt() -> i32:
         let t = self.peek()
         if t == TokenKind.TK_IDENT:
-            return if self.top_level_starts_decl() != 0: 0 else: 1
+            return if self.top_level_starts_decl(): 0 else: 1
         if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_FLOAT_LIT:
             return 1
         if t == TokenKind.TK_KW_IF or t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_LOOP or t == TokenKind.TK_KW_RETURN or t == TokenKind.TK_KW_WITH or t == TokenKind.TK_KW_DEFER:
@@ -358,32 +358,32 @@ impl Parser:
             p = p + 1
         false
 
-    fn top_level_starts_decl() -> i32:
+    fn top_level_starts_decl() -> bool:
         let t = self.peek()
         if t == TokenKind.TK_KW_FN or t == TokenKind.TK_KW_TYPE or t == TokenKind.TK_KW_ENUM or t == TokenKind.TK_KW_USE or t == TokenKind.TK_KW_EXTERN or t == TokenKind.TK_KW_ERROR or t == TokenKind.TK_KW_CONST or t == TokenKind.TK_KW_PUB or t == TokenKind.TK_KW_GLOBAL:
-            return 1
+            return true
         // D120 (§4.3): `resource type` is a declaration.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "resource") and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_TYPE:
-            return 1
+            return true
         // D51 §16.2b: `c facade name:` is a declaration; without this an
         // implicit-main file read the block as executable statements.
         if t == TokenKind.TK_IDENT and self.token_text_is(self.pos, "c") and (self.token_text_is(self.pos + 1, "facade") or self.token_text_is(self.pos + 1, "convention")):
-            return 1
+            return true
         if t == TokenKind.TK_KW_UNSAFE or t == TokenKind.TK_KW_ASYNC or t == TokenKind.TK_KW_GEN:
             if self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_KW_FN:
-                return 1
-            return 0
+                return true
+            return false
         if t == TokenKind.TK_KW_COMPTIME:
             if self.pos + 1 < self.tokens.len():
                 let next = self.tokens.get_tag(self.pos + 1)
                 if next == TokenKind.TK_KW_FN or next == TokenKind.TK_COLON or next == TokenKind.TK_KW_WITH:
-                    return 1
-            return 0
+                    return true
+            return false
         if t == TokenKind.TK_KW_LET or t == TokenKind.TK_KW_VAR:
             if self.implicit_main_mode != 0 and not self.implicit_main_has_main_hint and self.implicit_main_has_exec_stmt:
-                return 0
-            return 1
-        0
+                return false
+            return true
+        false
 
     mut fn record_top_level_stmt(stmt: NodeId) -> Unit:
         if stmt != 0:
@@ -1078,7 +1078,7 @@ impl Parser:
                 self.parse_target_select()
                 return
 
-        if self.implicit_main_mode != 0 and self.top_level_starts_decl() == 0:
+        if self.implicit_main_mode != 0 and self.top_level_starts_decl() == false:
             let stmt = self.parse_expr()
             if stmt != 0:
                 self.record_top_level_stmt(stmt)
@@ -1295,7 +1295,7 @@ impl Parser:
                 self.emit_error("unexpected indentation in an arm's declarations")
                 self.recover_to_top_level()
                 break
-            if self.top_level_starts_decl() == 0 and not (self.peek() == TokenKind.TK_KW_COMPTIME):
+            if self.top_level_starts_decl() == false and not (self.peek() == TokenKind.TK_KW_COMPTIME):
                 self.emit_error("an arm of a module-level comptime selection holds declarations, not statements (§17.5)")
                 self.recover_to_top_level()
                 continue
@@ -2074,14 +2074,14 @@ impl Parser:
             self.pool.add_impl_target_type_node(impl_node, target_node)
         self.pending_post_decls.push(impl_node as i32)
 
-    fn pending_derive_contains(trait_sym: i32) -> i32:
+    fn pending_derive_contains(trait_sym: i32) -> bool:
         for i in 0..self.pending_derive_count:
             if self.pool.get_extra(self.pending_derive_start + i) == trait_sym:
-                return 1
-        0
+                return true
+        false
 
     mut fn append_pending_derive_trait(trait_sym: i32):
-        if trait_sym == 0 or self.pending_derive_contains(trait_sym) != 0:
+        if trait_sym == 0 or self.pending_derive_contains(trait_sym):
             return
         let new_start = self.pool.extra_len()
         for i in 0..self.pending_derive_count:
@@ -4380,15 +4380,15 @@ impl Parser:
                 let save: i32 = self.pos
                 self.advance()
                 self.skip_newlines()
-                var is_closure = 0
+                var is_closure = false
                 if self.peek() == TokenKind.TK_R_PAREN:
                     self.advance()
                     if self.peek() == TokenKind.TK_FAT_ARROW or self.peek() == TokenKind.TK_ARROW:
-                        is_closure = 1
+                        is_closure = true
                 else:
                     is_closure = self.scan_is_paren_closure()
                 self.pos = save
-                if is_closure == 1:
+                if is_closure:
                     let node = self.parse_fat_arrow_paren_closure()
                     if node != 0: self.pool.mark_move_closure(node)
                     return node
@@ -7701,20 +7701,20 @@ impl Parser:
         self.pool.add_block_meta(block, label_sym)
         block
 
-    fn label_declaration_starts_statement(start: i32) -> i32:
+    fn label_declaration_starts_statement(start: i32) -> bool:
         if is_first_on_line(self.source, start):
-            return 1
+            return true
         if self.pos <= 0:
-            return 1
+            return true
         let prev = self.tokens.get_tag(self.pos - 1)
         if prev == TokenKind.TK_L_BRACE or prev == TokenKind.TK_SEMICOLON or prev == TokenKind.TK_LABEL:
-            return 1
-        0
+            return true
+        false
 
     mut fn parse_labeled_statement() -> NodeId:
         let start = self.current_start()
         let label_end = self.current_end()
-        if self.label_declaration_starts_statement(start) == 0:
+        if self.label_declaration_starts_statement(start) == false:
             self.emit_error_span("label must start a statement", start, label_end)
             self.advance()
             if self.peek() == TokenKind.TK_EOF or self.peek() == TokenKind.TK_DEDENT or self.peek() == TokenKind.TK_R_BRACE:
@@ -8818,7 +8818,7 @@ impl Parser:
     // Scan ahead (non-consuming) to check if we're inside a paren closure.
     // Called after consuming '(' (and possibly newlines).
     // Returns 1 if matching ')' is followed by '=>' or '->', 0 otherwise.
-    fn scan_is_paren_closure() -> i32:
+    fn scan_is_paren_closure() -> bool:
         var scan = self.pos
         var depth = 1
         while scan < self.tokens.len():
@@ -8831,13 +8831,13 @@ impl Parser:
                     let next = scan + 1
                     if next < self.tokens.len():
                         let nt = self.tokens.get_tag(next)
-                        if nt == TokenKind.TK_FAT_ARROW: return 1
-                        if nt == TokenKind.TK_ARROW: return 1
-                    return 0
+                        if nt == TokenKind.TK_FAT_ARROW: return true
+                        if nt == TokenKind.TK_ARROW: return true
+                    return false
             else if tag == TokenKind.TK_EOF:
-                return 0
+                return false
             scan = scan + 1
-        0
+        false
 
     // Parse: IDENT => expr (single untyped parameter fat-arrow closure)
     mut fn parse_fat_arrow_single() -> NodeId:

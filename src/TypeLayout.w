@@ -470,7 +470,7 @@ impl Sema:
             return true
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
             return not self.type_layout_is_dyn_fat_ptr(resolved as i32) and not self.type_layout_is_str_view(resolved as i32)
-        if tk == TypeKind.TY_GENERIC_INST and self.type_is_std_box_inst(resolved as i32) != 0:
+        if tk == TypeKind.TY_GENERIC_INST and self.type_is_std_box_inst(resolved as i32):
             return not self.type_layout_is_dyn_fat_ptr(self.get_generic_inst_arg(resolved as i32, 0))
         false
 

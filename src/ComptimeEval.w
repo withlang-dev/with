@@ -395,16 +395,16 @@ fn comptime_source_loc(text: &str, offset: i32) -> ComptimeSourceLoc:
         i = i + 1
     ComptimeSourceLoc { line: line, col: col }
 
-fn comptime_type_name_has_base(type_name: &str, base_name: &str) -> i32:
+fn comptime_type_name_has_base(type_name: &str, base_name: &str) -> bool:
     if type_name == base_name:
-        return 1
+        return true
     if type_name.len() <= base_name.len():
-        return 0
+        return false
     if type_name.slice(0, base_name.len()) != base_name:
-        return 0
+        return false
     if type_name[base_name.len()] == 91:
-        return 1
-    0
+        return true
+    false
 
 fn comptime_hex_digit_value(ch: i32) -> i32:
     if ch >= 48 and ch <= 57:
@@ -1874,7 +1874,7 @@ impl ComptimeEvaluator:
                 let resolved = self.sema.resolve_alias(ret_type as TypeId)
                 if self.sema.get_type_kind(resolved) != TypeKind.TY_VOID:
                     let body = self.ast.get_data1(fn_node)
-                    if self.sema.body_has_explicit_value_result(body, 1) != 0 and self.sema.body_can_fall_through(body) != 0:
+                    if self.sema.body_has_explicit_value_result(body, 1) and self.sema.body_can_fall_through(body) != 0:
                         return self.fail(fn_node, "missing return")
                     let default_value = self.default_value_for_type(ret_type, fn_node)
                     if default_value.kind == ComptimeValueKind.CV_INVALID:
@@ -2252,34 +2252,34 @@ impl ComptimeEvaluator:
         line = line ++ "\ttool=" ++ self.effect_tool_identity(parts)
         self.record_effect(line)
 
-    mut fn require_network_tool_allowed(record: &ComptimeCapabilityRecord, method: &str, parts: &List[str], node: i32) -> i32:
+    mut fn require_network_tool_allowed(record: &ComptimeCapabilityRecord, method: &str, parts: &List[str], node: i32) -> bool:
         if parts.len() == 0:
-            return 0
+            return false
         let exe = parts[0]
         if not comptime_process_requires_network(exe):
-            return 0
+            return false
         if record.network != 0:
-            return 0
+            return false
         let tool = comptime_process_basename(exe)
         let target = if record.target_name.len() > 0: record.target_name.clone() else: "<build>"
         let _ = self.fail(node, "ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()")
-        1
+        true
 
-    mut fn require_process_capture_path_allowed(record: &ComptimeCapabilityRecord, path: &str, method: &str, node: i32) -> i32:
+    mut fn require_process_capture_path_allowed(record: &ComptimeCapabilityRecord, path: &str, method: &str, node: i32) -> bool:
         if path.len() == 0:
-            return 0
+            return false
         let rel = self.capability_project_relative_path(record, path)
         if not comptime_tool_path_is_project_relative(rel):
             let _ = self.fail(node, "ProcessRunner." ++ method ++ " capture path escapes project root: " ++ path)
-            return 1
+            return true
         if not self.capability_write_file_allowed(record, rel):
             let _ = self.fail(node, "ProcessRunner." ++ method ++ " capture path is not a declared action output: " ++ rel)
-            return 1
-        0
+            return true
+        false
 
-    mut fn require_process_capture_allowed(record: &ComptimeCapabilityRecord, stdout_path: &str, stderr_path: &str, method: &str, node: i32) -> i32:
-        if self.require_process_capture_path_allowed(record, stdout_path, method, node) != 0:
-            return 1
+    mut fn require_process_capture_allowed(record: &ComptimeCapabilityRecord, stdout_path: &str, stderr_path: &str, method: &str, node: i32) -> bool:
+        if self.require_process_capture_path_allowed(record, stdout_path, method, node):
+            return true
         self.require_process_capture_path_allowed(record, stderr_path, method, node)
 
     fn lookup_slot_index(sym: i32) -> i32:
@@ -2378,18 +2378,18 @@ impl ComptimeEvaluator:
             di = di - 1
         0
 
-    fn fn_decl_node_is_comptime(fn_node: i32) -> i32:
+    fn fn_decl_node_is_comptime(fn_node: i32) -> bool:
         if fn_node == 0:
-            return 0
+            return false
         if self.ast.is_comptime_decl_node(fn_node):
-            return 1
+            return true
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
-            return 0
+            return false
         let flags = self.ast.fn_meta_flags(meta)
         if (flags / FnFlags.COMPTIME) % 2 == 1:
-            return 1
-        0
+            return true
+        false
 
     fn find_decl_index(decl_node: i32) -> i32:
         let cached = self.decl_index_by_node.get(decl_node)
@@ -2528,7 +2528,7 @@ impl ComptimeEvaluator:
         if type_id == 0:
             return false
         let name = self.sema.type_name(type_id)
-        if comptime_type_name_has_base(name, "StringBuilder") != 0:
+        if comptime_type_name_has_base(name, "StringBuilder"):
             return true
         if name.ends_with(".StringBuilder"):
             return true
@@ -2582,7 +2582,7 @@ impl ComptimeEvaluator:
             let builder = self.empty_string_builder_value(value.type_id, bytes_value.extra_count)
             for i in 0..bytes_value.extra_count:
                 let elem = self.extra_value_at((bytes_value.extra_start + i) as i64)
-                if comptime_value_is_intlike(elem) == 0:
+                if comptime_value_is_intlike(elem) == false:
                     let _ = self.fail(node, "StringBuilder bytes field must contain u8 values")
                     return comptime_value_invalid()
                 self.builders[builder.extra_start].push_byte(comptime_value_intlike(elem) as u8)
@@ -2621,7 +2621,7 @@ impl ComptimeEvaluator:
             let capacity_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if capacity_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return capacity_signal
-            if comptime_value_is_intlike(capacity_signal.value) == 0:
+            if comptime_value_is_intlike(capacity_signal.value) == false:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(capacity_signal.value)))
         self.fail(node, "StringBuilder static method '" ++ method ++ "' is not comptime-evaluable yet")
@@ -2664,7 +2664,7 @@ impl ComptimeEvaluator:
             let arg_signal2 = self.eval_expr(self.ast.get_extra(extra_start))
             if arg_signal2.kind != ComptimeControlKind.CTL_VALUE:
                 return arg_signal2
-            if comptime_value_is_intlike(arg_signal2.value) == 0:
+            if comptime_value_is_intlike(arg_signal2.value) == false:
                 return self.fail(node, "StringBuilder." ++ method ++ "() argument must be an integer")
             let updated2 = self.string_builder_append_chunk(builder, with_str_from_byte(comptime_value_intlike(arg_signal2.value) as i32), node)
             if updated2.kind != ComptimeValueKind.CV_STRING_BUILDER:
@@ -2888,7 +2888,7 @@ impl ComptimeEvaluator:
             let count_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if count_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return count_signal
-            if comptime_value_is_intlike(count_signal.value) == 0:
+            if comptime_value_is_intlike(count_signal.value) == false:
                 return self.fail(node, method ++ "() argument must be an integer")
             let rotated = comptime_rotate_bits(recv_value.data0, width, comptime_value_intlike(count_signal.value), method == "rotate_left")
             let result_type = self.node_type_or(node, recv_type)
@@ -3057,9 +3057,9 @@ impl ComptimeEvaluator:
             return self.fail(node, "collection.new() has no element type here: comptime folding runs before Sema types the uses, so write the binding's type (`var v: " ++ self.sema.type_name(resolved) ++ "[…] = …`)")
         let type_name = self.sema.type_name(result_type)
         let empty_start = self.extra_values.len() as i32
-        if comptime_type_name_has_base(type_name, "List") != 0:
+        if comptime_type_name_has_base(type_name, "List"):
             return comptime_control_value(comptime_value_list(result_type, empty_start, 0))
-        if comptime_type_name_has_base(type_name, "HashMap") != 0:
+        if comptime_type_name_has_base(type_name, "HashMap"):
             return comptime_control_value(comptime_value_map(result_type, empty_start, 0))
         self.fail(node, "static method is not comptime-evaluable yet")
 
@@ -3075,7 +3075,7 @@ impl ComptimeEvaluator:
             let arg_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return arg_signal
-            if comptime_value_is_intlike(arg_signal.value) == 0:
+            if comptime_value_is_intlike(arg_signal.value) == false:
                 return self.fail(node, "List[u8].push() argument must be an integer")
             let byte_val = comptime_value_intlike(arg_signal.value) as i32
             if self.reserve_string_bytes(node, recv_value.text.len() + 1) == 0:
@@ -3089,7 +3089,7 @@ impl ComptimeEvaluator:
             let needle_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if needle_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return needle_signal
-            if comptime_value_is_intlike(needle_signal.value) == 0:
+            if comptime_value_is_intlike(needle_signal.value) == false:
                 return self.fail(node, "List[u8].contains() argument must be an integer")
             let needle_byte = comptime_value_intlike(needle_signal.value) as i32
             for i in 0..recv_value.text.len():
@@ -3126,7 +3126,7 @@ impl ComptimeEvaluator:
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
-            if comptime_value_is_intlike(index_signal.value) == 0:
+            if comptime_value_is_intlike(index_signal.value) == false:
                 return self.fail(node, "List[u8].remove() index must be an integer")
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= recv_value.text.len():
@@ -3192,7 +3192,7 @@ impl ComptimeEvaluator:
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
-            if comptime_value_is_intlike(index_signal.value) == 0:
+            if comptime_value_is_intlike(index_signal.value) == false:
                 return self.fail(node, "List.get() index must be an integer")
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= recv_value.extra_count as i64:
@@ -3230,7 +3230,7 @@ impl ComptimeEvaluator:
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
-            if comptime_value_is_intlike(index_signal.value) == 0:
+            if comptime_value_is_intlike(index_signal.value) == false:
                 return self.fail(node, "List.remove() index must be an integer")
             let index = comptime_value_intlike(index_signal.value) as i32
             if index < 0 or index >= recv_value.extra_count:
@@ -3515,7 +3515,7 @@ impl ComptimeEvaluator:
             let index_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if index_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return index_signal
-            if comptime_value_is_intlike(index_signal.value) == 0:
+            if comptime_value_is_intlike(index_signal.value) == false:
                 return self.fail(node, "str.byte_at() index must be an integer")
             let index = comptime_value_intlike(index_signal.value)
             if index < 0 or index >= text.len():
@@ -3530,7 +3530,7 @@ impl ComptimeEvaluator:
             let end_signal = self.eval_expr(self.ast.get_extra(extra_start + 1))
             if end_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return end_signal
-            if comptime_value_is_intlike(start_signal.value) == 0 or comptime_value_is_intlike(end_signal.value) == 0:
+            if comptime_value_is_intlike(start_signal.value) == false or comptime_value_is_intlike(end_signal.value) == false:
                 return self.fail(node, "str.slice() bounds must be integers")
             let start = comptime_value_intlike(start_signal.value)
             let end = comptime_value_intlike(end_signal.value)
@@ -3606,7 +3606,7 @@ impl ComptimeEvaluator:
             let count_signal = self.eval_expr(self.ast.get_extra(extra_start))
             if count_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return count_signal
-            if comptime_value_is_intlike(count_signal.value) == 0:
+            if comptime_value_is_intlike(count_signal.value) == false:
                 return self.fail(node, "str.repeat() count must be an integer")
             let count = comptime_value_intlike(count_signal.value)
             if count < 0:
@@ -3851,7 +3851,7 @@ impl ComptimeEvaluator:
         var lhs_tid = self.node_type_or(lhs, lhs_signal.value.type_id)
         if lhs_tid == 0 and lhs_signal.value.kind == ComptimeValueKind.CV_STR:
             lhs_tid = self.sema.ty_str as i32
-        if lhs_tid != 0 and self.sema.pipeline_method_exists(lhs_tid, fn_sym) != 0:
+        if lhs_tid != 0 and self.sema.pipeline_method_exists(lhs_tid, fn_sym):
             return self.eval_pipeline_method_value(lhs, move lhs_signal.value, fn_sym, args_start, arg_count, node)
         // #766: a transform-folded initializer (#565) reaches here before
         // sema recorded pipeline routing, so the method-exists probe can miss
@@ -3918,7 +3918,7 @@ impl ComptimeEvaluator:
             let trait_sym = self.ast.get_data0(trait_node)
             if not self.sema.lang_trait_syms.contains(trait_sym) and not self.sema.trait_name_known(trait_sym):
                 return self.fail(trait_node, "unknown trait '" ++ self.pool.resolve(trait_sym) ++ "'")
-            return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym)))
+            return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym) as i32))
         if method == "fields":
             if arg_count != 0:
                 return self.fail(node, "type.fields() takes no arguments")
@@ -3982,7 +3982,7 @@ impl ComptimeEvaluator:
 
     mut fn capability_arg_i32(args: &ComptimeValue, index: i32, method: &str, node: i32) -> i32:
         let value = self.extra_value_at((args.extra_start + index) as i64)
-        if comptime_value_is_intlike(value) == 0:
+        if comptime_value_is_intlike(value) == false:
             let _ = self.fail(node, "capability method " ++ method ++ " expects an integer argument")
             return 0
         comptime_value_intlike(value) as i32
@@ -4201,7 +4201,7 @@ impl ComptimeEvaluator:
 
     fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
         let value = self.struct_field_value_by_name(options, field_name)
-        if comptime_value_is_intlike(value) != 0:
+        if comptime_value_is_intlike(value):
             return value.data0 as i32
         if value.kind == ComptimeValueKind.CV_ENUM:
             let sym = value.data0 as i32
@@ -4727,7 +4727,7 @@ impl ComptimeEvaluator:
         if message.extra_count != 1:
             return -1
         let payload = self.extra_value_at(message.extra_start as i64)
-        if comptime_value_is_intlike(payload) == 0:
+        if comptime_value_is_intlike(payload) == false:
             return -1
         comptime_value_intlike(payload) as i32
 
@@ -5313,7 +5313,7 @@ impl ComptimeEvaluator:
         comptime_control_value(comptime_value_struct(source_type, start, 2))
 
     mut fn archive_entry_kind_value(value: &ComptimeValue, node: i32) -> i32:
-        if comptime_value_is_intlike(value) != 0:
+        if comptime_value_is_intlike(value):
             return value.data0 as i32
         if value.kind == ComptimeValueKind.CV_ENUM:
             let sym = value.data0 as i32
@@ -5333,7 +5333,7 @@ impl ComptimeEvaluator:
         let source_value = self.struct_field_value_by_name(value, "source_path")
         let archive_value = self.struct_field_value_by_name(value, "archive_path")
         let mode_value = self.struct_field_value_by_name(value, "mode")
-        if source_value.kind != ComptimeValueKind.CV_STR or archive_value.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(mode_value) == 0:
+        if source_value.kind != ComptimeValueKind.CV_STR or archive_value.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(mode_value) == false:
             let _ = self.fail(node, "write_tar entries must be ArchiveEntry values")
             return ComptimeArchiveEntry { kind: -1, source_path: "", archive_path: "", mode: 0 }
         let kind = self.archive_entry_kind_value(kind_value, node)
@@ -6087,9 +6087,9 @@ impl ComptimeEvaluator:
             if has_stdin and (has_cwd or has_env):
                 return self.fail(node, "ProcessRunner.run_spec: stdin cannot yet be combined with cwd or env")
             let effect_env = if has_env: self.effect_env_text_from_process_env_value(spec_env) else: ""
-            if self.require_network_tool_allowed(record, method, argv_parts, node) != 0:
+            if self.require_network_tool_allowed(record, method, argv_parts, node):
                 return comptime_control_error()
-            if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
+            if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node):
                 return comptime_control_error()
             self.record_process_effect(record, method, argv_parts, spec_cwd.text, timeout_ms, spec_stdin.text, stdout_path, stderr_path, effect_env)
             if self.had_error != 0:
@@ -6144,7 +6144,7 @@ impl ComptimeEvaluator:
         if self.had_error != 0:
             return comptime_control_error()
         let argv_parts = self.effect_argv_parts_from_value(argv_value)
-        if self.require_network_tool_allowed(record, method, argv_parts, node) != 0:
+        if self.require_network_tool_allowed(record, method, argv_parts, node):
             return comptime_control_error()
 
         if method == "run":
@@ -6161,7 +6161,7 @@ impl ComptimeEvaluator:
             let stderr_path = self.capability_arg_str(args_signal.value, 2, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
-            if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
+            if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node):
                 return comptime_control_error()
             self.record_process_effect(record, method, argv_parts, "", 0, "", stdout_path, stderr_path, "")
             let saved_env = self.process_driver_env_clear(node)
@@ -6176,7 +6176,7 @@ impl ComptimeEvaluator:
         let timeout_ms = self.capability_arg_i32(args_signal.value, 3, method, node)
         if self.had_error != 0:
             return comptime_control_error()
-        if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node) != 0:
+        if self.require_process_capture_allowed(record, stdout_path, stderr_path, method, node):
             return comptime_control_error()
 
         if method == "run_capture":
@@ -6526,19 +6526,19 @@ impl ComptimeEvaluator:
         let loc = comptime_source_loc(text, self.ast.get_start(node))
         comptime_control_value(comptime_value_str(f"{path}:{loc.line}:{loc.col}"))
 
-    fn node_is_src_call(node: i32) -> i32:
+    fn node_is_src_call(node: i32) -> bool:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_CALL:
-            return 0
+            return false
         if self.ast.get_data2(node) != 0:
-            return 0
+            return false
         let callee = self.ast.get_data0(node)
         if callee == 0 or self.ast.kind(callee) != NodeKind.NK_IDENT:
-            return 0
+            return false
         let sym = self.ast.get_data0(callee)
         if sym == self.sema.syms.src:
-            return 1
+            return true
         let canonical_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
-        if canonical_sym == self.sema.syms.src: 1 else: 0
+        if canonical_sym == self.sema.syms.src: true else: false
 
     fn magic_ident_kind(node: i32) -> i32:
         var kind = self.sema.magic_ident_kind(node)
@@ -6555,13 +6555,13 @@ impl ComptimeEvaluator:
             return SemaMagicIdentKind.FN
         SemaMagicIdentKind.NONE
 
-    fn default_arg_uses_call_site(default_node: i32) -> i32:
-        if self.node_is_src_call(default_node) != 0:
-            return 1
-        if self.magic_ident_kind(default_node) != SemaMagicIdentKind.NONE: 1 else: 0
+    fn default_arg_uses_call_site(default_node: i32) -> bool:
+        if self.node_is_src_call(default_node):
+            return true
+        if self.magic_ident_kind(default_node) != SemaMagicIdentKind.NONE: true else: false
 
     mut fn eval_call_site_default_arg(default_node: i32, call_node: i32, caller_path: &str, caller_fn_sym: i32) -> ComptimeControl:
-        if self.node_is_src_call(default_node) != 0:
+        if self.node_is_src_call(default_node):
             let loc = comptime_source_loc(self.source_text_for_path(caller_path), self.ast.get_start(call_node))
             return comptime_control_value(comptime_value_str(f"{caller_path}:{loc.line}:{loc.col}"))
         let kind = self.magic_ident_kind(default_node)
@@ -6700,7 +6700,7 @@ impl ComptimeEvaluator:
         let end_signal = self.eval_expr(end_node)
         if end_signal.kind != ComptimeControlKind.CTL_VALUE:
             return end_signal
-        if comptime_value_is_intlike(start_signal.value) == 0 or comptime_value_is_intlike(end_signal.value) == 0:
+        if comptime_value_is_intlike(start_signal.value) == false or comptime_value_is_intlike(end_signal.value) == false:
             return self.fail(node, "range bounds must be integers in comptime")
         comptime_control_value(
             comptime_value_range(
@@ -6722,7 +6722,7 @@ impl ComptimeEvaluator:
         let target = self.sema.resolve_alias(target_type as TypeId)
         let target_kind = self.sema.get_type_kind(target)
         let is_float = value_signal.value.kind == ComptimeValueKind.CV_FLOAT
-        let is_int = comptime_value_is_intlike(value_signal.value) != 0
+        let is_int = comptime_value_is_intlike(value_signal.value)
         if target_kind == TypeKind.TY_INT and is_int:
             // Keep the low bits in two's complement.
             let bits = self.sema.get_type_d0(target)
@@ -6876,13 +6876,13 @@ impl ComptimeEvaluator:
         if self.ast.get_data1(node) != 0:
             let s = self.eval_expr(self.ast.get_data1(node))
             if s.kind != ComptimeControlKind.CTL_VALUE: return s
-            if comptime_value_is_intlike(s.value) == 0: return self.fail(node, "comptime slice start must be an integer")
+            if comptime_value_is_intlike(s.value) == false: return self.fail(node, "comptime slice start must be an integer")
             start = comptime_value_intlike(s.value)
         var end: i64 = base.text.len()
         if self.ast.get_data2(node) != 0:
             let e = self.eval_expr(self.ast.get_data2(node))
             if e.kind != ComptimeControlKind.CTL_VALUE: return e
-            if comptime_value_is_intlike(e.value) == 0: return self.fail(node, "comptime slice end must be an integer")
+            if comptime_value_is_intlike(e.value) == false: return self.fail(node, "comptime slice end must be an integer")
             end = comptime_value_intlike(e.value)
         if start < 0 or end > base.text.len() or start > end:
             return self.fail(node, "comptime str slice out of bounds")
@@ -6895,7 +6895,7 @@ impl ComptimeEvaluator:
         let index_signal = self.eval_expr(self.ast.get_data1(node))
         if index_signal.kind != ComptimeControlKind.CTL_VALUE:
             return index_signal
-        if comptime_value_is_intlike(index_signal.value) == 0:
+        if comptime_value_is_intlike(index_signal.value) == false:
             return self.fail(node, "comptime index must be an integer")
         let index = comptime_value_intlike(index_signal.value)
         let base = move base_signal.value
@@ -6971,7 +6971,7 @@ impl ComptimeEvaluator:
         if op == UnaryOp.UOP_NEGATE and inner.value.kind == ComptimeValueKind.CV_FLOAT:
             return comptime_control_value(comptime_value_float(result_ty, 0.0 - inner.value.real, ""))
         if op == UnaryOp.UOP_NEGATE:
-            if comptime_value_is_intlike(inner.value) == 0:
+            if comptime_value_is_intlike(inner.value) == false:
                 return self.fail(node, "unary '-' requires integer comptime values")
             // #943: `-2147483648i32` is i32::MIN and must evaluate. Negating the
             // *operand* cannot express it: int_eval_unary_neg narrows the
@@ -7011,7 +7011,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "integer overflow in comptime")
             return comptime_control_value(self.checked_int_value(result_ty, arith.value))
         if op == UnaryOp.UOP_BIT_NOT:
-            if comptime_value_is_intlike(inner.value) == 0:
+            if comptime_value_is_intlike(inner.value) == false:
                 return self.fail(node, "bitwise not requires integer comptime values")
             // Mask to the result width/signedness: bare two's-complement
             // flip left ~0u32 as 64-bit -1 and the const materialization
@@ -7033,7 +7033,7 @@ impl ComptimeEvaluator:
         self.unsupported(node)
 
     mut fn eval_binary_compare(node: i32, op: i32, lhs: &ComptimeValue, rhs: &ComptimeValue) -> ComptimeControl:
-        if comptime_value_is_intlike(lhs) != 0 and comptime_value_is_intlike(rhs) != 0:
+        if comptime_value_is_intlike(lhs) and comptime_value_is_intlike(rhs):
             let lv = comptime_value_intlike(lhs)
             let rv = comptime_value_intlike(rhs)
             // #943: ordering must follow the operand's signedness. These are
@@ -7061,7 +7061,7 @@ impl ComptimeEvaluator:
             let rv = rhs.data0
             if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
             if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
-        if (lhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(lhs) != 0) and (rhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(rhs) != 0) and (lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT):
+        if (lhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(lhs)) and (rhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(rhs)) and (lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT):
             let lf = comptime_float_of(lhs)
             let rf = comptime_float_of(rhs)
             if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lf == rf: 1 else: 0))
@@ -7080,7 +7080,7 @@ impl ComptimeEvaluator:
                 if comptime_values_equal(lhs, item, self.extra_values) != 0:
                     matched = 1
                     break
-        else if rhs.kind == ComptimeValueKind.CV_RANGE and comptime_value_is_intlike(lhs) != 0:
+        else if rhs.kind == ComptimeValueKind.CV_RANGE and comptime_value_is_intlike(lhs):
             let value = comptime_value_intlike(lhs)
             if rhs.extra_start != 0:
                 matched = if value >= rhs.data0 and value <= rhs.data1: 1 else: 0
@@ -7182,7 +7182,7 @@ impl ComptimeEvaluator:
             return self.concat_comptime_strings(node, lhs.text, rhs.text)
 
         if lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT:
-            if (lhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(lhs) == 0) or (rhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(rhs) == 0):
+            if (lhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(lhs) == false) or (rhs.kind != ComptimeValueKind.CV_FLOAT and comptime_value_is_intlike(rhs) == false):
                 return self.fail(node, "float arithmetic requires numeric comptime values")
             let lf = comptime_float_of(lhs)
             let rf = comptime_float_of(rhs)
@@ -7192,7 +7192,7 @@ impl ComptimeEvaluator:
             if op == BinaryOp.OP_MUL: return comptime_control_value(comptime_value_float(float_ty, lf * rf, ""))
             if op == BinaryOp.OP_DIV: return comptime_control_value(comptime_value_float(float_ty, lf / rf, ""))
             return self.fail(node, "operator is not comptime-evaluable on floats")
-        if comptime_value_is_intlike(lhs) == 0 or comptime_value_is_intlike(rhs) == 0:
+        if comptime_value_is_intlike(lhs) == false or comptime_value_is_intlike(rhs) == false:
             return self.fail(node, "operator requires integer comptime values")
         let lv = comptime_value_intlike(lhs)
         let rv = comptime_value_intlike(rhs)
@@ -7381,7 +7381,7 @@ impl ComptimeEvaluator:
             self.bind_value(self.ast.get_data0(pat), value, 0)
             return 1
         if kind == NodeKind.NK_PAT_INT:
-            if comptime_value_is_intlike(value) == 0:
+            if comptime_value_is_intlike(value) == false:
                 return 0
             if comptime_value_intlike(value) == self.ast.int_lit_value(pat):
                 return 1
@@ -7399,7 +7399,7 @@ impl ComptimeEvaluator:
                 return 1
             return 0
         if kind == NodeKind.NK_PAT_RANGE:
-            if comptime_value_is_intlike(value) == 0:
+            if comptime_value_is_intlike(value) == false:
                 return 0
             let v = comptime_value_intlike(value)
             let start_value = self.ast.get_data0(pat) as i64
@@ -7471,9 +7471,9 @@ impl ComptimeEvaluator:
                     if self.match_pattern(inner_pat, inner_value, node) == 0:
                         return 0
                 return 1
-            if comptime_value_is_intlike(value) != 0:
+            if comptime_value_is_intlike(value):
                 let variant_value = self.eval_disc_variant_sym(variant_sym, pat)
-                if variant_value.kind == ComptimeControlKind.CTL_VALUE and comptime_value_is_intlike(variant_value.value) != 0:
+                if variant_value.kind == ComptimeControlKind.CTL_VALUE and comptime_value_is_intlike(variant_value.value):
                     return if comptime_value_intlike(value) == comptime_value_intlike(variant_value.value): 1 else: 0
             return 0
         if kind == NodeKind.NK_FIELD_ACCESS:
@@ -7481,7 +7481,7 @@ impl ComptimeEvaluator:
             // evaluate the pattern expression and compare values.
             let qp = self.eval_expr(pat)
             if qp.kind == ComptimeControlKind.CTL_VALUE:
-                if comptime_value_is_intlike(value) != 0 and comptime_value_is_intlike(qp.value) != 0:
+                if comptime_value_is_intlike(value) and comptime_value_is_intlike(qp.value):
                     return if comptime_value_intlike(value) == comptime_value_intlike(qp.value): 1 else: 0
                 if value.kind == ComptimeValueKind.CV_ENUM and qp.value.kind == ComptimeValueKind.CV_ENUM:
                     return if value.data0 == qp.value.data0 and value.extra_count == 0 and qp.value.extra_count == 0: 1 else: 0
@@ -7525,23 +7525,23 @@ impl ComptimeEvaluator:
         let subj_d0 = subject_signal.value.data0
         self.fail(node, f"no comptime match arm matched (subject kind={subj_kind} data0={subj_d0})")
 
-    fn signal_matches_loop(signal: &ComptimeControl, loop_label: i32) -> i32:
+    fn signal_matches_loop(signal: &ComptimeControl, loop_label: i32) -> bool:
         if signal.kind != ComptimeControlKind.CTL_BREAK and signal.kind != ComptimeControlKind.CTL_CONTINUE:
-            return 0
+            return false
         if signal.label == 0:
-            return 1
+            return true
         if signal.label == loop_label:
-            return 1
-        0
+            return true
+        false
 
-    fn signal_matches_block(signal: &ComptimeControl, block_label: i32) -> i32:
+    fn signal_matches_block(signal: &ComptimeControl, block_label: i32) -> bool:
         if signal.kind != ComptimeControlKind.CTL_BREAK:
-            return 0
+            return false
         if block_label == 0:
-            return 0
+            return false
         if signal.label == block_label:
-            return 1
-        0
+            return true
+        false
 
     mut fn eval_loop(node: i32) -> ComptimeControl:
         let loop_label = self.ast.get_data1(node)
@@ -7550,7 +7550,7 @@ impl ComptimeEvaluator:
             var body_signal = self.eval_expr(self.ast.get_data0(node))
             if body_signal.kind == ComptimeControlKind.CTL_VALUE:
                 continue
-            if self.signal_matches_loop(body_signal, loop_label) != 0:
+            if self.signal_matches_loop(body_signal, loop_label):
                 if body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
                     continue
                 self.loop_labels.pop()
@@ -7577,7 +7577,7 @@ impl ComptimeEvaluator:
             let body_signal = self.eval_expr(self.ast.get_data1(node))
             if body_signal.kind == ComptimeControlKind.CTL_VALUE:
                 continue
-            if self.signal_matches_loop(body_signal, loop_label) != 0:
+            if self.signal_matches_loop(body_signal, loop_label):
                 if body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
                     continue
                 self.loop_labels.pop()
@@ -7592,7 +7592,7 @@ impl ComptimeEvaluator:
         while true:
             let body_signal = self.eval_expr(self.ast.get_data0(node))
             if body_signal.kind != ComptimeControlKind.CTL_VALUE:
-                if self.signal_matches_loop(body_signal, loop_label) != 0:
+                if self.signal_matches_loop(body_signal, loop_label):
                     if body_signal.kind != ComptimeControlKind.CTL_CONTINUE:
                         self.loop_labels.pop()
                         return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
@@ -7659,7 +7659,7 @@ impl ComptimeEvaluator:
             self.pop_scope()
             if body_signal.kind == ComptimeControlKind.CTL_VALUE:
                 continue
-            if self.signal_matches_loop(body_signal, loop_label) != 0:
+            if self.signal_matches_loop(body_signal, loop_label):
                 if body_signal.kind == ComptimeControlKind.CTL_CONTINUE:
                     continue
                 self.loop_labels.pop()
@@ -7927,9 +7927,9 @@ impl ComptimeEvaluator:
                     // annotation) names the instance, as Sema would (Law 2).
                     if result_type != 0 and self.sema.get_type_kind(self.sema.resolve_alias(result_type)) != TypeKind.TY_GENERIC_INST:
                         let recv_name = self.sema.type_name(self.sema.resolve_alias(result_type))
-                        let base = if comptime_type_name_has_base(recv_name, "List") != 0: "List" else if comptime_type_name_has_base(recv_name, "HashMap") != 0: "HashMap" else: ""
+                        let base = if comptime_type_name_has_base(recv_name, "List"): "List" else if comptime_type_name_has_base(recv_name, "HashMap"): "HashMap" else: ""
                         let demanded = self.expected_type()
-                        if base.len() > 0 and demanded != 0 and self.sema.get_type_kind(self.sema.resolve_alias(demanded)) == TypeKind.TY_GENERIC_INST and comptime_type_name_has_base(self.sema.type_name(self.sema.resolve_alias(demanded)), base) != 0:
+                        if base.len() > 0 and demanded != 0 and self.sema.get_type_kind(self.sema.resolve_alias(demanded)) == TypeKind.TY_GENERIC_INST and comptime_type_name_has_base(self.sema.type_name(self.sema.resolve_alias(demanded)), base):
                             result_type = demanded
                             type_source = "demand"
                         else if base.len() > 0 and self.body_fn_nodes.len() > 0 and not self.sema.typed_expr_types.contains(node):
@@ -7945,7 +7945,7 @@ impl ComptimeEvaluator:
                     if result_type != 0:
                         let resolved_result = self.sema.resolve_alias(result_type)
                         let result_name = self.sema.type_name(resolved_result)
-                        if comptime_type_name_has_base(result_name, "List") != 0 or comptime_type_name_has_base(result_name, "HashMap") != 0:
+                        if comptime_type_name_has_base(result_name, "List") or comptime_type_name_has_base(result_name, "HashMap"):
                             return self.eval_static_collection_new(result_type, node, arg_count)
                 return self.eval_static_type_method_call(recv_type, field, self.ast.get_data1(node), arg_count, node)
             var recv_signal = self.eval_expr(recv_node)
@@ -7963,7 +7963,7 @@ impl ComptimeEvaluator:
                     let field_value = self.extra_value_at((recv_signal.value.extra_start + field_index) as i64)
                     if field_value.kind == ComptimeValueKind.CV_FN:
                         return self.eval_fn_value_call(field_value, self.ast.get_data1(node), arg_count, node)
-                if self.sema.pipeline_method_exists(recv_signal.value.type_id, field) != 0:
+                if self.sema.pipeline_method_exists(recv_signal.value.type_id, field):
                     return self.eval_user_method_value(recv_node, recv_signal.value, field, self.ast.get_data1(node), arg_count, node, 0)
             if recv_signal.value.kind == ComptimeValueKind.CV_LIST or recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
                 if recv_signal.value.kind == ComptimeValueKind.CV_BYTES:
@@ -8070,7 +8070,7 @@ impl ComptimeEvaluator:
             let message = arg_values[0]
             let location = arg_values[1]
             let line = arg_values[2]
-            if message.kind != ComptimeValueKind.CV_STR or location.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(line) == 0:
+            if message.kind != ComptimeValueKind.CV_STR or location.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(line) == false:
                 return self.fail(node, "panic runtime call expects string, string, integer arguments")
             let line_value = comptime_value_intlike(line)
             let rendered_location =
@@ -8103,7 +8103,7 @@ impl ComptimeEvaluator:
             if arg_values.len() != 1:
                 return self.fail(node, fn_name ++ " takes one argument")
             let value = arg_values[0]
-            if comptime_value_is_intlike(value) == 0:
+            if comptime_value_is_intlike(value) == false:
                 return self.fail(node, fn_name ++ " argument must be an integer")
             if fn_name == "with_println_i32":
                 with_println_i32(comptime_value_intlike(value) as i32)
@@ -8155,7 +8155,7 @@ impl ComptimeEvaluator:
                 return self.fail(node, "with_str_byte_at takes two arguments")
             let text = arg_values[0]
             let index = arg_values[1]
-            if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(index) == 0:
+            if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(index) == false:
                 return self.fail(node, "with_str_byte_at expects string and integer arguments")
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), with_str_byte_at_ref(with_str_clone_ref(text.text), comptime_value_intlike(index))))
         if fn_name == "with_str_slice":
@@ -8164,7 +8164,7 @@ impl ComptimeEvaluator:
             let text = arg_values[0]
             let start = arg_values[1]
             let end = arg_values[2]
-            if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(start) == 0 or comptime_value_is_intlike(end) == 0:
+            if text.kind != ComptimeValueKind.CV_STR or comptime_value_is_intlike(start) == false or comptime_value_is_intlike(end) == false:
                 return self.fail(node, "with_str_slice expects string and integer arguments")
             return comptime_control_value(comptime_value_str(with_str_slice_ref(with_str_clone_ref(text.text), comptime_value_intlike(start), comptime_value_intlike(end))))
         if fn_name == "with_str_contains" or fn_name == "with_str_starts_with" or fn_name == "with_str_ends_with":
@@ -8292,7 +8292,7 @@ impl ComptimeEvaluator:
                 return comptime_control_value(self.empty_string_builder_value(result_type, 0))
             if arg_values.len() != 1:
                 return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
-            if comptime_value_is_intlike(arg_values[0]) == 0:
+            if comptime_value_is_intlike(arg_values[0]) == false:
                 return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
             return comptime_control_value(self.empty_string_builder_value(result_type, comptime_value_intlike(arg_values[0])))
         let fn_node = self.find_fn_decl_node(fn_sym)
@@ -8322,7 +8322,7 @@ impl ComptimeEvaluator:
                     return comptime_control_value(self.empty_string_builder_value(result_type_from_node, 0))
                 if arg_values.len() != 1:
                     return self.fail(node, "StringBuilder.with_capacity() expects exactly one argument in comptime")
-                if comptime_value_is_intlike(arg_values[0]) == 0:
+                if comptime_value_is_intlike(arg_values[0]) == false:
                     return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                 return comptime_control_value(self.empty_string_builder_value(result_type_from_node, comptime_value_intlike(arg_values[0])))
             let ret_type_for_constructor = self.comptime_fn_return_type(fn_sym, tp_syms, tp_tys)
@@ -8330,7 +8330,7 @@ impl ComptimeEvaluator:
                 if arg_values.len() == 0:
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, 0))
                 if arg_values.len() == 1:
-                    if comptime_value_is_intlike(arg_values[0]) == 0:
+                    if comptime_value_is_intlike(arg_values[0]) == false:
                         return self.fail(node, "StringBuilder.with_capacity() expects an integer capacity")
                     return comptime_control_value(self.empty_string_builder_value(ret_type_for_constructor, comptime_value_intlike(arg_values[0])))
         // A runtime ABI function compiled in-unit (D30) has, to the
@@ -8414,7 +8414,7 @@ impl ComptimeEvaluator:
                     if has_generic_subst != 0:
                         self.restore_generic_substitutions(generic_snapshot)
                     return self.fail(node, "wrong argument count in comptime call")
-                var default_signal = if self.default_arg_uses_call_site(default_node) != 0:
+                var default_signal = if self.default_arg_uses_call_site(default_node):
                     self.eval_call_site_default_arg(default_node, node, caller_path, caller_fn_sym)
                 else:
                     self.eval_expr(default_node)
@@ -8640,13 +8640,13 @@ impl ComptimeEvaluator:
             let stmt_signal = self.eval_expr(self.ast.get_extra(extra_start + i))
             if stmt_signal.kind != ComptimeControlKind.CTL_VALUE:
                 self.pop_scope()
-                if self.signal_matches_block(stmt_signal, block_label) != 0:
+                if self.signal_matches_block(stmt_signal, block_label):
                     return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
                 return stmt_signal
         if tail != 0:
             let tail_signal = self.eval_expr(tail)
             self.pop_scope()
-            if self.signal_matches_block(tail_signal, block_label) != 0:
+            if self.signal_matches_block(tail_signal, block_label):
                 return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
             return tail_signal
         self.pop_scope()
@@ -8745,7 +8745,7 @@ impl ComptimeEvaluator:
         self.unsupported(node)
 
 impl Sema:
-    fn force_eval_comptime_expr(node: i32) -> i32:
+    fn force_eval_comptime_expr(node: i32) -> bool:
         let value = unsafe { comptime_force_eval_expr(self as *mut Sema, self.ast, self.pool, node) }
         comptime_value_is_valid(value)
 
@@ -8857,11 +8857,11 @@ impl Sema:
             let viewed = self.copy_out_of_temporary(type_value, val_type as i32)
             if viewed != 0 and self.record_contextual_copy_adjustment(type_value, viewed, val_type as i32) != 0:
                 val_type = viewed as TypeId
-            else if self.reject_view_into_temporary(type_value, "global `" ++ with_str_clone_ref(self.pool_resolve(name)) ++ "` binds") != 0:
+            else if self.reject_view_into_temporary(type_value, "global `" ++ with_str_clone_ref(self.pool_resolve(name)) ++ "` binds"):
                 return
         // The annotation is an owned demand like a local one's (#1803).
         if ann_type != 0 and val_type != 0 and self.has_contextual_copy_adjustment(type_value) == 0 and not self.reject_implicit_numeric_narrowing(type_value, ann_type as i32, val_type as i32):
-            if self.types_compatible(ann_type as i32, val_type as i32) == 0:
+            if self.types_compatible(ann_type as i32, val_type as i32) == false:
                 if self.arithmetic_result_type(ann_type, val_type) == 0:
                     self.emit_error("type mismatch in binding", decl)
         let final_type = if ann_type != 0: ann_type else: val_type

@@ -95,7 +95,7 @@ impl Lexer:
         loop:
             let tag = self.next_token()
             tokens.append(tag, self.token_start, self.pos)
-            if lexer_token_is_significant(tag) != 0:
+            if lexer_token_is_significant(tag):
                 self.last_sig_tag = tag
             self.line_start = if tag == TokenKind.TK_NEWLINE: 1 else if tag == TokenKind.TK_COMMENT: self.line_start else: 0
             if tag == TokenKind.TK_L_PAREN or tag == TokenKind.TK_L_BRACKET or tag == TokenKind.TK_L_BRACE:
@@ -363,7 +363,7 @@ impl Lexer:
             // statement; the previous line's last token says nothing.
             // #2525: decided before `/=`: where a regex can start, `/=` has no
             // left operand to divide, so `/=> x/` is a regex beginning with `=`.
-            if (self.line_start != 0 and self.bracket_depth == 0) or lexer_slash_starts_regex(self.last_sig_tag) != 0:
+            if (self.line_start != 0 and self.bracket_depth == 0) or lexer_slash_starts_regex(self.last_sig_tag):
                 return self.lex_regex()
             if self.pos + 1 < slen and src[(self.pos + 1)] == CharCode.Eq:  // /=
                 self.pos = self.pos + 2
@@ -844,41 +844,41 @@ fn lex_is_digit(ch: i32) -> bool:
 fn is_hex_digit(ch: i32) -> bool:
     (ch >= CharCode.D0 and ch <= CharCode.D9) or (ch >= CharCode.A and ch <= CharCode.F) or (ch >= CharCode.LowerA and ch <= CharCode.LowerF) or ch == CharCode.Underscore
 
-fn lexer_token_is_significant(tag: i32) -> i32:
+fn lexer_token_is_significant(tag: i32) -> bool:
     if tag == TokenKind.TK_NEWLINE or tag == TokenKind.TK_COMMENT:
-        return 0
-    1
+        return false
+    true
 
-fn lexer_slash_starts_regex(prev_tag: i32) -> i32:
+fn lexer_slash_starts_regex(prev_tag: i32) -> bool:
     if prev_tag < 0:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_EQ or prev_tag == TokenKind.TK_EQ_EQ or prev_tag == TokenKind.TK_BANG_EQ or prev_tag == TokenKind.TK_BANG or prev_tag == TokenKind.TK_COLON:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_COMMA or prev_tag == TokenKind.TK_SEMICOLON or prev_tag == TokenKind.TK_L_PAREN or prev_tag == TokenKind.TK_L_BRACKET or prev_tag == TokenKind.TK_L_BRACE:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_ARROW or prev_tag == TokenKind.TK_FAT_ARROW or prev_tag == TokenKind.TK_PIPE_GT or prev_tag == TokenKind.TK_LT_PIPE:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_PLUS or prev_tag == TokenKind.TK_MINUS or prev_tag == TokenKind.TK_STAR or prev_tag == TokenKind.TK_PERCENT:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_PLUS_WRAP or prev_tag == TokenKind.TK_MINUS_WRAP or prev_tag == TokenKind.TK_STAR_WRAP:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_PLUS_SAT or prev_tag == TokenKind.TK_MINUS_SAT or prev_tag == TokenKind.TK_STAR_SAT:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_QUESTION or prev_tag == TokenKind.TK_QUESTION_DOT or prev_tag == TokenKind.TK_QUESTION_QUESTION:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_LT or prev_tag == TokenKind.TK_GT or prev_tag == TokenKind.TK_LT_EQ or prev_tag == TokenKind.TK_GT_EQ:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_AMPERSAND or prev_tag == TokenKind.TK_PIPE or prev_tag == TokenKind.TK_CARET:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_KW_RETURN or prev_tag == TokenKind.TK_KW_IF or prev_tag == TokenKind.TK_KW_WHILE or prev_tag == TokenKind.TK_KW_FOR or prev_tag == TokenKind.TK_KW_MATCH:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_KW_LET or prev_tag == TokenKind.TK_KW_VAR or prev_tag == TokenKind.TK_KW_WITH or prev_tag == TokenKind.TK_KW_IN:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_KW_AND or prev_tag == TokenKind.TK_KW_OR or prev_tag == TokenKind.TK_KW_NOT:
-        return 1
+        return true
     if prev_tag == TokenKind.TK_EQ_TILDE or prev_tag == TokenKind.TK_BANG_TILDE:
-        return 1
-    0
+        return true
+    false
 
 // Compute the 0-based column of a byte offset by scanning backward.
 fn column_of(source: &str, pos: i32) -> i32:

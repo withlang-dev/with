@@ -2171,11 +2171,11 @@ fn mir_cleanup_edge_to(target: &str) -> i32:
 // #760: the CLI validates the spec BEFORE compiling, so a typo'd edge is
 // a hard error instead of a five-minute compile ending in marker text
 // and rc=0. One parser: this reuses the exact from/to readers below.
-fn mir_cleanup_edge_spec_ok(spec: &str) -> i32:
+fn mir_cleanup_edge_spec_ok(spec: &str) -> bool:
     let target = mir_debug_spec_target(spec)
     if mir_cleanup_edge_from(target) < 0 or mir_cleanup_edge_to(target) < 0:
-        return 0
-    1
+        return false
+    true
 
 // Moved-ness of a drop state for the vacated-sub-place rule: Init < Maybe,
 // MaybeMoved < Moved; -1 for a state that holds no value to compare (never
@@ -3070,22 +3070,22 @@ fn mir_block_single_successor(body: &MirBody, bb: i32) -> i32:
         return body.term_data3(bb)
     -1
 
-fn mir_block_reaches_linearly(body: &MirBody, from_bb: i32, to_bb: i32) -> i32:
+fn mir_block_reaches_linearly(body: &MirBody, from_bb: i32, to_bb: i32) -> bool:
     if from_bb == to_bb:
-        return 1
+        return true
     var cur = from_bb
     var hops = 0
     while hops < 4096:
         let nxt = mir_block_single_successor(body, cur)
         if nxt < 0 or nxt >= body.block_count():
-            return 0
+            return false
         if nxt == to_bb:
-            return 1
+            return true
         if nxt <= cur:
-            return 0
+            return false
         cur = nxt
         hops = hops + 1
-    0
+    false
 
 fn mir_local_of_place(body: &MirBody, place: i32) -> i32:
     if place < 0 or place >= body.place_locals.len():
@@ -3187,7 +3187,7 @@ fn validate_use_after_kill_body(body: &MirBody, pool: &InternPool) -> str:
             let reads = mir_rvalue_read_locals(body, d1)
             for ri in 0..reads.len():
                 let used = reads[ri]
-                if used >= 0 and used < local_count and killed[used] != 0 and mir_block_reaches_linearly(body, killed_bb[used], bb) != 0:
+                if used >= 0 and used < local_count and killed[used] != 0 and mir_block_reaches_linearly(body, killed_bb[used], bb):
                     return f"{fn_name}: local _{used} is read at bb{bb} after its reset-on-move blank zeroed it"
             // Then the write: a zero fill kills, any other write revives.
             if d0 >= 0 and d0 < body.place_locals.len() and body.place_proj_counts[d0] == 0:

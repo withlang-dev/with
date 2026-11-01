@@ -1226,7 +1226,7 @@ impl Codegen:
     // `src as tgt` where src is a transparent std Box and tgt is a raw
     // pointer to its payload type: the box value itself (#1280).
     fn mir_cast_is_box_payload_pointer(src_sema_ty: i32, tgt_sema_ty: i32) -> bool:
-        if src_sema_ty <= 0 or tgt_sema_ty <= 0 or self.sema.type_is_std_box_inst(src_sema_ty) == 0:
+        if src_sema_ty <= 0 or tgt_sema_ty <= 0 or self.sema.type_is_std_box_inst(src_sema_ty) == false:
             return false
         let tgt = self.sema.resolve_alias(tgt_sema_ty as TypeId)
         if self.sema.get_type_kind(tgt) != TypeKind.TY_PTR:
@@ -1388,7 +1388,7 @@ impl Codegen:
                         if pointee_sema > 0:
                             cur_sema_ty = pointee_sema
                             deref_ty = self.mir_sema_type_to_llvm(pointee_sema)
-                    else if self.sema.type_is_std_box_inst(deref_resolved) != 0:
+                    else if self.sema.type_is_std_box_inst(deref_resolved):
                         // Transparent std Box: deref of the box yields the payload.
                         let box_payload_sema = self.sema.get_generic_inst_arg(deref_resolved, 0)
                         if box_payload_sema > 0:
@@ -1615,7 +1615,7 @@ impl Codegen:
                         if pointee_sema > 0:
                             cur_sema_ty = pointee_sema
                             deref_ptr_ty = self.mir_sema_type_to_llvm(pointee_sema)
-                    else if self.sema.type_is_std_box_inst(deref_resolved) != 0:
+                    else if self.sema.type_is_std_box_inst(deref_resolved):
                         // Transparent std Box: the box value IS the payload
                         // pointer, so the load above already lands on the
                         // payload — only the type bookkeeping needs the
@@ -1836,7 +1836,7 @@ impl Codegen:
             let text = self.str_const_text(cd)
             let const_sema_ty = if const_id >= 0 and const_id < body.const_types.len(): body.const_types[const_id] else: 0
             // A `&str` constant is the literal's own `{ptr, len}` (#1810).
-            if self.mir_sema_type_is_ref_to_str(const_sema_ty) != 0 and not self.sema.type_layout_is_str_view(const_sema_ty):
+            if self.mir_sema_type_is_ref_to_str(const_sema_ty) and not self.sema.type_layout_is_str_view(const_sema_ty):
                 return self.gen_string_literal_ref(text)
             return self.gen_string_literal_raw(text)
 
@@ -2283,7 +2283,7 @@ impl Codegen:
         let source_resolved = self.mir_resolve_alias_at(self.mir_operand_sema_type(body, operand_id))
         if self.mir_type_kind_at(source_resolved) != TypeKind.TY_GENERIC_INST or self.mir_type_d2_at(source_resolved) != 1:
             return 0
-        if self.sema.type_symbol_is_std_box(self.mir_type_d0_at(source_resolved)) == 0:
+        if self.sema.type_symbol_is_std_box(self.mir_type_d0_at(source_resolved)) == false:
             return 0
         let payload_info = self.mir_dyn_arg_info_from_sema_type(self.mir_type_extra_at(self.mir_type_d1_at(source_resolved)), 1)
         if payload_info.type_sym == 0 or wl_get_type_kind(wl_type_of(val)) != wl_pointer_type_kind():
@@ -2295,7 +2295,7 @@ impl Codegen:
             return val
         if wl_type_of(val) == target_ty:
             return val
-        if self.llvm_type_is_dyn_fat_ptr(target_ty) == 0:
+        if self.llvm_type_is_dyn_fat_ptr(target_ty) == false:
             return val
         let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(target_sema_ty)
         if trait_sym == 0:
@@ -2316,7 +2316,7 @@ impl Codegen:
     mut fn mir_build_dyn_trait_value_from_ref_place(body: &MirBody, place_id: i32, ptr: i64, target_ty: i64, target_sema_ty: i32) -> i64:
         if ptr == 0 or target_ty == 0:
             return ptr
-        if self.llvm_type_is_dyn_fat_ptr(target_ty) == 0:
+        if self.llvm_type_is_dyn_fat_ptr(target_ty) == false:
             return ptr
         var trait_sym = self.mir_dyn_trait_symbol_from_sema_type(target_sema_ty)
         let place_sema_ty = self.mir_place_sema_type(body, place_id)
@@ -2635,7 +2635,7 @@ impl Codegen:
         struct_idx >= 0 and not self.is_union_struct_index(struct_idx) and not self.is_bitpacked_struct(ty)
 
     fn mir_eq_type_is_box(resolved: i32) -> bool:
-        self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved) == 1 and self.sema.type_symbol_is_std_box(self.sema.get_generic_inst_base(resolved)) != 0
+        self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_arg_count(resolved) == 1 and self.sema.type_symbol_is_std_box(self.sema.get_generic_inst_base(resolved))
 
     // Continue only where `equal` holds: the walk returns false at the first
     // part that differs.
@@ -5118,17 +5118,17 @@ impl Codegen:
                             let ev_val = self.mir_eval_operand(body, ev_op, ev_payload_ty)
                             var ev_payload_val = self.coerce_value_to_type(ev_val, ev_payload_ty)
                             var ev_dyn_trait_sym = self.mir_dyn_trait_symbol_from_sema_type(ev_payload_sema)
-                            if ev_dyn_trait_sym == 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty) != 0:
+                            if ev_dyn_trait_sym == 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty):
                                 ev_dyn_trait_sym = self.current_return_option_payload_dyn_trait()
                             var ev_dyn_info = DynArgInfo { type_sym: 0, use_ptr: 0 }
-                            if ev_dyn_trait_sym != 0 or self.llvm_type_is_dyn_fat_ptr(ev_payload_ty) != 0:
+                            if ev_dyn_trait_sym != 0 or self.llvm_type_is_dyn_fat_ptr(ev_payload_ty):
                                 ev_dyn_info = self.mir_dyn_arg_info_from_operand(body, ev_op, ev_val)
                                 if ev_dyn_info.type_sym == 0:
                                     let ev_sema = self.mir_operand_sema_type(body, ev_op)
                                     ev_dyn_info = self.mir_dyn_arg_info_from_sema_type(ev_sema, 0)
-                            if ev_dyn_trait_sym == 0 and ev_dyn_info.type_sym != 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty) != 0:
+                            if ev_dyn_trait_sym == 0 and ev_dyn_info.type_sym != 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty):
                                 ev_dyn_trait_sym = self.find_dyn_trait_for_type_and_current_method(ev_dyn_info.type_sym)
-                            if ev_dyn_info.type_sym == 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty) != 0:
+                            if ev_dyn_info.type_sym == 0 and self.llvm_type_is_dyn_fat_ptr(ev_payload_ty):
                                 let field_nominal = self.current_method_named_field_nominal_sym()
                                 if field_nominal != 0:
                                     ev_dyn_info = DynArgInfo { type_sym: field_nominal, use_ptr: 1 }
@@ -5138,7 +5138,7 @@ impl Codegen:
                                 if ev_dyn_info.type_sym != 0:
                                     if ev_dyn_info.use_ptr != 0:
                                         let ev_ptr_val =
-                                            if self.llvm_type_is_dyn_fat_ptr(wl_type_of(ev_val)) != 0:
+                                            if self.llvm_type_is_dyn_fat_ptr(wl_type_of(ev_val)):
                                                 wl_build_extract_value(self.builder, ev_val, 0)
                                             else:
                                                 ev_val
@@ -7247,7 +7247,7 @@ impl Codegen:
         if self.mir_type_d2_at(resolved) != 1:
             return false
         let base_sym = self.mir_type_d0_at(resolved)
-        self.sema.type_symbol_is_std_box(base_sym) != 0
+        self.sema.type_symbol_is_std_box(base_sym)
 
     // Returns 1 for Rc[T], 2 for Arc[T], and 0 for other types.
     fn mir_sema_type_refcount_kind(sema_ty: i32) -> i32:
@@ -7259,7 +7259,7 @@ impl Codegen:
         if self.mir_type_d2_at(resolved) != 1:
             return 0
         let base_sym = self.mir_type_d0_at(resolved)
-        if self.sema.type_symbol_is_std_rc_owner(base_sym) == 0:
+        if self.sema.type_symbol_is_std_rc_owner(base_sym) == false:
             return 0
         let name = self.sema_symbol_text(base_sym)
         if name == "Rc":
@@ -7402,7 +7402,7 @@ impl Codegen:
     // its value's drop (mir_emit_dyn_payload_drop), then the cell's free —
     // Box's own Drop impl would drop a `dyn` value, which names no type.
     mut fn mir_emit_boxed_dyn_drop_ptr(ptr: i64, ty: i64, sema_ty: i32) -> bool:
-        if not self.mir_sema_type_is_box(sema_ty) or self.llvm_type_is_dyn_fat_ptr(ty) == 0:
+        if not self.mir_sema_type_is_box(sema_ty) or self.llvm_type_is_dyn_fat_ptr(ty) == false:
             return false
         let resolved = self.mir_resolve_alias_at(sema_ty)
         let payload_sema_ty = self.mir_type_extra_at(self.mir_type_d1_at(resolved))
@@ -7438,7 +7438,7 @@ impl Codegen:
         let resolved = self.mir_resolve_alias_at(sema_ty)
         let arg_start = self.mir_type_d1_at(resolved)
         let payload_sema_ty = self.mir_type_extra_at(arg_start)
-        if self.llvm_type_is_dyn_fat_ptr(box_ty) != 0:
+        if self.llvm_type_is_dyn_fat_ptr(box_ty):
             heap_ptr = wl_build_extract_value(self.builder, value, 0)
         else:
             payload_ty = self.mir_sema_type_to_llvm(payload_sema_ty)
@@ -7816,7 +7816,7 @@ impl Codegen:
         if task_sema_ty <= 0:
             return 0
         let resolved = self.sema.resolve_alias(task_sema_ty as TypeId) as i32
-        if self.sema.type_is_task(resolved) == 0 and self.sema.type_is_scoped_task(resolved) == 0:
+        if self.sema.type_is_task(resolved) == 0 and self.sema.type_is_scoped_task(resolved) == false:
             return 0
         if self.sema.get_generic_inst_arg_count(resolved) < 1:
             return 0
@@ -8136,18 +8136,18 @@ impl Codegen:
             return 0
         wl_build_load(self.builder, ptr_ty, storage_ptr)
 
-    fn sema_type_is_str_value_or_view(sema_ty: i32) -> i32:
+    fn sema_type_is_str_value_or_view(sema_ty: i32) -> bool:
         if sema_ty <= 0:
-            return 0
+            return false
         let resolved = self.sema.resolve_alias(sema_ty as TypeId) as i32
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_STR:
-            return 1
+            return true
         if tk == TypeKind.TY_REF:
             let inner = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId) as i32
             if self.sema.get_type_kind(inner) == TypeKind.TY_STR:
-                return 1
-        0
+                return true
+        false
 
     // The text of a CK_STR constant: a raw literal's bytes as written, any
     // other literal's with its escapes decoded.
@@ -8210,10 +8210,10 @@ impl Codegen:
             let expected_kind = wl_get_type_kind(expected_ty)
             let actual_kind = wl_get_type_kind(wl_type_of(out))
             let literal_text = self.mir_operand_str_literal(body, operand_id)
-            if lends_c_strings != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty) != 0:
+            if lends_c_strings != 0 and literal_text.found and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty):
                 let direct = wl_build_global_string_ptr(self.builder, literal_text.text)
                 return CallArgValue { value: self.enforce_coerced_type(direct, expected_ty, "wrong argument type"), cleanup_ptr: 0 }
-            if lends_c_strings != 0 and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty) != 0 and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)) != 0:
+            if lends_c_strings != 0 and expected_kind == wl_pointer_type_kind() and self.sema.sema_type_is_c_char_pointer(expected_sema_ty) and self.sema_type_is_str_value_or_view(self.mir_operand_sema_type(body, operand_id)):
                 var str_out = out
                 if actual_kind == wl_pointer_type_kind():
                     let str_ty = self.mir_sema_type_to_llvm(self.sema.ty_str as i32)
@@ -8405,7 +8405,7 @@ impl Codegen:
         let op_id = body.call_arg_operands[(arg_start + idx)]
         let arg = self.mir_eval_operand(body, op_id, 0)
         let arg_sema = self.mir_operand_sema_type(body, op_id)
-        if self.mir_sema_type_is_ref_to_str(arg_sema) != 0 and wl_get_type_kind(wl_type_of(arg)) == wl_pointer_type_kind():
+        if self.mir_sema_type_is_ref_to_str(arg_sema) and wl_get_type_kind(wl_type_of(arg)) == wl_pointer_type_kind():
             let str_ty = self.str_llvm_type()
             if str_ty != 0:
                 return wl_build_load(self.builder, str_ty, arg)
@@ -8418,7 +8418,7 @@ impl Codegen:
         if self.is_str_type(wl_type_of(recv)):
             return recv
         let recv_sema = self.mir_operand_sema_type(body, recv_op)
-        if self.mir_sema_type_is_ref_to_str(recv_sema) != 0 and wl_get_type_kind(wl_type_of(recv)) == wl_pointer_type_kind():
+        if self.mir_sema_type_is_ref_to_str(recv_sema) and wl_get_type_kind(wl_type_of(recv)) == wl_pointer_type_kind():
             let str_ty = self.str_llvm_type()
             if str_ty != 0:
                 return wl_build_load(self.builder, str_ty, recv)
@@ -9099,7 +9099,7 @@ impl Codegen:
                 let d_tk = self.mir_type_kind_at(d_resolved)
                 if d_tk == TypeKind.TY_PTR or d_tk == TypeKind.TY_REF:
                     ty = self.mir_type_d0_at(d_resolved)
-                else if self.sema.type_is_std_box_inst(d_resolved) != 0:
+                else if self.sema.type_is_std_box_inst(d_resolved):
                     // Transparent std Box: deref of the box yields the payload.
                     ty = self.sema.get_generic_inst_arg(d_resolved, 0)
                 active_variant_idx = -1
@@ -9522,7 +9522,7 @@ impl Codegen:
             return self.mir_dyn_trait_symbol_from_sema_type(self.mir_type_d0_at(resolved))
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.mir_type_d0_at(resolved)
-            if self.sema.type_symbol_is_std_box(base_sym) != 0 and self.mir_type_d2_at(resolved) == 1:
+            if self.sema.type_symbol_is_std_box(base_sym) and self.mir_type_d2_at(resolved) == 1:
                 let extra_start = self.mir_type_d1_at(resolved)
                 return self.mir_dyn_trait_symbol_from_sema_type(self.mir_type_extra_at(extra_start))
         0
@@ -10156,7 +10156,7 @@ impl Codegen:
 
         var result = heap_ptr
         let dest_ty = self.mir_dest_llvm_type(body, dest_place)
-        if dest_ty != 0 and self.llvm_type_is_dyn_fat_ptr(dest_ty) != 0:
+        if dest_ty != 0 and self.llvm_type_is_dyn_fat_ptr(dest_ty):
             let dest_sema_ty = self.mir_intrinsic_dest_sema_type(body, dest_place)
             let trait_sym = self.mir_dyn_trait_symbol_from_sema_type(dest_sema_ty)
             var info = self.mir_dyn_arg_info_from_operand(body, value_op, value)
@@ -10186,7 +10186,7 @@ impl Codegen:
         if self.mir_type_kind_at(box_resolved) != TypeKind.TY_GENERIC_INST:
             return false
         let box_base = self.mir_type_d0_at(box_resolved)
-        if self.sema.type_symbol_is_std_box(box_base) == 0 or self.mir_type_d2_at(box_resolved) != 1:
+        if self.sema.type_symbol_is_std_box(box_base) == false or self.mir_type_d2_at(box_resolved) != 1:
             return false
         let arg_extra = self.mir_type_d1_at(box_resolved)
         let payload_sema_ty = self.mir_type_extra_at(arg_extra)
@@ -14204,7 +14204,7 @@ impl Codegen:
     // the same value the direct path builds — never the concrete's own address.
     mut fn mir_build_dyn_arg_fat_value(body: &MirBody, args_id: i32, operand_id: i32, ai: i32, dyn_trait_sym: i32) -> i64:
         let arg_val = self.mir_eval_operand(body, operand_id, 0)
-        if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)) != 0:
+        if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)):
             return arg_val
         self.mir_dyn_arg_fat_from_value(body, args_id, operand_id, ai, dyn_trait_sym, arg_val)
 
@@ -14507,7 +14507,7 @@ impl Codegen:
                                 if gc_contract_sig >= 0:
                                     self.sema.sig_param_uses_value_ref_abi(gc_contract_sig, gc_ai) != 0
                                 else:
-                                    gc_ra_param_start >= 0 and self.sema.fn_param_uses_value_ref_abi(gc_ra_param_start, gc_ai, gc_ra_owner_sym, gc_ra_owner_ty) != 0
+                                    gc_ra_param_start >= 0 and self.sema.fn_param_uses_value_ref_abi(gc_ra_param_start, gc_ai, gc_ra_owner_sym, gc_ra_owner_ty)
                             if gc_ai_is_ref:
                                 gc_val = self.marshal_ref_addr(body, gc_op, gc_raw_val)
                             gc_arg_vals.push(gc_val)
@@ -15608,7 +15608,7 @@ impl Codegen:
             else if dyn_trait_sym != 0:
                 // Evaluate without coercion so we get the raw concrete value.
                 arg_val = self.mir_eval_operand(body, operand_id, 0)
-                if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)) != 0:
+                if self.llvm_type_is_dyn_fat_ptr(wl_type_of(arg_val)):
                     // Already a dyn fat pointer (a dyn-typed RK_REF temp built
                     // it at the assign) — wrapping again would nest fat values.
                     self.record_codegen_call_argument(body, args_id, operand_id, ai, AnalysisMarshalStrategy.DirectValue, arg_val, arg_val)
@@ -18364,16 +18364,16 @@ impl Codegen:
             return 0
         self.struct_llvm_types[st_opt.unwrap()]
 
-    fn mir_sema_type_is_ref_to_str(sema_ty: i32) -> i32:
+    fn mir_sema_type_is_ref_to_str(sema_ty: i32) -> bool:
         if sema_ty <= 0:
-            return 0
+            return false
         let resolved = self.mir_resolve_alias_at(sema_ty)
         if self.mir_type_kind_at(resolved) != TypeKind.TY_REF:
-            return 0
+            return false
         let inner = self.mir_resolve_alias_at(self.mir_type_d0_at(resolved))
         if self.mir_type_kind_at(inner) == TypeKind.TY_STR:
-            return 1
-        0
+            return true
+        false
 
     fn build_str_value(ptr: i64, len: i64) -> i64:
         let str_sym = self.intern.intern("str")

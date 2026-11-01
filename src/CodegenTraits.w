@@ -854,7 +854,7 @@ impl Codegen:
             let method_sym = self.codegen_sema_sym_for(self.trait_method_names[method_idx])
             // A generic override may not have an LLVM function yet. Its
             // declaration still overrides the default, just as in Sema.
-            if self.sema.impl_decl_has_method(impl_node, method_sym) != 0: continue
+            if self.sema.impl_decl_has_method(impl_node, method_sym): continue
             self.generate_default_trait_method_for_impl_ext(impl_type_sym, method_idx, trait_sym, impl_node)
 
     mut fn generate_default_trait_methods():

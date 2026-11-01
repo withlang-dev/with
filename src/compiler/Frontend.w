@@ -229,25 +229,25 @@ fn c_import_str_contains(text: &str, needle: &str) -> bool:
     false
 
 impl Zcu:
-    fn read_trace_c_import_cache_frontend() -> i32:
+    fn read_trace_c_import_cache_frontend() -> bool:
         let _ = self
         let raw = runtime_getenv("WITH_TRACE_CIMPORT_CACHE")
         if raw.len() == 0:
-            return 0
+            return false
         if raw == "0":
-            return 0
-        1
+            return false
+        true
 
-fn frontend_debug_type_names_enabled() -> i32:
+fn frontend_debug_type_names_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_TYPE_NAMES")
     if raw.len() == 0:
-        return 0
+        return false
     if raw == "0":
-        return 0
-    1
+        return false
+    true
 
 fn frontend_dump_type_decl_names(stage: &str, pool: &AstPool, intern: &InternPool):
-    if frontend_debug_type_names_enabled() == 0:
+    if frontend_debug_type_names_enabled() == false:
         return
     runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():
@@ -429,7 +429,7 @@ impl Zcu:
             let cached = self.c_import_cache_lookup(cache_key)
             if cached.len() > 0:
                 // Already injected in this compilation — skip to avoid duplicate declarations
-                if self.trace_c_import_cache != 0:
+                if self.trace_c_import_cache:
                     runtime_eprint("c_import cache hit (memory) — skipping duplicate")
                 continue
             else:
@@ -439,7 +439,7 @@ impl Zcu:
                 // c_import; otherwise generate in-order so the dedup table is truthful.
                 let fs_cached = if c_import_count == 1: c_import_fs_cache_lookup(cache_key) else: ""
                 if fs_cached.len() > 0:
-                    if self.trace_c_import_cache != 0:
+                    if self.trace_c_import_cache:
                         runtime_eprint("c_import cache hit (fs)")
                     // What the translator printed on the miss, printed again:
                     // a header warns on every build, not only the first (#1465).
@@ -456,7 +456,7 @@ impl Zcu:
                     for dpi in 0..hit_dep_paths.len():
                         self.record_frontend_tracked_input(hit_dep_paths[dpi])
                 else:
-                    if self.trace_c_import_cache != 0:
+                    if self.trace_c_import_cache:
                         runtime_eprint("c_import cache miss")
                     let libclang_header_spec = c_import_decode_escapes(resolved_header_spec)
                     // §16.2a: apply no_methods opt-out for this import before generation.
@@ -1186,7 +1186,7 @@ impl Zcu:
         var full_msg = if detail.len() > 0: msg ++ ": " ++ detail else: msg
         // §16.1: if the target macOS SDK could not be resolved, name the missing
         // target input and the remedies (never a host tool — none is used).
-        if with_cimport_macos_sdk_missing() != 0:
+        if with_cimport_macos_sdk_missing():
             full_msg = full_msg ++ "; no macOS SDK for target headers: this compiler carries no darwin sysroot (#1915) — set WITH_SDKROOT or SDKROOT, or configure [c_import] sdk_path in with.toml"
         // #2530: a header outside the embedded (libc-only) sysroot reads as
         // a bare "file not found"; name what was searched and both ways out.
@@ -1195,7 +1195,7 @@ impl Zcu:
             if missing.len() > 0:
                 full_msg = full_msg ++ "; the embedded macOS sysroot this compiler carries (#1915) holds libc only, and '" ++ missing ++ "' is not in it — name an SDK that has it (WITH_SDKROOT, SDKROOT, or [c_import] sdk_path in with.toml), or take the library through `with get`"
         // #1915: a Windows c_import parses the SDK's libc headers only.
-        if with_cimport_windows_libc_missing() != 0:
+        if with_cimport_windows_libc_missing():
             full_msg = full_msg ++ "; the LLVM SDK carries no Windows C runtime (libc/windows) — install an SDK built with `with build :sdk-windows-libc`, or name one with WITH_WINDOWS_LIBC_DIR"
         self.diagnostics.emit(Diagnostic.err(full_msg, span))
 
@@ -1524,7 +1524,7 @@ fn c_import_macro_decl(line: &str) -> str:
         return ""
     value = c_import_trim_outer_parens(value)
 
-    if c_import_is_int_literal(value) != 0:
+    if c_import_is_int_literal(value):
         return "let " ++ name ++ " = " ++ value ++ "\n"
 
     if value.len() >= 2 and value[0] == 34 and value[value.len() as i64 - 1] == 34:
@@ -1774,37 +1774,37 @@ fn c_import_escape_with_string(value: &str) -> str:
             out = out ++ value.slice(i as i64, (i + 1) as i64)
     out
 
-fn c_import_is_int_literal(text_raw: &str) -> i32:
+fn c_import_is_int_literal(text_raw: &str) -> bool:
     let text = c_import_trim(text_raw)
     if text.len() == 0:
-        return 0
+        return false
 
     var i = 0
     if text[0] == 45 or text[0] == 43:
         i = 1
     if i >= text.len():
-        return 0
+        return false
 
     if i + 1 < text.len() and text[i] == 48 and (text[(i + 1)] == 120 or text[(i + 1)] == 88):
         i = i + 2
         if i >= text.len():
-            return 0
+            return false
         while i < text.len():
             let ch = text[i]
             let is_digit = ch >= 48 and ch <= 57
             let is_hex_lo = ch >= 97 and ch <= 102
             let is_hex_hi = ch >= 65 and ch <= 70
             if not (is_digit or is_hex_lo or is_hex_hi):
-                return 0
+                return false
             i = i + 1
-        return 1
+        return true
 
     while i < text.len():
         let ch = text[i]
         if ch < 48 or ch > 57:
-            return 0
+            return false
         i = i + 1
-    1
+    true
 
 fn c_import_is_space(ch: i32) -> bool:
     ch == 32 or ch == 9 or ch == 10 or ch == 13
@@ -1897,7 +1897,7 @@ impl Zcu:
 
     mut fn compile_file_frontend_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_file:start " ++ path)
         let source_dir = frontend_dirname(path)
         self.reset_for_new_invocation(source_dir, path, "")
@@ -1920,7 +1920,7 @@ impl Zcu:
 
         let text = frontend_normalize_source_text(raw_text)
         self.set_current_source(source_dir, path, text)
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint(f"[frontend] compile_file:source_ready bytes={text.len()}")
         let pool = self.compile_source_frontend(text, path, 0)
         if pool.decl_count() == 0 and not self.diagnostics.has_errors():
@@ -1932,7 +1932,7 @@ impl Zcu:
 
     mut fn compile_file_frontend_entry_with_config(path: &str, cfg: ProjectConfig) -> AstPool:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_file_entry:start " ++ path)
         let source_dir = frontend_dirname(path)
         self.reset_for_new_invocation(source_dir, path, "")
@@ -1993,7 +1993,7 @@ impl Zcu:
 
     mut fn compile_source_frontend_mode(text: &str, name: &str, file_id: i32, implicit_main_mode: i32) -> AstPool:
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_source:parse")
         let normalized_text = frontend_normalize_source_text(text)
         self.current_source_path = with_str_clone_ref(name)
@@ -2077,7 +2077,7 @@ impl Zcu:
             self.set_resolve_snapshot(ResolveResult.init(), name)
             return AstPool.new()
 
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_source:resolve")
         // Wave 4: sidecar resolved artifact.
         let t_resolve = runtime_clock_nanos()
@@ -2108,7 +2108,7 @@ impl Zcu:
             self.set_typed_snapshot("", AstPool.new())
             return AstPool.new()
 
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_source:imports")
         // Build the sema/codegen pool via recursive syntactic import expansion.
         // The prelude closure is already in the pool as the #682-inc1 prefix
@@ -2161,7 +2161,7 @@ impl Zcu:
         // comptime branches before final sema.
         let t_comptime = runtime_clock_nanos()
         if pool.has_comptime_nodes() or pool.has_type_derives():
-            if zcu_debug_init_enabled() != 0:
+            if zcu_debug_init_enabled():
                 runtime_eprint("[frontend] compile_source:comptime-transform")
             var pre_sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
             pre_sema.source_text = with_str_clone_ref(text)
@@ -2252,7 +2252,7 @@ impl Zcu:
         // AstPool construction is complete — freeze to catch any future mutations.
         pool.freeze()
 
-        if zcu_debug_init_enabled() != 0:
+        if zcu_debug_init_enabled():
             runtime_eprint("[frontend] compile_source:sema")
         let t_sema = runtime_clock_nanos()
         // D89 (§4.3): a field whose numeric type its uses decide makes the
@@ -3157,13 +3157,13 @@ fn frontend_fn_tier_verdict(tier: &List[i32], paths: &List[str], pool: &AstPool,
             if j == idx:
                 continue
             let jd = tier[j]
-            if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname and (paths[idx] == paths[j] or sema_tier_path_is_std_implementation(paths[j]) == 0 or not frontend_fn_decl_is_displaceable(pool, intern, jd)):
+            if pool.kind(jd) == NodeKind.NK_FN_DECL and pool.get_data0(jd) == iname and (paths[idx] == paths[j] or sema_tier_path_is_std_implementation(paths[j]) == false or not frontend_fn_decl_is_displaceable(pool, intern, jd)):
                 return FRONTEND_FN_DROP
         return FRONTEND_FN_KEEP
     if displaceable:
         for j in 0..tier.len():
             let jd = tier[j]
-            if j != idx and pool.kind(jd) == NodeKind.NK_EXTERN_FN and pool.get_data0(jd) == iname and paths[idx] != paths[j] and sema_tier_path_is_std_implementation(paths[idx]) != 0:
+            if j != idx and pool.kind(jd) == NodeKind.NK_EXTERN_FN and pool.get_data0(jd) == iname and paths[idx] != paths[j] and sema_tier_path_is_std_implementation(paths[idx]):
                 return FRONTEND_FN_DISPLACE
 
     let current_rank = frontend_fn_decl_rank(current_kind)

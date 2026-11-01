@@ -15,14 +15,14 @@ use std.collections.HashMap
 use rt.rt_core
 
 
-fn intern_debug_init_enabled() -> i32:
+fn intern_debug_init_enabled() -> bool:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 fn intern_debug_init(msg: &str):
-    if intern_debug_init_enabled() == 0:
+    if intern_debug_init_enabled() == false:
         return
     with_eprint("[intern-init] " ++ msg)
 

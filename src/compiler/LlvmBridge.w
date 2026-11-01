@@ -1270,8 +1270,8 @@ fn wl_delete_function_body(f: i64) -> Unit:
 
 fn wl_get_first_global(m: i64) -> i64: unsafe { LLVMGetFirstGlobal(m as *mut u8) as i64 }
 fn wl_get_next_global(g: i64) -> i64: unsafe { LLVMGetNextGlobal(g as *mut u8) as i64 }
-fn wl_global_has_initializer(g: i64) -> i32:
-    unsafe { if LLVMGetInitializer(g as *mut u8) as i64 != 0: 1 else: 0 }
+fn wl_global_has_initializer(g: i64) -> bool:
+    unsafe { if LLVMGetInitializer(g as *mut u8) as i64 != 0: true else: false }
 fn wl_get_linkage(v: i64) -> i32: unsafe { LLVMGetLinkage(v as *mut u8) }
 fn wl_appending_linkage() -> i32: LLVM_AppendingLinkage
 fn wl_delete_global(g: i64) -> Unit: unsafe { LLVMDeleteGlobal(g as *mut u8) }

@@ -59,7 +59,7 @@ fn codegen_units_apply_global_ownership(unit_module: i64, k: i32) -> Unit:
         var g = wl_get_first_global(unit_module)
         while g != 0:
             let next = wl_get_next_global(g)
-            if wl_global_has_initializer(g) != 0:
+            if wl_global_has_initializer(g):
                 let linkage = wl_get_linkage(g)
                 if linkage == wl_appending_linkage():
                     wl_delete_global(g)
@@ -73,7 +73,7 @@ fn codegen_units_apply_global_ownership(unit_module: i64, k: i32) -> Unit:
     // units must be externally visible there too.
     var g0 = wl_get_first_global(unit_module)
     while g0 != 0:
-        if wl_global_has_initializer(g0) != 0 and wl_get_linkage(g0) == wl_internal_linkage():
+        if wl_global_has_initializer(g0) and wl_get_linkage(g0) == wl_internal_linkage():
             wl_set_linkage(g0, wl_external_linkage())
         g0 = wl_get_next_global(g0)
 

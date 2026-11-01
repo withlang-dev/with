@@ -259,24 +259,24 @@ fn suspend_compute_live_out_for_block(body: &MirBody, live_in: SuspendBits, loca
         suspend_add_successor_live(body, live_in, local_count, d2, out_bits)
     out_bits
 
-fn suspend_is_scheduler_yield_intrinsic(intrinsic: MirIntrinsic) -> i32:
+fn suspend_is_scheduler_yield_intrinsic(intrinsic: MirIntrinsic) -> bool:
     // Closed current-fiber suspension set. Update this helper whenever a
     // runtime intrinsic can park/yield the caller instead of returning a Task.
     if intrinsic == MirIntrinsic.FIBER_AWAIT:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.FIBER_SELECT:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.FIBER_SELECT_BIASED:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.SCOPE_AWAIT_ALL:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.CHAN_SEND:
-        return 1
+        return true
     if intrinsic == MirIntrinsic.CHAN_RECV:
-        return 1
-    0
+        return true
+    false
 
 fn suspend_callee_sym(body: &MirBody, operand_id: i32) -> i32:
     if operand_id < 0 or operand_id >= body.operand_kinds.len():
@@ -290,9 +290,9 @@ fn suspend_callee_sym(body: &MirBody, operand_id: i32) -> i32:
         return 0
     body.const_d0[const_id]
 
-fn suspend_term_directly_yields(body: &MirBody, bb: i32) -> i32:
+fn suspend_term_directly_yields(body: &MirBody, bb: i32) -> bool:
     if body.term_kind(bb) != TermKind.TK_CALL:
-        return 0
+        return false
     let call_id = body.term_data1(bb)
     suspend_is_scheduler_yield_intrinsic(body.call_intrinsic(call_id))
 
@@ -311,11 +311,11 @@ fn suspend_body_index_for_sym(body_by_fn: &HashMap[i32, i32], fn_sym: i32) -> i3
         return -1
     body_by_fn.get(fn_sym).unwrap()
 
-fn suspend_body_has_direct_yield(body: &MirBody) -> i32:
+fn suspend_body_has_direct_yield(body: &MirBody) -> bool:
     for bb in 0..body.block_count():
-        if suspend_term_directly_yields(body, bb) != 0:
-            return 1
-    0
+        if suspend_term_directly_yields(body, bb):
+            return true
+    false
 
 // The closure body a call argument hands over, when the argument is the
 // local a closure constant was assigned to; -1 otherwise.
@@ -349,37 +349,37 @@ fn suspend_closure_arg_body(body: &MirBody, body_by_fn: &HashMap[i32, i32], oper
 // §12.3 / D69: a closure handed straight to a call — a `for` body over a
 // Gen[T] among them — runs inside that call, so the call suspends when the
 // closure's body may.
-fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> i32:
+fn suspend_call_passes_suspending_closure(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> bool:
     let call_id = body.term_data1(bb)
     if call_id < 0 or call_id >= body.call_arg_starts.len():
-        return 0
+        return false
     let start = body.call_arg_starts[call_id]
     for ai in 0..body.call_arg_counts[call_id]:
         let closure_idx = suspend_closure_arg_body(body, body_by_fn, body.call_arg_operands[(start + ai)])
         if closure_idx >= 0 and closure_idx < body_may_suspend.vlen() as i32 and body_may_suspend.vget(closure_idx as i64) != 0:
-            return 1
-    0
+            return true
+    false
 
-fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> i32:
+fn suspend_body_calls_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> bool:
     for bb in 0..body.block_count():
         if body.term_kind(bb) != TermKind.TK_CALL:
             continue
-        if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
-            return 1
+        if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb):
+            return true
         let callee = suspend_callee_sym(body, body.term_data0(bb))
         let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
         if callee_idx < 0 or callee_idx >= body_may_suspend.vlen() as i32:
             continue
         if body_may_suspend.vget(callee_idx as i64) != 0:
-            return 1
-    0
+            return true
+    false
 
 fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i32]) -> SuspendBits:
     let body_count = mir_mod.bodies.len() as i32
     let body_may_suspend = suspend_bits_fill(body_count, 0)
     for bi in 0..body_count:
         let body = &mir_mod.bodies[bi]
-        if suspend_body_has_direct_yield(body) != 0:
+        if suspend_body_has_direct_yield(body):
             body_may_suspend.vset(bi as i32, 1)
 
     var changed = 1
@@ -389,7 +389,7 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
             if body_may_suspend.vget(bi2 as i64) != 0:
                 continue
             let body = &mir_mod.bodies[bi2]
-            if suspend_body_calls_may_suspend(body, body_by_fn, body_may_suspend) != 0:
+            if suspend_body_calls_may_suspend(body, body_by_fn, body_may_suspend):
                 body_may_suspend.vset(bi2 as i32, 1)
                 changed = 1
     body_may_suspend
@@ -397,9 +397,9 @@ fn suspend_compute_may_suspend(mir_mod: &MirModule, body_by_fn: &HashMap[i32, i3
 fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, bb: i32) -> i32:
     if body.term_kind(bb) != TermKind.TK_CALL:
         return 0
-    if suspend_term_directly_yields(body, bb) != 0:
+    if suspend_term_directly_yields(body, bb):
         return 1
-    if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
+    if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb):
         return 1
     let callee = suspend_callee_sym(body, body.term_data0(bb))
     let callee_idx = suspend_body_index_for_sym(body_by_fn, callee)
@@ -407,40 +407,40 @@ fn suspend_term_may_suspend(body: &MirBody, body_by_fn: &HashMap[i32, i32], body
         return 0
     body_may_suspend.vget(callee_idx as i64)
 
-fn suspend_type_is_no_await_guard(sema: &Sema, tid: i32) -> i32:
+fn suspend_type_is_no_await_guard(sema: &Sema, tid: i32) -> bool:
     sema.type_is_no_await_guard(tid)
 
-fn suspend_type_is_ref_like(sema: &Sema, tid: i32) -> i32:
+fn suspend_type_is_ref_like(sema: &Sema, tid: i32) -> bool:
     if tid <= 0:
-        return 0
+        return false
     let kind = sema.get_type_kind(sema.resolve_alias(tid as TypeId))
     if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR:
-        return 1
-    0
+        return true
+    false
 
-fn suspend_local_is_ref_like(sema: &Sema, body: &MirBody, local: i32) -> i32:
+fn suspend_local_is_ref_like(sema: &Sema, body: &MirBody, local: i32) -> bool:
     if local < 0 or local >= body.local_type_ids.len():
-        return 0
+        return false
     suspend_type_is_ref_like(sema, body.local_type_ids[local])
 
-fn suspend_body_has_guard_local(sema: &Sema, body: &MirBody) -> i32:
+fn suspend_body_has_guard_local(sema: &Sema, body: &MirBody) -> bool:
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids[li]
-        if suspend_type_is_no_await_guard(sema, local_ty) != 0:
-            return 1
-    0
+        if suspend_type_is_no_await_guard(sema, local_ty):
+            return true
+    false
 
-fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> i32:
+fn suspend_body_has_may_suspend_term(body: &MirBody, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits) -> bool:
     for bb in 0..body.block_count():
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) != 0:
-            return 1
-    0
+            return true
+    false
 
 fn suspend_collect_guard_locals(sema: &Sema, body: &MirBody) -> List[i32]:
     let out: List[i32] = List.new()
     for li in 0..body.local_count():
         let local_ty = body.local_type_ids[li]
-        if suspend_type_is_no_await_guard(sema, local_ty) != 0:
+        if suspend_type_is_no_await_guard(sema, local_ty):
             out.push(li)
     out
 
@@ -636,7 +636,7 @@ fn suspend_prov_transfer_term(bits: SuspendBits, sema: &Sema, body: &MirBody, gu
 
     if kind == TermKind.TK_CALL:
         let dest_local = suspend_direct_place_local(body, d2)
-        if suspend_local_is_ref_like(sema, body, dest_local) == 0:
+        if suspend_local_is_ref_like(sema, body, dest_local) == false:
             suspend_prov_clear_local(bits, local_count, guard_count, dest_local)
             return
         let origins = suspend_prov_origins_from_call(bits, sema, body, guard_locals, guard_count, d0, d1)
@@ -771,7 +771,7 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
     var diag = Diagnostic.err("E0702: suspension is not allowed inside no_suspend block", Span { file: sema.local_file_id, start: site.start, end: site.end })
     let call_id = body.term_data1(bb)
     let intrinsic = body.call_intrinsic(call_id)
-    if suspend_is_scheduler_yield_intrinsic(intrinsic) != 0:
+    if suspend_is_scheduler_yield_intrinsic(intrinsic):
         if intrinsic == MirIntrinsic.FIBER_CLEANUP_AWAIT:
             diag.add_note("implicit cleanup of an ephemeral Task may yield here")
         else:
@@ -791,7 +791,7 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
                 diag.add_note("generator `" ++ gen_name ++ "` may suspend, and its body runs inside this loop")
             else:
                 diag.add_note("call to may_suspend function `" ++ sema.pool_resolve(callee) ++ "` occurs here")
-        else if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb) != 0:
+        else if suspend_call_passes_suspending_closure(body, body_by_fn, body_may_suspend, bb):
             diag.add_note("a closure passed to this call — or this loop's body — may suspend, and runs inside the call")
         else:
             diag.add_note("this call may yield the current fiber")
@@ -839,7 +839,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
     let guard_count = guard_locals.len() as i32
     if guard_count == 0:
         return out
-    if suspend_body_has_may_suspend_term(body, body_by_fn, body_may_suspend) == 0:
+    if suspend_body_has_may_suspend_term(body, body_by_fn, body_may_suspend) == false:
         return out
 
     let liveness = suspend_liveness(sema, body)
@@ -861,7 +861,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
             if suspend_get_bit(bits, li) == 0:
                 continue
             let local_ty = body.local_type_ids[li]
-            if suspend_type_is_no_await_guard(sema, local_ty) != 0:
+            if suspend_type_is_no_await_guard(sema, local_ty):
                 let site = suspend_site_span(ast, body, bb)
                 if not suspend_reported_site(&reported_starts, &reported_ends, &reported_locals, &reported_origins, site, li, li):
                     reported_starts.push(site.start)
@@ -880,7 +880,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
             if suspend_get_bit(bits, vi) == 0:
                 continue
             let view_ty = body.local_type_ids[vi]
-            if suspend_type_is_no_await_guard(sema, view_ty) != 0:
+            if suspend_type_is_no_await_guard(sema, view_ty):
                 continue
             for gi in 0..guard_count:
                 if suspend_prov_get_local_origin(prov_bits, guard_count, vi, gi as i32) == 0:

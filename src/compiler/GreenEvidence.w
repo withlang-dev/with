@@ -137,11 +137,11 @@ fn green_by_source_identity(root: &str) -> str:
 // candidate records it before anything is installed; a census that cannot
 // record refuses the install, so a reseed never leaves a stale bar behind
 // a new compiler.
-fn green_publish_ceremony_bar(root: &str, compiler_path: &str, target_name: &str) -> i32:
+fn green_publish_ceremony_bar(root: &str, compiler_path: &str, target_name: &str) -> bool:
     let out_dir = green_join(root, "out/ceremony-bar")
     if runtime_mkdir_p(out_dir) != 0:
         runtime_eprint(f"[{target_name}] error: could not create {out_dir}; nothing was installed")
-        return 1
+        return true
     let recorded = green_join(out_dir, "ceremony-bar.tsv")
     runtime_remove_file(recorded)
     var argv = build_graph_argv_append("", compiler_path)
@@ -157,8 +157,8 @@ fn green_publish_ceremony_bar(root: &str, compiler_path: &str, target_name: &str
     if rc != 0 or bar.len() == 0:
         runtime_eprint(runtime_read_file(err))
         runtime_eprint(f"[{target_name}] error: the candidate could not record the ceremony census bar (exit {rc}, {bar.len()} bytes in {recorded}); nothing was installed")
-        return 1
+        return true
     let dest = green_join(green_store_dir(), "ceremony-bar.tsv")
-    if build_graph_install_path(f"[{target_name}]", recorded, bar, dest, 0o644, "") != 0: return 1
+    if build_graph_install_path(f"[{target_name}]", recorded, bar, dest, 0o644, "") != 0: return true
     print(f"[{target_name}] {dest} <- this tree's ceremony census counts")
-    0
+    false

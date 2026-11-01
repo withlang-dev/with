@@ -98,24 +98,24 @@ impl Sema:
             return "float literal '" ++ expr_text ++ "' defaults to f64; cast with '" ++ expr_text ++ " as " ++ expected_name ++ "'"
         ""
 
-    fn try_ci_coercion(fn_sym: i32, arg_ty: i32, param_ty: i32) -> i32:
+    fn try_ci_coercion(fn_sym: i32, arg_ty: i32, param_ty: i32) -> bool:
         // c_import auto-coercion: allow bool → integer at ABI boundary
         let arg_resolved = self.resolve_alias(arg_ty as TypeId)
         let arg_k = self.get_type_kind(arg_resolved)
         let par_k = self.get_type_kind(self.resolve_alias(param_ty))
         if arg_k == TypeKind.TY_BOOL and par_k == TypeKind.TY_INT:
-            return 1
+            return true
         // str → C string (§16.3c, D47): a `str` is lent to a c_imported
         // `const char *` parameter for the call, whatever the function's other
         // parameters or its return need: a raw call still reads its text input.
-        if self.ci_type_is_const_c_string_input(param_ty) != 0:
+        if self.ci_type_is_const_c_string_input(param_ty):
             if arg_k == TypeKind.TY_STR:
-                return 1
+                return true
             if arg_k == TypeKind.TY_REF:
                 let inner = self.resolve_alias(self.get_type_d0(arg_resolved) as TypeId)
                 if self.get_type_kind(inner) == TypeKind.TY_STR:
-                    return 1
-        0
+                    return true
+        false
 
     fn integer_pointer_cast_help(expected_ty: i32, actual_ty: i32, expr_text: &str) -> str:
         let expected = self.resolve_alias(expected_ty as TypeId)
@@ -148,7 +148,7 @@ impl Sema:
         if call_name.len() > 0:
             msg = msg ++ " in call to '" ++ call_name ++ "'"
         var diag = Diagnostic.err(msg, primary)
-        if expr_text.len() > 0 and sema_str_contains_char(expr_text, 10) == 0:
+        if expr_text.len() > 0 and sema_str_contains_char(expr_text, 10) == false:
             diag.add_label(primary, "argument expression '" ++ expr_text ++ "' has type " ++ actual_name)
         else:
             diag.add_label(primary, "argument has type " ++ actual_name)
@@ -457,7 +457,7 @@ impl Sema:
             // #756: spans are per-file offsets — containment across files is
             // coordinate soup (the renderer's own copy of the adoption bug:
             // regex.w free fns printed as BTreeMap methods).
-            if self.decls_share_source_file(di, decl_index) == 0:
+            if self.decls_share_source_file(di, decl_index) == false:
                 continue
             let impl_start = self.ast.get_start(cand)
             let impl_end = self.ast.get_end(cand)
@@ -472,14 +472,14 @@ impl Sema:
         self.typed_dump_seen_nodes = sema_new_map_i32_i32()
         self.typed_dump_visit_budget = 1000
 
-    mut fn mark_typed_dump_visit(node: i32) -> i32:
+    mut fn mark_typed_dump_visit(node: i32) -> bool:
         if self.typed_dump_visit_budget <= 0:
-            return 0
+            return false
         if self.typed_dump_seen_nodes.contains(node):
-            return 0
+            return false
         self.typed_dump_visit_budget = self.typed_dump_visit_budget - 1
         self.typed_dump_seen_nodes.insert(node, 1)
-        1
+        true
 
     fn clamp_extra_span_count(extra_start: i32, raw_count: i32, stride: i32, hard_cap: i32) -> i32:
         if raw_count <= 0:
@@ -525,7 +525,7 @@ impl Sema:
         for ai in 0..self.contextual_copy_adjustments.len():
             let file_id = self.ast.file(self.contextual_copy_adjustments[ai].source_node as NodeId) as i32
             let path = paths.get(file_id) ?? &""
-            if sema_tier_path_is_std_implementation(path) == 0: n += 1
+            if sema_tier_path_is_std_implementation(path) == false: n += 1
         n
 
     mut fn dump_typed_module() -> str:
@@ -564,10 +564,10 @@ impl Sema:
                 if owner_type_name.len() > 0:
                     if parsed_fn_name.len() > 0:
                         fn_name = owner_type_name ++ "." ++ parsed_fn_name
-                    else if sema_str_contains_char(fn_name, 46) == 0:
+                    else if sema_str_contains_char(fn_name, 46) == false:
                         fn_name = owner_type_name ++ "." ++ fn_name
                 let sig_idx = self.get_sig(fn_name_sym)
-                if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                if fn_name_sym > 0 and self.sig_idx_valid(sig_idx):
                     out.push_str("  fn ")
                     out.push_str(fn_name)
                     out.push_str("(")
@@ -605,7 +605,7 @@ impl Sema:
                 let ext_name_sym = self.ast.get_data0(decl)
                 let ext_name = self.safe_symbol_text(ext_name_sym)
                 let sig_idx = self.get_sig(ext_name_sym)
-                if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                if ext_name_sym > 0 and self.sig_idx_valid(sig_idx):
                     out.push_str("  extern fn ")
                     out.push_str(ext_name)
                     out.push_str("(")
@@ -742,10 +742,10 @@ impl Sema:
                 if owner_type_name.len() > 0:
                     if parsed_fn_name.len() > 0:
                         fn_name = owner_type_name ++ "." ++ parsed_fn_name
-                    else if sema_str_contains_char(fn_name, 46) == 0:
+                    else if sema_str_contains_char(fn_name, 46) == false:
                         fn_name = owner_type_name ++ "." ++ fn_name
                 let sig_idx = self.get_sig(fn_name_sym)
-                if fn_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                if fn_name_sym > 0 and self.sig_idx_valid(sig_idx):
                     typed_write("  fn ")
                     typed_write(fn_name)
                     typed_write("(")
@@ -781,7 +781,7 @@ impl Sema:
                 let ext_name_sym = self.ast.get_data0(decl)
                 let ext_name = self.safe_symbol_text(ext_name_sym)
                 let sig_idx = self.get_sig(ext_name_sym)
-                if ext_name_sym > 0 and self.sig_idx_valid(sig_idx) != 0:
+                if ext_name_sym > 0 and self.sig_idx_valid(sig_idx):
                     typed_write("  extern fn ")
                     typed_write(ext_name)
                     typed_write("(")

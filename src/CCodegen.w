@@ -515,18 +515,18 @@ impl CCodegen:
         assert(i >= 0 and i < self.mir_mod.bodies.len())
         unsafe { with_vec_get_ptr_es(&raw const self.mir_mod.bodies as *mut u8, i, sizeof[MirBody]()) as &MirBody }
 
-fn cc_is_ident_start(ch: i32) -> i32:
+fn cc_is_ident_start(ch: i32) -> bool:
     if ch == 95:
-        return 1
+        return true
     if ch >= 65 and ch <= 90:
-        return 1
+        return true
     if ch >= 97 and ch <= 122:
-        return 1
-    0
+        return true
+    false
 
-fn cc_is_ident_char(ch: i32) -> i32:
+fn cc_is_ident_char(ch: i32) -> bool:
     if ch >= 48 and ch <= 57:
-        return 1
+        return true
     cc_is_ident_start(ch)
 
 fn cc_hex_digit(v: i32) -> str:
@@ -628,43 +628,43 @@ fn cc_hash_name_component(value: i64) -> str:
         return "n" ++ f"{0 - value}"
     f"{value}"
 
-fn cc_is_raw_string_token_text(text: &str) -> i32:
+fn cc_is_raw_string_token_text(text: &str) -> bool:
     if text.len() < 3:
-        return 0
+        return false
     if text[0] != 114:  // r
-        return 0
+        return false
     var i = 1
     while i < text.len() and text[i] == 35:  // #
         i = i + 1
     let hash_count = i - 1
     if i >= text.len() or text[i] != 34:
-        return 0
+        return false
     let len = text.len()
     if len < i + 2 + hash_count:
-        return 0
+        return false
     let close_quote = len - hash_count - 1
     if close_quote <= i or text[close_quote] != 34:
-        return 0
+        return false
     var hi = 0
     while hi < hash_count:
         if text[(close_quote + 1 + hi)] != 35:
-            return 0
+            return false
         hi = hi + 1
-    1
+    true
 
-fn cc_is_quoted_string_token_text(text: &str, prefix_len: i32) -> i32:
+fn cc_is_quoted_string_token_text(text: &str, prefix_len: i32) -> bool:
     let len = text.len()
     if len < prefix_len + 2:
-        return 0
+        return false
     if text[prefix_len] != 34:
-        return 0
+        return false
     if text[(len - 1)] != 34:
-        return 0
+        return false
     var i = prefix_len + 1
     while i < len - 1:
         let ch = text[i]
         if ch == 10 or ch == 13:
-            return 0
+            return false
         if ch == 34:
             var slash_count = 0
             var j = i - 1
@@ -672,12 +672,12 @@ fn cc_is_quoted_string_token_text(text: &str, prefix_len: i32) -> i32:
                 slash_count = slash_count + 1
                 j = j - 1
             if slash_count % 2 == 0:
-                return 0
+                return false
         i = i + 1
-    1
+    true
 
 fn cc_string_token_payload(text: &str) -> str:
-    if cc_is_raw_string_token_text(text) != 0:
+    if cc_is_raw_string_token_text(text):
         var i = 1
         while i < text.len() and text[i] == 35:
             i = i + 1
@@ -688,28 +688,28 @@ fn cc_string_token_payload(text: &str) -> str:
                 end_q = end_q - 1
             if end_q >= content_start and text[end_q] == 34:
                 return text.slice(content_start as i64, end_q as i64)
-    if cc_is_quoted_string_token_text(text, 0) != 0:
+    if cc_is_quoted_string_token_text(text, 0):
         return cc_decode_with_string_escapes(text.slice(1, text.len() as i64 - 1))
-    if text.len() >= 3 and text[0] == 102 and cc_is_quoted_string_token_text(text, 1) != 0:
+    if text.len() >= 3 and text[0] == 102 and cc_is_quoted_string_token_text(text, 1):
         return cc_decode_with_string_escapes(text.slice(2, text.len() as i64 - 1))
     ""
 
-fn cc_is_string_token_text(text: &str) -> i32:
-    if cc_is_raw_string_token_text(text) != 0:
-        return 1
-    if cc_is_quoted_string_token_text(text, 0) != 0:
-        return 1
-    if text.len() >= 3 and text[0] == 102 and cc_is_quoted_string_token_text(text, 1) != 0:
-        return 1
-    0
+fn cc_is_string_token_text(text: &str) -> bool:
+    if cc_is_raw_string_token_text(text):
+        return true
+    if cc_is_quoted_string_token_text(text, 0):
+        return true
+    if text.len() >= 3 and text[0] == 102 and cc_is_quoted_string_token_text(text, 1):
+        return true
+    false
 
-fn cc_is_c_string_token_text(text: &str) -> i32:
-    if text.len() >= 3 and text[0] == 99 and cc_is_quoted_string_token_text(text, 1) != 0:
-        return 1
-    0
+fn cc_is_c_string_token_text(text: &str) -> bool:
+    if text.len() >= 3 and text[0] == 99 and cc_is_quoted_string_token_text(text, 1):
+        return true
+    false
 
 fn cc_c_string_token_payload(text: &str) -> str:
-    if cc_is_c_string_token_text(text) != 0:
+    if cc_is_c_string_token_text(text):
         return cc_decode_with_string_escapes(text.slice(2, text.len() as i64 - 1))
     ""
 
@@ -722,7 +722,7 @@ impl CCodegen:
         let end = self.ast.get_end(node)
         if start >= 0 and end > start and end <= src_text.len():
             let text = src_text.slice(start as i64, end as i64)
-            if cc_is_string_token_text(text) != 0:
+            if cc_is_string_token_text(text):
                 return cc_string_token_payload(text)
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(node)))
 
@@ -739,7 +739,7 @@ impl CCodegen:
         let end = self.ast.get_end(expr)
         if start >= 0 and end > start and end <= src_text.len():
             let text = src_text.slice(start as i64, end as i64)
-            if cc_is_c_string_token_text(text) != 0:
+            if cc_is_c_string_token_text(text):
                 return cc_c_string_token_payload(text)
         cc_string_literal_payload(cc_intern_resolve(self.intern, self.ast.get_data0(expr)))
 
@@ -780,35 +780,35 @@ fn cc_sanitize_ident(raw: &str) -> str:
         if with_interrupt_requested() != 0:
             return "__with_interrupted"
         let b = raw[i]
-        if cc_is_ident_char(b) != 0:
+        if cc_is_ident_char(b):
             out = out ++ raw.slice(i as i64, (i + 1) as i64)
         else:
             out = out ++ "_"
     if out.len() == 0:
         return "sym"
     let first = out[0]
-    if cc_is_ident_start(first) == 0:
+    if cc_is_ident_start(first) == false:
         return "_" ++ out
     out
 
-fn cc_str_ends_with(text: &str, suffix: &str) -> i32:
+fn cc_str_ends_with(text: &str, suffix: &str) -> bool:
     if suffix.len() == 0:
-        return 1
+        return true
     if text.len() < suffix.len():
-        return 0
+        return false
     let start = text.len() - suffix.len()
     if text.slice(start as i64, text.len() as i64) == suffix:
-        return 1
-    0
+        return true
+    false
 
-fn cc_str_starts_with(text: &str, prefix: &str) -> i32:
+fn cc_str_starts_with(text: &str, prefix: &str) -> bool:
     if prefix.len() == 0:
-        return 1
+        return true
     if text.len() < prefix.len():
-        return 0
+        return false
     if text.slice(0, prefix.len() as i64) == prefix:
-        return 1
-    0
+        return true
+    false
 
 fn cc_str_find_last_char(text: &str, ch: i32) -> i32:
     var i = text.len() as i32 - 1
@@ -824,33 +824,33 @@ fn cc_owner_prefix(sym_text: &str) -> str:
         return ""
     sym_text.slice(0, dot as i64)
 
-fn cc_str_contains_dot(text: &str) -> i32:
+fn cc_str_contains_dot(text: &str) -> bool:
     for i in 0..text.len():
         if text[i] == 46:
-            return 1
-    0
+            return true
+    false
 
-fn cc_str_contains(text: &str, needle: &str) -> i32:
+fn cc_str_contains(text: &str, needle: &str) -> bool:
     if needle.len() == 0:
-        return 1
+        return true
     if text.len() < needle.len():
-        return 0
+        return false
     let end = text.len() - needle.len()
     for i in 0..(end + 1):
         if text.slice(i as i64, (i + needle.len()) as i64) == needle:
-            return 1
-    0
+            return true
+    false
 
-fn cc_rval_looks_address(text: &str) -> i32:
+fn cc_rval_looks_address(text: &str) -> bool:
     if text.len() >= 2 and text[0] == 40 and text[1] == 38:
-        return 1
-    if cc_str_contains(text, "*)") != 0 or cc_str_contains(text, "* const") != 0:
-        return 1
-    0
+        return true
+    if cc_str_contains(text, "*)") != 0 or cc_str_contains(text, "* const"):
+        return true
+    false
 
-fn cc_name_matches(raw: &str, wanted: &str) -> i32:
+fn cc_name_matches(raw: &str, wanted: &str) -> bool:
     if raw == wanted:
-        return 1
+        return true
     cc_str_ends_with(raw, "." ++ wanted)
 
 fn cc_emit_checked_signed_helpers(c_type: &str, suffix: &str, min_expr: &str) -> str:
@@ -957,37 +957,37 @@ fn cc_base_name(raw: &str) -> str:
         return with_str_clone_ref(raw)
     raw.slice((dot + 1) as i64, raw.len() as i64)
 
-fn cc_is_list_method_name(name: &str) -> i32:
+fn cc_is_list_method_name(name: &str) -> bool:
     if name == "new":
-        return 1
+        return true
     if name == "push" or name == "get" or name == "len":
-        return 1
+        return true
     if name == "slot" or name == "remove" or name == "clear" or name == "pop":
-        return 1
-    0
+        return true
+    false
 
-fn cc_is_hashmap_method_name(name: &str) -> i32:
+fn cc_is_hashmap_method_name(name: &str) -> bool:
     if name == "insert" or name == "contains" or name == "remove":
-        return 1
+        return true
     if name == "get" or name == "len" or name == "new":
-        return 1
-    0
+        return true
+    false
 
-fn cc_is_option_method_name(name: &str) -> i32:
+fn cc_is_option_method_name(name: &str) -> bool:
     if name == "is_some" or name == "unwrap" or name == "expect":
-        return 1
-    0
+        return true
+    false
 
-fn cc_is_public_abi_name(name: &str) -> i32:
+fn cc_is_public_abi_name(name: &str) -> bool:
     if name.starts_with("with_") or name.starts_with("rt_") or name.starts_with("wl_"):
-        return 1
+        return true
     if name.starts_with("migrate_") or name.starts_with("ci_"):
-        return 1
+        return true
     if name == "pthread_self":
-        return 1
+        return true
     if name == "i32_to_str" or name == "i64_to_string" or name == "str_from_byte":
-        return 1
-    0
+        return true
+    false
 
 impl CCodegen:
     fn fn_c_name(fn_sym: i32) -> str:
@@ -998,7 +998,7 @@ impl CCodegen:
             return cc_sanitize_ident(export_name)
         let raw = cc_intern_resolve(self.intern, fn_sym)
         let id = cc_sanitize_ident(raw)
-        if self.fn_decl_is_public(fn_sym) != 0 and cc_is_public_abi_name(id) != 0:
+        if self.fn_decl_is_public(fn_sym) and cc_is_public_abi_name(id):
             return id
         if id == "main":
             return f"__with_main__{fn_sym}"
@@ -1009,7 +1009,7 @@ impl CCodegen:
         if fn_sym == 0 or self.fn_c_export_name(fn_sym).len() > 0:
             return false
         let id = cc_sanitize_ident(cc_intern_resolve(self.intern, fn_sym))
-        not (self.fn_decl_is_public(fn_sym) != 0 and cc_is_public_abi_name(id) != 0)
+        not (self.fn_decl_is_public(fn_sym) and cc_is_public_abi_name(id))
 
     fn global_c_name(sym: i32) -> str:
         if sym == 0:
@@ -1160,14 +1160,14 @@ impl CCodegen:
                 return decl
         0 as NodeId
 
-    fn fn_decl_is_public(sym: i32) -> i32:
+    fn fn_decl_is_public(sym: i32) -> bool:
         let decl = self.fn_decl_node(sym)
         if decl == 0 as NodeId:
-            return 0
+            return false
         let flags = self.ast.get_data2(decl)
         if (flags / FnFlags.PUB) % 2 == 1:
-            return 1
-        0
+            return true
+        false
 
     fn fn_callconv_name(meta: i32) -> str:
         if meta < 0:
@@ -1196,15 +1196,15 @@ impl CCodegen:
     // interface body (the runtime's interface, D30 step 3) defines nothing:
     // its prototype still comes from the fixed block below or the extern
     // walk, and the C runtime defines it.
-    fn module_exports_c_name(name: &str) -> i32:
+    fn module_exports_c_name(name: &str) -> bool:
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_FN_DECL or self.ast.fn_decl_body_is_interface(decl):
                 continue
             let sym = self.ast.get_data0(decl)
             if self.fn_c_name(sym) == name:
-                return 1
-        0
+                return true
+        false
 
     // A declaration's own type node resolves where it is declared: frozen
     // resolution judges visibility from sema.current_module_path, and the
@@ -1379,39 +1379,39 @@ impl CCodegen:
             return out ++ "__with"
         out
 
-    fn type_is_payload_enum(tid: i32) -> i32:
+    fn type_is_payload_enum(tid: i32) -> bool:
         let base_tid = self.sema.type_reflection_variant_base(tid)
         if base_tid == 0:
-            return 0
+            return false
         let count = self.sema.type_reflection_variant_count(tid)
         for vi in 0..count:
             if self.sema.type_reflection_variant_payload_count(tid, vi) > 0:
-                return 1
-        0
+                return true
+        false
 
-    fn type_is_distinct(tid: i32) -> i32:
+    fn type_is_distinct(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym == 0:
-            return 0
+            return false
         if self.sema.distinct_type_names.contains(name_sym):
-            return 1
-        0
+            return true
+        false
 
-    fn type_is_c_void(tid: i32) -> i32:
+    fn type_is_c_void(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         if resolved == 0:
-            return 0
+            return false
         if self.sema.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let name_sym = self.sema.get_type_d0(resolved)
         if name_sym == 0:
-            return 0
+            return false
         if cc_intern_resolve(self.intern, name_sym) == "c_void":
-            return 1
-        0
+            return true
+        false
 
     fn payload_enum_variant_field(variant_index: i32) -> str:
         let _ = self
@@ -1439,7 +1439,7 @@ impl CCodegen:
     // The discriminant of the enum value `expr`.
     fn enum_tag_text(enum_tid: i32, expr: &str) -> str:
         // An enum with no payloads is its discriminant (an int32_t).
-        if self.type_is_payload_enum(enum_tid) == 0:
+        if self.type_is_payload_enum(enum_tid) == false:
             return "(" ++ expr ++ ")"
         if not self.option_is_nullable_pointer(enum_tid):
             return "(" ++ expr ++ ").tag"
@@ -1448,7 +1448,7 @@ impl CCodegen:
         f"((" ++ expr ++ f") != 0 ? {some_disc} : {none_disc})"
 
     fn payload_enum_named_variant(enum_tid: i32, variant_sym: i32) -> i32:
-        if self.type_is_payload_enum(enum_tid) == 0 or variant_sym == 0:
+        if self.type_is_payload_enum(enum_tid) == false or variant_sym == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
         let target = self.sema.pool_resolve(variant_sym)
@@ -1461,7 +1461,7 @@ impl CCodegen:
         -1
 
     mut fn payload_enum_variant_for_payload_tid(enum_tid: i32, payload_tid: i32) -> i32:
-        if self.type_is_payload_enum(enum_tid) == 0 or payload_tid == 0:
+        if self.type_is_payload_enum(enum_tid) == false or payload_tid == 0:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
         var found: i32 = -1
@@ -1471,14 +1471,14 @@ impl CCodegen:
             let candidate = self.sema.type_reflection_variant_payload_type_frozen(enum_tid, vi, 0)
             if candidate == 0:
                 continue
-            if self.strict_type_match(candidate, payload_tid) != 0:
+            if self.strict_type_match(candidate, payload_tid):
                 if found >= 0:
                     return -1
                 found = vi
         found
 
     fn payload_enum_single_payload_variant(enum_tid: i32) -> i32:
-        if self.type_is_payload_enum(enum_tid) == 0:
+        if self.type_is_payload_enum(enum_tid) == false:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
         var found: i32 = -1
@@ -1491,7 +1491,7 @@ impl CCodegen:
         found
 
     fn payload_enum_single_unit_variant(enum_tid: i32) -> i32:
-        if self.type_is_payload_enum(enum_tid) == 0:
+        if self.type_is_payload_enum(enum_tid) == false:
             return -1
         let variant_count = self.sema.type_reflection_variant_count(enum_tid)
         var found: i32 = -1
@@ -1552,7 +1552,7 @@ impl CCodegen:
             return "with_fmt_i64((int64_t)(intptr_t)(" ++ expr ++ "))"
         if tk == TypeKind.TY_INT:
             return self.debug_int_format_expr(resolved as i32, expr)
-        if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32) != 0:
+        if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32):
             return self.payload_enum_format_expr(resolved as i32, expr, context)
         // A payload with no default display shows its Debug form (D61).
         self.debug_formatter_call_expr(resolved as i32, expr, context)
@@ -1722,9 +1722,9 @@ impl CCodegen:
     // {fn_ptr, ctx} whose fn_ptr always takes ctx first (Codegen.w
     // gen_fn_to_fat_ptr_thunk). TY_EXTERN_FN stays a bare C function pointer —
     // it is a foreign ABI surface, not a With fn value.
-    fn fn_tid_is_fat(tid: i32) -> i32:
+    fn fn_tid_is_fat(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
-        if self.sema.get_type_kind(resolved) == TypeKind.TY_FN: 1 else: 0
+        if self.sema.get_type_kind(resolved) == TypeKind.TY_FN: true else: false
 
     fn fat_thunk_name(fn_sym: i32, canon_tid: i32) -> str:
         let _ = self
@@ -1742,11 +1742,11 @@ impl CCodegen:
             self.fat_thunk_tids.push(canon)
         "((" ++ self.fn_type_c_name(canon) ++ ")" ++ cc_lbrace() ++ " " ++ self.fat_thunk_name(fn_sym, canon) ++ ", 0 " ++ cc_rbrace() ++ ")"
 
-    fn rvalue_is_str_const_use(body: &MirBody, rval_id: i32) -> i32:
+    fn rvalue_is_str_const_use(body: &MirBody, rval_id: i32) -> bool:
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
-            return 0
+            return false
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
-            return 0
+            return false
         self.operand_is_str_const(body, body.rval_d0[rval_id])
 
     fn rvalue_ck_fn_sym(body: &MirBody, rval_id: i32) -> i32:
@@ -1816,13 +1816,13 @@ impl CCodegen:
             return -1
         let od = body.operand_d0[callee_operand]
         let local_id = self.place_local_id(body, od)
-        if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
+        if local_id >= 0 and self.place_is_direct_local(body, od, local_id):
             if self.local_assigned_fn_sym(body, local_id) != 0:
                 return -1
         let callee_tid = self.callee_fn_type_from_operand(body, callee_operand)
         if callee_tid == 0:
             return -1
-        if self.fn_tid_is_fat(callee_tid) == 0:
+        if self.fn_tid_is_fat(callee_tid) == false:
             return -1
         od
 
@@ -1962,7 +1962,7 @@ impl CCodegen:
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
-                if self.type_is_payload_enum(tid) != 0:
+                if self.type_is_payload_enum(tid):
                     let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
                     if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
                         downcast_enum_tid = tid
@@ -2066,7 +2066,7 @@ impl CCodegen:
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
-                if self.type_is_payload_enum(tid) != 0:
+                if self.type_is_payload_enum(tid):
                     let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
                     if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
                         downcast_enum_tid = tid
@@ -2164,7 +2164,7 @@ impl CCodegen:
                     continue
                 return 0
             if pk == ProjKind.PK_DOWNCAST:
-                if self.type_is_payload_enum(tid) != 0:
+                if self.type_is_payload_enum(tid):
                     let payload_count = self.sema.type_reflection_variant_payload_count(tid, pd)
                     if payload_count > 0 and i + 1 < count and body.proj_kinds[(start + i + 1)] == ProjKind.PK_FIELD:
                         downcast_enum_tid = tid
@@ -2186,18 +2186,18 @@ impl CCodegen:
             return 0
         tid
 
-    mut fn type_match(expected: i32, actual: i32) -> i32:
+    mut fn type_match(expected: i32, actual: i32) -> bool:
         if expected == 0 or actual == 0:
-            return 1
-        if self.sema.types_compatible_frozen(expected, actual) != 0:
-            return 1
-        if self.sema.types_compatible_frozen(actual, expected) != 0:
-            return 1
-        0
+            return true
+        if self.sema.types_compatible_frozen(expected, actual):
+            return true
+        if self.sema.types_compatible_frozen(actual, expected):
+            return true
+        false
 
-    mut fn strict_type_match(expected: i32, actual: i32) -> i32:
+    mut fn strict_type_match(expected: i32, actual: i32) -> bool:
         if expected == 0 or actual == 0:
-            return 1
+            return true
         let e = self.sema.resolve_alias(expected)
         let a = self.sema.resolve_alias(actual)
         let ek = self.sema.get_type_kind(e)
@@ -2206,8 +2206,8 @@ impl CCodegen:
             let en = self.sema.get_type_d0(e)
             let an = self.sema.get_type_d0(a)
             if en == an:
-                return 1
-            return 0
+                return true
+            return false
         self.type_match(e, a)
 
     fn is_scalar_like_tid(tid: i32) -> bool:
@@ -2215,7 +2215,7 @@ impl CCodegen:
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_ENUM:
             return true
-        if self.type_is_distinct(resolved as i32) != 0:
+        if self.type_is_distinct(resolved as i32):
             return true
         false
 
@@ -2227,7 +2227,7 @@ impl CCodegen:
             return current_tid
         if current_tid == 0 or self.is_void_tid(current_tid):
             return cand
-        if self.strict_type_match(current_tid, cand) != 0:
+        if self.strict_type_match(current_tid, cand):
             return current_tid
         let cur_scalar = self.is_scalar_like_tid(current_tid)
         let cand_scalar = self.is_scalar_like_tid(cand)
@@ -2287,11 +2287,11 @@ impl CCodegen:
         if tk == TypeKind.TY_STR:
             return "with_str"
         if tk == TypeKind.TY_STRUCT:
-            if self.type_is_c_void(resolved as i32) != 0:
+            if self.type_is_c_void(resolved as i32):
                 return "void"
             return self.struct_c_name(resolved)
         if tk == TypeKind.TY_ENUM:
-            if self.type_is_payload_enum(resolved as i32) != 0:
+            if self.type_is_payload_enum(resolved as i32):
                 return self.struct_c_name(resolved)
             return "int32_t"
         // #1810: a shared `&str` is a view, `{ptr, len}` by value — the
@@ -2320,7 +2320,7 @@ impl CCodegen:
                 if (tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF) and self.sema.get_type_d1(resolved) == 0:
                     return "const void*"
                 return "void*"
-            if self.type_is_c_void(inner_resolved as i32) != 0:
+            if self.type_is_c_void(inner_resolved as i32):
                 if (tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF) and self.sema.get_type_d1(resolved) == 0:
                     return "const void*"
                 return "void*"
@@ -2353,7 +2353,7 @@ impl CCodegen:
             // with-abi §3 (#2036): the nullable pointer is its payload's type.
             if self.option_is_nullable_pointer(resolved as i32):
                 return self.c_type(self.sema.get_generic_inst_arg(resolved as i32, 0), 0)
-            if self.type_is_payload_enum(resolved as i32) != 0:
+            if self.type_is_payload_enum(resolved as i32):
                 return self.struct_c_name(resolved)
             // Other generic types: treat as opaque struct
             return self.struct_c_name(resolved)
@@ -2525,23 +2525,23 @@ impl CCodegen:
         let base_sym = self.sema.get_generic_inst_base(resolved as i32)
         cc_intern_resolve(self.intern, base_sym)
 
-    fn generic_inst_needs_struct_def(tid: i32) -> i32:
+    fn generic_inst_needs_struct_def(tid: i32) -> bool:
         let base_name = self.generic_inst_base_name(tid)
         if base_name == "ListSlot":
-            return 1
+            return true
         if base_name == "ListIter":
-            return 1
+            return true
         if base_name == "ListIterPlace":
-            return 1
+            return true
         if base_name == "HashMapEntry":
-            return 1
+            return true
         if base_name == "Handle":
-            return 1
+            return true
         if base_name == "SlotMapSlot":
-            return 1
+            return true
         if base_name == "Atomic":
-            return 1
-        0
+            return true
+        false
 
     // An instance of a declared generic struct (`Wrap[str]`, std's
     // `Box[Node]`, `BTreeMap[i32, str]`): Sema's reflection names its fields
@@ -2552,7 +2552,7 @@ impl CCodegen:
         let resolved = self.sema.resolve_alias(tid)
         if self.sema.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST or self.std_box_pointee_tid(resolved as i32) != 0:
             return false
-        if self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.type_is_payload_enum(resolved as i32) != 0:
+        if self.generic_inst_needs_struct_def(resolved as i32) or self.type_is_payload_enum(resolved as i32):
             return false
         let base_name = self.generic_inst_base_name(resolved as i32)
         if base_name == "List" or base_name == "HashMap" or base_name == "HashSet" or base_name == "SlotMap":
@@ -2565,7 +2565,7 @@ impl CCodegen:
     // LLVM backend (sema_type_to_llvm): its T, or 0 for any other type.
     fn std_box_pointee_tid(tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(tid)
-        if self.sema.type_is_std_box_inst(resolved as i32) == 0:
+        if self.sema.type_is_std_box_inst(resolved as i32) == false:
             return 0
         self.sema.get_generic_inst_arg(resolved as i32, 0)
 
@@ -2593,7 +2593,7 @@ impl CCodegen:
         let kind = self.sema.get_type_kind(resolved as TypeId)
         if self.option_is_nullable_pointer(resolved):
             return false
-        kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_TUPLE or self.type_is_payload_enum(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
+        kind == TypeKind.TY_STRUCT or kind == TypeKind.TY_TUPLE or self.type_is_payload_enum(resolved) or self.generic_inst_is_declared_struct(resolved)
 
     // A field of a generic instance: a declared struct's own field, or a
     // field the backend synthesizes for a modeled container (List's ptr/len).
@@ -2694,7 +2694,7 @@ impl CCodegen:
                 continue
             if out == 0:
                 out = value_tid
-            else if self.strict_type_match(out, value_tid) == 0:
+            else if self.strict_type_match(out, value_tid) == false:
                 return 0
         out
 
@@ -2710,7 +2710,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -2722,14 +2722,14 @@ impl CCodegen:
                     let src_ok = body.operand_kinds[src_operand]
                     if src_ok == OperandKind.OK_COPY or src_ok == OperandKind.OK_MOVE:
                         let src_place = body.operand_d0[src_operand]
-                        if self.place_is_direct_local(body, src_place, local_id) != 0:
+                        if self.place_is_direct_local(body, src_place, local_id):
                             continue
                 let src_elem_tid = self.list_element_tid(self.operand_tid(body, src_operand))
                 if src_elem_tid == 0 or self.is_void_tid(src_elem_tid):
                     continue
                 if out == 0:
                     out = src_elem_tid
-                else if self.strict_type_match(out, src_elem_tid) == 0:
+                else if self.strict_type_match(out, src_elem_tid) == false:
                     return 0
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
@@ -2739,14 +2739,14 @@ impl CCodegen:
             if self.call_arg_count(body, args_id) < 2:
                 continue
             let recv_place = self.call_first_arg_place_id(body, args_id)
-            if self.place_is_direct_local(body, recv_place, local_id) == 0:
+            if self.place_is_direct_local(body, recv_place, local_id) == false:
                 continue
             let elem_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 1))
             if elem_tid == 0 or self.is_void_tid(elem_tid):
                 continue
             if out == 0:
                 out = elem_tid
-            else if self.strict_type_match(out, elem_tid) == 0:
+            else if self.strict_type_match(out, elem_tid) == false:
                 return 0
         out
 
@@ -2794,13 +2794,13 @@ impl CCodegen:
         if call_ret != 0 and self.is_void_tid(call_ret) == false:
             let call_ret_resolved = self.sema.resolve_alias(call_ret)
             let call_ret_kind = self.sema.get_type_kind(call_ret_resolved)
-            if self.type_is_payload_enum(call_ret) != 0:
+            if self.type_is_payload_enum(call_ret):
                 self.local_effective_cache.insert(cache_key, call_ret)
                 return call_ret
             if self.is_void_tid(declared) or declared_resolved == 0 or declared_kind == TypeKind.TY_ERR:
                 self.local_effective_cache.insert(cache_key, call_ret)
                 return call_ret
-            if declared_kind != call_ret_kind or self.strict_type_match(declared, call_ret) == 0:
+            if declared_kind != call_ret_kind or self.strict_type_match(declared, call_ret) == false:
                 if declared_kind == TypeKind.TY_GENERIC_INST and call_ret_kind == TypeKind.TY_GENERIC_INST:
                     self.local_effective_cache.insert(cache_key, call_ret)
                     return call_ret
@@ -2815,7 +2815,7 @@ impl CCodegen:
         if self.is_void_tid(declared) == false and (declared_resolved == 0 or declared_kind != TypeKind.TY_ERR):
             if declared_kind == TypeKind.TY_GENERIC_INST:
                 let inferred_generic = self.infer_local_tid(body, local_id)
-                if inferred_generic != 0 and self.is_void_tid(inferred_generic) == false and self.type_is_payload_enum(inferred_generic) != 0:
+                if inferred_generic != 0 and self.is_void_tid(inferred_generic) == false and self.type_is_payload_enum(inferred_generic):
                     self.local_effective_cache.insert(cache_key, inferred_generic)
                     return inferred_generic
             self.local_effective_cache.insert(cache_key, declared)
@@ -2860,7 +2860,7 @@ impl CCodegen:
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
             let dest_place = body.term_data2(bb)
-            if self.place_is_direct_local(body, dest_place, local_id) == 0:
+            if self.place_is_direct_local(body, dest_place, local_id) == false:
                 continue
             let args_id = body.term_data1(bb)
             let callee_operand = body.term_data0(bb)
@@ -2873,11 +2873,11 @@ impl CCodegen:
             let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
             if ret_tid == 0 or self.is_void_tid(ret_tid):
                 continue
-            if self.type_is_payload_enum(ret_tid) == 0:
+            if self.type_is_payload_enum(ret_tid) == false:
                 continue
             if out == 0:
                 out = ret_tid
-            else if self.strict_type_match(out, ret_tid) == 0:
+            else if self.strict_type_match(out, ret_tid) == false:
                 out = 0
                 break
         self.local_call_ret_cache.insert(cache_key, out)
@@ -2903,7 +2903,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -2918,16 +2918,16 @@ impl CCodegen:
                     continue
                 let src_place = body.operand_d0[src_operand]
                 let src_local = self.place_local_id(body, src_place)
-                if src_local < 0 or self.place_is_direct_local(body, src_place, src_local) == 0:
+                if src_local < 0 or self.place_is_direct_local(body, src_place, src_local) == false:
                     continue
                 var src_tid = self.local_direct_call_return_tid(body, src_local)
                 if src_tid == 0:
                     src_tid = self.local_payload_downcast_option_tid(body, src_local)
-                if self.type_is_payload_enum(src_tid) == 0:
+                if self.type_is_payload_enum(src_tid) == false:
                     continue
                 if out == 0:
                     out = src_tid
-                else if self.strict_type_match(out, src_tid) == 0:
+                else if self.strict_type_match(out, src_tid) == false:
                     self.local_copied_payload_cache.insert(cache_key, -1)
                     return 0
         self.local_copied_payload_cache.insert(cache_key, out)
@@ -2955,7 +2955,7 @@ impl CCodegen:
     // the projection after the downcast ignored.
     mut fn local_declared_non_option_payload_enum(body: &MirBody, local_id: i32) -> bool:
         let declared = self.sema.resolve_alias(self.local_declared_tid(body, local_id) as TypeId) as i32
-        self.type_is_payload_enum(declared) != 0
+        self.type_is_payload_enum(declared)
 
     mut fn local_payload_downcast_option_tid(body: &MirBody, local_id: i32) -> i32:
         if local_id < 0:
@@ -3000,7 +3000,7 @@ impl CCodegen:
                     continue
                 if out == 0:
                     out = opt_tid
-                else if self.strict_type_match(out, opt_tid) == 0:
+                else if self.strict_type_match(out, opt_tid) == false:
                     self.local_downcast_option_cache.insert(cache_key, -1)
                     return 0
         self.local_downcast_option_cache.insert(cache_key, out)
@@ -3032,7 +3032,7 @@ impl CCodegen:
         if current == 0:
             values[local_id] = tid
             return values
-        if self.strict_type_match(current, tid) == 0:
+        if self.strict_type_match(current, tid) == false:
             values[local_id] = -1
         values
 
@@ -3078,7 +3078,7 @@ impl CCodegen:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
                 let dst_local = self.place_local_id(body, dst_place)
-                if self.place_is_direct_local(body, dst_place, dst_local) == 0:
+                if self.place_is_direct_local(body, dst_place, dst_local) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -3093,12 +3093,12 @@ impl CCodegen:
                     continue
                 let src_place = body.operand_d0[src_operand]
                 let src_local = self.place_local_id(body, src_place)
-                if src_local < 0 or self.place_is_direct_local(body, src_place, src_local) == 0:
+                if src_local < 0 or self.place_is_direct_local(body, src_place, src_local) == false:
                     continue
                 var src_tid = self.local_direct_call_return_tid(body, src_local)
                 if src_tid == 0:
                     src_tid = cc_list_tid_at(downcast_option_tids, src_local)
-                if self.type_is_payload_enum(src_tid) == 0:
+                if self.type_is_payload_enum(src_tid) == false:
                     continue
                 out = self.record_local_tid(move out, dst_local, src_tid)
         out
@@ -3113,42 +3113,42 @@ impl CCodegen:
         let local_id = self.place_local_id(body, place_id)
         self.local_declared_tid(body, local_id)
 
-    fn place_is_direct_local(body: &MirBody, place_id: i32, local_id: i32) -> i32:
+    fn place_is_direct_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
         let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
-            return 0
+            return false
         if body.place_locals[place_id] != local_id:
-            return 0
+            return false
         if body.place_proj_counts[place_id] != 0:
-            return 0
-        1
+            return false
+        true
 
-    fn place_uses_local(body: &MirBody, place_id: i32, local_id: i32) -> i32:
+    fn place_uses_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
         let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
-            return 0
+            return false
         if body.place_locals[place_id] == local_id:
-            return 1
-        0
+            return true
+        false
 
-    fn local_is_read(body: &MirBody, local_id: i32) -> i32:
+    fn local_is_read(body: &MirBody, local_id: i32) -> bool:
         if local_id < 0:
-            return 0
+            return false
         for oi in 0..body.operand_kinds.len():
             let ok = body.operand_kinds[oi]
             if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                 continue
             let place_id = body.operand_d0[oi]
-            if self.place_uses_local(body, place_id, local_id) != 0:
-                return 1
-        0
+            if self.place_uses_local(body, place_id, local_id):
+                return true
+        false
 
-    fn operand_uses_local(body: &MirBody, operand_id: i32, local_id: i32) -> i32:
+    fn operand_uses_local(body: &MirBody, operand_id: i32, local_id: i32) -> bool:
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
-            return 0
+            return false
         let ok = body.operand_kinds[operand_id]
         if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
-            return 0
+            return false
         let place_id = body.operand_d0[operand_id]
         self.place_uses_local(body, place_id, local_id)
 
@@ -3160,13 +3160,13 @@ impl CCodegen:
             return -1
         let place_id = body.operand_d0[operand_id]
         let local_id = self.place_local_id(body, place_id)
-        if self.place_is_direct_local(body, place_id, local_id) == 0:
+        if self.place_is_direct_local(body, place_id, local_id) == false:
             return -1
         local_id
 
-    fn rvalue_uses_local(body: &MirBody, rval_id: i32, local_id: i32) -> i32:
+    fn rvalue_uses_local(body: &MirBody, rval_id: i32, local_id: i32) -> bool:
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
-            return 0
+            return false
         let rk = body.rval_kinds[rval_id]
         let d0 = body.rval_d0[rval_id]
         let d1 = body.rval_d1[rval_id]
@@ -3176,40 +3176,40 @@ impl CCodegen:
         if rk == RvalueKind.RK_ARRAY_FILL:
             return self.operand_uses_local(body, d0, local_id)
         if rk == RvalueKind.RK_BIN_OP:
-            if self.operand_uses_local(body, d1, local_id) != 0:
-                return 1
+            if self.operand_uses_local(body, d1, local_id):
+                return true
             return self.operand_uses_local(body, d2, local_id)
         if rk == RvalueKind.RK_STR_CONCAT_N:
             if d0 < 0 or d0 >= body.call_arg_starts.len():
-                return 0
+                return false
             let start = body.call_arg_starts[d0]
             let count = body.call_arg_counts[d0]
             for i in 0..count:
-                if self.operand_uses_local(body, body.call_arg_operands[(start + i)], local_id) != 0:
-                    return 1
-            return 0
+                if self.operand_uses_local(body, body.call_arg_operands[(start + i)], local_id):
+                    return true
+            return false
         if rk == RvalueKind.RK_UN_OP:
             return self.operand_uses_local(body, d1, local_id)
         if rk == RvalueKind.RK_REF or rk == RvalueKind.RK_ADDR_OF or rk == RvalueKind.RK_DISCRIMINANT or rk == RvalueKind.RK_LEN:
             return self.place_uses_local(body, d0, local_id)
         if rk == RvalueKind.RK_SLICE:
-            if self.place_uses_local(body, d0, local_id) != 0:
-                return 1
-            if self.operand_uses_local(body, d1, local_id) != 0:
-                return 1
+            if self.place_uses_local(body, d0, local_id):
+                return true
+            if self.operand_uses_local(body, d1, local_id):
+                return true
             return self.operand_uses_local(body, d2, local_id)
         if rk == RvalueKind.RK_CAST:
             return self.operand_uses_local(body, d0, local_id)
         if rk == RvalueKind.RK_AGGREGATE:
             let fields_id = body.rval_d1[rval_id]
             if fields_id < 0 or fields_id >= body.agg_field_starts.len():
-                return 0
+                return false
             let start = body.agg_field_starts[fields_id]
             let count = body.agg_field_counts[fields_id]
             for i in 0..count:
-                if self.operand_uses_local(body, body.agg_field_operands[(start + i)], local_id) != 0:
-                    return 1
-        0
+                if self.operand_uses_local(body, body.agg_field_operands[(start + i)], local_id):
+                    return true
+        false
 
     mut fn local_value_use_mark_place(body: &MirBody, place_id: i32):
         let local_id = self.place_local_id(body, place_id)
@@ -3419,7 +3419,7 @@ impl CCodegen:
                 let field_name = cc_member(cc_intern_resolve(self.intern, pd))
                 // A distinct type is its inner type in C (`typedef double
                 // TotalF64`): `.value` is the same object, no member.
-                if tk == TypeKind.TY_STRUCT and field_name == "value" and self.type_is_distinct(resolved as i32) != 0:
+                if tk == TypeKind.TY_STRUCT and field_name == "value" and self.type_is_distinct(resolved as i32):
                     current_tid = self.struct_field_tid(resolved as i32, pd)
                     continue
                 out = out ++ "." ++ field_name
@@ -3470,7 +3470,7 @@ impl CCodegen:
                     current_tid = self.std_box_pointee_tid(resolved as i32)
                 continue
             if pk == ProjKind.PK_DOWNCAST:
-                if self.type_is_payload_enum(current_tid) != 0:
+                if self.type_is_payload_enum(current_tid):
                     let payload_count = self.sema.type_reflection_variant_payload_count(current_tid, pd)
                     if payload_count == 0:
                         self.fail(f"payload downcast for unit variant {pd} of enum " ++ self.sema.type_name(current_tid))
@@ -3926,7 +3926,7 @@ impl CCodegen:
             return "1"
         let inner = self.sema.get_type_d0(resolved)
         let inner_resolved = self.sema.resolve_alias(inner as TypeId)
-        if self.sema.get_type_kind(inner_resolved) == TypeKind.TY_VOID or self.type_is_c_void(inner_resolved as i32) != 0:
+        if self.sema.get_type_kind(inner_resolved) == TypeKind.TY_VOID or self.type_is_c_void(inner_resolved as i32):
             return "1"
         "sizeof(" ++ self.c_type(inner, 0) ++ ")"
 
@@ -4128,7 +4128,7 @@ impl CCodegen:
         let dst_c = self.c_type(dst_tid, 0)
         let aggregate_kind = body.rval_d0[rval_id]
         if aggregate_kind != 0:
-            if self.type_is_payload_enum(dst_tid) == 0:
+            if self.type_is_payload_enum(dst_tid) == false:
                 if dst_tk == TypeKind.TY_ENUM:
                     let tag = self.sema.type_reflection_variant_discriminant(dst_tid, body.rval_d2[rval_id])
                     return f"{tag}"
@@ -4138,7 +4138,7 @@ impl CCodegen:
                 let payload_op: i32 = body.agg_field_operands[start]
                 var payload_text = self.operand_text(body, payload_op)
                 let payload_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, variant_index, 0)
-                if self.fn_tid_is_fat(payload_tid) != 0:
+                if self.fn_tid_is_fat(payload_tid):
                     let payload_fn_sym = self.operand_ck_fn_sym(body, payload_op)
                     if payload_fn_sym != 0:
                         payload_text = self.fat_fn_literal(payload_fn_sym, self.sema.resolve_alias(payload_tid) as i32)
@@ -4155,7 +4155,7 @@ impl CCodegen:
                     let field_op: i32 = body.agg_field_operands[(start + pi)]
                     var field_text = self.operand_text(body, field_op)
                     let field_tid = self.sema.type_reflection_variant_payload_type_frozen(dst_tid, variant_index, pi)
-                    if self.fn_tid_is_fat(field_tid) != 0:
+                    if self.fn_tid_is_fat(field_tid):
                         let field_fn_sym = self.operand_ck_fn_sym(body, field_op)
                         if field_fn_sym != 0:
                             field_text = self.fat_fn_literal(field_fn_sym, self.sema.resolve_alias(field_tid) as i32)
@@ -4192,7 +4192,7 @@ impl CCodegen:
                         agg_field_tid = self.sema.type_extra[(t_start + i)]
                 let field_op: i32 = body.agg_field_operands[(start + i)]
                 var field_text = self.operand_text(body, field_op)
-                if agg_field_tid != 0 and self.fn_tid_is_fat(agg_field_tid) != 0:
+                if agg_field_tid != 0 and self.fn_tid_is_fat(agg_field_tid):
                     let agg_fn_sym = self.operand_ck_fn_sym(body, field_op)
                     if agg_fn_sym != 0:
                         field_text = self.fat_fn_literal(agg_fn_sym, self.sema.resolve_alias(agg_field_tid) as i32)
@@ -4484,7 +4484,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -4507,7 +4507,7 @@ impl CCodegen:
                     let src_local = self.place_local_id(body, od)
                     if src_local < 0:
                         continue
-                    if self.place_is_direct_local(body, od, src_local) == 0:
+                    if self.place_is_direct_local(body, od, src_local) == false:
                         continue
                     cand = self.local_assigned_fn_sym_depth(body, src_local, depth + 1)
                     if cand == -2:
@@ -4542,7 +4542,7 @@ impl CCodegen:
             let local_id = self.place_local_id(body, od)
             if local_id < 0:
                 return 0
-            if self.place_is_direct_local(body, od, local_id) == 0:
+            if self.place_is_direct_local(body, od, local_id) == false:
                 return 0
             let inferred = self.local_assigned_fn_sym(body, local_id)
             if inferred > 0:
@@ -4566,26 +4566,26 @@ impl CCodegen:
             return -1
         body.operand_d0[first_arg]
 
-    fn place_same(body: &MirBody, a: i32, b: i32) -> i32:
+    fn place_same(body: &MirBody, a: i32, b: i32) -> bool:
         let _ = self
         if a < 0 or b < 0:
-            return 0
+            return false
         if a >= body.place_locals.len() or b >= body.place_locals.len():
-            return 0
+            return false
         if body.place_locals[a] != body.place_locals[b]:
-            return 0
+            return false
         let ac = body.place_proj_counts[a]
         let bc = body.place_proj_counts[b]
         if ac != bc:
-            return 0
+            return false
         let astart = body.place_proj_starts[a]
         let bstart = body.place_proj_starts[b]
         for i in 0..ac:
             if body.proj_kinds[(astart + i)] != body.proj_kinds[(bstart + i)]:
-                return 0
+                return false
             if body.proj_d0[(astart + i)] != body.proj_d0[(bstart + i)]:
-                return 0
-        1
+                return false
+        true
 
     fn place_kind_cache_lookup(body_fn_sym: i32, place_id: i32) -> Option[CcPlaceKind]:
         let raw = self.place_kind_cache.get(cc_body_local_cache_key(body_fn_sym, place_id))
@@ -4651,7 +4651,7 @@ impl CCodegen:
                 continue
             let args_id = body.term_data1(bb)
             let first_place = self.call_first_arg_place_id(body, args_id)
-            if self.place_same(body, first_place, place_id) == 0:
+            if self.place_same(body, first_place, place_id) == false:
                 continue
             let method = self.call_method_base_name(body, body.term_data0(bb))
             if method.len() == 0:
@@ -4707,7 +4707,7 @@ impl CCodegen:
                 continue
             let args_id = body.term_data1(bb)
             let first_place = self.call_first_arg_place_id(body, args_id)
-            if self.place_is_direct_local(body, first_place, local_id) == 0:
+            if self.place_is_direct_local(body, first_place, local_id) == false:
                 continue
             let method = self.call_method_base_name(body, body.term_data0(bb))
             if method.len() == 0:
@@ -4754,9 +4754,9 @@ impl CCodegen:
                 let dst_local = self.place_local_id(body, dst_place)
                 if src_local < 0 or dst_local < 0:
                     continue
-                if self.place_is_direct_local(body, src_place, src_local) == 0:
+                if self.place_is_direct_local(body, src_place, src_local) == false:
                     continue
-                if self.place_is_direct_local(body, dst_place, dst_local) == 0:
+                if self.place_is_direct_local(body, dst_place, dst_local) == false:
                     continue
                 if src_local == local_id:
                     let k = self.local_place_kind_depth(body, dst_local, depth + 1)
@@ -4808,22 +4808,22 @@ impl CCodegen:
             return dest_tid
         0
 
-    fn sig_matches_call_name(sig_sym: i32, fn_sym: i32) -> i32:
+    fn sig_matches_call_name(sig_sym: i32, fn_sym: i32) -> bool:
         if sig_sym == fn_sym:
-            return 1
+            return true
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
-            return 0
+            return false
         let sig_text = cc_intern_resolve(self.intern, sig_sym)
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             if sig_text == raw:
-                return 1
-            return 0
+                return true
+            return false
         if sig_text == raw:
-            return 1
-        if cc_str_ends_with(sig_text, "." ++ raw) != 0:
-            return 1
-        0
+            return true
+        if cc_str_ends_with(sig_text, "." ++ raw):
+            return true
+        false
 
     mut fn infer_named_call_sym_scan(body: &MirBody, fn_sym: i32, args_id: i32, dest_place: i32, only_local_defs: i32) -> i32:
         let raw = cc_intern_resolve(self.intern, fn_sym)
@@ -4838,13 +4838,13 @@ impl CCodegen:
             let sym: i32 = self.sema.sig_names[si]
             if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
-            if self.sig_matches_call_name(sym, fn_sym) == 0:
+            if self.sig_matches_call_name(sym, fn_sym) == false:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
@@ -4853,7 +4853,7 @@ impl CCodegen:
                 if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -4861,7 +4861,7 @@ impl CCodegen:
             var score = 0
             if sym == fn_sym or sym_text == raw:
                 score = score + 4
-            if cc_str_contains_dot(raw) == 0 and cc_str_ends_with(sym_text, "." ++ raw) != 0:
+            if cc_str_contains_dot(raw) == false and cc_str_ends_with(sym_text, "." ++ raw):
                 score = score + 2
             if self.has_body_for_sym(sym):
                 score = score + 1
@@ -4900,7 +4900,7 @@ impl CCodegen:
         for i in 0..self.mir_mod.body_fn_syms.len():
             let cand: i32 = self.mir_mod.body_fn_syms[i]
             let cand_text = cc_intern_resolve(self.intern, cand)
-            if cc_name_matches(cand_text, raw) == 0:
+            if cc_name_matches(cand_text, raw) == false:
                 continue
             let sig_idx = self.sig_index_for_sym(cand)
             if sig_idx < 0:
@@ -4908,7 +4908,7 @@ impl CCodegen:
             if self.sema.sig_get_param_count(sig_idx) != argc:
                 continue
             let ret_tid = self.c_sig_return_type(sig_idx)
-            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..argc:
@@ -4917,7 +4917,7 @@ impl CCodegen:
                 if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(sig_idx, ai)
-                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -4925,11 +4925,11 @@ impl CCodegen:
             var score = 0
             if cand_text == raw:
                 score = score + 4
-            if cc_str_ends_with(cand_text, "." ++ raw) != 0:
+            if cc_str_ends_with(cand_text, "." ++ raw):
                 score = score + 3
             if first_owner.len() > 0:
                 let owner = cc_owner_prefix(cand_text)
-                if owner == first_owner or cc_str_ends_with(owner, "." ++ first_owner) != 0:
+                if owner == first_owner or cc_str_ends_with(owner, "." ++ first_owner):
                     score = score + 2
             if score > match_score:
                 match_score = score
@@ -4950,7 +4950,7 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
@@ -4959,7 +4959,7 @@ impl CCodegen:
                 if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -4986,14 +4986,14 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let ret_tid = self.c_sig_return_type(si)
-            if self.type_match(dest_tid, ret_tid) == 0:
+            if self.type_match(dest_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 let arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.type_match(p_tid, arg_tid) == 0:
+                if self.type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -5021,7 +5021,7 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si as i32) != arg_count:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
-            if cc_str_ends_with(sym_text, wanted) == 0:
+            if cc_str_ends_with(sym_text, wanted) == false:
                 continue
             if out.len() > 0:
                 out = out ++ ", "
@@ -5076,7 +5076,7 @@ impl CCodegen:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return 0
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             return 0
         if self.call_arg_count(body, args_id) <= 0:
             return 0
@@ -5087,7 +5087,7 @@ impl CCodegen:
         let full = owner ++ "." ++ raw
         self.lookup_body_sym_by_name(full)
 
-    fn method_infer_active(method_sym: i32, args_id: i32, dest_place: i32) -> i32:
+    fn method_infer_active(method_sym: i32, args_id: i32, dest_place: i32) -> bool:
         for i in 0..self.active_method_syms.len():
             if self.active_method_syms[i] != method_sym:
                 continue
@@ -5095,8 +5095,8 @@ impl CCodegen:
                 continue
             if self.active_method_dests[i] != dest_place:
                 continue
-            return 1
-        0
+            return true
+        false
 
     mut fn method_infer_push(method_sym: i32, args_id: i32, dest_place: i32) -> Unit:
         self.active_method_syms.push(method_sym)
@@ -5110,14 +5110,14 @@ impl CCodegen:
         self.active_method_args.pop()
         self.active_method_dests.pop()
 
-    fn direct_infer_active(args_id: i32, dest_place: i32) -> i32:
+    fn direct_infer_active(args_id: i32, dest_place: i32) -> bool:
         for i in 0..self.active_direct_args.len():
             if self.active_direct_args[i] != args_id:
                 continue
             if self.active_direct_dests[i] != dest_place:
                 continue
-            return 1
-        0
+            return true
+        false
 
     mut fn direct_infer_push(args_id: i32, dest_place: i32) -> Unit:
         self.active_direct_args.push(args_id)
@@ -5210,11 +5210,11 @@ impl CReach:
         let n = text.len()
         while i < n:
             let c = text[i]
-            if cc_is_ident_char(c) == 0:
+            if cc_is_ident_char(c) == false:
                 i += 1
                 continue
             let start = i
-            while i < n and cc_is_ident_char(text[i]) != 0: i += 1
+            while i < n and cc_is_ident_char(text[i]): i += 1
             if not is_digit(text[i - 1] as i32) or i - start < 4: continue
             let id = text.slice(start, i)
             if not id.contains("__"): continue
@@ -5283,7 +5283,7 @@ impl CCodegen:
                 if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                     continue
                 let p = body.operand_d0[arg_operand]
-                if self.place_is_direct_local(body, p, local_id) == 0:
+                if self.place_is_direct_local(body, p, local_id) == false:
                     continue
                 let param_count = self.sema.sig_get_param_count(sig_idx)
                 if ai < 0 or ai >= param_count:
@@ -5294,7 +5294,7 @@ impl CCodegen:
                 if hint_tid == 0 or self.is_void_tid(hint_tid):
                     hint_tid = p_tid
                     continue
-                if self.type_match(hint_tid, p_tid) != 0:
+                if self.type_match(hint_tid, p_tid):
                     continue
             if hint_tid != 0 and self.is_void_tid(hint_tid) == false:
                 self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
@@ -5360,10 +5360,10 @@ impl CCodegen:
                 if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                     continue
                 let src_place = body.operand_d0[src_operand]
-                if self.place_is_direct_local(body, src_place, local_id) == 0:
+                if self.place_is_direct_local(body, src_place, local_id) == false:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) != 0:
+                if self.place_is_direct_local(body, dst_place, local_id):
                     continue
                 let dst_tid = self.place_tid_no_infer(body, dst_place)
                 if dst_tid == 0 or self.is_void_tid(dst_tid):
@@ -5379,7 +5379,7 @@ impl CCodegen:
         let cache_hit = self.call_infer_cache_lookup("direct", body.fn_sym, 0, args_id, dest_place)
         if cache_hit != -1234567:
             return cache_hit
-        if self.direct_infer_active(args_id, dest_place) != 0:
+        if self.direct_infer_active(args_id, dest_place):
             self.call_infer_cache_store("direct", body.fn_sym, 0, args_id, dest_place, 0)
             return 0
         self.direct_infer_push(args_id, dest_place)
@@ -5397,7 +5397,7 @@ impl CCodegen:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return ""
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             return cc_owner_prefix(raw)
         let wanted = "." ++ raw
         let arg_count = self.call_arg_count(body, args_id)
@@ -5406,7 +5406,7 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si as i32) != arg_count:
                 continue
             let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
-            if cc_str_ends_with(sym_text, wanted) == 0:
+            if cc_str_ends_with(sym_text, wanted) == false:
                 continue
             let owner = cc_owner_prefix(sym_text)
             if owner.len() == 0:
@@ -5424,7 +5424,7 @@ impl CCodegen:
             if body.term_kind(bb) != TermKind.TK_CALL:
                 continue
             let dest_place = body.term_data2(bb)
-            if self.place_is_direct_local(body, dest_place, local_id) == 0:
+            if self.place_is_direct_local(body, dest_place, local_id) == false:
                 continue
             let callee_operand = body.term_data0(bb)
             if callee_operand < 0 or callee_operand >= body.operand_kinds.len():
@@ -5452,7 +5452,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -5485,7 +5485,7 @@ impl CCodegen:
             if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                 continue
             let p = body.operand_d0[first_arg]
-            if self.place_is_direct_local(body, p, local_id) == 0:
+            if self.place_is_direct_local(body, p, local_id) == false:
                 continue
             let callee_operand = body.term_data0(bb)
             if callee_operand < 0 or callee_operand >= body.operand_kinds.len():
@@ -5529,12 +5529,12 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
-            if cc_str_ends_with(sym_text, wanted) == 0:
+            if cc_str_ends_with(sym_text, wanted) == false:
                 continue
             let owner = cc_owner_prefix(sym_text)
             let owner_matched = if preferred_owner.len() > 0 and owner == preferred_owner: 1 else: 0
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
@@ -5545,7 +5545,7 @@ impl CCodegen:
                 let p_tid = self.sema.sig_param_type(si, ai)
                 if ai == 0 and owner_matched != 0:
                     continue
-                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -5566,7 +5566,7 @@ impl CCodegen:
         let cache_hit = self.call_infer_cache_lookup("qualified-method", body.fn_sym, method_sym, args_id, dest_place)
         if cache_hit != -1234567:
             return cache_hit
-        if self.method_infer_active(method_sym, args_id, dest_place) != 0:
+        if self.method_infer_active(method_sym, args_id, dest_place):
             self.call_infer_cache_store("qualified-method", body.fn_sym, method_sym, args_id, dest_place, 0)
             return 0
         self.method_infer_push(method_sym, args_id, dest_place)
@@ -5586,7 +5586,7 @@ impl CCodegen:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return 0
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             return 0
         let first_arg_tid = self.call_first_arg_resolved_tid(body, args_id)
         let owner_text = self.type_owner_text(first_arg_tid)
@@ -5604,13 +5604,13 @@ impl CCodegen:
             if self.sema.sig_get_param_count(si) != argc:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
-            if cc_str_ends_with(sym_text, wanted) == 0:
+            if cc_str_ends_with(sym_text, wanted) == false:
                 continue
             let owner = cc_owner_prefix(sym_text)
-            if owner != owner_text and cc_str_ends_with(owner, "." ++ owner_text) == 0:
+            if owner != owner_text and cc_str_ends_with(owner, "." ++ owner_text) == false:
                 continue
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == false:
                 continue
             var params_ok = 1
             for ai in 0..argc:
@@ -5619,7 +5619,7 @@ impl CCodegen:
                 if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == false:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -5689,7 +5689,7 @@ impl CCodegen:
                 if sym == fn_sym:
                     out = si as i32
                     break
-            if out < 0 and cc_str_contains_dot(raw) != 0:
+            if out < 0 and cc_str_contains_dot(raw):
                 var match_idx: i32 = -1
                 for si in 0..self.sema.sig_names.len():
                     let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
@@ -5702,7 +5702,7 @@ impl CCodegen:
                         break
                 if match_idx >= 0:
                     out = match_idx
-            if out < 0 and cc_str_contains_dot(raw) == 0:
+            if out < 0 and cc_str_contains_dot(raw) == false:
                 // #785: a dotless name (plain extern like with_print_str) must
                 // first try the EXACT sig-name match; without it the callee sig
                 // stays unresolved and call args skip pointer marshalling.
@@ -5718,12 +5718,12 @@ impl CCodegen:
                         break
                 if exact_idx >= 0:
                     out = exact_idx
-            if out < 0 and cc_str_contains_dot(raw) == 0:
+            if out < 0 and cc_str_contains_dot(raw) == false:
                 let wanted = "." ++ raw
                 var match_idx: i32 = -1
                 for si in 0..self.sema.sig_names.len():
                     let sym_text = cc_intern_resolve(self.intern, self.sema.sig_names[si])
-                    if cc_str_ends_with(sym_text, wanted) == 0:
+                    if cc_str_ends_with(sym_text, wanted) == false:
                         continue
                     if match_idx < 0:
                         match_idx = si as i32
@@ -5740,7 +5740,7 @@ impl CCodegen:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return ""
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             return ""
         let first_kind = self.sema.get_type_kind(self.call_first_arg_resolved_tid(body, args_id))
         if first_kind != TypeKind.TY_STR:
@@ -5768,7 +5768,7 @@ impl CCodegen:
         let raw = cc_intern_resolve(self.intern, fn_sym)
         if raw.len() == 0:
             return 0
-        if cc_str_contains_dot(raw) != 0:
+        if cc_str_contains_dot(raw):
             return 0
         let first_kind = self.sema.get_type_kind(self.call_first_arg_resolved_tid(body, args_id))
         if first_kind != TypeKind.TY_STR:
@@ -6104,10 +6104,10 @@ impl CCodegen:
             if opt_tid != 0 and self.is_void_tid(opt_tid) == false:
                 return opt_tid
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == false and self.type_is_payload_enum(hinted) != 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false and self.type_is_payload_enum(hinted):
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == false and self.type_is_payload_enum(dst) != 0:
+            if dst != 0 and self.is_void_tid(dst) == false and self.type_is_payload_enum(dst):
                 return dst
             if hinted != 0 and self.is_void_tid(hinted) == false and self.is_scalar_like_tid(hinted) == false:
                 let hinted_opt = self.option_tid_for_payload(hinted)
@@ -6364,7 +6364,7 @@ impl CCodegen:
         let od = body.operand_d0[callee_operand]
         if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
             let local_id = self.place_local_id(body, od)
-            if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
+            if local_id >= 0 and self.place_is_direct_local(body, od, local_id):
                 let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
                 if local_fn_sym == -2:
                     self.fail("C backend cannot lower ambiguous indirect call")
@@ -6373,7 +6373,7 @@ impl CCodegen:
                     return self.resolve_call_named_callee(body, local_fn_sym, args_id, dest_place)
             let callee_tid = self.callee_fn_type_from_operand(body, callee_operand)
             if callee_tid != 0:
-                if self.fn_tid_is_fat(callee_tid) != 0:
+                if self.fn_tid_is_fat(callee_tid):
                     return self.place_text(body, od) ++ ".fn_ptr"
                 return self.place_text(body, od)
             let inferred = self.infer_direct_call_sym(body, args_id, dest_place)
@@ -6443,7 +6443,7 @@ impl CCodegen:
             if callee_tid != 0:
                 return self.sema.get_type_d2(callee_tid)
             let local_id = self.place_local_id(body, od)
-            if local_id >= 0 and self.place_is_direct_local(body, od, local_id) != 0:
+            if local_id >= 0 and self.place_is_direct_local(body, od, local_id):
                 let local_fn_sym = self.local_assigned_fn_sym(body, local_id)
                 if local_fn_sym > 0:
                     return self.call_return_tid_for_fn_sym(body, local_fn_sym, args_id, dest_place, fallback)
@@ -6507,7 +6507,7 @@ impl CCodegen:
                 let dest_place = body.term_data2(bb)
                 let recv_place = self.call_first_arg_place_id(body, args_id)
                 // Don't infer container type if this local is the call destination (it's the result, not the receiver)
-                if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) != 0 and self.place_is_direct_local(body, dest_place, local_id) == 0:
+                if allow_container_receiver_infer != 0 and self.place_is_direct_local(body, recv_place, local_id) and self.place_is_direct_local(body, dest_place, local_id) == false:
                     let kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
                     if kind == CcBuiltin.LIST_NEW or kind == CcBuiltin.LIST_PUSH or kind == CcBuiltin.LIST_GET or kind == CcBuiltin.LIST_LEN or kind == CcBuiltin.LIST_REMOVE or kind == CcBuiltin.LIST_CLEAR or kind == CcBuiltin.LIST_POP:
                         if recv_hint == 0:
@@ -6518,7 +6518,7 @@ impl CCodegen:
                     if kind == CcBuiltin.OPT_IS_SOME or kind == CcBuiltin.OPT_UNWRAP or kind == CcBuiltin.OPT_EXPECT:
                         if recv_hint == 0:
                             recv_hint = self.sema.ty_i64 as i32
-                if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                if self.place_is_direct_local(body, dest_place, local_id):
                     // Map get/contains/len return int64_t, not the receiver type
                     let call_kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
                     if call_kind == CcBuiltin.MAP_GET or call_kind == CcBuiltin.MAP_CONTAINS or call_kind == CcBuiltin.MAP_LEN or call_kind == CcBuiltin.OPT_IS_SOME:
@@ -6540,7 +6540,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -6635,7 +6635,7 @@ impl CCodegen:
             if inferred == 0 or self.is_void_tid(inferred):
                 self.local_infer_cache_store(body.fn_sym, local_id, hinted)
                 return hinted
-            if self.strict_type_match(inferred, hinted) == 0:
+            if self.strict_type_match(inferred, hinted) == false:
                 let inferred_scalar = self.is_scalar_like_tid(inferred)
                 let hinted_scalar = self.is_scalar_like_tid(hinted)
                 if inferred_scalar != 0 and hinted_scalar != 0:
@@ -6665,12 +6665,12 @@ impl CCodegen:
         let local_id = self.place_local_id(body, place_id)
         if local_id < 0:
             return 0
-        if self.place_is_direct_local(body, place_id, local_id) == 0:
+        if self.place_is_direct_local(body, place_id, local_id) == false:
             return 0
         self.local_ref_target_tid(body, local_id)
 
-    mut fn operand_is_pointer_value(body: &MirBody, operand_id: i32) -> i32:
-        if self.type_is_raw_pointer_tid(self.operand_tid(body, operand_id)): 1 else: 0
+    mut fn operand_is_pointer_value(body: &MirBody, operand_id: i32) -> bool:
+        if self.type_is_raw_pointer_tid(self.operand_tid(body, operand_id)): true else: false
 
     mut fn call_arg_address_text(body: &MirBody, op_id: i32, arg_text: &str) -> str:
         // A constant operand has no address; materialize it as a C99
@@ -6749,7 +6749,7 @@ impl CCodegen:
                 if arg_text == "0" or arg_text == "NULL":
                     out = out ++ "NULL"
                     continue
-                if self.operand_is_pointer_value(body, op_id) != 0:
+                if self.operand_is_pointer_value(body, op_id):
                     out = out ++ arg_text
                     continue
                 out = out ++ self.call_arg_address_text(body, op_id, arg_text)
@@ -6795,7 +6795,7 @@ impl CCodegen:
                         // range view is not terminated at its end — is lent
                         // a NUL-terminated copy (with_cstr_lend), released
                         // after the call, as the LLVM backend lends it.
-                        if self.sema.sema_type_is_c_char_pointer(p_tid) != 0 and self.operand_is_str_const(body, op_id) == 0:
+                        if self.sema.sema_type_is_c_char_pointer(p_tid) and self.operand_is_str_const(body, op_id) == false:
                             let lend_name = f"__with_lend{self.call_lends.len()}"
                             self.call_lends.push("with_cstr_lend(" ++ str_arg ++ ")")
                             out = out ++ "((" ++ self.c_type(p_tid, 0) ++ ")" ++ lend_name ++ ")"
@@ -6815,7 +6815,7 @@ impl CCodegen:
                     // propagation renders as a with_str VALUE; a `*const str`
                     // param needs a real header pointer. The array compound
                     // literal materializes it with block lifetime.
-                    if p_inner_tk == TypeKind.TY_STR and self.operand_is_str_const(body, op_id) != 0:
+                    if p_inner_tk == TypeKind.TY_STR and self.operand_is_str_const(body, op_id):
                         out = out ++ "((with_str[]){ " ++ arg_text ++ " })"
                         continue
                 // Reverse: callee expects struct by value but arg is a pointer — dereference
@@ -6832,15 +6832,15 @@ impl CCodegen:
             out = out ++ arg_text
         out
 
-    fn operand_is_str_const(body: &MirBody, op_id: i32) -> i32:
+    fn operand_is_str_const(body: &MirBody, op_id: i32) -> bool:
         if op_id < 0 or op_id >= body.operand_kinds.len():
-            return 0
+            return false
         if body.operand_kinds[op_id] != OperandKind.OK_CONSTANT:
-            return 0
+            return false
         let cd = body.operand_d0[op_id]
         if cd < 0 or cd >= body.const_kinds.len():
-            return 0
-        if body.const_kinds[cd] == ConstKind.CK_STR: 1 else: 0
+            return false
+        if body.const_kinds[cd] == ConstKind.CK_STR: true else: false
 
     // The with_str VALUE of a str-ish operand. A str and a `&str` view both
     // render as it — a view is the str's own {ptr, len} (#1810); a thin
@@ -7279,7 +7279,7 @@ impl CCodegen:
             if has_ret != 0:
                 let dst = self.place_text(body, dest_place)
                 let dst_tid = ret_tid
-                if self.type_is_payload_enum(dst_tid) != 0:
+                if self.type_is_payload_enum(dst_tid):
                     let some_variant = self.payload_enum_single_payload_variant(dst_tid)
                     let none_variant = self.payload_enum_single_unit_variant(dst_tid)
                     if some_variant < 0 or none_variant < 0:
@@ -7411,7 +7411,7 @@ impl CCodegen:
             let remove_tail = if key_glue: ")" else: ", " ++ is_str_key ++ ")"
             if recv_is_hashmap != 0:
                 let dst = self.place_text(body, dest_place)
-                if self.type_is_payload_enum(ret_tid) == 0:
+                if self.type_is_payload_enum(ret_tid) == false:
                     self.fail("HashMap.remove Option result requires a payload enum")
                     return "    abort();"
                 let some_variant = self.payload_enum_single_payload_variant(ret_tid)
@@ -7444,7 +7444,7 @@ impl CCodegen:
             let is_str_key = if self.sema.get_type_kind(self.sema.resolve_alias(key_tid as TypeId)) == TypeKind.TY_STR: "1" else: "0"
             let dst = self.place_text(body, dest_place)
             let dst_tid = ret_tid
-            if self.type_is_payload_enum(dst_tid) != 0:
+            if self.type_is_payload_enum(dst_tid):
                 let some_variant = self.payload_enum_single_payload_variant(dst_tid)
                 let none_variant = self.payload_enum_single_unit_variant(dst_tid)
                 if some_variant < 0 or none_variant < 0:
@@ -7478,7 +7478,7 @@ impl CCodegen:
             let opt_text = self.operand_text(body, opt_operand)
             let opt_tid = self.operand_tid(body, opt_operand)
             var test_text = "((" ++ opt_text ++ ") != 0)"
-            if self.type_is_payload_enum(opt_tid) != 0:
+            if self.type_is_payload_enum(opt_tid):
                 let some_variant = self.payload_enum_single_payload_variant(opt_tid)
                 if some_variant < 0:
                     self.fail("Option.is_some expects an enum with one payload-bearing variant")
@@ -7515,7 +7515,7 @@ impl CCodegen:
                     if carrier_base == self.sema.syms.option or carrier_base == self.sema.syms.result:
                         carrier_tid = carrier_candidate as i32
                         borrowed_carrier = true
-            if self.type_is_payload_enum(carrier_tid) != 0:
+            if self.type_is_payload_enum(carrier_tid):
                 let carrier_resolved = self.sema.resolve_alias(carrier_tid as TypeId)
                 let carrier_text = if borrowed_carrier: "(*(" ++ opt_text ++ "))" else: opt_text
                 let is_result = self.sema.get_type_kind(carrier_resolved) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(carrier_resolved as i32) == self.sema.syms.result
@@ -8026,7 +8026,7 @@ impl CCodegen:
             let opt_text = self.operand_text(body, opt_operand)
             let opt_tid = self.operand_tid(body, opt_operand)
             var test_text = "((" ++ opt_text ++ ") == 0)"
-            if self.type_is_payload_enum(opt_tid) != 0:
+            if self.type_is_payload_enum(opt_tid):
                 let some_variant = self.payload_enum_single_payload_variant(opt_tid)
                 if some_variant < 0:
                     self.fail("Option.is_none expects an enum with one payload-bearing variant")
@@ -8420,7 +8420,7 @@ impl CCodegen:
             // A payload enum — a declared one or a generic instance such as
             // Option[&str] — formats its variant and payload, as
             // display_format_expr does for an enum payload.
-            if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32) != 0:
+            if (tk == TypeKind.TY_ENUM or tk == TypeKind.TY_GENERIC_INST) and self.type_is_payload_enum(resolved as i32):
                 let fmt_expr = self.payload_enum_format_expr(resolved as i32, val_text, "fmt.to_str")
                 var out_enum = ""
                 if has_ret != 0:
@@ -8693,7 +8693,7 @@ impl CCodegen:
 
     mut fn collection_literal_elem_text(body: &MirBody, args_id: i32, index: i32, elem_tid: i32) -> str:
         let operand = self.call_arg_operand(body, args_id, index)
-        if self.fn_tid_is_fat(elem_tid) != 0:
+        if self.fn_tid_is_fat(elem_tid):
             let fn_sym = self.operand_ck_fn_sym(body, operand)
             if fn_sym != 0:
                 return self.fat_fn_literal(fn_sym, self.sema.resolve_alias(elem_tid as TypeId) as i32)
@@ -8773,36 +8773,36 @@ impl CCodegen:
             return out
         ""
 
-    mut fn field_place_matches(body: &MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> i32:
+    mut fn field_place_matches(body: &MirBody, place_id: i32, struct_tid: i32, field_sym: i32) -> bool:
         if place_id < 0 or place_id >= body.place_locals.len():
-            return 0
+            return false
         let count = body.place_proj_counts[place_id]
         if count != 1:
-            return 0
+            return false
         let start = body.place_proj_starts[place_id]
         if body.proj_kinds[start] != ProjKind.PK_FIELD:
-            return 0
+            return false
         if body.proj_d0[start] != field_sym:
-            return 0
+            return false
         let lid = body.place_locals[place_id]
         if lid < 0 or lid >= body.local_type_ids.len():
-            return 0
+            return false
         let base_tid = self.local_declared_tid(body, lid)
         if self.is_void_tid(base_tid):
-            return 0
+            return false
         let base_resolved = self.sema.resolve_alias(base_tid)
         let want_resolved = self.sema.resolve_alias(struct_tid)
         if self.sema.get_type_kind(base_resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         if self.sema.get_type_kind(want_resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let base_name = self.sema.get_type_d0(base_resolved)
         let want_name = self.sema.get_type_d0(want_resolved)
         if base_name == want_name:
-            return 1
+            return true
         if base_name != 0 and want_name != 0 and cc_intern_resolve(self.intern, base_name) == cc_intern_resolve(self.intern, want_name):
-            return 1
-        0
+            return true
+        false
 
     mut fn rvalue_infer_tid(body: &MirBody, rval_id: i32) -> i32:
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -8881,16 +8881,16 @@ impl CCodegen:
             return
         self.field_cache_record(base_resolved, field_sym, tid)
 
-    fn place_is_single_field(body: &MirBody, place_id: i32) -> i32:
+    fn place_is_single_field(body: &MirBody, place_id: i32) -> bool:
         let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
-            return 0
+            return false
         if body.place_proj_counts[place_id] != 1:
-            return 0
+            return false
         let start = body.place_proj_starts[place_id]
         if body.proj_kinds[start] != ProjKind.PK_FIELD:
-            return 0
-        1
+            return false
+        true
 
     mut fn build_field_cache_from_usage():
         if self.field_cache_ready != 0:
@@ -8913,7 +8913,7 @@ impl CCodegen:
                 let args_id = body.term_data1(bb)
                 let dest_place = body.term_data2(bb)
                 let recv_place = self.call_first_arg_place_id(body, args_id)
-                let recv_is_field = if recv_place >= 0: self.place_is_single_field(body, recv_place) else: 0
+                let recv_is_field = if recv_place >= 0: self.place_is_single_field(body, recv_place) else: false
                 let dest_is_field = self.place_is_single_field(body, dest_place)
                 if recv_is_field == 0 and dest_is_field == 0:
                     continue
@@ -8999,12 +8999,12 @@ impl CCodegen:
                             if ok != OperandKind.OK_COPY and ok != OperandKind.OK_MOVE:
                                 continue
                             let arg_place = body.operand_d0[arg_operand]
-                            if self.field_place_matches(body, arg_place, resolved_struct, field_sym) == 0:
+                            if self.field_place_matches(body, arg_place, resolved_struct, field_sym) == false:
                                 continue
                             let p_tid = self.sema.sig_param_type(sig_idx, ai)
                             inferred = self.prefer_inferred_tid(inferred, p_tid)
 
-                        if self.field_place_matches(body, dest_place, resolved_struct, field_sym) != 0:
+                        if self.field_place_matches(body, dest_place, resolved_struct, field_sym):
                             let ret_tid = self.c_sig_return_type(sig_idx)
                             inferred = self.prefer_inferred_tid(inferred, ret_tid)
 
@@ -9017,7 +9017,7 @@ impl CCodegen:
                     let dst_place = body.stmt_d0[stmt_id]
                     let rval_id = body.stmt_d1[stmt_id]
 
-                    if self.field_place_matches(body, dst_place, resolved_struct, field_sym) != 0:
+                    if self.field_place_matches(body, dst_place, resolved_struct, field_sym):
                         var rv_tid: i32 = 0
                         if rval_id >= 0 and rval_id < body.rval_kinds.len():
                             let rk = body.rval_kinds[rval_id]
@@ -9029,7 +9029,7 @@ impl CCodegen:
                                     let od = body.operand_d0[rd0]
                                     if ok == OperandKind.OK_COPY or ok == OperandKind.OK_MOVE:
                                         let src_local = self.place_local_id(body, od)
-                                        if src_local >= 0 and self.place_is_direct_local(body, od, src_local) != 0:
+                                        if src_local >= 0 and self.place_is_direct_local(body, od, src_local):
                                             rv_tid = self.local_declared_tid(body, src_local)
                                     else if ok == OperandKind.OK_CONSTANT:
                                         if od >= 0 and od < body.const_types.len():
@@ -9063,12 +9063,12 @@ impl CCodegen:
                     if src_ok != OperandKind.OK_COPY and src_ok != OperandKind.OK_MOVE:
                         continue
                     let src_place = body.operand_d0[src_operand]
-                    if self.field_place_matches(body, src_place, resolved_struct, field_sym) == 0:
+                    if self.field_place_matches(body, src_place, resolved_struct, field_sym) == false:
                         continue
                     let dst_local = self.place_local_id(body, dst_place)
                     if dst_local < 0:
                         continue
-                    if self.place_is_direct_local(body, dst_place, dst_local) == 0:
+                    if self.place_is_direct_local(body, dst_place, dst_local) == false:
                         continue
                     let dst_tid = self.local_declared_tid(body, dst_local)
                     inferred = self.prefer_inferred_tid(inferred, dst_tid)
@@ -9173,9 +9173,9 @@ impl CCodegen:
             return -1
         local_id
 
-    fn local_has_assignment(body: &MirBody, local_id: i32) -> i32:
+    fn local_has_assignment(body: &MirBody, local_id: i32) -> bool:
         if local_id < 0:
-            return 0
+            return false
         for bb in 0..body.block_count():
             let start = body.bb_stmt_starts[bb]
             let count = body.bb_stmt_counts[bb]
@@ -9184,13 +9184,13 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) != 0:
-                    return 1
+                if self.place_is_direct_local(body, dst_place, local_id):
+                    return true
             if body.term_kind(bb) == TermKind.TK_CALL:
                 let dest_place = body.term_data2(bb)
-                if self.place_is_direct_local(body, dest_place, local_id) != 0:
-                    return 1
-        0
+                if self.place_is_direct_local(body, dest_place, local_id):
+                    return true
+        false
 
     mut fn zero_value_text(tid: i32) -> str:
         // MIR can retain the backend's pseudo List type for compiler-created
@@ -9210,9 +9210,9 @@ impl CCodegen:
             return "NULL"
         if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_base_name(resolved as i32) == "List":
             return "(with_vec)" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
-        if tk == TypeKind.TY_GENERIC_INST and (self.generic_inst_needs_struct_def(resolved as i32) != 0 or self.generic_inst_is_declared_struct(resolved as i32)):
+        if tk == TypeKind.TY_GENERIC_INST and (self.generic_inst_needs_struct_def(resolved as i32) or self.generic_inst_is_declared_struct(resolved as i32)):
             return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
-        if tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_FN or self.type_is_payload_enum(resolved as i32) != 0:
+        if tk == TypeKind.TY_STR or tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_TUPLE or tk == TypeKind.TY_FN or self.type_is_payload_enum(resolved as i32):
             return "(" ++ self.c_type(resolved, 0) ++ ")" ++ cc_lbrace() ++ "0" ++ cc_rbrace()
         "0"
 
@@ -9254,7 +9254,7 @@ impl CCodegen:
         let d1 = body.stmt_d1[stmt_id]
         if sk == StmtKind.Assign:
             let dst_local = self.place_local_id(body, d0)
-            if self.place_is_direct_local(body, d0, dst_local) != 0 and self.local_has_value_use(body, dst_local) == 0:
+            if self.place_is_direct_local(body, d0, dst_local) and self.local_has_value_use(body, dst_local) == 0:
                 if d1 >= 0 and d1 < body.rval_kinds.len() and body.rval_kinds[d1] == RvalueKind.RK_AGGREGATE:
                     return "    /* dead aggregate temp */"
             let dst_place = self.place_text(body, d0)
@@ -9288,7 +9288,7 @@ impl CCodegen:
             let dst_c_type_for_assign = self.c_type(dst_tid, 0)
             let rval_looks_address = cc_rval_looks_address(rval)
             if rval_looks_address != 0 and rval != "0" and rval != "0LL" and rval != "NULL":
-                if cc_str_contains(dst_c_type_for_assign, "*") != 0:
+                if cc_str_contains(dst_c_type_for_assign, "*"):
                     return "    " ++ dst_place ++ " = (" ++ dst_c_type_for_assign ++ ")" ++ rval ++ ";"
                 if dst_c_type_for_assign == "int64_t":
                     return "    " ++ dst_place ++ " = (int64_t)(intptr_t)" ++ rval ++ ";"
@@ -9317,7 +9317,7 @@ impl CCodegen:
             let agg_literal = self.aggregate_compound_literal(body, d1, dst_tid)
             if agg_literal.len() > 0:
                 return "    " ++ dst_place ++ " = " ++ agg_literal ++ ";"
-            if self.type_is_payload_enum(dst_tid) != 0:
+            if self.type_is_payload_enum(dst_tid):
                 let rv_tid_for_payload = self.rvalue_tid(body, d1)
                 let variant_index = self.payload_enum_variant_for_payload_tid(dst_tid, rv_tid_for_payload)
                 if variant_index >= 0:
@@ -9351,7 +9351,7 @@ impl CCodegen:
                         needs_wrap = true
                 if needs_wrap:
                     let src_local = self.rvalue_direct_local_id(body, d1)
-                    if src_local >= 0 and self.local_has_assignment(body, src_local) == 0:
+                    if src_local >= 0 and self.local_has_assignment(body, src_local) == false:
                         return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
                     let dst_c = self.c_type(dst_tid, 0)
                     if dst_c == "with_str" or dst_c == "with_vec":
@@ -9374,7 +9374,7 @@ impl CCodegen:
                     // if-join over literals) renders as a with_str VALUE; the
                     // pointer local takes the array-compound-literal address.
                     let dst_pointee_for_copy = self.sema.resolve_alias(self.sema.get_type_d0(dst_resolved_for_copy) as TypeId)
-                    if self.sema.get_type_kind(dst_pointee_for_copy) == TypeKind.TY_STR and self.rvalue_is_str_const_use(body, d1) != 0:
+                    if self.sema.get_type_kind(dst_pointee_for_copy) == TypeKind.TY_STR and self.rvalue_is_str_const_use(body, d1):
                         return "    " ++ dst_place ++ " = ((with_str[]){ " ++ rval ++ " });"
                 if dst_c_for_copy != rv_c_for_copy:
                     let dst_scalar = self.is_scalar_like_tid(dst_tid)
@@ -9543,13 +9543,13 @@ impl CCodegen:
         // payload's types are what it needs.
         if self.option_is_nullable_pointer(resolved as i32):
             return self.collect_struct_types_from_tid(move acc, self.sema.get_generic_inst_arg(resolved as i32, 0))
-        if tk == TypeKind.TY_STRUCT or self.type_is_payload_enum(resolved as i32) != 0:
+        if tk == TypeKind.TY_STRUCT or self.type_is_payload_enum(resolved as i32):
             let cname = self.struct_c_name(resolved as i32)
             if not acc.seen_names.contains(resolved as i32) and not acc.seen_c_names.contains(cname):
                 acc.seen_names.insert(resolved as i32, 1)
                 acc.seen_c_names.insert(cname, 1)
                 acc.out.push(resolved as i32)
-            if self.type_is_payload_enum(resolved as i32) != 0:
+            if self.type_is_payload_enum(resolved as i32):
                 var payload_acc = acc
                 let variant_count = self.sema.type_reflection_variant_count(resolved as i32)
                 for vi in 0..variant_count:
@@ -9573,7 +9573,7 @@ impl CCodegen:
             return tuple_acc
         if tk == TypeKind.TY_GENERIC_INST:
             let base_name = self.generic_inst_base_name(resolved as i32)
-            if self.generic_inst_needs_struct_def(resolved as i32) != 0:
+            if self.generic_inst_needs_struct_def(resolved as i32):
                 if not acc.seen_names.contains(resolved as i32):
                     acc.seen_names.insert(resolved as i32, 1)
                     acc.out.push(resolved as i32)
@@ -9673,7 +9673,7 @@ impl CCodegen:
             for ti in 0..count:
                 cur = self.collect_fn_types_from_tid(move cur, self.sema.type_extra[(start + ti)])
             return cur
-        if self.type_is_payload_enum(resolved as i32) != 0:
+        if self.type_is_payload_enum(resolved as i32):
             let variant_count = self.sema.type_reflection_variant_count(resolved as i32)
             for vi in 0..variant_count:
                 let payload_count = self.sema.type_reflection_variant_payload_count(resolved as i32, vi)
@@ -9778,14 +9778,14 @@ impl CCodegen:
             i = i + 1
             let resolved = self.sema.resolve_alias(tid as TypeId) as i32
             let tk = self.sema.get_type_kind(resolved as TypeId)
-            if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved) != 0:
+            if tk == TypeKind.TY_GENERIC_INST and self.generic_inst_needs_struct_def(resolved):
                 let field_tids = self.synthetic_generic_struct_field_tids(resolved)
                 for fi in 0..field_tids.len():
                     if self.check_interrupted() != 0:
                         return move acc.out
                     acc = self.collect_struct_types_from_tid(move acc, field_tids[fi])
                 continue
-            if self.type_is_payload_enum(resolved) != 0:
+            if self.type_is_payload_enum(resolved):
                 let variant_count = self.sema.type_reflection_variant_count(resolved)
                 for vi in 0..variant_count:
                     let payload_count = self.sema.type_reflection_variant_payload_count(resolved, vi)
@@ -9888,7 +9888,7 @@ impl CCodegen:
                 let start = self.sema.get_type_d1(resolved as TypeId)
                 let count = self.sema.get_type_d2(resolved as TypeId)
                 var ready = 1
-                if self.generic_inst_needs_struct_def(resolved) != 0:
+                if self.generic_inst_needs_struct_def(resolved):
                     let base_name = self.generic_inst_base_name(resolved)
                     if base_name == "HashMapEntry":
                         let key_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
@@ -9898,7 +9898,7 @@ impl CCodegen:
                         let value_tid = self.sema.resolve_alias(self.sema.get_generic_inst_arg(resolved, 0) as TypeId)
                         if self.tid_is_c_struct_value(value_tid as i32) and value_tid != resolved and not emitted_names.contains(value_tid as i32):
                             ready = 0
-                else if self.type_is_payload_enum(resolved) != 0:
+                else if self.type_is_payload_enum(resolved):
                     let variant_count = self.sema.type_reflection_variant_count(resolved)
                     for vi in 0..variant_count:
                         let payload_count = self.sema.type_reflection_variant_payload_count(resolved, vi)
@@ -10019,7 +10019,7 @@ impl CCodegen:
                 continue
             if self.option_is_nullable_pointer(resolved as i32):
                 continue
-            if self.type_is_payload_enum(resolved as i32) != 0:
+            if self.type_is_payload_enum(resolved as i32):
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
                 out = out ++ "    int32_t tag;\n"
                 var has_payload = 0
@@ -10399,9 +10399,9 @@ impl CCodegen:
         "2, " ++ hash_fn ++ ", " ++ eq_fn
 
     fn prelude_block_declares(name: &str) -> bool:
-        cc_str_starts_with(name, "with_str_") != 0 or cc_str_starts_with(name, "with_fmt_") != 0 or
+        cc_str_starts_with(name, "with_str_") or cc_str_starts_with(name, "with_fmt_") or
         name == "with_fiber_in_fiber" or name == "with_fiber_await" or name == "with_fiber_cleanup_await" or
-        name == "with_fiber_cancel" or name == "with_fiber_panic_capture" or cc_str_starts_with(name, "with_println_") != 0 or
+        name == "with_fiber_cancel" or name == "with_fiber_panic_capture" or cc_str_starts_with(name, "with_println_") or
         name == "with_alloc" or name == "with_alloc_aligned" or name == "with_free" or name == "with_memcpy" or name == "with_memmove" or
         name == "with_memset" or name == "with_memcmp" or name == "with_hashmap_get_ptr" or
         name == "with_hashmap_capacity" or name == "with_hashmap_slot_occupied" or
@@ -10424,7 +10424,7 @@ impl CCodegen:
         // `&str` in 7d8d085e while the header still said `with_str`).
         if self.prelude_block_declares(name):
             return false
-        if cc_str_starts_with(name, "wl_") != 0:
+        if cc_str_starts_with(name, "wl_"):
             return false
         if self.extern_declared_by_included_headers(name):
             return false
@@ -10655,14 +10655,14 @@ impl CCodegen:
                 let copied_local = self.place_local_id(body, copied_place)
                 if copied_local == local_id:
                     continue
-                if self.place_is_direct_local(body, copied_place, copied_local) == 0:
+                if self.place_is_direct_local(body, copied_place, copied_local) == false:
                     continue
                 let copied_tid = self.local_ref_target_tid(body, copied_local)
                 if copied_tid == 0 or self.is_void_tid(copied_tid):
                     continue
                 if out == 0:
                     out = copied_tid
-                else if self.strict_type_match(out, copied_tid) == 0:
+                else if self.strict_type_match(out, copied_tid) == false:
                     self.local_ref_target_cache.insert(cache_key, -1)
                     return 0
                 continue
@@ -10673,7 +10673,7 @@ impl CCodegen:
                 continue
             if out == 0:
                 out = src_tid
-            else if self.strict_type_match(out, src_tid) == 0:
+            else if self.strict_type_match(out, src_tid) == false:
                 self.local_ref_target_cache.insert(cache_key, -1)
                 return 0
         if out == 0:
@@ -10692,7 +10692,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let rval_id = body.stmt_d1[stmt_id]
                 if rval_id < 0 or rval_id >= body.rval_kinds.len():
@@ -10706,14 +10706,14 @@ impl CCodegen:
             let tk = body.term_kind(bb)
             if tk == TermKind.TK_CALL:
                 let dest_place = body.term_data2(bb)
-                if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                if self.place_is_direct_local(body, dest_place, local_id):
                     let callee_op = body.term_data0(bb)
                     let args_id = body.term_data1(bb)
                     let kind = self.call_builtin_kind(body, callee_op, args_id, dest_place)
                     if kind == CcBuiltin.MAP_GET or kind == CcBuiltin.MAP_CONTAINS or kind == CcBuiltin.MAP_LEN:
                         if kind == CcBuiltin.MAP_GET:
                             let ret_tid = self.call_return_tid(body, bb, callee_op, args_id, dest_place)
-                            if self.type_is_payload_enum(ret_tid) != 0:
+                            if self.type_is_payload_enum(ret_tid):
                                 continue
                         return true
         false
@@ -10738,7 +10738,7 @@ impl CCodegen:
         for bb in 0..body.block_count():
             if body.term_kind(bb) == TermKind.TK_CALL:
                 let dest_place = body.term_data2(bb)
-                if self.place_is_direct_local(body, dest_place, local_id) != 0:
+                if self.place_is_direct_local(body, dest_place, local_id):
                     let callee_op = body.term_data0(bb)
                     let args_id = body.term_data1(bb)
                     let intrinsic_kind = cc_builtin_from_mir_intrinsic(body.call_intrinsic(args_id))
@@ -10755,7 +10755,7 @@ impl CCodegen:
                 if body.stmt_kinds[stmt_id] != StmtKind.Assign:
                     continue
                 let dst_place = body.stmt_d0[stmt_id]
-                if self.place_is_direct_local(body, dst_place, local_id) == 0:
+                if self.place_is_direct_local(body, dst_place, local_id) == false:
                     continue
                 let src_local = self.rvalue_direct_local_id(body, body.stmt_d1[stmt_id])
                 if src_local >= 0 and src_local != local_id and self.local_originates_from_map_get_depth(body, src_local, depth + 1):
@@ -10780,7 +10780,7 @@ impl CCodegen:
             if not cc_builtin_uses_list_receiver(kind):
                 continue
             let recv_place = self.call_first_arg_place_id(body, args_id)
-            if self.place_is_direct_local(body, recv_place, local_id) != 0:
+            if self.place_is_direct_local(body, recv_place, local_id):
                 return true
         false
 
@@ -10799,7 +10799,7 @@ impl CCodegen:
             if not cc_builtin_uses_option_receiver(kind):
                 continue
             let recv_place = self.call_first_arg_place_id(body, args_id)
-            if self.place_is_direct_local(body, recv_place, local_id) != 0:
+            if self.place_is_direct_local(body, recv_place, local_id):
                 return true
         false
 
@@ -10830,7 +10830,7 @@ impl CCodegen:
                     kind = self.call_builtin_kind(body, callee_op, args_id, dest_place)
                 let recv_place = self.call_first_arg_place_id(body, args_id)
                 let recv_local = self.place_local_id(body, recv_place)
-                if self.place_is_direct_local(body, recv_place, recv_local) != 0:
+                if self.place_is_direct_local(body, recv_place, recv_local):
                     if cc_builtin_uses_list_receiver(kind):
                         flags = cc_mark_local_repr(move flags, recv_local, 2)
                     else if cc_builtin_uses_option_receiver(kind):
@@ -10886,11 +10886,11 @@ impl CCodegen:
                     continue
                 let lhs = body.rval_d1[rval_id]
                 let rhs = body.rval_d2[rval_id]
-                if op == BinaryOp.OP_SUB and self.operand_uses_local(body, lhs, local_id) != 0 and self.operand_is_int_const(body, rhs, 1):
+                if op == BinaryOp.OP_SUB and self.operand_uses_local(body, lhs, local_id) and self.operand_is_int_const(body, rhs, 1):
                     return true
-                if (op == BinaryOp.OP_NEQ or op == BinaryOp.OP_EQ) and self.operand_uses_local(body, lhs, local_id) != 0 and self.operand_is_int_const(body, rhs, 0):
+                if (op == BinaryOp.OP_NEQ or op == BinaryOp.OP_EQ) and self.operand_uses_local(body, lhs, local_id) and self.operand_is_int_const(body, rhs, 0):
                     return true
-                if (op == BinaryOp.OP_NEQ or op == BinaryOp.OP_EQ) and self.operand_uses_local(body, rhs, local_id) != 0 and self.operand_is_int_const(body, lhs, 0):
+                if (op == BinaryOp.OP_NEQ or op == BinaryOp.OP_EQ) and self.operand_uses_local(body, rhs, local_id) and self.operand_is_int_const(body, lhs, 0):
                     return true
         false
 
@@ -11242,7 +11242,7 @@ impl CCodegen:
             let local_id = self.place_local_id(body, dest_place)
             if local_id < 0:
                 continue
-            if self.place_is_direct_local(body, dest_place, local_id) == 0:
+            if self.place_is_direct_local(body, dest_place, local_id) == false:
                 continue
             let declared_tid = self.local_declared_tid(body, local_id)
             let declared_resolved = self.sema.resolve_alias(declared_tid)
@@ -11304,7 +11304,7 @@ impl CCodegen:
                     let override_tid = call_override_tids[oi]
                     let declared_kind_for_override = self.sema.get_type_kind(self.sema.resolve_alias(declared_tid))
                     let override_kind = self.sema.get_type_kind(self.sema.resolve_alias(override_tid))
-                    if declared_kind_for_override != override_kind or self.strict_type_match(declared_tid, override_tid) == 0:
+                    if declared_kind_for_override != override_kind or self.strict_type_match(declared_tid, override_tid) == false:
                         use_tid = override_tid
                     break
             let downcast_opt_tid = cc_list_tid_at(downcast_option_tids, li)
@@ -11318,13 +11318,13 @@ impl CCodegen:
             var should_infer_local = 0
             if self.is_void_tid(use_tid) or use_resolved_before_infer == 0 or use_kind_before_infer == TypeKind.TY_ERR:
                 should_infer_local = 1
-            if use_kind_before_infer == TypeKind.TY_GENERIC_INST and self.type_is_payload_enum(use_tid) == 0:
+            if use_kind_before_infer == TypeKind.TY_GENERIC_INST and self.type_is_payload_enum(use_tid) == false:
                 should_infer_local = 1
             if should_infer_local != 0:
                 let inferred_tid = self.infer_local_tid(body, li)
                 if inferred_tid != 0 and self.is_void_tid(inferred_tid) == false:
                     let inferred_kind = self.sema.get_type_kind(self.sema.resolve_alias(inferred_tid))
-                    if self.is_void_tid(use_tid) or use_kind_before_infer != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
+                    if self.is_void_tid(use_tid) or use_kind_before_infer != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == false:
                         use_tid = inferred_tid
             self.local_effective_cache.insert(cc_body_local_cache_key(body.fn_sym, li), use_tid)
             let use_resolved = self.sema.resolve_alias(use_tid)
@@ -11484,19 +11484,19 @@ impl CCodegen:
         out.write("extern void with_fmt_buf_write_f64_spec(uint8_t*, double, int64_t, int32_t, int32_t, int32_t);\n")
         out.write("extern void with_fmt_buf_write_str_spec_ref(uint8_t*, with_str, int64_t, int32_t, int32_t);\n")
         out.write("extern with_str with_fmt_buf_finish(uint8_t*);\n")
-        if self.module_exports_c_name("with_alloc") == 0:
+        if self.module_exports_c_name("with_alloc") == false:
             out.write("extern void* with_alloc(int64_t);\n")
-        if self.module_exports_c_name("with_alloc_aligned") == 0:
+        if self.module_exports_c_name("with_alloc_aligned") == false:
             out.write("extern void* with_alloc_aligned(int64_t, int64_t);\n")
-        if self.module_exports_c_name("with_free") == 0:
+        if self.module_exports_c_name("with_free") == false:
             out.write("extern void with_free(void*);\n")
-        if self.module_exports_c_name("with_memcpy") == 0:
+        if self.module_exports_c_name("with_memcpy") == false:
             out.write("extern void* with_memcpy(void*, const void*, int64_t);\n")
-        if self.module_exports_c_name("with_memset") == 0:
+        if self.module_exports_c_name("with_memset") == false:
             out.write("extern void* with_memset(void*, int32_t, int64_t);\n")
-        if self.module_exports_c_name("with_memmove") == 0:
+        if self.module_exports_c_name("with_memmove") == false:
             out.write("extern void* with_memmove(void*, const void*, int64_t);\n")
-        if self.module_exports_c_name("with_memcmp") == 0:
+        if self.module_exports_c_name("with_memcmp") == false:
             out.write("extern int32_t with_memcmp(const void*, const void*, int64_t);\n")
         out.write("extern void* with_hashmap_get_ptr(void*, const void*, int64_t);\n")
         // D44 map traversal's slot walk (#1434); rt_core's own signatures.
@@ -11833,13 +11833,13 @@ impl CCodegen:
                     payload = self.sema.type_reflection_variant_payload_type_frozen(resolved, vi, 0)
             return "    if ((" ++ lv ++ ") != 0) " ++ cc_lbrace() ++ " " ++ self.drop_call_text(lv, payload, false) ++ " " ++ cc_rbrace() ++ "\n"
         var out = ""
-        let has_drop = self.sema.type_has_drop_impl(resolved) != 0
+        let has_drop = self.sema.type_has_drop_impl(resolved)
         if has_drop:
             let fn_name = self.user_drop_fn_name(resolved)
             if fn_name.len() == 0:
                 return "    abort();\n"
             out = out ++ "    " ++ fn_name ++ "(&(" ++ lv ++ "));\n"
-        let variants = if self.type_is_payload_enum(resolved) != 0: self.sema.type_reflection_variant_count(resolved) else: 0
+        let variants = if self.type_is_payload_enum(resolved): self.sema.type_reflection_variant_count(resolved) else: 0
         if variants == 0:
             return out ++ self.drop_struct_fields_text(lv, resolved)
         // #693: an enum's payload cleanup belongs to the variant switch; an
@@ -11915,7 +11915,7 @@ impl CCodegen:
                 return "    abort();\n"
             // #697/§2.5.1: a reset-on-move Box is null.
             return "    if ((" ++ lv ++ ") != NULL) " ++ cc_lbrace() ++ " " ++ self.drop_call_text("(*(" ++ lv ++ "))", box_pointee, true) ++ " with_free((void*)(" ++ lv ++ ")); " ++ cc_rbrace() ++ "\n"
-        if self.sema.type_symbol_is_std_rc_owner(base) != 0:
+        if self.sema.type_symbol_is_std_rc_owner(base):
             // RcControl {strong, value}: the last holder drops the payload
             // and frees both cells; Arc counts atomically.
             let payload = self.sema.get_generic_inst_arg(resolved, 0)
@@ -12032,7 +12032,7 @@ impl CCodegen:
             // D120: a List of values shares its buffer.
             if base == self.sema.syms.list:
                 return "    with_vec_retain(&(" ++ lv ++ "), (int64_t)sizeof(" ++ self.c_type(self.sema.get_generic_inst_arg(resolved, 0), 0) ++ "));\n"
-        if self.type_is_payload_enum(resolved) != 0 and not self.option_is_nullable_pointer(resolved):
+        if self.type_is_payload_enum(resolved) and not self.option_is_nullable_pointer(resolved):
             var out = "    switch ((" ++ lv ++ ").tag) " ++ cc_lbrace() ++ "\n"
             for vi in 0..self.sema.type_reflection_variant_count(resolved):
                 var case_text = ""
@@ -12167,7 +12167,7 @@ impl CCodegen:
             return self.key_type_has_walk(self.sema.resolve_alias(self.sema.type_extra[(self.sema.get_type_d1(resolved as TypeId) + 1)] as TypeId) as i32)
         if tk == TypeKind.TY_STRUCT:
             return true
-        if self.type_is_payload_enum(resolved) != 0:
+        if self.type_is_payload_enum(resolved):
             return true
         if tk == TypeKind.TY_GENERIC_INST:
             return self.sema.get_generic_inst_base(resolved) == self.sema.syms.list or self.std_box_pointee_tid(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
@@ -12273,7 +12273,7 @@ impl CCodegen:
             if self.sema.get_type_kind(self.sema.resolve_alias(box_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
                 return " with_hasher_write(st, (const uint8_t*)&(" ++ lv ++ "), (int64_t)sizeof(" ++ lv ++ "));"
             return self.key_hash_text("(*(" ++ lv ++ "))", box_pointee, "st")
-        if self.type_is_payload_enum(resolved) != 0:
+        if self.type_is_payload_enum(resolved):
             if self.option_is_nullable_pointer(resolved):
                 var payload: i32 = 0
                 for vi in 0..self.sema.type_reflection_variant_count(resolved):
@@ -12321,7 +12321,7 @@ impl CCodegen:
             if self.sema.get_type_kind(self.sema.resolve_alias(box_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
                 return " if ((" ++ la ++ ") != (" ++ lb ++ ")) return 0;"
             return " if (!" ++ self.key_eq_text("(*(" ++ la ++ "))", "(*(" ++ lb ++ "))", box_pointee) ++ ") return 0;"
-        if self.type_is_payload_enum(resolved) != 0:
+        if self.type_is_payload_enum(resolved):
             if self.option_is_nullable_pointer(resolved):
                 var payload: i32 = 0
                 for vi in 0..self.sema.type_reflection_variant_count(resolved):

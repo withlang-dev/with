@@ -11,11 +11,11 @@ use compiler.CodegenUnits
 use AnalysisTypes
 use InternPool
 
-fn backend_debug_pool_flow_enabled() -> i32:
+fn backend_debug_pool_flow_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 impl Zcu:
     mut fn compile_to_object_backend(pool: &AstPool, opt_level: i32, output_path: &str, debug_info: bool, release: bool, module_object_mode: bool) -> i32:
@@ -53,14 +53,14 @@ impl Zcu:
         if not debug_info:
             cg.debug_info = 0
         cg.release = release
-        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled() != 0:
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
             runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_count()}")
             runtime_eprint(f"[backend] sema.pool symbols={sema_symbols}")
             runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_decls}")
-        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled() != 0:
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_count()}")
-        if backend_debug_pool_flow_enabled() != 0:
+        if backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend-diag] pool.extra_len={backend_pool.extra_len()} pool.nodes={backend_pool.node_count()}")
             backend_dump_struct_extras(backend_pool, cg.intern)
         let do_profile = runtime_getenv("WITH_PROFILE").len() > 0
@@ -211,12 +211,12 @@ impl Zcu:
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
-        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled() != 0:
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
             runtime_eprint(f"[backend] frontend.pool symbols={self.frontend_pool.symbol_count()}")
             runtime_eprint(f"[backend] sema.pool symbols={sema_symbols}")
             runtime_eprint(f"[backend] backend_pool decls={backend_pool.decl_count()} sema.ast.decls={sema_decls}")
-        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled() != 0:
+        if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or cg.intern.symbol_count() <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] cg.intern symbols={cg.intern.symbol_count()}")
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)

@@ -2685,7 +2685,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         // `(...)` is the variadic convention — wrong. C passes each call's
         // promoted arguments with the fixed-argument convention, so the
         // declaration is the prototype every call in the unit agrees on.
-        if with_cimport_fn_is_unprototyped(session, idx) != 0:
+        if with_cimport_fn_is_unprototyped(session, idx):
             let shape = ci_migrate_unprototyped_call_shape(session, name)
             if shape.starts_with("!"):
                 return ci_migrate_fail_function(f"migrate: '{name}' is declared without a prototype and {shape.slice(1, shape.len())}, so no prototype describes its calls; declare it with its parameters (C11 6.5.2.2p6)")

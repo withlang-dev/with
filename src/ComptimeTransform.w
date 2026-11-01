@@ -639,7 +639,7 @@ impl Sema:
         self.comptime_truthy_error = ""
         var evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, source_ast, self.pool, node) }
         let value = move evald.value
-        if comptime_value_is_valid(value) == 0:
+        if comptime_value_is_valid(value) == false:
             self.comptime_truthy_error = move evald.error_msg
             return -1
         let truthy = comptime_value_truthy(value)
@@ -760,10 +760,10 @@ impl Sema:
         if intern.resolve(pool.get_data1(callee)) == "new":
             return node
         let recv = pool.get_data0(callee)
-        if self.static_receiver_type_is_known(recv) == 0:
+        if self.static_receiver_type_is_known(recv) == false:
             return node
         let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node) }
-        if comptime_value_is_valid(evald.value) == 0:
+        if comptime_value_is_valid(evald.value) == false:
             return node
         let folded = self.ct_build_value_tree(pool, intern, evald.value, node, evald.extras)
         if folded != 0:
@@ -1149,7 +1149,7 @@ impl Sema:
         let iterable_node = pool.get_data1(inner)
         var evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, pool, self.pool, iterable_node) }
         let iterable = move evald.value
-        if comptime_value_is_valid(iterable) == 0:
+        if comptime_value_is_valid(iterable) == false:
             return wrapper
 
         let iter_count = ct_iter_count(iterable)
@@ -1194,7 +1194,7 @@ impl Sema:
         let diag_count_before = self.diags.count()
         var evald = unsafe { comptime_force_eval_expr_result(self as *mut Sema, pool, self.pool, inner) }
         let value = move evald.value
-        if comptime_value_is_valid(value) == 0:
+        if comptime_value_is_valid(value) == false:
             if evald.error_msg.len() > 0 and self.diags.count() == diag_count_before:
                 self.ct_emit_error(pool, inner, evald.error_msg)
             return node
@@ -1253,7 +1253,7 @@ impl Sema:
             pool.set_data0(node, base)
             pool.set_data1(node, field_expr)
             let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, field_expr) }
-            if comptime_value_is_valid(evald.value) == 0:
+            if comptime_value_is_valid(evald.value) == false:
                 return node
             if evald.value.kind != ComptimeValueKind.CV_STR:
                 self.ct_emit_error(pool, node, "computed field access requires comptime string field name")
@@ -1561,14 +1561,14 @@ impl Sema:
             return self.decl_is_c_import[di]
         0
 
-fn ct_source_decl_is_local(ast: &AstPool, decl_index: i32) -> i32:
+fn ct_source_decl_is_local(ast: &AstPool, decl_index: i32) -> bool:
     let limit = ast.local_decl_count()
     if limit < 0:
-        return 1
+        return true
     let total = ast.decl_count()
     if decl_index >= total - limit:
-        return 1
-    0
+        return true
+    false
 
 fn ct_type_decl_tp_count(ast: &AstPool, node: i32) -> i32:
     let extra_start = ast.get_data1(node)
@@ -1984,86 +1984,86 @@ impl Sema:
             return self.is_copy(tid as TypeId)
         if trait_sym == self.syms.clone_trait and self.is_copy(tid as TypeId) != 0:
             return 1
-        if self.type_implements_trait(tid, trait_sym) != 0:
+        if self.type_implements_trait(tid, trait_sym):
             return 1
         let resolved = self.resolve_alias(tid as TypeId)
         let type_sym = self.get_type_name(resolved)
         if type_sym != 0 and self.type_decl_nodes.contains(type_sym):
             let decl: i32 = self.type_decl_nodes.get(type_sym).unwrap()
-            if self.type_decl_has_derive(decl, trait_sym) != 0:
+            if self.type_decl_has_derive(decl, trait_sym):
                 return 1
-            if self.type_decl_has_derive(decl, all_sym) != 0 and self.ct_type_decl_can_derive_trait(out, intern, decl, trait_sym, all_sym) != 0:
+            if self.type_decl_has_derive(decl, all_sym) and self.ct_type_decl_can_derive_trait(out, intern, decl, trait_sym, all_sym):
                 return 1
         0
 
-    mut fn ct_type_decl_can_derive_trait(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+    mut fn ct_type_decl_can_derive_trait(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
         if trait_sym == self.syms.copy_trait:
-            return 0
+            return false
         let sub_kind = type_decl_sub_kind(out.get_data2(decl))
         if trait_sym == intern.intern("Display"):
             if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
-                return 1
-            return 0
+                return true
+            return false
         // #1289: `derive(all)` on an enum takes Debug (always) and Clone
         // when every payload can supply it; the other traits stay struct-only.
         if sub_kind == TypeDeclKind.Enum or sub_kind == TypeDeclKind.DiscEnum:
             if trait_sym != intern.intern("Debug") and trait_sym != self.syms.clone_trait:
-                return 0
+                return false
             let enum_tid = self.lookup_named_type_visible(out.get_data0(decl))
             if enum_tid == 0:
-                return 0
+                return false
             let enum_resolved = self.resolve_alias(enum_tid)
             if self.get_type_kind(enum_resolved) != TypeKind.TY_ENUM:
-                return 0
+                return false
             var pos = self.get_type_d1(enum_resolved)
             for _ in 0..self.get_type_d2(enum_resolved):
                 let payload_count: i32 = self.type_extra[(pos + 1)]
                 for pi in 0..payload_count:
                     let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
                     if self.ct_type_can_supply_derive_trait(out, intern, payload_tid, trait_sym, all_sym) == 0:
-                        return 0
+                        return false
                 pos = pos + 2 + payload_count
-            return 1
+            return true
         if sub_kind != TypeDeclKind.Struct:
-            return 0
+            return false
         let type_name_sym = out.get_data0(decl)
         let tid = self.lookup_named_type_visible(type_name_sym)
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         for fi in 0..field_count:
             let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             if self.ct_type_can_supply_derive_trait(out, intern, field_tid, trait_sym, all_sym) == 0:
-                return 0
-        1
+                return false
+        true
 
-    mut fn ct_type_decl_should_generate_derive(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
-        if self.type_decl_has_derive(decl, trait_sym) != 0:
-            return 1
-        if self.type_decl_has_derive(decl, all_sym) != 0 and self.ct_type_decl_can_derive_trait(out, intern, decl, trait_sym, all_sym) != 0:
-            return 1
-        0
+    mut fn ct_type_decl_should_generate_derive(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
+        if self.type_decl_has_derive(decl, trait_sym):
+            return true
+        if self.type_decl_has_derive(decl, all_sym) and self.ct_type_decl_can_derive_trait(out, intern, decl, trait_sym, all_sym):
+            return true
+        false
 
-fn ct_supported_derive_target(intern: &InternPool, derive_sym: i32) -> i32:
+fn ct_supported_derive_target(intern: &InternPool, derive_sym: i32) -> bool:
     let name = intern.resolve(derive_sym).clone()
-    if name == "all": return 1
-    if name == "Copy": return 1
-    if name == "Clone": return 1
-    if name == "Default": return 1
-    if name == "Eq": return 1
-    if name == "Ord": return 1
-    if name == "Debug": return 1
-    if name == "Display": return 1
-    if name == "Builder": return 1
-    if name == "SoA": return 1
-    if name == "Serialize": return 1
-    if name == "Deserialize": return 1
-    if name == "ComponentId": return 1
-    0
+    if name == "all": return true
+    if name == "Copy": return true
+    if name == "Clone": return true
+    if name == "Default": return true
+    if name == "Eq": return true
+    if name == "Ord": return true
+    if name == "Debug": return true
+    if name == "Display": return true
+    if name == "Builder": return true
+    if name == "SoA": return true
+    if name == "Serialize": return true
+    if name == "Deserialize": return true
+    if name == "ComponentId": return true
+    false
 
 fn ct_derive_target_fn_name(name: &str) -> str:
     if name.len() == 0:
@@ -2136,7 +2136,7 @@ impl Sema:
                 // §11.8 (D96): nothing to derive; a key is hashed by the compiler.
                 self.ct_emit_error_help(out, decl, "`Hash` is not derived: every key is hashed by the compiler, consistently with its `==` (§11.7, §11.8)", "remove `Hash` from the derive list")
                 continue
-            if ct_supported_derive_target(intern, derive_sym) != 0:
+            if ct_supported_derive_target(intern, derive_sym):
                 continue
             let generated_source = self.ct_eval_user_derive_source(out, intern, decl, derive_sym)
             let generated_decls = self.ct_parse_user_derive_source(out, intern, decl, generated_source)
@@ -2144,65 +2144,65 @@ impl Sema:
                 generated.push(generated_decls[gi])
         generated
 
-fn ct_type_param_list_contains(out: &AstPool, tp_start: i32, tp_count: i32, sym: i32) -> i32:
+fn ct_type_param_list_contains(out: &AstPool, tp_start: i32, tp_count: i32, sym: i32) -> bool:
     var pos = tp_start
     for _ in 0..tp_count:
         let tp_sym = out.get_extra(pos)
         if tp_sym == sym:
-            return 1
+            return true
         let bound_count = out.get_extra(pos + 1)
         pos = pos + 2 + bound_count
-    0
+    false
 
-fn ct_type_node_mentions_type_param(out: &AstPool, node: i32, tp_start: i32, tp_count: i32) -> i32:
+fn ct_type_node_mentions_type_param(out: &AstPool, node: i32, tp_start: i32, tp_count: i32) -> bool:
     if node == 0 or tp_count == 0:
-        return 0
+        return false
     let kind = out.kind(node)
     if kind == NodeKind.NK_TYPE_NAMED or kind == NodeKind.NK_IDENT:
         return ct_type_param_list_contains(out, tp_start, tp_count, out.get_data0(node))
     if kind == NodeKind.NK_TYPE_GENERIC:
-        if ct_type_param_list_contains(out, tp_start, tp_count, out.get_data0(node)) != 0:
-            return 1
+        if ct_type_param_list_contains(out, tp_start, tp_count, out.get_data0(node)):
+            return true
         let start = out.get_data1(node)
         let count = out.get_data2(node)
         for i in 0..count:
-            if ct_type_node_mentions_type_param(out, out.get_extra(start + i), tp_start, tp_count) != 0:
-                return 1
-        return 0
+            if ct_type_node_mentions_type_param(out, out.get_extra(start + i), tp_start, tp_count):
+                return true
+        return false
     if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE:
         return ct_type_node_mentions_type_param(out, out.get_data0(node), tp_start, tp_count)
     if kind == NodeKind.NK_TYPE_TUPLE or kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let start2 = out.get_data0(node)
         let count2 = out.get_data1(node)
         for i2 in 0..count2:
-            if ct_type_node_mentions_type_param(out, out.get_extra(start2 + i2), tp_start, tp_count) != 0:
-                return 1
+            if ct_type_node_mentions_type_param(out, out.get_extra(start2 + i2), tp_start, tp_count):
+                return true
         if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
             return ct_type_node_mentions_type_param(out, out.get_data2(node), tp_start, tp_count)
-    0
+    false
 
 impl Sema:
-    mut fn ct_validate_explicit_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+    mut fn ct_validate_explicit_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
         let assumed = sema_pair_key(out.get_data0(decl), trait_sym)
         self.derives_assumed.insert(assumed, 1)
         let ok = self.ct_check_struct_derive_fields(out, intern, decl, trait_sym, all_sym)
         self.derives_assumed.remove(assumed)
         ok
 
-    mut fn ct_check_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
-        if self.type_decl_has_derive(decl, trait_sym) == 0:
-            return 1
+    mut fn ct_check_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
+        if self.type_decl_has_derive(decl, trait_sym) == false:
+            return true
         let trait_name = intern.resolve(trait_sym).clone()
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             self.ct_emit_error(out, decl, "cannot derive " ++ trait_name ++ " for a non-struct type")
-            return 0
+            return false
         let type_name_sym = out.get_data0(decl)
         let tid = self.lookup_named_type_visible(type_name_sym)
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let te_start = self.get_type_d1(resolved)
         let field_count = self.get_type_d2(resolved)
         let type_extra_start = out.get_data1(decl)
@@ -2212,37 +2212,37 @@ impl Sema:
             let field_sym: i32 = self.type_extra[(te_start + fi * 3)]
             let field_tid: i32 = self.type_extra[(te_start + fi * 3 + 1)]
             let field_type_node = out.get_extra(type_extra_start + 1 + fi * 3 + 1)
-            if ct_type_node_mentions_type_param(out, field_type_node, tp_start, tp_count) != 0:
+            if ct_type_node_mentions_type_param(out, field_type_node, tp_start, tp_count):
                 continue
             if self.ct_type_can_supply_derive_trait(out, intern, field_tid, trait_sym, all_sym) == 0:
                 let field_type_name = self.type_name(field_tid)
                 self.ct_emit_error_help(out, field_type_node, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': field '" ++ intern.resolve(field_sym) ++ "' of type '" ++ field_type_name ++ "' does not implement " ++ trait_name, "add `@[derive(" ++ trait_name ++ ")]` to the declaration of '" ++ field_type_name ++ "', or implement " ++ trait_name ++ " for it")
-                return 0
-        1
+                return false
+        true
 
     // #1289: the enum twin of the struct validator — every variant payload
     // must supply the trait, or the explicit derive is an error, never an
     // inert attribute. Payload type nodes follow SemaDecl's enum layout:
     // extra[0] = variant count, then per variant [name, payload_count,
     // payload type nodes...] (a disc enum leads with its repr node).
-    mut fn ct_validate_explicit_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
+    mut fn ct_validate_explicit_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
         let assumed = sema_pair_key(out.get_data0(decl), trait_sym)
         self.derives_assumed.insert(assumed, 1)
         let ok = self.ct_check_enum_derive_payloads(out, intern, decl, trait_sym, all_sym)
         self.derives_assumed.remove(assumed)
         ok
 
-    mut fn ct_check_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> i32:
-        if self.type_decl_has_derive(decl, trait_sym) == 0:
-            return 1
+    mut fn ct_check_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
+        if self.type_decl_has_derive(decl, trait_sym) == false:
+            return true
         let trait_name = intern.resolve(trait_sym).clone()
         let type_name_sym = out.get_data0(decl)
         let tid = self.lookup_named_type_visible(type_name_sym)
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
-            return 0
+            return false
         let tp_start = ct_type_decl_tp_start(out, decl)
         let tp_count = ct_type_decl_tp_count(out, decl)
         let is_disc = type_decl_sub_kind(out.get_data2(decl)) == TypeDeclKind.DiscEnum
@@ -2255,15 +2255,15 @@ impl Sema:
             for pi in 0..payload_count:
                 let payload_tid: i32 = self.type_extra[(pos + 2 + pi)]
                 let payload_type_node = out.get_extra(ast_pos + pi)
-                if ct_type_node_mentions_type_param(out, payload_type_node, tp_start, tp_count) != 0:
+                if ct_type_node_mentions_type_param(out, payload_type_node, tp_start, tp_count):
                     continue
                 if self.ct_type_can_supply_derive_trait(out, intern, payload_tid, trait_sym, all_sym) == 0:
                     let payload_type_name = self.type_name(payload_tid)
                     self.ct_emit_error_help(out, payload_type_node, "cannot derive " ++ trait_name ++ " for type '" ++ intern.resolve(type_name_sym) ++ "': variant '" ++ intern.resolve(variant_sym) ++ "' payload of type '" ++ payload_type_name ++ "' does not implement " ++ trait_name, "add `@[derive(" ++ trait_name ++ ")]` to the declaration of '" ++ payload_type_name ++ "', or implement " ++ trait_name ++ " for it")
-                    return 0
+                    return false
             ast_pos = ast_pos + payload_count
             pos = pos + 2 + payload_count
-        1
+        true
 
 fn ct_type_decl_is_enum(out: &AstPool, decl: i32) -> bool:
     let sub_kind = type_decl_sub_kind(out.get_data2(decl))
@@ -2345,7 +2345,7 @@ impl Sema:
     mut fn ct_generate_copy_derive(mut out: AstPool, intern: &InternPool, decl: i32) -> List[i32]:
         let generated: List[i32] = List.new()
         let copy_trait_sym = intern.intern("Copy")
-        if self.type_decl_has_derive(decl, copy_trait_sym) == 0:
+        if self.type_decl_has_derive(decl, copy_trait_sym) == false:
             return generated
         let type_name_sym = out.get_data0(decl)
         if self.select_trait_impl(type_name_sym, copy_trait_sym) != 0:
@@ -2362,7 +2362,7 @@ impl Sema:
 
         let default_trait_sym = intern.intern("Default")
         let all_sym = intern.intern("all")
-        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, default_trait_sym, all_sym) == 0:
+        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, default_trait_sym, all_sym) == false:
             return generated
         let default_method_sym = intern.intern("default")
         let type_name_sym = out.get_data0(decl)
@@ -2431,7 +2431,7 @@ impl Sema:
 
         let eq_trait_sym = intern.intern("Eq")
         let all_sym = intern.intern("all")
-        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, eq_trait_sym, all_sym) == 0:
+        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, eq_trait_sym, all_sym) == false:
             return generated
         let eq_method_sym = intern.intern("eq")
         let type_name_sym = out.get_data0(decl)
@@ -2504,7 +2504,7 @@ impl Sema:
 
         let ord_trait_sym = intern.intern("Ord")
         let all_sym = intern.intern("all")
-        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, ord_trait_sym, all_sym) == 0:
+        if self.ct_validate_explicit_struct_derive_fields(out, intern, decl, ord_trait_sym, all_sym) == false:
             return generated
         let cmp_method_sym = intern.intern("cmp")
         let type_name_sym = out.get_data0(decl)
@@ -2715,7 +2715,7 @@ impl Sema:
         let display_trait_sym = intern.intern("Display")
         let sub_kind = type_decl_sub_kind(out.get_data2(decl))
         if sub_kind != TypeDeclKind.Enum and sub_kind != TypeDeclKind.DiscEnum:
-            if self.type_decl_has_derive(decl, display_trait_sym) != 0:
+            if self.type_decl_has_derive(decl, display_trait_sym):
                 self.ct_emit_error(out, decl, "cannot derive Display for a non-enum type")
             return generated
 
@@ -2906,7 +2906,7 @@ impl Sema:
             return generated
 
         let builder_derive_sym = intern.intern("Builder")
-        if self.type_decl_has_derive(decl, builder_derive_sym) == 0:
+        if self.type_decl_has_derive(decl, builder_derive_sym) == false:
             return generated
 
         let type_name_sym = out.get_data0(decl)
@@ -3372,59 +3372,59 @@ impl Sema:
 
             if out.kind(decl) != NodeKind.NK_TYPE_DECL or self.decl_is_lazy_skipped(di):
                 continue
-            if self.type_decl_has_derive(decl as i32, copy_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, copy_trait_sym):
                 let generated_copy = self.ct_generate_copy_derive(out, intern, decl as i32)
                 for gi in 0..generated_copy.len():
                     ordered.push(generated_copy[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_copy.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, default_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, default_trait_sym, all_sym):
                 let generated_defaults = self.ct_generate_default_derive(out, intern, decl as i32)
                 for gi in 0..generated_defaults.len():
                     ordered.push(generated_defaults[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_defaults.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, eq_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, eq_trait_sym, all_sym):
                 let generated_eq = self.ct_generate_eq_derive(out, intern, decl as i32)
                 for gi in 0..generated_eq.len():
                     ordered.push(generated_eq[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_eq.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, ord_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, ord_trait_sym, all_sym):
                 let generated_ord = self.ct_generate_ord_derive(out, intern, decl as i32)
                 for gi in 0..generated_ord.len():
                     ordered.push(generated_ord[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_ord.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, debug_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, debug_trait_sym, all_sym):
                 let generated_debug = self.ct_generate_debug_derive(out, intern, decl as i32)
                 for gi in 0..generated_debug.len():
                     ordered.push(generated_debug[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_debug.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, display_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, display_trait_sym, all_sym):
                 let generated_display = self.ct_generate_display_derive(out, intern, decl as i32)
                 for gi in 0..generated_display.len():
                     ordered.push(generated_display[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_display.len()) as i32
             if type_decl_is_error(out.get_data2(decl)) != 0:
                 let generated_error = self.ct_generate_error_decl_impls(out, intern, decl as i32)
@@ -3433,61 +3433,61 @@ impl Sema:
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_error.len()) as i32
-            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, clone_trait_sym, all_sym) != 0:
+            if self.ct_type_decl_should_generate_derive(out, intern, decl as i32, clone_trait_sym, all_sym):
                 let generated_clone = self.ct_generate_clone_derive(out, intern, decl as i32)
                 for gi in 0..generated_clone.len():
                     ordered.push(generated_clone[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_clone.len()) as i32
-            if self.type_decl_has_derive(decl as i32, builder_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, builder_trait_sym):
                 let generated_builder = self.ct_generate_builder_derive(out, intern, decl as i32)
                 for gi in 0..generated_builder.len():
                     ordered.push(generated_builder[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_builder.len()) as i32
-            if self.type_decl_has_derive(decl as i32, soa_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, soa_trait_sym):
                 let generated_soa = self.ct_generate_soa_derive(out, intern, decl as i32)
                 for gi in 0..generated_soa.len():
                     ordered.push(generated_soa[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_soa.len()) as i32
-            if self.type_decl_has_derive(decl as i32, serialize_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, serialize_trait_sym):
                 let generated_serialize = self.ct_generate_serialize_derive(out, intern, decl as i32)
                 for gi in 0..generated_serialize.len():
                     ordered.push(generated_serialize[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_serialize.len()) as i32
-            if self.type_decl_has_derive(decl as i32, deserialize_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, deserialize_trait_sym):
                 let generated_deserialize = self.ct_generate_deserialize_derive(out, intern, decl as i32)
                 for gi in 0..generated_deserialize.len():
                     ordered.push(generated_deserialize[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_deserialize.len()) as i32
-            if self.type_decl_has_derive(decl as i32, component_id_trait_sym) != 0:
+            if self.type_decl_has_derive(decl as i32, component_id_trait_sym):
                 let generated_component_id = self.ct_generate_component_id_derive(out, intern, decl as i32)
                 for gi in 0..generated_component_id.len():
                     ordered.push(generated_component_id[gi])
                     ordered_paths.push(sema_owned_text(decl_path))
                     ordered_file_ids.push(decl_file_id)
                     ordered_ci.push(decl_ci)
-                if ct_source_decl_is_local(source_ast, di) != 0:
+                if ct_source_decl_is_local(source_ast, di):
                     generated_local_count = (generated_local_count + generated_component_id.len()) as i32
             let generated_user_derives = self.ct_generate_user_defined_derives(out, intern, decl as i32)
             for gi in 0..generated_user_derives.len():
@@ -3495,7 +3495,7 @@ impl Sema:
                 ordered_paths.push(sema_owned_text(decl_path))
                 ordered_file_ids.push(decl_file_id)
                 ordered_ci.push(decl_ci)
-            if ct_source_decl_is_local(source_ast, di) != 0:
+            if ct_source_decl_is_local(source_ast, di):
                 generated_local_count = (generated_local_count + generated_user_derives.len()) as i32
         self.local_file_id = saved_file_id
         while out.decl_count() > 0:
