@@ -143,6 +143,8 @@ fn pkg_current_platform() -> str:
         return "darwin-aarch64"
     if os() == "Linux" and arch() == "x86_64":
         return "linux-x86_64"
+    if os() == "Linux" and arch() == "aarch64":
+        return "linux-aarch64"
     if os() == "Windows" and arch() == "x86_64":
         return "windows-x86_64"
     if os() == "Windows" and arch() == "aarch64":
@@ -201,7 +203,7 @@ fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
     needles.push("libz")
     needles.push("libxml2")
     needles.push("zstd")
-    if platform == "linux-x86_64":
+    if platform == "linux-x86_64" or platform == "linux-aarch64":
         needles.push("libstdc++")
         needles.push("libgcc_s")
         needles.push("libc++")
