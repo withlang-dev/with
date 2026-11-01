@@ -30,14 +30,15 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.libc
 
+// contract: unproved:0:malloc is outside the corpus and not a known pure reader
 pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *const u8 {
-    var __local_yield_: *mut u8 = (((if (if __param_gcontext != null: 1 else: 0) != 0: (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as u64), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) else: (with_alloc(((1088 as u64) as i64)) as *mut c_void)) as *mut u8))
+    var __local_yield_: *mut u8 = (((if __param_gcontext != null: (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((1088 as u64), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) else: (with_alloc(((1088 as u64) as i64)) as *mut c_void)) as *mut u8))
 
     var __local_i: i32
 
     var __local_p: *mut u8
 
-    if ((if __local_yield_ == null: 1 else: 0) != 0) {
+    if (__local_yield_ == null) {
         return ((null as *const u8))
     }
 
@@ -45,14 +46,14 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 256: 1 else: 0) != 0) {
+    while (__local_i < 256) {
         var __local_c: i32 = ((tolower(__local_i) as i32))
 
         var __ci_expr_old_0: *mut u8 = __local_p
 
         (__local_p = __local_p + 1)
 
-        ((*__ci_expr_old_0) = (((if (if __local_c < 256: 1 else: 0) != 0: __local_c else: __local_i) as u8)))
+        ((*__ci_expr_old_0) = (((if __local_c < 256: __local_c else: __local_i) as u8)))
 
 
 
@@ -63,14 +64,14 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 256: 1 else: 0) != 0) {
-        var __local_c_1: i32 = (((if islower(__local_i) != 0: (toupper(__local_i) as i32) else: (tolower(__local_i) as i32)) as i32))
+    while (__local_i < 256) {
+        var __local_c_1: i32 = (((if islower(__local_i): (toupper(__local_i) as i32) else: (tolower(__local_i) as i32)) as i32))
 
         var __ci_expr_old_1: *mut u8 = __local_p
 
         (__local_p = __local_p + 1)
 
-        ((*__ci_expr_old_1) = (((if (if __local_c_1 < 256: 1 else: 0) != 0: __local_c_1 else: __local_i) as u8)))
+        ((*__ci_expr_old_1) = (((if __local_c_1 < 256: __local_c_1 else: __local_i) as u8)))
 
 
 
@@ -83,48 +84,48 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 256: 1 else: 0) != 0) {
-        if (isdigit(__local_i) != 0) {
+    while (__local_i < 256) {
+        if isdigit(__local_i) {
             ((__local_p[(64 + (__local_i / 8))]) = ((__local_p[(64 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isupper(__local_i) != 0) {
+        if isupper(__local_i) {
             ((__local_p[(96 + (__local_i / 8))]) = ((__local_p[(96 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (islower(__local_i) != 0) {
+        if islower(__local_i) {
             ((__local_p[(128 + (__local_i / 8))]) = ((__local_p[(128 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isalnum(__local_i) != 0) {
+        if isalnum(__local_i) {
             ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if ((if __local_i == 95: 1 else: 0) != 0) {
+        if (__local_i == 95) {
             ((__local_p[(160 + (__local_i / 8))]) = ((__local_p[(160 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isspace(__local_i) != 0) {
+        if isspace(__local_i) {
             ((__local_p[(0 + (__local_i / 8))]) = ((__local_p[(0 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isxdigit(__local_i) != 0) {
+        if isxdigit(__local_i) {
             ((__local_p[(32 + (__local_i / 8))]) = ((__local_p[(32 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isgraph(__local_i) != 0) {
+        if isgraph(__local_i) {
             ((__local_p[(192 + (__local_i / 8))]) = ((__local_p[(192 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (isprint(__local_i) != 0) {
+        if isprint(__local_i) {
             ((__local_p[(224 + (__local_i / 8))]) = ((__local_p[(224 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (ispunct(__local_i) != 0) {
+        if ispunct(__local_i) {
             ((__local_p[(256 + (__local_i / 8))]) = ((__local_p[(256 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
-        if (iscntrl(__local_i) != 0) {
+        if iscntrl(__local_i) {
             ((__local_p[(288 + (__local_i / 8))]) = ((__local_p[(288 + (__local_i / 8))]) as u8) | (((1 as u32) << (((__local_i as i32) & (7 as i32)) as u32)) as u8))
         }
 
@@ -138,34 +139,34 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 256: 1 else: 0) != 0) {
+    while (__local_i < 256) {
         var __local_x: i32 = ((0 as i32))
 
-        if (isspace(__local_i) != 0) {
+        if isspace(__local_i) {
             (__local_x = __local_x + 1)
         }
 
-        if (isalpha(__local_i) != 0) {
+        if isalpha(__local_i) {
             (__local_x = __local_x + 2)
         }
 
-        if (islower(__local_i) != 0) {
+        if islower(__local_i) {
             (__local_x = __local_x + 4)
         }
 
-        if (isdigit(__local_i) != 0) {
+        if isdigit(__local_i) {
             (__local_x = __local_x + 8)
         }
 
         var __ci_expr_logic_2: i32
 
-        if (isalnum(__local_i) != 0) {
+        if isalnum(__local_i) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if __local_i == 95: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if __local_i == 95: 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             (__local_x = __local_x + 16)
         }
 
@@ -187,8 +188,9 @@ pub unsafe fn pcre2_maketables_8(__param_gcontext: *mut pcre2_real_general_conte
 
 }
 
+// contract: unproved:0:frees a part of it,unproved:1:read only
 pub unsafe fn pcre2_maketables_free_8(__param_gcontext: *mut pcre2_real_general_context_8, __param_tables: *const u8) {
-    if ((if __param_gcontext != null: 1 else: 0) != 0) {
+    if (__param_gcontext != null) {
         (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).free.unwrap()((__param_tables as *mut c_void), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
     } else {
         with_free(((__param_tables as *mut c_void) as *mut u8))

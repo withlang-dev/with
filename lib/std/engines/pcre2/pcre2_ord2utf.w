@@ -29,6 +29,7 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
+// contract: unproved:1:out-parameter read before the write
 pub unsafe fn _pcre2_ord2utf_8(__param_cvalue: u32, __param_buffer: *mut u8) -> u32 {
     var __local_cvalue = __param_cvalue
     var __local_buffer = __param_buffer
@@ -36,8 +37,8 @@ pub unsafe fn _pcre2_ord2utf_8(__param_cvalue: u32, __param_buffer: *mut u8) -> 
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < _pcre2_utf8_table1_size: 1 else: 0) != 0) {
-        if ((if ((__local_cvalue as i32)) <= _pcre2_utf8_table1[__local_i]: 1 else: 0) != 0) {
+    while (__local_i < _pcre2_utf8_table1_size) {
+        if (((__local_cvalue as i32)) <= _pcre2_utf8_table1[__local_i]) {
             break
         }
 
@@ -50,7 +51,7 @@ pub unsafe fn _pcre2_ord2utf_8(__param_cvalue: u32, __param_buffer: *mut u8) -> 
 
     var __local_j: u32 = __local_i
 
-    while ((if __local_j != 0: 1 else: 0) != 0) {
+    while (__local_j != 0) {
         var __ci_expr_old_0: *mut u8 = __local_buffer
 
         (__local_buffer = __local_buffer - 1)

@@ -30,11 +30,12 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.option
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_options: u32) -> i32 {
     var __local_re: *mut pcre2_real_code_8 = __param_code
 
-    if (((__param_options as u32) & (512 as u32)) != 0) {
-        if ((if __param_options != 512: 1 else: 0) != 0) {
+    if ((__param_options as u32) & (512 as u32)) {
+        if (__param_options != 512) {
             return -45
         }
 
@@ -42,16 +43,16 @@ pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_
 
     }
 
-    if ((if __param_code == null: 1 else: 0) != 0) {
+    if (__param_code == null) {
         return -51
     }
 
-    if ((if ((__param_options as u32) & ((~((((((1 as u32) | (2 as u32)) as u32) | (4 as u32)) as u32) | (256 as u32))) as u32)) != 0: 1 else: 0) != 0) {
+    if (((__param_options as u32) & ((~((((((1 as u32) | (2 as u32)) as u32) | (4 as u32)) as u32) | (256 as u32))) as u32)) != 0) {
         return -45
     }
 
-    if ((if ((__param_options as u32) & (256 as u32)) != 0: 1 else: 0) != 0) {
-        if ((if (((*__local_re).overall_options as u32) & (67108864 as u32)) == 0: 1 else: 0) != 0) {
+    if (((__param_options as u32) & (256 as u32)) != 0) {
+        if ((((*__local_re).overall_options as u32) & (67108864 as u32)) == 0) {
             ((*__local_re).overall_options = ((*__local_re).overall_options as u32) | (67108864 as u32))
 
         }
@@ -62,6 +63,7 @@ pub unsafe fn pcre2_jit_compile_8(__param_code: *mut pcre2_real_code_8, __param_
 
 }
 
+// contract: receiver:pcre2_real_code_8,unproved:1:read only,unproved:5:out-parameter written conditionally,unproved:6:read only
 pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_subject: *const u8, __param_length: u64, __param_start_offset: u64, __param_options: u32, __param_match_data: *mut pcre2_real_match_data_8, __param_mcontext: *mut pcre2_real_match_context_8) -> i32 {
 
 
@@ -76,10 +78,7 @@ pub unsafe fn pcre2_jit_match_8(__param_code: *const pcre2_real_code_8, __param_
 
 }
 
-pub unsafe fn pcre2_jit_free_unused_memory_8(__param_gcontext: *mut pcre2_real_general_context_8) {
-    return
-}
-
+// contract: unproved:2:read only
 pub unsafe fn pcre2_jit_stack_create_8(__param_startsize: u64, __param_maxsize: u64, __param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_jit_stack_8 {
 
 
@@ -88,22 +87,22 @@ pub unsafe fn pcre2_jit_stack_create_8(__param_startsize: u64, __param_maxsize: 
 
 }
 
+// contract: receiver:pcre2_real_match_context_8,unproved:2:read only
 pub unsafe fn pcre2_jit_stack_assign_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callback: Option[unsafe extern "C" fn(*mut c_void) -> *mut pcre2_real_jit_stack_8], __param_callback_data: *mut c_void) {
     return
 }
 
-pub unsafe fn pcre2_jit_stack_free_8(__param_jit_stack: *mut pcre2_real_jit_stack_8) {
-    return
-}
-
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn _pcre2_jit_free_rodata_8(__param_current: *mut c_void, __param_allocator_data: *mut c_void) {
     return
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn _pcre2_jit_free_8(__param_executable_jit: *mut c_void, __param_memctl: *mut pcre2_memctl) {
     return
 }
 
+// contract: unproved:0:read only
 pub unsafe fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> u64 {
 
     return ((0 as u64))
@@ -112,5 +111,21 @@ pub unsafe fn _pcre2_jit_get_size_8(__param_executable_jit: *mut c_void) -> u64 
 
 pub fn _pcre2_jit_get_target_8() -> *const c_char {
     return (&"JIT is not supported"[0] as *mut c_char)
+
+}
+
+impl pcre2_real_general_context_8 {
+    pub fn pcre2_jit_free_unused_memory_8() {
+        let __param_gcontext: *mut pcre2_real_general_context_8 = (self as *const pcre2_real_general_context_8) as *mut pcre2_real_general_context_8
+        return
+    }
+
+}
+
+impl pcre2_real_jit_stack_8 {
+    pub fn pcre2_jit_stack_free_8() {
+        let __param_jit_stack: *mut pcre2_real_jit_stack_8 = (self as *const pcre2_real_jit_stack_8) as *mut pcre2_real_jit_stack_8
+        return
+    }
 
 }

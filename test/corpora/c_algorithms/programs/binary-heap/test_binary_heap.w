@@ -15,7 +15,7 @@ pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (__local_heap = binary_heap_new((0 as i32), Some(int_compare)))
 
         unsafe { binary_heap_free(__local_heap) }
@@ -30,7 +30,7 @@ pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
 
     (__local_heap = binary_heap_new((0 as i32), Some(int_compare)))
 
-    if (((if not ((if __local_heap == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_heap == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_binary_heap_new_free".ptr, c"test-binary-heap.c".ptr, (47 as i32), c"heap == NULL".ptr)
     } else {
         0
@@ -40,7 +40,7 @@ pub fn test_binary_heap_new_free() -> Unit writes allocation_limit {
 
     (__local_heap = binary_heap_new((0 as i32), Some(int_compare)))
 
-    if (((if not ((if __local_heap == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_heap == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_binary_heap_new_free".ptr, c"test-binary-heap.c".ptr, (51 as i32), c"heap == NULL".ptr)
     } else {
         0
@@ -57,10 +57,10 @@ pub fn test_binary_heap_insert() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (test_array[__local_i] = __local_i)
 
-        if (((if not ((if unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_binary_heap_insert".ptr, c"test-binary-heap.c".ptr, (63 as i32), c"binary_heap_insert(heap, &test_array[i]) != 0".ptr)
         } else {
             0
@@ -72,7 +72,7 @@ pub fn test_binary_heap_insert() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { binary_heap_num_entries(__local_heap) } == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_heap).binary_heap_num_entries() } == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_binary_heap_insert".ptr, c"test-binary-heap.c".ptr, (66 as i32), c"binary_heap_num_entries(heap) == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -93,10 +93,10 @@ pub fn test_min_heap() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (test_array[__local_i] = __local_i)
 
-        if (((if not ((if unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_min_heap".ptr, c"test-binary-heap.c".ptr, (82 as i32), c"binary_heap_insert(heap, &test_array[i]) != 0".ptr)
         } else {
             0
@@ -110,10 +110,10 @@ pub fn test_min_heap() writes allocation_limit {
 
     (__local_i = ((-1 as i32)))
 
-    while ((if unsafe { binary_heap_num_entries(__local_heap) } > 0: 1 else: 0) != 0) {
-        (__local_val = ((unsafe { binary_heap_pop(__local_heap) } as *mut i32)))
+    while (unsafe { (*__local_heap).binary_heap_num_entries() } > 0) {
+        (__local_val = ((unsafe { (*__local_heap).binary_heap_pop() } as *mut i32)))
 
-        if (((if not ((if (unsafe *__local_val) == (__local_i + 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((unsafe *__local_val) == (__local_i + 1)): 1 else: 0) as i64) {
             __assert_rtn(c"test_min_heap".ptr, c"test-binary-heap.c".ptr, (90 as i32), c"*val == i + 1".ptr)
         } else {
             0
@@ -123,13 +123,13 @@ pub fn test_min_heap() writes allocation_limit {
 
     }
 
-    if (((if not ((if unsafe { binary_heap_num_entries(__local_heap) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_heap).binary_heap_num_entries() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_min_heap".ptr, c"test-binary-heap.c".ptr, (95 as i32), c"binary_heap_num_entries(heap) == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { binary_heap_pop(__local_heap) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_heap).binary_heap_pop() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_min_heap".ptr, c"test-binary-heap.c".ptr, (96 as i32), c"binary_heap_pop(heap) == BINARY_HEAP_NULL".ptr)
     } else {
         0
@@ -150,10 +150,10 @@ pub fn test_max_heap() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (test_array[__local_i] = __local_i)
 
-        if (((if not ((if unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { binary_heap_insert(__local_heap, (((&raw const test_array[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_max_heap".ptr, c"test-binary-heap.c".ptr, (112 as i32), c"binary_heap_insert(heap, &test_array[i]) != 0".ptr)
         } else {
             0
@@ -167,10 +167,10 @@ pub fn test_max_heap() writes allocation_limit {
 
     (__local_i = ((10000 as i32)))
 
-    while ((if unsafe { binary_heap_num_entries(__local_heap) } > 0: 1 else: 0) != 0) {
-        (__local_val = ((unsafe { binary_heap_pop(__local_heap) } as *mut i32)))
+    while (unsafe { (*__local_heap).binary_heap_num_entries() } > 0) {
+        (__local_val = ((unsafe { (*__local_heap).binary_heap_pop() } as *mut i32)))
 
-        if (((if not ((if (unsafe *__local_val) == (__local_i - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((unsafe *__local_val) == (__local_i - 1)): 1 else: 0) as i64) {
             __assert_rtn(c"test_max_heap".ptr, c"test-binary-heap.c".ptr, (120 as i32), c"*val == i - 1".ptr)
         } else {
             0
@@ -199,8 +199,8 @@ pub fn test_out_of_memory() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 16: 1 else: 0) != 0) {
-        if (((if not ((if unsafe { binary_heap_insert(__local_heap, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (__local_i < 16) {
+        if ((if not (unsafe { binary_heap_insert(__local_heap, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (143 as i32), c"binary_heap_insert(heap, &values[i]) != 0".ptr)
         } else {
             0
@@ -212,7 +212,7 @@ pub fn test_out_of_memory() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { binary_heap_num_entries(__local_heap) } == 16: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_heap).binary_heap_num_entries() } == 16): 1 else: 0) as i64) {
         __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (146 as i32), c"binary_heap_num_entries(heap) == 16".ptr)
     } else {
         0
@@ -220,14 +220,14 @@ pub fn test_out_of_memory() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 16: 1 else: 0) != 0) {
-        if (((if not ((if unsafe { binary_heap_insert(__local_heap, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (__local_i < 16) {
+        if ((if not (unsafe { binary_heap_insert(__local_heap, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } == 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (150 as i32), c"binary_heap_insert(heap, &values[i]) == 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { binary_heap_num_entries(__local_heap) } == 16: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_heap).binary_heap_num_entries() } == 16): 1 else: 0) as i64) {
             __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (151 as i32), c"binary_heap_num_entries(heap) == 16".ptr)
         } else {
             0
@@ -241,10 +241,10 @@ pub fn test_out_of_memory() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 16: 1 else: 0) != 0) {
-        (__local_value = ((unsafe { binary_heap_pop(__local_heap) } as *mut i32)))
+    while (__local_i < 16) {
+        (__local_value = ((unsafe { (*__local_heap).binary_heap_pop() } as *mut i32)))
 
-        if (((if not ((if (unsafe *__local_value) == __local_i: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((unsafe *__local_value) == __local_i): 1 else: 0) as i64) {
             __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (158 as i32), c"*value == i".ptr)
         } else {
             0
@@ -256,7 +256,7 @@ pub fn test_out_of_memory() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { binary_heap_num_entries(__local_heap) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_heap).binary_heap_num_entries() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_out_of_memory".ptr, c"test-binary-heap.c".ptr, (161 as i32), c"binary_heap_num_entries(heap) == 0".ptr)
     } else {
         0
@@ -266,6 +266,7 @@ pub fn test_out_of_memory() writes allocation_limit {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn main(__param_argc: i32, __param_argv: *mut *mut c_char) -> i32 writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 

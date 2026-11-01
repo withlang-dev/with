@@ -112,13 +112,13 @@ pub fn zError(__param_err: i32) -> *const c_char {
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_err < -6: 1 else: 0) != 0) {
+    if (__param_err < -6) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_err > 2: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_err > 2: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_ternary_1 = ((9 as i32)))
     } else {
         (__ci_expr_ternary_1 = (((2 - __param_err) as i32)))
@@ -129,12 +129,14 @@ pub fn zError(__param_err: i32) -> *const c_char {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn zcalloc(__param_opaque_: *mut c_void, __param_items: u32, __param_size: u32) -> *mut c_void {
 
-    return (((if (if (sizeof[u32]() as usize) > 2: 1 else: 0) != 0: (with_alloc(((((__param_items as u32) *% (__param_size as u32)) as u64) as i64)) as *mut c_void) else: (with_alloc_zeroed(((__param_items as u64) as i64), ((__param_size as u64) as i64)) as *mut c_void)) as *mut c_void))
+    return (((if (sizeof[u32]() as usize) > 2: (with_alloc(((((__param_items as u32) *% (__param_size as u32)) as u64) as i64)) as *mut c_void) else: (with_alloc_zeroed(((__param_items as u64) as i64), ((__param_size as u64) as i64)) as *mut c_void)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 pub unsafe fn zcfree(__param_opaque_: *mut c_void, __param_ptr: *mut c_void) {
 
     with_free((__param_ptr as *mut u8))

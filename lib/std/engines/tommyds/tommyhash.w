@@ -69,6 +69,7 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_void, __param_key_len: u64) -> u32 {
     var __local_key_len = __param_key_len
     var __local_key: *const u8 = ((__param_void_key as *const u8))
@@ -87,7 +88,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_v
     (__local_a = __local_b)
 
 
-    while ((if __local_key_len > 12: 1 else: 0) != 0) {
+    while (__local_key_len > 12) {
         (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
         (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
@@ -131,7 +132,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_v
 
             (__local_b = (__local_b +% __local_a))
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -280,7 +281,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_v
 
         (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -289,6 +290,7 @@ pub unsafe fn tommy_hash_u32(__param_init_val: u32, __param_void_key: *const c_v
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_void, __param_key_len: u64) -> u64 {
     var __local_key_len = __param_key_len
     var __local_key: *const u8 = ((__param_void_key as *const u8))
@@ -309,7 +311,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_v
 
     (__local_c = (((__local_c +% (((__param_init_val as u64) >> (32 as u32)) as u32)) as u32)))
 
-    while ((if __local_key_len > 12: 1 else: 0) != 0) {
+    while (__local_key_len > 12) {
         (__local_a = (__local_a +% tommy_le_uint32_read(((__local_key + ((0 as isize) as usize)) as *const c_void))))
 
         (__local_b = (__local_b +% tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void))))
@@ -353,7 +355,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_v
 
             (__local_b = (__local_b +% __local_a))
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -502,7 +504,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_v
 
         (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -511,6 +513,7 @@ pub unsafe fn tommy_hash_u64(__param_init_val: u64, __param_void_key: *const c_v
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const c_void) -> u32 {
     var __local_key: *const u8 = ((__param_void_key as *const u8))
 
@@ -530,17 +533,17 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const 
     (__local_a = __local_b)
 
 
-    while (1 != 0) {
+    while true {
         var __local_v: u32 = ((tommy_le_uint32_read((__local_key as *const c_void)) as u32))
 
-        if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+        if tommy_haszero_u32(__local_v) {
+            if ((__local_v as u32) & (__local_m[0] as u32)) {
                 (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                if ((__local_v as u32) & (__local_m[1] as u32)) {
                     (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                    if ((__local_v as u32) & (__local_m[2] as u32)) {
                         (__local_a = (__local_a +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
@@ -556,14 +559,14 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const 
 
         (__local_v = ((tommy_le_uint32_read(((__local_key + ((4 as isize) as usize)) as *const c_void)) as u32)))
 
-        if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+        if tommy_haszero_u32(__local_v) {
+            if ((__local_v as u32) & (__local_m[0] as u32)) {
                 (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                if ((__local_v as u32) & (__local_m[1] as u32)) {
                     (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                    if ((__local_v as u32) & (__local_m[2] as u32)) {
                         (__local_b = (__local_b +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
@@ -579,14 +582,14 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const 
 
         (__local_v = ((tommy_le_uint32_read(((__local_key + ((8 as isize) as usize)) as *const c_void)) as u32)))
 
-        if (tommy_haszero_u32(__local_v) != 0) {
-            if (((__local_v as u32) & (__local_m[0] as u32)) != 0) {
+        if tommy_haszero_u32(__local_v) {
+            if ((__local_v as u32) & (__local_m[0] as u32)) {
                 (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[0] as u32))))
 
-                if (((__local_v as u32) & (__local_m[1] as u32)) != 0) {
+                if ((__local_v as u32) & (__local_m[1] as u32)) {
                     (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[1] as u32))))
 
-                    if (((__local_v as u32) & (__local_m[2] as u32)) != 0) {
+                    if ((__local_v as u32) & (__local_m[2] as u32)) {
                         (__local_c = (__local_c +% ((__local_v as u32) & (__local_m[2] as u32))))
                     }
 
@@ -637,7 +640,7 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const 
 
             (__local_b = (__local_b +% __local_a))
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -675,7 +678,7 @@ pub unsafe fn tommy_strhash_u32(__param_init_val: u32, __param_void_key: *const 
 
         (__local_c = (__local_c -% ((((__local_b as u32) << (24 as u32)) as u32) | (((__local_b as u32) >> ((32 - 24) as u32)) as u32))))
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -724,6 +727,7 @@ pub fn tommy_inthash_u64(__param_key: u64) -> u64 {
 
 }
 
+// contract: unproved:0:read only
 unsafe fn tommy_le_uint32_read(__param_ptr: *const c_void) -> u32 {
     var __local_v: u32
 

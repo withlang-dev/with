@@ -18,7 +18,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+    while (__local_len >= ((sizeof[u64]() as i64))) {
         with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         (__local_h = (__local_h as u64) ^ (__local_block as u64))
@@ -36,7 +36,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
         (__local_len = __local_len - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -86,7 +86,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
     var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    while ((*__local_msg) != 0) {
+    while (*__local_msg) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
@@ -106,7 +106,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
         ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
@@ -144,11 +144,11 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
-    if ((if __param_nlen == 0: 1 else: 0) != 0) {
+    if (__param_nlen == 0) {
         return ((__local_str as *mut c_char))
     }
 
-    if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
+    if (__param_nlen > __local_slen) {
         return ((null as *mut c_char))
     }
 
@@ -157,11 +157,11 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
     loop {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_str) == (*__param_needle)) {
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return ((__local_str as *mut c_char))
         }
 
@@ -172,7 +172,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
         (__local_slen = __local_slen - 1)
 
-        if not ((__ci_expr_old_0 != 0)) {
+        if not (__ci_expr_old_0) {
             break
         }
     }
@@ -185,7 +185,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 pub unsafe fn _cco_new_fiber(__param_task: *mut cco_task, __param_data: *mut c_void) -> *mut cco_task_fiber {
     var __local_new_fb: *mut cco_task_fiber = with 0 as __ci_expr_seq_5 {
         var __ci_expr_lit_0: [cco_task_fiber; 1] = [cco_task_fiber { task: __param_task, data: __param_data, recover_state: cco_task_state.zeroed(), error_: cco_err_t.zeroed() }]
-        (c_safe_memcpy((with_alloc((((if 1 != 0: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)
+        (c_safe_memcpy((with_alloc((((if true: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)
     }
 
     ((*__local_new_fb).next = __local_new_fb)
@@ -203,7 +203,7 @@ pub unsafe fn _cco_spawn(__param_task: *mut cco_task, __param_grp: *mut cco_grou
         var __ci_expr_ternary_1: *mut cco_task_fiber = null
         if ((*__param_fib).next != null) {
             var __ci_expr_lit_0: [cco_task_fiber; 1] = [cco_task_fiber { next: (*__param_fib).next, parent: __param_fib, recover_state: cco_task_state.zeroed(), error_: cco_err_t.zeroed() }]
-            (__ci_expr_ternary_1 = ((c_safe_memcpy((with_alloc((((if 1 != 0: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)))
+            (__ci_expr_ternary_1 = ((c_safe_memcpy((with_alloc((((if true: (sizeof[cco_task_fiber]() as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void), (&__ci_expr_lit_0[0] as *mut cco_task_fiber), (sizeof[cco_task_fiber]() as i64)) as *mut cco_task_fiber)))
         } else {
             (__ci_expr_ternary_1 = __param_fib)
         }
@@ -234,43 +234,43 @@ pub unsafe fn _cco_cancel(__param_fib: *mut cco_task_fiber, __param_grp: *mut cc
     var __ci_expr_logic_0: i32 = 0
 
     if (__param_grp != null) {
-        (__ci_expr_logic_0 = (if (if (*__param_grp).spawn_count() == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__param_grp).spawn_count() == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return ((false as bool))
     }
 
 
     var __local_fit: *mut cco_task_fiber = (*__param_fib).next
 
-    while ((if __local_fit != __param_fib: 1 else: 0) != 0) {
+    while (__local_fit != __param_fib) {
         var __local_tsk: *mut cco_task = (*__local_fit).task
 
         loop {
             var __ci_expr_logic_1: i32
 
-            if ((if not (__param_grp != null): 1 else: 0) != 0) {
+            if (not (__param_grp != null)) {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_1 = (if (if (*(&raw const (*__local_tsk).base.state as *const cco_task_state)).parent_grp == __param_grp: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_1 = (if (*(&raw const (*__local_tsk).base.state as *const cco_task_state)).parent_grp == __param_grp: 1 else: 0))
             }
 
-            if (__ci_expr_logic_1 != 0) {
-                let __ci_copy_90: cco_err_t = (cco_err_t { code: 1073741824, line: __param_line, file: __param_file, info: (*(&raw const (*__param_fib).error_ as *const cco_err_t)).info } as cco_err_t)
-                with_memcpy((&raw mut (*__local_fit).error_ as *mut u8), (&raw const __ci_copy_90 as *const u8), sizeof[cco_err_t]())
+            if __ci_expr_logic_1 {
+                let __ci_copy_78: cco_err_t = (cco_err_t { code: 1073741824, line: __param_line, file: __param_file, info: (*(&raw const (*__param_fib).error_ as *const cco_err_t)).info } as cco_err_t)
+                with_memcpy((&raw mut (*__local_fit).error_ as *mut u8), (&raw const __ci_copy_78 as *const u8), sizeof[cco_err_t]())
 
                 loop {
                     var __local__st: *mut cco_task_state = (((&raw const (*(&raw const (*(*__local_fit).task).base as *const cco_task_base)).state as *const cco_task_state) as *mut cco_task_state))
 
-                    if ((if not (*__local__st).finalizing: 1 else: 0) != 0) {
+                    if (not (*__local__st).finalizing) {
                         ((*__local__st).pos = cco_POS_FINAL)
 
                         ((*__local__st).finalizing = true)
 
                     }
 
-                    if not ((0 != 0)) {
+                    if not (false) {
                         break
                     }
                 }
@@ -366,7 +366,7 @@ impl cco_task_fiber {
             ((unsafe *__param_fib).cur_awaiter = (unsafe *(&raw const (*(*__param_fib).task).base as *const cco_task_base)).awaiter)
             ((unsafe *__param_fib).cur_awaitbits = (unsafe *(&raw const (*(*__param_fib).task).base as *const cco_task_base)).awaitbits)
             ((unsafe *__param_fib).status = ((unsafe { _cco_resume_task((*__param_fib).task) } as i32)))
-            if ((unsafe *(&raw const (*__param_fib).error_ as *const cco_err_t)).code != 0) {
+            if (unsafe *(&raw const (*__param_fib).error_ as *const cco_err_t)).code {
                 goto '__ci_bb_1
             } else {
                 goto '__ci_bb_2
@@ -374,7 +374,7 @@ impl cco_task_fiber {
         }
 
         '__ci_bb_1 {
-            if ((if (unsafe *__param_fib).status == cco_DONE: 1 else: 0) != 0) {
+            if ((unsafe *__param_fib).status == cco_DONE) {
                 goto '__ci_bb_3
             } else {
                 goto '__ci_bb_4
@@ -382,15 +382,15 @@ impl cco_task_fiber {
         }
 
         '__ci_bb_2 {
-            if ((((unsafe *__param_fib).status as i32) & ((~(unsafe *__param_fib).cur_awaitbits) as i32)) != 0) {
+            if (((unsafe *__param_fib).status as i32) & ((~(unsafe *__param_fib).cur_awaitbits) as i32)) {
                 (__ci_expr_logic_0 = (if true: 1 else: 0))
             } else {
                 ((unsafe *__param_fib).task = (unsafe *__param_fib).cur_awaiter)
 
-                (__ci_expr_logic_0 = (if (if (unsafe *__param_fib).task != null: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_0 = (if (unsafe *__param_fib).task != null: 1 else: 0))
 
             }
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 goto '__ci_bb_20
             } else {
                 goto '__ci_bb_21
@@ -399,7 +399,7 @@ impl cco_task_fiber {
 
         '__ci_bb_3 {
             ((unsafe *__param_fib).task = (unsafe *__param_fib).cur_awaiter)
-            if ((if (unsafe *__param_fib).task == null: 1 else: 0) != 0) {
+            if ((unsafe *__param_fib).task == null) {
                 goto '__ci_bb_5
             } else {
                 goto '__ci_bb_6
@@ -465,7 +465,7 @@ impl cco_task_fiber {
         }
 
         '__ci_bb_14 {
-            if ((((unsafe *(&raw const (*__param_fib).error_ as *const cco_err_t)).code as u32) & ((~((((1 as u32) << (30 as u32)) as u32) | (((1 as u32) << (29 as u32)) as u32))) as u32)) != 0) {
+            if (((unsafe *(&raw const (*__param_fib).error_ as *const cco_err_t)).code as u32) & ((~((((1 as u32) << (30 as u32)) as u32) | (((1 as u32) << (29 as u32)) as u32))) as u32)) {
                 goto '__ci_bb_22
             } else {
                 goto '__ci_bb_23
@@ -474,7 +474,7 @@ impl cco_task_fiber {
 
         '__ci_bb_15 {
             (__local__st__goto_744_9 = (((&raw const (unsafe *(&raw const (*(*__param_fib).task).base as *const cco_task_base)).state as *const cco_task_state) as *mut cco_task_state)))
-            if ((if not (unsafe *__local__st__goto_744_9).finalizing: 1 else: 0) != 0) {
+            if (not (unsafe *__local__st__goto_744_9).finalizing) {
                 goto '__ci_bb_18
             } else {
                 goto '__ci_bb_19
@@ -482,7 +482,7 @@ impl cco_task_fiber {
         }
 
         '__ci_bb_16 {
-            if (0 != 0) {
+            if false {
                 goto '__ci_bb_15
             } else {
                 goto '__ci_bb_17
@@ -530,10 +530,10 @@ impl cco_task_fiber {
 
         var __local_more: i32 = ((unsafe { (*__local__next).cco_execute() } as i32))
 
-        if ((if not (__local_more != 0): 1 else: 0) != 0) {
+        if (not __local_more) {
             var __local_unlinked: *mut cco_task_fiber = __local__next
 
-            if ((if __param_fib == __local_unlinked: 1 else: 0) != 0) {
+            if (__param_fib == __local_unlinked) {
                 (__local__next = ((null as *mut cco_task_fiber)))
             } else {
                 (__local__next = (unsafe *__local__next).next)
@@ -559,14 +559,14 @@ impl cco_task_fiber {
         loop {
             var __local__st: *mut cco_task_state = (((&raw const (unsafe *(&raw const (*(*__param_fib).task).base as *const cco_task_base)).state as *const cco_task_state) as *mut cco_task_state))
 
-            if ((if not (unsafe *__local__st).finalizing: 1 else: 0) != 0) {
+            if (not (unsafe *__local__st).finalizing) {
                 ((unsafe *__local__st).pos = cco_POS_FINAL)
 
                 ((unsafe *__local__st).finalizing = true)
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }

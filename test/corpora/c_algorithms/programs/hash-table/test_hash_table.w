@@ -24,7 +24,7 @@ pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
         (__local_value = unsafe { alloc_test_strdup((&__local_buf[0] as *mut c_char)) })
@@ -37,7 +37,7 @@ pub fn generate_hash_table() -> *mut _HashTable writes allocation_limit {
     }
 
 
-    unsafe { hash_table_register_free_functions(__local_hash_table, null, Some(alloc_test_free)) }
+    unsafe { (*__local_hash_table).hash_table_register_free_functions(null, Some(alloc_test_free)) }
 
     return __local_hash_table
 
@@ -48,7 +48,7 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 
     (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
-    if (((if not ((if __local_hash_table != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_hash_table != null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (77 as i32), c"hash_table != NULL".ptr)
     } else {
         0
@@ -68,13 +68,13 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 
     (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
-    if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_hash_table == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (91 as i32), c"hash_table == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (92 as i32), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0
@@ -84,13 +84,13 @@ pub fn test_hash_table_new_free() -> Unit writes allocation_limit, value1, value
 
     (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
-    if (((if not ((if __local_hash_table == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_hash_table == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (96 as i32), c"hash_table == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_new_free".ptr, c"test-hash-table.c".ptr, (97 as i32), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0
@@ -109,7 +109,7 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 
     (__local_hash_table = generate_hash_table())
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (111 as i32), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -117,12 +117,12 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
         (__local_value = ((unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } as *mut c_char)))
 
-        if (((if not ((if strcmp((__local_value as *const c_char), (&__local_buf[0] as *mut c_char)) == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (strcmp((__local_value as *const c_char), (&__local_buf[0] as *mut c_char)) == 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (118 as i32), c"strcmp(value, buf) == 0".ptr)
         } else {
             0
@@ -136,7 +136,7 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, -1)
 
-    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (123 as i32), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -144,7 +144,7 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, 10000)
 
-    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (125 as i32), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -156,7 +156,7 @@ pub fn test_hash_table_insert_lookup() writes allocation_limit {
 
     (__local_value = ((unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } as *mut c_char)))
 
-    if (((if not ((if strcmp((__local_value as *const c_char), c"hello world".ptr) == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (strcmp((__local_value as *const c_char), c"hello world".ptr) == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_insert_lookup".ptr, c"test-hash-table.c".ptr, (131 as i32), c"strcmp(value, \"hello world\") == 0".ptr)
     } else {
         0
@@ -173,7 +173,7 @@ pub fn test_hash_table_remove() writes allocation_limit {
 
     (__local_hash_table = generate_hash_table())
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (143 as i32), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -181,7 +181,7 @@ pub fn test_hash_table_remove() writes allocation_limit {
 
     sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, 5000)
 
-    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (145 as i32), c"hash_table_lookup(hash_table, buf) != NULL".ptr)
     } else {
         0
@@ -189,13 +189,13 @@ pub fn test_hash_table_remove() writes allocation_limit {
 
     unsafe { hash_table_remove(__local_hash_table, (&__local_buf[0] as *mut c_char)) }
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 9999): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (151 as i32), c"hash_table_num_entries(hash_table) == 9999".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (154 as i32), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
     } else {
         0
@@ -205,7 +205,7 @@ pub fn test_hash_table_remove() writes allocation_limit {
 
     unsafe { hash_table_remove(__local_hash_table, (&__local_buf[0] as *mut c_char)) }
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 9999: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 9999): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_remove".ptr, c"test-hash-table.c".ptr, (160 as i32), c"hash_table_num_entries(hash_table) == 9999".ptr)
     } else {
         0
@@ -230,23 +230,23 @@ pub fn test_hash_table_iterating() writes allocation_limit {
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
-    while (unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } != 0) {
-        unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
+    while unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_has_more() } {
+        unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_next() }
 
         (__local_count = __local_count + 1)
 
     }
 
-    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_count == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (185 as i32), c"count == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    let __ci_copy_69: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
+    let __ci_copy_69: _HashTablePair = unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_next() }
     with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_69 as *const u8), sizeof[_HashTablePair]())
 
-    if (((if not ((if (unsafe *(&raw const __local_pair as *const _HashTablePair)).value == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((unsafe *(&raw const __local_pair as *const _HashTablePair)).value == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (189 as i32), c"pair.value == HASH_TABLE_NULL".ptr)
     } else {
         0
@@ -258,7 +258,7 @@ pub fn test_hash_table_iterating() writes allocation_limit {
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
-    if (((if not ((if unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_has_more() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating".ptr, c"test-hash-table.c".ptr, (198 as i32), c"hash_table_iter_has_more(&iterator) == 0".ptr)
     } else {
         0
@@ -293,13 +293,13 @@ pub fn test_hash_table_iterating_remove() writes allocation_limit {
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
-    while (unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } != 0) {
-        let __ci_copy_32: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
-        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_32 as *const u8), sizeof[_HashTablePair]())
+    while unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_has_more() } {
+        let __ci_copy_34: _HashTablePair = unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_next() }
+        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_34 as *const u8), sizeof[_HashTablePair]())
 
         (__local_val = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).value as *mut c_char)))
 
-        if ((if (atoi((__local_val as *const c_char)) % 100) == 0: 1 else: 0) != 0) {
+        if ((atoi((__local_val as *const c_char)) % 100) == 0) {
             unsafe { hash_table_remove(__local_hash_table, (__local_val as *mut c_void)) }
 
             (__local_removed = (__local_removed +% 1))
@@ -310,19 +310,19 @@ pub fn test_hash_table_iterating_remove() writes allocation_limit {
 
     }
 
-    if (((if not ((if __local_removed == 100: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_removed == 100): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (241 as i32), c"removed == 100".ptr)
     } else {
         0
     }
 
-    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_count == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (242 as i32), c"count == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((10000 as u32) -% (__local_removed as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == ((10000 as u32) -% (__local_removed as u32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (244 as i32), c"hash_table_num_entries(hash_table) == NUM_TEST_VALUES - removed".ptr)
     } else {
         0
@@ -330,18 +330,18 @@ pub fn test_hash_table_iterating_remove() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
-        if ((if (__local_i % 100) == 0: 1 else: 0) != 0) {
-            if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((__local_i % 100) == 0) {
+            if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } == null): 1 else: 0) as i64) {
                 __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (251 as i32), c"hash_table_lookup(hash_table, buf) == NULL".ptr)
             } else {
                 0
             }
 
         } else {
-            if (((if not ((if unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (unsafe { hash_table_lookup(__local_hash_table, (&__local_buf[0] as *mut c_char)) } != null): 1 else: 0) as i64) {
                 __assert_rtn(c"test_hash_table_iterating_remove".ptr, c"test-hash-table.c".ptr, (253 as i32), c"hash_table_lookup(hash_table, buf) != NULL".ptr)
             } else {
                 0
@@ -372,6 +372,7 @@ pub fn new_key(__param_value: i32) -> *mut i32 writes allocated_keys, allocation
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn free_key(__param_key: *mut c_void) writes allocated_keys {
     alloc_test_free(__param_key)
 
@@ -392,6 +393,7 @@ pub fn new_value(__param_value: i32) -> *mut i32 writes allocated_values, alloca
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn free_value(__param_value: *mut c_void) writes allocated_values {
     alloc_test_free(__param_value)
 
@@ -410,13 +412,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     (__local_hash_table = hash_table_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { hash_table_register_free_functions(__local_hash_table, Some(free_key), Some(free_value)) }
+    unsafe { (*__local_hash_table).hash_table_register_free_functions(Some(free_key), Some(free_value)) }
 
     (allocated_values = ((0 as i32)))
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (__local_key = new_key(__local_i))
 
         (__local_value = new_value((99 as i32)))
@@ -429,13 +431,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
     }
 
 
-    if (((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_keys == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (324 as i32), c"allocated_keys == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if (((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (325 as i32), c"allocated_values == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -445,13 +447,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     unsafe { hash_table_remove(__local_hash_table, ((&raw mut __local_i as *mut i32) as *mut c_void)) }
 
-    if (((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_keys == (10000 - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (331 as i32), c"allocated_keys == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
     }
 
-    if (((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == (10000 - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (332 as i32), c"allocated_values == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
@@ -461,13 +463,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     (__local_value = new_value((999 as i32)))
 
-    if (((if not ((if allocated_keys == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_keys == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (338 as i32), c"allocated_keys == NUM_TEST_VALUES".ptr)
     } else {
         0
     }
 
-    if (((if not ((if allocated_values == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (339 as i32), c"allocated_values == NUM_TEST_VALUES".ptr)
     } else {
         0
@@ -475,13 +477,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     unsafe { hash_table_insert(__local_hash_table, (__local_key as *mut c_void), (__local_value as *mut c_void)) }
 
-    if (((if not ((if allocated_keys == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_keys == (10000 - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (343 as i32), c"allocated_keys == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
     }
 
-    if (((if not ((if allocated_values == (10000 - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == (10000 - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (344 as i32), c"allocated_values == NUM_TEST_VALUES - 1".ptr)
     } else {
         0
@@ -489,13 +491,13 @@ pub fn test_hash_table_free_functions() -> Unit writes allocated_keys, allocated
 
     unsafe { hash_table_free(__local_hash_table) }
 
-    if (((if not ((if allocated_keys == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_keys == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (349 as i32), c"allocated_keys == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if allocated_values == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_free_functions".ptr, c"test-hash-table.c".ptr, (350 as i32), c"allocated_values == 0".ptr)
     } else {
         0
@@ -516,13 +518,13 @@ pub fn test_hash_table_out_of_memory() writes allocation_limit {
 
     (__local_values[0] = ((0 as i32)))
 
-    if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (365 as i32), c"hash_table_insert(hash_table, &values[0], &values[0]) == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (366 as i32), c"hash_table_num_entries(hash_table) == 0".ptr)
     } else {
         0
@@ -532,16 +534,16 @@ pub fn test_hash_table_out_of_memory() writes allocation_limit {
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < 65: 1 else: 0) != 0) {
+    while (__local_i < 65) {
         (__local_values[__local_i] = ((__local_i as i32)))
 
-        if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (379 as i32), c"hash_table_insert(hash_table, &values[i], &values[i]) != 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == ((__local_i as u32) +% (1 as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == ((__local_i as u32) +% (1 as u32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (380 as i32), c"hash_table_num_entries(hash_table) == i + 1".ptr)
         } else {
             0
@@ -553,7 +555,7 @@ pub fn test_hash_table_out_of_memory() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 65): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (383 as i32), c"hash_table_num_entries(hash_table) == 65".ptr)
     } else {
         0
@@ -563,13 +565,13 @@ pub fn test_hash_table_out_of_memory() writes allocation_limit {
 
     (__local_values[65] = ((65 as i32)))
 
-    if (((if not ((if unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { hash_table_insert(__local_hash_table, (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void), (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (390 as i32), c"hash_table_insert(hash_table, &values[65], &values[65]) == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { hash_table_num_entries(__local_hash_table) } == 65: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_hash_table).hash_table_num_entries() } == 65): 1 else: 0) as i64) {
         __assert_rtn(c"test_hash_table_out_of_memory".ptr, c"test-hash-table.c".ptr, (391 as i32), c"hash_table_num_entries(hash_table) == 65".ptr)
     } else {
         0
@@ -599,15 +601,15 @@ pub fn test_hash_iterator_key_pair() writes allocation_limit, value1, value2 {
 
     unsafe { hash_table_iterate(__local_hash_table, (&raw mut __local_iterator as *mut _HashTableIterator)) }
 
-    while (unsafe { hash_table_iter_has_more((&raw mut __local_iterator as *mut _HashTableIterator)) } != 0) {
-        let __ci_copy_55: _HashTablePair = unsafe { hash_table_iter_next((&raw mut __local_iterator as *mut _HashTableIterator)) }
-        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_55 as *const u8), sizeof[_HashTablePair]())
+    while unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_has_more() } {
+        let __ci_copy_57: _HashTablePair = unsafe { (*(&raw mut __local_iterator as *mut _HashTableIterator)).hash_table_iter_next() }
+        with_memcpy((&raw mut __local_pair as *mut u8), (&raw const __ci_copy_57 as *const u8), sizeof[_HashTablePair]())
 
         (__local_key = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).key as *mut i32)))
 
         (__local_val = (((unsafe *(&raw const __local_pair as *const _HashTablePair)).value as *mut i32)))
 
-        if (((if not ((if (unsafe *__local_key) == (unsafe *__local_val): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((unsafe *__local_key) == (unsafe *__local_val)): 1 else: 0) as i64) {
             __assert_rtn(c"test_hash_iterator_key_pair".ptr, c"test-hash-table.c".ptr, (419 as i32), c"*key == *val".ptr)
         } else {
             0
@@ -619,6 +621,7 @@ pub fn test_hash_iterator_key_pair() writes allocation_limit, value1, value2 {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn main(__param_argc: i32, __param_argv: *mut *mut c_char) -> i32 writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 

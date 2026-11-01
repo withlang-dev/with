@@ -4,12 +4,13 @@ use std.engines.c_algorithms_testing.alloc_testing
 use std.libc
 use std.option
 
+// contract: unproved:0:indexed as an array
 pub unsafe fn run_tests(__param_tests: *mut Option[extern "C" fn() -> Unit]) writes allocation_limit {
     var __local_i: i32
 
     (__local_i = ((0 as i32)))
 
-    while ((if (__param_tests[__local_i]) != null: 1 else: 0) != 0) {
+    while ((__param_tests[__local_i]) != null) {
         run_test((__param_tests[__local_i]).unwrap())
 
 
@@ -25,7 +26,7 @@ fn run_test(__param_test: extern "C" fn() -> Unit) -> Unit {
 
     __param_test()
 
-    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == 0): 1 else: 0) as i64) {
         __assert_rtn(c"run_test".ptr, c"framework.c".ptr, (41 as i32), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0

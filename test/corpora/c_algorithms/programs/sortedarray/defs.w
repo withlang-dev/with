@@ -495,7 +495,6 @@ pub type _SortedArray { pub data: *mut *mut c_void = null, pub length: u32 = 0, 
 impl Copy for _SortedArray
 
 pub let SORTED_ARRAY_NULL: *mut c_void = null
-pub let NUM_TEST_VALUES: u64 = 100
 pub let REMOVE_IDX_1: i32 = 23
 pub let REMOVE_IDX_2: i32 = 57
 pub let REMOVE_IDX_2_LEN: i32 = 7

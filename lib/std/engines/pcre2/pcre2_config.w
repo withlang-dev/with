@@ -29,8 +29,9 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
+// contract: unproved:1:out-parameter written conditionally
 pub unsafe fn pcre2_config_8(__param_what: u32, __param_where_: *mut c_void) -> i32 {
-    if ((if __param_where_ == null: 1 else: 0) != 0) {
+    if (__param_where_ == null) {
         while true {
             match __param_what {
                 0 => {
@@ -142,16 +143,16 @@ pub unsafe fn pcre2_config_8(__param_what: u32, __param_where_: *mut c_void) -> 
             10 => {
                 var __local_v: *const c_char = _pcre2_unicode_version_8
 
-                return ((((1 as u64) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as u64)) as u64)) as i32))
+                return ((((1 as u64) +% ((if __param_where_ == null: (strlen(__local_v) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v) as u64)) as u64)) as i32))
 
             },
             9 => {
                 ((*(__param_where_ as *mut u32)) = ((1 as u32)))
             },
             11 => {
-                var __local_v_1: *const c_char = (((if (if 0 == 0: 1 else: 0) != 0: ("10.47 2025-10-21" as *mut c_char) else: ("10.47PCRE2_PRERELEASE 2025-10-21" as *mut c_char)) as *const c_char))
+                var __local_v_1: *const c_char = (((if 0 == 0: ("10.47 2025-10-21" as *mut c_char) else: ("10.47PCRE2_PRERELEASE 2025-10-21" as *mut c_char)) as *const c_char))
 
-                return ((((1 as u64) +% ((if (if __param_where_ == null: 1 else: 0) != 0: (strlen(__local_v_1) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as u64)) as u64)) as i32))
+                return ((((1 as u64) +% ((if __param_where_ == null: (strlen(__local_v_1) as u64) else: (_pcre2_strcpy_c8_8((__param_where_ as *mut u8), __local_v_1) as u64)) as u64)) as i32))
 
             },
             _ => {

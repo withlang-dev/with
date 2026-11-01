@@ -215,7 +215,7 @@ unsafe fn regex_match_spans_at(code: *const i8, text: &str, start_offset: i32) -
     ) }
     if rc >= 0:
         let ovector = unsafe { pcre2_get_ovector_pointer_8(match_data) }
-        let count = unsafe { pcre2_get_ovector_count_8(match_data) } as i32
+        let count = unsafe { (*match_data).pcre2_get_ovector_count_8() } as i32
         for i in 0..count:
             spans.push(unsafe { *((ovector as i64 + i as i64 * 16) as *const u64) } as i32)
             spans.push(unsafe { *((ovector as i64 + i as i64 * 16 + 8) as *const u64) } as i32)

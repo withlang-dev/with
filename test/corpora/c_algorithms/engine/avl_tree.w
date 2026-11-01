@@ -8,7 +8,7 @@ pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_voi
 
     (__local_new_tree = ((alloc_test_malloc((sizeof[_AVLTree]() as u64)) as *mut _AVLTree)))
 
-    if ((if __local_new_tree == null: 1 else: 0) != 0) {
+    if (__local_new_tree == null) {
         return ((null as *mut _AVLTree))
 
     }
@@ -23,6 +23,7 @@ pub fn avl_tree_new(__param_compare_func: Option[unsafe extern "C" fn(*mut c_voi
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn avl_tree_free(__param_tree: *mut _AVLTree) {
     avl_tree_free_subtree(__param_tree, (*__param_tree).root_node)
 
@@ -30,6 +31,7 @@ pub unsafe fn avl_tree_free(__param_tree: *mut _AVLTree) {
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_void, __param_value: *mut c_void) -> *mut _AVLTreeNode writes allocation_limit {
     var __local_rover: *mut *mut _AVLTreeNode
 
@@ -41,10 +43,10 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
     (__local_previous_node = ((null as *mut _AVLTreeNode)))
 
-    while ((if (*__local_rover) != null: 1 else: 0) != 0) {
+    while ((*__local_rover) != null) {
         (__local_previous_node = (*__local_rover))
 
-        if ((if (*__param_tree).compare_func.unwrap()(__param_key, (*(*__local_rover)).key) < 0: 1 else: 0) != 0) {
+        if ((*__param_tree).compare_func.unwrap()(__param_key, (*(*__local_rover)).key) < 0) {
             (__local_rover = (((&raw const (*(*__local_rover)).children[AVL_TREE_NODE_LEFT] as *const *mut _AVLTreeNode) as *mut *mut _AVLTreeNode)))
 
         } else {
@@ -56,7 +58,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
     (__local_new_node = ((alloc_test_malloc((sizeof[_AVLTreeNode]() as u64)) as *mut _AVLTreeNode)))
 
-    if ((if __local_new_node == null: 1 else: 0) != 0) {
+    if (__local_new_node == null) {
         return ((null as *mut _AVLTreeNode))
 
     }
@@ -83,6 +85,7 @@ pub unsafe fn avl_tree_insert(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
     var __local_swap_node: *mut _AVLTreeNode
 
@@ -92,13 +95,13 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
     (__local_swap_node = avl_tree_node_get_replacement(__param_tree, __param_node))
 
-    if ((if __local_swap_node == null: 1 else: 0) != 0) {
+    if (__local_swap_node == null) {
         avl_tree_node_replace(__param_tree, __param_node, (null as *mut _AVLTreeNode))
 
         (__local_balance_startpoint = (*__param_node).parent)
 
     } else {
-        if ((if (*__local_swap_node).parent == __param_node: 1 else: 0) != 0) {
+        if ((*__local_swap_node).parent == __param_node) {
             (__local_balance_startpoint = __local_swap_node)
 
         } else {
@@ -108,10 +111,10 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
         (__local_i = ((0 as i32)))
 
-        while ((if __local_i < 2: 1 else: 0) != 0) {
+        while (__local_i < 2) {
             ((*__local_swap_node).children[__local_i] = (*__param_node).children[__local_i])
 
-            if ((if (*__local_swap_node).children[__local_i] != null: 1 else: 0) != 0) {
+            if ((*__local_swap_node).children[__local_i] != null) {
                 ((*__local_swap_node).children[__local_i].parent = __local_swap_node)
 
             }
@@ -136,12 +139,13 @@ pub unsafe fn avl_tree_remove_node(__param_tree: *mut _AVLTree, __param_node: *m
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn avl_tree_remove(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> i32 {
     var __local_node: *mut _AVLTreeNode
 
     (__local_node = avl_tree_lookup_node(__param_tree, __param_key))
 
-    if ((if __local_node == null: 1 else: 0) != 0) {
+    if (__local_node == null) {
         return 0
 
     }
@@ -152,6 +156,7 @@ pub unsafe fn avl_tree_remove(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn avl_tree_lookup_node(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> *mut _AVLTreeNode {
     var __local_node: *mut _AVLTreeNode
 
@@ -159,14 +164,14 @@ pub unsafe fn avl_tree_lookup_node(__param_tree: *mut _AVLTree, __param_key: *mu
 
     (__local_node = (*__param_tree).root_node)
 
-    while ((if __local_node != null: 1 else: 0) != 0) {
+    while (__local_node != null) {
         (__local_diff = (((*__param_tree).compare_func.unwrap()(__param_key, (*__local_node).key) as i32)))
 
-        if ((if __local_diff == 0: 1 else: 0) != 0) {
+        if (__local_diff == 0) {
             return __local_node
 
         }
-        if ((if __local_diff < 0: 1 else: 0) != 0) {
+        if (__local_diff < 0) {
             (__local_node = (*__local_node).children[AVL_TREE_NODE_LEFT])
 
         } else {
@@ -180,12 +185,13 @@ pub unsafe fn avl_tree_lookup_node(__param_tree: *mut _AVLTree, __param_key: *mu
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn avl_tree_lookup(__param_tree: *mut _AVLTree, __param_key: *mut c_void) -> *mut c_void {
     var __local_node: *mut _AVLTreeNode
 
     (__local_node = avl_tree_lookup_node(__param_tree, __param_key))
 
-    if ((if __local_node == null: 1 else: 0) != 0) {
+    if (__local_node == null) {
         return avl_tree_null_value
 
     }
@@ -194,31 +200,35 @@ pub unsafe fn avl_tree_lookup(__param_tree: *mut _AVLTree, __param_key: *mut c_v
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_root_node(__param_tree: *mut _AVLTree) -> *mut _AVLTreeNode {
     return (*__param_tree).root_node
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_node_key(__param_node: *mut _AVLTreeNode) -> *mut c_void {
     return (*__param_node).key
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_node_value(__param_node: *mut _AVLTreeNode) -> *mut c_void {
     return (*__param_node).value
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_node_child(__param_node: *mut _AVLTreeNode, __param_side: i32) -> *mut _AVLTreeNode {
     var __ci_expr_logic_0: i32
 
-    if ((if __param_side == 0: 1 else: 0) != 0) {
+    if (__param_side == 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_side == 1: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_side == 1: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return (((*__param_node).children[__param_side] as *mut _AVLTreeNode))
 
     }
@@ -228,13 +238,15 @@ pub unsafe fn avl_tree_node_child(__param_node: *mut _AVLTreeNode, __param_side:
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_node_parent(__param_node: *mut _AVLTreeNode) -> *mut _AVLTreeNode {
     return (*__param_node).parent
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> i32 {
-    if ((if __param_node == null: 1 else: 0) != 0) {
+    if (__param_node == null) {
         return 0
 
     }
@@ -243,6 +255,7 @@ pub unsafe fn avl_tree_subtree_height(__param_node: *mut _AVLTreeNode) -> i32 {
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void writes allocation_limit {
     var __local_array: *mut *mut c_void
 
@@ -250,7 +263,7 @@ pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void
 
     (__local_array = ((alloc_test_malloc((((sizeof[usize]() as u64) *% ((*__param_tree).num_nodes as u64)) as u64)) as *mut *mut c_void)))
 
-    if ((if __local_array == null: 1 else: 0) != 0) {
+    if (__local_array == null) {
         return ((null as *mut *mut c_void))
 
     }
@@ -263,13 +276,9 @@ pub unsafe fn avl_tree_to_array(__param_tree: *mut _AVLTree) -> *mut *mut c_void
 
 }
 
-pub unsafe fn avl_tree_num_entries(__param_tree: *mut _AVLTree) -> u32 {
-    return (*__param_tree).num_nodes
-
-}
-
+// contract: receiver:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn avl_tree_free_subtree(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> Unit {
-    if ((if __param_node == null: 1 else: 0) != 0) {
+    if (__param_node == null) {
         return
 
     }
@@ -300,7 +309,7 @@ unsafe fn avl_tree_update_height(__param_node: *mut _AVLTreeNode) -> Unit {
 
     (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as i32)))
 
-    if ((if __local_left_height > __local_right_height: 1 else: 0) != 0) {
+    if (__local_left_height > __local_right_height) {
         ((*__param_node).height = (((__local_left_height + 1) as i32)))
 
     } else {
@@ -311,7 +320,7 @@ unsafe fn avl_tree_update_height(__param_node: *mut _AVLTreeNode) -> Unit {
 }
 
 unsafe fn avl_tree_node_parent_side(__param_node: *mut _AVLTreeNode) -> i32 {
-    if ((if (*(*__param_node).parent).children[AVL_TREE_NODE_LEFT] == __param_node: 1 else: 0) != 0) {
+    if ((*(*__param_node).parent).children[AVL_TREE_NODE_LEFT] == __param_node) {
         return 0
 
     }
@@ -320,15 +329,16 @@ unsafe fn avl_tree_node_parent_side(__param_node: *mut _AVLTreeNode) -> i32 {
 
 }
 
+// contract: receiver-mut:_AVLTree,unproved:1:out-parameter read before the write,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn avl_tree_node_replace(__param_tree: *mut _AVLTree, __param_node1: *mut _AVLTreeNode, __param_node2: *mut _AVLTreeNode) -> Unit {
     var __local_side: i32
 
-    if ((if __param_node2 != null: 1 else: 0) != 0) {
+    if (__param_node2 != null) {
         ((*__param_node2).parent = (*__param_node1).parent)
 
     }
 
-    if ((if (*__param_node1).parent == null: 1 else: 0) != 0) {
+    if ((*__param_node1).parent == null) {
         ((*__param_tree).root_node = __param_node2)
 
     } else {
@@ -342,6 +352,7 @@ unsafe fn avl_tree_node_replace(__param_tree: *mut _AVLTree, __param_node1: *mut
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn avl_tree_rotate(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode, __param_direction: i32) -> *mut _AVLTreeNode {
     var __local_new_root: *mut _AVLTreeNode
 
@@ -355,7 +366,7 @@ unsafe fn avl_tree_rotate(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTr
 
     ((*__param_node).parent = __local_new_root)
 
-    if ((if (*__param_node).children[((1 as u32) -% (__param_direction as u32))] != null: 1 else: 0) != 0) {
+    if ((*__param_node).children[((1 as u32) -% (__param_direction as u32))] != null) {
         ((*__param_node).children[((1 as u32) -% (__param_direction as u32))].parent = __param_node)
 
     }
@@ -368,6 +379,7 @@ unsafe fn avl_tree_rotate(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTr
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> *mut _AVLTreeNode {
     var __local_node = __param_node
     var __local_left_subtree: *mut _AVLTreeNode
@@ -384,10 +396,10 @@ unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut 
 
     (__local_diff = (((avl_tree_subtree_height(__local_right_subtree) - avl_tree_subtree_height(__local_left_subtree)) as i32)))
 
-    if ((if __local_diff >= 2: 1 else: 0) != 0) {
+    if (__local_diff >= 2) {
         (__local_child = __local_right_subtree)
 
-        if ((if avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_RIGHT]) < avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_LEFT]): 1 else: 0) != 0) {
+        if (avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_RIGHT]) < avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_LEFT])) {
             avl_tree_rotate(__param_tree, __local_right_subtree, (1 as i32))
 
         }
@@ -395,10 +407,10 @@ unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut 
         (__local_node = avl_tree_rotate(__param_tree, __local_node, (0 as i32)))
 
     } else {
-        if ((if __local_diff <= -2: 1 else: 0) != 0) {
+        if (__local_diff <= -2) {
             (__local_child = (*__local_node).children[AVL_TREE_NODE_LEFT])
 
-            if ((if avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_LEFT]) < avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_RIGHT]): 1 else: 0) != 0) {
+            if (avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_LEFT]) < avl_tree_subtree_height((*__local_child).children[AVL_TREE_NODE_RIGHT])) {
                 avl_tree_rotate(__param_tree, __local_left_subtree, (0 as i32))
 
             }
@@ -414,12 +426,13 @@ unsafe fn avl_tree_node_balance(__param_tree: *mut _AVLTree, __param_node: *mut 
 
 }
 
+// contract: receiver-mut:_AVLTree,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn avl_tree_balance_to_root(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) {
     var __local_rover: *mut _AVLTreeNode
 
     (__local_rover = __param_node)
 
-    while ((if __local_rover != null: 1 else: 0) != 0) {
+    while (__local_rover != null) {
         (__local_rover = avl_tree_node_balance(__param_tree, __local_rover))
 
         (__local_rover = (*__local_rover).parent)
@@ -428,6 +441,7 @@ unsafe fn avl_tree_balance_to_root(__param_tree: *mut _AVLTree, __param_node: *m
 
 }
 
+// contract: receiver-mut:_AVLTree,unproved:1:returns a pointer loaded from the parameter
 unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_node: *mut _AVLTreeNode) -> *mut _AVLTreeNode {
     var __local_left_subtree: *mut _AVLTreeNode
 
@@ -450,11 +464,11 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __local_left_subtree == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __local_right_subtree == null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_left_subtree == null) {
+        (__ci_expr_logic_0 = (if __local_right_subtree == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return ((null as *mut _AVLTreeNode))
 
     }
@@ -464,7 +478,7 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
     (__local_right_height = ((avl_tree_subtree_height(__local_right_subtree) as i32)))
 
-    if ((if __local_left_height < __local_right_height: 1 else: 0) != 0) {
+    if (__local_left_height < __local_right_height) {
         (__local_side = AVL_TREE_NODE_RIGHT)
 
     } else {
@@ -474,7 +488,7 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
     (__local_result = (*__param_node).children[__local_side])
 
-    while ((if (*__local_result).children[(1 - __local_side)] != null: 1 else: 0) != 0) {
+    while ((*__local_result).children[(1 - __local_side)] != null) {
         (__local_result = (*__local_result).children[(1 - __local_side)])
 
     }
@@ -489,8 +503,9 @@ unsafe fn avl_tree_node_get_replacement(__param_tree: *mut _AVLTree, __param_nod
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
 unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __param_array: *mut *mut c_void, __param_index: *mut i32) -> Unit {
-    if ((if __param_subtree == null: 1 else: 0) != 0) {
+    if (__param_subtree == null) {
         return
 
     }
@@ -502,6 +517,15 @@ unsafe fn avl_tree_to_array_add_subtree(__param_subtree: *mut _AVLTreeNode, __pa
     ((*__param_index) = (*__param_index) + 1)
 
     avl_tree_to_array_add_subtree((*__param_subtree).children[AVL_TREE_NODE_RIGHT], __param_array, __param_index)
+
+}
+
+impl _AVLTree {
+    pub fn avl_tree_num_entries() -> u32 {
+        let __param_tree: *mut _AVLTree = (self as *const _AVLTree) as *mut _AVLTree
+        return (unsafe *__param_tree).num_nodes
+
+    }
 
 }
 

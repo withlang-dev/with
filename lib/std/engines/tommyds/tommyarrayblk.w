@@ -70,65 +70,11 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
-pub unsafe fn tommy_arrayblk_init(__param_array: *mut tommy_arrayblk_struct) {
-    tommy_array_init(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct))
-
-    ((*__param_array).count = ((0 as u64)))
-
-}
-
-pub unsafe fn tommy_arrayblk_done(__param_array: *mut tommy_arrayblk_struct) {
-    var __local_i: u64
-
-    (__local_i = ((0 as u64)))
-
-    while ((if __local_i < tommy_array_size(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)): 1 else: 0) != 0) {
-        with_free((tommy_array_get(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct), __local_i) as *mut u8))
-
-        (__local_i = (__local_i +% 1))
-
-    }
-
-
-    tommy_array_done(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct))
-
-}
-
-pub unsafe fn tommy_arrayblk_grow(__param_array: *mut tommy_arrayblk_struct, __param_count: u64) {
-    var __local_block_max: u64
-
-    var __local_block_mac: u64
-
-    if ((if (*__param_array).count >= __param_count: 1 else: 0) != 0) {
-        return
-    }
-
-    ((*__param_array).count = __param_count)
-
-    (__local_block_max = ((((((((__param_count as u64) +% (4096 as u64)) as u64) -% (1 as u64)) as u64) / (4096 as u64)) as u64)))
-
-    (__local_block_mac = ((tommy_array_size(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)) as u64)))
-
-    if ((if __local_block_mac < __local_block_max: 1 else: 0) != 0) {
-        tommy_array_grow(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct), __local_block_max)
-
-        while ((if __local_block_mac < __local_block_max: 1 else: 0) != 0) {
-            var __local_ptr: *mut *mut c_void = (((with_alloc_zeroed(((4096 as u64) as i64), ((sizeof[usize]() as u64) as i64)) as *mut c_void) as *mut *mut c_void))
-
-            tommy_array_set(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct), __local_block_mac, (__local_ptr as *mut c_void))
-
-            (__local_block_mac = (__local_block_mac +% 1))
-
-        }
-
-    }
-
-}
-
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_arrayblk_ref(__param_array: *mut tommy_arrayblk_struct, __param_pos: u64) -> *mut *mut c_void {
     var __local_ptr: *mut *mut c_void
 
-    if (((if not ((if __param_pos < (*__param_array).count: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__param_pos < (*__param_array).count): 1 else: 0) as i64) {
         __assert_rtn(c"tommy_arrayblk_ref".ptr, c"tommyarrayblk.h".ptr, (91 as i32), c"pos < array->count".ptr)
     } else {
         0
@@ -140,31 +86,97 @@ pub unsafe fn tommy_arrayblk_ref(__param_array: *mut tommy_arrayblk_struct, __pa
 
 }
 
+// contract: receiver:tommy_arrayblk_struct,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_arrayblk_set(__param_array: *mut tommy_arrayblk_struct, __param_pos: u64, __param_element: *mut c_void) {
     ((*(tommy_arrayblk_ref(__param_array, __param_pos))) = __param_element)
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_arrayblk_get(__param_array: *mut tommy_arrayblk_struct, __param_pos: u64) -> *mut c_void {
     return (*(tommy_arrayblk_ref(__param_array, __param_pos)))
 
 }
 
+// contract: receiver-mut:tommy_arrayblk_struct,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_arrayblk_insert(__param_array: *mut tommy_arrayblk_struct, __param_element: *mut c_void) {
     var __local_pos: u64 = (*__param_array).count
 
-    tommy_arrayblk_grow(__param_array, (((__local_pos as u64) +% (1 as u64)) as u64))
+    (*__param_array).tommy_arrayblk_grow((((__local_pos as u64) +% (1 as u64)) as u64))
 
     tommy_arrayblk_set(__param_array, __local_pos, __param_element)
 
 }
 
-pub unsafe fn tommy_arrayblk_size(__param_array: *mut tommy_arrayblk_struct) -> u64 {
-    return (*__param_array).count
+impl tommy_arrayblk_struct {
+    pub mut fn tommy_arrayblk_init() {
+        let __param_array: *mut tommy_arrayblk_struct = self as *mut tommy_arrayblk_struct
+        unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_init() }
 
-}
+        ((unsafe *__param_array).count = ((0 as u64)))
 
-pub unsafe fn tommy_arrayblk_memory_usage(__param_array: *mut tommy_arrayblk_struct) -> u64 {
-    return ((tommy_array_memory_usage(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)) as u64) +% (((((tommy_array_size(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)) as u64) *% (4096 as u64)) as u64) *% (8 as u64)) as u64))
+    }
+
+    pub fn tommy_arrayblk_done() {
+        let __param_array: *mut tommy_arrayblk_struct = (self as *const tommy_arrayblk_struct) as *mut tommy_arrayblk_struct
+        var __local_i: u64
+
+        (__local_i = ((0 as u64)))
+
+        while (__local_i < unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_size() }) {
+            with_free((unsafe { tommy_array_get(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct), __local_i) } as *mut u8))
+
+            (__local_i = (__local_i +% 1))
+
+        }
+
+
+        unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_done() }
+
+    }
+
+    pub mut fn tommy_arrayblk_grow(__param_count: u64) {
+        let __param_array: *mut tommy_arrayblk_struct = self as *mut tommy_arrayblk_struct
+        var __local_block_max: u64
+
+        var __local_block_mac: u64
+
+        if ((unsafe *__param_array).count >= __param_count) {
+            return
+        }
+
+        ((unsafe *__param_array).count = __param_count)
+
+        (__local_block_max = ((((((((__param_count as u64) +% (4096 as u64)) as u64) -% (1 as u64)) as u64) / (4096 as u64)) as u64)))
+
+        (__local_block_mac = ((unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_size() } as u64)))
+
+        if (__local_block_mac < __local_block_max) {
+            unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_grow(__local_block_max) }
+
+            while (__local_block_mac < __local_block_max) {
+                var __local_ptr: *mut *mut c_void = (((with_alloc_zeroed(((4096 as u64) as i64), ((sizeof[usize]() as u64) as i64)) as *mut c_void) as *mut *mut c_void))
+
+                unsafe { tommy_array_set(((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct), __local_block_mac, (__local_ptr as *mut c_void)) }
+
+                (__local_block_mac = (__local_block_mac +% 1))
+
+            }
+
+        }
+
+    }
+
+    pub fn tommy_arrayblk_size() -> u64 {
+        let __param_array: *mut tommy_arrayblk_struct = (self as *const tommy_arrayblk_struct) as *mut tommy_arrayblk_struct
+        return (unsafe *__param_array).count
+
+    }
+
+    pub fn tommy_arrayblk_memory_usage() -> u64 {
+        let __param_array: *mut tommy_arrayblk_struct = (self as *const tommy_arrayblk_struct) as *mut tommy_arrayblk_struct
+        return ((unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_memory_usage() } as u64) +% (((((unsafe { (*((&raw const (*__param_array).block as *const tommy_array_struct) as *mut tommy_array_struct)).tommy_array_size() } as u64) *% (4096 as u64)) as u64) *% (8 as u64)) as u64))
+
+    }
 
 }

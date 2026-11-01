@@ -18,6 +18,7 @@ use std.engines.pcre2.pcre2_maketables
 use std.libc
 use std.collections
 
+// contract: receiver-mut:regex_t,unproved:1:read only
 pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const c_char, __param_cflags: i32) -> i32 writes _pcre2_default_compile_context_8 {
     var __local_erroffset: u64
 
@@ -33,33 +34,33 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
     ((*__param_preg).re_pcre2_code = null)
 
-    (__local_patlen = (((if (if ((__param_cflags as i32) & (2048 as i32)) != 0: 1 else: 0) != 0: ((((((*__param_preg).re_endp as usize) -% (__param_pattern as usize)) as i64) / (sizeof[c_char]() as i64)) as u64) else: ((~(0 as u64)) as u64)) as u64)))
+    (__local_patlen = (((if ((__param_cflags as i32) & (2048 as i32)) != 0: ((((((*__param_preg).re_endp as usize) -% (__param_pattern as usize)) as i64) / (sizeof[c_char]() as i64)) as u64) else: ((~(0 as u64)) as u64)) as u64)))
 
-    if ((if ((__param_cflags as i32) & (1 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (1 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (8 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (2 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (2 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (1024 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (16 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (16 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (32 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (4096 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (4096 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (33554432 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (64 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (64 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (524288 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (1024 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (1024 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (131072 as i32))
     }
 
-    if ((if ((__param_cflags as i32) & (512 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_cflags as i32) & (512 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (262144 as i32))
     }
 
@@ -69,23 +70,23 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
     ((*__param_preg).re_erroffset = __local_erroffset)
 
-    if ((if (*__param_preg).re_pcre2_code == null: 1 else: 0) != 0) {
+    if ((*__param_preg).re_pcre2_code == null) {
         var __local_i: u32
 
-        if ((if __local_errorcode < 100: 1 else: 0) != 0) {
+        if (__local_errorcode < 100) {
             return REG_BADPAT
         }
 
         (__local_errorcode = __local_errorcode - 100)
 
-        if ((if __local_errorcode < (((((24 * (sizeof[i32]() as usize)) as u64) / (4 as u64)) as i32)): 1 else: 0) != 0) {
+        if (__local_errorcode < (((((24 * (sizeof[i32]() as usize)) as u64) / (4 as u64)) as i32))) {
             return eint1[__local_errorcode]
         }
 
         (__local_i = ((0 as u32)))
 
-        while ((if __local_i < (((16 * (sizeof[i32]() as usize)) as u64) / (4 as u64)): 1 else: 0) != 0) {
-            if ((if __local_errorcode == eint2[__local_i]: 1 else: 0) != 0) {
+        while (__local_i < (((16 * (sizeof[i32]() as usize)) as u64) / (4 as u64))) {
+            if (__local_errorcode == eint2[__local_i]) {
                 return eint2[((__local_i as u32) +% (1 as u32))]
             }
 
@@ -106,7 +107,7 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
     ((*__param_preg).re_erroffset = ((-1 as u64)))
 
-    if ((if (*__param_preg).re_match_data == null: 1 else: 0) != 0) {
+    if ((*__param_preg).re_match_data == null) {
         pcre2_code_free_8(((*__param_preg).re_pcre2_code as *mut pcre2_real_code_8))
 
         ((*__param_preg).re_pcre2_code = null)
@@ -119,6 +120,7 @@ pub unsafe fn pcre2_regcomp(__param_preg: *mut regex_t, __param_pattern: *const 
 
 }
 
+// contract: unproved:0:pcre2_match_8 may write through it,unproved:1:read only,unproved:3:out-parameter a return before the write
 pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const c_char, __param_nmatch: u64, __param_pmatch: *mut regmatch_t, __param_eflags: i32) -> i32 writes _pcre2_default_match_context_8 {
     var __local_nmatch = __param_nmatch
     var __local_rc: i32
@@ -132,37 +134,37 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 
     var __local_md: *mut pcre2_real_match_data_8 = (((*__param_preg).re_match_data as *mut pcre2_real_match_data_8))
 
-    if ((if __param_string == null: 1 else: 0) != 0) {
+    if (__param_string == null) {
         return REG_INVARG
     }
 
-    if ((if ((__param_eflags as i32) & (4 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_eflags as i32) & (4 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (1 as i32))
     }
 
-    if ((if ((__param_eflags as i32) & (8 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_eflags as i32) & (8 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (2 as i32))
     }
 
-    if ((if ((__param_eflags as i32) & (256 as i32)) != 0: 1 else: 0) != 0) {
+    if (((__param_eflags as i32) & (256 as i32)) != 0) {
         (__local_options = (__local_options as i32) | (4 as i32))
     }
 
     var __ci_expr_logic_0: i32
 
-    if ((if (((*__param_preg).re_cflags as i32) & (32 as i32)) != 0: 1 else: 0) != 0) {
+    if ((((*__param_preg).re_cflags as i32) & (32 as i32)) != 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (&(__param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (&(__param_pmatch[0]) as *mut c_void) == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__local_nmatch = ((0 as u64)))
     }
 
 
-    if ((if ((__param_eflags as i32) & (128 as i32)) != 0: 1 else: 0) != 0) {
-        if ((if (&(__param_pmatch[0]) as *mut c_void) == null: 1 else: 0) != 0) {
+    if (((__param_eflags as i32) & (128 as i32)) != 0) {
+        if ((&(__param_pmatch[0]) as *mut c_void) == null) {
             return REG_INVARG
         }
 
@@ -179,21 +181,21 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 
     (__local_rc = ((pcre2_match_8(((*__param_preg).re_pcre2_code as *const pcre2_real_code_8), ((__param_string as *const u8) + ((__local_so as isize) as usize)), ((__local_eo - __local_so) as u64), (0 as u64), (__local_options as u32), __local_md, (null as *mut pcre2_real_match_context_8)) as i32)))
 
-    if ((if __local_rc >= 0: 1 else: 0) != 0) {
+    if (__local_rc >= 0) {
         var __local_i: u64
 
         var __local_ovector: *mut u64 = pcre2_get_ovector_pointer_8(__local_md)
 
-        if ((if ((__local_rc as u64)) > __local_nmatch: 1 else: 0) != 0) {
+        if (((__local_rc as u64)) > __local_nmatch) {
             (__local_rc = ((__local_nmatch as i32)))
         }
 
         (__local_i = ((0 as u64)))
 
-        while ((if __local_i < ((__local_rc as u64)): 1 else: 0) != 0) {
-            ((__param_pmatch[__local_i]).rm_so = (((if (if (__local_ovector[((__local_i as u64) *% (2 as u64))]) == (~(0 as u64)): 1 else: 0) != 0: (-1 as i32) else: ((((__local_ovector[((__local_i as u64) *% (2 as u64))]) as u64) +% (__local_so as u64)) as i32)) as i32)))
+        while (__local_i < ((__local_rc as u64))) {
+            ((__param_pmatch[__local_i]).rm_so = (((if (__local_ovector[((__local_i as u64) *% (2 as u64))]) == (~(0 as u64)): (-1 as i32) else: ((((__local_ovector[((__local_i as u64) *% (2 as u64))]) as u64) +% (__local_so as u64)) as i32)) as i32)))
 
-            ((__param_pmatch[__local_i]).rm_eo = (((if (if (__local_ovector[((((__local_i as u64) *% (2 as u64)) as u64) +% (1 as u64))]) == (~(0 as u64)): 1 else: 0) != 0: (-1 as i32) else: ((((__local_ovector[((((__local_i as u64) *% (2 as u64)) as u64) +% (1 as u64))]) as u64) +% (__local_so as u64)) as i32)) as i32)))
+            ((__param_pmatch[__local_i]).rm_eo = (((if (__local_ovector[((((__local_i as u64) *% (2 as u64)) as u64) +% (1 as u64))]) == (~(0 as u64)): (-1 as i32) else: ((((__local_ovector[((((__local_i as u64) *% (2 as u64)) as u64) +% (1 as u64))]) as u64) +% (__local_so as u64)) as i32)) as i32)))
 
 
             (__local_i = (__local_i +% 1))
@@ -201,7 +203,7 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
         }
 
 
-        while ((if __local_i < __local_nmatch: 1 else: 0) != 0) {
+        while (__local_i < __local_nmatch) {
             ((__param_pmatch[__local_i]).rm_eo = ((-1 as i32)))
 
             ((__param_pmatch[__local_i]).rm_so = (__param_pmatch[__local_i]).rm_eo)
@@ -217,11 +219,11 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if __local_rc <= -3: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if __local_rc >= -23: 1 else: 0) != 0: 1 else: 0))
+    if (__local_rc <= -3) {
+        (__ci_expr_logic_1 = (if __local_rc >= -23: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return REG_INVARG
     }
 
@@ -261,6 +263,7 @@ pub unsafe fn pcre2_regexec(__param_preg: *const regex_t, __param_string: *const
 
 }
 
+// contract: unproved:1:read only,unproved:2:out-parameter read before the write
 pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t, __param_errbuf: *mut c_char, __param_errbuf_size: u64) -> u64 {
     var __local_message: *const c_char
 
@@ -277,13 +280,13 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_errcode <= 0: 1 else: 0) != 0) {
+    if (__param_errcode <= 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_errcode >= (((((18 * (sizeof[usize]() as usize)) as u64) / (sizeof[usize]() as u64)) as i32)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_errcode >= (((((18 * (sizeof[usize]() as usize)) as u64) / (sizeof[usize]() as u64)) as i32)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_ternary_1 = c"unknown error code".ptr)
     } else {
         (__ci_expr_ternary_1 = pstring[__param_errcode])
@@ -298,22 +301,22 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __param_preg != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if (*__param_preg).re_erroffset != ((-1 as u64)): 1 else: 0) != 0: 1 else: 0))
+    if (__param_preg != null) {
+        (__ci_expr_logic_2 = (if (*__param_preg).re_erroffset != ((-1 as u64)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
-        (__local_snprintf_rc = ((snprintf((&__local_offset_buf[0] as *mut c_char), ((23 * (sizeof[c_char]() as usize)) as u64), c" at offset %d".ptr, ((*__param_preg).re_erroffset as i32)) as i32)))
+    if __ci_expr_logic_2 {
+        (__local_snprintf_rc = snprintf((&__local_offset_buf[0] as *mut c_char), ((23 * (sizeof[c_char]() as usize)) as u64), c" at offset %d".ptr, ((*__param_preg).re_erroffset as i32)))
 
-        (__ci_expr_logic_3 = (if (if __local_snprintf_rc > 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __local_snprintf_rc > 0: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_3 != 0) {
-        (__ci_expr_logic_4 = (if (if __local_snprintf_rc < (((23 * (sizeof[c_char]() as usize)) as i32)): 1 else: 0) != 0: 1 else: 0))
+    if __ci_expr_logic_3 {
+        (__ci_expr_logic_4 = (if __local_snprintf_rc < (((23 * (sizeof[c_char]() as usize)) as i32)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         (__local_have_offset = ((1 as i32)))
 
         (__local_offset_buf[(((23 * (sizeof[c_char]() as usize)) as u64) -% (1 as u64))] = ((0 as c_char)))
@@ -323,8 +326,8 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
 
     (__local_i = ((0 as u64)))
 
-    while ((if (*__local_message) != 0: 1 else: 0) != 0) {
-        if ((if ((__local_i as u64) +% (1 as u64)) < __param_errbuf_size: 1 else: 0) != 0) {
+    while ((*__local_message) != 0) {
+        if (((__local_i as u64) +% (1 as u64)) < __param_errbuf_size) {
             ((__param_errbuf[__local_i]) = (*__local_message))
         }
 
@@ -336,11 +339,11 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
     }
 
 
-    if (__local_have_offset != 0) {
+    if __local_have_offset {
         (__local_message = (&__local_offset_buf[0] as *const c_char))
 
-        while ((if (*__local_message) != 0: 1 else: 0) != 0) {
-            if ((if ((__local_i as u64) +% (1 as u64)) < __param_errbuf_size: 1 else: 0) != 0) {
+        while ((*__local_message) != 0) {
+            if (((__local_i as u64) +% (1 as u64)) < __param_errbuf_size) {
                 ((__param_errbuf[__local_i]) = (*__local_message))
             }
 
@@ -354,8 +357,8 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
 
     }
 
-    if ((if __param_errbuf_size > 0: 1 else: 0) != 0) {
-        ((__param_errbuf[(if (if __local_i < __param_errbuf_size: 1 else: 0) != 0: __local_i else: (((__param_errbuf_size as u64) -% (1 as u64)) as u64))]) = ((0 as c_char)))
+    if (__param_errbuf_size > 0) {
+        ((__param_errbuf[(if __local_i < __param_errbuf_size: __local_i else: (((__param_errbuf_size as u64) -% (1 as u64)) as u64))]) = ((0 as c_char)))
     }
 
     (__local_i = (__local_i +% 1))
@@ -364,6 +367,7 @@ pub unsafe fn pcre2_regerror(__param_errcode: i32, __param_preg: *const regex_t,
 
 }
 
+// contract: unproved:0:pcre2_match_data_free_8 may write through it
 pub unsafe fn pcre2_regfree(__param_preg: *mut regex_t) {
     pcre2_match_data_free_8(((*__param_preg).re_match_data as *mut pcre2_real_match_data_8))
 

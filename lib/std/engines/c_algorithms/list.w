@@ -2,12 +2,13 @@
 use std.engines.c_algorithms.defs
 use std.option
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn list_free(__param_list: *mut _ListEntry) {
     var __local_entry: *mut _ListEntry
 
     (__local_entry = __param_list)
 
-    while ((if __local_entry != null: 1 else: 0) != 0) {
+    while (__local_entry != null) {
         var __local_next: *mut _ListEntry
 
         (__local_next = (*__local_entry).next)
@@ -20,24 +21,25 @@ pub unsafe fn list_free(__param_list: *mut _ListEntry) {
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry {
     var __local_newentry: *mut _ListEntry
 
-    if ((if __param_list == null: 1 else: 0) != 0) {
+    if (__param_list == null) {
         return ((null as *mut _ListEntry))
 
     }
 
     (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as u64) as i64)) as *mut c_void) as *mut _ListEntry)))
 
-    if ((if __local_newentry == null: 1 else: 0) != 0) {
+    if (__local_newentry == null) {
         return ((null as *mut _ListEntry))
 
     }
 
     ((*__local_newentry).data = __param_data)
 
-    if ((if (*__param_list) != null: 1 else: 0) != 0) {
+    if ((*__param_list) != null) {
         ((*(*__param_list)).prev = __local_newentry)
 
     }
@@ -52,19 +54,20 @@ pub unsafe fn list_prepend(__param_list: *mut *mut _ListEntry, __param_data: *mu
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut c_void) -> *mut _ListEntry {
     var __local_rover: *mut _ListEntry
 
     var __local_newentry: *mut _ListEntry
 
-    if ((if __param_list == null: 1 else: 0) != 0) {
+    if (__param_list == null) {
         return ((null as *mut _ListEntry))
 
     }
 
     (__local_newentry = (((with_alloc(((sizeof[_ListEntry]() as u64) as i64)) as *mut c_void) as *mut _ListEntry)))
 
-    if ((if __local_newentry == null: 1 else: 0) != 0) {
+    if (__local_newentry == null) {
         return ((null as *mut _ListEntry))
 
     }
@@ -73,7 +76,7 @@ pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut
 
     ((*__local_newentry).next = ((null as *mut _ListEntry)))
 
-    if ((if (*__param_list) == null: 1 else: 0) != 0) {
+    if ((*__param_list) == null) {
         ((*__param_list) = __local_newentry)
 
         ((*__local_newentry).prev = ((null as *mut _ListEntry)))
@@ -81,7 +84,7 @@ pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut
     } else {
         (__local_rover = (*__param_list))
 
-        while ((if (*__local_rover).next != null: 1 else: 0) != 0) {
+        while ((*__local_rover).next != null) {
 
             (__local_rover = (*__local_rover).next)
 
@@ -98,8 +101,9 @@ pub unsafe fn list_append(__param_list: *mut *mut _ListEntry, __param_data: *mut
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn list_prev(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
-    if ((if __param_listentry == null: 1 else: 0) != 0) {
+    if (__param_listentry == null) {
         return ((null as *mut _ListEntry))
 
     }
@@ -108,8 +112,9 @@ pub unsafe fn list_prev(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn list_next(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
-    if ((if __param_listentry == null: 1 else: 0) != 0) {
+    if (__param_listentry == null) {
         return ((null as *mut _ListEntry))
 
     }
@@ -118,8 +123,9 @@ pub unsafe fn list_next(__param_listentry: *mut _ListEntry) -> *mut _ListEntry {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn list_data(__param_listentry: *mut _ListEntry) -> *mut c_void {
-    if ((if __param_listentry == null: 1 else: 0) != 0) {
+    if (__param_listentry == null) {
         return list_null_value
 
     }
@@ -128,14 +134,16 @@ pub unsafe fn list_data(__param_listentry: *mut _ListEntry) -> *mut c_void {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn list_set_data(__param_listentry: *mut _ListEntry, __param_value: *mut c_void) {
-    if ((if __param_listentry != null: 1 else: 0) != 0) {
+    if (__param_listentry != null) {
         ((*__param_listentry).data = __param_value)
 
     }
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: u32) -> *mut _ListEntry {
     var __local_entry: *mut _ListEntry
 
@@ -145,8 +153,8 @@ pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: u32) -> *
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
-        if ((if __local_entry == null: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
+        if (__local_entry == null) {
             return ((null as *mut _ListEntry))
 
         }
@@ -163,12 +171,13 @@ pub unsafe fn list_nth_entry(__param_list: *mut _ListEntry, __param_n: u32) -> *
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: u32) -> *mut c_void {
     var __local_entry: *mut _ListEntry
 
     (__local_entry = list_nth_entry(__param_list, __param_n))
 
-    if ((if __local_entry == null: 1 else: 0) != 0) {
+    if (__local_entry == null) {
         return list_null_value
 
     }
@@ -177,6 +186,7 @@ pub unsafe fn list_nth_data(__param_list: *mut _ListEntry, __param_n: u32) -> *m
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn list_length(__param_list: *mut _ListEntry) -> u32 {
     var __local_entry: *mut _ListEntry
 
@@ -186,7 +196,7 @@ pub unsafe fn list_length(__param_list: *mut _ListEntry) -> u32 {
 
     (__local_entry = __param_list)
 
-    while ((if __local_entry != null: 1 else: 0) != 0) {
+    while (__local_entry != null) {
         (__local_length = (__local_length +% 1))
 
         (__local_entry = (*__local_entry).next)
@@ -197,6 +207,7 @@ pub unsafe fn list_length(__param_list: *mut _ListEntry) -> u32 {
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
     var __local_rover: *mut _ListEntry
 
@@ -210,7 +221,7 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
     (__local_array = (((with_alloc(((((sizeof[usize]() as u64) *% (__local_length as u64)) as u64) as i64)) as *mut c_void) as *mut *mut c_void)))
 
-    if ((if __local_array == null: 1 else: 0) != 0) {
+    if (__local_array == null) {
         return ((null as *mut *mut c_void))
 
     }
@@ -219,7 +230,7 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __local_length: 1 else: 0) != 0) {
+    while (__local_i < __local_length) {
         ((__local_array[__local_i]) = (*__local_rover).data)
 
         (__local_rover = (*__local_rover).next)
@@ -234,33 +245,34 @@ pub unsafe fn list_to_array(__param_list: *mut _ListEntry) -> *mut *mut c_void {
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally
 pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entry: *mut _ListEntry) -> i32 {
     var __ci_expr_logic_1: i32
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_list == null: 1 else: 0) != 0) {
+    if (__param_list == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*__param_list) == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__param_list) == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_entry == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __param_entry == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return 0
 
     }
 
 
-    if ((if (*__param_entry).prev == null: 1 else: 0) != 0) {
+    if ((*__param_entry).prev == null) {
         ((*__param_list) = (*__param_entry).next)
 
-        if ((if (*__param_entry).next != null: 1 else: 0) != 0) {
+        if ((*__param_entry).next != null) {
             ((*(*__param_entry).next).prev = ((null as *mut _ListEntry)))
 
         }
@@ -268,7 +280,7 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
     } else {
         ((*(*__param_entry).prev).next = (*__param_entry).next)
 
-        if ((if (*__param_entry).next != null: 1 else: 0) != 0) {
+        if ((*__param_entry).next != null) {
             ((*(*__param_entry).next).prev = (*__param_entry).prev)
 
         }
@@ -281,6 +293,7 @@ pub unsafe fn list_remove_entry(__param_list: *mut *mut _ListEntry, __param_entr
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callback: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32], __param_data: *mut c_void) -> u32 {
     var __local_entries_removed: u32
 
@@ -290,13 +303,13 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_list == null: 1 else: 0) != 0) {
+    if (__param_list == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_callback == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_callback == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return ((0 as u32))
 
     }
@@ -306,11 +319,11 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
     (__local_rover = (*__param_list))
 
-    while ((if __local_rover != null: 1 else: 0) != 0) {
+    while (__local_rover != null) {
         (__local_next = (*__local_rover).next)
 
-        if (__param_callback.unwrap()((*__local_rover).data, __param_data) != 0) {
-            if ((if (*__local_rover).prev == null: 1 else: 0) != 0) {
+        if __param_callback.unwrap()((*__local_rover).data, __param_data) {
+            if ((*__local_rover).prev == null) {
                 ((*__param_list) = (*__local_rover).next)
 
             } else {
@@ -318,7 +331,7 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
             }
 
-            if ((if (*__local_rover).next != null: 1 else: 0) != 0) {
+            if ((*__local_rover).next != null) {
                 ((*(*__local_rover).next).prev = (*__local_rover).prev)
 
             }
@@ -337,18 +350,20 @@ pub unsafe fn list_remove_data(__param_list: *mut *mut _ListEntry, __param_callb
 
 }
 
+// contract: unproved:0:out-parameter read before the write
 pub unsafe fn list_sort(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> Unit {
     list_sort_internal(__param_list, __param_compare_func)
 
 }
 
+// contract: stored-unknown:0,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32, __param_data: *mut c_void) -> *mut _ListEntry {
     var __local_rover: *mut _ListEntry
 
     (__local_rover = __param_list)
 
-    while ((if __local_rover != null: 1 else: 0) != 0) {
-        if ((if __param_callback((*__local_rover).data, __param_data) != 0: 1 else: 0) != 0) {
+    while (__local_rover != null) {
+        if (__param_callback((*__local_rover).data, __param_data) != 0) {
             return __local_rover
 
         }
@@ -363,6 +378,7 @@ pub unsafe fn list_find_data(__param_list: *mut _ListEntry, __param_callback: un
 
 }
 
+// contract: stored-unknown:0,unproved:1:out-parameter read before the write — stores an argument; ownership not modeled
 pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mut _ListIterator) {
     ((*__param_iter).prev_next = __param_list)
 
@@ -370,80 +386,7 @@ pub unsafe fn list_iterate(__param_list: *mut *mut _ListEntry, __param_iter: *mu
 
 }
 
-pub unsafe fn list_iter_has_more(__param_iter: *mut _ListIterator) -> i32 {
-    var __ci_expr_logic_0: i32
-
-    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        return (if (*((*__param_iter).prev_next)) != null: 1 else: 0)
-
-    }
-    return (if (*(*__param_iter).current).next != null: 1 else: 0)
-
-
-
-}
-
-pub unsafe fn list_iter_next(__param_iter: *mut _ListIterator) -> *mut c_void {
-    var __ci_expr_logic_0: i32
-
-    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        ((*__param_iter).current = (*((*__param_iter).prev_next)))
-
-    } else {
-        ((*__param_iter).prev_next = (((&raw const (*(*__param_iter).current).next as *const *mut _ListEntry) as *mut *mut _ListEntry)))
-
-        ((*__param_iter).current = (*(*__param_iter).current).next)
-
-    }
-
-
-    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
-        return list_null_value
-
-    }
-    return (*(*__param_iter).current).data
-
-
-}
-
-pub unsafe fn list_iter_remove(__param_iter: *mut _ListIterator) {
-    var __ci_expr_logic_0: i32
-
-    if ((if (*__param_iter).current == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if true: 1 else: 0))
-    } else {
-        (__ci_expr_logic_0 = (if (if (*__param_iter).current != (*((*__param_iter).prev_next)): 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (not (__ci_expr_logic_0 != 0)) {
-        ((*((*__param_iter).prev_next)) = (*(*__param_iter).current).next)
-
-        if ((if (*(*__param_iter).current).next != null: 1 else: 0) != 0) {
-            ((*(*(*__param_iter).current).next).prev = (*(*__param_iter).current).prev)
-
-        }
-
-        with_free((((*__param_iter).current as *mut c_void) as *mut u8))
-
-        ((*__param_iter).current = ((null as *mut _ListEntry)))
-
-    }
-
-
-}
-
+// contract: unproved:0:out-parameter written conditionally
 unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _ListEntry {
     var __local_pivot: *mut _ListEntry
 
@@ -461,13 +404,13 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_list == null: 1 else: 0) != 0) {
+    if (__param_list == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_compare_func == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_compare_func == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return ((null as *mut _ListEntry))
 
     }
@@ -475,13 +418,13 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     var __ci_expr_logic_1: i32
 
-    if ((if (*__param_list) == null: 1 else: 0) != 0) {
+    if ((*__param_list) == null) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*(*__param_list)).next == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*(*__param_list)).next == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return (*__param_list)
 
     }
@@ -495,15 +438,15 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     (__local_rover = (*(*__param_list)).next)
 
-    while ((if __local_rover != null: 1 else: 0) != 0) {
+    while (__local_rover != null) {
         var __local_next: *mut _ListEntry = (*__local_rover).next
 
-        if ((if __param_compare_func.unwrap()((*__local_rover).data, (*__local_pivot).data) < 0: 1 else: 0) != 0) {
+        if (__param_compare_func.unwrap()((*__local_rover).data, (*__local_pivot).data) < 0) {
             ((*__local_rover).prev = ((null as *mut _ListEntry)))
 
             ((*__local_rover).next = __local_less_list)
 
-            if ((if __local_less_list != null: 1 else: 0) != 0) {
+            if (__local_less_list != null) {
                 ((*__local_less_list).prev = __local_rover)
 
             }
@@ -515,7 +458,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
             ((*__local_rover).next = __local_more_list)
 
-            if ((if __local_more_list != null: 1 else: 0) != 0) {
+            if (__local_more_list != null) {
                 ((*__local_more_list).prev = __local_rover)
 
             }
@@ -534,7 +477,7 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     ((*__param_list) = __local_less_list)
 
-    if ((if __local_less_list == null: 1 else: 0) != 0) {
+    if (__local_less_list == null) {
         ((*__local_pivot).prev = ((null as *mut _ListEntry)))
 
         ((*__param_list) = __local_pivot)
@@ -548,17 +491,97 @@ unsafe fn list_sort_internal(__param_list: *mut *mut _ListEntry, __param_compare
 
     ((*__local_pivot).next = __local_more_list)
 
-    if ((if __local_more_list != null: 1 else: 0) != 0) {
+    if (__local_more_list != null) {
         ((*__local_more_list).prev = __local_pivot)
 
     }
 
-    if ((if __local_more_list == null: 1 else: 0) != 0) {
+    if (__local_more_list == null) {
         return __local_pivot
 
     }
     return __local_more_list_end
 
+
+}
+
+impl _ListIterator {
+    pub fn list_iter_has_more() -> i32 {
+        let __param_iter: *mut _ListIterator = (self as *const _ListIterator) as *mut _ListIterator
+        var __ci_expr_logic_0: i32
+
+        if ((unsafe *__param_iter).current == null) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (unsafe *__param_iter).current != (unsafe *((*__param_iter).prev_next)): 1 else: 0))
+        }
+
+        if __ci_expr_logic_0 {
+            return (if (unsafe *((*__param_iter).prev_next)) != null: 1 else: 0)
+
+        }
+        return (if (unsafe *(*__param_iter).current).next != null: 1 else: 0)
+
+
+
+    }
+
+    pub mut fn list_iter_next() -> *mut c_void {
+        let __param_iter: *mut _ListIterator = self as *mut _ListIterator
+        var __ci_expr_logic_0: i32
+
+        if ((unsafe *__param_iter).current == null) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (unsafe *__param_iter).current != (unsafe *((*__param_iter).prev_next)): 1 else: 0))
+        }
+
+        if __ci_expr_logic_0 {
+            ((unsafe *__param_iter).current = (unsafe *((*__param_iter).prev_next)))
+
+        } else {
+            ((unsafe *__param_iter).prev_next = (((&raw const (unsafe *(*__param_iter).current).next as *const *mut _ListEntry) as *mut *mut _ListEntry)))
+
+            ((unsafe *__param_iter).current = (unsafe *(*__param_iter).current).next)
+
+        }
+
+
+        if ((unsafe *__param_iter).current == null) {
+            return list_null_value
+
+        }
+        return (unsafe *(*__param_iter).current).data
+
+
+    }
+
+    pub mut fn list_iter_remove() {
+        let __param_iter: *mut _ListIterator = self as *mut _ListIterator
+        var __ci_expr_logic_0: i32
+
+        if ((unsafe *__param_iter).current == null) {
+            (__ci_expr_logic_0 = (if true: 1 else: 0))
+        } else {
+            (__ci_expr_logic_0 = (if (unsafe *__param_iter).current != (unsafe *((*__param_iter).prev_next)): 1 else: 0))
+        }
+
+        if (not __ci_expr_logic_0) {
+            ((unsafe *((*__param_iter).prev_next)) = (unsafe *(*__param_iter).current).next)
+
+            if ((unsafe *(*__param_iter).current).next != null) {
+                ((unsafe *(*(*__param_iter).current).next).prev = (unsafe *(*__param_iter).current).prev)
+
+            }
+
+            with_free((((unsafe *__param_iter).current as *mut c_void) as *mut u8))
+
+            ((unsafe *__param_iter).current = ((null as *mut _ListEntry)))
+
+        }
+
+
+    }
 
 }
 

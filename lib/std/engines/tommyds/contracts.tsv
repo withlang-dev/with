@@ -1,0 +1,181 @@
+allocator_reset	receiver-mut:tommy_allocator_struct
+cache_clear	plain
+compare	unproved:0:read only,unproved:1:read only
+compare_vector	unproved:0:read only,unproved:1:read only
+count_arg_callback	unproved:0:out-parameter read before the write,unproved:1:read only
+count_callback	unproved:0:read only
+hashdyn_grow_step	receiver-mut:tommy_hashdyn_struct
+hashdyn_shrink_step	receiver-mut:tommy_hashdyn_struct
+hashlin_grow_step	receiver-mut:tommy_hashlin_struct
+hashlin_shrink_step	receiver-mut:tommy_hashlin_struct
+isqrt	plain
+main	plain
+nano	plain
+nano_init	plain
+rnd	plain
+search_callback	unproved:0:read only,unproved:1:read only
+start	stored-unknown:0
+stop	plain
+test_alloc	plain
+test_array	plain
+test_arrayblk	plain
+test_arrayblkof	plain
+test_arrayof	plain
+test_hash	plain
+test_hashdyn	plain
+test_hashlin	plain
+test_hashtable	plain
+test_list	plain
+test_list_order	stored-unknown:0
+test_tree	plain
+test_trie	plain
+test_trie_inplace	plain
+tommy_allocator_alloc	receiver-mut:tommy_allocator_struct
+tommy_allocator_done	receiver-mut:tommy_allocator_struct
+tommy_allocator_free	receiver-mut:tommy_allocator_struct,stored-unknown:1
+tommy_allocator_init	receiver-mut:tommy_allocator_struct
+tommy_allocator_memory_usage	receiver:tommy_allocator_struct
+tommy_array_done	receiver:tommy_array_struct
+tommy_array_get	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_array_grow	receiver-mut:tommy_array_struct
+tommy_array_init	receiver-mut:tommy_array_struct
+tommy_array_insert	receiver-mut:tommy_array_struct,stored-unknown:1
+tommy_array_memory_usage	receiver:tommy_array_struct
+tommy_array_ref	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_array_set	receiver:tommy_array_struct,stored-unknown:2
+tommy_array_size	receiver:tommy_array_struct
+tommy_arrayblk_done	receiver:tommy_arrayblk_struct
+tommy_arrayblk_get	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_arrayblk_grow	receiver-mut:tommy_arrayblk_struct
+tommy_arrayblk_init	receiver-mut:tommy_arrayblk_struct
+tommy_arrayblk_insert	receiver-mut:tommy_arrayblk_struct,stored-unknown:1
+tommy_arrayblk_memory_usage	receiver:tommy_arrayblk_struct
+tommy_arrayblk_ref	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_arrayblk_set	receiver:tommy_arrayblk_struct,stored-unknown:2
+tommy_arrayblk_size	receiver:tommy_arrayblk_struct
+tommy_arrayblkof_done	receiver:tommy_arrayblkof_struct
+tommy_arrayblkof_grow	receiver-mut:tommy_arrayblkof_struct
+tommy_arrayblkof_init	receiver-mut:tommy_arrayblkof_struct
+tommy_arrayblkof_memory_usage	receiver:tommy_arrayblkof_struct
+tommy_arrayblkof_ref	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_arrayblkof_size	receiver:tommy_arrayblkof_struct
+tommy_arrayof_done	receiver:tommy_arrayof_struct
+tommy_arrayof_grow	receiver-mut:tommy_arrayof_struct
+tommy_arrayof_init	receiver-mut:tommy_arrayof_struct
+tommy_arrayof_memory_usage	receiver:tommy_arrayof_struct
+tommy_arrayof_ref	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_arrayof_size	receiver:tommy_arrayof_struct
+tommy_chain_concat	receiver-mut:tommy_node_struct,stored-unknown:1
+tommy_chain_merge	receiver-mut:tommy_chain_struct,unproved:1:read only
+tommy_chain_merge_degenerated	receiver-mut:tommy_chain_struct,unproved:1:read only
+tommy_chain_mergesort	receiver-mut:tommy_chain_struct
+tommy_chain_splice	receiver-mut:tommy_node_struct,stored-unknown:1,stored-unknown:2,stored-unknown:3
+tommy_ctz_u32	plain
+tommy_ctz_u64	plain
+tommy_hash_u32	unproved:1:read only
+tommy_hash_u64	unproved:1:read only
+tommy_hashdyn_bucket	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_hashdyn_count	receiver:tommy_hashdyn_struct
+tommy_hashdyn_done	unproved:0:frees a part of it
+tommy_hashdyn_foreach	receiver:tommy_hashdyn_struct
+tommy_hashdyn_foreach_arg	receiver:tommy_hashdyn_struct,stored-unknown:2
+tommy_hashdyn_init	receiver-mut:tommy_hashdyn_struct
+tommy_hashdyn_insert	receiver-mut:tommy_hashdyn_struct,stored-unknown:1,stored-unknown:2
+tommy_hashdyn_memory_usage	receiver:tommy_hashdyn_struct
+tommy_hashdyn_remove	receiver-mut:tommy_hashdyn_struct,stored-unknown:2
+tommy_hashdyn_remove_existing	receiver-mut:tommy_hashdyn_struct,unproved:1:out-parameter read before the write
+tommy_hashdyn_resize	receiver-mut:tommy_hashdyn_struct
+tommy_hashdyn_search	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:2
+tommy_hashlin_bucket	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_hashlin_bucket_ref	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_hashlin_count	receiver:tommy_hashlin_struct
+tommy_hashlin_done	receiver:tommy_hashlin_struct
+tommy_hashlin_foreach	receiver:tommy_hashlin_struct
+tommy_hashlin_foreach_arg	receiver:tommy_hashlin_struct,stored-unknown:2
+tommy_hashlin_init	receiver-mut:tommy_hashlin_struct
+tommy_hashlin_insert	receiver-mut:tommy_hashlin_struct,stored-unknown:1,stored-unknown:2
+tommy_hashlin_memory_usage	receiver:tommy_hashlin_struct
+tommy_hashlin_pos	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_hashlin_remove	receiver-mut:tommy_hashlin_struct,stored-unknown:2
+tommy_hashlin_remove_existing	receiver-mut:tommy_hashlin_struct,unproved:1:out-parameter read before the write
+tommy_hashlin_search	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:2
+tommy_hashlin_stable	receiver-mut:tommy_hashlin_struct
+tommy_hashtable_bucket	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_hashtable_count	receiver:tommy_hashtable_struct
+tommy_hashtable_done	unproved:0:frees a part of it
+tommy_hashtable_foreach	receiver:tommy_hashtable_struct
+tommy_hashtable_foreach_arg	receiver:tommy_hashtable_struct,stored-unknown:2
+tommy_hashtable_init	receiver-mut:tommy_hashtable_struct
+tommy_hashtable_insert	receiver-mut:tommy_hashtable_struct,stored-unknown:1,stored-unknown:2
+tommy_hashtable_memory_usage	receiver:tommy_hashtable_struct
+tommy_hashtable_remove	receiver-mut:tommy_hashtable_struct,stored-unknown:2
+tommy_hashtable_remove_existing	receiver-mut:tommy_hashtable_struct,unproved:1:out-parameter read before the write
+tommy_hashtable_search	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:2
+tommy_haszero_u32	plain
+tommy_ilog2_u32	plain
+tommy_ilog2_u64	plain
+tommy_inthash_u32	plain
+tommy_inthash_u64	plain
+tommy_le_uint32_read	unproved:0:read only
+tommy_list_concat	unproved:0:out-parameter a return before the write,unproved:1:read only
+tommy_list_count	unproved:0:read only
+tommy_list_empty	unproved:0:read only
+tommy_list_foreach	unproved:0:read only
+tommy_list_foreach_arg	unproved:0:read only,stored-unknown:2
+tommy_list_head	unproved:0:returns a pointer loaded from the parameter
+tommy_list_init	unproved:0:mutated through a pointer to no corpus record
+tommy_list_insert_first	unproved:0:mutated through a pointer to no corpus record,stored-unknown:1
+tommy_list_insert_head	unproved:0:out-parameter read before the write,stored-unknown:1,stored-unknown:2
+tommy_list_insert_head_not_empty	unproved:0:out-parameter read before the write,stored-unknown:1
+tommy_list_insert_tail	unproved:0:out-parameter read before the write,stored-unknown:1,stored-unknown:2
+tommy_list_insert_tail_not_empty	receiver-mut:tommy_node_struct,stored-unknown:1
+tommy_list_remove_existing	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+tommy_list_set	unproved:0:mutated through a pointer to no corpus record,stored-unknown:1,stored-unknown:2
+tommy_list_sort	unproved:0:out-parameter written conditionally
+tommy_list_tail	unproved:0:returns a pointer loaded from the parameter
+tommy_roundup_pow2_u32	plain
+tommy_roundup_pow2_u64	plain
+tommy_strhash_u32	unproved:1:read only
+tommy_tree_balance	receiver-mut:tommy_node_struct
+tommy_tree_count	receiver:tommy_tree_struct
+tommy_tree_delta	receiver:tommy_node_struct
+tommy_tree_foreach	unproved:0:tommy_tree_foreach_node may write through it
+tommy_tree_foreach_arg	unproved:0:tommy_tree_foreach_arg_node may write through it,stored-unknown:2
+tommy_tree_foreach_arg_node	unproved:0:tommy_tree_foreach_arg_node may write through it,stored-unknown:2
+tommy_tree_foreach_node	unproved:0:tommy_tree_foreach_node may write through it
+tommy_tree_init	receiver-mut:tommy_tree_struct
+tommy_tree_insert	receiver-mut:tommy_tree_struct,stored-unknown:1,stored-unknown:2
+tommy_tree_insert_node	stored-unknown:1,unproved:2:out-parameter written conditionally
+tommy_tree_memory_usage	receiver:tommy_tree_struct
+tommy_tree_move_right	unproved:0:NULL is an accepted argument,unproved:1:read only
+tommy_tree_remove	receiver-mut:tommy_tree_struct,stored-unknown:1
+tommy_tree_remove_existing	receiver-mut:tommy_tree_struct,unproved:1:read only
+tommy_tree_remove_node	stored-unknown:1,stored-unknown:2,unproved:3:out-parameter a return before the write
+tommy_tree_rotate_left	receiver-mut:tommy_node_struct
+tommy_tree_rotate_right	receiver-mut:tommy_node_struct
+tommy_tree_search	unproved:0:tommy_tree_search_node may write through it,stored-unknown:1
+tommy_tree_search_compare	unproved:0:tommy_tree_search_node may write through it,stored-unknown:2
+tommy_tree_search_node	unproved:1:read only,stored-unknown:2
+tommy_trie_bucket	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_trie_count	receiver:tommy_trie_struct
+tommy_trie_init	receiver-mut:tommy_trie_struct,stored-unknown:1
+tommy_trie_inplace_bucket	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_trie_inplace_count	receiver:tommy_trie_inplace_struct
+tommy_trie_inplace_init	receiver-mut:tommy_trie_inplace_struct
+tommy_trie_inplace_insert	receiver-mut:tommy_trie_inplace_struct,stored-unknown:1,stored-unknown:2
+tommy_trie_inplace_list_insert_first	receiver-mut:tommy_trie_inplace_node_struct,ret-from:0
+tommy_trie_inplace_list_insert_tail_not_empty	receiver-mut:tommy_trie_inplace_node_struct,stored-unknown:1
+tommy_trie_inplace_list_remove	unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
+tommy_trie_inplace_memory_usage	receiver:tommy_trie_inplace_struct
+tommy_trie_inplace_remove	receiver-mut:tommy_trie_inplace_struct
+tommy_trie_inplace_remove_existing	receiver-mut:tommy_trie_inplace_struct,stored-unknown:1
+tommy_trie_inplace_search	unproved:0:returns a pointer the receiver's view cannot carry
+tommy_trie_insert	receiver-mut:tommy_trie_struct,stored-unknown:1,stored-unknown:2
+tommy_trie_memory_usage	receiver:tommy_trie_struct
+tommy_trie_remove	receiver-mut:tommy_trie_struct
+tommy_trie_remove_existing	receiver-mut:tommy_trie_struct,unproved:1:out-parameter read before the write
+tommy_trie_search	unproved:0:returns a pointer the receiver's view cannot carry
+trie_bucket_insert	receiver-mut:tommy_trie_struct,unproved:2:out-parameter read before the write,stored-unknown:3
+trie_bucket_remove_existing	receiver-mut:tommy_trie_struct,stored-unknown:2,unproved:3:returns a pointer loaded from the parameter
+trie_inplace_bucket_insert	unproved:1:out-parameter read before the write,stored-unknown:2
+trie_inplace_bucket_remove	unproved:1:out-parameter read before the write,stored-unknown:2

@@ -30,6 +30,7 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.collections
 
+// contract: unproved:1:out-parameter a return before the write
 pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *mut u8, __param_size: u64) -> i32 {
     var __local_message: *const u8
 
@@ -40,17 +41,17 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *m
     var __local_rc: i32 = ((0 as i32))
 
 
-    if ((if __param_size == 0: 1 else: 0) != 0) {
+    if (__param_size == 0) {
         return -48
     }
 
-    if ((if __param_enumber >= 100: 1 else: 0) != 0) {
+    if (__param_enumber >= 100) {
         (__local_message = (&compile_error_texts[0] as *const u8))
 
         (__local_n = (((__param_enumber - 100) as i32)))
 
     } else {
-        if ((if __param_enumber < 0: 1 else: 0) != 0) {
+        if (__param_enumber < 0) {
             (__local_message = (&match_error_texts[0] as *const u8))
 
             (__local_n = (((0 - __param_enumber) as i32)))
@@ -63,19 +64,19 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *m
         }
     }
 
-    while ((if __local_n > 0: 1 else: 0) != 0) {
+    while (__local_n > 0) {
         while true {
             var __ci_expr_old_0: *const u8 = __local_message
 
             (__local_message = __local_message + 1)
 
-            if (not ((if (*__ci_expr_old_0) != 0: 1 else: 0) != 0)) {
+            if (not ((*__ci_expr_old_0) != 0)) {
                 break
             }
 
         }
 
-        if ((if (*__local_message) == 0: 1 else: 0) != 0) {
+        if ((*__local_message) == 0) {
             return -29
         }
 
@@ -86,8 +87,8 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *m
 
     (__local_i = ((0 as u64)))
 
-    while ((if (*__local_message) != 0: 1 else: 0) != 0) {
-        if ((if __local_i >= ((__param_size as u64) -% (1 as u64)): 1 else: 0) != 0) {
+    while ((*__local_message) != 0) {
+        if (__local_i >= ((__param_size as u64) -% (1 as u64))) {
             (__local_rc = ((-48 as i32)))
 
             break
@@ -109,7 +110,7 @@ pub unsafe fn pcre2_get_error_message_8(__param_enumber: i32, __param_buffer: *m
 
     ((__param_buffer[__local_i]) = ((0 as u8)))
 
-    return (if __local_rc != 0: __local_rc else: (__local_i as i32))
+    return (if __local_rc: __local_rc else: (__local_i as i32))
 
 }
 

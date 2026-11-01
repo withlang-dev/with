@@ -29,6 +29,7 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
+// contract: unproved:0:read only,unproved:2:out-parameter written conditionally,unproved:3:out-parameter written conditionally,unproved:4:read only
 pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_code_8, __param_number_of_codes: i32, __param_serialized_bytes: *mut *mut u8, __param_serialized_size: *mut u64, __param_gcontext: *mut pcre2_real_general_context_8) -> i32 {
     var __local_bytes: *mut u8
 
@@ -44,30 +45,30 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     var __local_data: *mut pcre2_serialized_data
 
-    var __local_memctl: *const pcre2_memctl = (((if (if __param_gcontext != null: 1 else: 0) != 0: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
+    var __local_memctl: *const pcre2_memctl = (((if __param_gcontext != null: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
 
     var __ci_expr_logic_1: i32
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_codes == null: 1 else: 0) != 0) {
+    if (__param_codes == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_serialized_bytes == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_serialized_bytes == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_serialized_size == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __param_serialized_size == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return -51
     }
 
 
-    if ((if __param_number_of_codes <= 0: 1 else: 0) != 0) {
+    if (__param_number_of_codes <= 0) {
         return -29
     }
 
@@ -77,21 +78,21 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
-        if ((if (__param_codes[__local_i]) == null: 1 else: 0) != 0) {
+    while (__local_i < __param_number_of_codes) {
+        if ((__param_codes[__local_i]) == null) {
             return -51
         }
 
         (__local_re = (__param_codes[__local_i]))
 
-        if ((if (*__local_re).magic_number != 1346589253: 1 else: 0) != 0) {
+        if ((*__local_re).magic_number != 1346589253) {
             return -31
         }
 
-        if ((if __local_tables == null: 1 else: 0) != 0) {
+        if (__local_tables == null) {
             (__local_tables = (*__local_re).tables)
         } else {
-            if ((if __local_tables != (*__local_re).tables: 1 else: 0) != 0) {
+            if (__local_tables != (*__local_re).tables) {
                 return -30
             }
         }
@@ -106,7 +107,7 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     (__local_bytes = (((*__local_memctl).malloc.unwrap()((((__local_total_size as u64) +% (sizeof[pcre2_memctl]() as u64)) as u64), (*__local_memctl).memory_data) as *mut u8)))
 
-    if ((if __local_bytes == null: 1 else: 0) != 0) {
+    if (__local_bytes == null) {
         return -48
     }
 
@@ -132,7 +133,7 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __param_number_of_codes: 1 else: 0) != 0) {
+    while (__local_i < __param_number_of_codes) {
         (__local_re = (__param_codes[__local_i]))
 
         with_memcpy(((__local_dst_bytes as *mut c_void) as *mut u8), (((__local_re as *const c_char) as *const c_void) as *const u8), ((*__local_re).blocksize as i64))
@@ -159,11 +160,12 @@ pub unsafe fn pcre2_serialize_encode_8(__param_codes: *mut *const pcre2_real_cod
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,unproved:2:read only,unproved:3:read only
 pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_8, __param_number_of_codes: i32, __param_bytes: *const u8, __param_gcontext: *mut pcre2_real_general_context_8) -> i32 {
     var __local_number_of_codes = __param_number_of_codes
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
-    var __local_memctl: *const pcre2_memctl = (((if (if __param_gcontext != null: 1 else: 0) != 0: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
+    var __local_memctl: *const pcre2_memctl = (((if __param_gcontext != null: ((&raw const (*__param_gcontext).memctl as *const pcre2_memctl) as *mut pcre2_memctl) else: ((&raw const (*(&raw const _pcre2_default_compile_context_8 as *const pcre2_real_compile_context_8)).memctl as *const pcre2_memctl) as *mut pcre2_memctl)) as *const pcre2_memctl))
 
     var __local_src_bytes: *const u8
 
@@ -178,38 +180,38 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     var __ci_expr_logic_0: i32
 
-    if ((if __local_data == null: 1 else: 0) != 0) {
+    if (__local_data == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_codes == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_codes == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return -51
     }
 
 
-    if ((if __local_number_of_codes <= 0: 1 else: 0) != 0) {
+    if (__local_number_of_codes <= 0) {
         return -29
     }
 
-    if ((if (*__local_data).number_of_codes <= 0: 1 else: 0) != 0) {
+    if ((*__local_data).number_of_codes <= 0) {
         return -62
     }
 
-    if ((if (*__local_data).magic != 1347564115: 1 else: 0) != 0) {
+    if ((*__local_data).magic != 1347564115) {
         return -31
     }
 
-    if ((if (*__local_data).version != 3080202: 1 else: 0) != 0) {
+    if ((*__local_data).version != 3080202) {
         return -32
     }
 
-    if ((if (*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64)): 1 else: 0) != 0) {
+    if ((*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64))) {
         return -32
     }
 
-    if ((if __local_number_of_codes > (*__local_data).number_of_codes: 1 else: 0) != 0) {
+    if (__local_number_of_codes > (*__local_data).number_of_codes) {
         (__local_number_of_codes = (*__local_data).number_of_codes)
     }
 
@@ -217,7 +219,7 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     (__local_tables = (((*__local_memctl).malloc.unwrap()((((1088 as u64) +% (sizeof[u64]() as u64)) as u64), (*__local_memctl).memory_data) as *mut u8)))
 
-    if ((if __local_tables == null: 1 else: 0) != 0) {
+    if (__local_tables == null) {
         return -48
     }
 
@@ -229,23 +231,23 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __local_number_of_codes: 1 else: 0) != 0) {
+    while (__local_i < __local_number_of_codes) {
         var __local_blocksize: u64
 
         with_memcpy((((&raw mut __local_blocksize as *mut u64) as *mut c_void) as *mut u8), (((__local_src_bytes + ((offsetof[pcre2_real_code_8](blocksize) as usize) as usize)) as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
-        if ((if __local_blocksize <= (sizeof[pcre2_real_code_8]() as usize): 1 else: 0) != 0) {
+        if (__local_blocksize <= (sizeof[pcre2_real_code_8]() as usize)) {
             return -62
         }
 
         (__local_dst_re = ((_pcre2_memctl_malloc_8(__local_blocksize, (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_code_8)))
 
-        if ((if __local_dst_re == null: 1 else: 0) != 0) {
+        if (__local_dst_re == null) {
             (*__local_memctl).free.unwrap()((__local_tables as *mut c_void), (*__local_memctl).memory_data)
 
             (__local_j = ((0 as i32)))
 
-            while ((if __local_j < __local_i: 1 else: 0) != 0) {
+            while (__local_j < __local_i) {
                 (*__local_memctl).free.unwrap()(((__param_codes[__local_j]) as *mut c_void), (*__local_memctl).memory_data)
 
                 ((__param_codes[__local_j]) = ((null as *mut pcre2_real_code_8)))
@@ -266,19 +268,19 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
         var __ci_expr_logic_1: i32
 
-        if ((if (*__local_dst_re).magic_number != 1346589253: 1 else: 0) != 0) {
+        if ((*__local_dst_re).magic_number != 1346589253) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if (*__local_dst_re).name_entry_size > ((128 + 2) + 1): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (*__local_dst_re).name_entry_size > ((128 + 2) + 1): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (*__local_dst_re).name_count > 10000: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (*__local_dst_re).name_count > 10000: 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             (*__local_memctl).free.unwrap()((__local_dst_re as *mut c_void), (*__local_memctl).memory_data)
 
             return -62
@@ -306,22 +308,23 @@ pub unsafe fn pcre2_serialize_decode_8(__param_codes: *mut *mut pcre2_real_code_
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) -> i32 {
     var __local_data: *const pcre2_serialized_data = ((__param_bytes as *const pcre2_serialized_data))
 
-    if ((if __local_data == null: 1 else: 0) != 0) {
+    if (__local_data == null) {
         return -51
     }
 
-    if ((if (*__local_data).magic != 1347564115: 1 else: 0) != 0) {
+    if ((*__local_data).magic != 1347564115) {
         return -31
     }
 
-    if ((if (*__local_data).version != 3080202: 1 else: 0) != 0) {
+    if ((*__local_data).version != 3080202) {
         return -32
     }
 
-    if ((if (*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64)): 1 else: 0) != 0) {
+    if ((*__local_data).config != ((((sizeof[u8]() as u64) | (((8 as u64) << (8 as u32)) as u64)) as u64) | (((sizeof[u64]() as u64) << (16 as u32)) as u64))) {
         return -32
     }
 
@@ -329,8 +332,9 @@ pub unsafe fn pcre2_serialize_get_number_of_codes_8(__param_bytes: *const u8) ->
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn pcre2_serialize_free_8(__param_bytes: *mut u8) {
-    if ((if __param_bytes != null: 1 else: 0) != 0) {
+    if (__param_bytes != null) {
         var __local_memctl: *mut pcre2_memctl = (((__param_bytes - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
         (*__local_memctl).free.unwrap()((__local_memctl as *mut c_void), (*__local_memctl).memory_data)

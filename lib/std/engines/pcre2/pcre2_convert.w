@@ -30,6 +30,7 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.collections
 
+// contract: stored-unknown:0,unproved:3:out-parameter a return before the write,unproved:4:out-parameter written conditionally,unproved:5:read only — stores an argument; ownership not modeled
 pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plength: u64, __param_options: u32, __param_buffptr: *mut *mut u8, __param_bufflenptr: *mut u64, __param_ccontext: *mut pcre2_real_convert_context_8) -> i32 writes _pcre2_default_convert_context_8 {
     var __local_pattern = __param_pattern
     var __local_plength = __param_plength
@@ -50,25 +51,25 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __local_pattern == null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __local_plength == 0: 1 else: 0) != 0: 1 else: 0))
+    if (__local_pattern == null) {
+        (__ci_expr_logic_0 = (if __local_plength == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__local_pattern = (&__local_null_str[0] as *const u8))
     }
 
 
     var __ci_expr_logic_1: i32
 
-    if ((if __local_pattern == null: 1 else: 0) != 0) {
+    if (__local_pattern == null) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_bufflenptr == null: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __param_bufflenptr == null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
-        if ((if __param_bufflenptr != null: 1 else: 0) != 0) {
+    if __ci_expr_logic_1 {
+        if (__param_bufflenptr != null) {
             ((*__param_bufflenptr) = ((0 as u64)))
         }
 
@@ -81,19 +82,19 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
     var __ci_expr_logic_2: i32
 
-    if ((if ((__param_options as u32) & ((~((((((((1 as u32) | (2 as u32)) as u32) | (48 as u32)) as u32) | (80 as u32)) as u32) | (((((16 as u32) | (4 as u32)) as u32) | (8 as u32)) as u32))) as u32)) != 0: 1 else: 0) != 0) {
+    if (((__param_options as u32) & ((~((((((((1 as u32) | (2 as u32)) as u32) | (48 as u32)) as u32) | (80 as u32)) as u32) | (((((16 as u32) | (4 as u32)) as u32) | (8 as u32)) as u32))) as u32)) != 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if ((__local_pattype as u32) & ((((~__local_pattype) as u32) +% (1 as u32)) as u32)) != __local_pattype: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if ((__local_pattype as u32) & ((((~__local_pattype) as u32) +% (1 as u32)) as u32)) != __local_pattype: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if __local_pattype == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __local_pattype == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         ((*__param_bufflenptr) = ((0 as u64)))
 
         return -34
@@ -101,26 +102,26 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
     }
 
 
-    if ((if __local_plength == (~(0 as u64)): 1 else: 0) != 0) {
+    if (__local_plength == (~(0 as u64))) {
         (__local_plength = ((_pcre2_strlen_8(__local_pattern) as u64)))
     }
 
-    if ((if __local_ccontext == null: 1 else: 0) != 0) {
+    if (__local_ccontext == null) {
         (__local_ccontext = ((&raw mut _pcre2_default_convert_context_8 as *mut pcre2_real_convert_context_8)))
     }
 
     var __ci_expr_logic_4: i32 = 0
 
-    if (__local_utf != 0) {
-        (__ci_expr_logic_4 = (if (if ((__param_options as u32) & (2 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+    if __local_utf {
+        (__ci_expr_logic_4 = (if ((__param_options as u32) & (2 as u32)) == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         var __local_erroroffset: u64
 
         (__local_rc = ((_pcre2_valid_utf_8(__local_pattern, __local_plength, (&raw mut __local_erroroffset as *mut u64)) as i32)))
 
-        if ((if __local_rc != 0: 1 else: 0) != 0) {
+        if (__local_rc != 0) {
             ((*__param_bufflenptr) = __local_erroroffset)
 
             return __local_rc
@@ -132,11 +133,11 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
     var __ci_expr_logic_5: i32 = 0
 
-    if ((if __param_buffptr != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_5 = (if (if (*__param_buffptr) != null: 1 else: 0) != 0: 1 else: 0))
+    if (__param_buffptr != null) {
+        (__ci_expr_logic_5 = (if (*__param_buffptr) != null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_5 != 0) {
+    if __ci_expr_logic_5 {
         (__local_use_buffer = (*__param_buffptr))
 
         (__local_use_length = (*__param_bufflenptr))
@@ -146,15 +147,15 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
     var __local_i: i32 = ((0 as i32))
 
-    while ((if __local_i < 2: 1 else: 0) != 0) {
+    while (__local_i < 2) {
         var __local_allocated: *mut u8
 
         var __local_dummyrun: i32 = with 0 as __ci_expr_seq_117 {
             var __ci_expr_logic_6: i32
-            if ((if __param_buffptr == null: 1 else: 0) != 0) {
+            if (__param_buffptr == null) {
                 (__ci_expr_logic_6 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_6 = (if (if (*__param_buffptr) == null: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_6 = (if (*__param_buffptr) == null: 1 else: 0))
             }
             __ci_expr_logic_6
         }
@@ -173,7 +174,7 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
                 _ => {
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -193,26 +194,26 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
         var __ci_expr_logic_8: i32
 
-        if ((if __local_rc != 0: 1 else: 0) != 0) {
+        if (__local_rc != 0) {
             (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_8 = (if (if __param_buffptr == null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if __param_buffptr == null: 1 else: 0))
         }
 
-        if (__ci_expr_logic_8 != 0) {
+        if __ci_expr_logic_8 {
             (__ci_expr_logic_9 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_9 = (if (if (*__param_buffptr) != null: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_9 = (if (*__param_buffptr) != null: 1 else: 0))
         }
 
-        if (__ci_expr_logic_9 != 0) {
+        if __ci_expr_logic_9 {
             return __local_rc
         }
 
 
         (__local_allocated = ((_pcre2_memctl_malloc_8((((sizeof[pcre2_memctl]() as u64) +% ((((((*__param_bufflenptr) as u64) +% (1 as u64)) as u64) *% (8 as u64)) as u64)) as u64), (__local_ccontext as *mut pcre2_memctl)) as *mut u8)))
 
-        if ((if __local_allocated == null: 1 else: 0) != 0) {
+        if (__local_allocated == null) {
             ((*__param_bufflenptr) = ((0 as u64)))
 
             return -48
@@ -233,7 +234,7 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -244,8 +245,9 @@ pub unsafe fn pcre2_pattern_convert_8(__param_pattern: *const u8, __param_plengt
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) {
-    if ((if __param_converted != null: 1 else: 0) != 0) {
+    if (__param_converted != null) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_converted as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
         (*__local_memctl).free.unwrap()((__local_memctl as *mut c_void), (*__local_memctl).memory_data)
@@ -254,6 +256,7 @@ pub unsafe fn pcre2_converted_pattern_free_8(__param_converted: *mut u8) {
 
 }
 
+// contract: unproved:1:read only,stored-unknown:4,out:6:u64,unproved:8:read only — stores an argument; ownership not modeled
 unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __param_plength: u64, __param_utf: i32, __param_use_buffer: *mut u8, __param_use_length: u64, __param_bufflenptr: *mut u64, __param_dummyrun: i32, __param_ccontext: *mut pcre2_real_convert_context_8) -> i32 {
     var __local_plength = __param_plength
     var __local_posix__goto_154_12: *const u8 = null
@@ -367,7 +370,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_1 {
-        if ((if (*__local_s__goto_172_1) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_172_1) != 0) {
             goto '__ci_bb_2
         } else {
             goto '__ci_bb_4
@@ -375,7 +378,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_2 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_5
         } else {
             goto '__ci_bb_6
@@ -403,7 +406,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_7 {
-        if ((if __local_plength > 0: 1 else: 0) != 0) {
+        if (__local_plength > 0) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -413,7 +416,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     '__ci_bb_8 {
         (__local_clength__goto_179_7 = ((1 as i32)))
         (__local_convlength__goto_158_12 = (__local_convlength__goto_158_12 +% (((((__local_p__goto_155_14 as usize) -% (__local_pp__goto_156_14 as usize)) as i64) / (sizeof[u8]() as i64)) as u64)))
-        if (__param_dummyrun != 0) {
+        if __param_dummyrun {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -421,7 +424,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_9 {
-        if ((if __local_posix_state__goto_161_10 >= 3: 1 else: 0) != 0) {
+        if (__local_posix_state__goto_161_10 >= 3) {
             goto '__ci_bb_160
         } else {
             goto '__ci_bb_161
@@ -437,10 +440,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
         (__local_pp__goto_156_14 = __local_p__goto_155_14)
         (__local_c__goto_178_12 = (((*__local_posix__goto_154_12) as u32)))
         (__ci_expr_logic_1 = 0)
-        if (__param_utf != 0) {
-            (__ci_expr_logic_1 = (if (if __local_c__goto_178_12 >= 192: 1 else: 0) != 0: 1 else: 0))
+        if __param_utf {
+            (__ci_expr_logic_1 = (if __local_c__goto_178_12 >= 192: 1 else: 0))
         }
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             goto '__ci_bb_12
         } else {
             goto '__ci_bb_13
@@ -448,7 +451,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_12 {
-        if ((if ((__local_c__goto_178_12 as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+        if (((__local_c__goto_178_12 as u32) & (32 as u32)) == 0) {
             goto '__ci_bb_14
         } else {
             goto '__ci_bb_15
@@ -458,9 +461,9 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     '__ci_bb_13 {
         (__local_posix__goto_154_12 = __local_posix__goto_154_12 + ((__local_clength__goto_179_7 as isize) as usize))
         (__local_plength = (__local_plength -% (__local_clength__goto_179_7 as u64)))
-        (__local_sc__goto_178_15 = (((if __local_nextisliteral__goto_164_6 != 0: (0 as u32) else: __local_c__goto_178_12) as u32)))
+        (__local_sc__goto_178_15 = (((if __local_nextisliteral__goto_164_6: (0 as u32) else: __local_c__goto_178_12) as u32)))
         (__local_nextisliteral__goto_164_6 = ((0 as i32)))
-        if ((if __local_posix_state__goto_161_10 >= 3: 1 else: 0) != 0) {
+        if (__local_posix_state__goto_161_10 >= 3) {
             goto '__ci_bb_26
         } else {
             goto '__ci_bb_27
@@ -474,7 +477,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_15 {
-        if ((if ((__local_c__goto_178_12 as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+        if (((__local_c__goto_178_12 as u32) & (16 as u32)) == 0) {
             goto '__ci_bb_17
         } else {
             goto '__ci_bb_18
@@ -492,7 +495,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_18 {
-        if ((if ((__local_c__goto_178_12 as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+        if (((__local_c__goto_178_12 as u32) & (8 as u32)) == 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -510,7 +513,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_21 {
-        if ((if ((__local_c__goto_178_12 as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+        if (((__local_c__goto_178_12 as u32) & (4 as u32)) == 0) {
             goto '__ci_bb_23
         } else {
             goto '__ci_bb_24
@@ -538,7 +541,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_26 {
-        if ((if __local_c__goto_178_12 == 93: 1 else: 0) != 0) {
+        if (__local_c__goto_178_12 == 93) {
             goto '__ci_bb_29
         } else {
             goto '__ci_bb_30
@@ -567,7 +570,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_32 {
-        if ((if (*__local_s__goto_208_7) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_208_7) != 0) {
             goto '__ci_bb_33
         } else {
             goto '__ci_bb_35
@@ -575,7 +578,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_33 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_36
         } else {
             goto '__ci_bb_37
@@ -612,7 +615,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_39 {
-        if ((if __local_c__goto_178_12 == 92: 1 else: 0) != 0) {
+        if (__local_c__goto_178_12 == 92) {
             goto '__ci_bb_59
         } else {
             goto '__ci_bb_60
@@ -621,10 +624,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_40 {
         (__ci_expr_logic_3 = 0)
-        if ((if __local_c__goto_178_12 >= 97: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if __local_c__goto_178_12 <= 122: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c__goto_178_12 >= 97) {
+            (__ci_expr_logic_3 = (if __local_c__goto_178_12 <= 122: 1 else: 0))
         }
-        if (__ci_expr_logic_3 != 0) {
+        if __ci_expr_logic_3 {
             goto '__ci_bb_41
         } else {
             goto '__ci_bb_42
@@ -639,13 +642,13 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
         (__local_posix_state__goto_161_10 = ((3 as u32)))
         (__ci_expr_logic_5 = 0)
         (__ci_expr_logic_4 = 0)
-        if ((if __local_c__goto_178_12 == 58: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_plength > 0: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c__goto_178_12 == 58) {
+            (__ci_expr_logic_4 = (if __local_plength > 0: 1 else: 0))
         }
-        if (__ci_expr_logic_4 != 0) {
-            (__ci_expr_logic_5 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_4 {
+            (__ci_expr_logic_5 = (if (*__local_posix__goto_154_12) == 93: 1 else: 0))
         }
-        if (__ci_expr_logic_5 != 0) {
+        if __ci_expr_logic_5 {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_44
@@ -662,7 +665,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_45 {
-        if ((if (*__local_s__goto_224_11) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_224_11) != 0) {
             goto '__ci_bb_46
         } else {
             goto '__ci_bb_48
@@ -670,7 +673,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_46 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_49
         } else {
             goto '__ci_bb_50
@@ -700,7 +703,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_51 {
-        if ((if __local_c__goto_178_12 == 91: 1 else: 0) != 0) {
+        if (__local_c__goto_178_12 == 91) {
             goto '__ci_bb_52
         } else {
             goto '__ci_bb_53
@@ -717,7 +720,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_54 {
-        if ((if __local_c__goto_178_12 == 58: 1 else: 0) != 0) {
+        if (__local_c__goto_178_12 == 58) {
             goto '__ci_bb_55
         } else {
             goto '__ci_bb_56
@@ -755,7 +758,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_60 {
-        if ((if (__local_p__goto_155_14 + ((__local_clength__goto_179_7 as isize) as usize)) > __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if ((__local_p__goto_155_14 + ((__local_clength__goto_179_7 as isize) as usize)) > __local_endp__goto_157_14) {
             goto '__ci_bb_67
         } else {
             goto '__ci_bb_68
@@ -763,7 +766,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_61 {
-        if ((if (*__local_s__goto_241_32) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_241_32) != 0) {
             goto '__ci_bb_62
         } else {
             goto '__ci_bb_64
@@ -771,7 +774,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_62 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_65
         } else {
             goto '__ci_bb_66
@@ -826,7 +829,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_72 {
-        if ((if (*__local_s__goto_253_5) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_253_5) != 0) {
             goto '__ci_bb_73
         } else {
             goto '__ci_bb_75
@@ -834,7 +837,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_73 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_76
         } else {
             goto '__ci_bb_77
@@ -848,7 +851,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_75 {
         (__local_posix_state__goto_161_10 = ((3 as u32)))
-        if ((if __local_plength > 0: 1 else: 0) != 0) {
+        if (__local_plength > 0) {
             goto '__ci_bb_78
         } else {
             goto '__ci_bb_79
@@ -867,7 +870,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_78 {
-        if ((if (*__local_posix__goto_154_12) == 94: 1 else: 0) != 0) {
+        if ((*__local_posix__goto_154_12) == 94) {
             goto '__ci_bb_80
         } else {
             goto '__ci_bb_81
@@ -887,10 +890,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_81 {
         (__ci_expr_logic_10 = 0)
-        if ((if __local_plength > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if (*__local_posix__goto_154_12) == 93: 1 else: 0) != 0: 1 else: 0))
+        if (__local_plength > 0) {
+            (__ci_expr_logic_10 = (if (*__local_posix__goto_154_12) == 93: 1 else: 0))
         }
-        if (__ci_expr_logic_10 != 0) {
+        if __ci_expr_logic_10 {
             goto '__ci_bb_88
         } else {
             goto '__ci_bb_89
@@ -898,7 +901,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_82 {
-        if ((if (*__local_s__goto_291_9) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_291_9) != 0) {
             goto '__ci_bb_83
         } else {
             goto '__ci_bb_85
@@ -906,7 +909,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_83 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_86
         } else {
             goto '__ci_bb_87
@@ -945,7 +948,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_90 {
-        if ((if (*__local_s__goto_297_9) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_297_9) != 0) {
             goto '__ci_bb_91
         } else {
             goto '__ci_bb_93
@@ -953,7 +956,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_91 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_95
@@ -981,7 +984,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_96 {
-        if ((if __local_plength == 0: 1 else: 0) != 0) {
+        if (__local_plength == 0) {
             goto '__ci_bb_97
         } else {
             goto '__ci_bb_98
@@ -993,7 +996,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_98 {
-        if (__local_extended__goto_163_6 != 0) {
+        if __local_extended__goto_163_6 {
             goto '__ci_bb_99
         } else {
             goto '__ci_bb_100
@@ -1007,10 +1010,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_100 {
         (__ci_expr_logic_12 = 0)
-        if ((if (*__local_posix__goto_154_12) < 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if strchr(posix_meta_escapes, ((*__local_posix__goto_154_12) as i32)) != null: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_posix__goto_154_12) < 255) {
+            (__ci_expr_logic_12 = (if strchr(posix_meta_escapes, ((*__local_posix__goto_154_12) as i32)) != null: 1 else: 0))
         }
-        if (__ci_expr_logic_12 != 0) {
+        if __ci_expr_logic_12 {
             goto '__ci_bb_102
         } else {
             goto '__ci_bb_103
@@ -1023,10 +1026,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_102 {
         (__ci_expr_logic_13 = 0)
-        if ((if (*__local_posix__goto_154_12) >= 48: 1 else: 0) != 0) {
-            (__ci_expr_logic_13 = (if (if (*__local_posix__goto_154_12) <= 57: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_posix__goto_154_12) >= 48) {
+            (__ci_expr_logic_13 = (if (*__local_posix__goto_154_12) <= 57: 1 else: 0))
         }
-        if (__ci_expr_logic_13 != 0) {
+        if __ci_expr_logic_13 {
             goto '__ci_bb_105
         } else {
             goto '__ci_bb_106
@@ -1048,7 +1051,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_106 {
-        if ((if (__local_p__goto_155_14 + ((1 as isize) as usize)) > __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if ((__local_p__goto_155_14 + ((1 as isize) as usize)) > __local_endp__goto_157_14) {
             goto '__ci_bb_113
         } else {
             goto '__ci_bb_114
@@ -1056,7 +1059,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_107 {
-        if ((if (*__local_s__goto_308_51) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_308_51) != 0) {
             goto '__ci_bb_108
         } else {
             goto '__ci_bb_110
@@ -1064,7 +1067,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_108 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_111
         } else {
             goto '__ci_bb_112
@@ -1107,12 +1110,12 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_115 {
-        if ((if not (__local_extended__goto_163_6 != 0): 1 else: 0) != 0) {
+        if (not __local_extended__goto_163_6) {
             (__ci_expr_logic_17 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_17 = (if (if __local_bracount__goto_160_10 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_17 = (if __local_bracount__goto_160_10 == 0: 1 else: 0))
         }
-        if (__ci_expr_logic_17 != 0) {
+        if __ci_expr_logic_17 {
             goto '__ci_bb_116
         } else {
             goto '__ci_bb_117
@@ -1135,7 +1138,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_119 {
         (__local_lastspecial__goto_162_10 = __local_c__goto_178_12)
-        if ((if (__local_p__goto_155_14 + ((1 as isize) as usize)) > __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if ((__local_p__goto_155_14 + ((1 as isize) as usize)) > __local_endp__goto_157_14) {
             goto '__ci_bb_125
         } else {
             goto '__ci_bb_126
@@ -1148,7 +1151,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_121 {
-        if ((if not (__local_extended__goto_163_6 != 0): 1 else: 0) != 0) {
+        if (not __local_extended__goto_163_6) {
             goto '__ci_bb_122
         } else {
             goto '__ci_bb_123
@@ -1180,7 +1183,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_127 {
-        if ((if __local_lastspecial__goto_162_10 != 42: 1 else: 0) != 0) {
+        if (__local_lastspecial__goto_162_10 != 42) {
             goto '__ci_bb_128
         } else {
             goto '__ci_bb_129
@@ -1189,19 +1192,19 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_128 {
         (__ci_expr_logic_20 = 0)
-        if ((if not (__local_extended__goto_163_6 != 0): 1 else: 0) != 0) {
+        if (not __local_extended__goto_163_6) {
             var __ci_expr_logic_19: i32
 
-            if ((if __local_posix_state__goto_161_10 < 2: 1 else: 0) != 0) {
+            if (__local_posix_state__goto_161_10 < 2) {
                 (__ci_expr_logic_19 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_19 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_19 = (if __local_lastspecial__goto_162_10 == 40: 1 else: 0))
             }
 
-            (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
+            (__ci_expr_logic_20 = (if __ci_expr_logic_19: 1 else: 0))
 
         }
-        if (__ci_expr_logic_20 != 0) {
+        if __ci_expr_logic_20 {
             goto '__ci_bb_130
         } else {
             goto '__ci_bb_131
@@ -1221,7 +1224,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_132 {
-        if (__local_extended__goto_163_6 != 0) {
+        if __local_extended__goto_163_6 {
             goto '__ci_bb_133
         } else {
             goto '__ci_bb_134
@@ -1233,12 +1236,12 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_134 {
-        if ((if __local_posix_state__goto_161_10 == 0: 1 else: 0) != 0) {
+        if (__local_posix_state__goto_161_10 == 0) {
             (__ci_expr_logic_21 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_21 = (if (if __local_lastspecial__goto_162_10 == 40: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_21 = (if __local_lastspecial__goto_162_10 == 40: 1 else: 0))
         }
-        if (__ci_expr_logic_21 != 0) {
+        if __ci_expr_logic_21 {
             goto '__ci_bb_135
         } else {
             goto '__ci_bb_136
@@ -1256,10 +1259,10 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_137 {
         (__ci_expr_logic_22 = 0)
-        if ((if __local_c__goto_178_12 < 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_22 = (if (if strchr(pcre2_escaped_literals, (__local_c__goto_178_12 as i32)) != null: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c__goto_178_12 < 255) {
+            (__ci_expr_logic_22 = (if strchr(pcre2_escaped_literals, (__local_c__goto_178_12 as i32)) != null: 1 else: 0))
         }
-        if (__ci_expr_logic_22 != 0) {
+        if __ci_expr_logic_22 {
             goto '__ci_bb_138
         } else {
             goto '__ci_bb_139
@@ -1272,7 +1275,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 
     '__ci_bb_139 {
         (__local_lastspecial__goto_162_10 = ((255 as u32)))
-        if ((if (__local_p__goto_155_14 + ((__local_clength__goto_179_7 as isize) as usize)) > __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if ((__local_p__goto_155_14 + ((__local_clength__goto_179_7 as isize) as usize)) > __local_endp__goto_157_14) {
             goto '__ci_bb_146
         } else {
             goto '__ci_bb_147
@@ -1280,7 +1283,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_140 {
-        if ((if (*__local_s__goto_367_7) != 0: 1 else: 0) != 0) {
+        if ((*__local_s__goto_367_7) != 0) {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_143
@@ -1288,7 +1291,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
     }
 
     '__ci_bb_141 {
-        if ((if __local_p__goto_155_14 >= __local_endp__goto_157_14: 1 else: 0) != 0) {
+        if (__local_p__goto_155_14 >= __local_endp__goto_157_14) {
             goto '__ci_bb_144
         } else {
             goto '__ci_bb_145
@@ -1442,7 +1445,7 @@ unsafe fn convert_posix(__param_pattype: u32, __param_pattern: *const u8, __para
 unsafe fn convert_glob_write(__param_out: *mut pcre2_output_context, __param_chr: u8) {
     ((*__param_out).output_size = ((*__param_out).output_size +% 1))
 
-    if ((if (*__param_out).output < (*__param_out).output_end: 1 else: 0) != 0) {
+    if ((*__param_out).output < (*__param_out).output_end) {
         var __ci_expr_old_0: *mut u8 = (*__param_out).output
 
         ((*__param_out).output = (*__param_out).output + 1)
@@ -1466,7 +1469,7 @@ unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param
     loop {
         (__local_output_size = (__local_output_size +% 1))
 
-        if ((if __local_output < __local_output_end: 1 else: 0) != 0) {
+        if (__local_output < __local_output_end) {
             var __ci_expr_old_0: *mut u8 = __local_output
 
             (__local_output = __local_output + 1)
@@ -1480,7 +1483,7 @@ unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param
         }
 
         (__local_length = (__local_length -% 1))
-        if not (((if __local_length != 0: 1 else: 0) != 0)) {
+        if not ((__local_length != 0)) {
             break
         }
     }
@@ -1492,7 +1495,7 @@ unsafe fn convert_glob_write_str(__param_out: *mut pcre2_output_context, __param
 }
 
 unsafe fn convert_glob_print_separator(__param_out: *mut pcre2_output_context, __param_separator: u8, __param_with_escape: i32) {
-    if (__param_with_escape != 0) {
+    if __param_with_escape {
         convert_glob_write(__param_out, (92 as u8))
     }
 
@@ -1513,6 +1516,7 @@ unsafe fn convert_glob_print_wildcard(__param_out: *mut pcre2_output_context, __
 
 }
 
+// contract: unproved:0:out-parameter read before the write,unproved:1:read only,unproved:2:out-parameter a return before the write
 unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern_end: *const u8, __param_out: *mut pcre2_output_context) -> i32 {
     var __local_start: *const u8 = ((*__param_from) + ((1 as isize) as usize))
 
@@ -1524,8 +1528,8 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
     var __local_class_index: i32
 
-    while (1 != 0) {
-        if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+    while true {
+        if (__local_pattern >= __param_pattern_end) {
             return 0
         }
 
@@ -1538,13 +1542,13 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
         var __ci_expr_logic_1: i32
 
-        if ((if __local_c < 97: 1 else: 0) != 0) {
+        if (__local_c < 97) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if __local_c > 122: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if __local_c > 122: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             break
         }
 
@@ -1555,19 +1559,19 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
     var __ci_expr_logic_2: i32
 
-    if ((if __local_c != 58: 1 else: 0) != 0) {
+    if (__local_c != 58) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if __local_pattern >= __param_pattern_end: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if __local_pattern >= __param_pattern_end: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if (*__local_pattern) != 93: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if (*__local_pattern) != 93: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         return 0
     }
 
@@ -1576,15 +1580,15 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
     (__local_class_index = ((1 as i32)))
 
-    while (1 != 0) {
-        if ((if (*__local_class_ptr) == 0: 1 else: 0) != 0) {
+    while true {
+        if ((*__local_class_ptr) == 0) {
             return 0
         }
 
         (__local_pattern = __local_start)
 
-        while ((if (*__local_pattern) == (((*__local_class_ptr) as u8)): 1 else: 0) != 0) {
-            if ((if (*__local_pattern) == 58: 1 else: 0) != 0) {
+        while ((*__local_pattern) == (((*__local_class_ptr) as u8))) {
+            if ((*__local_pattern) == 58) {
                 (__local_pattern = __local_pattern + ((2 as isize) as usize))
 
                 (__local_start = __local_start - ((2 as isize) as usize))
@@ -1596,7 +1600,7 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
                     convert_glob_write(__param_out, (*__ci_expr_old_4))
 
-                    if not (((if __local_start < __local_pattern: 1 else: 0) != 0)) {
+                    if not ((__local_start < __local_pattern)) {
                         break
                     }
                 }
@@ -1613,7 +1617,7 @@ unsafe fn convert_glob_parse_class(__param_from: *mut *const u8, __param_pattern
 
         }
 
-        while ((if (*__local_class_ptr) != 58: 1 else: 0) != 0) {
+        while ((*__local_class_ptr) != 58) {
             (__local_class_ptr = __local_class_ptr + 1)
         }
 
@@ -1633,11 +1637,11 @@ fn convert_glob_char_in_class(__param_class_index: i32, __param_c: u8) -> i32 {
     while true {
         match __param_class_index {
             1 => {
-                if ((if __param_c == 95: 1 else: 0) != 0) {
+                if (__param_c == 95) {
                     return 0
                 }
 
-                if ((if ((((unsafe (__local_cbits + ((64 as isize) as usize))[((__param_c as i32) / 8)]) as i32) as u32) & (((1 as u32) << (((__param_c as i32) & (7 as i32)) as u32)) as u32)) != 0: 1 else: 0) != 0) {
+                if (((((unsafe (__local_cbits + ((64 as isize) as usize))[((__param_c as i32) / 8)]) as i32) as u32) & (((1 as u32) << (((__param_c as i32) & (7 as i32)) as u32)) as u32)) != 0) {
                     return 0
                 }
 
@@ -1651,7 +1655,7 @@ fn convert_glob_char_in_class(__param_class_index: i32, __param_c: u8) -> i32 {
                 (__local_cbit = ((96 as i32)))
             },
             4 => {
-                if ((if __param_c == 95: 1 else: 0) != 0) {
+                if (__param_c == 95) {
                     return 0
                 }
 
@@ -1659,7 +1663,7 @@ fn convert_glob_char_in_class(__param_class_index: i32, __param_c: u8) -> i32 {
 
             },
             5 => {
-                if ((if ((((unsafe (__local_cbits + ((288 as isize) as usize))[((__param_c as i32) / 8)]) as i32) as u32) & (((1 as u32) << (((__param_c as i32) & (7 as i32)) as u32)) as u32)) != 0: 1 else: 0) != 0) {
+                if (((((unsafe (__local_cbits + ((288 as isize) as usize))[((__param_c as i32) / 8)]) as i32) as u32) & (((1 as u32) << (((__param_c as i32) & (7 as i32)) as u32)) as u32)) != 0) {
                     return 1
                 }
 
@@ -1673,25 +1677,25 @@ fn convert_glob_char_in_class(__param_class_index: i32, __param_c: u8) -> i32 {
 
                 var __ci_expr_logic_0: i32
 
-                if ((if __param_c == 10: 1 else: 0) != 0) {
+                if (__param_c == 10) {
                     (__ci_expr_logic_0 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_0 = (if (if __param_c == 11: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_0 = (if __param_c == 11: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_0 != 0) {
+                if __ci_expr_logic_0 {
                     (__ci_expr_logic_1 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_1 = (if (if __param_c == 12: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_1 = (if __param_c == 12: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_1 != 0) {
+                if __ci_expr_logic_1 {
                     (__ci_expr_logic_2 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_2 = (if (if __param_c == 13: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_2 = (if __param_c == 13: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_2 != 0) {
+                if __ci_expr_logic_2 {
                     return 0
                 }
 
@@ -1736,6 +1740,7 @@ fn convert_glob_char_in_class(__param_class_index: i32, __param_c: u8) -> i32 {
 
 }
 
+// contract: unproved:0:out-parameter read before the write,unproved:1:read only,unproved:2:out-parameter a return before the write
 unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern_end: *const u8, __param_out: *mut pcre2_output_context, __param_utf: i32, __param_separator: u8, __param_with_escape: i32, __param_escape: u8, __param_no_wildsep: i32) -> i32 {
     var __local_is_negative: i32 = ((0 as i32))
 
@@ -1758,7 +1763,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
 
 
-    if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+    if (__local_pattern >= __param_pattern_end) {
         ((*__param_from) = __local_pattern)
 
         return 106
@@ -1767,16 +1772,16 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
     var __ci_expr_logic_0: i32
 
-    if ((if (*__local_pattern) == 33: 1 else: 0) != 0) {
+    if ((*__local_pattern) == 33) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*__local_pattern) == 94: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__local_pattern) == 94: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__local_pattern = __local_pattern + 1)
 
-        if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+        if (__local_pattern >= __param_pattern_end) {
             ((*__param_from) = __local_pattern)
 
             return 106
@@ -1791,8 +1796,8 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
         (__local_len = ((2 as i32)))
 
-        if ((if not (__param_no_wildsep != 0): 1 else: 0) != 0) {
-            if (__param_with_escape != 0) {
+        if (not __param_no_wildsep) {
+            if __param_with_escape {
                 ((*__param_out).out_str[__local_len] = ((92 as u8)))
 
                 (__local_len = __local_len + 1)
@@ -1814,7 +1819,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
     (__local_prev_c = ((0 as u32)))
 
-    if ((if (*__local_pattern) == 93: 1 else: 0) != 0) {
+    if ((*__local_pattern) == 93) {
         ((*__param_out).out_str[0] = ((92 as u8)))
 
         ((*__param_out).out_str[1] = ((93 as u8)))
@@ -1829,7 +1834,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
     }
 
-    while ((if __local_pattern < __param_pattern_end: 1 else: 0) != 0) {
+    while (__local_pattern < __param_pattern_end) {
         (__local_char_start = __local_pattern)
 
         var __ci_expr_old_1: *const u8 = __local_pattern
@@ -1841,12 +1846,12 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
         var __ci_expr_logic_2: i32 = 0
 
-        if (__param_utf != 0) {
-            (__ci_expr_logic_2 = (if (if __local_c >= 192: 1 else: 0) != 0: 1 else: 0))
+        if __param_utf {
+            (__ci_expr_logic_2 = (if __local_c >= 192: 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
-            if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+        if __ci_expr_logic_2 {
+            if (((__local_c as u32) & (32 as u32)) == 0) {
                 var __ci_expr_old_3: *const u8 = __local_pattern
 
                 (__local_pattern = __local_pattern + 1)
@@ -1854,19 +1859,19 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                 (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_3) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
             } else {
-                if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                if (((__local_c as u32) & (16 as u32)) == 0) {
                     (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                     (__local_pattern = __local_pattern + ((2 as isize) as usize))
 
                 } else {
-                    if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                    if (((__local_c as u32) & (8 as u32)) == 0) {
                         (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                         (__local_pattern = __local_pattern + ((3 as isize) as usize))
 
                     } else {
-                        if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_c as u32) & (4 as u32)) == 0) {
                             (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                             (__local_pattern = __local_pattern + ((4 as isize) as usize))
@@ -1886,22 +1891,22 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
 
 
-        if ((if __local_c == 93: 1 else: 0) != 0) {
+        if (__local_c == 93) {
             convert_glob_write(__param_out, (__local_c as u8))
 
             var __ci_expr_logic_5: i32 = 0
 
             var __ci_expr_logic_4: i32 = 0
 
-            if ((if not (__local_is_negative != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_4 = (if (if not (__param_no_wildsep != 0): 1 else: 0) != 0: 1 else: 0))
+            if (not __local_is_negative) {
+                (__ci_expr_logic_4 = (if not __param_no_wildsep: 1 else: 0))
             }
 
-            if (__ci_expr_logic_4 != 0) {
-                (__ci_expr_logic_5 = (if __local_separator_seen != 0: 1 else: 0))
+            if __ci_expr_logic_4 {
+                (__ci_expr_logic_5 = (if __local_separator_seen: 1 else: 0))
             }
 
-            if (__ci_expr_logic_5 != 0) {
+            if __ci_expr_logic_5 {
                 ((*__param_out).out_str[0] = ((40 as u8)))
 
                 ((*__param_out).out_str[1] = ((63 as u8)))
@@ -1925,22 +1930,22 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
         }
 
-        if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+        if (__local_pattern >= __param_pattern_end) {
             break
         }
 
         var __ci_expr_logic_6: i32 = 0
 
-        if ((if __local_c == 91: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if (*__local_pattern) == 58: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c == 91) {
+            (__ci_expr_logic_6 = (if (*__local_pattern) == 58: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if __ci_expr_logic_6 {
             ((*__param_from) = __local_pattern)
 
             (__local_class_index = ((convert_glob_parse_class(__param_from, __param_pattern_end, __param_out) as i32)))
 
-            if ((if __local_class_index != 0: 1 else: 0) != 0) {
+            if (__local_class_index != 0) {
                 (__local_pattern = (*__param_from))
 
                 (__local_has_prev_c = ((0 as i32)))
@@ -1949,11 +1954,11 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
                 var __ci_expr_logic_7: i32 = 0
 
-                if ((if not (__local_is_negative != 0): 1 else: 0) != 0) {
-                    (__ci_expr_logic_7 = (if convert_glob_char_in_class(__local_class_index, __param_separator) != 0: 1 else: 0))
+                if (not __local_is_negative) {
+                    (__ci_expr_logic_7 = (if convert_glob_char_in_class(__local_class_index, __param_separator): 1 else: 0))
                 }
 
-                if (__ci_expr_logic_7 != 0) {
+                if __ci_expr_logic_7 {
                     (__local_separator_seen = ((1 as i32)))
                 }
 
@@ -1967,15 +1972,15 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
             var __ci_expr_logic_8: i32 = 0
 
-            if ((if __local_c == 45: 1 else: 0) != 0) {
-                (__ci_expr_logic_8 = (if __local_has_prev_c != 0: 1 else: 0))
+            if (__local_c == 45) {
+                (__ci_expr_logic_8 = (if __local_has_prev_c: 1 else: 0))
             }
 
-            if (__ci_expr_logic_8 != 0) {
-                (__ci_expr_logic_9 = (if (if (*__local_pattern) != 93: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_8 {
+                (__ci_expr_logic_9 = (if (*__local_pattern) != 93: 1 else: 0))
             }
 
-            if (__ci_expr_logic_9 != 0) {
+            if __ci_expr_logic_9 {
                 convert_glob_write(__param_out, (45 as u8))
 
                 (__local_char_start = __local_pattern)
@@ -1989,12 +1994,12 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
                 var __ci_expr_logic_11: i32 = 0
 
-                if (__param_utf != 0) {
-                    (__ci_expr_logic_11 = (if (if __local_c >= 192: 1 else: 0) != 0: 1 else: 0))
+                if __param_utf {
+                    (__ci_expr_logic_11 = (if __local_c >= 192: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_11 != 0) {
-                    if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+                if __ci_expr_logic_11 {
+                    if (((__local_c as u32) & (32 as u32)) == 0) {
                         var __ci_expr_old_12: *const u8 = __local_pattern
 
                         (__local_pattern = __local_pattern + 1)
@@ -2002,19 +2007,19 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                         (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_12) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                     } else {
-                        if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_c as u32) & (16 as u32)) == 0) {
                             (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                             (__local_pattern = __local_pattern + ((2 as isize) as usize))
 
                         } else {
-                            if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                            if (((__local_c as u32) & (8 as u32)) == 0) {
                                 (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                 (__local_pattern = __local_pattern + ((3 as isize) as usize))
 
                             } else {
-                                if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                                if (((__local_c as u32) & (4 as u32)) == 0) {
                                     (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                     (__local_pattern = __local_pattern + ((4 as isize) as usize))
@@ -2034,17 +2039,17 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
 
 
-                if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+                if (__local_pattern >= __param_pattern_end) {
                     break
                 }
 
                 var __ci_expr_logic_13: i32 = 0
 
-                if ((if __param_escape != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_13 = (if (if __local_c == __param_escape: 1 else: 0) != 0: 1 else: 0))
+                if (__param_escape != 0) {
+                    (__ci_expr_logic_13 = (if __local_c == __param_escape: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_13 != 0) {
+                if __ci_expr_logic_13 {
                     (__local_char_start = __local_pattern)
 
                     var __ci_expr_old_14: *const u8 = __local_pattern
@@ -2056,12 +2061,12 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
                     var __ci_expr_logic_15: i32 = 0
 
-                    if (__param_utf != 0) {
-                        (__ci_expr_logic_15 = (if (if __local_c >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __param_utf {
+                        (__ci_expr_logic_15 = (if __local_c >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_15 != 0) {
-                        if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+                    if __ci_expr_logic_15 {
+                        if (((__local_c as u32) & (32 as u32)) == 0) {
                             var __ci_expr_old_16: *const u8 = __local_pattern
 
                             (__local_pattern = __local_pattern + 1)
@@ -2069,19 +2074,19 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                             (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_16) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                         } else {
-                            if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                            if (((__local_c as u32) & (16 as u32)) == 0) {
                                 (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                 (__local_pattern = __local_pattern + ((2 as isize) as usize))
 
                             } else {
-                                if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                                if (((__local_c as u32) & (8 as u32)) == 0) {
                                     (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                     (__local_pattern = __local_pattern + ((3 as isize) as usize))
 
                                 } else {
-                                    if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                                    if (((__local_c as u32) & (4 as u32)) == 0) {
                                         (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                         (__local_pattern = __local_pattern + ((4 as isize) as usize))
@@ -2104,11 +2109,11 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                 } else {
                     var __ci_expr_logic_17: i32 = 0
 
-                    if ((if __local_c == 91: 1 else: 0) != 0) {
-                        (__ci_expr_logic_17 = (if (if (*__local_pattern) == 58: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 91) {
+                        (__ci_expr_logic_17 = (if (*__local_pattern) == 58: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_17 != 0) {
+                    if __ci_expr_logic_17 {
                         ((*__param_from) = __local_pattern)
 
                         return -64
@@ -2118,7 +2123,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                 }
 
 
-                if ((if __local_prev_c > __local_c: 1 else: 0) != 0) {
+                if (__local_prev_c > __local_c) {
                     ((*__param_from) = __local_pattern)
 
                     return -64
@@ -2127,11 +2132,11 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
                 var __ci_expr_logic_18: i32 = 0
 
-                if ((if __local_prev_c < __param_separator: 1 else: 0) != 0) {
-                    (__ci_expr_logic_18 = (if (if __param_separator < __local_c: 1 else: 0) != 0: 1 else: 0))
+                if (__local_prev_c < __param_separator) {
+                    (__ci_expr_logic_18 = (if __param_separator < __local_c: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_18 != 0) {
+                if __ci_expr_logic_18 {
                     (__local_separator_seen = ((1 as i32)))
                 }
 
@@ -2143,11 +2148,11 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
             } else {
                 var __ci_expr_logic_19: i32 = 0
 
-                if ((if __param_escape != 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_19 = (if (if __local_c == __param_escape: 1 else: 0) != 0: 1 else: 0))
+                if (__param_escape != 0) {
+                    (__ci_expr_logic_19 = (if __local_c == __param_escape: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_19 != 0) {
+                if __ci_expr_logic_19 {
                     (__local_char_start = __local_pattern)
 
                     var __ci_expr_old_20: *const u8 = __local_pattern
@@ -2159,12 +2164,12 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
                     var __ci_expr_logic_21: i32 = 0
 
-                    if (__param_utf != 0) {
-                        (__ci_expr_logic_21 = (if (if __local_c >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __param_utf {
+                        (__ci_expr_logic_21 = (if __local_c >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_21 != 0) {
-                        if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+                    if __ci_expr_logic_21 {
+                        if (((__local_c as u32) & (32 as u32)) == 0) {
                             var __ci_expr_old_22: *const u8 = __local_pattern
 
                             (__local_pattern = __local_pattern + 1)
@@ -2172,19 +2177,19 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
                             (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_22) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                         } else {
-                            if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                            if (((__local_c as u32) & (16 as u32)) == 0) {
                                 (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                 (__local_pattern = __local_pattern + ((2 as isize) as usize))
 
                             } else {
-                                if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                                if (((__local_c as u32) & (8 as u32)) == 0) {
                                     (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                     (__local_pattern = __local_pattern + ((3 as isize) as usize))
 
                                 } else {
-                                    if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                                    if (((__local_c as u32) & (4 as u32)) == 0) {
                                         (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_pattern) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_pattern[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_pattern[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_pattern[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                         (__local_pattern = __local_pattern + ((4 as isize) as usize))
@@ -2204,7 +2209,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
 
 
-                    if ((if __local_pattern >= __param_pattern_end: 1 else: 0) != 0) {
+                    if (__local_pattern >= __param_pattern_end) {
                         break
                     }
 
@@ -2226,30 +2231,30 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
         var __ci_expr_logic_23: i32
 
-        if ((if __local_c == 91: 1 else: 0) != 0) {
+        if (__local_c == 91) {
             (__ci_expr_logic_23 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_23 = (if (if __local_c == 93: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_23 = (if __local_c == 93: 1 else: 0))
         }
 
-        if (__ci_expr_logic_23 != 0) {
+        if __ci_expr_logic_23 {
             (__ci_expr_logic_24 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_24 = (if (if __local_c == 92: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_24 = (if __local_c == 92: 1 else: 0))
         }
 
-        if (__ci_expr_logic_24 != 0) {
+        if __ci_expr_logic_24 {
             (__ci_expr_logic_25 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_25 = (if (if __local_c == 45: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_25 = (if __local_c == 45: 1 else: 0))
         }
 
-        if (__ci_expr_logic_25 != 0) {
+        if __ci_expr_logic_25 {
             convert_glob_write(__param_out, (92 as u8))
         }
 
 
-        if ((if __local_c == __param_separator: 1 else: 0) != 0) {
+        if (__local_c == __param_separator) {
             (__local_separator_seen = ((1 as i32)))
         }
 
@@ -2260,7 +2265,7 @@ unsafe fn convert_glob_parse_range(__param_from: *mut *const u8, __param_pattern
 
             convert_glob_write(__param_out, (*__ci_expr_old_26))
 
-            if not (((if __local_char_start < __local_pattern: 1 else: 0) != 0)) {
+            if not ((__local_char_start < __local_pattern)) {
                 break
             }
         }
@@ -2296,6 +2301,7 @@ unsafe fn convert_glob_print_commit(__param_out: *mut pcre2_output_context) {
 
 }
 
+// contract: unproved:1:read only,stored-unknown:4,unproved:6:out-parameter written conditionally,unproved:8:read only — stores an argument; ownership not modeled
 unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param_plength: u64, __param_utf: i32, __param_use_buffer: *mut u8, __param_use_length: u64, __param_bufflenptr: *mut u64, __param_dummyrun: i32, __param_ccontext: *mut pcre2_real_convert_context_8) -> i32 {
     var __local_pattern = __param_pattern
     var __local_out: pcre2_output_context
@@ -2332,20 +2338,20 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
     var __ci_expr_logic_1: i32 = 0
 
-    if (__param_utf != 0) {
+    if __param_utf {
         var __ci_expr_logic_0: i32
 
-        if ((if __local_separator >= 128: 1 else: 0) != 0) {
+        if (__local_separator >= 128) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if __local_escape >= 128: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if __local_escape >= 128: 1 else: 0))
         }
 
-        (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __ci_expr_logic_0: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         ((*__param_bufflenptr) = ((0 as u64)))
 
         return -64
@@ -2375,27 +2381,27 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __local_pattern < __local_pattern_end: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if (__local_pattern[0]) == 42: 1 else: 0) != 0: 1 else: 0))
+    if (__local_pattern < __local_pattern_end) {
+        (__ci_expr_logic_2 = (if (__local_pattern[0]) == 42: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
-        if (__local_no_wildsep != 0) {
+    if __ci_expr_logic_2 {
+        if __local_no_wildsep {
             (__local_is_start = ((0 as i32)))
         } else {
             var __ci_expr_logic_4: i32 = 0
 
             var __ci_expr_logic_3: i32 = 0
 
-            if ((if not (__local_no_starstar != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if (__local_pattern + ((1 as isize) as usize)) < __local_pattern_end: 1 else: 0) != 0: 1 else: 0))
+            if (not __local_no_starstar) {
+                (__ci_expr_logic_3 = (if (__local_pattern + ((1 as isize) as usize)) < __local_pattern_end: 1 else: 0))
             }
 
-            if (__ci_expr_logic_3 != 0) {
-                (__ci_expr_logic_4 = (if (if (__local_pattern[1]) == 42: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_3 {
+                (__ci_expr_logic_4 = (if (__local_pattern[1]) == 42: 1 else: 0))
             }
 
-            if (__ci_expr_logic_4 != 0) {
+            if __ci_expr_logic_4 {
                 (__local_is_start = ((0 as i32)))
             }
 
@@ -2404,7 +2410,7 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
     }
 
 
-    if (__local_is_start != 0) {
+    if __local_is_start {
         (__local_out.out_str[0] = ((92 as u8)))
 
         (__local_out.out_str[1] = ((65 as u8)))
@@ -2413,7 +2419,7 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
     }
 
-    while ((if __local_pattern < __local_pattern_end: 1 else: 0) != 0) {
+    while (__local_pattern < __local_pattern_end) {
         var __ci_expr_old_5: *const u8 = __local_pattern
 
         (__local_pattern = __local_pattern + 1)
@@ -2421,10 +2427,10 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
         (__local_c = (*__ci_expr_old_5))
 
 
-        if ((if __local_c == 42: 1 else: 0) != 0) {
+        if (__local_c == 42) {
             (__local_is_start = (((if __local_pattern == (__local_pattern_start + ((1 as isize) as usize)): 1 else: 0) as i32)))
 
-            if (__local_in_atomic != 0) {
+            if __local_in_atomic {
                 convert_glob_write((&raw mut __local_out as *mut pcre2_output_context), (41 as u8))
 
                 (__local_in_atomic = ((0 as i32)))
@@ -2435,21 +2441,21 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
             var __ci_expr_logic_6: i32 = 0
 
-            if ((if not (__local_no_starstar != 0): 1 else: 0) != 0) {
-                (__ci_expr_logic_6 = (if (if __local_pattern < __local_pattern_end: 1 else: 0) != 0: 1 else: 0))
+            if (not __local_no_starstar) {
+                (__ci_expr_logic_6 = (if __local_pattern < __local_pattern_end: 1 else: 0))
             }
 
-            if (__ci_expr_logic_6 != 0) {
-                (__ci_expr_logic_7 = (if (if (*__local_pattern) == 42: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_6 {
+                (__ci_expr_logic_7 = (if (*__local_pattern) == 42: 1 else: 0))
             }
 
-            if (__ci_expr_logic_7 != 0) {
+            if __ci_expr_logic_7 {
                 var __ci_expr_logic_8: i32
 
-                if (__local_is_start != 0) {
+                if __local_is_start {
                     (__ci_expr_logic_8 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_8 = (if (if (__local_pattern[-2]) == __local_separator: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_8 = (if (__local_pattern[-2]) == __local_separator: 1 else: 0))
                 }
 
                 (__local_after_separator = __ci_expr_logic_8)
@@ -2459,16 +2465,16 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
                     (__local_pattern = __local_pattern + 1)
                     var __ci_expr_logic_9: i32 = 0
 
-                    if ((if __local_pattern < __local_pattern_end: 1 else: 0) != 0) {
-                        (__ci_expr_logic_9 = (if (if (*__local_pattern) == 42: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_pattern < __local_pattern_end) {
+                        (__ci_expr_logic_9 = (if (*__local_pattern) == 42: 1 else: 0))
                     }
 
-                    if not ((__ci_expr_logic_9 != 0)) {
+                    if not (__ci_expr_logic_9) {
                         break
                     }
                 }
 
-                if ((if __local_pattern >= __local_pattern_end: 1 else: 0) != 0) {
+                if (__local_pattern >= __local_pattern_end) {
                     (__local_no_slash_z = ((1 as i32)))
 
                     break
@@ -2485,29 +2491,29 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
                 var __ci_expr_logic_10: i32 = 0
 
-                if (__local_after_separator != 0) {
-                    (__ci_expr_logic_10 = (if (if __local_escape != 0: 1 else: 0) != 0: 1 else: 0))
+                if __local_after_separator {
+                    (__ci_expr_logic_10 = (if __local_escape != 0: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_10 != 0) {
-                    (__ci_expr_logic_11 = (if (if (*__local_pattern) == __local_escape: 1 else: 0) != 0: 1 else: 0))
+                if __ci_expr_logic_10 {
+                    (__ci_expr_logic_11 = (if (*__local_pattern) == __local_escape: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_11 != 0) {
-                    (__ci_expr_logic_12 = (if (if (__local_pattern + ((1 as isize) as usize)) < __local_pattern_end: 1 else: 0) != 0: 1 else: 0))
+                if __ci_expr_logic_11 {
+                    (__ci_expr_logic_12 = (if (__local_pattern + ((1 as isize) as usize)) < __local_pattern_end: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_12 != 0) {
-                    (__ci_expr_logic_13 = (if (if (__local_pattern[1]) == __local_separator: 1 else: 0) != 0: 1 else: 0))
+                if __ci_expr_logic_12 {
+                    (__ci_expr_logic_13 = (if (__local_pattern[1]) == __local_separator: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_13 != 0) {
+                if __ci_expr_logic_13 {
                     (__local_pattern = __local_pattern + 1)
                 }
 
 
-                if (__local_is_start != 0) {
-                    if ((if (*__local_pattern) != __local_separator: 1 else: 0) != 0) {
+                if __local_is_start {
+                    if ((*__local_pattern) != __local_separator) {
                         continue
                     }
 
@@ -2539,13 +2545,13 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
                 var __ci_expr_logic_14: i32
 
-                if ((if not (__local_after_separator != 0): 1 else: 0) != 0) {
+                if (not __local_after_separator) {
                     (__ci_expr_logic_14 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_14 = (if (if (*__local_pattern) != __local_separator: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_14 = (if (*__local_pattern) != __local_separator: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_14 != 0) {
+                if __ci_expr_logic_14 {
                     (__local_out.out_str[0] = ((46 as u8)))
 
                     (__local_out.out_str[1] = ((42 as u8)))
@@ -2592,20 +2598,20 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
             var __ci_expr_logic_15: i32 = 0
 
-            if ((if __local_pattern < __local_pattern_end: 1 else: 0) != 0) {
-                (__ci_expr_logic_15 = (if (if (*__local_pattern) == 42: 1 else: 0) != 0: 1 else: 0))
+            if (__local_pattern < __local_pattern_end) {
+                (__ci_expr_logic_15 = (if (*__local_pattern) == 42: 1 else: 0))
             }
 
-            if (__ci_expr_logic_15 != 0) {
+            if __ci_expr_logic_15 {
                 loop {
                     (__local_pattern = __local_pattern + 1)
                     var __ci_expr_logic_16: i32 = 0
 
-                    if ((if __local_pattern < __local_pattern_end: 1 else: 0) != 0) {
-                        (__ci_expr_logic_16 = (if (if (*__local_pattern) == 42: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_pattern < __local_pattern_end) {
+                        (__ci_expr_logic_16 = (if (*__local_pattern) == 42: 1 else: 0))
                     }
 
-                    if not ((__ci_expr_logic_16 != 0)) {
+                    if not (__ci_expr_logic_16) {
                         break
                     }
                 }
@@ -2613,22 +2619,22 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
             }
 
 
-            if (__local_no_wildsep != 0) {
-                if ((if __local_pattern >= __local_pattern_end: 1 else: 0) != 0) {
+            if __local_no_wildsep {
+                if (__local_pattern >= __local_pattern_end) {
                     (__local_no_slash_z = ((1 as i32)))
 
                     break
 
                 }
 
-                if (__local_is_start != 0) {
+                if __local_is_start {
                     continue
                 }
 
             }
 
-            if ((if not (__local_is_start != 0): 1 else: 0) != 0) {
-                if (__local_after_starstar != 0) {
+            if (not __local_is_start) {
+                if __local_after_starstar {
                     (__local_out.out_str[0] = ((40 as u8)))
 
                     (__local_out.out_str[1] = ((63 as u8)))
@@ -2645,7 +2651,7 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
             }
 
-            if (__local_no_wildsep != 0) {
+            if __local_no_wildsep {
                 convert_glob_write((&raw mut __local_out as *mut pcre2_output_context), (46 as u8))
             } else {
                 convert_glob_print_wildcard((&raw mut __local_out as *mut pcre2_output_context), __local_separator, __local_with_escape)
@@ -2655,7 +2661,7 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
             (__local_out.out_str[1] = ((63 as u8)))
 
-            if ((if __local_pattern >= __local_pattern_end: 1 else: 0) != 0) {
+            if (__local_pattern >= __local_pattern_end) {
                 (__local_out.out_str[1] = ((43 as u8)))
             }
 
@@ -2665,8 +2671,8 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         }
 
-        if ((if __local_c == 63: 1 else: 0) != 0) {
-            if (__local_no_wildsep != 0) {
+        if (__local_c == 63) {
+            if __local_no_wildsep {
                 convert_glob_write((&raw mut __local_out as *mut pcre2_output_context), (46 as u8))
             } else {
                 convert_glob_print_wildcard((&raw mut __local_out as *mut pcre2_output_context), __local_separator, __local_with_escape)
@@ -2676,10 +2682,10 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         }
 
-        if ((if __local_c == 91: 1 else: 0) != 0) {
+        if (__local_c == 91) {
             (__local_result = ((convert_glob_parse_range((&raw mut __local_pattern as *mut *const u8), __local_pattern_end, (&raw mut __local_out as *mut pcre2_output_context), __param_utf, __local_separator, __local_with_escape, __local_escape, __local_no_wildsep) as i32)))
 
-            if ((if __local_result != 0: 1 else: 0) != 0) {
+            if (__local_result != 0) {
                 break
             }
 
@@ -2689,12 +2695,12 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         var __ci_expr_logic_17: i32 = 0
 
-        if ((if __local_escape != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if __local_c == __local_escape: 1 else: 0) != 0: 1 else: 0))
+        if (__local_escape != 0) {
+            (__ci_expr_logic_17 = (if __local_c == __local_escape: 1 else: 0))
         }
 
-        if (__ci_expr_logic_17 != 0) {
-            if ((if __local_pattern >= __local_pattern_end: 1 else: 0) != 0) {
+        if __ci_expr_logic_17 {
+            if (__local_pattern >= __local_pattern_end) {
                 (__local_result = ((-64 as i32)))
 
                 break
@@ -2713,11 +2719,11 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         var __ci_expr_logic_19: i32 = 0
 
-        if ((if __local_c < 255: 1 else: 0) != 0) {
-            (__ci_expr_logic_19 = (if (if strchr(pcre2_escaped_literals, (__local_c as i32)) != null: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c < 255) {
+            (__ci_expr_logic_19 = (if strchr(pcre2_escaped_literals, (__local_c as i32)) != null: 1 else: 0))
         }
 
-        if (__ci_expr_logic_19 != 0) {
+        if __ci_expr_logic_19 {
             convert_glob_write((&raw mut __local_out as *mut pcre2_output_context), (92 as u8))
         }
 
@@ -2726,8 +2732,8 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
     }
 
-    if ((if __local_result == 0: 1 else: 0) != 0) {
-        if ((if not (__local_no_slash_z != 0): 1 else: 0) != 0) {
+    if (__local_result == 0) {
+        if (not __local_no_slash_z) {
             (__local_out.out_str[0] = ((92 as u8)))
 
             (__local_out.out_str[1] = ((122 as u8)))
@@ -2736,7 +2742,7 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         }
 
-        if (__local_in_atomic != 0) {
+        if __local_in_atomic {
             convert_glob_write((&raw mut __local_out as *mut pcre2_output_context), (41 as u8))
         }
 
@@ -2744,18 +2750,18 @@ unsafe fn convert_glob(__param_options: u32, __param_pattern: *const u8, __param
 
         var __ci_expr_logic_20: i32 = 0
 
-        if ((if not (__param_dummyrun != 0): 1 else: 0) != 0) {
-            (__ci_expr_logic_20 = (if (if (*(&raw const __local_out as *const pcre2_output_context)).output_size != (((((((*(&raw const __local_out as *const pcre2_output_context)).output as usize) -% (__param_use_buffer as usize)) as i64) / (sizeof[u8]() as i64)) as u64)): 1 else: 0) != 0: 1 else: 0))
+        if (not __param_dummyrun) {
+            (__ci_expr_logic_20 = (if (*(&raw const __local_out as *const pcre2_output_context)).output_size != (((((((*(&raw const __local_out as *const pcre2_output_context)).output as usize) -% (__param_use_buffer as usize)) as i64) / (sizeof[u8]() as i64)) as u64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_20 != 0) {
+        if __ci_expr_logic_20 {
             (__local_result = ((-48 as i32)))
         }
 
 
     }
 
-    if ((if __local_result != 0: 1 else: 0) != 0) {
+    if (__local_result != 0) {
         ((*__param_bufflenptr) = ((((((__local_pattern as usize) -% (__local_pattern_start as usize)) as i64) / (sizeof[u8]() as i64)) as u64)))
 
         return __local_result

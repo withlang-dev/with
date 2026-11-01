@@ -29,7 +29,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+    while (__local_len >= ((sizeof[u64]() as i64))) {
         with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         (__local_h = (__local_h as u64) ^ (__local_block as u64))
@@ -47,7 +47,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
         (__local_len = __local_len - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -97,7 +97,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
     var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    while ((*__local_msg) != 0) {
+    while (*__local_msg) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
@@ -117,7 +117,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
         ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
@@ -155,11 +155,11 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
-    if ((if __param_nlen == 0: 1 else: 0) != 0) {
+    if (__param_nlen == 0) {
         return ((__local_str as *mut c_char))
     }
 
-    if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
+    if (__param_nlen > __local_slen) {
         return ((null as *mut c_char))
     }
 
@@ -168,11 +168,11 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
     loop {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_str) == (*__param_needle)) {
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return ((__local_str as *mut c_char))
         }
 
@@ -183,7 +183,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
         (__local_slen = __local_slen - 1)
 
-        if not ((__ci_expr_old_0 != 0)) {
+        if not (__ci_expr_old_0) {
             break
         }
     }
@@ -196,7 +196,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 unsafe fn IVec_drop(__param_cself: *const IVec) {
     var __local_self_: *mut IVec = ((__param_cself as *mut IVec))
 
-    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+    if ((*__local_self_).data == null) {
         return
     }
 
@@ -214,7 +214,7 @@ unsafe fn IVec_clear(__param_self_: *mut IVec) {
 
         (__local_i = __local_i - 1)
 
-        if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+        if (not (__ci_expr_old_0 != 0)) {
             break
         }
 
@@ -225,12 +225,12 @@ unsafe fn IVec_clear(__param_self_: *mut IVec) {
 }
 
 unsafe fn IVec_reserve(__param_self_: *mut IVec, __param_cap: i64) -> bool {
-    var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (*__param_self_).size else: __param_cap) as i64))
+    var __local_n: i64 = (((if __param_cap == 9223372036854775807: (*__param_self_).size else: __param_cap) as i64))
 
-    if ((((if __param_cap > (*__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as i32)) != 0) {
-        var __local_d: *mut i32 = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (((*__param_self_).capacity * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
+    if (((if __param_cap > (*__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (*__param_self_).capacity: 1 else: 0) as i32)) {
+        var __local_d: *mut i32 = (((with_realloc((((*__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (((*__param_self_).capacity * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
 
-        if ((if __local_d == null: 1 else: 0) != 0) {
+        if (__local_d == null) {
             return ((false as bool))
         }
 
@@ -245,7 +245,7 @@ unsafe fn IVec_reserve(__param_self_: *mut IVec, __param_cap: i64) -> bool {
 }
 
 unsafe fn IVec_resize(__param_self_: *mut IVec, __param_len: i64, __param_null_: i32) -> bool {
-    if ((if not IVec_reserve(__param_self_, __param_len): 1 else: 0) != 0) {
+    if (not IVec_reserve(__param_self_, __param_len)) {
         return ((false as bool))
     }
 
@@ -253,7 +253,7 @@ unsafe fn IVec_resize(__param_self_: *mut IVec, __param_len: i64, __param_null_:
 
     var __local_i: i64 = __param_len
 
-    while ((if __local_i < __local_n: 1 else: 0) != 0) {
+    while (__local_i < __local_n) {
 
 
         (__local_i = __local_i + 1)
@@ -263,7 +263,7 @@ unsafe fn IVec_resize(__param_self_: *mut IVec, __param_len: i64, __param_null_:
 
     var __local_i_1: i64 = __local_n
 
-    while ((if __local_i_1 < __param_len: 1 else: 0) != 0) {
+    while (__local_i_1 < __param_len) {
         (((*__param_self_).data[__local_i_1]) = __param_null_)
 
         (__local_i_1 = __local_i_1 + 1)
@@ -278,7 +278,7 @@ unsafe fn IVec_resize(__param_self_: *mut IVec, __param_len: i64, __param_null_:
 }
 
 unsafe fn IVec_erase_n(__param_self_: *mut IVec, __param_idx: i64, __param_len: i64) -> IVec_iter {
-    if (((if not ((if (__param_idx + __param_len) <= (*__param_self_).size: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((__param_idx + __param_len) <= (*__param_self_).size): 1 else: 0) as i64) {
         __assert_rtn(c"IVec_erase_n".ptr, c"vec.h".ptr, (337 as i32), c"idx + len <= self->size".ptr)
     } else {
         0
@@ -293,7 +293,7 @@ unsafe fn IVec_erase_n(__param_self_: *mut IVec, __param_idx: i64, __param_len: 
 
     var __local_i: i64 = ((0 as i64))
 
-    while ((if __local_i < __param_len: 1 else: 0) != 0) {
+    while (__local_i < __param_len) {
 
 
         (__local_i = __local_i + 1)
@@ -313,15 +313,15 @@ unsafe fn IVec_erase_n(__param_self_: *mut IVec, __param_idx: i64, __param_len: 
 }
 
 unsafe fn IVec_insert_uninit(__param_self_: *mut IVec, __param_idx: i64, __param_n: i64) -> IVec_iter {
-    if ((if ((*__param_self_).size + __param_n) >= (*__param_self_).capacity: 1 else: 0) != 0) {
-        if ((if not IVec_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + __param_n) as i64)): 1 else: 0) != 0) {
+    if (((*__param_self_).size + __param_n) >= (*__param_self_).capacity) {
+        if (not IVec_reserve(__param_self_, (((((*__param_self_).size * 3) / 2) + __param_n) as i64))) {
             return (*(__param_self_ as *const IVec)).end()
         }
     }
 
     var __local_pos: *mut i32 = ((*__param_self_).data + ((__param_idx as i64) as usize))
 
-    with_memmove((((__local_pos + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), ((__local_pos as *const c_void) as *const u8), (((if 1 != 0: ((((*__param_self_).size - __param_idx) * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+    with_memmove((((__local_pos + ((__param_n as i64) as usize)) as *mut c_void) as *mut u8), ((__local_pos as *const c_void) as *const u8), (((if true: ((((*__param_self_).size - __param_idx) * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
 
     ((*__param_self_).size = (*__param_self_).size + __param_n)
 
@@ -335,9 +335,9 @@ unsafe fn IVec_find_in(__param_self_: *const IVec, __param_i1: IVec_iter, __para
         var __ci_expr_ternary_1: *mut i32 = null
         var __ci_expr_logic_0: i32 = 0
         if ((*(&raw const __param_i1 as *const IVec_iter)).ref != null) {
-            (__ci_expr_logic_0 = (if (if not ((*(&raw const __param_i2 as *const IVec_iter)).ref != null): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if not ((*(&raw const __param_i2 as *const IVec_iter)).ref != null): 1 else: 0))
         }
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__ci_expr_ternary_1 = (*(&raw const __param_i1 as *const IVec_iter)).end)
         } else {
             (__ci_expr_ternary_1 = (*(&raw const __param_i2 as *const IVec_iter)).ref)
@@ -345,10 +345,10 @@ unsafe fn IVec_find_in(__param_self_: *const IVec, __param_i1: IVec_iter, __para
         (__ci_expr_ternary_1 as *const i32)
     }
 
-    while ((if (*(&raw const __param_i1 as *const IVec_iter)).ref != __local_p2: 1 else: 0) != 0) {
+    while ((*(&raw const __param_i1 as *const IVec_iter)).ref != __local_p2) {
         var __local_r: i32 = (*((*(&raw const __param_i1 as *const IVec_iter)).ref))
 
-        if ((if (*(&raw mut __param_raw as *mut i32)) == (*(&raw const __local_r as *const i32)): 1 else: 0) != 0) {
+        if ((*(&raw mut __param_raw as *mut i32)) == (*(&raw const __local_r as *const i32))) {
             return __param_i1
         }
 
@@ -377,7 +377,7 @@ pub unsafe fn IVec_put_n(__param_self_: *mut IVec, __param_raw: *const i32, __pa
 
         (__local_n = __local_n - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -391,7 +391,7 @@ pub unsafe fn IVec_put_n(__param_self_: *mut IVec, __param_raw: *const i32, __pa
 
 // contract: receiver-mut:IVec,unproved:1:read only
 unsafe fn IVec_copy(__param_self_: *mut IVec, __param_other: *const IVec) {
-    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+    if (__param_self_ == __param_other) {
         return
     }
 
@@ -406,7 +406,7 @@ unsafe fn IVec_copy(__param_self_: *mut IVec, __param_other: *const IVec) {
     var __local__c_end_i: i64 = (*__param_other).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         (((*__param_self_).data[__local_i]) = ((((*__param_other).data[__local_i]) as i32)))
 
         (__local_i = __local_i + 1)
@@ -427,7 +427,7 @@ unsafe fn IVec_copy_to(__param_self_: *mut IVec, __param_idx: i64, __param_arr: 
         var __local_q: *mut i32 = (__local_p + ((__param_n as i64) as usize))
 
 
-        while ((if __local_p != __local_q: 1 else: 0) != 0) {
+        while (__local_p != __local_q) {
             var __ci_expr_old_0: *mut i32 = __local_p
 
             (__local_p = __local_p + 1)
@@ -468,7 +468,7 @@ fn IVec_clone(__param_vec: IVec) -> IVec {
     var __local__c_end_i: i64 = (unsafe *(&raw const __param_vec as *const IVec)).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         ((unsafe __local_out.data[__local_i]) = (((unsafe (*(&raw const __param_vec as *const IVec)).data[__local_i]) as i32)))
 
         (__local_i = __local_i + 1)
@@ -516,14 +516,14 @@ pub fn IVec_init() -> IVec {
 }
 
 pub fn IVec_with_capacity(__param_cap: i64) -> IVec {
-    var __local_out: IVec = IVec { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
+    var __local_out: IVec = IVec { data: (((with_alloc((((if true: ((__param_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn IVec_with_size_uninit(__param_size: i64) -> IVec {
-    var __local_out: IVec = IVec { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
+    var __local_out: IVec = IVec { data: (((with_alloc((((if true: ((__param_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -531,9 +531,9 @@ pub fn IVec_with_size_uninit(__param_size: i64) -> IVec {
 
 pub fn IVec_with_size(__param_size: i64, __param_default_raw: i32) -> IVec {
     var __local_size = __param_size
-    var __local_out: IVec = IVec { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
+    var __local_out: IVec = IVec { data: (((with_alloc((((if true: ((__local_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
 
-    while (__local_size != 0) {
+    while __local_size {
         (__local_size = __local_size - 1)
 
         ((unsafe __local_out.data[__local_size]) = __param_default_raw)
@@ -559,7 +559,7 @@ pub unsafe fn IVec_insert_n(__param_self_: *mut IVec, __param_idx: i64, __param_
     var __local_it_: IVec_iter = IVec_insert_uninit(__param_self_, __param_idx, __param_n)
 
     if ((*(&raw const __local_it_ as *const IVec_iter)).ref != null) {
-        with_memcpy((((*(&raw const __local_it_ as *const IVec_iter)).ref as *mut c_void) as *mut u8), ((&(__param_arr[0]) as *mut i32) as *const u8), (((if 1 != 0: ((__param_n * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
+        with_memcpy((((*(&raw const __local_it_ as *const IVec_iter)).ref as *mut c_void) as *mut u8), ((&(__param_arr[0]) as *mut i32) as *const u8), (((if true: ((__param_n * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64))
     }
 
     return __local_it_
@@ -568,7 +568,7 @@ pub unsafe fn IVec_insert_n(__param_self_: *mut IVec, __param_idx: i64, __param_
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_at(__param_self_: *const IVec, __param_idx: i64) -> *const i32 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"IVec_at".ptr, c"vec.h".ptr, (206 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -580,7 +580,7 @@ pub unsafe fn IVec_at(__param_self_: *const IVec, __param_idx: i64) -> *const i3
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn IVec_at_mut(__param_self_: *mut IVec, __param_idx: i64) -> *mut i32 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"IVec_at_mut".ptr, c"vec.h".ptr, (210 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -593,7 +593,7 @@ pub unsafe fn IVec_at_mut(__param_self_: *mut IVec, __param_idx: i64) -> *mut i3
 pub fn IVec_advance(__param_it_: IVec_iter, __param_n: u64) -> IVec_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const IVec_iter)).ref + (__param_n as usize))
 
-    if ((if (unsafe *(&raw const __param_it_ as *const IVec_iter)).ref >= (unsafe *(&raw const __param_it_ as *const IVec_iter)).end: 1 else: 0) != 0) {
+    if ((unsafe *(&raw const __param_it_ as *const IVec_iter)).ref >= (unsafe *(&raw const __param_it_ as *const IVec_iter)).end) {
         (__param_it_.ref = ((null as *mut i32)))
     }
 
@@ -604,7 +604,7 @@ pub fn IVec_advance(__param_it_: IVec_iter, __param_n: u64) -> IVec_iter {
 
 // contract: receiver:IVec,unproved:1:read only
 pub unsafe fn IVec_eq(__param_self_: *const IVec, __param_other: *const IVec) -> bool {
-    return ((((with_memcmp((((*__param_self_).data as *const c_void) as *const u8), (((*__param_other).data as *const c_void) as *const u8), (((if 1 != 0: (((*__param_self_).size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) == 0)) as bool))
+    return ((((with_memcmp((((*__param_self_).data as *const c_void) as *const u8), (((*__param_other).data as *const c_void) as *const u8), (((if true: (((*__param_self_).size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) == 0)) as bool))
 
 }
 
@@ -614,7 +614,7 @@ impl Copy for ctest_vec_basics_run__c_i2_anon
 fn ctest_vec_basics_run() {
     var __local_d: IVec = with 0 as __ci_expr_seq_5 {
         var __ci_expr_lit_0: [i32; 12] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]
-        unsafe { IVec_from_n((&__ci_expr_lit_0[0] as *mut i32), (12 as i64)) }
+        unsafe { IVec_from_n((&__ci_expr_lit_0[0] as *mut i32), (([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].len() as u64) as i64)) }
     }
 
     assert_compare((1 as i32), c"==".ptr, (12 as i64), (unsafe { (*((&raw mut __local_d as *mut IVec) as *const IVec)).size() } as i64), c"vec_test.c".ptr, (9 as i32))
@@ -626,7 +626,7 @@ fn ctest_vec_basics_run() {
     var __local__c_end_i: i32 = ((9 as i32))
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         unsafe { (*(&raw mut __local_d as *mut IVec)).push_back(((__local_i * 10) as i32)) }
 
         (__local_i = __local_i + 1)
@@ -636,7 +636,7 @@ fn ctest_vec_basics_run() {
 
     var __local_res: IVec = with 0 as __ci_expr_seq_20 {
         var __ci_expr_lit_1: [i32; 14] = [6, 7, 8, 9, 10, 11, 12, 20, 30, 40, 50, 60, 70, 80]
-        unsafe { IVec_from_n((&__ci_expr_lit_1[0] as *mut i32), (14 as i64)) }
+        unsafe { IVec_from_n((&__ci_expr_lit_1[0] as *mut i32), (([6, 7, 8, 9, 10, 11, 12, 20, 30, 40, 50, 60, 70, 80].len() as u64) as i64)) }
     }
 
     assert_bool((1 as i32), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (16 as i32))
@@ -647,7 +647,7 @@ fn ctest_vec_basics_run() {
 
     var __ci_expr_lit_2: [i32; 10] = [6, 7, 8, 9, 10, 11, 12, 60, 70, 80]
 
-    unsafe { (*(&raw mut __local_res as *mut IVec)).take(unsafe { IVec_from_n((&__ci_expr_lit_2[0] as *mut i32), (10 as i64)) }) }
+    unsafe { (*(&raw mut __local_res as *mut IVec)).take(unsafe { IVec_from_n((&__ci_expr_lit_2[0] as *mut i32), (([6, 7, 8, 9, 10, 11, 12, 60, 70, 80].len() as u64) as i64)) }) }
 
 
     assert_bool((1 as i32), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (22 as i32))
@@ -658,7 +658,7 @@ fn ctest_vec_basics_run() {
 
     var __ci_expr_lit_3: [i32; 14] = [6, 7, 8, 9, 10, 11, 12, 200, 300, 400, 500, 60, 70, 80]
 
-    unsafe { (*(&raw mut __local_res as *mut IVec)).take(unsafe { IVec_from_n((&__ci_expr_lit_3[0] as *mut i32), (14 as i64)) }) }
+    unsafe { (*(&raw mut __local_res as *mut IVec)).take(unsafe { IVec_from_n((&__ci_expr_lit_3[0] as *mut i32), (([6, 7, 8, 9, 10, 11, 12, 200, 300, 400, 500, 60, 70, 80].len() as u64) as i64)) }) }
 
 
     assert_bool((1 as i32), (true as bool), (unsafe { IVec_eq(((&raw mut __local_res as *mut IVec) as *const IVec), ((&raw mut __local_d as *mut IVec) as *const IVec)) } as bool), c"vec_test.c".ptr, (28 as i32))
@@ -678,7 +678,7 @@ fn ctest_vec_basics_run() {
         __local__c_i2.size = (((((2 * (sizeof[usize]() as usize)) as u64) / (sizeof[IVec]() as u64))) as i32)
 
 
-        while ((if (unsafe *(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).index < (unsafe *(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).size: 1 else: 0) != 0) {
+        while ((unsafe *(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).index < (unsafe *(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).size) {
             unsafe { IVec_drop(((*((*(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).ref)) as *const IVec)) }
 
             (__local__c_i2.ref = (unsafe *(&raw const __local__c_i2 as *const ctest_vec_basics_run__c_i2_anon)).ref + 1)
@@ -689,7 +689,7 @@ fn ctest_vec_basics_run() {
         }
 
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -722,8 +722,8 @@ impl IVec {
 
     pub mut fn push(__param_value: i32) -> *mut i32 {
         let __param_self_: *mut IVec = self as *mut IVec
-        if ((if (unsafe *__param_self_).size == (unsafe *__param_self_).capacity: 1 else: 0) != 0) {
-            if ((if not unsafe { IVec_reserve(__param_self_, ((((*__param_self_).size * 2) + 4) as i64)) }: 1 else: 0) != 0) {
+        if ((unsafe *__param_self_).size == (unsafe *__param_self_).capacity) {
+            if (not unsafe { IVec_reserve(__param_self_, ((((*__param_self_).size * 2) + 4) as i64)) }) {
                 return ((null as *mut i32))
             }
         }
@@ -761,13 +761,13 @@ impl IVec {
 
     pub fn is_empty() -> bool {
         let __param_self_: *const IVec = self as *const IVec
-        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+        return ((((not (unsafe *__param_self_).size)) as bool))
 
     }
 
     pub mut fn pop() {
         let __param_self_: *mut IVec = self as *mut IVec
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"IVec_pop".ptr, c"vec.h".ptr, (151 as i32), c"self->size".ptr)
         } else {
             0
@@ -783,7 +783,7 @@ impl IVec {
 
     pub mut fn pull() -> i32 {
         let __param_self_: *mut IVec = self as *mut IVec
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"IVec_pull".ptr, c"vec.h".ptr, (153 as i32), c"self->size".ptr)
         } else {
             0
@@ -833,10 +833,10 @@ impl IVec {
         var __ci_expr_logic_0: i32 = 0
 
         if ((unsafe *(&raw const __param_i1 as *const IVec_iter)).ref != null) {
-            (__ci_expr_logic_0 = (if (if not ((unsafe *(&raw const __param_i2 as *const IVec_iter)).ref != null): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if not ((unsafe *(&raw const __param_i2 as *const IVec_iter)).ref != null): 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__ci_expr_ternary_1 = (unsafe *(&raw const __param_i1 as *const IVec_iter)).end)
         } else {
             (__ci_expr_ternary_1 = (unsafe *(&raw const __param_i2 as *const IVec_iter)).ref)
@@ -851,7 +851,7 @@ impl IVec {
         let __param_self_: *const IVec = self as *const IVec
         var __local_it_: IVec_iter = IVec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const IVec_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
         } else {
             (__local_it_.ref = ((null as *mut i32)))
@@ -865,7 +865,7 @@ impl IVec {
         let __param_self_: *const IVec = self as *const IVec
         var __local_it_: IVec_iter = IVec_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const IVec_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
 
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const IVec_iter)).end - ((1 as i64) as usize))
@@ -927,7 +927,7 @@ impl IVec_iter {
         let __param_it_: *mut IVec_iter = self as *mut IVec_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut i32)))
         }
 
@@ -938,7 +938,7 @@ impl IVec_iter {
         let __param_it_: *mut IVec_iter = self as *mut IVec_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref - 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut i32)))
         }
 

@@ -22,7 +22,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+    while (__local_len >= ((sizeof[u64]() as i64))) {
         with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         (__local_h = (__local_h as u64) ^ (__local_block as u64))
@@ -40,7 +40,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
         (__local_len = __local_len - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -90,7 +90,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
     var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    while ((*__local_msg) != 0) {
+    while (*__local_msg) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
@@ -110,7 +110,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
         ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
@@ -148,11 +148,11 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
-    if ((if __param_nlen == 0: 1 else: 0) != 0) {
+    if (__param_nlen == 0) {
         return ((__local_str as *mut c_char))
     }
 
-    if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
+    if (__param_nlen > __local_slen) {
         return ((null as *mut c_char))
     }
 
@@ -161,11 +161,11 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
     loop {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_str) == (*__param_needle)) {
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return ((__local_str as *mut c_char))
         }
 
@@ -176,7 +176,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
         (__local_slen = __local_slen - 1)
 
-        if not ((__ci_expr_old_0 != 0)) {
+        if not (__ci_expr_old_0) {
             break
         }
     }
@@ -201,7 +201,7 @@ unsafe fn Span_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_stri
 
     (__local_s.data = __param_d + ((_cspan_slice((&(*(&raw const __local_s as *const Span)).shape[0] as *mut i32), (&(*(&raw const __local_s.stride as *const cspan_tuple1)).d[0] as *mut i32), (&raw mut __local_outrank as *mut i32), (&(__param_shape[0]) as *mut i32), (&(__param_stri[0]) as *mut i32), (&(__param_args[0]) as *mut [i64; 3]), __param_rank) as i64) as usize))
 
-    if (((if not ((if __local_outrank == 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_outrank == 1): 1 else: 0) as i64) {
         __assert_rtn(c"Span_slice_".ptr, c"cspan_test.c".ptr, (5 as i32), c"outrank == 1".ptr)
     } else {
         0
@@ -216,11 +216,11 @@ unsafe fn Span_begin(__param_self_: *const Span) -> Span_iter {
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if 1 == 1: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_self_).shape[0] == 0: 1 else: 0) != 0: 1 else: 0))
+    if (1 == 1) {
+        (__ci_expr_logic_0 = (if (*__param_self_).shape[0] == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_ternary_1 = ((null as *mut i32)))
     } else {
         (__ci_expr_ternary_1 = (*__param_self_).data)
@@ -255,19 +255,19 @@ unsafe fn Span_next(__param_it_: *mut Span_iter) -> Unit {
 
 // contract: unproved:0:_cspan_size may write through it
 unsafe fn Span_size(__param_self_: *const Span) -> i64 {
-    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (1 as i32))
+    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), ((((__param_self_).shape.len() as u64) as i64) as i32))
 
 }
 
 fn Span_transposed(__param_sp: Span) -> Span {
-    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple1)).d[0] as *mut i32), (1 as i32)) }
+    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple1)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span)).shape.len() as u64) as i64) as i32)) }
 
     return __param_sp
 
 }
 
 fn Span_swapped_axes(__param_sp: Span, __param_ax1: i32, __param_ax2: i32) -> Span {
-    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple1)).d[0] as *mut i32), (1 as i32), __param_ax1, __param_ax2) }
+    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple1)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span)).shape.len() as u64) as i64) as i32), __param_ax1, __param_ax2) }
 
     return __param_sp
 
@@ -275,7 +275,7 @@ fn Span_swapped_axes(__param_sp: Span, __param_ax1: i32, __param_ax2: i32) -> Sp
 
 // contract: receiver:Span,unproved:1:read only
 unsafe fn Span_eq(__param_x: *const Span, __param_y: *const Span) -> bool {
-    if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((1 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
+    if (with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((1 * (sizeof[i32]() as usize)) as u64) as i64)) != 0) {
         return ((false as bool))
     }
 
@@ -284,8 +284,8 @@ unsafe fn Span_eq(__param_x: *const Span, __param_y: *const Span) -> bool {
     var __local__j: Span_iter = Span_begin(__param_y)
 
 
-    while ((if (*(&raw const __local__i as *const Span_iter)).ref != null: 1 else: 0) != 0) {
-        if ((if not ((if (*((*(&raw const __local__i as *const Span_iter)).ref)) == (*((*(&raw const __local__j as *const Span_iter)).ref)): 1 else: 0) != 0): 1 else: 0) != 0) {
+    while ((*(&raw const __local__i as *const Span_iter)).ref != null) {
+        if (not ((*((*(&raw const __local__i as *const Span_iter)).ref)) == (*((*(&raw const __local__j as *const Span_iter)).ref)))) {
             return ((false as bool))
         }
 
@@ -321,7 +321,7 @@ unsafe fn Span2_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_str
 
     (__local_s.data = __param_d + ((_cspan_slice((&(*(&raw const __local_s as *const Span2)).shape[0] as *mut i32), (&(*(&raw const __local_s.stride as *const cspan_tuple2)).d[0] as *mut i32), (&raw mut __local_outrank as *mut i32), (&(__param_shape[0]) as *mut i32), (&(__param_stri[0]) as *mut i32), (&(__param_args[0]) as *mut [i64; 3]), __param_rank) as i64) as usize))
 
-    if (((if not ((if __local_outrank == 2: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_outrank == 2): 1 else: 0) as i64) {
         __assert_rtn(c"Span2_slice_".ptr, c"cspan_test.c".ptr, (5 as i32), c"outrank == 2".ptr)
     } else {
         0
@@ -336,11 +336,11 @@ unsafe fn Span2_begin(__param_self_: *const Span2) -> Span2_iter {
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if 2 == 1: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_self_).shape[0] == 0: 1 else: 0) != 0: 1 else: 0))
+    if (2 == 1) {
+        (__ci_expr_logic_0 = (if (*__param_self_).shape[0] == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_ternary_1 = ((null as *mut i32)))
     } else {
         (__ci_expr_ternary_1 = (*__param_self_).data)
@@ -363,11 +363,11 @@ unsafe fn Span2_next(__param_it_: *mut Span2_iter) -> Unit {
     var __local_done: bool = with 0 as __ci_expr_seq_17 {
         var __ci_expr_logic_0: i32 = 0
         ((*__param_it_).pos[1] = (*__param_it_).pos[1] + 1)
-        if ((if (*__param_it_).pos[1] == (*(*__param_it_)._s).shape[1]: 1 else: 0) != 0) {
+        if ((*__param_it_).pos[1] == (*(*__param_it_)._s).shape[1]) {
             ((*__param_it_).pos[1] = ((0 as i32)))
             ((*(&raw mut __local_off as *mut i64)) = (*(&raw mut __local_off as *mut i64)) + ((*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple2)).d[0] - (((*(*__param_it_)._s).shape[1] as i64) * (*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple2)).d[1])))
             ((*__param_it_).pos[0] = (*__param_it_).pos[0] + 1)
-            (__ci_expr_logic_0 = (if (if (*__param_it_).pos[0] == (*(*__param_it_)._s).shape[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (*__param_it_).pos[0] == (*(*__param_it_)._s).shape[0]: 1 else: 0))
         }
         (__ci_expr_logic_0 != 0)
     }
@@ -382,19 +382,19 @@ unsafe fn Span2_next(__param_it_: *mut Span2_iter) -> Unit {
 
 // contract: unproved:0:_cspan_size may write through it
 unsafe fn Span2_size(__param_self_: *const Span2) -> i64 {
-    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (2 as i32))
+    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), ((((__param_self_).shape.len() as u64) as i64) as i32))
 
 }
 
 fn Span2_transposed(__param_sp: Span2) -> Span2 {
-    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span2)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple2)).d[0] as *mut i32), (2 as i32)) }
+    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span2)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple2)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span2)).shape.len() as u64) as i64) as i32)) }
 
     return __param_sp
 
 }
 
 fn Span2_swapped_axes(__param_sp: Span2, __param_ax1: i32, __param_ax2: i32) -> Span2 {
-    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span2)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple2)).d[0] as *mut i32), (2 as i32), __param_ax1, __param_ax2) }
+    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span2)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple2)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span2)).shape.len() as u64) as i64) as i32), __param_ax1, __param_ax2) }
 
     return __param_sp
 
@@ -402,7 +402,7 @@ fn Span2_swapped_axes(__param_sp: Span2, __param_ax1: i32, __param_ax2: i32) -> 
 
 // contract: receiver:Span2,unproved:1:read only
 unsafe fn Span2_eq(__param_x: *const Span2, __param_y: *const Span2) -> bool {
-    if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((2 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
+    if (with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((2 * (sizeof[i32]() as usize)) as u64) as i64)) != 0) {
         return ((false as bool))
     }
 
@@ -411,8 +411,8 @@ unsafe fn Span2_eq(__param_x: *const Span2, __param_y: *const Span2) -> bool {
     var __local__j: Span2_iter = Span2_begin(__param_y)
 
 
-    while ((if (*(&raw const __local__i as *const Span2_iter)).ref != null: 1 else: 0) != 0) {
-        if ((if not ((if (*((*(&raw const __local__i as *const Span2_iter)).ref)) == (*((*(&raw const __local__j as *const Span2_iter)).ref)): 1 else: 0) != 0): 1 else: 0) != 0) {
+    while ((*(&raw const __local__i as *const Span2_iter)).ref != null) {
+        if (not ((*((*(&raw const __local__i as *const Span2_iter)).ref)) == (*((*(&raw const __local__j as *const Span2_iter)).ref)))) {
             return ((false as bool))
         }
 
@@ -442,7 +442,7 @@ unsafe fn Span3_slice_(__param_d: *mut i32, __param_shape: *mut i32, __param_str
 
     (__local_s.data = __param_d + ((_cspan_slice((&(*(&raw const __local_s as *const Span3)).shape[0] as *mut i32), (&(*(&raw const __local_s.stride as *const cspan_tuple3)).d[0] as *mut i32), (&raw mut __local_outrank as *mut i32), (&(__param_shape[0]) as *mut i32), (&(__param_stri[0]) as *mut i32), (&(__param_args[0]) as *mut [i64; 3]), __param_rank) as i64) as usize))
 
-    if (((if not ((if __local_outrank == 3: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_outrank == 3): 1 else: 0) as i64) {
         __assert_rtn(c"Span3_slice_".ptr, c"cspan_test.c".ptr, (5 as i32), c"outrank == 3".ptr)
     } else {
         0
@@ -457,11 +457,11 @@ unsafe fn Span3_begin(__param_self_: *const Span3) -> Span3_iter {
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if 3 == 1: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_self_).shape[0] == 0: 1 else: 0) != 0: 1 else: 0))
+    if (3 == 1) {
+        (__ci_expr_logic_0 = (if (*__param_self_).shape[0] == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_ternary_1 = ((null as *mut i32)))
     } else {
         (__ci_expr_ternary_1 = (*__param_self_).data)
@@ -485,17 +485,17 @@ unsafe fn Span3_next(__param_it_: *mut Span3_iter) -> Unit {
         var __ci_expr_logic_1: i32 = 0
         var __ci_expr_logic_0: i32 = 0
         ((*__param_it_).pos[2] = (*__param_it_).pos[2] + 1)
-        if ((if (*__param_it_).pos[2] == (*(*__param_it_)._s).shape[2]: 1 else: 0) != 0) {
+        if ((*__param_it_).pos[2] == (*(*__param_it_)._s).shape[2]) {
             ((*__param_it_).pos[2] = ((0 as i32)))
             ((*(&raw mut __local_off as *mut i64)) = (*(&raw mut __local_off as *mut i64)) + ((*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple3)).d[1] - (((*(*__param_it_)._s).shape[2] as i64) * (*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple3)).d[2])))
             ((*__param_it_).pos[1] = (*__param_it_).pos[1] + 1)
-            (__ci_expr_logic_0 = (if (if (*__param_it_).pos[1] == (*(*__param_it_)._s).shape[1]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (*__param_it_).pos[1] == (*(*__param_it_)._s).shape[1]: 1 else: 0))
         }
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             ((*__param_it_).pos[1] = ((0 as i32)))
             ((*(&raw mut __local_off as *mut i64)) = (*(&raw mut __local_off as *mut i64)) + ((*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple3)).d[0] - (((*(*__param_it_)._s).shape[1] as i64) * (*(&raw const (*(*__param_it_)._s).stride as *const cspan_tuple3)).d[1])))
             ((*__param_it_).pos[0] = (*__param_it_).pos[0] + 1)
-            (__ci_expr_logic_1 = (if (if (*__param_it_).pos[0] == (*(*__param_it_)._s).shape[0]: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (*__param_it_).pos[0] == (*(*__param_it_)._s).shape[0]: 1 else: 0))
         }
         (__ci_expr_logic_1 != 0)
     }
@@ -510,19 +510,19 @@ unsafe fn Span3_next(__param_it_: *mut Span3_iter) -> Unit {
 
 // contract: unproved:0:_cspan_size may write through it
 unsafe fn Span3_size(__param_self_: *const Span3) -> i64 {
-    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), (3 as i32))
+    return _cspan_size((&(*__param_self_).shape[0] as *mut i32), ((((__param_self_).shape.len() as u64) as i64) as i32))
 
 }
 
 fn Span3_transposed(__param_sp: Span3) -> Span3 {
-    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span3)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple3)).d[0] as *mut i32), (3 as i32)) }
+    unsafe { _cspan_transpose((&(*(&raw const __param_sp as *const Span3)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple3)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span3)).shape.len() as u64) as i64) as i32)) }
 
     return __param_sp
 
 }
 
 fn Span3_swapped_axes(__param_sp: Span3, __param_ax1: i32, __param_ax2: i32) -> Span3 {
-    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span3)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple3)).d[0] as *mut i32), (3 as i32), __param_ax1, __param_ax2) }
+    unsafe { _cspan_swap_axes((&(*(&raw const __param_sp as *const Span3)).shape[0] as *mut i32), (&(*(&raw const __param_sp.stride as *const cspan_tuple3)).d[0] as *mut i32), (((((&raw mut __param_sp as *mut Span3)).shape.len() as u64) as i64) as i32), __param_ax1, __param_ax2) }
 
     return __param_sp
 
@@ -530,7 +530,7 @@ fn Span3_swapped_axes(__param_sp: Span3, __param_ax1: i32, __param_ax2: i32) -> 
 
 // contract: receiver:Span3,unproved:1:read only
 unsafe fn Span3_eq(__param_x: *const Span3, __param_y: *const Span3) -> bool {
-    if ((if with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((3 * (sizeof[i32]() as usize)) as u64) as i64)) != 0: 1 else: 0) != 0) {
+    if (with_memcmp(((&(*__param_x).shape[0] as *mut i32) as *const u8), ((&(*__param_y).shape[0] as *mut i32) as *const u8), (((3 * (sizeof[i32]() as usize)) as u64) as i64)) != 0) {
         return ((false as bool))
     }
 
@@ -539,8 +539,8 @@ unsafe fn Span3_eq(__param_x: *const Span3, __param_y: *const Span3) -> bool {
     var __local__j: Span3_iter = Span3_begin(__param_y)
 
 
-    while ((if (*(&raw const __local__i as *const Span3_iter)).ref != null: 1 else: 0) != 0) {
-        if ((if not ((if (*((*(&raw const __local__i as *const Span3_iter)).ref)) == (*((*(&raw const __local__j as *const Span3_iter)).ref)): 1 else: 0) != 0): 1 else: 0) != 0) {
+    while ((*(&raw const __local__i as *const Span3_iter)).ref != null) {
+        if (not ((*((*(&raw const __local__i as *const Span3_iter)).ref)) == (*((*(&raw const __local__j as *const Span3_iter)).ref)))) {
             return ((false as bool))
         }
 
@@ -576,17 +576,17 @@ fn ctest_cspan_subdim_run() {
     var __local__c_end_i: i64 = (((unsafe *(&raw const __local_m as *const Span3)).shape[0] as i64))
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         var __local_sub_i: Span2 = with 0 as __ci_expr_seq_108 {
             var __ci_expr_logic_3: i32 = 0
             var __ci_expr_logic_2: i32 = 0
-            if ((if __local_i < (unsafe *(&raw mut __local_m as *mut Span3)).shape[0]: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if 0 < (unsafe *(&raw mut __local_m as *mut Span3)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+            if (__local_i < (unsafe *(&raw mut __local_m as *mut Span3)).shape[0]) {
+                (__ci_expr_logic_2 = (if 0 < (unsafe *(&raw mut __local_m as *mut Span3)).shape[1]: 1 else: 0))
             }
-            if (__ci_expr_logic_2 != 0) {
-                (__ci_expr_logic_3 = (if (if 0 < (unsafe *(&raw mut __local_m as *mut Span3)).shape[2]: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_2 {
+                (__ci_expr_logic_3 = (if 0 < (unsafe *(&raw mut __local_m as *mut Span3)).shape[2]: 1 else: 0))
             }
-            if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                 __assert_rtn(c"ctest_cspan_subdim_run".ptr, c"cspan_test.c".ptr, (12 as i32), c"(i) < (&m)->shape[0] && (0) < (&m)->shape[1] && (0) < (&m)->shape[2]".ptr)
             } else {
                 0
@@ -600,13 +600,13 @@ fn ctest_cspan_subdim_run() {
         var __local__c_end_j: i64 = (((unsafe *(&raw const __local_m as *const Span3)).shape[1] as i64))
 
 
-        while ((if __local_j < __local__c_end_j: 1 else: 0) != 0) {
+        while (__local_j < __local__c_end_j) {
             var __local_sub_i_j: Span = with 0 as __ci_expr_seq_95 {
                 var __ci_expr_logic_5: i32 = 0
-                if ((if __local_j < (unsafe *(&raw mut __local_sub_i as *mut Span2)).shape[0]: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if 0 < (unsafe *(&raw mut __local_sub_i as *mut Span2)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+                if (__local_j < (unsafe *(&raw mut __local_sub_i as *mut Span2)).shape[0]) {
+                    (__ci_expr_logic_5 = (if 0 < (unsafe *(&raw mut __local_sub_i as *mut Span2)).shape[1]: 1 else: 0))
                 }
-                if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                     __assert_rtn(c"ctest_cspan_subdim_run".ptr, c"cspan_test.c".ptr, (14 as i32), c"(j) < (&sub_i)->shape[0] && (0) < (&sub_i)->shape[1]".ptr)
                 } else {
                     0
@@ -620,8 +620,8 @@ fn ctest_cspan_subdim_run() {
             var __local__c_end_k: i64 = (((unsafe *(&raw const __local_m as *const Span3)).shape[2] as i64))
 
 
-            while ((if __local_k < __local__c_end_k: 1 else: 0) != 0) {
-                if (((if not ((if __local_k < (unsafe *(&raw mut __local_sub_i_j as *mut Span)).shape[0]: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_k < __local__c_end_k) {
+                if ((if not (__local_k < (unsafe *(&raw mut __local_sub_i_j as *mut Span)).shape[0]): 1 else: 0) as i64) {
                     __assert_rtn(c"ctest_cspan_subdim_run".ptr, c"cspan_test.c".ptr, (16 as i32), c"(k) < (&sub_i_j)->shape[0]".ptr)
                 } else {
                     0
@@ -631,15 +631,15 @@ fn ctest_cspan_subdim_run() {
 
                 var __ci_expr_logic_7: i32 = 0
 
-                if ((if __local_i < (unsafe *(&raw mut __local_m as *mut Span3)).shape[0]: 1 else: 0) != 0) {
-                    (__ci_expr_logic_7 = (if (if __local_j < (unsafe *(&raw mut __local_m as *mut Span3)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+                if (__local_i < (unsafe *(&raw mut __local_m as *mut Span3)).shape[0]) {
+                    (__ci_expr_logic_7 = (if __local_j < (unsafe *(&raw mut __local_m as *mut Span3)).shape[1]: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_7 != 0) {
-                    (__ci_expr_logic_8 = (if (if __local_k < (unsafe *(&raw mut __local_m as *mut Span3)).shape[2]: 1 else: 0) != 0: 1 else: 0))
+                if __ci_expr_logic_7 {
+                    (__ci_expr_logic_8 = (if __local_k < (unsafe *(&raw mut __local_m as *mut Span3)).shape[2]: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_8 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_8: 1 else: 0) as i64) {
                     __assert_rtn(c"ctest_cspan_subdim_run".ptr, c"cspan_test.c".ptr, (16 as i32), c"(i) < (&m)->shape[0] && (j) < (&m)->shape[1] && (k) < (&m)->shape[2]".ptr)
                 } else {
                     0
@@ -684,20 +684,20 @@ fn ctest_cspan_slice_run() {
     var __local__c_end_i: i64 = (((unsafe *(&raw const __local_m1 as *const Span2)).shape[0] as i64))
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         var __local_j: i64 = ((0 as i64))
 
         var __local__c_end_j: i64 = (((unsafe *(&raw const __local_m1 as *const Span2)).shape[1] as i64))
 
 
-        while ((if __local_j < __local__c_end_j: 1 else: 0) != 0) {
+        while (__local_j < __local__c_end_j) {
             var __ci_expr_logic_2: i32 = 0
 
-            if ((if __local_i < (unsafe *(&raw mut __local_m1 as *mut Span2)).shape[0]: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if __local_j < (unsafe *(&raw mut __local_m1 as *mut Span2)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+            if (__local_i < (unsafe *(&raw mut __local_m1 as *mut Span2)).shape[0]) {
+                (__ci_expr_logic_2 = (if __local_j < (unsafe *(&raw mut __local_m1 as *mut Span2)).shape[1]: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                 __assert_rtn(c"ctest_cspan_slice_run".ptr, c"cspan_test.c".ptr, (30 as i32), c"(i) < (&m1)->shape[0] && (j) < (&m1)->shape[1]".ptr)
             } else {
                 0
@@ -730,20 +730,20 @@ fn ctest_cspan_slice_run() {
     var __local__c_end_i_1: i64 = (((unsafe *(&raw const __local_m2 as *const Span2)).shape[0] as i64))
 
 
-    while ((if __local_i_1 < __local__c_end_i_1: 1 else: 0) != 0) {
+    while (__local_i_1 < __local__c_end_i_1) {
         var __local_j_1: i64 = ((0 as i64))
 
         var __local__c_end_j_1: i64 = (((unsafe *(&raw const __local_m2 as *const Span2)).shape[1] as i64))
 
 
-        while ((if __local_j_1 < __local__c_end_j_1: 1 else: 0) != 0) {
+        while (__local_j_1 < __local__c_end_j_1) {
             var __ci_expr_logic_4: i32 = 0
 
-            if ((if __local_i_1 < (unsafe *(&raw mut __local_m2 as *mut Span2)).shape[0]: 1 else: 0) != 0) {
-                (__ci_expr_logic_4 = (if (if __local_j_1 < (unsafe *(&raw mut __local_m2 as *mut Span2)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+            if (__local_i_1 < (unsafe *(&raw mut __local_m2 as *mut Span2)).shape[0]) {
+                (__ci_expr_logic_4 = (if __local_j_1 < (unsafe *(&raw mut __local_m2 as *mut Span2)).shape[1]: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
                 __assert_rtn(c"ctest_cspan_slice_run".ptr, c"cspan_test.c".ptr, (39 as i32), c"(i) < (&m2)->shape[0] && (j) < (&m2)->shape[1]".ptr)
             } else {
                 0
@@ -776,7 +776,7 @@ pub unsafe fn Stack_drop(__param_cself: *const Stack) {
 
     (*__local_self_).clear()
 
-    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+    if ((*__local_self_).data == null) {
         return
     }
 
@@ -834,7 +834,7 @@ pub unsafe fn Stack_put_n(__param_self_: *mut Stack, __param_raw: *const i32, __
 
         (__local_n = __local_n - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -854,14 +854,14 @@ pub fn Stack_init() -> Stack {
 }
 
 pub fn Stack_with_capacity(__param_cap: i64) -> Stack {
-    var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
+    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__param_cap * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn Stack_with_size_uninit(__param_size: i64) -> Stack {
-    var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
+    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__param_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -869,9 +869,9 @@ pub fn Stack_with_size_uninit(__param_size: i64) -> Stack {
 
 pub fn Stack_with_size(__param_size: i64, __param_default_raw: i32) -> Stack {
     var __local_size = __param_size
-    var __local_out: Stack = Stack { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
+    var __local_out: Stack = Stack { data: (((with_alloc((((if true: ((__local_size * (sizeof[i32]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32)), size: __local_size, capacity: __local_size }
 
-    while (__local_size != 0) {
+    while __local_size {
         (__local_size = __local_size - 1)
 
         ((unsafe __local_out.data[__local_size]) = __param_default_raw)
@@ -894,7 +894,7 @@ pub unsafe fn Stack_from_n(__param_raw: *const i32, __param_n: i64) -> Stack {
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: i64) -> *const i32 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"Stack_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -906,7 +906,7 @@ pub unsafe fn Stack_at(__param_self_: *const Stack, __param_idx: i64) -> *const 
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Stack_at_mut(__param_self_: *mut Stack, __param_idx: i64) -> *mut i32 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"Stack_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -939,7 +939,7 @@ pub fn Stack_clone(__param_stk: Stack) -> Stack {
     var __local__c_end_i: i64 = (unsafe *(&raw const __param_stk as *const Stack)).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         ((unsafe __local_out.data[__local_i]) = (((unsafe (*(&raw const __param_stk as *const Stack)).data[__local_i]) as i32)))
 
         (__local_i = __local_i + 1)
@@ -953,7 +953,7 @@ pub fn Stack_clone(__param_stk: Stack) -> Stack {
 
 // contract: receiver-mut:Stack,unproved:1:read only
 pub unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack) {
-    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+    if (__param_self_ == __param_other) {
         return
     }
 
@@ -966,7 +966,7 @@ pub unsafe fn Stack_copy(__param_self_: *mut Stack, __param_other: *const Stack)
     var __local__c_end_i: i64 = (*__param_other).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         var __ci_expr_old_0: i64 = (*__param_self_).size
 
         ((*__param_self_).size = (*__param_self_).size + 1)
@@ -990,7 +990,7 @@ pub unsafe fn Stack_value_toraw(__param_val: *const i32) -> i32 {
 pub fn Stack_advance(__param_it_: Stack_iter, __param_n: u64) -> Stack_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Stack_iter)).ref + (__param_n as usize))
 
-    if ((if (unsafe *(&raw const __param_it_ as *const Stack_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Stack_iter)).end: 1 else: 0) != 0) {
+    if ((unsafe *(&raw const __param_it_ as *const Stack_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Stack_iter)).end) {
         (__param_it_.ref = ((null as *mut i32)))
     }
 
@@ -1002,7 +1002,7 @@ pub fn Stack_advance(__param_it_: Stack_iter, __param_n: u64) -> Stack_iter {
 fn ctest_cspan_slice2_run() {
     var __local__c_i4: i32 = ((0 as i32))
 
-    while ((if __local__c_i4 == 0: 1 else: 0) != 0) {
+    while (__local__c_i4 == 0) {
         var __local_stack: Stack = Stack.zeroed()
 
         while true {
@@ -1010,7 +1010,7 @@ fn ctest_cspan_slice2_run() {
 
             (__local__c_i4 = __local__c_i4 + 1)
 
-            if (not ((if __ci_expr_old_0 == 0: 1 else: 0) != 0)) {
+            if (not (__ci_expr_old_0 == 0)) {
                 break
             }
 
@@ -1018,7 +1018,7 @@ fn ctest_cspan_slice2_run() {
 
             var __local__c_end_i: i32 = ((((10 * 20) * 30) as i32))
 
-            while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+            while (__local_i < __local__c_end_i) {
                 unsafe { (*(&raw mut __local_stack as *mut Stack)).push(__local_i) }
 
                 (__local_i = __local_i + 1)
@@ -1038,8 +1038,8 @@ fn ctest_cspan_slice2_run() {
 
             var __ci_expr_lit_3: [i64; 3, 3] = [[1, 4, 0 as i64], [3, 7, 0 as i64], [20, 24, 0 as i64]]
 
-            let __ci_copy_142: Span3 = unsafe { Span3_slice_((*(&raw mut __local_ms3 as *mut Span3)).data, (&(*(&raw mut __local_ms3 as *mut Span3)).shape[0] as *mut i32), (&(*(&raw const (*(&raw mut __local_ms3 as *mut Span3)).stride as *const cspan_tuple3)).d[0] as *mut i32), (&__ci_expr_lit_3[0] as *mut [i64; 3]), (((((&raw mut __local_ms3 as *mut Span3)).shape.len() as u64) as i64) as i32)) }
-            with_memcpy((&raw mut __local_ms3 as *mut u8), (&raw const __ci_copy_142 as *const u8), sizeof[Span3]())
+            let __ci_copy_136: Span3 = unsafe { Span3_slice_((*(&raw mut __local_ms3 as *mut Span3)).data, (&(*(&raw mut __local_ms3 as *mut Span3)).shape[0] as *mut i32), (&(*(&raw const (*(&raw mut __local_ms3 as *mut Span3)).stride as *const cspan_tuple3)).d[0] as *mut i32), (&__ci_expr_lit_3[0] as *mut [i64; 3]), (((((&raw mut __local_ms3 as *mut Span3)).shape.len() as u64) as i64) as i32)) }
+            with_memcpy((&raw mut __local_ms3 as *mut u8), (&raw const __ci_copy_136 as *const u8), sizeof[Span3]())
 
             var __local_sum: i32 = ((0 as i32))
 
@@ -1047,32 +1047,32 @@ fn ctest_cspan_slice2_run() {
 
             var __local__c_end_i_1: i64 = (((unsafe *(&raw const __local_ms3 as *const Span3)).shape[0] as i64))
 
-            while ((if __local_i_1 < __local__c_end_i_1: 1 else: 0) != 0) {
+            while (__local_i_1 < __local__c_end_i_1) {
                 var __local_j: i64 = ((0 as i64))
 
                 var __local__c_end_j: i64 = (((unsafe *(&raw const __local_ms3 as *const Span3)).shape[1] as i64))
 
 
-                while ((if __local_j < __local__c_end_j: 1 else: 0) != 0) {
+                while (__local_j < __local__c_end_j) {
                     var __local_k: i64 = ((0 as i64))
 
                     var __local__c_end_k: i64 = (((unsafe *(&raw const __local_ms3 as *const Span3)).shape[2] as i64))
 
 
-                    while ((if __local_k < __local__c_end_k: 1 else: 0) != 0) {
+                    while (__local_k < __local__c_end_k) {
                         var __ci_expr_logic_5: i32 = 0
 
                         var __ci_expr_logic_4: i32 = 0
 
-                        if ((if __local_i_1 < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[0]: 1 else: 0) != 0) {
-                            (__ci_expr_logic_4 = (if (if __local_j < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[1]: 1 else: 0) != 0: 1 else: 0))
+                        if (__local_i_1 < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[0]) {
+                            (__ci_expr_logic_4 = (if __local_j < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[1]: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_4 != 0) {
-                            (__ci_expr_logic_5 = (if (if __local_k < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[2]: 1 else: 0) != 0: 1 else: 0))
+                        if __ci_expr_logic_4 {
+                            (__ci_expr_logic_5 = (if __local_k < (unsafe *(&raw mut __local_ms3 as *mut Span3)).shape[2]: 1 else: 0))
                         }
 
-                        if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                        if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                             __assert_rtn(c"ctest_cspan_slice2_run".ptr, c"cspan_test.c".ptr, (63 as i32), c"(i) < (&ms3)->shape[0] && (j) < (&ms3)->shape[1] && (k) < (&ms3)->shape[2]".ptr)
                         } else {
                             0
@@ -1125,7 +1125,7 @@ fn ctest_cspan_slice2_run() {
 fn ctest_cspan_equality_run() {
     var __local_base: Span = with 0 as __ci_expr_seq_5 {
         var __ci_expr_lit_0: [i32; 30] = [3, 1, 2, 3, 1, 2, 4, 5, 6, 2, 1, 7, 8, 9, 3, 1, 3, 1, 2, 3, 2, 2, 4, 5, 6, 3, 1, 7, 8, 9]
-        unsafe { Span_from_n((&__ci_expr_lit_0[0] as *mut i32), (30 as i64)) }
+        unsafe { Span_from_n((&__ci_expr_lit_0[0] as *mut i32), (([3, 1, 2, 3, 1, 2, 4, 5, 6, 2, 1, 7, 8, 9, 3, 1, 3, 1, 2, 3, 2, 2, 4, 5, 6, 3, 1, 7, 8, 9].len() as u64) as i64)) }
     }
 
     var __local_base2: Span2 = with 0 as __ci_expr_seq_12 {
@@ -1136,7 +1136,7 @@ fn ctest_cspan_equality_run() {
 
     var __local_test: Span = with 0 as __ci_expr_seq_17 {
         var __ci_expr_lit_3: [i32; 9] = [1, 2, 3, 4, 5, 6, 7, 8, 9]
-        unsafe { Span_from_n((&__ci_expr_lit_3[0] as *mut i32), (9 as i64)) }
+        unsafe { Span_from_n((&__ci_expr_lit_3[0] as *mut i32), (([1, 2, 3, 4, 5, 6, 7, 8, 9].len() as u64) as i64)) }
     }
 
     var __local_test2: Span2 = with 0 as __ci_expr_seq_24 {
@@ -1150,27 +1150,27 @@ fn ctest_cspan_equality_run() {
     var __local__c_end_y: i64 = (((((unsafe *(&raw const __local_base2 as *const Span2)).shape[0] - 3) + 1) as i64))
 
 
-    while ((if __local_y < __local__c_end_y: 1 else: 0) != 0) {
+    while (__local_y < __local__c_end_y) {
         var __local_x: i64 = ((0 as i64))
 
         var __local__c_end_x: i64 = (((((unsafe *(&raw const __local_base2 as *const Span2)).shape[1] - 3) + 1) as i64))
 
 
-        while ((if __local_x < __local__c_end_x: 1 else: 0) != 0) {
+        while (__local_x < __local__c_end_x) {
             var __local_expect_eq: bool = with 0 as __ci_expr_seq_60 {
                 var __ci_expr_logic_8: i32
                 var __ci_expr_logic_6: i32 = 0
-                if ((if __local_y == 0: 1 else: 0) != 0) {
-                    (__ci_expr_logic_6 = (if (if __local_x == 1: 1 else: 0) != 0: 1 else: 0))
+                if (__local_y == 0) {
+                    (__ci_expr_logic_6 = (if __local_x == 1: 1 else: 0))
                 }
-                if (__ci_expr_logic_6 != 0) {
+                if __ci_expr_logic_6 {
                     (__ci_expr_logic_8 = (if true: 1 else: 0))
                 } else {
                     var __ci_expr_logic_7: i32 = 0
-                    if ((if __local_y == 3: 1 else: 0) != 0) {
-                        (__ci_expr_logic_7 = (if (if __local_x == 2: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_y == 3) {
+                        (__ci_expr_logic_7 = (if __local_x == 2: 1 else: 0))
                     }
-                    (__ci_expr_logic_8 = (if __ci_expr_logic_7 != 0: 1 else: 0))
+                    (__ci_expr_logic_8 = (if __ci_expr_logic_7: 1 else: 0))
                 }
                 (__ci_expr_logic_8 != 0)
             }
@@ -1207,7 +1207,7 @@ pub unsafe fn Tiles_drop(__param_cself: *const Tiles) {
 
     (*__local_self_).clear()
 
-    if ((if (*__local_self_).data == null: 1 else: 0) != 0) {
+    if ((*__local_self_).data == null) {
         return
     }
 
@@ -1265,7 +1265,7 @@ pub unsafe fn Tiles_put_n(__param_self_: *mut Tiles, __param_raw: *const Span3, 
 
         (__local_n = __local_n - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -1285,14 +1285,14 @@ pub fn Tiles_init() -> Tiles {
 }
 
 pub fn Tiles_with_capacity(__param_cap: i64) -> Tiles {
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__param_cap * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: 0, capacity: __param_cap }
+    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__param_cap * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: 0, capacity: __param_cap }
 
     return __local_out
 
 }
 
 pub fn Tiles_with_size_uninit(__param_size: i64) -> Tiles {
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__param_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __param_size, capacity: __param_size }
+    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__param_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __param_size, capacity: __param_size }
 
     return __local_out
 
@@ -1300,9 +1300,9 @@ pub fn Tiles_with_size_uninit(__param_size: i64) -> Tiles {
 
 pub fn Tiles_with_size(__param_size: i64, __param_default_raw: Span3) -> Tiles {
     var __local_size = __param_size
-    var __local_out: Tiles = Tiles { data: (((with_alloc((((if 1 != 0: ((__local_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __local_size, capacity: __local_size }
+    var __local_out: Tiles = Tiles { data: (((with_alloc((((if true: ((__local_size * (sizeof[Span3]() as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3)), size: __local_size, capacity: __local_size }
 
-    while (__local_size != 0) {
+    while __local_size {
         (__local_size = __local_size - 1)
 
         ((unsafe __local_out.data[__local_size]) = __param_default_raw)
@@ -1315,7 +1315,7 @@ pub fn Tiles_with_size(__param_size: i64, __param_default_raw: Span3) -> Tiles {
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: i64) -> *const Span3 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"Tiles_at".ptr, c"stack.h".ptr, (189 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -1327,7 +1327,7 @@ pub unsafe fn Tiles_at(__param_self_: *const Tiles, __param_idx: i64) -> *const 
 
 // contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn Tiles_at_mut(__param_self_: *mut Tiles, __param_idx: i64) -> *mut Span3 {
-    if (((if not ((if ((__param_idx as u64)) < (((*__param_self_).size as u64)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (((__param_idx as u64)) < (((*__param_self_).size as u64))): 1 else: 0) as i64) {
         __assert_rtn(c"Tiles_at_mut".ptr, c"stack.h".ptr, (192 as i32), c"((size_t)(idx) < (size_t)(self->size))".ptr)
     } else {
         0
@@ -1360,7 +1360,7 @@ pub fn Tiles_clone(__param_stk: Tiles) -> Tiles {
     var __local__c_end_i: i64 = (unsafe *(&raw const __param_stk as *const Tiles)).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         ((unsafe __local_out.data[__local_i]) = (unsafe (*(&raw const __param_stk as *const Tiles)).data[__local_i]))
 
         (__local_i = __local_i + 1)
@@ -1374,7 +1374,7 @@ pub fn Tiles_clone(__param_stk: Tiles) -> Tiles {
 
 // contract: receiver-mut:Tiles,unproved:1:read only
 pub unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles) {
-    if ((if __param_self_ == __param_other: 1 else: 0) != 0) {
+    if (__param_self_ == __param_other) {
         return
     }
 
@@ -1387,7 +1387,7 @@ pub unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles)
     var __local__c_end_i: i64 = (*__param_other).size
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         var __ci_expr_old_0: i64 = (*__param_self_).size
 
         ((*__param_self_).size = (*__param_self_).size + 1)
@@ -1405,7 +1405,7 @@ pub unsafe fn Tiles_copy(__param_self_: *mut Tiles, __param_other: *const Tiles)
 pub fn Tiles_advance(__param_it_: Tiles_iter, __param_n: u64) -> Tiles_iter {
     (__param_it_.ref = (unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref + (__param_n as usize))
 
-    if ((if (unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Tiles_iter)).end: 1 else: 0) != 0) {
+    if ((unsafe *(&raw const __param_it_ as *const Tiles_iter)).ref >= (unsafe *(&raw const __param_it_ as *const Tiles_iter)).end) {
         (__param_it_.ref = ((null as *mut Span3)))
     }
 
@@ -1435,7 +1435,7 @@ unsafe fn ctest_cspan_cube_setup(__param_fixt: *mut ctest_cspan_cube_data) {
     var __local__c_end_i: i32 = N
 
 
-    while ((if __local_i < __local__c_end_i: 1 else: 0) != 0) {
+    while (__local_i < __local__c_end_i) {
         (*((&raw const (*__param_fixt).stack as *const Stack) as *mut Stack)).push(((__local_i + 1) as i32))
 
         (__local_i = __local_i + 1)
@@ -1456,7 +1456,7 @@ unsafe fn ctest_cspan_cube_setup(__param_fixt: *mut ctest_cspan_cube_data) {
     var __local__c_end_i_1: i64 = ((((*(&raw const __local_ms3 as *const Span3)).shape[0] - (if __local__c_inc_i > 0: 1 else: 0)) as i64))
 
 
-    while ((if (if __local__c_inc_i > 0: 1 else: 0) == (if __local_i_1 <= __local__c_end_i_1: 1 else: 0): 1 else: 0) != 0) {
+    while ((if __local__c_inc_i > 0: 1 else: 0) == (if __local_i_1 <= __local__c_end_i_1: 1 else: 0)) {
         var __local_j: i64 = ((0 as i64))
 
         var __local__c_inc_j: i64 = ((4 as i64))
@@ -1464,7 +1464,7 @@ unsafe fn ctest_cspan_cube_setup(__param_fixt: *mut ctest_cspan_cube_data) {
         var __local__c_end_j: i64 = ((((*(&raw const __local_ms3 as *const Span3)).shape[1] - (if __local__c_inc_j > 0: 1 else: 0)) as i64))
 
 
-        while ((if (if __local__c_inc_j > 0: 1 else: 0) == (if __local_j <= __local__c_end_j: 1 else: 0): 1 else: 0) != 0) {
+        while ((if __local__c_inc_j > 0: 1 else: 0) == (if __local_j <= __local__c_end_j: 1 else: 0)) {
             var __local_k: i64 = ((0 as i64))
 
             var __local__c_inc_k: i64 = ((4 as i64))
@@ -1472,7 +1472,7 @@ unsafe fn ctest_cspan_cube_setup(__param_fixt: *mut ctest_cspan_cube_data) {
             var __local__c_end_k: i64 = ((((*(&raw const __local_ms3 as *const Span3)).shape[2] - (if __local__c_inc_k > 0: 1 else: 0)) as i64))
 
 
-            while ((if (if __local__c_inc_k > 0: 1 else: 0) == (if __local_k <= __local__c_end_k: 1 else: 0): 1 else: 0) != 0) {
+            while ((if __local__c_inc_k > 0: 1 else: 0) == (if __local_k <= __local__c_end_k: 1 else: 0)) {
                 var __local_tile: Span3 = with 0 as __ci_expr_seq_44 {
                     var __ci_expr_lit_2: [i64; 3, 3] = [[__local_i_1, (__local_i_1 + 4), 0 as i64], [__local_j, (__local_j + 4), 0 as i64], [__local_k, (__local_k + 4), 0 as i64]]
                     Span3_slice_((*(&raw mut __local_ms3 as *mut Span3)).data, (&(*(&raw mut __local_ms3 as *mut Span3)).shape[0] as *mut i32), (&(*(&raw const (*(&raw mut __local_ms3 as *mut Span3)).stride as *const cspan_tuple3)).d[0] as *mut i32), (&__ci_expr_lit_2[0] as *mut [i64; 3]), (((((&raw mut __local_ms3 as *mut Span3)).shape.len() as u64) as i64) as i32))
@@ -1577,12 +1577,12 @@ impl Stack {
 
     pub mut fn reserve(__param_cap: i64) -> bool {
         let __param_self_: *mut Stack = self as *mut Stack
-        var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param_self_).size else: __param_cap) as i64))
+        var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
-        if ((((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) != 0) {
-            var __local_d: *mut i32 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
+        if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
+            var __local_d: *mut i32 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[i32]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[i32]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut i32))
 
-            if ((if __local_d == null: 1 else: 0) != 0) {
+            if (__local_d == null) {
                 return ((false as bool))
             }
 
@@ -1605,7 +1605,7 @@ impl Stack {
 
             (__local_i = __local_i - 1)
 
-            if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+            if (not (__ci_expr_old_0 != 0)) {
                 break
             }
 
@@ -1631,7 +1631,7 @@ impl Stack {
 
     pub fn is_empty() -> bool {
         let __param_self_: *const Stack = self as *const Stack
-        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+        return ((((not (unsafe *__param_self_).size)) as bool))
 
     }
 
@@ -1639,8 +1639,8 @@ impl Stack {
         let __param_self_: *mut Stack = self as *mut Stack
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Stack)).capacity() }: 1 else: 0) != 0) {
-            if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
+        if ((__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Stack)).capacity() }) {
+            if (not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }) {
                 return ((null as *mut i32))
             }
         }
@@ -1659,8 +1659,8 @@ impl Stack {
 
     pub mut fn push(__param_val: i32) -> *mut i32 {
         let __param_self_: *mut Stack = self as *mut Stack
-        if ((if (unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Stack)).capacity() }: 1 else: 0) != 0) {
-            if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }: 1 else: 0) != 0) {
+        if ((unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Stack)).capacity() }) {
+            if (not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }) {
                 return ((null as *mut i32))
             }
         }
@@ -1679,7 +1679,7 @@ impl Stack {
 
     pub mut fn pop() {
         let __param_self_: *mut Stack = self as *mut Stack
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"Stack_pop".ptr, c"stack.h".ptr, (149 as i32), c"self->size".ptr)
         } else {
             0
@@ -1695,7 +1695,7 @@ impl Stack {
 
     pub mut fn pull() -> i32 {
         let __param_self_: *mut Stack = self as *mut Stack
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"Stack_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
         } else {
             0
@@ -1719,7 +1719,7 @@ impl Stack {
         let __param_self_: *const Stack = self as *const Stack
         var __local_it_: Stack_iter = Stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Stack_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
         } else {
             (__local_it_.ref = ((null as *mut i32)))
@@ -1733,7 +1733,7 @@ impl Stack {
         let __param_self_: *const Stack = self as *const Stack
         var __local_it_: Stack_iter = Stack_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const Stack_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
 
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Stack_iter)).end - ((1 as i64) as usize))
@@ -1783,7 +1783,7 @@ impl Stack_iter {
         let __param_it_: *mut Stack_iter = self as *mut Stack_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut i32)))
         }
 
@@ -1794,7 +1794,7 @@ impl Stack_iter {
         let __param_it_: *mut Stack_iter = self as *mut Stack_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref - 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut i32)))
         }
 
@@ -1827,12 +1827,12 @@ impl Tiles {
 
     pub mut fn reserve(__param_cap: i64) -> bool {
         let __param_self_: *mut Tiles = self as *mut Tiles
-        var __local_n: i64 = (((if (if __param_cap == 9223372036854775807: 1 else: 0) != 0: (unsafe *__param_self_).size else: __param_cap) as i64))
+        var __local_n: i64 = (((if __param_cap == 9223372036854775807: (unsafe *__param_self_).size else: __param_cap) as i64))
 
-        if ((((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) != 0) {
-            var __local_d: *mut Span3 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if 1 != 0: ((if 1 != 0: ((__local_n * (sizeof[Span3]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[Span3]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3))
+        if (((if __param_cap > (unsafe *__param_self_).capacity: 1 else: 0) as i32) & ((if __local_n != (unsafe *__param_self_).capacity: 1 else: 0) as i32)) {
+            var __local_d: *mut Span3 = (((with_realloc((((unsafe *__param_self_).data as *mut c_void) as *mut u8), (0 as i64), (((if true: ((if true: ((__local_n * (sizeof[Span3]() as i64)) as i64) else: (((unsafe *__param_self_).capacity * (sizeof[Span3]() as i64)) as i64)) as i64) else: (-1 as i64)) as u64) as i64)) as *mut c_void) as *mut Span3))
 
-            if ((if __local_d == null: 1 else: 0) != 0) {
+            if (__local_d == null) {
                 return ((false as bool))
             }
 
@@ -1855,7 +1855,7 @@ impl Tiles {
 
             (__local_i = __local_i - 1)
 
-            if (not ((if __ci_expr_old_0 != 0: 1 else: 0) != 0)) {
+            if (not (__ci_expr_old_0 != 0)) {
                 break
             }
 
@@ -1881,7 +1881,7 @@ impl Tiles {
 
     pub fn is_empty() -> bool {
         let __param_self_: *const Tiles = self as *const Tiles
-        return ((((not ((unsafe *__param_self_).size != 0))) as bool))
+        return ((((not (unsafe *__param_self_).size)) as bool))
 
     }
 
@@ -1889,8 +1889,8 @@ impl Tiles {
         let __param_self_: *mut Tiles = self as *mut Tiles
         var __local_len: i64 = (unsafe *__param_self_).size
 
-        if ((if (__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Tiles)).capacity() }: 1 else: 0) != 0) {
-            if ((if not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }: 1 else: 0) != 0) {
+        if ((__local_len + __param_n) >= unsafe { (*(__param_self_ as *const Tiles)).capacity() }) {
+            if (not unsafe { (*__param_self_).reserve(((((__local_len * 3) / 2) + __param_n) as i64)) }) {
                 return ((null as *mut Span3))
             }
         }
@@ -1909,8 +1909,8 @@ impl Tiles {
 
     pub mut fn push(__param_val: Span3) -> *mut Span3 {
         let __param_self_: *mut Tiles = self as *mut Tiles
-        if ((if (unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Tiles)).capacity() }: 1 else: 0) != 0) {
-            if ((if not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }: 1 else: 0) != 0) {
+        if ((unsafe *__param_self_).size == unsafe { (*(__param_self_ as *const Tiles)).capacity() }) {
+            if (not unsafe { (*__param_self_).reserve((((((*__param_self_).size * 3) / 2) + 4) as i64)) }) {
                 return ((null as *mut Span3))
             }
         }
@@ -1929,7 +1929,7 @@ impl Tiles {
 
     pub mut fn pop() {
         let __param_self_: *mut Tiles = self as *mut Tiles
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"Tiles_pop".ptr, c"stack.h".ptr, (149 as i32), c"self->size".ptr)
         } else {
             0
@@ -1945,7 +1945,7 @@ impl Tiles {
 
     pub mut fn pull() -> Span3 {
         let __param_self_: *mut Tiles = self as *mut Tiles
-        if (((if not ((unsafe *__param_self_).size != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe *__param_self_).size: 1 else: 0) as i64) {
             __assert_rtn(c"Tiles_pull".ptr, c"stack.h".ptr, (152 as i32), c"self->size".ptr)
         } else {
             0
@@ -1969,7 +1969,7 @@ impl Tiles {
         let __param_self_: *const Tiles = self as *const Tiles
         var __local_it_: Tiles_iter = Tiles_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).end + (((unsafe *__param_self_).size as i64) as usize))
         } else {
             (__local_it_.ref = ((null as *mut Span3)))
@@ -1983,7 +1983,7 @@ impl Tiles {
         let __param_self_: *const Tiles = self as *const Tiles
         var __local_it_: Tiles_iter = Tiles_iter { ref: (unsafe *__param_self_).data, end: (unsafe *__param_self_).data }
 
-        if ((unsafe *__param_self_).size != 0) {
+        if (unsafe *__param_self_).size {
             (__local_it_.ref = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).ref + ((((unsafe *__param_self_).size - 1) as i64) as usize))
 
             (__local_it_.end = (unsafe *(&raw const __local_it_ as *const Tiles_iter)).end - ((1 as i64) as usize))
@@ -2033,7 +2033,7 @@ impl Tiles_iter {
         let __param_it_: *mut Tiles_iter = self as *mut Tiles_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref + 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut Span3)))
         }
 
@@ -2044,7 +2044,7 @@ impl Tiles_iter {
         let __param_it_: *mut Tiles_iter = self as *mut Tiles_iter
         ((unsafe *__param_it_).ref = (unsafe *__param_it_).ref - 1)
 
-        if ((if (unsafe *__param_it_).ref == (unsafe *__param_it_).end: 1 else: 0) != 0) {
+        if ((unsafe *__param_it_).ref == (unsafe *__param_it_).end) {
             ((unsafe *__param_it_).ref = ((null as *mut Span3)))
         }
 

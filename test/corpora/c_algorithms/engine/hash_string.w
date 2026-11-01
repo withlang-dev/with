@@ -2,6 +2,7 @@
 use std.engines.c_algorithms_testing.defs
 use std.libc
 
+// contract: unproved:0:read only
 pub unsafe fn string_hash(__param_string: *mut c_void) -> u32 {
     var __local_result: u32 = ((5381 as u32))
 
@@ -9,7 +10,7 @@ pub unsafe fn string_hash(__param_string: *mut c_void) -> u32 {
 
     (__local_p = ((__param_string as *mut u8)))
 
-    while ((if (*__local_p) != 0: 1 else: 0) != 0) {
+    while ((*__local_p) != 0) {
         (__local_result = ((((((((__local_result as u32) << (5 as u32)) as u32) +% (__local_result as u32)) as u32) +% (((*__local_p) as i32) as u32)) as u32)))
 
         (__local_p = __local_p + 1)
@@ -20,6 +21,7 @@ pub unsafe fn string_hash(__param_string: *mut c_void) -> u32 {
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn string_nocase_hash(__param_string: *mut c_void) -> u32 {
     var __local_result: u32 = ((5381 as u32))
 
@@ -27,7 +29,7 @@ pub unsafe fn string_nocase_hash(__param_string: *mut c_void) -> u32 {
 
     (__local_p = ((__param_string as *mut u8)))
 
-    while ((if (*__local_p) != 0: 1 else: 0) != 0) {
+    while ((*__local_p) != 0) {
         (__local_result = ((((((((__local_result as u32) << (5 as u32)) as u32) +% (__local_result as u32)) as u32) +% (tolower(((*__local_p) as i32)) as u32)) as u32)))
 
         (__local_p = __local_p + 1)

@@ -6,21 +6,21 @@ use std.collections
 pub fn bloom_filter_new(__param_table_size: u32, __param_hash_func: Option[unsafe extern "C" fn(*mut c_void) -> u32], __param_num_functions: u32) -> *mut _BloomFilter {
     var __local_filter: *mut _BloomFilter
 
-    if ((if __param_num_functions > ((salts.len() as u64)): 1 else: 0) != 0) {
+    if (__param_num_functions > ((salts.len() as u64))) {
         return ((null as *mut _BloomFilter))
 
     }
 
     (__local_filter = (((with_alloc(((sizeof[_BloomFilter]() as u64) as i64)) as *mut c_void) as *mut _BloomFilter)))
 
-    if ((if __local_filter == null: 1 else: 0) != 0) {
+    if (__local_filter == null) {
         return ((null as *mut _BloomFilter))
 
     }
 
     ((unsafe *__local_filter).table = (((with_alloc_zeroed(((((((__param_table_size as u32) +% (7 as u32)) as u32) / (8 as u32)) as u64) as i64), ((1 as u64) as i64)) as *mut c_void) as *mut u8)))
 
-    if ((if (unsafe *__local_filter).table == null: 1 else: 0) != 0) {
+    if ((unsafe *__local_filter).table == null) {
         with_free(((__local_filter as *mut c_void) as *mut u8))
 
         return ((null as *mut _BloomFilter))
@@ -37,6 +37,7 @@ pub fn bloom_filter_new(__param_table_size: u32, __param_hash_func: Option[unsaf
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn bloom_filter_free(__param_bloomfilter: *mut _BloomFilter) {
     with_free((((*__param_bloomfilter).table as *mut c_void) as *mut u8))
 
@@ -44,6 +45,7 @@ pub unsafe fn bloom_filter_free(__param_bloomfilter: *mut _BloomFilter) {
 
 }
 
+// contract: receiver-mut:_BloomFilter,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __param_value: *mut c_void) {
     var __local_hash: u32
 
@@ -59,7 +61,7 @@ pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __para
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < (*__param_bloomfilter).num_functions: 1 else: 0) != 0) {
+    while (__local_i < (*__param_bloomfilter).num_functions) {
         (__local_subhash = ((((__local_hash as u32) ^ (salts[__local_i] as u32)) as u32)))
 
         (__local_index = ((((__local_subhash as u32) % ((*__param_bloomfilter).table_size as u32)) as u32)))
@@ -76,6 +78,7 @@ pub unsafe fn bloom_filter_insert(__param_bloomfilter: *mut _BloomFilter, __para
 
 }
 
+// contract: receiver:_BloomFilter,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param_value: *mut c_void) -> i32 {
     var __local_hash: u32
 
@@ -93,7 +96,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < (*__param_bloomfilter).num_functions: 1 else: 0) != 0) {
+    while (__local_i < (*__param_bloomfilter).num_functions) {
         (__local_subhash = ((((__local_hash as u32) ^ (salts[__local_i] as u32)) as u32)))
 
         (__local_index = ((((__local_subhash as u32) % ((*__param_bloomfilter).table_size as u32)) as u32)))
@@ -102,7 +105,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
         (__local_bit = ((((1 as i32) << (((__local_index as u32) % (8 as u32)) as u32)) as i32)))
 
-        if ((if ((__local_b as i32) & (__local_bit as i32)) == 0: 1 else: 0) != 0) {
+        if (((__local_b as i32) & (__local_bit as i32)) == 0) {
             return 0
 
         }
@@ -117,6 +120,7 @@ pub unsafe fn bloom_filter_query(__param_bloomfilter: *mut _BloomFilter, __param
 
 }
 
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader,unproved:1:read only
 pub unsafe fn bloom_filter_read(__param_bloomfilter: *mut _BloomFilter, __param_array: *mut u8) -> Unit {
     var __local_array_size: u32
 
@@ -126,6 +130,7 @@ pub unsafe fn bloom_filter_read(__param_bloomfilter: *mut _BloomFilter, __param_
 
 }
 
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader,unproved:1:read only
 pub unsafe fn bloom_filter_load(__param_bloomfilter: *mut _BloomFilter, __param_array: *mut u8) -> Unit {
     var __local_array_size: u32
 
@@ -135,6 +140,7 @@ pub unsafe fn bloom_filter_load(__param_bloomfilter: *mut _BloomFilter, __param_
 
 }
 
+// contract: unproved:0:bloom_filter_new may write through it,unproved:1:read only
 pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter {
     var __local_result: *mut _BloomFilter
 
@@ -146,19 +152,19 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
     var __ci_expr_logic_0: i32
 
-    if ((if (*__param_filter1).table_size != (*__param_filter2).table_size: 1 else: 0) != 0) {
+    if ((*__param_filter1).table_size != (*__param_filter2).table_size) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return ((null as *mut _BloomFilter))
 
     }
@@ -166,7 +172,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
     (__local_result = bloom_filter_new((*__param_filter1).table_size, (*__param_filter1).hash_func, (*__param_filter1).num_functions))
 
-    if ((if __local_result == null: 1 else: 0) != 0) {
+    if (__local_result == null) {
         return ((null as *mut _BloomFilter))
 
     }
@@ -175,7 +181,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
+    while (__local_i < __local_array_size) {
         (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as i32) | (((*__param_filter2).table[__local_i]) as i32)) as u8)))
 
 
@@ -188,6 +194,7 @@ pub unsafe fn bloom_filter_union(__param_filter1: *mut _BloomFilter, __param_fil
 
 }
 
+// contract: unproved:0:bloom_filter_new may write through it,unproved:1:read only
 pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __param_filter2: *mut _BloomFilter) -> *mut _BloomFilter {
     var __local_result: *mut _BloomFilter
 
@@ -199,19 +206,19 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
 
     var __ci_expr_logic_0: i32
 
-    if ((if (*__param_filter1).table_size != (*__param_filter2).table_size: 1 else: 0) != 0) {
+    if ((*__param_filter1).table_size != (*__param_filter2).table_size) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__param_filter1).num_functions != (*__param_filter2).num_functions: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__param_filter1).hash_func != (*__param_filter2).hash_func: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return ((null as *mut _BloomFilter))
 
     }
@@ -219,7 +226,7 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
 
     (__local_result = bloom_filter_new((*__param_filter1).table_size, (*__param_filter1).hash_func, (*__param_filter1).num_functions))
 
-    if ((if __local_result == null: 1 else: 0) != 0) {
+    if (__local_result == null) {
         return ((null as *mut _BloomFilter))
 
     }
@@ -228,7 +235,7 @@ pub unsafe fn bloom_filter_intersection(__param_filter1: *mut _BloomFilter, __pa
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __local_array_size: 1 else: 0) != 0) {
+    while (__local_i < __local_array_size) {
         (((*__local_result).table[__local_i]) = ((((((*__param_filter1).table[__local_i]) as i32) & (((*__param_filter2).table[__local_i]) as i32)) as u8)))
 
 

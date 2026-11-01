@@ -26,14 +26,14 @@ pub fn generate_set() -> *mut _Set writes allocation_limit {
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
         (__local_value = unsafe { alloc_test_strdup((&__local_buf[0] as *mut c_char)) })
 
         unsafe { set_insert(__local_set, (__local_value as *mut c_void)) }
 
-        if (((if not ((if unsafe { set_num_entries(__local_set) } == ((__local_i as u32) +% (1 as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_set).set_num_entries() } == ((__local_i as u32) +% (1 as u32))): 1 else: 0) as i64) {
             __assert_rtn(c"generate_set".ptr, c"test-set.c".ptr, (56 as i32), c"set_num_entries(set) == i + 1".ptr)
         } else {
             0
@@ -45,7 +45,7 @@ pub fn generate_set() -> *mut _Set writes allocation_limit {
     }
 
 
-    unsafe { set_register_free_function(__local_set, Some(alloc_test_free)) }
+    unsafe { (*__local_set).set_register_free_function(Some(alloc_test_free)) }
 
     return __local_set
 
@@ -60,9 +60,9 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { set_register_free_function(__local_set, Some(alloc_test_free)) }
+    unsafe { (*__local_set).set_register_free_function(Some(alloc_test_free)) }
 
-    if (((if not ((if __local_set != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_set != null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (74 as i32), c"set != NULL".ptr)
     } else {
         0
@@ -70,7 +70,7 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         (__local_value = ((alloc_test_malloc((sizeof[i32]() as u64)) as *mut i32)))
 
         ((unsafe *__local_value) = __local_i)
@@ -89,7 +89,7 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    if (((if not ((if __local_set == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_set == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (91 as i32), c"set == NULL".ptr)
     } else {
         0
@@ -99,13 +99,13 @@ pub fn test_set_new_free() -> Unit writes allocation_limit {
 
     (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    if (((if not ((if __local_set == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_set == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (95 as i32), c"set == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_new_free".ptr, c"test-set.c".ptr, (96 as i32), c"alloc_test_get_allocated() == 0".ptr)
     } else {
         0
@@ -126,7 +126,7 @@ pub fn test_set_insert() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 6: 1 else: 0) != 0) {
+    while (__local_i < 6) {
         unsafe { set_insert(__local_set, (((&raw const __local_numbers1[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -137,7 +137,7 @@ pub fn test_set_insert() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 6: 1 else: 0) != 0) {
+    while (__local_i < 6) {
         unsafe { set_insert(__local_set, (((&raw const __local_numbers2[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -146,7 +146,7 @@ pub fn test_set_insert() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { set_num_entries(__local_set) } == 10: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_set).set_num_entries() } == 10): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_insert".ptr, c"test-set.c".ptr, (117 as i32), c"set_num_entries(set) == 10".ptr)
     } else {
         0
@@ -167,10 +167,10 @@ pub fn test_set_query() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 10000: 1 else: 0) != 0) {
+    while (__local_i < 10000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
-        if (((if not ((if unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_query".ptr, c"test-set.c".ptr, (133 as i32), c"set_query(set, buf) != 0".ptr)
         } else {
             0
@@ -182,13 +182,13 @@ pub fn test_set_query() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { set_query(__local_set, ("-1" as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_query(__local_set, ("-1" as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_query".ptr, c"test-set.c".ptr, (137 as i32), c"set_query(set, \"-1\") == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { set_query(__local_set, ("100001" as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_query(__local_set, ("100001" as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_query".ptr, c"test-set.c".ptr, (138 as i32), c"set_query(set, \"100001\") == 0".ptr)
     } else {
         0
@@ -209,9 +209,9 @@ pub fn test_set_remove() writes allocation_limit {
 
     (__local_set = generate_set())
 
-    (__local_num_entries = ((unsafe { set_num_entries(__local_set) } as u32)))
+    (__local_num_entries = ((unsafe { (*__local_set).set_num_entries() } as u32)))
 
-    if (((if not ((if __local_num_entries == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num_entries == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (153 as i32), c"num_entries == 10000".ptr)
     } else {
         0
@@ -219,28 +219,28 @@ pub fn test_set_remove() writes allocation_limit {
 
     (__local_i = ((4000 as i32)))
 
-    while ((if __local_i < 6000: 1 else: 0) != 0) {
+    while (__local_i < 6000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
-        if (((if not ((if unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (161 as i32), c"set_query(set, buf) != 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (164 as i32), c"set_remove(set, buf) != 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_num_entries(__local_set) } == ((__local_num_entries as u32) -% (1 as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_set).set_num_entries() } == ((__local_num_entries as u32) -% (1 as u32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (167 as i32), c"set_num_entries(set) == num_entries - 1".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_query(__local_set, (&__local_buf[0] as *mut c_char)) } == 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (170 as i32), c"set_query(set, buf) == 0".ptr)
         } else {
             0
@@ -256,16 +256,16 @@ pub fn test_set_remove() writes allocation_limit {
 
     (__local_i = ((-1000 as i32)))
 
-    while ((if __local_i < -500: 1 else: 0) != 0) {
+    while (__local_i < -500) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
-        if (((if not ((if unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } == 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (179 as i32), c"set_remove(set, buf) == 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_num_entries(__local_set) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_set).set_num_entries() } == __local_num_entries): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (180 as i32), c"set_num_entries(set) == num_entries".ptr)
         } else {
             0
@@ -279,16 +279,16 @@ pub fn test_set_remove() writes allocation_limit {
 
     (__local_i = ((50000 as i32)))
 
-    while ((if __local_i < 51000: 1 else: 0) != 0) {
+    while (__local_i < 51000) {
         sprintf((&__local_buf[0] as *mut c_char), c"%i".ptr, __local_i)
 
-        if (((if not ((if unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_remove(__local_set, (&__local_buf[0] as *mut c_char)) } == 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (186 as i32), c"set_remove(set, buf) == 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_num_entries(__local_set) } == __local_num_entries: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_set).set_num_entries() } == __local_num_entries): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_remove".ptr, c"test-set.c".ptr, (187 as i32), c"set_num_entries(set) == num_entries".ptr)
         } else {
             0
@@ -325,7 +325,7 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 7: 1 else: 0) != 0) {
+    while (__local_i < 7) {
         unsafe { set_insert(__local_set1, (((&raw const __local_numbers1[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -338,7 +338,7 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 7: 1 else: 0) != 0) {
+    while (__local_i < 7) {
         unsafe { set_insert(__local_set2, (((&raw const __local_numbers2[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -349,7 +349,7 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_result_set = unsafe { set_union(__local_set1, __local_set2) })
 
-    if (((if not ((if unsafe { set_num_entries(__local_result_set) } == 11: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_result_set).set_num_entries() } == 11): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (221 as i32), c"set_num_entries(result_set) == 11".ptr)
     } else {
         0
@@ -357,8 +357,8 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 11: 1 else: 0) != 0) {
-        if (((if not ((if unsafe { set_query(__local_result_set, (((&raw const __local_result[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (__local_i < 11) {
+        if ((if not (unsafe { set_query(__local_result_set, (((&raw const __local_result[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (224 as i32), c"set_query(result_set, &result[i]) != 0".ptr)
         } else {
             0
@@ -374,7 +374,7 @@ pub fn test_set_union() writes allocation_limit {
 
     alloc_test_set_limit((0 as i32))
 
-    if (((if not ((if unsafe { set_union(__local_set1, __local_set2) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_union(__local_set1, __local_set2) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (231 as i32), c"set_union(set1, set2) == NULL".ptr)
     } else {
         0
@@ -384,13 +384,13 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_allocated = ((alloc_test_get_allocated() as u64)))
 
-    if (((if not ((if unsafe { set_union(__local_set1, __local_set2) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_union(__local_set1, __local_set2) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (236 as i32), c"set_union(set1, set2) == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == __local_allocated: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == __local_allocated): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (237 as i32), c"alloc_test_get_allocated() == allocated".ptr)
     } else {
         0
@@ -400,13 +400,13 @@ pub fn test_set_union() writes allocation_limit {
 
     (__local_allocated = ((alloc_test_get_allocated() as u64)))
 
-    if (((if not ((if unsafe { set_union(__local_set1, __local_set2) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_union(__local_set1, __local_set2) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (243 as i32), c"set_union(set1, set2) == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == __local_allocated: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == __local_allocated): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_union".ptr, c"test-set.c".ptr, (244 as i32), c"alloc_test_get_allocated() == allocated".ptr)
     } else {
         0
@@ -439,7 +439,7 @@ pub fn test_set_intersection() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 7: 1 else: 0) != 0) {
+    while (__local_i < 7) {
         unsafe { set_insert(__local_set1, (((&raw const __local_numbers1[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -452,7 +452,7 @@ pub fn test_set_intersection() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 7: 1 else: 0) != 0) {
+    while (__local_i < 7) {
         unsafe { set_insert(__local_set2, (((&raw const __local_numbers2[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
 
 
@@ -463,7 +463,7 @@ pub fn test_set_intersection() writes allocation_limit {
 
     (__local_result_set = unsafe { set_intersection(__local_set1, __local_set2) })
 
-    if (((if not ((if unsafe { set_num_entries(__local_result_set) } == 3: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_result_set).set_num_entries() } == 3): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_intersection".ptr, c"test-set.c".ptr, (278 as i32), c"set_num_entries(result_set) == 3".ptr)
     } else {
         0
@@ -471,8 +471,8 @@ pub fn test_set_intersection() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 3: 1 else: 0) != 0) {
-        if (((if not ((if unsafe { set_query(__local_result_set, (((&raw const __local_result[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (__local_i < 3) {
+        if ((if not (unsafe { set_query(__local_result_set, (((&raw const __local_result[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_intersection".ptr, c"test-set.c".ptr, (281 as i32), c"set_query(result_set, &result[i]) != 0".ptr)
         } else {
             0
@@ -486,7 +486,7 @@ pub fn test_set_intersection() writes allocation_limit {
 
     alloc_test_set_limit((0 as i32))
 
-    if (((if not ((if unsafe { set_intersection(__local_set1, __local_set2) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_intersection(__local_set1, __local_set2) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_intersection".ptr, c"test-set.c".ptr, (286 as i32), c"set_intersection(set1, set2) == NULL".ptr)
     } else {
         0
@@ -496,13 +496,13 @@ pub fn test_set_intersection() writes allocation_limit {
 
     (__local_allocated = ((alloc_test_get_allocated() as u64)))
 
-    if (((if not ((if unsafe { set_intersection(__local_set1, __local_set2) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_intersection(__local_set1, __local_set2) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_intersection".ptr, c"test-set.c".ptr, (291 as i32), c"set_intersection(set1, set2) == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if alloc_test_get_allocated() == __local_allocated: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (alloc_test_get_allocated() == __local_allocated): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_intersection".ptr, c"test-set.c".ptr, (292 as i32), c"alloc_test_get_allocated() == allocated".ptr)
     } else {
         0
@@ -529,7 +529,7 @@ pub fn test_set_to_array() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 100: 1 else: 0) != 0) {
+    while (__local_i < 100) {
         (__local_values[__local_i] = ((1 as i32)))
 
         unsafe { set_insert(__local_set, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) }
@@ -544,8 +544,8 @@ pub fn test_set_to_array() writes allocation_limit {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 100: 1 else: 0) != 0) {
-        if (((if not ((if (unsafe *((__local_array[__local_i]) as *mut i32)) == 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (__local_i < 100) {
+        if ((if not ((unsafe *((__local_array[__local_i]) as *mut i32)) == 1): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_to_array".ptr, c"test-set.c".ptr, (319 as i32), c"*array[i] == 1".ptr)
         } else {
             0
@@ -561,7 +561,7 @@ pub fn test_set_to_array() writes allocation_limit {
 
     alloc_test_set_limit((0 as i32))
 
-    if (((if not ((if unsafe { set_to_array(__local_set) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_to_array(__local_set) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_to_array".ptr, c"test-set.c".ptr, (325 as i32), c"set_to_array(set) == NULL".ptr)
     } else {
         0
@@ -586,20 +586,20 @@ pub fn test_set_iterating() writes allocation_limit {
 
     unsafe { set_iterate(__local_set, (&raw mut __local_iterator as *mut _SetIterator)) }
 
-    while (unsafe { set_iter_has_more((&raw mut __local_iterator as *mut _SetIterator)) } != 0) {
-        unsafe { set_iter_next((&raw mut __local_iterator as *mut _SetIterator)) }
+    while unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_has_more() } {
+        unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_next() }
 
         (__local_count = __local_count + 1)
 
     }
 
-    if (((if not ((if unsafe { set_iter_next((&raw mut __local_iterator as *mut _SetIterator)) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_next() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating".ptr, c"test-set.c".ptr, (351 as i32), c"set_iter_next(&iterator) == NULL".ptr)
     } else {
         0
     }
 
-    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_count == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating".ptr, c"test-set.c".ptr, (354 as i32), c"count == 10000".ptr)
     } else {
         0
@@ -611,7 +611,7 @@ pub fn test_set_iterating() writes allocation_limit {
 
     unsafe { set_iterate(__local_set, (&raw mut __local_iterator as *mut _SetIterator)) }
 
-    if (((if not ((if unsafe { set_iter_has_more((&raw mut __local_iterator as *mut _SetIterator)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_has_more() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating".ptr, c"test-set.c".ptr, (363 as i32), c"set_iter_has_more(&iterator) == 0".ptr)
     } else {
         0
@@ -640,10 +640,10 @@ pub fn test_set_iterating_remove() writes allocation_limit {
 
     unsafe { set_iterate(__local_set, (&raw mut __local_iterator as *mut _SetIterator)) }
 
-    while (unsafe { set_iter_has_more((&raw mut __local_iterator as *mut _SetIterator)) } != 0) {
-        (__local_value = ((unsafe { set_iter_next((&raw mut __local_iterator as *mut _SetIterator)) } as *mut c_char)))
+    while unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_has_more() } {
+        (__local_value = ((unsafe { (*(&raw mut __local_iterator as *mut _SetIterator)).set_iter_next() } as *mut c_char)))
 
-        if ((if (atoi((__local_value as *const c_char)) % 100) == 0: 1 else: 0) != 0) {
+        if ((atoi((__local_value as *const c_char)) % 100) == 0) {
             unsafe { set_remove(__local_set, (__local_value as *mut c_void)) }
 
             (__local_removed = (__local_removed +% 1))
@@ -654,19 +654,19 @@ pub fn test_set_iterating_remove() writes allocation_limit {
 
     }
 
-    if (((if not ((if __local_count == 10000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_count == 10000): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating_remove".ptr, c"test-set.c".ptr, (403 as i32), c"count == 10000".ptr)
     } else {
         0
     }
 
-    if (((if not ((if __local_removed == 100: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_removed == 100): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating_remove".ptr, c"test-set.c".ptr, (404 as i32), c"removed == 100".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { set_num_entries(__local_set) } == ((10000 as u32) -% (__local_removed as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_set).set_num_entries() } == ((10000 as u32) -% (__local_removed as u32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_iterating_remove".ptr, c"test-set.c".ptr, (405 as i32), c"set_num_entries(set) == 10000 - removed".ptr)
     } else {
         0
@@ -689,6 +689,7 @@ pub fn new_value(__param_value: i32) -> *mut i32 writes allocated_values, alloca
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn free_value(__param_value: *mut c_void) writes allocated_values {
     alloc_test_free(__param_value)
 
@@ -705,13 +706,13 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
 
     (__local_set = set_new(Some(int_hash), Some(int_equal)))
 
-    unsafe { set_register_free_function(__local_set, Some(free_value)) }
+    unsafe { (*__local_set).set_register_free_function(Some(free_value)) }
 
     (allocated_values = ((0 as i32)))
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 1000: 1 else: 0) != 0) {
+    while (__local_i < 1000) {
         (__local_value = new_value(__local_i))
 
         unsafe { set_insert(__local_set, (__local_value as *mut c_void)) }
@@ -722,7 +723,7 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
     }
 
 
-    if (((if not ((if allocated_values == 1000: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 1000): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_free_function".ptr, c"test-set.c".ptr, (448 as i32), c"allocated_values == 1000".ptr)
     } else {
         0
@@ -732,7 +733,7 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
 
     unsafe { set_remove(__local_set, ((&raw mut __local_i as *mut i32) as *mut c_void)) }
 
-    if (((if not ((if allocated_values == 999: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 999): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_free_function".ptr, c"test-set.c".ptr, (454 as i32), c"allocated_values == 999".ptr)
     } else {
         0
@@ -740,7 +741,7 @@ pub fn test_set_free_function() -> Unit writes allocated_values, allocation_limi
 
     unsafe { set_free(__local_set) }
 
-    if (((if not ((if allocated_values == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_values == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_free_function".ptr, c"test-set.c".ptr, (459 as i32), c"allocated_values == 0".ptr)
     } else {
         0
@@ -761,13 +762,13 @@ pub fn test_set_out_of_memory() writes allocation_limit {
 
     (__local_values[0] = ((0 as i32)))
 
-    if (((if not ((if unsafe { set_insert(__local_set, (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_insert(__local_set, (((&raw const __local_values[0] as *const i32) as *mut i32) as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (474 as i32), c"set_insert(set, &values[0]) == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { set_num_entries(__local_set) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_set).set_num_entries() } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (475 as i32), c"set_num_entries(set) == 0".ptr)
     } else {
         0
@@ -777,16 +778,16 @@ pub fn test_set_out_of_memory() writes allocation_limit {
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < 65: 1 else: 0) != 0) {
+    while (__local_i < 65) {
         (__local_values[__local_i] = ((__local_i as i32)))
 
-        if (((if not ((if unsafe { set_insert(__local_set, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { set_insert(__local_set, (((&raw const __local_values[__local_i] as *const i32) as *mut i32) as *mut c_void)) } != 0): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (486 as i32), c"set_insert(set, &values[i]) != 0".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { set_num_entries(__local_set) } == ((__local_i as u32) +% (1 as u32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_set).set_num_entries() } == ((__local_i as u32) +% (1 as u32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (487 as i32), c"set_num_entries(set) == i + 1".ptr)
         } else {
             0
@@ -798,7 +799,7 @@ pub fn test_set_out_of_memory() writes allocation_limit {
     }
 
 
-    if (((if not ((if unsafe { set_num_entries(__local_set) } == 65: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_set).set_num_entries() } == 65): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (490 as i32), c"set_num_entries(set) == 65".ptr)
     } else {
         0
@@ -808,13 +809,13 @@ pub fn test_set_out_of_memory() writes allocation_limit {
 
     (__local_values[65] = ((65 as i32)))
 
-    if (((if not ((if unsafe { set_insert(__local_set, (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void)) } == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { set_insert(__local_set, (((&raw const __local_values[65] as *const i32) as *mut i32) as *mut c_void)) } == 0): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (497 as i32), c"set_insert(set, &values[65]) == 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { set_num_entries(__local_set) } == 65: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_set).set_num_entries() } == 65): 1 else: 0) as i64) {
         __assert_rtn(c"test_set_out_of_memory".ptr, c"test-set.c".ptr, (498 as i32), c"set_num_entries(set) == 65".ptr)
     } else {
         0
@@ -824,6 +825,7 @@ pub fn test_set_out_of_memory() writes allocation_limit {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn main(__param_argc: i32, __param_argv: *mut *mut c_char) -> i32 writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 

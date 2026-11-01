@@ -31,12 +31,13 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.engines.pcre2.pcre2_compile_class
 
+// contract: unproved:0:read only
 pub unsafe fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __param_length: u32) -> u16 {
     var __local_hash: u16
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -45,7 +46,7 @@ pub unsafe fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __para
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -54,6 +55,7 @@ pub unsafe fn _pcre2_compile_get_hash_from_name8(__param_name: *const u8, __para
 
 }
 
+// contract: unproved:0:read only,unproved:2:returns a pointer loaded from the parameter
 pub unsafe fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_length: u32, __param_cb: *mut compile_block_8) -> *mut named_group_8 {
     var __local_hash: u16 = ((_pcre2_compile_get_hash_from_name8(__param_name, __param_length) as u16))
 
@@ -63,20 +65,20 @@ pub unsafe fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_
 
     (__local_ng = (*__param_cb).named_groups)
 
-    while ((if __local_ng < __local_end: 1 else: 0) != 0) {
+    while (__local_ng < __local_end) {
         var __ci_expr_logic_1: i32 = 0
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if __param_length == (*__local_ng).length: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_hash == (((*__local_ng).hash_dup as i32) & (32767 as i32)): 1 else: 0) != 0: 1 else: 0))
+        if (__param_length == (*__local_ng).length) {
+            (__ci_expr_logic_0 = (if __local_hash == (((*__local_ng).hash_dup as i32) & (32767 as i32)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
-            (__ci_expr_logic_1 = (if (if _pcre2_strncmp_8(__param_name, (*__local_ng).name, (__param_length as u64)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_0 {
+            (__ci_expr_logic_1 = (if _pcre2_strncmp_8(__param_name, (*__local_ng).name, (__param_length as u64)) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return __local_ng
         }
 
@@ -90,6 +92,7 @@ pub unsafe fn _pcre2_compile_find_named_group8(__param_name: *const u8, __param_
 
 }
 
+// contract: receiver:compile_block_8,unproved:1:read only
 pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8, __param_ng: *mut named_group_8, __param_tablecount: u32) -> u32 {
     var __local_ng = __param_ng
     var __local_tablecount = __param_tablecount
@@ -105,20 +108,20 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if ((if (((*__local_ng).hash_dup as i32) & (32768 as i32)) != 0: 1 else: 0) != 0) {
+    if ((((*__local_ng).hash_dup as i32) & (32768 as i32)) != 0) {
         var __local_ng_it: *mut named_group_8
 
         var __local_end: *mut named_group_8 = ((*__param_cb).named_groups + (((*__param_cb).names_found as u32) as usize))
 
         (__local_ng_it = __local_ng + ((1 as isize) as usize))
 
-        while ((if __local_ng_it < __local_end: 1 else: 0) != 0) {
-            if ((if (*__local_ng_it).name == __local_name: 1 else: 0) != 0) {
+        while (__local_ng_it < __local_end) {
+            if ((*__local_ng_it).name == __local_name) {
                 (__local_duplicate_count = (__local_duplicate_count +% 1))
             }
 
@@ -131,21 +134,21 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __local_tablecount: 1 else: 0) != 0) {
+    while (__local_i < __local_tablecount) {
         var __local_crc: i32 = ((with_memcmp(((__local_name as *const c_void) as *const u8), (((__local_slot + ((2 as isize) as usize)) as *const c_void) as *const u8), (((__local_length * (8 / 8)) as u64) as i64)) as i32))
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if __local_crc == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (__local_slot[(2 + __local_length)]) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__local_crc == 0) {
+            (__ci_expr_logic_0 = (if (__local_slot[(2 + __local_length)]) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_crc = ((-1 as i32)))
         }
 
 
-        if ((if __local_crc < 0: 1 else: 0) != 0) {
+        if (__local_crc < 0) {
             with_memmove((((__local_slot + (((((*__param_cb).name_entry_size as i32) as u32) *% (__local_duplicate_count as u32)) as usize)) as *mut c_void) as *mut u8), ((__local_slot as *const c_void) as *const u8), ((((((((__local_tablecount as u32) -% (__local_i as u32)) as u32) *% (((*__param_cb).name_entry_size as i32) as u32)) as u32) *% (1 as u32)) as u64) as i64))
 
             break
@@ -162,7 +165,7 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
 
     (__local_tablecount = (__local_tablecount +% __local_duplicate_count))
 
-    while (1 != 0) {
+    while true {
         ((__local_slot[0]) = (((((*__local_ng).number as u32) >> (8 as u32)) as u8)))
 
         ((__local_slot[(0 + 1)]) = (((((*__local_ng).number as u32) & (255 as u32)) as u8)))
@@ -174,15 +177,15 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
 
         (__local_duplicate_count = (__local_duplicate_count -% 1))
 
-        if ((if __local_duplicate_count == 0: 1 else: 0) != 0) {
+        if (__local_duplicate_count == 0) {
             break
         }
 
 
-        while (1 != 0) {
+        while true {
             (__local_ng = __local_ng + 1)
 
-            if ((if (*__local_ng).name == __local_name: 1 else: 0) != 0) {
+            if ((*__local_ng).name == __local_name) {
                 break
             }
 
@@ -196,6 +199,7 @@ pub unsafe fn _pcre2_compile_add_name_to_table8(__param_cb: *mut compile_block_8
 
 }
 
+// contract: unproved:0:read only,unproved:2:out-parameter a return before the write,unproved:3:out-parameter a return before the write,unproved:4:out-parameter written conditionally,unproved:5:out-parameter read before the write
 pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __param_length: u32, __param_indexptr: *mut i32, __param_countptr: *mut i32, __param_errorcodeptr: *mut i32, __param_cb: *mut compile_block_8) -> i32 {
     var __local_i: u32
 
@@ -208,14 +212,14 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < (*__param_cb).names_found: 1 else: 0) != 0) {
+    while (__local_i < (*__param_cb).names_found) {
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if _pcre2_strncmp_8(__param_name, ((__local_slot + ((2 as isize) as usize)) as *const u8), (__param_length as u64)) == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (__local_slot[((2 as u32) +% (__param_length as u32))]) == 0: 1 else: 0) != 0: 1 else: 0))
+        if (_pcre2_strncmp_8(__param_name, ((__local_slot + ((2 as isize) as usize)) as *const u8), (__param_length as u64)) == 0) {
+            (__ci_expr_logic_0 = (if (__local_slot[((2 as u32) +% (__param_length as u32))]) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             break
         }
 
@@ -228,10 +232,10 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
     }
 
 
-    if ((if __local_i >= (*__param_cb).names_found: 1 else: 0) != 0) {
+    if (__local_i >= (*__param_cb).names_found) {
         loop {
             0
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -253,15 +257,15 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
         (__local_groupnumber = (((((((__local_slot[0]) as i32) << (8 as u32)) as i32) | ((__local_slot[(0 + 1)]) as i32)) as u32)))
 
-        ((*__param_cb).backref_map = ((*__param_cb).backref_map as u32) | ((if (if __local_groupnumber < 32: 1 else: 0) != 0: (((1 as u32) << (__local_groupnumber as u32)) as u32) else: (1 as u32)) as u32))
+        ((*__param_cb).backref_map = ((*__param_cb).backref_map as u32) | ((if __local_groupnumber < 32: (((1 as u32) << (__local_groupnumber as u32)) as u32) else: (1 as u32)) as u32))
 
-        if ((if __local_groupnumber > (*__param_cb).top_backref: 1 else: 0) != 0) {
+        if (__local_groupnumber > (*__param_cb).top_backref) {
             ((*__param_cb).top_backref = __local_groupnumber)
         }
 
         (__local_i = (__local_i +% 1))
 
-        if ((if __local_i >= (*__param_cb).names_found: 1 else: 0) != 0) {
+        if (__local_i >= (*__param_cb).names_found) {
             break
         }
 
@@ -270,13 +274,13 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
         var __ci_expr_logic_1: i32
 
-        if ((if _pcre2_strncmp_8(__param_name, ((__local_slot + ((2 as isize) as usize)) as *const u8), (__param_length as u64)) != 0: 1 else: 0) != 0) {
+        if (_pcre2_strncmp_8(__param_name, ((__local_slot + ((2 as isize) as usize)) as *const u8), (__param_length as u64)) != 0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if ((__local_slot + ((2 as isize) as usize))[__param_length]) != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if ((__local_slot + ((2 as isize) as usize))[__param_length]) != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             break
         }
 
@@ -289,6 +293,7 @@ pub unsafe fn _pcre2_compile_find_dupname_details8(__param_name: *const u8, __pa
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally,unproved:2:out-parameter read before the write,unproved:3:out-parameter a return before the write
 pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __param_errorcodeptr: *mut i32, __param_cb: *mut compile_block_8, __param_lengthptr: *mut u64) -> *mut u32 {
     var __local_pptr = __param_pptr
     var __local_captures: *mut u8
@@ -309,12 +314,12 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if ((if _pcre2_compile_process_capture_list((__local_pptr - ((1 as isize) as usize)), (0 as u64), __param_errorcodeptr, __param_cb) == 0: 1 else: 0) != 0) {
+    if (_pcre2_compile_process_capture_list((__local_pptr - ((1 as isize) as usize)), (0 as u64), __param_errorcodeptr, __param_cb) == 0) {
         return ((null as *mut u32))
     }
 
@@ -322,7 +327,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
     (__local_captures = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc.unwrap()(__local_size, (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut u8)))
 
-    if ((if __local_captures == null: 1 else: 0) != 0) {
+    if (__local_captures == null) {
         ((*__param_errorcodeptr) = ERR21)
 
         ((*__param_cb).erroroffset = (((((((__local_pptr[1]) as u64) << (32 as u32)) as u64) | ((__local_pptr[2]) as u64)) as u64)))
@@ -335,7 +340,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
     with_memset(((__local_captures as *mut c_void) as *mut u8), (0 as i32), (__local_size as i64))
 
-    while (1 != 0) {
+    while true {
         var __ci_expr_switch_continue_0: i32 = 0
 
         while true {
@@ -356,7 +361,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -368,10 +373,10 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
                     (__local_all_found = ((1 as i32)))
 
                     loop {
-                        if ((if (*__local_ng).name != __local_name: 1 else: 0) != 0) {
+                        if ((*__local_ng).name != __local_name) {
                             (__local_ng = __local_ng + 1)
 
-                            if ((if __local_ng < __local_end: 1 else: 0) != 0) {
+                            if (__local_ng < __local_end) {
                                 continue
                             }
                             break
@@ -382,14 +387,14 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
                         loop {
                             0
-                            if not ((0 != 0)) {
+                            if not (false) {
                                 break
                             }
                         }
 
                         (__local_bit = ((((1 as i32) << ((((*__local_ng).number as u32) & (7 as u32)) as u32)) as u8)))
 
-                        if ((if (((*__local_capture_ptr) as i32) & (__local_bit as i32)) == 0: 1 else: 0) != 0) {
+                        if ((((*__local_capture_ptr) as i32) & (__local_bit as i32)) == 0) {
                             ((*__local_capture_ptr) = ((*__local_capture_ptr) as u8) | (__local_bit as u8))
 
                             (__local_all_found = ((0 as i32)))
@@ -397,12 +402,12 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
                         }
 
                         (__local_ng = __local_ng + 1)
-                        if not (((if __local_ng < __local_end: 1 else: 0) != 0)) {
+                        if not ((__local_ng < __local_end)) {
                             break
                         }
                     }
 
-                    if ((if not (__local_all_found != 0): 1 else: 0) != 0) {
+                    if (not __local_all_found) {
                         ((*__param_lengthptr) = ((*__param_lengthptr) +% 5))
 
                         (__ci_expr_switch_continue_0 = 1)
@@ -429,14 +434,14 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
 
                     (__local_bit = ((((1 as i32) << ((((__local_pptr[-1]) as u32) & (7 as u32)) as u32)) as u8)))
 
-                    if ((if (((*__local_capture_ptr) as i32) & (__local_bit as i32)) != 0: 1 else: 0) != 0) {
+                    if ((((*__local_capture_ptr) as i32) & (__local_bit as i32)) != 0) {
                         ((__local_pptr[-1]) = ((0 as u32)))
 
                         (__ci_expr_switch_continue_0 = 1)
@@ -480,6 +485,7 @@ pub unsafe fn _pcre2_compile_parse_scan_substr_args8(__param_pptr: *mut u32, __p
 
 }
 
+// contract: unproved:0:read only,unproved:2:out-parameter read before the write,unproved:3:out-parameter read before the write
 pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, __param_offset: u64, __param_errorcodeptr: *mut i32, __param_cb: *mut compile_block_8) -> i32 {
     var __local_pptr: *mut u32 = __param_pptr_start
 
@@ -506,13 +512,13 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     (__local_size = ((_pcre2_compile_process_capture_list(__local_pptr, __param_offset, __param_errorcodeptr, __param_cb) as u64)))
 
-    if ((if __local_size == 0: 1 else: 0) != 0) {
+    if (__local_size == 0) {
         return 0
     }
 
     (__local_args = (((*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).malloc.unwrap()((((sizeof[recurse_arguments]() as u64) +% (((__local_size as u64) *% (sizeof[u16]() as u64)) as u64)) as u64), (*(&raw const (*(*__param_cb).cx).memctl as *const pcre2_memctl)).memory_data) as *mut recurse_arguments)))
 
-    if ((if __local_args == null: 1 else: 0) != 0) {
+    if (__local_args == null) {
         ((*__param_errorcodeptr) = ERR21)
 
         ((*__param_cb).erroroffset = __param_offset)
@@ -525,7 +531,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     ((*__local_args).size = __local_size)
 
-    if ((if (*__param_cb).last_data != null: 1 else: 0) != 0) {
+    if ((*__param_cb).last_data != null) {
         ((*(*__param_cb).last_data).next = (((&raw const (*__local_args).header as *const compile_data) as *mut compile_data)))
     } else {
         ((*__param_cb).first_data = (((&raw const (*__local_args).header as *const compile_data) as *mut compile_data)))
@@ -535,7 +541,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     (__local_captures = (((__local_args + ((1 as isize) as usize)) as *mut u16)))
 
-    while (1 != 0) {
+    while true {
         (__local_pptr = __local_pptr + 1)
 
         var __ci_expr_switch_continue_3: i32 = 0
@@ -559,7 +565,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -576,11 +582,11 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
                     while true {
                         (__local_ng = __local_ng + 1)
 
-                        if (not ((if __local_ng < __local_end: 1 else: 0) != 0)) {
+                        if (not (__local_ng < __local_end)) {
                             break
                         }
 
-                        if ((if (*__local_ng).name == __local_name: 1 else: 0) != 0) {
+                        if ((*__local_ng).name == __local_name) {
                             var __ci_expr_old_1: *mut u16 = __local_captures
 
                             (__local_captures = __local_captures + 1)
@@ -633,14 +639,14 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     ((*__local_args).skip_size = ((((((((__local_pptr as usize) -% (__param_pptr_start as usize)) as i64) / (sizeof[u32]() as i64)) as u64) -% (1 as u64)) as u64)))
 
-    if ((if __local_size == 1: 1 else: 0) != 0) {
+    if (__local_size == 1) {
         return 1
     }
 
@@ -648,10 +654,10 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     (__local_i = ((((((__local_size as u64) >> (1 as u32)) as u64) -% (1 as u64)) as u64)))
 
-    while (1 != 0) {
+    while true {
         do_heapify_u16(__local_captures, __local_size, __local_i)
 
-        if ((if __local_i == 0: 1 else: 0) != 0) {
+        if (__local_i == 0) {
             break
         }
 
@@ -661,7 +667,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     (__local_i = ((((__local_size as u64) -% (1 as u64)) as u64)))
 
-    while ((if __local_i > 0: 1 else: 0) != 0) {
+    while (__local_i > 0) {
         (__local_tmp = (((__local_captures[0]) as u16)))
 
         ((__local_captures[0]) = (((__local_captures[__local_i]) as u16)))
@@ -687,8 +693,8 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
     (__local_current = __local_captures)
 
-    while ((if __local_current < __local_captures_end: 1 else: 0) != 0) {
-        if ((if (*__local_current) != __local_tmp: 1 else: 0) != 0) {
+    while (__local_current < __local_captures_end) {
+        if ((*__local_current) != __local_tmp) {
             (__local_tmp = (*__local_current))
 
             var __ci_expr_old_5: *mut u16 = __local_captures
@@ -710,6 +716,7 @@ pub unsafe fn _pcre2_compile_parse_recurse_args8(__param_pptr_start: *mut u32, _
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,unproved:2:out-parameter written conditionally,unproved:3:out-parameter read before the write
 unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_offset: u64, __param_errorcodeptr: *mut i32, __param_cb: *mut compile_block_8) -> u64 {
     var __local_pptr = __param_pptr
     var __local_offset = __param_offset
@@ -726,7 +733,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
     var __local_end: *mut named_group_8 = ((*__param_cb).named_groups + (((*__param_cb).names_found as u32) as usize))
 
-    while (1 != 0) {
+    while true {
         (__local_pptr = __local_pptr + 1)
 
         var __ci_expr_switch_continue_0: i32 = 0
@@ -757,7 +764,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
                     (__local_ng = _pcre2_compile_find_named_group8(__local_name, __local_length, __param_cb))
 
-                    if ((if __local_ng == null: 1 else: 0) != 0) {
+                    if (__local_ng == null) {
                         ((*__param_errorcodeptr) = ERR15)
 
                         ((*__param_cb).erroroffset = __local_offset)
@@ -766,7 +773,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
                     }
 
-                    if ((if (((*__local_ng).hash_dup as i32) & (32768 as i32)) == 0: 1 else: 0) != 0) {
+                    if ((((*__local_ng).hash_dup as i32) & (32768 as i32)) == 0) {
                         ((__local_pptr[-1]) = ((2149122048 as u32)))
 
                         ((__local_pptr[0]) = (*__local_ng).number)
@@ -791,11 +798,11 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
                     while true {
                         (__local_ng = __local_ng + 1)
 
-                        if (not ((if __local_ng < __local_end: 1 else: 0) != 0)) {
+                        if (not (__local_ng < __local_end)) {
                             break
                         }
 
-                        if ((if (*__local_ng).name == __local_name: 1 else: 0) != 0) {
+                        if ((*__local_ng).name == __local_name) {
                             (__local_size = (__local_size +% 1))
                         }
 
@@ -815,7 +822,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
                     (__local_i = (((*__local_pptr) as u64)))
 
 
-                    if ((if __local_i > (*__param_cb).bracount: 1 else: 0) != 0) {
+                    if (__local_i > (*__param_cb).bracount) {
                         ((*__param_errorcodeptr) = ERR15)
 
                         ((*__param_cb).erroroffset = __local_offset)
@@ -824,7 +831,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
                     }
 
-                    if ((if __local_i > (*__param_cb).top_backref: 1 else: 0) != 0) {
+                    if (__local_i > (*__param_cb).top_backref) {
                         ((*__param_cb).top_backref = (((__local_i as u16) as u32)))
                     }
 
@@ -852,7 +859,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
         loop {
             0
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -863,6 +870,7 @@ unsafe fn _pcre2_compile_process_capture_list(__param_pptr: *mut u32, __param_of
 
 }
 
+// contract: unproved:0:out-parameter written conditionally
 unsafe fn do_heapify_u16(__param_captures: *mut u16, __param_size: u64, __param_i: u64) {
     var __local_i = __param_i
     var __local_max: u64
@@ -873,7 +881,7 @@ unsafe fn do_heapify_u16(__param_captures: *mut u16, __param_size: u64, __param_
 
     var __local_tmp: u16
 
-    while (1 != 0) {
+    while true {
         (__local_max = __local_i)
 
         (__local_left = ((((((__local_i as u64) << (1 as u32)) as u64) +% (1 as u64)) as u64)))
@@ -882,27 +890,27 @@ unsafe fn do_heapify_u16(__param_captures: *mut u16, __param_size: u64, __param_
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if __local_left < __param_size: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (__param_captures[__local_left]) > (__param_captures[__local_max]): 1 else: 0) != 0: 1 else: 0))
+        if (__local_left < __param_size) {
+            (__ci_expr_logic_0 = (if (__param_captures[__local_left]) > (__param_captures[__local_max]): 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_max = __local_left)
         }
 
 
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if __local_right < __param_size: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (__param_captures[__local_right]) > (__param_captures[__local_max]): 1 else: 0) != 0: 1 else: 0))
+        if (__local_right < __param_size) {
+            (__ci_expr_logic_1 = (if (__param_captures[__local_right]) > (__param_captures[__local_max]): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             (__local_max = __local_right)
         }
 
 
-        if ((if __local_i == __local_max: 1 else: 0) != 0) {
+        if (__local_i == __local_max) {
             return
         }
 

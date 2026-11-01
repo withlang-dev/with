@@ -69,20 +69,23 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
+// contract: unproved:0:mutated through a pointer to no corpus record
 pub unsafe fn tommy_list_init(__param_list: *mut *mut tommy_node_struct) {
     ((*__param_list) = null)
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn tommy_list_head(__param_list: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     return (*__param_list)
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 pub unsafe fn tommy_list_tail(__param_list: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
 
-    if ((if not (__local_head != null): 1 else: 0) != 0) {
+    if (not (__local_head != null)) {
         return ((0 as *mut tommy_node_struct))
     }
 
@@ -90,6 +93,7 @@ pub unsafe fn tommy_list_tail(__param_list: *mut *mut tommy_node_struct) -> *mut
 
 }
 
+// contract: unproved:0:mutated through a pointer to no corpus record,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_insert_first(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) {
     ((*__param_node).prev = __param_node)
 
@@ -99,6 +103,7 @@ pub unsafe fn tommy_list_insert_first(__param_list: *mut *mut tommy_node_struct,
 
 }
 
+// contract: unproved:0:out-parameter read before the write,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_insert_head_not_empty(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) {
     var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -112,6 +117,7 @@ pub unsafe fn tommy_list_insert_head_not_empty(__param_list: *mut *mut tommy_nod
 
 }
 
+// contract: receiver-mut:tommy_node_struct,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_insert_tail_not_empty(__param_head: *mut tommy_node_struct, __param_node: *mut tommy_node_struct) {
     ((*__param_node).prev = (*__param_head).prev)
 
@@ -123,6 +129,7 @@ pub unsafe fn tommy_list_insert_tail_not_empty(__param_head: *mut tommy_node_str
 
 }
 
+// contract: unproved:0:out-parameter read before the write,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_insert_head(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void) {
     var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -136,6 +143,7 @@ pub unsafe fn tommy_list_insert_head(__param_list: *mut *mut tommy_node_struct, 
 
 }
 
+// contract: unproved:0:out-parameter read before the write,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_insert_tail(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void) {
     var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -149,6 +157,7 @@ pub unsafe fn tommy_list_insert_tail(__param_list: *mut *mut tommy_node_struct, 
 
 }
 
+// contract: unproved:0:out-parameter read before the write,unproved:1:out-parameter read before the write
 pub unsafe fn tommy_list_remove_existing(__param_list: *mut *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_head: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -158,7 +167,7 @@ pub unsafe fn tommy_list_remove_existing(__param_list: *mut *mut tommy_node_stru
         ((*__local_head).prev = (*__param_node).prev)
     }
 
-    if ((if __local_head == __param_node: 1 else: 0) != 0) {
+    if (__local_head == __param_node) {
         ((*__param_list) = (*__param_node).next)
     } else {
         ((*(*__param_node).prev).next = (*__param_node).next)
@@ -168,6 +177,7 @@ pub unsafe fn tommy_list_remove_existing(__param_list: *mut *mut tommy_node_stru
 
 }
 
+// contract: unproved:0:out-parameter a return before the write,unproved:1:read only
 pub unsafe fn tommy_list_concat(__param_first: *mut *mut tommy_node_struct, __param_second: *mut *mut tommy_node_struct) {
     var __local_first_head: *mut tommy_node_struct
 
@@ -177,13 +187,13 @@ pub unsafe fn tommy_list_concat(__param_first: *mut *mut tommy_node_struct, __pa
 
     (__local_second_head = tommy_list_head(__param_second))
 
-    if ((if __local_second_head == 0: 1 else: 0) != 0) {
+    if (__local_second_head == 0) {
         return
     }
 
     (__local_first_head = tommy_list_head(__param_first))
 
-    if ((if __local_first_head == 0: 1 else: 0) != 0) {
+    if (__local_first_head == 0) {
         ((*__param_first) = (*__param_second))
 
         return
@@ -200,12 +210,13 @@ pub unsafe fn tommy_list_concat(__param_first: *mut *mut tommy_node_struct, __pa
 
 }
 
+// contract: unproved:0:out-parameter written conditionally
 pub unsafe fn tommy_list_sort(__param_list: *mut *mut tommy_node_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
     var __local_chain: tommy_chain_struct
 
     var __local_head: *mut tommy_node_struct
 
-    if (tommy_list_empty(__param_list) != 0) {
+    if tommy_list_empty(__param_list) {
         return
     }
 
@@ -215,17 +226,19 @@ pub unsafe fn tommy_list_sort(__param_list: *mut *mut tommy_node_struct, __param
 
     (__local_chain.tail = (*__local_head).prev)
 
-    tommy_chain_mergesort((&raw mut __local_chain as *mut tommy_chain_struct), __param_cmp)
+    (*(&raw mut __local_chain as *mut tommy_chain_struct)).tommy_chain_mergesort(__param_cmp)
 
     tommy_list_set(__param_list, (*(&raw const __local_chain as *const tommy_chain_struct)).head, (*(&raw const __local_chain as *const tommy_chain_struct)).tail)
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn tommy_list_empty(__param_list: *mut *mut tommy_node_struct) -> i32 {
     return (if tommy_list_head(__param_list) == 0: 1 else: 0)
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn tommy_list_count(__param_list: *mut *mut tommy_node_struct) -> u64 {
     var __local_count: u64 = ((0 as u64))
 
@@ -242,6 +255,7 @@ pub unsafe fn tommy_list_count(__param_list: *mut *mut tommy_node_struct) -> u64
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn tommy_list_foreach(__param_list: *mut *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     var __local_node: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -256,6 +270,7 @@ pub unsafe fn tommy_list_foreach(__param_list: *mut *mut tommy_node_struct, __pa
 
 }
 
+// contract: unproved:0:read only,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_list_foreach_arg(__param_list: *mut *mut tommy_node_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_node: *mut tommy_node_struct = tommy_list_head(__param_list)
 
@@ -270,6 +285,7 @@ pub unsafe fn tommy_list_foreach_arg(__param_list: *mut *mut tommy_node_struct, 
 
 }
 
+// contract: receiver-mut:tommy_node_struct,stored-unknown:1,stored-unknown:2,stored-unknown:3 — stores an argument; ownership not modeled
 pub unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, __param_first_after: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct, __param_second_tail: *mut tommy_node_struct) {
     ((*__param_first_after).prev = __param_second_tail)
 
@@ -281,6 +297,7 @@ pub unsafe fn tommy_chain_splice(__param_first_before: *mut tommy_node_struct, _
 
 }
 
+// contract: receiver-mut:tommy_node_struct,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __param_second_head: *mut tommy_node_struct) {
     ((*__param_second_head).prev = __param_first_tail)
 
@@ -288,16 +305,17 @@ pub unsafe fn tommy_chain_concat(__param_first_tail: *mut tommy_node_struct, __p
 
 }
 
+// contract: receiver-mut:tommy_chain_struct,unproved:1:read only
 pub unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
     var __local_first_i: *mut tommy_node_struct = (*__param_first).head
 
     var __local_second_i: *mut tommy_node_struct = (*__param_second).head
 
-    while (1 != 0) {
-        if ((if __param_cmp(((*__local_first_i).data as *const c_void), ((*__local_second_i).data as *const c_void)) > 0: 1 else: 0) != 0) {
+    while true {
+        if (__param_cmp(((*__local_first_i).data as *const c_void), ((*__local_second_i).data as *const c_void)) > 0) {
             var __local_next: *mut tommy_node_struct = (*__local_second_i).next
 
-            if ((if __local_first_i == (*__param_first).head: 1 else: 0) != 0) {
+            if (__local_first_i == (*__param_first).head) {
                 tommy_chain_concat(__local_second_i, __local_first_i)
 
                 ((*__param_first).head = __local_second_i)
@@ -307,14 +325,14 @@ pub unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_
 
             }
 
-            if ((if __local_second_i == (*__param_second).tail: 1 else: 0) != 0) {
+            if (__local_second_i == (*__param_second).tail) {
                 break
             }
 
             (__local_second_i = __local_next)
 
         } else {
-            if ((if __local_first_i == (*__param_first).tail: 1 else: 0) != 0) {
+            if (__local_first_i == (*__param_first).tail) {
                 tommy_chain_concat(__local_first_i, __local_second_i)
 
                 ((*__param_first).tail = (*__param_second).tail)
@@ -331,8 +349,9 @@ pub unsafe fn tommy_chain_merge(__param_first: *mut tommy_chain_struct, __param_
 
 }
 
+// contract: receiver-mut:tommy_chain_struct,unproved:1:read only
 pub unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_struct, __param_second: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) {
-    if ((if __param_cmp(((*(*__param_first).tail).data as *const c_void), ((*(*__param_second).head).data as *const c_void)) <= 0: 1 else: 0) != 0) {
+    if (__param_cmp(((*(*__param_first).tail).data as *const c_void), ((*(*__param_second).head).data as *const c_void)) <= 0) {
         tommy_chain_concat((*__param_first).tail, (*__param_second).head)
 
         ((*__param_first).tail = (*__param_second).tail)
@@ -341,7 +360,7 @@ pub unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_stru
 
     }
 
-    if ((if __param_cmp(((*(*__param_second).tail).data as *const c_void), ((*(*__param_first).head).data as *const c_void)) < 0: 1 else: 0) != 0) {
+    if (__param_cmp(((*(*__param_second).tail).data as *const c_void), ((*(*__param_first).head).data as *const c_void)) < 0) {
         tommy_chain_concat((*__param_second).tail, (*__param_first).head)
 
         ((*__param_first).head = (*__param_second).head)
@@ -354,87 +373,92 @@ pub unsafe fn tommy_chain_merge_degenerated(__param_first: *mut tommy_chain_stru
 
 }
 
-pub unsafe fn tommy_chain_mergesort(__param_chain: *mut tommy_chain_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) -> Unit {
-    var __local_bit: List[tommy_chain_struct] = [tommy_chain_struct.zeroed(); 65]
-
-    var __local_counter: u64
-
-    var __local_node: *mut tommy_node_struct = (*__param_chain).head
-
-    var __local_tail: *mut tommy_node_struct = (*__param_chain).tail
-
-    var __local_mask: u64
-
-    var __local_i: u64
-
-    (__local_counter = ((0 as u64)))
-
-    while (1 != 0) {
-        var __local_next: *mut tommy_node_struct
-
-        var __local_last: *mut tommy_chain_struct
-
-        (__local_last = (((&raw const __local_bit[64] as *const tommy_chain_struct) as *mut tommy_chain_struct)))
-
-        (__local_bit[64].head = __local_node)
-
-        (__local_bit[64].tail = __local_node)
-
-        (__local_next = (*__local_node).next)
-
-        (__local_i = ((0 as u64)))
-
-        (__local_mask = __local_counter)
-
-        while ((if ((__local_mask as u64) & (1 as u64)) != 0: 1 else: 0) != 0) {
-            tommy_chain_merge_degenerated(((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __local_last, __param_cmp)
-
-            (__local_mask = __local_mask >> (1 as u32))
-
-            (__local_last = (((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct)))
-
-            (__local_i = (__local_i +% 1))
-
-        }
-
-        (__local_bit[__local_i] = (*__local_last))
-
-        (__local_counter = (__local_counter +% 1))
-
-        if ((if __local_node == __local_tail: 1 else: 0) != 0) {
-            break
-        }
-
-        (__local_node = __local_next)
-
-    }
-
-    (__local_i = ((tommy_ctz_u64(__local_counter) as u64)))
-
-    (__local_mask = ((((__local_counter as u64) >> (__local_i as u32)) as u64)))
-
-    while ((if __local_mask != 1: 1 else: 0) != 0) {
-        (__local_mask = __local_mask >> (1 as u32))
-
-        if (((__local_mask as u64) & (1 as u64)) != 0) {
-            tommy_chain_merge_degenerated(((&raw const __local_bit[((__local_i as u64) +% (1 as u64))] as *const tommy_chain_struct) as *mut tommy_chain_struct), ((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __param_cmp)
-        } else {
-            (__local_bit[((__local_i as u64) +% (1 as u64))] = __local_bit[__local_i])
-        }
-
-        (__local_i = (__local_i +% 1))
-
-    }
-
-    with_memcpy((&raw mut (*__param_chain) as *mut u8), (&raw const __local_bit[__local_i] as *const u8), sizeof[tommy_chain_struct]())
-
-}
-
+// contract: unproved:0:mutated through a pointer to no corpus record,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn tommy_list_set(__param_list: *mut *mut tommy_node_struct, __param_head: *mut tommy_node_struct, __param_tail: *mut tommy_node_struct) {
     ((*__param_head).prev = __param_tail)
 
     ((*__param_tail).next = null)
 
     ((*__param_list) = __param_head)
+
+}
+
+impl tommy_chain_struct {
+    pub mut fn tommy_chain_mergesort(__param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32) -> Unit {
+        let __param_chain: *mut tommy_chain_struct = self as *mut tommy_chain_struct
+        var __local_bit: List[tommy_chain_struct] = [tommy_chain_struct.zeroed(); 65]
+
+        var __local_counter: u64
+
+        var __local_node: *mut tommy_node_struct = (unsafe *__param_chain).head
+
+        var __local_tail: *mut tommy_node_struct = (unsafe *__param_chain).tail
+
+        var __local_mask: u64
+
+        var __local_i: u64
+
+        (__local_counter = ((0 as u64)))
+
+        while true {
+            var __local_next: *mut tommy_node_struct
+
+            var __local_last: *mut tommy_chain_struct
+
+            (__local_last = (((&raw const __local_bit[64] as *const tommy_chain_struct) as *mut tommy_chain_struct)))
+
+            (__local_bit[64].head = __local_node)
+
+            (__local_bit[64].tail = __local_node)
+
+            (__local_next = (unsafe *__local_node).next)
+
+            (__local_i = ((0 as u64)))
+
+            (__local_mask = __local_counter)
+
+            while (((__local_mask as u64) & (1 as u64)) != 0) {
+                unsafe { tommy_chain_merge_degenerated(((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __local_last, __param_cmp) }
+
+                (__local_mask = __local_mask >> (1 as u32))
+
+                (__local_last = (((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct)))
+
+                (__local_i = (__local_i +% 1))
+
+            }
+
+            (__local_bit[__local_i] = (unsafe *__local_last))
+
+            (__local_counter = (__local_counter +% 1))
+
+            if (__local_node == __local_tail) {
+                break
+            }
+
+            (__local_node = __local_next)
+
+        }
+
+        (__local_i = ((tommy_ctz_u64(__local_counter) as u64)))
+
+        (__local_mask = ((((__local_counter as u64) >> (__local_i as u32)) as u64)))
+
+        while (__local_mask != 1) {
+            (__local_mask = __local_mask >> (1 as u32))
+
+            if ((__local_mask as u64) & (1 as u64)) {
+                unsafe { tommy_chain_merge_degenerated(((&raw const __local_bit[((__local_i as u64) +% (1 as u64))] as *const tommy_chain_struct) as *mut tommy_chain_struct), ((&raw const __local_bit[__local_i] as *const tommy_chain_struct) as *mut tommy_chain_struct), __param_cmp) }
+            } else {
+                (__local_bit[((__local_i as u64) +% (1 as u64))] = __local_bit[__local_i])
+            }
+
+            (__local_i = (__local_i +% 1))
+
+        }
+
+        with_memcpy((&raw mut (unsafe *__param_chain) as *mut u8), (&raw const __local_bit[__local_i] as *const u8), sizeof[tommy_chain_struct]())
+
+    }
 
 }

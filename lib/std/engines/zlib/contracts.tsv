@@ -1,0 +1,229 @@
+_tr_align	receiver-mut:internal_state
+_tr_flush_bits	receiver-mut:internal_state
+_tr_flush_block	receiver-mut:internal_state,unproved:1:read only
+_tr_init	receiver-mut:internal_state
+_tr_stored_block	receiver-mut:internal_state,unproved:1:read only
+_tr_tally	receiver-mut:internal_state
+adler32	unproved:1:read only
+adler32_combine	plain
+adler32_combine64	plain
+adler32_combine_	plain
+adler32_z	unproved:1:read only
+bi_flush	receiver-mut:internal_state
+bi_reverse	plain
+bi_windup	receiver-mut:internal_state
+build_bl_tree	receiver-mut:internal_state
+build_tree	receiver-mut:internal_state,unproved:1:out-parameter read before the write
+byte_swap	plain
+call_zopen64	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+call_zseek64	receiver:zlib_filefunc64_32_def_s,stored-unknown:1
+call_ztell64	receiver:zlib_filefunc64_32_def_s,stored-unknown:1
+compress	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2
+compress2	stored-unknown:0,unproved:1:out-parameter read before the write,stored-unknown:2
+compress2_z	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2
+compressBound	plain
+compressBound_z	plain
+compress_block	receiver-mut:internal_state,unproved:1:read only,unproved:2:read only
+compress_z	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2
+crc32	stored-unknown:1
+crc32_combine	plain
+crc32_combine64	plain
+crc32_combine_gen	plain
+crc32_combine_gen64	plain
+crc32_combine_op	plain
+crc32_z	stored-unknown:1
+crc_word	plain
+crc_word_big	plain
+decrypt_byte	unproved:0:read only,unproved:1:read only
+deflate	unproved:0:NULL is an accepted argument
+deflateBound	unproved:0:NULL is an accepted argument
+deflateBound_z	unproved:0:NULL is an accepted argument
+deflateCopy	unproved:0:NULL is an accepted argument,unproved:1:read only
+deflateEnd	unproved:0:NULL is an accepted argument
+deflateGetDictionary	unproved:0:NULL is an accepted argument,unproved:1:read only,unproved:2:out-parameter a return before the write
+deflateInit2_	unproved:0:NULL is an accepted argument,unproved:6:read only
+deflateInit_	unproved:0:NULL is an accepted argument,unproved:2:read only
+deflateParams	unproved:0:NULL is an accepted argument
+deflatePending	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
+deflatePrime	unproved:0:NULL is an accepted argument
+deflateReset	unproved:0:NULL is an accepted argument
+deflateResetKeep	unproved:0:NULL is an accepted argument
+deflateSetDictionary	unproved:0:NULL is an accepted argument,stored-unknown:1
+deflateSetHeader	unproved:0:NULL is an accepted argument,stored-unknown:1
+deflateStateCheck	unproved:0:NULL is an accepted argument
+deflateTune	unproved:0:NULL is an accepted argument
+deflateUsed	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+deflate_fast	receiver-mut:internal_state
+deflate_huff	receiver-mut:internal_state
+deflate_rle	receiver-mut:internal_state
+deflate_slow	receiver-mut:internal_state
+deflate_stored	receiver-mut:internal_state
+detect_data_type	receiver:internal_state
+error	unproved:0:read only
+fclose_file_func	unproved:0:read only,unproved:1:read only
+ferror_file_func	unproved:0:read only,unproved:1:read only
+file_compress	stored-unknown:0,unproved:1:read only
+file_uncompress	stored-unknown:0
+fill_fopen64_filefunc	receiver-mut:zlib_filefunc64_def_s
+fill_fopen_filefunc	receiver-mut:zlib_filefunc_def_s
+fill_window	receiver-mut:internal_state
+fill_zlib_filefunc64_32_def_from_filefunc32	receiver-mut:zlib_filefunc64_32_def_s,unproved:1:read only
+flush_pending	receiver-mut:z_stream_s
+fopen64_file_func	unproved:0:read only,unproved:1:read only
+fopen_file_func	unproved:0:read only,unproved:1:read only
+fread_file_func	unproved:0:read only,unproved:1:read only,unproved:2:read only
+fseek64_file_func	unproved:0:read only,unproved:1:read only
+fseek_file_func	unproved:0:read only,unproved:1:read only
+ftell64_file_func	unproved:0:read only,unproved:1:read only
+ftell_file_func	unproved:0:read only,unproved:1:read only
+fwrite_file_func	unproved:0:read only,unproved:1:read only,unproved:2:read only
+gen_bitlen	receiver-mut:internal_state,unproved:1:read only
+gen_codes	unproved:0:indexed as an array,unproved:2:read only
+get_crc_table	plain
+gz_avail	receiver-mut:gz_state
+gz_comp	receiver-mut:gz_state
+gz_compress	stored-unknown:0,stored-unknown:1
+gz_decomp	receiver-mut:gz_state
+gz_error	receiver-mut:gz_state,unproved:2:read only
+gz_fetch	receiver-mut:gz_state
+gz_init	receiver-mut:gz_state
+gz_intmax	plain
+gz_load	receiver-mut:gz_state,unproved:1:read only,out:3:u32
+gz_look	receiver-mut:gz_state
+gz_open	unproved:0:read only,unproved:2:read only
+gz_read	receiver-mut:gz_state,stored-unknown:1
+gz_reset	receiver-mut:gz_state
+gz_skip	receiver-mut:gz_state
+gz_uncompress	stored-unknown:0,unproved:1:read only
+gz_vacate	receiver-mut:gz_state
+gz_write	receiver-mut:gz_state,stored-unknown:1
+gz_zero	receiver-mut:gz_state
+gzbuffer	unproved:0:NULL is an accepted argument
+gzclearerr	unproved:0:NULL is an accepted argument
+gzclose	stored-unknown:0
+gzclose_r	stored-unknown:0
+gzclose_w	stored-unknown:0
+gzdirect	unproved:0:gz_look may write through it
+gzdopen	unproved:1:read only
+gzeof	unproved:0:NULL is an accepted argument
+gzerror	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
+gzflush	unproved:0:gz_error may write through it
+gzfread	stored-unknown:0,unproved:3:read only
+gzfwrite	stored-unknown:0,unproved:3:read only
+gzgetc	unproved:0:NULL is an accepted argument
+gzgetc_	unproved:0:NULL is an accepted argument
+gzgets	unproved:0:NULL is an accepted argument,stored-unknown:1
+gzoffset	unproved:0:NULL is an accepted argument
+gzoffset64	unproved:0:NULL is an accepted argument
+gzopen	unproved:0:read only,unproved:1:read only
+gzopen64	unproved:0:read only,unproved:1:read only
+gzprintf	unproved:0:NULL is an accepted argument,stored-unknown:1,variadic
+gzputc	unproved:0:NULL is an accepted argument
+gzputs	unproved:0:gz_error may write through it,stored-unknown:1
+gzread	unproved:0:gz_error may write through it,stored-unknown:1
+gzrewind	unproved:0:gz_reset may write through it
+gzseek	unproved:0:NULL is an accepted argument
+gzseek64	unproved:0:NULL is an accepted argument
+gzsetparams	unproved:0:NULL is an accepted argument
+gztell	unproved:0:NULL is an accepted argument
+gztell64	unproved:0:NULL is an accepted argument
+gzungetc	unproved:1:out-parameter written conditionally
+gzvprintf	unproved:0:NULL is an accepted argument,unproved:1:read only
+gzwrite	unproved:0:gz_error may write through it,stored-unknown:1
+inflate	unproved:0:NULL is an accepted argument
+inflateBack	unproved:0:NULL is an accepted argument,stored-unknown:2,stored-unknown:4
+inflateBackEnd	unproved:0:NULL is an accepted argument
+inflateBackInit_	unproved:0:NULL is an accepted argument,stored-unknown:2,unproved:3:read only
+inflateCodesUsed	unproved:0:NULL is an accepted argument
+inflateCopy	unproved:0:NULL is an accepted argument,unproved:1:read only
+inflateEnd	unproved:0:NULL is an accepted argument
+inflateGetDictionary	unproved:0:NULL is an accepted argument,unproved:1:read only,unproved:2:out-parameter a return before the write
+inflateGetHeader	unproved:0:NULL is an accepted argument,stored-unknown:1
+inflateInit2_	unproved:0:NULL is an accepted argument,unproved:2:read only
+inflateInit_	unproved:0:NULL is an accepted argument,unproved:1:read only
+inflateMark	unproved:0:NULL is an accepted argument
+inflatePrime	unproved:0:NULL is an accepted argument
+inflateReset	unproved:0:NULL is an accepted argument
+inflateReset2	unproved:0:NULL is an accepted argument
+inflateResetKeep	unproved:0:NULL is an accepted argument
+inflateSetDictionary	unproved:0:NULL is an accepted argument,unproved:1:read only
+inflateStateCheck	unproved:0:NULL is an accepted argument
+inflateSync	unproved:0:NULL is an accepted argument
+inflateSyncPoint	unproved:0:NULL is an accepted argument
+inflateUndermine	unproved:0:NULL is an accepted argument
+inflateValidate	unproved:0:NULL is an accepted argument
+inflate_fast	receiver-mut:z_stream_s
+inflate_fixed	receiver-mut:inflate_state
+inflate_table	unproved:1:read only,unproved:3:out-parameter written conditionally,unproved:4:out-parameter read before the write,unproved:5:out-parameter a return before the write
+init_block	receiver-mut:internal_state
+init_keys	unproved:0:read only,unproved:1:out-parameter read before the write,unproved:2:read only
+lm_init	receiver-mut:internal_state
+longest_match	receiver-mut:internal_state
+main	unproved:1:read only
+multmodp	plain
+pqdownheap	receiver-mut:internal_state,unproved:1:read only
+putShortMSB	receiver-mut:internal_state
+read_buf	receiver-mut:z_stream_s,stored-unknown:1
+scan_tree	receiver-mut:internal_state,unproved:1:out-parameter read before the write
+send_all_trees	receiver-mut:internal_state
+send_tree	receiver-mut:internal_state,unproved:1:read only
+slide_hash	receiver-mut:internal_state
+strcmpcasenosensitive_internal	unproved:0:read only,unproved:1:read only
+string_copy	unproved:0:out-parameter a return before the write,unproved:1:read only
+syncsearch	unproved:0:out-parameter read before the write,unproved:1:read only
+tr_static_init	plain
+uncompress	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2
+uncompress2	stored-unknown:0,unproved:1:out-parameter read before the write,stored-unknown:2,unproved:3:out-parameter read before the write
+uncompress2_z	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2,unproved:3:out-parameter written conditionally
+uncompress_z	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2
+unz64local_CheckCurrentFileCoherencyHeader	unproved:0:call_zseek64 may write through it,out:1:u32,out:2:u64,out:3:u32
+unz64local_DosDateToTmuDate	unproved:1:out-parameter read before the write
+unz64local_GetCurrentFileInfoInternal	stored-unknown:0,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write,stored-unknown:3,stored-unknown:5,stored-unknown:7
+unz64local_SearchCentralDir	receiver:zlib_filefunc64_32_def_s,stored-unknown:1
+unz64local_SearchCentralDir64	receiver:zlib_filefunc64_32_def_s,stored-unknown:1
+unz64local_getLong	receiver:zlib_filefunc64_32_def_s,stored-unknown:1,unproved:2:out-parameter written conditionally
+unz64local_getLong64	receiver:zlib_filefunc64_32_def_s,stored-unknown:1,unproved:2:out-parameter written conditionally
+unz64local_getShort	receiver:zlib_filefunc64_32_def_s,stored-unknown:1,unproved:2:out-parameter written conditionally
+unzClose	unproved:0:out-parameter written conditionally
+unzCloseCurrentFile	unproved:0:out-parameter written conditionally
+unzGetCurrentFileInfo	stored-unknown:0,unproved:1:out-parameter read before the write,stored-unknown:2,stored-unknown:4,stored-unknown:6
+unzGetCurrentFileInfo64	stored-unknown:0,unproved:1:out-parameter written conditionally,stored-unknown:2,stored-unknown:4,stored-unknown:6
+unzGetCurrentFileZStreamPos64	unproved:0:read only
+unzGetFilePos	unproved:0:read only,unproved:1:out-parameter read before the write
+unzGetFilePos64	unproved:0:read only,unproved:1:out-parameter written conditionally
+unzGetGlobalComment	stored-unknown:0,stored-unknown:1
+unzGetGlobalInfo	unproved:0:read only,unproved:1:out-parameter a return before the write
+unzGetGlobalInfo64	unproved:0:read only,unproved:1:out-parameter a return before the write
+unzGetLocalExtrafield	unproved:0:read only,stored-unknown:1
+unzGetOffset	unproved:0:read only
+unzGetOffset64	unproved:0:read only
+unzGoToFilePos	stored-unknown:0,unproved:1:read only
+unzGoToFilePos64	stored-unknown:0,unproved:1:read only
+unzGoToFirstFile	stored-unknown:0
+unzGoToNextFile	stored-unknown:0
+unzLocateFile	stored-unknown:0,unproved:1:read only
+unzOpen	stored-unknown:0
+unzOpen2	stored-unknown:0,unproved:1:read only
+unzOpen2_64	stored-unknown:0,unproved:1:read only
+unzOpen64	stored-unknown:0
+unzOpenCurrentFile	stored-unknown:0
+unzOpenCurrentFile2	stored-unknown:0,unproved:1:out-parameter written conditionally,unproved:2:out-parameter written conditionally
+unzOpenCurrentFile3	stored-unknown:0,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write,unproved:4:read only
+unzOpenCurrentFilePassword	stored-unknown:0,unproved:1:read only
+unzOpenInternal	stored-unknown:0,unproved:1:read only
+unzReadCurrentFile	unproved:0:read only,stored-unknown:1
+unzRepair	unproved:0:read only,unproved:1:read only,stored-unknown:2,unproved:3:out-parameter read before the write,unproved:4:out-parameter read before the write
+unzSetOffset	stored-unknown:0
+unzSetOffset64	stored-unknown:0
+unzStringFileNameCompare	unproved:0:read only,unproved:1:read only
+unzeof	unproved:0:read only
+unztell	unproved:0:read only
+unztell64	unproved:0:read only
+update_keys	unproved:0:out-parameter read before the write,unproved:1:read only
+updatewindow	receiver:z_stream_s,unproved:1:read only
+x2nmodp	plain
+zError	plain
+zcalloc	unproved:0:read only
+zcfree	unproved:0:read only,unproved:1:read only
+zlibCompileFlags	plain
+zlibVersion	plain

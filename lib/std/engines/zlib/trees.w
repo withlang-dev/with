@@ -15,73 +15,7 @@ use std.engines.zlib.crc32
 use std.engines.zlib.inftrees
 use std.collections
 
-pub unsafe fn _tr_init(__param_s: *mut internal_state) {
-    tr_static_init()
-
-    ((*__param_s).l_desc.dyn_tree = (&(*__param_s).dyn_ltree[0] as *mut ct_data_s))
-
-    ((*__param_s).l_desc.stat_desc = ((&raw const static_l_desc as *const static_tree_desc_s)))
-
-    ((*__param_s).d_desc.dyn_tree = (&(*__param_s).dyn_dtree[0] as *mut ct_data_s))
-
-    ((*__param_s).d_desc.stat_desc = ((&raw const static_d_desc as *const static_tree_desc_s)))
-
-    ((*__param_s).bl_desc.dyn_tree = (&(*__param_s).bl_tree[0] as *mut ct_data_s))
-
-    ((*__param_s).bl_desc.stat_desc = ((&raw const static_bl_desc as *const static_tree_desc_s)))
-
-    ((*__param_s).bi_buf = ((0 as u16)))
-
-    ((*__param_s).bi_valid = ((0 as i32)))
-
-    ((*__param_s).bi_used = ((0 as i32)))
-
-    init_block(__param_s)
-
-}
-
-pub unsafe fn _tr_tally(__param_s: *mut internal_state, __param_dist: u32, __param_lc: u32) -> i32 {
-    var __local_dist = __param_dist
-    var __ci_expr_old_0: u32 = (*__param_s).sym_next
-
-    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
-
-    (((*__param_s).sym_buf[__ci_expr_old_0]) = ((__local_dist as u8)))
-
-
-    var __ci_expr_old_1: u32 = (*__param_s).sym_next
-
-    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
-
-    (((*__param_s).sym_buf[__ci_expr_old_1]) = ((((__local_dist as u32) >> (8 as u32)) as u8)))
-
-
-    var __ci_expr_old_2: u32 = (*__param_s).sym_next
-
-    ((*__param_s).sym_next = ((*__param_s).sym_next +% 1))
-
-    (((*__param_s).sym_buf[__ci_expr_old_2]) = ((__param_lc as u8)))
-
-
-    if ((if __local_dist == 0: 1 else: 0) != 0) {
-        ((*__param_s).dyn_ltree[__param_lc].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[__param_lc].fc as *const ct_data_s_fc)).freq +% 1))
-
-    } else {
-        ((*__param_s).matches = ((*__param_s).matches +% 1))
-
-        (__local_dist = (__local_dist -% 1))
-
-
-        ((*__param_s).dyn_ltree[(((_length_code[__param_lc] as i32) + 256) + 1)].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[(((_length_code[__param_lc] as i32) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
-
-        ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
-
-    }
-
-    return (if (*__param_s).sym_next == (*__param_s).sym_end: 1 else: 0)
-
-}
-
+// contract: receiver-mut:internal_state,unproved:1:read only
 pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut c_char, __param_stored_len: u64, __param_last: i32) {
     var __local_opt_lenb: u64
 
@@ -90,8 +24,8 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
     var __local_max_blindex: i32 = ((0 as i32))
 
-    if ((if (*__param_s).level > 0: 1 else: 0) != 0) {
-        if ((if (*(*__param_s).strm).data_type == 2: 1 else: 0) != 0) {
+    if ((*__param_s).level > 0) {
+        if ((*(*__param_s).strm).data_type == 2) {
             ((*(*__param_s).strm).data_type = ((detect_data_type(__param_s) as i32)))
         }
 
@@ -110,13 +44,13 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
         var __ci_expr_logic_0: i32
 
-        if ((if __local_static_lenb <= __local_opt_lenb: 1 else: 0) != 0) {
+        if (__local_static_lenb <= __local_opt_lenb) {
             (__ci_expr_logic_0 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_0 = (if (if (*__param_s).strategy == 4: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if (*__param_s).strategy == 4: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_opt_lenb = __local_static_lenb)
         }
 
@@ -132,18 +66,18 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if ((__param_stored_len as u64) +% (4 as u64)) <= __local_opt_lenb: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if __param_buf != null: 1 else: 0) != 0: 1 else: 0))
+    if (((__param_stored_len as u64) +% (4 as u64)) <= __local_opt_lenb) {
+        (__ci_expr_logic_1 = (if __param_buf != null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         _tr_stored_block(__param_s, __param_buf, __param_stored_len, __param_last)
 
     } else {
-        if ((if __local_static_lenb == __local_opt_lenb: 1 else: 0) != 0) {
+        if (__local_static_lenb == __local_opt_lenb) {
             var __local_len: i32 = ((3 as i32))
 
-            if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+            if ((*__param_s).bi_valid > (16 - __local_len)) {
                 var __local_val: i32 = (((((1 as i32) << (1 as u32)) + __param_last) as i32))
 
                 ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -186,7 +120,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
         } else {
             var __local_len_1: i32 = ((3 as i32))
 
-            if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+            if ((*__param_s).bi_valid > (16 - __local_len_1)) {
                 var __local_val_1: i32 = (((((2 as i32) << (1 as u32)) + __param_last) as i32))
 
                 ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -235,7 +169,7 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
     init_block(__param_s)
 
-    if (__param_last != 0) {
+    if __param_last {
         bi_windup(__param_s)
 
     }
@@ -243,100 +177,11 @@ pub unsafe fn _tr_flush_block(__param_s: *mut internal_state, __param_buf: *mut 
 
 }
 
-pub unsafe fn _tr_flush_bits(__param_s: *mut internal_state) {
-    bi_flush(__param_s)
-
-}
-
-pub unsafe fn _tr_align(__param_s: *mut internal_state) {
-    var __local_len: i32 = ((3 as i32))
-
-    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
-        var __local_val: i32 = ((((1 as i32) << (1 as u32)) as i32))
-
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
-
-        var __ci_expr_old_0: u64 = (*__param_s).pending
-
-        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-        (((*__param_s).pending_buf[__ci_expr_old_0]) = (((((*__param_s).bi_buf as i32) & (255 as i32)) as u8)))
-
-
-
-
-        var __ci_expr_old_1: u64 = (*__param_s).pending
-
-        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-        (((*__param_s).pending_buf[__ci_expr_old_1]) = (((((*__param_s).bi_buf as i32) >> (8 as u32)) as u8)))
-
-
-
-
-
-
-        ((*__param_s).bi_buf = (((((__local_val as u16) as i32) >> ((16 - (*__param_s).bi_valid) as u32)) as u16)))
-
-        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len - 16))
-
-    } else {
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | (((2 as i32) << ((*__param_s).bi_valid as u32)) as u16))
-
-        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len)
-
-    }
-
-
-
-    var __local_len_1: i32 = (((*(&raw const static_ltree[256].dl as *const ct_data_s_dl)).len as i32))
-
-    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
-        var __local_val_1: i32 = (((*(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as i32))
-
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
-
-        var __ci_expr_old_2: u64 = (*__param_s).pending
-
-        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-        (((*__param_s).pending_buf[__ci_expr_old_2]) = (((((*__param_s).bi_buf as i32) & (255 as i32)) as u8)))
-
-
-
-
-        var __ci_expr_old_3: u64 = (*__param_s).pending
-
-        ((*__param_s).pending = ((*__param_s).pending +% 1))
-
-        (((*__param_s).pending_buf[__ci_expr_old_3]) = (((((*__param_s).bi_buf as i32) >> (8 as u32)) as u8)))
-
-
-
-
-
-
-        ((*__param_s).bi_buf = (((((__local_val_1 as u16) as i32) >> ((16 - (*__param_s).bi_valid) as u32)) as u16)))
-
-        ((*__param_s).bi_valid = (*__param_s).bi_valid + (__local_len_1 - 16))
-
-    } else {
-        ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((*(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as i32) << ((*__param_s).bi_valid as u32)) as u16))
-
-        ((*__param_s).bi_valid = (*__param_s).bi_valid + __local_len_1)
-
-    }
-
-
-
-    bi_flush(__param_s)
-
-}
-
+// contract: receiver-mut:internal_state,unproved:1:read only
 pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut c_char, __param_stored_len: u64, __param_last: i32) {
     var __local_len: i32 = ((3 as i32))
 
-    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > (16 - __local_len)) {
         var __local_val: i32 = (((((0 as i32) << (1 as u32)) + __param_last) as i32))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -416,7 +261,7 @@ pub unsafe fn _tr_stored_block(__param_s: *mut internal_state, __param_buf: *mut
 
 
 
-    if (__param_stored_len != 0) {
+    if __param_stored_len {
         with_memcpy(((((*__param_s).pending_buf + ((*__param_s).pending as usize)) as *mut c_void) as *mut u8), (((__param_buf as *mut u8) as *const c_void) as *const u8), (__param_stored_len as i64))
     }
 
@@ -438,7 +283,7 @@ fn bi_reverse(__param_code: u32, __param_len: i32) -> u32 {
 
 
         (__local_len = __local_len - 1)
-        if not (((if __local_len > 0: 1 else: 0) != 0)) {
+        if not ((__local_len > 0)) {
             break
         }
     }
@@ -448,7 +293,7 @@ fn bi_reverse(__param_code: u32, __param_len: i32) -> u32 {
 }
 
 unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
-    if ((if (*__param_s).bi_valid == 16: 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid == 16) {
         var __ci_expr_old_0: u64 = (*__param_s).pending
 
         ((*__param_s).pending = ((*__param_s).pending +% 1))
@@ -474,7 +319,7 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
         ((*__param_s).bi_valid = ((0 as i32)))
 
     } else {
-        if ((if (*__param_s).bi_valid >= 8: 1 else: 0) != 0) {
+        if ((*__param_s).bi_valid >= 8) {
             var __ci_expr_old_2: u64 = (*__param_s).pending
 
             ((*__param_s).pending = ((*__param_s).pending +% 1))
@@ -494,7 +339,7 @@ unsafe fn bi_flush(__param_s: *mut internal_state) -> Unit {
 }
 
 unsafe fn bi_windup(__param_s: *mut internal_state) {
-    if ((if (*__param_s).bi_valid > 8: 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > 8) {
         var __ci_expr_old_0: u64 = (*__param_s).pending
 
         ((*__param_s).pending = ((*__param_s).pending +% 1))
@@ -516,7 +361,7 @@ unsafe fn bi_windup(__param_s: *mut internal_state) {
 
 
     } else {
-        if ((if (*__param_s).bi_valid > 0: 1 else: 0) != 0) {
+        if ((*__param_s).bi_valid > 0) {
             var __ci_expr_old_2: u64 = (*__param_s).pending
 
             ((*__param_s).pending = ((*__param_s).pending +% 1))
@@ -537,6 +382,7 @@ unsafe fn bi_windup(__param_s: *mut internal_state) {
 
 }
 
+// contract: unproved:0:indexed as an array,unproved:2:read only
 unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: i32, __param_bl_count: *mut u16) {
     var __local_next_code: List[u16] = [0; 16]
 
@@ -548,7 +394,7 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: i32, __param
 
     (__local_bits = ((1 as i32)))
 
-    while ((if __local_bits <= 15: 1 else: 0) != 0) {
+    while (__local_bits <= 15) {
         (__local_code = ((((((__local_code as u32) +% (((__param_bl_count[(__local_bits - 1)]) as i32) as u32)) as u32) << (1 as u32)) as u32)))
 
         (__local_next_code[__local_bits] = ((__local_code as u16)))
@@ -563,10 +409,10 @@ unsafe fn gen_codes(__param_tree: *mut ct_data_s, __param_max_code: i32, __param
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
+    while (__local_n <= __param_max_code) {
         var __local_len: i32 = (((*(&raw const (__param_tree[__local_n]).dl as *const ct_data_s_dl)).len as i32))
 
-        if ((if __local_len == 0: 1 else: 0) != 0) {
+        if (__local_len == 0) {
             (__local_n = __local_n + 1)
 
             continue
@@ -598,7 +444,7 @@ unsafe fn init_block(__param_s: *mut internal_state) {
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n < ((256 + 1) + 29): 1 else: 0) != 0) {
+    while (__local_n < ((256 + 1) + 29)) {
         ((*__param_s).dyn_ltree[__local_n].fc.freq = ((0 as u16)))
 
         (__local_n = __local_n + 1)
@@ -608,7 +454,7 @@ unsafe fn init_block(__param_s: *mut internal_state) {
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n < 30: 1 else: 0) != 0) {
+    while (__local_n < 30) {
         ((*__param_s).dyn_dtree[__local_n].fc.freq = ((0 as u16)))
 
         (__local_n = __local_n + 1)
@@ -618,7 +464,7 @@ unsafe fn init_block(__param_s: *mut internal_state) {
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n < 19: 1 else: 0) != 0) {
+    while (__local_n < 19) {
         ((*__param_s).bl_tree[__local_n].fc.freq = ((0 as u16)))
 
         (__local_n = __local_n + 1)
@@ -640,36 +486,37 @@ unsafe fn init_block(__param_s: *mut internal_state) {
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:read only
 unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_k: i32) {
     var __local_k = __param_k
     var __local_v: i32 = (((*__param_s).heap[__local_k] as i32))
 
     var __local_j: i32 = ((((__local_k as i32) << (1 as u32)) as i32))
 
-    while ((if __local_j <= (*__param_s).heap_len: 1 else: 0) != 0) {
+    while (__local_j <= (*__param_s).heap_len) {
         var __ci_expr_logic_2: i32 = 0
 
-        if ((if __local_j < (*__param_s).heap_len: 1 else: 0) != 0) {
+        if (__local_j < (*__param_s).heap_len) {
             var __ci_expr_logic_1: i32
 
-            if ((if (*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
+            if ((*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq) {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if (*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if (*__param_s).depth[(*__param_s).heap[(__local_j + 1)]] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
+                if ((*(&raw const (__param_tree[(*__param_s).heap[(__local_j + 1)]]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq) {
+                    (__ci_expr_logic_0 = (if (*__param_s).depth[(*__param_s).heap[(__local_j + 1)]] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0))
                 }
 
-                (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
+                (__ci_expr_logic_1 = (if __ci_expr_logic_0: 1 else: 0))
 
             }
 
-            (__ci_expr_logic_2 = (if __ci_expr_logic_1 != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if __ci_expr_logic_1: 1 else: 0))
 
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             (__local_j = __local_j + 1)
 
         }
@@ -677,20 +524,20 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
         var __ci_expr_logic_4: i32
 
-        if ((if (*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
+        if ((*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq < (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
             var __ci_expr_logic_3: i32 = 0
 
-            if ((if (*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq: 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if (*__param_s).depth[__local_v] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0) != 0: 1 else: 0))
+            if ((*(&raw const (__param_tree[__local_v]).fc as *const ct_data_s_fc)).freq == (*(&raw const (__param_tree[(*__param_s).heap[__local_j]]).fc as *const ct_data_s_fc)).freq) {
+                (__ci_expr_logic_3 = (if (*__param_s).depth[__local_v] <= (*__param_s).depth[(*__param_s).heap[__local_j]]: 1 else: 0))
             }
 
-            (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if __ci_expr_logic_3: 1 else: 0))
 
         }
 
-        if (__ci_expr_logic_4 != 0) {
+        if __ci_expr_logic_4 {
             break
         }
 
@@ -707,6 +554,7 @@ unsafe fn pqdownheap(__param_s: *mut internal_state, __param_tree: *mut ct_data_
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:read only
 unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) {
     var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
@@ -737,7 +585,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
     (__local_bits = ((0 as i32)))
 
-    while ((if __local_bits <= 15: 1 else: 0) != 0) {
+    while (__local_bits <= 15) {
         ((*__param_s).bl_count[__local_bits] = ((0 as u16)))
 
         (__local_bits = __local_bits + 1)
@@ -749,12 +597,12 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
     (__local_h = ((((*__param_s).heap_max + 1) as i32)))
 
-    while ((if __local_h < ((2 * ((256 + 1) + 29)) + 1): 1 else: 0) != 0) {
+    while (__local_h < ((2 * ((256 + 1) + 29)) + 1)) {
         (__local_n = (((*__param_s).heap[__local_h] as i32)))
 
         (__local_bits = (((((*(&raw const (__local_tree[(*(&raw const (__local_tree[__local_n]).dl as *const ct_data_s_dl)).dad]).dl as *const ct_data_s_dl)).len as i32) + 1) as i32)))
 
-        if ((if __local_bits > __local_max_length: 1 else: 0) != 0) {
+        if (__local_bits > __local_max_length) {
             (__local_bits = __local_max_length)
 
             (__local_overflow = __local_overflow + 1)
@@ -763,7 +611,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         ((__local_tree[__local_n]).dl.len = ((__local_bits as u16)))
 
-        if ((if __local_n > __local_max_code: 1 else: 0) != 0) {
+        if (__local_n > __local_max_code) {
             (__local_h = __local_h + 1)
 
             continue
@@ -774,7 +622,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         (__local_xbits = ((0 as i32)))
 
-        if ((if __local_n >= __local_base: 1 else: 0) != 0) {
+        if (__local_n >= __local_base) {
             (__local_xbits = (((__local_extra[(__local_n - __local_base)]) as i32)))
         }
 
@@ -792,7 +640,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     }
 
 
-    if ((if __local_overflow == 0: 1 else: 0) != 0) {
+    if (__local_overflow == 0) {
         return
     }
 
@@ -800,7 +648,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
     loop {
         (__local_bits = (((__local_max_length - 1) as i32)))
 
-        while ((if (*__param_s).bl_count[__local_bits] == 0: 1 else: 0) != 0) {
+        while ((*__param_s).bl_count[__local_bits] == 0) {
             (__local_bits = __local_bits - 1)
         }
 
@@ -812,27 +660,27 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         (__local_overflow = __local_overflow - 2)
 
-        if not (((if __local_overflow > 0: 1 else: 0) != 0)) {
+        if not ((__local_overflow > 0)) {
             break
         }
     }
 
     (__local_bits = __local_max_length)
 
-    while ((if __local_bits != 0: 1 else: 0) != 0) {
+    while (__local_bits != 0) {
         (__local_n = (((*__param_s).bl_count[__local_bits] as i32)))
 
-        while ((if __local_n != 0: 1 else: 0) != 0) {
+        while (__local_n != 0) {
             (__local_h = __local_h - 1)
 
             (__local_m = (((*__param_s).heap[__local_h] as i32)))
 
 
-            if ((if __local_m > __local_max_code: 1 else: 0) != 0) {
+            if (__local_m > __local_max_code) {
                 continue
             }
 
-            if ((if (((*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).len as u32)) != ((__local_bits as u32)): 1 else: 0) != 0) {
+            if ((((*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).len as u32)) != ((__local_bits as u32))) {
 
                 ((*__param_s).opt_len = ((*__param_s).opt_len +% ((((__local_bits as u64) -% (((*(&raw const (__local_tree[__local_m]).dl as *const ct_data_s_dl)).len as i32) as u64)) as u64) *% (((*(&raw const (__local_tree[__local_m]).fc as *const ct_data_s_fc)).freq as i32) as u64))))
 
@@ -852,6 +700,7 @@ unsafe fn gen_bitlen(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:out-parameter read before the write
 unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_desc_s) {
     var __local_tree: *mut ct_data_s = (*__param_desc).dyn_tree
 
@@ -875,8 +724,8 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n < __local_elems: 1 else: 0) != 0) {
-        if ((if (*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
+    while (__local_n < __local_elems) {
+        if ((*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq != 0) {
             ((*__param_s).heap_len = (*__param_s).heap_len + 1)
 
             (__local_max_code = __local_n)
@@ -897,12 +746,12 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
     }
 
 
-    while ((if (*__param_s).heap_len < 2: 1 else: 0) != 0) {
+    while ((*__param_s).heap_len < 2) {
         ((*__param_s).heap_len = (*__param_s).heap_len + 1)
 
         var __ci_expr_ternary_0: i32 = 0
 
-        if ((if __local_max_code < 2: 1 else: 0) != 0) {
+        if (__local_max_code < 2) {
             (__local_max_code = __local_max_code + 1)
 
             (__ci_expr_ternary_0 = __local_max_code)
@@ -932,7 +781,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
     (__local_n = ((((*__param_s).heap_len / 2) as i32)))
 
-    while ((if __local_n >= 1: 1 else: 0) != 0) {
+    while (__local_n >= 1) {
         pqdownheap(__param_s, __local_tree, __local_n)
 
         (__local_n = __local_n - 1)
@@ -970,7 +819,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         ((__local_tree[__local_node]).fc.freq = (((((*(&raw const (__local_tree[__local_n]).fc as *const ct_data_s_fc)).freq as i32) + ((*(&raw const (__local_tree[__local_m]).fc as *const ct_data_s_fc)).freq as i32)) as u16)))
 
-        ((*__param_s).depth[__local_node] = ((((if (if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: 1 else: 0) != 0: ((*__param_s).depth[__local_n] as i32) else: ((*__param_s).depth[__local_m] as i32)) + 1) as u8)))
+        ((*__param_s).depth[__local_node] = ((((if (*__param_s).depth[__local_n] >= (*__param_s).depth[__local_m]: ((*__param_s).depth[__local_n] as i32) else: ((*__param_s).depth[__local_m] as i32)) + 1) as u8)))
 
         ((__local_tree[__local_m]).dl.dad = ((__local_node as u16)))
 
@@ -986,7 +835,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
         pqdownheap(__param_s, __local_tree, (1 as i32))
 
-        if not (((if (*__param_s).heap_len >= 2: 1 else: 0) != 0)) {
+        if not (((*__param_s).heap_len >= 2)) {
             break
         }
     }
@@ -1002,6 +851,7 @@ unsafe fn build_tree(__param_s: *mut internal_state, __param_desc: *mut tree_des
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:out-parameter read before the write
 unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: i32) {
     var __local_n: i32
 
@@ -1017,7 +867,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_min_count: i32 = ((4 as i32))
 
-    if ((if __local_nextlen == 0: 1 else: 0) != 0) {
+    if (__local_nextlen == 0) {
         (__local_max_count = ((138 as i32)))
 
         (__local_min_count = ((3 as i32)))
@@ -1028,7 +878,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
+    while (__local_n <= __param_max_code) {
         (__local_curlen = __local_nextlen)
 
         (__local_nextlen = (((*(&raw const (__param_tree[(__local_n + 1)]).dl as *const ct_data_s_dl)).len as i32)))
@@ -1037,30 +887,30 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         (__local_count = __local_count + 1)
 
-        if ((if __local_count < __local_max_count: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_curlen == __local_nextlen: 1 else: 0) != 0: 1 else: 0))
+        if (__local_count < __local_max_count) {
+            (__ci_expr_logic_0 = (if __local_curlen == __local_nextlen: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_n = __local_n + 1)
 
             continue
 
 
         }
-        if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
+        if (__local_count < __local_min_count) {
             ((*__param_s).bl_tree[__local_curlen].fc.freq = (((((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq as i32) +% ((__local_count as u16) as i32)) as u16)))
 
         } else {
-            if ((if __local_curlen != 0: 1 else: 0) != 0) {
-                if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
+            if (__local_curlen != 0) {
+                if (__local_curlen != __local_prevlen) {
                     ((*__param_s).bl_tree[__local_curlen].fc.freq = ((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).freq +% 1))
                 }
 
                 ((*__param_s).bl_tree[16].fc.freq = ((*(&raw const (*__param_s).bl_tree[16].fc as *const ct_data_s_fc)).freq +% 1))
 
             } else {
-                if ((if __local_count <= 10: 1 else: 0) != 0) {
+                if (__local_count <= 10) {
                     ((*__param_s).bl_tree[17].fc.freq = ((*(&raw const (*__param_s).bl_tree[17].fc as *const ct_data_s_fc)).freq +% 1))
 
                 } else {
@@ -1075,14 +925,14 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         (__local_prevlen = __local_curlen)
 
-        if ((if __local_nextlen == 0: 1 else: 0) != 0) {
+        if (__local_nextlen == 0) {
             (__local_max_count = ((138 as i32)))
 
             (__local_min_count = ((3 as i32)))
 
 
         } else {
-            if ((if __local_curlen == __local_nextlen: 1 else: 0) != 0) {
+            if (__local_curlen == __local_nextlen) {
                 (__local_max_count = ((6 as i32)))
 
                 (__local_min_count = ((3 as i32)))
@@ -1105,6 +955,7 @@ unsafe fn scan_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:read only
 unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s, __param_max_code: i32) {
     var __local_n: i32
 
@@ -1120,7 +971,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     var __local_min_count: i32 = ((4 as i32))
 
-    if ((if __local_nextlen == 0: 1 else: 0) != 0) {
+    if (__local_nextlen == 0) {
         (__local_max_count = ((138 as i32)))
 
         (__local_min_count = ((3 as i32)))
@@ -1129,7 +980,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n <= __param_max_code: 1 else: 0) != 0) {
+    while (__local_n <= __param_max_code) {
         (__local_curlen = __local_nextlen)
 
         (__local_nextlen = (((*(&raw const (__param_tree[(__local_n + 1)]).dl as *const ct_data_s_dl)).len as i32)))
@@ -1138,22 +989,22 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         (__local_count = __local_count + 1)
 
-        if ((if __local_count < __local_max_count: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_curlen == __local_nextlen: 1 else: 0) != 0: 1 else: 0))
+        if (__local_count < __local_max_count) {
+            (__ci_expr_logic_0 = (if __local_curlen == __local_nextlen: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_n = __local_n + 1)
 
             continue
 
 
         }
-        if ((if __local_count < __local_min_count: 1 else: 0) != 0) {
+        if (__local_count < __local_min_count) {
             loop {
                 var __local_len: i32 = (((*(&raw const (*__param_s).bl_tree[__local_curlen].dl as *const ct_data_s_dl)).len as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len)) {
                     var __local_val: i32 = (((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1192,17 +1043,17 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
                 (__local_count = __local_count - 1)
-                if not (((if __local_count != 0: 1 else: 0) != 0)) {
+                if not ((__local_count != 0)) {
                     break
                 }
             }
 
         } else {
-            if ((if __local_curlen != 0: 1 else: 0) != 0) {
-                if ((if __local_curlen != __local_prevlen: 1 else: 0) != 0) {
+            if (__local_curlen != 0) {
+                if (__local_curlen != __local_prevlen) {
                     var __local_len_1: i32 = (((*(&raw const (*__param_s).bl_tree[__local_curlen].dl as *const ct_data_s_dl)).len as i32))
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_1)) {
                         var __local_val_1: i32 = (((*(&raw const (*__param_s).bl_tree[__local_curlen].fc as *const ct_data_s_fc)).code as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1247,7 +1098,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                 var __local_len_2: i32 = (((*(&raw const (*__param_s).bl_tree[16].dl as *const ct_data_s_dl)).len as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len_2)) {
                     var __local_val_2: i32 = (((*(&raw const (*__param_s).bl_tree[16].fc as *const ct_data_s_fc)).code as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_2 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1287,7 +1138,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                 var __local_len_3: i32 = ((2 as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len_3)) {
                     var __local_val_3: i32 = (((__local_count - 3) as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_3 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1326,10 +1177,10 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
 
             } else {
-                if ((if __local_count <= 10: 1 else: 0) != 0) {
+                if (__local_count <= 10) {
                     var __local_len_4: i32 = (((*(&raw const (*__param_s).bl_tree[17].dl as *const ct_data_s_dl)).len as i32))
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_4)) {
                         var __local_val_4: i32 = (((*(&raw const (*__param_s).bl_tree[17].fc as *const ct_data_s_fc)).code as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_4 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1369,7 +1220,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                     var __local_len_5: i32 = ((3 as i32))
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_5)) {
                         var __local_val_5: i32 = (((__local_count - 3) as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_5 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1410,7 +1261,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
                 } else {
                     var __local_len_6: i32 = (((*(&raw const (*__param_s).bl_tree[18].dl as *const ct_data_s_dl)).len as i32))
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_6): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_6)) {
                         var __local_val_6: i32 = (((*(&raw const (*__param_s).bl_tree[18].fc as *const ct_data_s_fc)).code as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_6 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1450,7 +1301,7 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
                     var __local_len_7: i32 = ((7 as i32))
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_7): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_7)) {
                         var __local_val_7: i32 = (((__local_count - 11) as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_7 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1497,14 +1348,14 @@ unsafe fn send_tree(__param_s: *mut internal_state, __param_tree: *mut ct_data_s
 
         (__local_prevlen = __local_curlen)
 
-        if ((if __local_nextlen == 0: 1 else: 0) != 0) {
+        if (__local_nextlen == 0) {
             (__local_max_count = ((138 as i32)))
 
             (__local_min_count = ((3 as i32)))
 
 
         } else {
-            if ((if __local_curlen == __local_nextlen: 1 else: 0) != 0) {
+            if (__local_curlen == __local_nextlen) {
                 (__local_max_count = ((6 as i32)))
 
                 (__local_min_count = ((3 as i32)))
@@ -1538,8 +1389,8 @@ unsafe fn build_bl_tree(__param_s: *mut internal_state) -> i32 {
 
     (__local_max_blindex = (((19 - 1) as i32)))
 
-    while ((if __local_max_blindex >= 3: 1 else: 0) != 0) {
-        if ((if (*(&raw const (*__param_s).bl_tree[bl_order[__local_max_blindex]].dl as *const ct_data_s_dl)).len != 0: 1 else: 0) != 0) {
+    while (__local_max_blindex >= 3) {
+        if ((*(&raw const (*__param_s).bl_tree[bl_order[__local_max_blindex]].dl as *const ct_data_s_dl)).len != 0) {
             break
         }
 
@@ -1564,7 +1415,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: i32, __
 
     var __local_len: i32 = ((5 as i32))
 
-    if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > (16 - __local_len)) {
         var __local_val: i32 = (((__param_lcodes - 257) as i32))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1604,7 +1455,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: i32, __
 
     var __local_len_1: i32 = ((5 as i32))
 
-    if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > (16 - __local_len_1)) {
         var __local_val_1: i32 = (((__param_dcodes - 1) as i32))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1644,7 +1495,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: i32, __
 
     var __local_len_2: i32 = ((4 as i32))
 
-    if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > (16 - __local_len_2)) {
         var __local_val_2: i32 = (((__param_blcodes - 4) as i32))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_2 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1684,11 +1535,11 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: i32, __
 
     (__local_rank = ((0 as i32)))
 
-    while ((if __local_rank < __param_blcodes: 1 else: 0) != 0) {
+    while (__local_rank < __param_blcodes) {
 
         var __local_len_3: i32 = ((3 as i32))
 
-        if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+        if ((*__param_s).bi_valid > (16 - __local_len_3)) {
             var __local_val_3: i32 = (((*(&raw const (*__param_s).bl_tree[bl_order[__local_rank]].dl as *const ct_data_s_dl)).len as i32))
 
             ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_3 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1741,6 +1592,7 @@ unsafe fn send_all_trees(__param_s: *mut internal_state, __param_lcodes: i32, __
 
 }
 
+// contract: receiver-mut:internal_state,unproved:1:read only,unproved:2:read only
 unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const ct_data_s, __param_dtree: *const ct_data_s) -> Unit {
     var __local_dist: u32
 
@@ -1752,7 +1604,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
     var __local_extra: i32
 
-    if ((if (*__param_s).sym_next != 0: 1 else: 0) != 0) {
+    if ((*__param_s).sym_next != 0) {
         loop {
             var __ci_expr_old_0: u32 = __local_sx
 
@@ -1775,10 +1627,10 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
             (__local_lc = ((((*__param_s).sym_buf[__ci_expr_old_2]) as i32)))
 
 
-            if ((if __local_dist == 0: 1 else: 0) != 0) {
+            if (__local_dist == 0) {
                 var __local_len: i32 = (((*(&raw const (__param_ltree[__local_lc]).dl as *const ct_data_s_dl)).len as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len)) {
                     var __local_val: i32 = (((*(&raw const (__param_ltree[__local_lc]).fc as *const ct_data_s_fc)).code as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1822,7 +1674,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                 var __local_len_1: i32 = (((*(&raw const (__param_ltree[((((__local_code as u32) +% (256 as u32)) as u32) +% (1 as u32))]).dl as *const ct_data_s_dl)).len as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len_1): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len_1)) {
                     var __local_val_1: i32 = (((*(&raw const (__param_ltree[((((__local_code as u32) +% (256 as u32)) as u32) +% (1 as u32))]).fc as *const ct_data_s_fc)).code as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1862,12 +1714,12 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                 (__local_extra = ((extra_lbits[__local_code] as i32)))
 
-                if ((if __local_extra != 0: 1 else: 0) != 0) {
+                if (__local_extra != 0) {
                     (__local_lc = __local_lc - base_length[__local_code])
 
                     var __local_len_2: i32 = __local_extra
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_2): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_2)) {
                         var __local_val_2: i32 = __local_lc
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_2 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1909,12 +1761,12 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                 (__local_dist = (__local_dist -% 1))
 
-                (__local_code = (((if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32)) as u32)))
+                (__local_code = (((if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32)) as u32)))
 
 
                 var __local_len_3: i32 = (((*(&raw const (__param_dtree[__local_code]).dl as *const ct_data_s_dl)).len as i32))
 
-                if ((if (*__param_s).bi_valid > (16 - __local_len_3): 1 else: 0) != 0) {
+                if ((*__param_s).bi_valid > (16 - __local_len_3)) {
                     var __local_val_3: i32 = (((*(&raw const (__param_dtree[__local_code]).fc as *const ct_data_s_fc)).code as i32))
 
                     ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_3 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -1954,12 +1806,12 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
                 (__local_extra = ((extra_dbits[__local_code] as i32)))
 
-                if ((if __local_extra != 0: 1 else: 0) != 0) {
+                if (__local_extra != 0) {
                     (__local_dist = (__local_dist -% (base_dist[__local_code] as u32)))
 
                     var __local_len_4: i32 = __local_extra
 
-                    if ((if (*__param_s).bi_valid > (16 - __local_len_4): 1 else: 0) != 0) {
+                    if ((*__param_s).bi_valid > (16 - __local_len_4)) {
                         var __local_val_4: i32 = ((__local_dist as i32))
 
                         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_4 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -2002,7 +1854,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
             }
 
 
-            if not (((if __local_sx < (*__param_s).sym_next: 1 else: 0) != 0)) {
+            if not ((__local_sx < (*__param_s).sym_next)) {
                 break
             }
         }
@@ -2010,7 +1862,7 @@ unsafe fn compress_block(__param_s: *mut internal_state, __param_ltree: *const c
 
     var __local_len_5: i32 = (((*(&raw const (__param_ltree[256]).dl as *const ct_data_s_dl)).len as i32))
 
-    if ((if (*__param_s).bi_valid > (16 - __local_len_5): 1 else: 0) != 0) {
+    if ((*__param_s).bi_valid > (16 - __local_len_5)) {
         var __local_val_5: i32 = (((*(&raw const (__param_ltree[256]).fc as *const ct_data_s_fc)).code as i32))
 
         ((*__param_s).bi_buf = ((*__param_s).bi_buf as u16) | ((((__local_val_5 as u16) as i32) << ((*__param_s).bi_valid as u32)) as u16))
@@ -2057,14 +1909,14 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> i32 {
 
     (__local_n = ((0 as i32)))
 
-    while ((if __local_n <= 31: 1 else: 0) != 0) {
+    while (__local_n <= 31) {
         var __ci_expr_logic_0: i32 = 0
 
-        if (((__local_block_mask as u64) & (1 as u64)) != 0) {
-            (__ci_expr_logic_0 = (if (if (*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((__local_block_mask as u64) & (1 as u64)) {
+            (__ci_expr_logic_0 = (if (*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             return 0
         }
 
@@ -2081,27 +1933,27 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> i32 {
 
     var __ci_expr_logic_1: i32
 
-    if ((if (*(&raw const (*__param_s).dyn_ltree[9].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
+    if ((*(&raw const (*__param_s).dyn_ltree[9].fc as *const ct_data_s_fc)).freq != 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*(&raw const (*__param_s).dyn_ltree[10].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*(&raw const (*__param_s).dyn_ltree[10].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (*(&raw const (*__param_s).dyn_ltree[13].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (*(&raw const (*__param_s).dyn_ltree[13].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         return 1
     }
 
 
     (__local_n = ((32 as i32)))
 
-    while ((if __local_n < 256: 1 else: 0) != 0) {
-        if ((if (*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0: 1 else: 0) != 0) {
+    while (__local_n < 256) {
+        if ((*(&raw const (*__param_s).dyn_ltree[__local_n].fc as *const ct_data_s_fc)).freq != 0) {
             return 1
         }
 
@@ -2111,6 +1963,170 @@ unsafe fn detect_data_type(__param_s: *mut internal_state) -> i32 {
 
 
     return 0
+
+}
+
+impl internal_state {
+    pub mut fn _tr_init() {
+        let __param_s: *mut internal_state = self as *mut internal_state
+        tr_static_init()
+
+        ((unsafe *__param_s).l_desc.dyn_tree = (&(unsafe *__param_s).dyn_ltree[0] as *mut ct_data_s))
+
+        ((unsafe *__param_s).l_desc.stat_desc = ((&raw const static_l_desc as *const static_tree_desc_s)))
+
+        ((unsafe *__param_s).d_desc.dyn_tree = (&(unsafe *__param_s).dyn_dtree[0] as *mut ct_data_s))
+
+        ((unsafe *__param_s).d_desc.stat_desc = ((&raw const static_d_desc as *const static_tree_desc_s)))
+
+        ((unsafe *__param_s).bl_desc.dyn_tree = (&(unsafe *__param_s).bl_tree[0] as *mut ct_data_s))
+
+        ((unsafe *__param_s).bl_desc.stat_desc = ((&raw const static_bl_desc as *const static_tree_desc_s)))
+
+        ((unsafe *__param_s).bi_buf = ((0 as u16)))
+
+        ((unsafe *__param_s).bi_valid = ((0 as i32)))
+
+        ((unsafe *__param_s).bi_used = ((0 as i32)))
+
+        unsafe { init_block(__param_s) }
+
+    }
+
+    pub mut fn _tr_tally(__param_dist: u32, __param_lc: u32) -> i32 {
+        let __param_s: *mut internal_state = self as *mut internal_state
+        var __local_dist = __param_dist
+        var __ci_expr_old_0: u32 = (unsafe *__param_s).sym_next
+
+        ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
+
+        ((unsafe (*__param_s).sym_buf[__ci_expr_old_0]) = ((__local_dist as u8)))
+
+
+        var __ci_expr_old_1: u32 = (unsafe *__param_s).sym_next
+
+        ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
+
+        ((unsafe (*__param_s).sym_buf[__ci_expr_old_1]) = ((((__local_dist as u32) >> (8 as u32)) as u8)))
+
+
+        var __ci_expr_old_2: u32 = (unsafe *__param_s).sym_next
+
+        ((unsafe *__param_s).sym_next = ((unsafe *__param_s).sym_next +% 1))
+
+        ((unsafe (*__param_s).sym_buf[__ci_expr_old_2]) = ((__param_lc as u8)))
+
+
+        if (__local_dist == 0) {
+            ((unsafe *__param_s).dyn_ltree[__param_lc].fc.freq = ((unsafe *(&raw const (*__param_s).dyn_ltree[__param_lc].fc as *const ct_data_s_fc)).freq +% 1))
+
+        } else {
+            ((unsafe *__param_s).matches = ((unsafe *__param_s).matches +% 1))
+
+            (__local_dist = (__local_dist -% 1))
+
+
+            ((unsafe *__param_s).dyn_ltree[(((_length_code[__param_lc] as i32) + 256) + 1)].fc.freq = ((unsafe *(&raw const (*__param_s).dyn_ltree[(((_length_code[__param_lc] as i32) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
+
+            ((unsafe *__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32))].fc.freq = ((unsafe *(&raw const (*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[((256 as u32) +% (((__local_dist as u32) >> (7 as u32)) as u32))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
+
+        }
+
+        return (if (unsafe *__param_s).sym_next == (unsafe *__param_s).sym_end: 1 else: 0)
+
+    }
+
+    pub mut fn _tr_flush_bits() {
+        let __param_s: *mut internal_state = self as *mut internal_state
+        unsafe { bi_flush(__param_s) }
+
+    }
+
+    pub mut fn _tr_align() {
+        let __param_s: *mut internal_state = self as *mut internal_state
+        var __local_len: i32 = ((3 as i32))
+
+        if ((unsafe *__param_s).bi_valid > (16 - __local_len)) {
+            var __local_val: i32 = ((((1 as i32) << (1 as u32)) as i32))
+
+            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as u16) | ((((__local_val as u16) as i32) << ((unsafe *__param_s).bi_valid as u32)) as u16))
+
+            var __ci_expr_old_0: u64 = (unsafe *__param_s).pending
+
+            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+
+            ((unsafe (*__param_s).pending_buf[__ci_expr_old_0]) = (((((unsafe *__param_s).bi_buf as i32) & (255 as i32)) as u8)))
+
+
+
+
+            var __ci_expr_old_1: u64 = (unsafe *__param_s).pending
+
+            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+
+            ((unsafe (*__param_s).pending_buf[__ci_expr_old_1]) = (((((unsafe *__param_s).bi_buf as i32) >> (8 as u32)) as u8)))
+
+
+
+
+
+
+            ((unsafe *__param_s).bi_buf = (((((__local_val as u16) as i32) >> ((16 - (unsafe *__param_s).bi_valid) as u32)) as u16)))
+
+            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len - 16))
+
+        } else {
+            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as u16) | (((2 as i32) << ((unsafe *__param_s).bi_valid as u32)) as u16))
+
+            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len)
+
+        }
+
+
+
+        var __local_len_1: i32 = (((unsafe *(&raw const static_ltree[256].dl as *const ct_data_s_dl)).len as i32))
+
+        if ((unsafe *__param_s).bi_valid > (16 - __local_len_1)) {
+            var __local_val_1: i32 = (((unsafe *(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as i32))
+
+            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as u16) | ((((__local_val_1 as u16) as i32) << ((unsafe *__param_s).bi_valid as u32)) as u16))
+
+            var __ci_expr_old_2: u64 = (unsafe *__param_s).pending
+
+            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+
+            ((unsafe (*__param_s).pending_buf[__ci_expr_old_2]) = (((((unsafe *__param_s).bi_buf as i32) & (255 as i32)) as u8)))
+
+
+
+
+            var __ci_expr_old_3: u64 = (unsafe *__param_s).pending
+
+            ((unsafe *__param_s).pending = ((unsafe *__param_s).pending +% 1))
+
+            ((unsafe (*__param_s).pending_buf[__ci_expr_old_3]) = (((((unsafe *__param_s).bi_buf as i32) >> (8 as u32)) as u8)))
+
+
+
+
+
+
+            ((unsafe *__param_s).bi_buf = (((((__local_val_1 as u16) as i32) >> ((16 - (unsafe *__param_s).bi_valid) as u32)) as u16)))
+
+            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + (__local_len_1 - 16))
+
+        } else {
+            ((unsafe *__param_s).bi_buf = ((unsafe *__param_s).bi_buf as u16) | ((((unsafe *(&raw const static_ltree[256].fc as *const ct_data_s_fc)).code as i32) << ((unsafe *__param_s).bi_valid as u32)) as u16))
+
+            ((unsafe *__param_s).bi_valid = (unsafe *__param_s).bi_valid + __local_len_1)
+
+        }
+
+
+
+        unsafe { bi_flush(__param_s) }
+
+    }
 
 }
 
