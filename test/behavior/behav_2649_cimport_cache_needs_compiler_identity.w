@@ -17,8 +17,16 @@ fn main:
     assert(write_file(base ++ "/k.h", "#define ANSWER 42\n") == 0)
     assert(write_file(base ++ "/main.w", "use c_import(\"" ++ base ++ "/k.h\")\nfn main:\n    print(ANSWER)\n") == 0)
     let _home = set_env("HOME", base ++ "/home")
-    let ran = run_to_files(&[compiler, "check", base ++ "/main.w"], base ++ "/run.out", base ++ "/run.err", 120000)
+    let ran = run_to_files(&[compiler, "check", base ++ "/main.w"], base ++ "/run.out", base ++ "/run.err", 1800000)
+    // A failure says what the compiler said: the lane's capture is all a
+    // release runner leaves behind (the check failed on the linux-x86_64 and
+    // linux-aarch64 release lanes with nothing but the assertion, v0.16.0.4).
+    if ran.code != 0:
+        eprint(f"check exited {ran.code}; stderr:\n" ++ (read_file(base ++ "/run.err") ?? ""))
     assert(ran.code == 0)
-    assert(list_files_text(base ++ "/home/.cache/with/c_import").contains(".w"))
+    let cached = list_files_text(base ++ "/home/.cache/with/c_import")
+    if not cached.contains(".w"):
+        eprint("no translation under " ++ base ++ "/home/.cache/with/c_import; entries: " ++ cached)
+    assert(cached.contains(".w"))
     let _done = remove_tree(base)
     print("ok")

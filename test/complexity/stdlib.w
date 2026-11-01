@@ -456,14 +456,17 @@ fn elapsed(work: &fn(i32) -> i32, n: i32):
         finish = cpu_time_ns()
     (finish - start) / runs
 
-fn median(a: i64, b: i64, c: i64):
-    if a < b:
-        if b < c: b else if a < c: c else: a
-    else:
-        if a < c: a else if b < c: c else: b
+fn least(a: i64, b: i64, c: i64):
+    if a <= b and a <= c: a else if b <= c: b else: c
 
+// The least of three samples, not the median: the bound measures how the
+// work grows, and other processes on the host only ever add to a sample
+// (a shared cache, a sibling on the other hyperthread), so the least
+// sample is the one closest to the work's own cost. Under a release
+// battery's load the median of three read a priority queue at 6.3x for n×4
+// on linux-aarch64 while the same binary alone read 4.6x (#2911).
 fn sample(work: &fn(i32) -> i32, n: i32):
-    median(elapsed(work, n), elapsed(work, n), elapsed(work, n))
+    least(elapsed(work, n), elapsed(work, n), elapsed(work, n))
 
 fn measure(name: &str, work: &fn(i32) -> i32, n: i32, issue: i32):
     let small = sample(work, n)

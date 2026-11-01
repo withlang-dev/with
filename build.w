@@ -1189,6 +1189,14 @@ fn stage_compiler_obj(name: &str) -> str:
 fn release_compiler_bin(name: &str) -> str:
     host_bin("out/release/bin/" ++ name)
 
+// A test lane's ceiling is a hang guard, not a speed budget (#2902). Each
+// test in a lane has its own thirty-minute guard (TEST_HANG_GUARD_MS); the
+// lane as a whole is hung, not slow, only after an hour. The driver's own
+// default is twenty minutes, which behavior-tests, native-phase-tests and
+// tools-tests crossed on a 4-core Windows runner (v0.16.0.4) while every
+// test in them passed.
+fn test_lane(kind: BuildKind, name: str, entry: str) -> Target: target_new(kind, name, entry).timeout(3600000)
+
 fn release_platform_asset_bin() -> str:
     let host_os = os()
     let host_arch = arch()
@@ -2574,15 +2582,19 @@ fn run_stdlib_complexity_action(ctx: ActionCtx) -> i32:
     compile_args.push(binary.clone())
     let compiled = ctx.process_runner().run_capture_cwd(
         compile_args,
-        build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 300000, root)
+        build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 1800000, root)
     if compiled.rc != 0:
         ctx.diagnostics().error(f"stdlib-complexity: compiler {compiler} exited {compiled.rc}; stdout={stdout_rel} stderr={stderr_rel}\n" ++ fs.read_text(stdout_rel) ++ fs.read_text(stderr_rel))
+    // The hang guard a test gets (#2902), not a speed budget: the timing run
+    // took over 120 s on a loaded 4-core Windows runner and was killed after
+    // ten of its rows, which read as "result or growth check failed" with
+    // every printed row within its bound (v0.16.0.4).
     let timing_out = build_project_join(output, "timing.stdout")
     let timing_err = build_project_join(output, "timing.stderr")
     var timing_args: List[str] = List.new()
     timing_args.push(binary.clone())
     let timed = ctx.process_runner().run_capture_cwd(timing_args,
-        build_project_abs(root, timing_out), build_project_abs(root, timing_err), 120000, root)
+        build_project_abs(root, timing_out), build_project_abs(root, timing_err), 1800000, root)
     if timed.rc != 0:
         ctx.diagnostics().error("stdlib-complexity: result or growth check failed\n" ++
             fs.read_text(timing_out) ++ fs.read_text(timing_err))
@@ -4174,20 +4186,20 @@ pub fn build(ctx: BuildCtx) -> Build:
     // ran 2 wide for minutes on an idle machine: 243 s pooled against 45 s at
     // full width. Unpooled, each runs alone with the full core window, one
     // after another; their children are 57-300 MB, so full width is safe.
-    var behavior_tests = target_new(.Test, "behavior-tests", "test/behavior/*.w")
+    var behavior_tests = test_lane(.Test, "behavior-tests", "test/behavior/*.w")
     behavior_tests = behavior_tests.arg("compiler=" ++ release_compiler_bin("with"))
     behavior_tests = behavior_tests.dep("build")
     out = out.add_target(behavior_tests)
 
     // Debug-allocator fixture lane (custom //! expect-debug-alloc directive; run
     // via tools/debug_drop.w, not the built-in test runner). See debug-allocator.md.
-    var debug_alloc_tests = target_new(.Action, "debug-alloc-tests", "").output("out/debug-alloc-tests")
+    var debug_alloc_tests = test_lane(.Action, "debug-alloc-tests", "").output("out/debug-alloc-tests")
     debug_alloc_tests = debug_alloc_tests.allow_parallel()
     debug_alloc_tests.action = run_debug_alloc_tests_action
     debug_alloc_tests = debug_alloc_tests.input(release_compiler_bin("with"))
     debug_alloc_tests = debug_alloc_tests.input("tools/debug_drop.w")
     debug_alloc_tests = debug_alloc_tests.input("test/debug_alloc")
-    var validate_all_async = target_new(.Action, "validate-all-async", "").output("out/validate-all-async")
+    var validate_all_async = test_lane(.Action, "validate-all-async", "").output("out/validate-all-async")
     validate_all_async.action = run_validate_all_async_action
     validate_all_async = validate_all_async.input(release_compiler_bin("with"))
     validate_all_async = validate_all_async.input("test/behavior")
@@ -4261,7 +4273,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     rt_decl_audit = rt_decl_audit.write_scope("out/rt-decl-audit")
     out = out.add_target(rt_decl_audit)
     // Runtime measurements need a quiet worker pool; leave this action serial.
-    var stdlib_complexity = target_new(.Action, "stdlib-complexity", "").output("out/stdlib-complexity")
+    var stdlib_complexity = test_lane(.Action, "stdlib-complexity", "").output("out/stdlib-complexity")
     stdlib_complexity.action = run_stdlib_complexity_action
     stdlib_complexity = stdlib_complexity.input(release_compiler_bin("with"))
     stdlib_complexity = stdlib_complexity.input("test/complexity/stdlib.w")
@@ -4293,12 +4305,12 @@ pub fn build(ctx: BuildCtx) -> Build:
     d_acceptance_corpus = d_acceptance_corpus.dep("build")
     d_acceptance_corpus = d_acceptance_corpus.write_scope("out/d-acceptance")
     out = out.add_target(d_acceptance_corpus)
-    var d_acceptance_tests = target_new(.Test, "d-acceptance-tests", "out/d-acceptance/corpus/*.w")
+    var d_acceptance_tests = test_lane(.Test, "d-acceptance-tests", "out/d-acceptance/corpus/*.w")
     d_acceptance_tests = d_acceptance_tests.arg("compiler=" ++ release_compiler_bin("with"))
     d_acceptance_tests = d_acceptance_tests.dep("d-acceptance-corpus")
     out = out.add_target(d_acceptance_tests)
 
-    var deep_debug_tool_tests = target_new(.Action, "deep-debug-tool-tests", "").output("out/deep-debug-tool-tests")
+    var deep_debug_tool_tests = test_lane(.Action, "deep-debug-tool-tests", "").output("out/deep-debug-tool-tests")
     deep_debug_tool_tests = deep_debug_tool_tests.allow_parallel()
     deep_debug_tool_tests.action = run_deep_debug_tool_tests_action
     deep_debug_tool_tests = deep_debug_tool_tests.input(release_compiler_bin("with"))
@@ -4309,7 +4321,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // D51 stage 10 (ruling §63): the foreign-contract view and audit over
     // test/contract/*.w — snapshots and planted suspicious configurations.
-    var contract_view_tests = target_new(.Action, "contract-view-tests", "").output("out/contract-view-tests")
+    var contract_view_tests = test_lane(.Action, "contract-view-tests", "").output("out/contract-view-tests")
     contract_view_tests = contract_view_tests.allow_parallel()
     contract_view_tests.action = run_contract_view_tests_action
     contract_view_tests = contract_view_tests.input(release_compiler_bin("with"))
@@ -4331,7 +4343,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     battery_uat = battery_uat.timeout(1800000)
     out = out.add_target(battery_uat)
 
-    var uat_tests = target_new(.Action, "uat-tests", "").output("out/uat-tests")
+    var uat_tests = test_lane(.Action, "uat-tests", "").output("out/uat-tests")
     uat_tests = uat_tests.allow_parallel()
     uat_tests.action = run_uat_tests_action
     uat_tests = uat_tests.input(release_compiler_bin("with"))
@@ -4351,7 +4363,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     abi_hash_check = abi_hash_check.write_scope("out/abi-hash-check")
     out = out.add_target(abi_hash_check)
 
-    var native_compile_error_tests = target_new(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
+    var native_compile_error_tests = test_lane(.Test, "native-compile-error-tests", "test/compile_errors/*.w")
     native_compile_error_tests = native_compile_error_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_compile_error_tests = native_compile_error_tests.dep("build")
     // The native suites run the release compiler (`build`) and read
@@ -4360,17 +4372,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     // under load, then internals-tests 118 s). selfcheck still gates.
     out = out.add_target(native_compile_error_tests)
 
-    var native_codegen_tests = target_new(.Test, "native-codegen-tests", "test/codegen/*.w")
+    var native_codegen_tests = test_lane(.Test, "native-codegen-tests", "test/codegen/*.w")
     native_codegen_tests = native_codegen_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_codegen_tests = native_codegen_tests.dep("build")
     out = out.add_target(native_codegen_tests)
 
-    var native_spec_tests = target_new(.Test, "native-spec-tests", "test/spec/*.w")
+    var native_spec_tests = test_lane(.Test, "native-spec-tests", "test/spec/*.w")
     native_spec_tests = native_spec_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_spec_tests = native_spec_tests.dep("build")
     out = out.add_target(native_spec_tests)
 
-    var comptime_diff_tests = target_new(.Test, "comptime-diff-tests", "test/comptime_diff/*.w")
+    var comptime_diff_tests = test_lane(.Test, "comptime-diff-tests", "test/comptime_diff/*.w")
     comptime_diff_tests = comptime_diff_tests.allow_parallel()
     comptime_diff_tests = comptime_diff_tests.arg("compiler=" ++ release_compiler_bin("with"))
     comptime_diff_tests = comptime_diff_tests.dep("build")
@@ -4380,7 +4392,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // wasm32 against out/lib/cross/wasm32/ and run through its emitted JS
     // host under node. `with build :wasm-tests`; not in the standing
     // battery because it needs node on PATH.
-    var wasm_tests = target_new(.Test, "wasm-tests", "test/wasm/*.w")
+    var wasm_tests = test_lane(.Test, "wasm-tests", "test/wasm/*.w")
     wasm_tests = wasm_tests.allow_parallel()
     wasm_tests = wasm_tests.arg("compiler=" ++ release_compiler_bin("with"))
     wasm_tests = wasm_tests.arg("--target=wasm32")
@@ -4388,51 +4400,51 @@ pub fn build(ctx: BuildCtx) -> Build:
     wasm_tests = wasm_tests.dep("cross-rt-wasm")
     out = out.add_target(wasm_tests)
 
-    var native_phase_tests = target_new(.Test, "native-phase-tests", "test/phase/*.w")
+    var native_phase_tests = test_lane(.Test, "native-phase-tests", "test/phase/*.w")
     native_phase_tests = native_phase_tests.arg("compiler=" ++ release_compiler_bin("with"))
     native_phase_tests = native_phase_tests.dep("build")
     out = out.add_target(native_phase_tests)
 
-    var internals_tests = target_new(.Test, "internals-tests", "test/internals/*.w")
+    var internals_tests = test_lane(.Test, "internals-tests", "test/internals/*.w")
     internals_tests = internals_tests.allow_parallel()
     internals_tests = internals_tests.arg("compiler=" ++ release_compiler_bin("with"))
     internals_tests = internals_tests.dep("build")
     out = out.add_target(internals_tests)
 
-    var lexer_tests = target_new(.Test, "lexer-tests", "test/lexer/*.w")
+    var lexer_tests = test_lane(.Test, "lexer-tests", "test/lexer/*.w")
     lexer_tests = lexer_tests.allow_parallel()
     lexer_tests = lexer_tests.arg("compiler=" ++ release_compiler_bin("with"))
     lexer_tests = lexer_tests.dep("build")
     out = out.add_target(lexer_tests)
 
-    var parser_tests = target_new(.Test, "parser-tests", "test/parser/*.w")
+    var parser_tests = test_lane(.Test, "parser-tests", "test/parser/*.w")
     parser_tests = parser_tests.allow_parallel()
     parser_tests = parser_tests.arg("compiler=" ++ release_compiler_bin("with"))
     parser_tests = parser_tests.dep("build")
     out = out.add_target(parser_tests)
 
-    var cli_selfhost_smoke_tests = target_new(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
+    var cli_selfhost_smoke_tests = test_lane(.Action, "cli-selfhost-smoke-tests", "").output("out/test-graph/cli-selfhost-smoke-tests")
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.allow_parallel()
     cli_selfhost_smoke_tests.action = run_cli_selfhost_smoke_action
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.input(release_compiler_bin("with"))
     cli_selfhost_smoke_tests = cli_selfhost_smoke_tests.dep("build")
     out = out.add_target(cli_selfhost_smoke_tests)
 
-    var cli_selfhost_one_liner_tests = target_new(.Action, "cli-selfhost-one-liner-tests", "").output("out/test-graph/cli-selfhost-one-liner-tests")
+    var cli_selfhost_one_liner_tests = test_lane(.Action, "cli-selfhost-one-liner-tests", "").output("out/test-graph/cli-selfhost-one-liner-tests")
     cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.allow_parallel()
     cli_selfhost_one_liner_tests.action = run_cli_selfhost_one_liner_action
     cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.input(release_compiler_bin("with"))
     cli_selfhost_one_liner_tests = cli_selfhost_one_liner_tests.dep("build")
     out = out.add_target(cli_selfhost_one_liner_tests)
 
-    var cli_selfhost_fmt_tests = target_new(.Action, "cli-selfhost-fmt-tests", "").output("out/test-graph/cli-selfhost-fmt-tests")
+    var cli_selfhost_fmt_tests = test_lane(.Action, "cli-selfhost-fmt-tests", "").output("out/test-graph/cli-selfhost-fmt-tests")
     cli_selfhost_fmt_tests = cli_selfhost_fmt_tests.allow_parallel()
     cli_selfhost_fmt_tests.action = run_cli_selfhost_fmt_action
     cli_selfhost_fmt_tests = cli_selfhost_fmt_tests.input(release_compiler_bin("with"))
     cli_selfhost_fmt_tests = cli_selfhost_fmt_tests.dep("build")
     out = out.add_target(cli_selfhost_fmt_tests)
 
-    var cli_selfhost_object_symbol_tests = target_new(.Action, "cli-selfhost-object-symbol-tests", "").output("out/test-graph/cli-selfhost-object-symbol-tests")
+    var cli_selfhost_object_symbol_tests = test_lane(.Action, "cli-selfhost-object-symbol-tests", "").output("out/test-graph/cli-selfhost-object-symbol-tests")
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.allow_parallel()
     cli_selfhost_object_symbol_tests.action = run_cli_selfhost_object_symbol_action
     cli_selfhost_object_symbol_tests = cli_selfhost_object_symbol_tests.arg("nm")
@@ -4442,7 +4454,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // D39 bundle interfaces: .wi flavor, --link-bundle, declaration-only
     // codegen (build/selfhost.w bs_check_bundle_interface).
-    var bundle_interface_tests = target_new(.Action, "bundle-interface-tests", "").output("out/test-graph/bundle-interface-tests")
+    var bundle_interface_tests = test_lane(.Action, "bundle-interface-tests", "").output("out/test-graph/bundle-interface-tests")
     bundle_interface_tests = bundle_interface_tests.allow_parallel()
     bundle_interface_tests.action = run_bundle_interface_action
     bundle_interface_tests = bundle_interface_tests.arg("nm")
@@ -4471,14 +4483,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     bundle_interface_tests = bundle_interface_tests.dep("build")
     out = out.add_target(bundle_interface_tests)
 
-    var cli_selfhost_build_w_tests = target_new(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
+    var cli_selfhost_build_w_tests = test_lane(.Action, "cli-selfhost-build-w-tests", "").output("out/test-graph/cli-selfhost-build-w-tests")
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.allow_parallel()
     cli_selfhost_build_w_tests.action = run_cli_selfhost_build_w_action
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.input(release_compiler_bin("with"))
     cli_selfhost_build_w_tests = cli_selfhost_build_w_tests.dep("build")
     out = out.add_target(cli_selfhost_build_w_tests)
 
-    var build_helper_programs = target_new(.Action, "build-helper-programs", "").output("out/test-graph/build-helper-programs")
+    var build_helper_programs = test_lane(.Action, "build-helper-programs", "").output("out/test-graph/build-helper-programs")
     build_helper_programs = build_helper_programs.allow_parallel()
     build_helper_programs.action = run_build_helper_programs_action
     build_helper_programs = build_helper_programs.input(release_compiler_bin("with"))
@@ -4493,7 +4505,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // the release compiler and run, and every package test runs, so a
     // rotted example turns the battery red. The example list lives in
     // build/examples.w; untracked user work under examples/ is not on it.
-    var examples_tests = target_new(.Action, "examples-tests", "").output("out/test-graph/examples-tests")
+    var examples_tests = test_lane(.Action, "examples-tests", "").output("out/test-graph/examples-tests")
     examples_tests = examples_tests.allow_parallel()
     examples_tests.action = run_examples_tests_action
     examples_tests = examples_tests.input(release_compiler_bin("with"))
@@ -4515,7 +4527,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The tools lane (#1335): every tools/*.w is compiled (never run) with
     // the release compiler, so a tool that stops compiling turns the battery
     // red instead of rotting until someone reaches for it.
-    var tools_tests = target_new(.Action, "tools-tests", "").output("out/test-graph/tools-tests")
+    var tools_tests = test_lane(.Action, "tools-tests", "").output("out/test-graph/tools-tests")
     tools_tests = tools_tests.allow_parallel()
     tools_tests.action = run_tools_tests_action
     tools_tests = tools_tests.input(release_compiler_bin("with"))
@@ -4552,7 +4564,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     seed_driver = seed_driver.arg(release_asset_for_host())
     out = out.add_target(seed_driver)
 
-    var cli_selfhost_project_tests = target_new(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
+    var cli_selfhost_project_tests = test_lane(.Action, "cli-selfhost-project-tests", "").output("out/test-graph/cli-selfhost-project-tests")
     cli_selfhost_project_tests = cli_selfhost_project_tests.allow_parallel()
     cli_selfhost_project_tests.action = run_cli_selfhost_project_action
     cli_selfhost_project_tests = cli_selfhost_project_tests.input(release_compiler_bin("with"))
@@ -4560,21 +4572,21 @@ pub fn build(ctx: BuildCtx) -> Build:
     cli_selfhost_project_tests = cli_selfhost_project_tests.dep("build")
     out = out.add_target(cli_selfhost_project_tests)
 
-    var cli_selfhost_lsp_tests = target_new(.Action, "cli-selfhost-lsp-tests", "").output("out/test-graph/cli-selfhost-lsp-tests")
+    var cli_selfhost_lsp_tests = test_lane(.Action, "cli-selfhost-lsp-tests", "").output("out/test-graph/cli-selfhost-lsp-tests")
     cli_selfhost_lsp_tests = cli_selfhost_lsp_tests.allow_parallel()
     cli_selfhost_lsp_tests.action = run_cli_selfhost_lsp_action
     cli_selfhost_lsp_tests = cli_selfhost_lsp_tests.input(release_compiler_bin("with"))
     cli_selfhost_lsp_tests = cli_selfhost_lsp_tests.dep("build")
     out = out.add_target(cli_selfhost_lsp_tests)
 
-    var cli_selfhost_edge_tests = target_new(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
+    var cli_selfhost_edge_tests = test_lane(.Action, "cli-selfhost-edge-tests", "").output("out/test-graph/cli-selfhost-edge-tests")
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.allow_parallel()
     cli_selfhost_edge_tests.action = run_cli_selfhost_edge_action
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.input(release_compiler_bin("with"))
     cli_selfhost_edge_tests = cli_selfhost_edge_tests.dep("build")
     out = out.add_target(cli_selfhost_edge_tests)
 
-    var cli_selfhost_parallel_tests = target_new(.Action, "cli-selfhost-parallel-tests", "").output("out/test-graph/cli-selfhost-parallel-tests")
+    var cli_selfhost_parallel_tests = test_lane(.Action, "cli-selfhost-parallel-tests", "").output("out/test-graph/cli-selfhost-parallel-tests")
     cli_selfhost_parallel_tests.action = run_cli_selfhost_parallel_action
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.input(release_compiler_bin("with"))
     cli_selfhost_parallel_tests = cli_selfhost_parallel_tests.dep("build")
@@ -4633,14 +4645,14 @@ pub fn build(ctx: BuildCtx) -> Build:
         invariance_check = invariance_check.dep("invariance-" ++ inv_label)
     out = out.add_target(invariance_check)
 
-    var embedded_runtime_regression = target_new(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
+    var embedded_runtime_regression = test_lane(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
     embedded_runtime_regression = embedded_runtime_regression.allow_parallel()
     embedded_runtime_regression.action = run_embedded_runtime_regression_action
     embedded_runtime_regression = embedded_runtime_regression.input(release_compiler_bin("with"))
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
 
-    var runtime_generation_regression = target_new(.Action, "runtime-generation-regression", "").output("out/test-graph/runtime-generation-regression")
+    var runtime_generation_regression = test_lane(.Action, "runtime-generation-regression", "").output("out/test-graph/runtime-generation-regression")
     runtime_generation_regression = runtime_generation_regression.allow_parallel()
     runtime_generation_regression.action = run_runtime_generation_regression_action
     runtime_generation_regression = runtime_generation_regression.input(release_compiler_bin("with"))
@@ -4649,7 +4661,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     runtime_generation_regression = runtime_generation_regression.dep("runtime-producer")
     out = out.add_target(runtime_generation_regression)
 
-    var emit_c_smoke = target_new(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
+    var emit_c_smoke = test_lane(.Action, "emit-c-smoke", "").output("out/test-graph/emit-c-smoke")
     emit_c_smoke = emit_c_smoke.allow_parallel()
     emit_c_smoke.action = run_emit_c_smoke_action
     emit_c_smoke = emit_c_smoke.input(release_compiler_bin("with"))

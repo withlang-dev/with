@@ -155,7 +155,11 @@ fn p7_run_with_compiler_keeping_env(compiler: &str, case_dir: &str, label: &str,
     var argv = ""
     argv = p7_argv_append(argv, compiler)
     argv = argv ++ args_blob
-    let rc = unsafe { with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 300000, case_dir) }
+    // A hang guard, not a speed budget (#2902): `build --emit-c` of a
+    // program is slow on a loaded 4-core release runner (the emit-c smoke
+    // lane took 880 s there), and a child killed at 300 s leaves an empty
+    // stderr and a non-zero exit that a test reads as its own failure.
+    let rc = unsafe { with_exec_argv_capture_cwd(argv, stdout_path, stderr_path, 1800000, case_dir) }
     P7Run { rc, stdout: read_file(stdout_path).unwrap(), stderr: read_file(stderr_path).unwrap() }
 
 pub fn p7_build_args -> str:
