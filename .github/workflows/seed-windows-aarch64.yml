@@ -216,10 +216,11 @@ jobs:
           ln -sf "$LLVM_PREFIX/bin/ld.lld"   .link-shim/ld64.lld
           ln -sf "$LLVM_PREFIX/bin/lld"      .link-shim/lld
           ln -sf "$LLVM_PREFIX/bin/lld"      .link-shim/lld-link
-          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
-          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
-          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
-          ln -sf "$xml2" .link-shim/libxml2.so.16
+          xml2="$(ldconfig -p 2>/dev/null | awk '/libxml2\.so\.2 /{print $NF; exit}' || true)"
+          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* /usr/lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1 || true)"
+          # A runner image without libxml2.so.2 (set -e, pipefail: the empty `ls` exited the step with 2) runs the SDK lld as it is.
+          [ -n "$xml2" ] || echo "no system libxml2.so.2; the SDK lld runs without the alias"
+          [ -z "$xml2" ] || ln -sf "$xml2" .link-shim/libxml2.so.16
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
 
       - name: Bootstrap host seed
