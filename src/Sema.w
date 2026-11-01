@@ -2205,6 +2205,11 @@ type Sema {
     current_fn_sig_idx: i32,           // sig index of current function (-1 if not in a fn body)
     current_fn_variadic: i32,          // 1 while checking a `...` definition body (never a closure in it)
     recording_propagated_effect: i32,
+    // #912/D178: the for-desugar demands `next()` with the iterable standing in
+    // as its receiver node; when the loop's iterator is a value derived from
+    // the iterable (the inserted `iter()`), `next` mutates that temporary, not
+    // the iterable, so its receiver effect and edge are not propagated.
+    iter_next_receiver_derived: i32,
 
     // Closure capture summaries: closure node -> [capture_sym, effect_bits, type]*.
     // The type is recorded while the capture's scope is still available.
@@ -4178,6 +4183,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         current_fn_sig_idx: -1,
         current_fn_variadic: 0,
         recording_propagated_effect: 0,
+        iter_next_receiver_derived: 0,
         closure_capture_summary_starts: sema_new_map_i32_i32(),
         closure_capture_summary_counts: sema_new_map_i32_i32(),
         closure_capture_summary_data: List.new(),

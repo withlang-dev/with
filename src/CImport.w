@@ -7689,8 +7689,8 @@ impl CiExprPool:
         // nonzero, as it is in C; the test migrates as written. A literal
         // (`while (1)`, `if (0)`) is the bool it means.
         if self.kind(value_id) == CiExprKind.CIE_INT_LIT:
-            let text: str = self.get_string(self.get_d0(value_id))
-            return self.bool_lit(if text == "0": 0 else: 1, 0)
+            let text = self.get_string(self.get_d0(value_id))
+            return self.bool_lit((text != "0") as i32, 0)
         value_id
 
     fn bool_value_expr_ir(session: i64, cursor: i32, bool_expr_id: CiExprId, types: CiTypePool) -> CiExprId:
