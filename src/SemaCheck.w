@@ -19896,6 +19896,9 @@ impl Sema:
         else:
             self.check_expr_value_context(iterable)
         self.loop_iterable_node = outer_loop_iterable
+        // #2816 (§4.7): a range iterates `T: One + Ord`; a `for` over a
+        // Range[str] reached codegen, which asked LLVM to add 1 to a str.
+        if self.refuse_unsteppable_range(iter_type as i32, iterable): return 0
         // §13.6a: over an Option or Result the `for` is a one-clause
         // comprehension, not a loop — the body runs once on Some/Ok, not at
         // all on None/Err, and a body that is `yield E` makes it a value.
@@ -20129,6 +20132,9 @@ impl Sema:
         else:
             self.check_expr_value_context(iterable)
         self.loop_iterable_node = outer_loop_iterable
+        // #2816 (§4.7): a range iterates `T: One + Ord`; a `for` over a
+        // Range[str] reached codegen, which asked LLVM to add 1 to a str.
+        if self.refuse_unsteppable_range(iter_ty as i32, iterable): return 0
         let gen_elem = self.resolve_gen_for(iterable, iterable, iter_ty as i32)
         if gen_elem != 0:
             self.mark_moved_if_consumed(iterable)
@@ -20294,6 +20300,7 @@ impl Sema:
         // #2544 (§4.7, §13.5): a range is a sequence; its iterator is std's
         // range_iter over the bounds (`for` keeps its counter loop).
         if self.get_type_kind(resolved as TypeId) == TypeKind.TY_RANGE:
+            if self.refuse_unsteppable_range(resolved, iterable): return 0
             return self.demand_free_fn_implicit_iter(self.range_iter_fn_name(resolved), resolved, iterable, key_node)
         let owner_sym = self.method_owner_symbol_for_type(resolved)
         if owner_sym == 0:
@@ -20369,6 +20376,19 @@ impl Sema:
     // contract it records under `key_node` moves to for_iter_types (the
     // result type) and the returned signature.
     // §4.7: a range's std iterator by its inclusiveness (the type's d1).
+    // §4.7: a range iterates `T: One + Ord` — a type with a successor; the
+    // counter loop and std's range_iter step by one. A range of anything
+    // else is a value (bounds, membership) but no sequence: refused here,
+    // never handed to codegen (#2816).
+    mut fn refuse_unsteppable_range(range_type: i32, node: i32) -> bool:
+        var resolved = self.resolve_alias(range_type as TypeId)
+        if self.get_type_kind(resolved) == TypeKind.TY_REF: resolved = self.resolve_alias(self.get_type_d0(resolved) as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_RANGE: return false
+        let elem = self.get_type_d0(resolved)
+        if elem == 0 or self.is_plain_numeric_type(elem): return false
+        self.emit_error(f"cannot iterate over `{self.type_name(resolved as i32)}`: `{self.type_name(elem)}` has no successor (§4.7: a range iterates `T: One + Ord`)", node)
+        true
+
     fn range_iter_fn_name(range_type: i32) -> str:
         if self.get_type_d1(self.resolve_alias(range_type as TypeId)) != 0: "range_iter_inclusive" else: "range_iter"
 
@@ -26182,6 +26202,7 @@ impl Sema:
             return self.generic_fn_node_for_symbol(self.pool_lookup_symbol("slice_iter"))
         // #2544 (§4.7): a range's `iter()` is std's range_iter.
         if name == "iter" and self.receiver_is_range(recv_type):
+
             return self.generic_fn_node_for_symbol(self.pool_lookup_symbol(self.range_iter_fn_name(recv_type)))
         if not sema_iter_adapter_name(name):
             return 0
@@ -26228,7 +26249,9 @@ impl Sema:
         // instead of inside std's push.
         var fn_name: str =
             if self.receiver_is_slice(recv_type) and self.pool_resolve(field) == "iter": "slice_iter"
-            else if self.receiver_is_range(recv_type) and self.pool_resolve(field) == "iter": self.range_iter_fn_name(recv_type)
+            else if self.receiver_is_range(recv_type) and self.pool_resolve(field) == "iter":
+                if self.refuse_unsteppable_range(recv_type, node): return 0
+                self.range_iter_fn_name(recv_type)
             else: "iter_" ++ self.pool_resolve(field)
         // `collect[HashSet]` / `collect[BTreeSet]` name their own builders
         // (check_pipeline recorded the bracket's target).
