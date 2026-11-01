@@ -78,29 +78,29 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     let seed = root ++ "/src/main"
     let release = root ++ "/out/release/bin/with"
     set_env("WITH_VERSION", version)
-    // The pinned seed drives the gates (seed-driver refuses any other driver).
+    // The pinned seed drives everything but the publish: seed-driver refuses
+    // any other driver, and :release-uat and the package targets depend on
+    // release-checks, which depends on it (#2888). The UAT exercises the
+    // packaged asset whoever drives it. :selfcheck runs before :test because
+    // test-green demands its state and the test group does not run it (#2887).
     set_env("WITH", seed)
     var gates: List[str] = List.new()
     gates.push(":fixpoint")
+    gates.push(":selfcheck")
     gates.push(":test")
     gates.push(":test-green")
     gates.push(":last-green")
+    gates.push(":release-uat")
+    gates.push(":package-current-host")
+    gates.push(":package-llvm-sdk")
     let build_argv = argv2(seed, "build")
     if step("darwin build", &build_argv) != 0: return 1
     for gi in 0..gates.len():
         let target = gates[gi]
         let argv = argv3(seed, "build", target)
         if step("darwin " ++ target, &argv) != 0: return 1
-    // The rebuilt compiler runs the UAT, packages and publishes.
+    // The rebuilt compiler publishes.
     set_env("WITH", release)
-    var finals: List[str] = List.new()
-    finals.push(":release-uat")
-    finals.push(":package-current-host")
-    finals.push(":package-llvm-sdk")
-    for fi in 0..finals.len():
-        let target = finals[fi]
-        let argv = argv3(release, "build", target)
-        if step("darwin " ++ target, &argv) != 0: return 1
     let sdk = "out/release/with-llvm-sdk-22.1.6-darwin-aarch64.tar.gz"
     publish_env(version, channel, "out/release/with-darwin-aarch64",
         sdk ++ "," ++ sdk ++ ".sha256," ++ sdk ++ ".manifest,scripts/install.sh,scripts/install.ps1,scripts/install.cmd",
@@ -119,10 +119,18 @@ fn linux_aarch64_script(version: &str, channel: &str, sha: &str, seed_version: &
     "echo '" ++ seed_sha ++ "  src/main' | sha256sum -c - && chmod +x src/main\n" ++
     "WITH=/work/with/src/main ./src/main build :deps\n" ++
     "export WITH_OUT_DIR=/work/with/out WITH_VERSION=" ++ version ++ "\n" ++
-    "for t in '' :fixpoint :test :test-green :last-green; do WITH=/work/with/src/main ./src/main build $t; done\n" ++
-    "LIBGL_ALWAYS_SOFTWARE=1 WITH=/work/with/out/release/bin/with xvfb-run -a -s '-screen 0 1280x800x24' ./out/release/bin/with build :release-uat\n" ++
-    "for t in :package-current-host :package-llvm-sdk; do WITH=/work/with/out/release/bin/with ./out/release/bin/with build $t; done\n" ++
-    "SDK=out/release/with-llvm-sdk-22.1.6-linux-aarch64.tar.gz\n" ++
+    "for t in '' :fixpoint :selfcheck :test :test-green :last-green; do WITH=/work/with/src/main ./src/main build $t; done\n" ++
+    "LIBGL_ALWAYS_SOFTWARE=1 WITH=/work/with/src/main xvfb-run -a -s '-screen 0 1280x800x24' ./src/main build :release-uat\n" ++
+    "WITH=/work/with/src/main ./src/main build :package-current-host\n" ++
+    // The container extracted the pinned SDK asset (`build :deps`); it has no
+    // SDK build tree for :package-llvm-sdk to package, so the release gets the
+    // pinned asset itself, as every CI lane publishes it: the tag and the
+    // digests of the archive and its sidecars come from sdk.lock.
+    "A=with-llvm-sdk-22.1.6-linux-aarch64.tar.gz\n" ++
+    "T=$(sed -n \"s/^$A.version=//p\" sdk.lock)\n" ++
+    "for s in '' .sha256 .manifest; do curl -fsSL --retry 5 -o out/release/$A$s https://github.com/withlang-dev/with/releases/download/$T/$A$s; " ++
+    "echo \"$(sed -n \"s/^$A$s=//p\" sdk.lock)  out/release/$A$s\" | sha256sum -c -; done\n" ++
+    "SDK=out/release/$A\n" ++
     "RELEASE_TAG=" ++ version ++ " RELEASE_TITLE='With " ++ version ++ "' RELEASE_CHANNEL=" ++ channel ++ " RELEASE_ASSETS=out/release/with-linux-aarch64 " ++
     "RELEASE_EXTRA_FILES=$SDK,$SDK.sha256,$SDK.manifest RELEASE_BUILDER='local linux-aarch64 (docker on the release host)' RELEASE_REPO=withlang-dev/with " ++
     "WITH=/work/with/out/release/bin/with ./out/release/bin/with build :publish-release-asset\n"
