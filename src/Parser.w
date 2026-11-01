@@ -283,17 +283,17 @@ impl Parser:
     // §18.5b (D74): a token that opens an executable statement, never a
     // declaration, at a module's top level. `let`/`var` are declarations
     // there; attributes, `impl`, `trait` and `c facade` were taken above.
-    fn top_level_starts_stmt() -> i32:
+    fn top_level_starts_stmt() -> bool:
         let t = self.peek()
         if t == TokenKind.TK_IDENT:
-            return if self.top_level_starts_decl(): 0 else: 1
+            return not (self.top_level_starts_decl())
         if t == TokenKind.TK_INT_LIT or t == TokenKind.TK_STRING_LIT or t == TokenKind.TK_FLOAT_LIT:
-            return 1
+            return true
         if t == TokenKind.TK_KW_IF or t == TokenKind.TK_KW_MATCH or t == TokenKind.TK_KW_FOR or t == TokenKind.TK_KW_WHILE or t == TokenKind.TK_KW_LOOP or t == TokenKind.TK_KW_RETURN or t == TokenKind.TK_KW_WITH or t == TokenKind.TK_KW_DEFER:
-            return 1
+            return true
         if t == TokenKind.TK_L_PAREN or t == TokenKind.TK_L_BRACKET or t == TokenKind.TK_MINUS or t == TokenKind.TK_KW_NOT or t == TokenKind.TK_BANG:
-            return 1
-        0
+            return true
+        false
 
     mut fn emit_module_top_level_stmt(stmt: NodeId):
         let span = Span { file: self.file_id, start: self.pool.get_start(stmt), end: self.pool.get_end(stmt) }
@@ -1084,7 +1084,7 @@ impl Parser:
                 self.record_top_level_stmt(stmt)
             else:
                 self.recover_to_top_level()
-        else if self.module_label.len() > 0 and self.top_level_starts_stmt() != 0:
+        else if self.module_label.len() > 0 and self.top_level_starts_stmt():
             // §18.5b (D74): an imported module may not hold executable
             // statements. The statement is parsed so the error covers it
             // and the rest of the module is still diagnosed.

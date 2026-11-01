@@ -97,7 +97,7 @@ fn comptime_value_int(type_id: i32, value: i64) -> ComptimeValue:
         extra_count: 0,
     }
 
-fn comptime_value_bool(value: i32) -> ComptimeValue:
+fn comptime_value_bool(value: bool) -> ComptimeValue:
     ComptimeValue {
         kind: ComptimeValueKind.CV_BOOL,
         type_id: 0,
@@ -410,93 +410,93 @@ fn comptime_value_format(value: &ComptimeValue, extras: &List[ComptimeValue], se
         return "<" ++ sema.type_name(value.type_id) ++ ">"
     "<invalid>"
 
-fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &List[ComptimeValue]) -> i32:
+fn comptime_values_equal(lhs: &ComptimeValue, rhs: &ComptimeValue, extras: &List[ComptimeValue]) -> bool:
     if lhs.kind != rhs.kind:
-        return 0
+        return false
     if lhs.kind == ComptimeValueKind.CV_INVALID:
-        return 0
+        return false
     if lhs.kind == ComptimeValueKind.CV_VOID:
-        return 1
+        return true
     if lhs.kind == ComptimeValueKind.CV_INT or lhs.kind == ComptimeValueKind.CV_BOOL:
         if lhs.data0 == rhs.data0:
-            return 1
-        return 0
+            return true
+        return false
     if lhs.kind == ComptimeValueKind.CV_FLOAT:
         if lhs.real == rhs.real:
-            return 1
-        return 0
+            return true
+        return false
     if lhs.kind == ComptimeValueKind.CV_STR:
-        return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text))
+        return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text)) != 0
     if lhs.kind == ComptimeValueKind.CV_RANGE:
         if lhs.data0 == rhs.data0 and lhs.data1 == rhs.data1 and lhs.extra_start == rhs.extra_start:
-            return 1
-        return 0
+            return true
+        return false
     if lhs.kind == ComptimeValueKind.CV_ARRAY or lhs.kind == ComptimeValueKind.CV_TUPLE:
         if lhs.extra_count != rhs.extra_count:
-            return 0
+            return false
         for i in 0..lhs.extra_count:
             let left = extras[(lhs.extra_start + i)]
             let right = extras[(rhs.extra_start + i)]
-            if comptime_values_equal(left, right, extras) == 0:
-                return 0
-        return 1
+            if comptime_values_equal(left, right, extras) == false:
+                return false
+        return true
     if lhs.kind == ComptimeValueKind.CV_STRUCT:
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
-            return 0
+            return false
         for i in 0..lhs.extra_count:
             let left = extras[(lhs.extra_start + i)]
             let right = extras[(rhs.extra_start + i)]
-            if comptime_values_equal(left, right, extras) == 0:
-                return 0
-        return 1
+            if comptime_values_equal(left, right, extras) == false:
+                return false
+        return true
     if lhs.kind == ComptimeValueKind.CV_LIST:
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
-            return 0
+            return false
         for i in 0..lhs.extra_count:
             let left = extras[(lhs.extra_start + i)]
             let right = extras[(rhs.extra_start + i)]
-            if comptime_values_equal(left, right, extras) == 0:
-                return 0
-        return 1
+            if comptime_values_equal(left, right, extras) == false:
+                return false
+        return true
     if lhs.kind == ComptimeValueKind.CV_MAP:
         if lhs.type_id != rhs.type_id or lhs.extra_count != rhs.extra_count:
-            return 0
+            return false
         for i in 0..lhs.extra_count:
             let base = i * 2
             let left_key = extras[(lhs.extra_start + base)]
             let right_key = extras[(rhs.extra_start + base)]
-            if comptime_values_equal(left_key, right_key, extras) == 0:
-                return 0
+            if comptime_values_equal(left_key, right_key, extras) == false:
+                return false
             let left_value = extras[(lhs.extra_start + base + 1)]
             let right_value = extras[(rhs.extra_start + base + 1)]
-            if comptime_values_equal(left_value, right_value, extras) == 0:
-                return 0
-        return 1
+            if comptime_values_equal(left_value, right_value, extras) == false:
+                return false
+        return true
     if lhs.kind == ComptimeValueKind.CV_CAPABILITY:
         if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0 and lhs.data1 == rhs.data1 and lhs.extra_start == rhs.extra_start:
-            return 1
-        return 0
+            return true
+        return false
     if lhs.kind == ComptimeValueKind.CV_FN:
         if lhs.type_id == rhs.type_id and lhs.data0 == rhs.data0:
-            return 1
-        return 0
+            return true
+        return false
     if lhs.kind == ComptimeValueKind.CV_ENUM:
         if lhs.type_id != rhs.type_id or lhs.data0 != rhs.data0 or lhs.extra_count != rhs.extra_count:
-            return 0
+            return false
         for i in 0..lhs.extra_count:
             let left = extras[(lhs.extra_start + i)]
             let right = extras[(rhs.extra_start + i)]
-            if comptime_values_equal(left, right, extras) == 0:
-                return 0
-        return 1
+            if comptime_values_equal(left, right, extras) == false:
+                return false
+        return true
     if lhs.kind == ComptimeValueKind.CV_BYTES:
-        return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text))
+        return with_str_eq_ref(with_str_clone_ref(lhs.text), with_str_clone_ref(rhs.text)) != 0
     if lhs.kind == ComptimeValueKind.CV_STRING_BUILDER:
         // One buffer, one builder: the length is a snapshot, not identity.
         if lhs.type_id == rhs.type_id and lhs.extra_start == rhs.extra_start:
-            return 1
-        return 0
-    0
+            return true
+        return false
+    false
 
 // #747: explicit owned copy — ComptimeValue's text is an owned str now.
 fn comptime_value_clone(v: &ComptimeValue) -> ComptimeValue:

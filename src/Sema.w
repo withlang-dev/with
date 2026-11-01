@@ -7074,7 +7074,7 @@ impl Sema:
         // can hold, so copying "the pointee" has no meaning (it trapped).
         if tk == TypeKind.TY_TRAIT_OBJ:
             return true
-        if self.type_is_ephemeral_value(resolved) != 0:
+        if self.type_is_ephemeral_value(resolved):
             return true
         var parts: List[i32] = List.new()
         self.type_inline_parts(resolved, mut parts)
@@ -8408,20 +8408,20 @@ impl Sema:
             let idx: i32 = opt.unwrap()
             self.bind_is_scoped_task[idx] = is_scoped_task
 
-    fn scope_lookup_is_ephemeral_task(sym: i32) -> i32:
+    fn scope_lookup_is_ephemeral_task(sym: i32) -> bool:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
-            return self.bind_provenance[opt.unwrap()].is_ephemeral_task
-        0
+            return self.bind_provenance[opt.unwrap()].is_ephemeral_task != 0
+        false
 
-    fn scope_set_is_ephemeral_task(sym: i32, is_ephemeral_task: i32):
+    fn scope_set_is_ephemeral_task(sym: i32, is_ephemeral_task: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
             let slot_idx = idx as i64
             with self.bind_provenance.slot(slot_idx) as mut slot:
                 var provenance = slot.get()
-                provenance.is_ephemeral_task = is_ephemeral_task
+                provenance.is_ephemeral_task = is_ephemeral_task as i32
                 slot.set(provenance)
 
     fn scope_lookup_is_non_send_task(sym: i32) -> bool:
@@ -8440,20 +8440,20 @@ impl Sema:
                 provenance.is_non_send_task = is_non_send_task
                 slot.set(provenance)
 
-    fn scope_lookup_is_ephemeral_value(sym: i32) -> i32:
+    fn scope_lookup_is_ephemeral_value(sym: i32) -> bool:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
-            return self.bind_provenance[opt.unwrap()].is_ephemeral_value
-        0
+            return self.bind_provenance[opt.unwrap()].is_ephemeral_value != 0
+        false
 
-    fn scope_set_is_ephemeral_value(sym: i32, is_ephemeral_value: i32):
+    fn scope_set_is_ephemeral_value(sym: i32, is_ephemeral_value: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx = opt.unwrap()
             let slot_idx = idx as i64
             with self.bind_provenance.slot(slot_idx) as mut slot:
                 var provenance = slot.get()
-                provenance.is_ephemeral_value = is_ephemeral_value
+                provenance.is_ephemeral_value = is_ephemeral_value as i32
                 slot.set(provenance)
 
     fn scope_set_effect_dep_sym(sym: i32, dep_sym: i32):
@@ -9010,7 +9010,7 @@ impl Sema:
             // is independent of `a`; poisoning it made a later read of `g`
             // "may originate from `a`" (§21.1 Rule 6) in another function.
             let view_ty = self.bind_types[bi]
-            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) or self.type_is_ephemeral_value(view_ty) != 0)
+            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) or self.type_is_ephemeral_value(view_ty))
             if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym):
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
 
@@ -9314,7 +9314,7 @@ impl Sema:
             let start = self.ast.get_data0(node)
             let count = self.ast.get_data1(node)
             for ei in 0..count:
-                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl) != 0:
+                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl):
                     return false
             for ei in 0..count:
                 if self.type_node_zero_is_sentinel(self.ast.get_extra(start + ei), decl):
@@ -9342,34 +9342,34 @@ impl Sema:
     // Whether a field of this declared type may need drop glue, so an
     // explicit `move` of it is a vacate that resets its storage. Answers 1
     // whenever the walk cannot prove otherwise.
-    mut fn type_node_may_need_drop(node: i32, decl: i32) -> i32:
+    mut fn type_node_may_need_drop(node: i32, decl: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
-            return 0
+            return false
         if kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_ARRAY:
             return self.type_node_may_need_drop(self.ast.get_data0(node), decl)
         if kind == NodeKind.NK_TYPE_TUPLE:
             let start = self.ast.get_data0(node)
             for ei in 0..self.ast.get_data1(node):
-                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl) != 0:
-                    return 1
-            return 0
+                if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl):
+                    return true
+            return false
         if kind == NodeKind.NK_TYPE_NAMED:
             let sym = self.ast.get_data0(node)
             let tp_start = self.type_decl_tp_start(decl)
             for ti in 0..self.type_decl_tp_count(decl):
                 if self.ast.get_extra(tp_start + ti) == sym:
-                    return 1
+                    return true
             let prim = self.primitive_type_by_sym(sym)
             if prim != 0:
-                return if self.get_type_kind(self.resolve_alias(prim as TypeId)) == TypeKind.TY_STR: 1 else: 0
+                return self.get_type_kind(self.resolve_alias(prim as TypeId)) == TypeKind.TY_STR
             let named = self.lookup_named_type_visible(sym)
             if named == 0:
-                return 1
-            return self.type_needs_drop(named)
-        1
+                return true
+            return self.type_needs_drop(named) != 0
+        true
 
     // The same for a resolved type: a droppable type proves nothing (D82);
     // otherwise a pointer-shaped type, or an aggregate holding one, is

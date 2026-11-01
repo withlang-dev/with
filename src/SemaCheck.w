@@ -1046,7 +1046,7 @@ impl Sema:
                     continue
                 if self.expr_is_untyped_literal_aggregate(arm_nodes[ai]):
                     literal_arm_count = literal_arm_count + 1
-                else if self.body_can_fall_through(arm_nodes[ai]) != 0:
+                else if self.body_can_fall_through(arm_nodes[ai]):
                     typed_numeric_arm = 1
         let literal_arms_adapt = literal_arm_count > 0 and typed_numeric_arm != 0
 
@@ -1061,7 +1061,7 @@ impl Sema:
             // break) never reaches the join even when its recorded type is
             // Unit; it is diverging, not a Unit anchor.
             let reach_node = arm_nodes[ai]
-            if reach_node > 0 and self.body_can_fall_through(reach_node) == 0:
+            if reach_node > 0 and self.body_can_fall_through(reach_node) == false:
                 continue
             reaching_count = reaching_count + 1
             if literal_arms_adapt and self.expr_is_untyped_literal_aggregate(reach_node):
@@ -1297,7 +1297,7 @@ impl Sema:
                 let resolved = self.resolve_alias(arm_ty as TypeId)
                 if self.get_type_kind(resolved) == TypeKind.TY_NEVER:
                     diverging_count = diverging_count + 1
-                else if arm_node > 0 and self.body_can_fall_through(arm_node) == 0:
+                else if arm_node > 0 and self.body_can_fall_through(arm_node) == false:
                     diverging_count = diverging_count + 1
                 else if final_is_ref:
                     if (self.get_type_kind(resolved) != TypeKind.TY_REF or self.types_compatible(final_type as TypeId, arm_ty as TypeId) == false) and not deferred_arms.contains(arm_node):
@@ -1739,34 +1739,34 @@ impl Sema:
     // the call-local `[]mut` exclusivity pass. A miss here is an order-visibility
     // wart, not memory unsafety: a slice view cannot realloc or free its source,
     // so no dangling access is possible either way.
-    fn expr_mentions_root_sym(node: i32, sym: i32) -> i32:
+    fn expr_mentions_root_sym(node: i32, sym: i32) -> bool:
         if node == 0 or sym == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
-            return if self.ast.get_data0(node) == sym: 1 else: 0
+            return self.ast.get_data0(node) == sym
         if kind == NodeKind.NK_CALL:
-            if self.expr_mentions_root_sym(self.ast.get_data0(node), sym) != 0:
-                return 1
+            if self.expr_mentions_root_sym(self.ast.get_data0(node), sym):
+                return true
             let emc_start = self.ast.get_data1(node)
             let emc_count = self.ast.get_data2(node)
             for emi in 0..emc_count:
-                if self.expr_mentions_root_sym(self.ast.get_extra(emc_start + emi), sym) != 0:
-                    return 1
-            return 0
+                if self.expr_mentions_root_sym(self.ast.get_extra(emc_start + emi), sym):
+                    return true
+            return false
         if kind == NodeKind.NK_BINARY:
-            if self.expr_mentions_root_sym(self.ast.get_data1(node), sym) != 0:
-                return 1
+            if self.expr_mentions_root_sym(self.ast.get_data1(node), sym):
+                return true
             return self.expr_mentions_root_sym(self.ast.get_data2(node), sym)
         if kind == NodeKind.NK_UNARY:
             return self.expr_mentions_root_sym(self.ast.get_data1(node), sym)
         if kind == NodeKind.NK_FIELD_ACCESS or kind == NodeKind.NK_COMPUTED_FIELD_ACCESS or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_COPY_ARG:
             return self.expr_mentions_root_sym(self.ast.get_data0(node), sym)
         if kind == NodeKind.NK_INDEX:
-            if self.expr_mentions_root_sym(self.ast.get_data0(node), sym) != 0:
-                return 1
+            if self.expr_mentions_root_sym(self.ast.get_data0(node), sym):
+                return true
             return self.expr_mentions_root_sym(self.ast.get_data1(node), sym)
-        0
+        false
 
     // The source text of a node in the file being checked, for a diagnostic
     // that quotes what the program wrote.
@@ -1927,7 +1927,7 @@ impl Sema:
                     let owner = self.method_owner_symbol_for_type(owner_ty as i32)
                     if owner != 0:
                         offset = 1
-                        if (self.method_has_mut_self_flag(owner, method) != 0 or self.builtin_method_requires_mutable_receiver(owner, method)) and self.places_overlap(recv, target):
+                        if (self.method_has_mut_self_flag(owner, method) or self.builtin_method_requires_mutable_receiver(owner, method)) and self.places_overlap(recv, target):
                             return node
                 let in_recv = self.mutating_call_on_place(recv, target)
                 if in_recv > 0:
@@ -2099,7 +2099,7 @@ impl Sema:
                         if self.are_borrows_disjoint_paths(m_start, m_count, o_start, o_count) == false:
                             self.emit_error(f"`{m_name}` cannot be passed as `[]mut` twice in one call: the callee would hold two overlapping mutable views of it", o_node)
                     continue
-                if self.expr_mentions_root_sym(o_node, m_root) != 0:
+                if self.expr_mentions_root_sym(o_node, m_root):
                     self.emit_error(f"`{m_name}` cannot be read here while the callee is writing into it (`{m_name}` is passed as `[]mut`)", o_node)
 
     // ── Type expression resolution ───────────────────────────────────
@@ -3003,7 +3003,7 @@ impl Sema:
         let ret = self.sig_return_type(sig)
         if ret == 0:
             return false
-        self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0
+        self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret)
 
     // #1783 (§21.1): a method may store a view of a parameter into its
     // receiver (EFF_STORE_IN_RECEIVER, note_view_store_into_root), and a
@@ -3020,7 +3020,7 @@ impl Sema:
             if pt <= 0:
                 continue
             let tk = self.get_type_kind(self.resolve_alias(pt as TypeId))
-            if tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or self.type_is_ephemeral_value(pt) != 0:
+            if tk == TypeKind.TY_REF or tk == TypeKind.TY_FN or self.type_is_ephemeral_value(pt):
                 return true
         false
 
@@ -3655,7 +3655,7 @@ impl Sema:
         let entries = self.declared_view_origin_entries(node)
         let ret = self.sig_return_type(sig)
         let ret_kind = if ret > 0: self.get_type_kind(self.resolve_alias(ret as TypeId)) else: TypeKind.TY_VOID
-        if ret <= 0 or (ret_kind != TypeKind.TY_REF and self.type_is_ephemeral_value(ret) == 0):
+        if ret <= 0 or (ret_kind != TypeKind.TY_REF and self.type_is_ephemeral_value(ret) == false):
             self.emit_error(f"`{fn_text}` returns no view: a `from` clause names the origins of a returned view (§21.1 rule 6)", node)
             return
         let meta = self.ast.find_fn_meta(node)
@@ -5426,7 +5426,7 @@ impl Sema:
                         // decided by its length, as in a let (#1367).
                         let ppat_ty = self.sig_param_type(sig_idx, pi)
                         let ppat_mismatch = self.report_fixed_array_slice_mismatch(ppat, ppat_ty)
-                        if not unresolved_variant and not ppat_mismatch and self.pattern_is_refutable_for(ppat, ppat_ty) != 0 and self.fn_is_clause_body_symbol(fn_name) == false:
+                        if not unresolved_variant and not ppat_mismatch and self.pattern_is_refutable_for(ppat, ppat_ty) and self.fn_is_clause_body_symbol(fn_name) == false:
                             self.emit_error("refutable parameter pattern requires another function clause or an else", ppat)
 
         // Effect tracking: save outer state and populate for this function
@@ -5664,9 +5664,9 @@ impl Sema:
                 if body_root != 0:
                     self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
                 self.check_returned_view_origins(body, body)
-            else if has_ret_annotation and body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) == 0 and self.expr_is_ephemeral_value(body) == 0:
+            else if has_ret_annotation and body_materializes_copy == 0 and self.type_is_ephemeral_value(body_ty as i32) == false and self.expr_is_ephemeral_value(body) == false:
                 self.check_returned_owned_as_view(body, body_ty as i32, ret_type, body)
-            else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) != 0 or self.expr_is_ephemeral_value(body) != 0):
+            else if body_materializes_copy == 0 and (self.type_is_ephemeral_value(body_ty as i32) or self.expr_is_ephemeral_value(body)):
                 self.note_returned_transparent_view_effects(body)
                 self.check_returned_ephemeral_value_origins(body, body)
             self.check_returned_closure_env(body, body)
@@ -5702,9 +5702,9 @@ impl Sema:
             let explicit_void_results_ok = self.check_body_explicit_value_results(body, 1, body_expected_ret as i32, "return type mismatch")
             // §4.9: falling off the end of a `Result[Unit, E]` body is `Ok(())`,
             // also after an early `return Err(...)`.
-            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(body_expected_ret as i32) == false:
+            if explicit_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body) and self.type_is_result_of_unit(body_expected_ret as i32) == false:
                 self.emit_error("missing return", body)
-            else if self.body_can_fall_through(body) != 0 and self.type_has_default_value(body_expected_ret as i32) == 0:
+            else if self.body_can_fall_through(body) and self.type_has_default_value(body_expected_ret as i32) == 0:
                 // A body that cannot fall through (its last statement is
                 // `while true` with no break, or diverges) returns on every
                 // path it has; only one that can reach its end needs a value.
@@ -6050,7 +6050,7 @@ impl Sema:
     fn declared_view_origin(sig_idx: i32) -> i32:
         let ret = self.sig_return_type(sig_idx)
         let ret_resolved = self.resolve_alias(ret as TypeId)
-        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF and (ret <= 0 or self.type_is_ephemeral_value(ret) == 0):
+        if self.get_type_kind(ret_resolved) != TypeKind.TY_REF and (ret <= 0 or self.type_is_ephemeral_value(ret) == false):
             return DECLARED_ORIGIN_NONE
         let receiver_mode = self.sig_receiver_mode(sig_idx)
         if receiver_mode != ReceiverMode.None and receiver_mode != ReceiverMode.Missing:
@@ -8182,22 +8182,22 @@ impl Sema:
         self.with_exit_mono_syms.insert(node, self.sig_names[exit_sig])
         if is_mut != 0: WithFormKind.GuardedMut else: WithFormKind.Guarded
 
-    mut fn fn_symbol_may_suspend(fn_sym: i32) -> i32:
+    mut fn fn_symbol_may_suspend(fn_sym: i32) -> bool:
         if fn_sym == 0:
-            return 0
+            return false
         if self.suspend_facts_settling != 0:
             let settled_node = self.fn_decl_node_for_suspend(fn_sym)
-            return if settled_node != 0 and self.suspend_fact_nodes.contains(settled_node): 1 else: 0
+            return settled_node != 0 and self.suspend_fact_nodes.contains(settled_node)
         if self.suspend_visiting.contains(fn_sym):
-            return 0
+            return false
         if not self.fn_decl_nodes.contains(fn_sym):
-            return 0
+            return false
         self.suspend_visiting.insert(fn_sym, 1)
         self.suspend_site_depth += 1
         let fn_node: i32 = self.fn_decl_nodes.get(fn_sym).unwrap()
         // D39: an interface declaration is never async (the parser rejects
         // it), so by declaration it never suspends.
-        let result = if self.ast.fn_decl_body_is_interface(fn_node): 0 else: self.expr_may_suspend(self.ast.get_data1(fn_node))
+        let result = if self.ast.fn_decl_body_is_interface(fn_node): false else: self.expr_may_suspend(self.ast.get_data1(fn_node)) != 0
         self.suspend_site_depth -= 1
         self.suspend_visiting.remove(fn_sym)
         result
@@ -8672,7 +8672,7 @@ impl Sema:
         // A generic gen fn's specialization has no declaration of its own:
         // its body is the generic declaration's.
         if not self.concrete_specialization_by_sym.contains(producer) or self.suspend_visiting.contains(producer):
-            return self.fn_symbol_may_suspend(producer) != 0
+            return self.fn_symbol_may_suspend(producer)
         let spec_idx: i32 = self.concrete_specialization_by_sym.get(producer).unwrap()
         self.suspend_visiting.insert(producer, 1)
         let result = self.expr_may_suspend(self.ast.get_data1(self.concrete_specialization_nodes[spec_idx])) != 0
@@ -8721,7 +8721,7 @@ impl Sema:
             return 0
         if kind == NodeKind.NK_CALL:
             if self.comp_resolved.contains(node):
-                if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
+                if self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()):
                     return self.suspension_site(node)
             // #1985: a callable value, a `dyn` method, or a callable argument.
             if self.suspend_facts_settling != 0 and self.call_suspends_through_callable(node, false):
@@ -8732,7 +8732,7 @@ impl Sema:
                 if self.binding_closure_nodes.contains(callee_sym):
                     if self.callable_node_may_suspend(self.binding_closure_nodes.get(callee_sym).unwrap()) != 0:
                         return self.suspension_site(node)
-                if self.fn_symbol_may_suspend(callee_sym) != 0:
+                if self.fn_symbol_may_suspend(callee_sym):
                     return self.suspension_site(node)
             else if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
                 let recv_expr = self.ast.get_data0(callee)
@@ -8770,14 +8770,14 @@ impl Sema:
         if kind == NodeKind.NK_PIPELINE:
             // `x |> f` calls its stage (d0 = the piped value, d1 = the stage):
             // the stage's resolved callee may suspend like any call's (#916).
-            if self.comp_resolved.contains(node) and self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()) != 0:
+            if self.comp_resolved.contains(node) and self.fn_symbol_may_suspend(self.comp_resolved.get(node).unwrap()):
                 return self.suspension_site(node)
-            if self.pipeline_method_calls.contains(node) and self.fn_symbol_may_suspend(self.pipeline_method_calls.get(node).unwrap()) != 0:
+            if self.pipeline_method_calls.contains(node) and self.fn_symbol_may_suspend(self.pipeline_method_calls.get(node).unwrap()):
                 return self.suspension_site(node)
             if self.suspend_facts_settling != 0 and self.pipeline_suspends_through_callable(node, false):
                 return self.suspension_site(node)
             let stage = self.ast.get_data1(node)
-            if self.ast.kind(stage) == NodeKind.NK_IDENT and self.fn_symbol_may_suspend(self.ast.get_data0(stage)) != 0:
+            if self.ast.kind(stage) == NodeKind.NK_IDENT and self.fn_symbol_may_suspend(self.ast.get_data0(stage)):
                 return self.suspension_site(node)
             if self.expr_may_suspend(self.ast.get_data0(node)) != 0:
                 return 1
@@ -9424,7 +9424,7 @@ impl Sema:
             else if trait_sym == self.syms.sync_trait:
                 self.type_is_sync(cap_ty)
             else:
-                if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.scope_lookup_is_ephemeral_task(cap_sym) != 0 or self.scope_lookup_is_non_send_task(cap_sym):
+                if self.scope_lookup_is_ephemeral_value(cap_sym) or self.scope_lookup_is_ephemeral_task(cap_sym) or self.scope_lookup_is_non_send_task(cap_sym):
                     false
                 else:
                     self.type_is_send(cap_ty)
@@ -9453,7 +9453,7 @@ impl Sema:
             if self.expr_uses_symbol(body, cap_sym) == 0:
                 continue
             let cap_ty = self.scope_lookup(cap_sym)
-            if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.scope_lookup_is_ephemeral_task(cap_sym) != 0 or self.scope_lookup_is_non_send_task(cap_sym):
+            if self.scope_lookup_is_ephemeral_value(cap_sym) or self.scope_lookup_is_ephemeral_task(cap_sym) or self.scope_lookup_is_non_send_task(cap_sym):
                 return cap_sym
             if self.type_is_send(cap_ty) == false:
                 return cap_sym
@@ -9488,7 +9488,7 @@ impl Sema:
                         if nested_capture != 0:
                             return nested_capture
                         let arg_ty = self.cached_or_checked_expr_type(arg_node)
-                        if self.expr_is_ephemeral_value(arg_node) != 0 or self.expr_is_ephemeral_task(arg_node) != 0 or self.expr_creates_non_send_task(arg_node) or self.type_is_send(arg_ty) == false:
+                        if self.expr_is_ephemeral_value(arg_node) or self.expr_is_ephemeral_task(arg_node) or self.expr_creates_non_send_task(arg_node) or self.type_is_send(arg_ty) == false:
                             if self.ast.kind(arg_node) == NodeKind.NK_IDENT:
                                 return self.ast.get_data0(arg_node)
                             return 0
@@ -9509,7 +9509,7 @@ impl Sema:
             return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_CALL or kind == NodeKind.NK_ASYNC_BLOCK:
-            if self.expr_is_ephemeral_task(node) != 0:
+            if self.expr_is_ephemeral_task(node):
                 return 1
         if kind == NodeKind.NK_ASYNC_BLOCK:
             return 0
@@ -9743,7 +9743,7 @@ impl Sema:
                     let arg_count = self.ast.get_data2(node)
                     for ai in 0..arg_count:
                         let arg_node = self.ast.get_extra(args_start + ai)
-                        if self.expr_is_ephemeral_value(arg_node) != 0 or self.expr_is_ephemeral_task(arg_node) != 0 or self.expr_creates_non_send_task(arg_node):
+                        if self.expr_is_ephemeral_value(arg_node) or self.expr_is_ephemeral_task(arg_node) or self.expr_creates_non_send_task(arg_node):
                             return true
                         let arg_ty = self.cached_or_checked_expr_type(arg_node)
                         if self.type_is_send(arg_ty) == false:
@@ -10053,9 +10053,9 @@ impl Sema:
         self.task_param_consumed_memo.insert(key, result)
         result
 
-    mut fn expr_is_ephemeral_task(node: i32) -> i32:
+    mut fn expr_is_ephemeral_task(node: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.expr_is_ephemeral_task(self.ast.get_data0(node))
@@ -10071,10 +10071,10 @@ impl Sema:
                     let args_start = self.ast.get_data1(node)
                     let arg_count = self.ast.get_data2(node)
                     for ai in 0..arg_count:
-                        if self.expr_is_ephemeral_value(self.ast.get_extra(args_start + ai)) != 0:
-                            return 1
-            return 0
-        0
+                        if self.expr_is_ephemeral_value(self.ast.get_extra(args_start + ai)):
+                            return true
+            return false
+        false
 
     mut fn check_ephemeral_task_arg_escape(arg_node: i32, expected_ty: i32, is_extern_call: i32, callee_sym: i32, param_i: i32):
         if arg_node <= 0:
@@ -10084,7 +10084,7 @@ impl Sema:
         // copy would let the borrowed storage escape its origin's lifetime.
         // Same unsafe lane as the task gate below. (List element virality per
         // §5.2 is tracked separately.)
-        if self.expr_is_ephemeral_value(arg_node) != 0 and self.param_is_by_reference(expected_ty) == false and callee_sym != 0:
+        if self.expr_is_ephemeral_value(arg_node) and self.param_is_by_reference(expected_ty) == false and callee_sym != 0:
             let ebx_path = self.fn_symbol_source_path(callee_sym)
             if sema_path_is_std_box_module(ebx_path) or sema_path_is_std_rc_module(ebx_path) or self.safe_symbol_text(callee_sym) == "box_ctx":
                 if self.in_unsafe != 0:
@@ -10092,7 +10092,7 @@ impl Sema:
                 else:
                     self.emit_error("an ephemeral value cannot be stored on the heap: it borrows stack-scoped storage (§5.1); copy the data out (e.g. .to_owned()) or use a handle (§6) for a persistent relationship", arg_node)
                     return
-        if self.expr_is_ephemeral_task(arg_node) == 0:
+        if self.expr_is_ephemeral_task(arg_node) == false:
             return
         if self.param_is_by_reference(expected_ty):
             return
@@ -10109,36 +10109,36 @@ impl Sema:
     mut fn check_ephemeral_task_storage(value_node: i32, context: &str):
         if value_node <= 0:
             return
-        if self.expr_is_ephemeral_task(value_node) != 0:
+        if self.expr_is_ephemeral_task(value_node):
             self.emit_error("ephemeral Task cannot be stored in " ++ context, value_node)
 
-    mut fn expr_is_ephemeral_value(node: i32) -> i32:
+    mut fn expr_is_ephemeral_value(node: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.expr_is_ephemeral_value(self.ast.get_data0(node))
         if kind == NodeKind.NK_IDENT:
             let sym = self.ast.get_data0(node)
-            if self.scope_lookup_is_ephemeral_value(sym) != 0:
-                return 1
-            if self.scope_lookup_is_ephemeral_task(sym) != 0:
-                return 1
+            if self.scope_lookup_is_ephemeral_value(sym):
+                return true
+            if self.scope_lookup_is_ephemeral_task(sym):
+                return true
             let tid = self.scope_lookup(sym)
             if tid >= 0:
-                if self.type_is_ephemeral_value(tid) != 0:
-                    return 1
+                if self.type_is_ephemeral_value(tid):
+                    return true
                 // §12.4 / D63: a callable parameter may be a non-`move`
                 // closure — a view of the caller's frame — and the callee
                 // cannot tell, so it is ephemeral here exactly as a `&T`
                 // parameter is (#1698): its origin is the parameter itself.
                 if self.callable_param_is_view(sym, tid):
-                    return 1
-            return 0
+                    return true
+            return false
         if kind == NodeKind.NK_UNARY:
             let op = self.ast.get_data0(node)
             if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
-                return 1
+                return true
             // `*r` is the pointee read out as a value: it holds a view only
             // when its own type can (`**rr`, `*r` of a `&List[&T]`). A Copy
             // read through a reference (`*r` of a `&i32`) owns what it holds
@@ -10153,18 +10153,18 @@ impl Sema:
                         return self.type_is_ephemeral_value(self.get_type_d0(resolved_operand))
             return self.expr_is_ephemeral_value(self.ast.get_data1(node))
         if kind == NodeKind.NK_SLICE:
-            return 1
+            return true
         if kind == NodeKind.NK_CALL:
             // §13.4 (#1732): the iterator pulled from an ephemeral generator
             // value is as ephemeral as that value.
             if self.gen_pull_view_nodes.contains(node):
-                return 1
+                return true
             // A variant constructor call carrying an ephemeral payload
             // (`Some(f)`, rule 10) recorded its payload's origins on the
             // call; it is ephemeral as a value whatever its type says.
             let call_ty = self.typed_expr_types.get(node) ?? 0
             if call_ty != 0 and self.type_holds_callable(call_ty, 0) and (self.expr_view_dep_count(node) > 0 or self.expr_view_origin_mask(node) != 0):
-                return 1
+                return true
             return self.expr_is_ephemeral_task(node)
         // Rule 10 (§21.1): a tuple or variant is transparent to the views it
         // carries; `Some(f)` of a callable parameter holds that view.
@@ -10172,64 +10172,64 @@ impl Sema:
             let tuple_start = self.ast.get_data0(node)
             let tuple_count = self.ast.get_data1(node)
             for ti in 0..tuple_count:
-                if self.expr_is_ephemeral_value(self.ast.get_extra(tuple_start + ti)) != 0:
-                    return 1
-            return 0
+                if self.expr_is_ephemeral_value(self.ast.get_extra(tuple_start + ti)):
+                    return true
+            return false
         if kind == NodeKind.NK_ENUM_VARIANT:
             let variant_start = self.ast.get_data2(node)
             let variant_count = self.ast.get_extra(variant_start)
             for vi in 0..variant_count:
-                if self.expr_is_ephemeral_value(self.ast.get_extra(variant_start + 1 + vi)) != 0:
-                    return 1
-            return 0
+                if self.expr_is_ephemeral_value(self.ast.get_extra(variant_start + 1 + vi)):
+                    return true
+            return false
         if kind == NodeKind.NK_VARIANT_SHORTHAND:
             let shorthand_start = self.ast.get_data1(node)
             let shorthand_count = self.ast.get_data2(node)
             for vi in 0..shorthand_count:
-                if self.expr_is_ephemeral_value(self.ast.get_extra(shorthand_start + vi)) != 0:
-                    return 1
-            return 0
+                if self.expr_is_ephemeral_value(self.ast.get_extra(shorthand_start + vi)):
+                    return true
+            return false
         // #625 (decisions.md D2): a container/struct literal of an ephemeral type is
         // an ephemeral value — needed so Box.new(View{…}) / heap-escape gates fire.
         // A tuple literal is one too: `Box.new((view, 1))` put the view on the
         // heap past its origin, as `Box.new(view)` would (§5.1).
         if kind == NodeKind.NK_STRUCT_LIT or kind == NodeKind.NK_ARRAY_LIT or kind == NodeKind.NK_MAP_LIT or kind == NodeKind.NK_TUPLE:
-            if self.type_is_ephemeral_value(self.cached_or_checked_expr_type(node)) != 0:
-                return 1
+            if self.type_is_ephemeral_value(self.cached_or_checked_expr_type(node)):
+                return true
             // A literal holding an ephemeral VALUE (a non-`move` closure in a
             // field, #1638) is ephemeral even when its type is not.
             if kind == NodeKind.NK_STRUCT_LIT:
                 let field_start = self.ast.get_data1(node)
                 let field_count = self.ast.get_data2(node)
                 for fi in 0..field_count:
-                    if self.expr_is_ephemeral_value(self.ast.get_extra(field_start + fi * 2 + 1)) != 0:
-                        return 1
-                return 0
+                    if self.expr_is_ephemeral_value(self.ast.get_extra(field_start + fi * 2 + 1)):
+                        return true
+                return false
             let elem_start = self.ast.get_data0(node)
             let elem_count = self.ast.get_data1(node)
             let stride = if kind == NodeKind.NK_MAP_LIT: 2 else: 1
             for ei in 0..elem_count * stride:
-                if self.expr_is_ephemeral_value(self.ast.get_extra(elem_start + ei)) != 0:
-                    return 1
-            return 0
+                if self.expr_is_ephemeral_value(self.ast.get_extra(elem_start + ei)):
+                    return true
+            return false
         // §12.4 / D63: a non-`move` closure holding a place of this frame is
         // a view of it — ephemeral as a value, though `fn(A) -> R` the type
         // is not. Storing it (#1594, #1638) is a store of a view.
         if kind == NodeKind.NK_CLOSURE and self.ast.is_move_closure(node) == false:
             for ci in 0..self.closure_capture_summary_count(node):
                 if (self.closure_capture_summary_eff(node, ci) & EFF_CAPTURE_BY_PLACE) != 0:
-                    return 1
-            return 0
+                    return true
+            return false
         // A `move ||` closure owns its environment, but a capture that is
         // itself a view (a callable parameter, a binding holding a non-move
         // closure) makes the closure a carrier of that view (#1698).
         if kind == NodeKind.NK_CLOSURE:
             for ci in 0..self.closure_capture_summary_count(node):
                 let cap_sym = self.closure_capture_summary_sym(node, ci)
-                if self.scope_lookup_is_ephemeral_value(cap_sym) != 0 or self.callable_param_is_view(cap_sym, self.scope_lookup(cap_sym)):
-                    return 1
-            return 0
-        0
+                if self.scope_lookup_is_ephemeral_value(cap_sym) or self.callable_param_is_view(cap_sym, self.scope_lookup(cap_sym)):
+                    return true
+            return false
+        false
 
     // §12.4 / D63 (#1698): a callable parameter of the function being
     // checked is a view whose origin is the parameter itself — the argument
@@ -10245,7 +10245,7 @@ impl Sema:
     // Whether a value of this type can hold a view: an ephemeral type
     // (Rule 1-3, §22.1), or one that can hold a callable (below).
     mut fn type_can_carry_view(tid: i32) -> bool:
-        tid > 0 and (self.type_is_ephemeral_value(tid) != 0 or self.type_holds_callable(tid, 0))
+        tid > 0 and (self.type_is_ephemeral_value(tid) or self.type_holds_callable(tid, 0))
 
     // Whether a value of this type can hold a callable — the one place a
     // view hides behind a type that is not ephemeral (§12.4, D63): `fn(A) ->
@@ -11032,7 +11032,7 @@ impl Sema:
             // `@[entry]` and `test_*` do not infer (§4.10): their exit status
             // is fixed, and `if failed: return 1` with a fall-off is the idiom.
             let falls_off = body_ty == 0 or body_ty == self.ty_void
-            if falls_off and entry_point == 0 and self.body_can_fall_through(body) != 0 and self.type_is_result_of_unit(info.value_type) == false:
+            if falls_off and entry_point == 0 and self.body_can_fall_through(body) and self.type_is_result_of_unit(info.value_type) == false:
                 self.emit_error("missing return", body)
             // D141: the tail joins the explicit returns as another return
             // would (`return None` … `n` is Option[i32]; `return None` beside
@@ -11183,95 +11183,95 @@ impl Sema:
             return SemaIntLiteralValue { 0, 0 }
         SemaIntLiteralValue { 1, fast.value }
 
-    fn condition_is_static_true(node: i32) -> i32:
+    fn condition_is_static_true(node: i32) -> bool:
         if node != 0 and (self.ast.kind(node) == NodeKind.NK_GROUPED or self.ast.kind(node) == NodeKind.NK_NO_SUSPEND):
             return self.condition_is_static_true(self.ast.get_data0(node))
         if self.bool_literal_is_true(node) != 0:
-            return 1
+            return true
         // D177 (§4.2a): an integer tests true when nonzero, so `while 1:` is
         // the constant-true loop `while true:` is.
         let lit = self.int_literal_i64_value(node)
         if lit.ok != 0 and lit.value != 0:
-            return 1
+            return true
         if node == 0 or self.ast.kind(node) != NodeKind.NK_BINARY:
-            return 0
+            return false
         let op = self.ast.get_data0(node)
         if op != BinaryOp.OP_EQ and op != BinaryOp.OP_NEQ:
-            return 0
+            return false
         let lhs = self.int_literal_i64_value(self.ast.get_data1(node))
         if lhs.ok == 0:
-            return 0
+            return false
         let rhs = self.int_literal_i64_value(self.ast.get_data2(node))
         if rhs.ok == 0:
-            return 0
+            return false
         if op == BinaryOp.OP_EQ:
-            return if lhs.value == rhs.value: 1 else: 0
-        if lhs.value != rhs.value: 1 else: 0
+            return lhs.value == rhs.value
+        if lhs.value != rhs.value: true else: false
 
-    fn body_can_fall_through(node: i32) -> i32:
+    fn body_can_fall_through(node: i32) -> bool:
         if node == 0:
-            return 1
+            return true
         if self.typed_expr_types.contains(node):
             let ty = self.typed_expr_types.get(node).unwrap()
             if ty == self.ty_never:
-                return 0
+                return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_FN_DECL:
-            return 1
+            return true
         // An `unsafe fn` body is its block under NK_UNSAFE_BLOCK (and an
         // unsafe block is its block): read through it, or a body ending in
         // `while true` was judged to fall through and asked for a Default.
         if kind == NodeKind.NK_UNSAFE_BLOCK or kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_NO_SUSPEND:
             return self.body_can_fall_through(self.ast.get_data0(node))
         if kind == NodeKind.NK_RETURN:
-            return 0
+            return false
         if kind == NodeKind.NK_GOTO:
-            return 0
+            return false
         // #772: break/continue transfer control to a loop edge — they never
         // fall through into a join (`?? break` assigned the unreachable Unit
         // into the typed join result).
         if kind == NodeKind.NK_BREAK or kind == NodeKind.NK_CONTINUE:
-            return 0
+            return false
         if kind == NodeKind.NK_BLOCK:
             // #779: a `break` targeting THIS block's own label exits to the
             // block's after-edge — the block itself falls through.
             let bcf_meta = self.ast.find_block_meta(node)
             if bcf_meta >= 0 and self.ast.block_meta_label(bcf_meta) != 0 and self.is_break_target(node):
-                return 1
+                return true
             let extra_start = self.ast.get_data0(node)
             let stmt_count = self.ast.get_data1(node)
             for si in 0..stmt_count:
-                if self.body_can_fall_through(self.ast.get_extra(extra_start + si)) == 0:
-                    return 0
+                if self.body_can_fall_through(self.ast.get_extra(extra_start + si)) == false:
+                    return false
             let tail = self.ast.get_data2(node)
             if tail != 0:
                 return self.body_can_fall_through(tail)
-            return 1
+            return true
         if kind == NodeKind.NK_IF_EXPR:
             let else_body = self.ast.get_data2(node)
             if else_body == 0:
-                return 1
-            if self.body_can_fall_through(self.ast.get_data1(node)) != 0:
-                return 1
+                return true
+            if self.body_can_fall_through(self.ast.get_data1(node)):
+                return true
             return self.body_can_fall_through(else_body)
         if kind == NodeKind.NK_MATCH:
             let arm_start = self.ast.get_data1(node)
             let arm_count = self.ast.get_data2(node)
             if arm_count == 0:
-                return 1
+                return true
             for ai in 0..arm_count:
-                if self.body_can_fall_through(self.ast.get_extra(arm_start + ai)) != 0:
-                    return 1
-            return 0
+                if self.body_can_fall_through(self.ast.get_extra(arm_start + ai)):
+                    return true
+            return false
         if kind == NodeKind.NK_MATCH_ARM:
             return self.body_can_fall_through(self.ast.get_data1(node))
         if kind == NodeKind.NK_LOOP:
-            return if self.is_break_target(node): 1 else: 0
+            return self.is_break_target(node)
         if kind == NodeKind.NK_WHILE:
-            return if self.condition_is_static_true(self.ast.get_data0(node)) != 0 and not self.is_break_target(node): 0 else: 1
+            return not (self.condition_is_static_true(self.ast.get_data0(node)) and not self.is_break_target(node))
         if kind == NodeKind.NK_DO_WHILE:
-            return if self.condition_is_static_true(self.ast.get_data1(node)) != 0 and not self.is_break_target(node): 0 else: 1
-        1
+            return not (self.condition_is_static_true(self.ast.get_data1(node)) and not self.is_break_target(node))
+        true
 
     mut fn check_bitwise_literal_with_expected(node: i32, expected: TypeId) -> TypeId:
         let saved: i32 = self.in_bitwise_literal_context
@@ -12485,9 +12485,9 @@ impl Sema:
             if async_scope_default_tail != 0:
                 result = self.ty_void
             else:
-                if result != 0 and self.type_is_ephemeral_value(result as i32) != 0:
+                if result != 0 and self.type_is_ephemeral_value(result as i32):
                     self.emit_error("async scope result cannot be ephemeral; await or copy the value before it leaves the scope", body)
-                if self.expr_is_ephemeral_value(body) != 0:
+                if self.expr_is_ephemeral_value(body):
                     self.emit_error("async scope result cannot be ephemeral; await or copy the value before it leaves the scope", body)
             return result
 
@@ -12513,9 +12513,9 @@ impl Sema:
             if sync_scope_default_tail != 0:
                 result = self.ty_void
             else:
-                if result != 0 and self.type_is_ephemeral_value(result as i32) != 0:
+                if result != 0 and self.type_is_ephemeral_value(result as i32):
                     self.emit_error("scope result cannot be ephemeral; join or copy the value before it leaves the scope", body)
-                if self.expr_is_ephemeral_value(body) != 0:
+                if self.expr_is_ephemeral_value(body):
                     self.emit_error("scope result cannot be ephemeral; join or copy the value before it leaves the scope", body)
             return result
 
@@ -16292,7 +16292,7 @@ impl Sema:
             self.emit_task_must_observe_error(stmt)
             return
         self.eph_task_visiting = sema_new_map_i32_i32()
-        if self.expr_is_ephemeral_task(stmt) != 0 or self.expr_creates_ephemeral_task(stmt) != 0:
+        if self.expr_is_ephemeral_task(stmt) or self.expr_creates_ephemeral_task(stmt) != 0:
             self.emit_task_detach_safety_error(stmt)
             return
         self.detached_task_stmt_nodes.insert(stmt, 1)
@@ -16451,7 +16451,7 @@ impl Sema:
                     // else: …`) carries them on the binding, which the
                     // body-level call after teardown no longer finds.
                     self.note_returned_transparent_view_effects(tail)
-            else if tail_materializes == 0 and node != self.body_tail_block and tail_is_value != 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0):
+            else if tail_materializes == 0 and node != self.body_tail_block and tail_is_value != 0 and (self.type_is_ephemeral_value(tail_type as i32) or self.expr_is_ephemeral_value(tail)):
                 // An inner block's tail that is an ephemeral VALUE — a stage
                 // over a generator viewing the block's `v`, a view-holding
                 // struct — leaves the block exactly as a tail view does: its
@@ -16459,7 +16459,7 @@ impl Sema:
                 // `let s = { let v = …; over(&v) |> map(f) }` ran over freed
                 // storage).
                 self.check_view_escape_origins(tail, tail, block_scope_start)
-            else if tail_materializes == 0 and (self.type_is_ephemeral_value(tail_type as i32) != 0 or self.expr_is_ephemeral_value(tail) != 0) and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
+            else if tail_materializes == 0 and (self.type_is_ephemeral_value(tail_type as i32) or self.expr_is_ephemeral_value(tail)) and tail_is_value != 0 and self.stmt_pos_depth == 0 and self.current_return_type != 0 and self.current_return_type != self.ty_void:
                 // #625 (decisions.md D2): a tail-position return of an ephemeral value
                 // (struct or container) is escape-checked HERE, in-scope, while the
                 // block's binding view-deps are still live. The body-level check
@@ -16516,22 +16516,22 @@ impl Sema:
     // wider signed type. A narrower integer, and signed into unsigned at any
     // width, need an explicit `as`. Literals are adapted to the expected type
     // before this is consulted, so only typed values reach here.
-    fn int_narrowing_requires_cast(expected: TypeId, actual: TypeId) -> i32:
+    fn int_narrowing_requires_cast(expected: TypeId, actual: TypeId) -> bool:
         if expected == 0 or actual == 0:
-            return 0
+            return false
         let er = self.resolve_alias(expected)
         let ar = self.resolve_alias(actual)
         if self.get_type_kind(er) != TypeKind.TY_INT or self.get_type_kind(ar) != TypeKind.TY_INT:
-            return 0
+            return false
         let ew = self.get_type_d0(er)
         let aw = self.get_type_d0(ar)
         let e_signed = self.get_type_d1(er) != 0
         let a_signed = self.get_type_d1(ar) != 0
         if e_signed == a_signed:
-            return if ew < aw: 1 else: 0
+            return ew < aw
         if e_signed and ew > aw:
-            return 0
-        1
+            return false
+        true
 
     // The type both operands of a builtin arithmetic operator convert to
     // implicitly (§4.2.6): the operand the other widens into losslessly, or
@@ -16548,9 +16548,9 @@ impl Sema:
             return if self.get_type_d0(lr) >= self.get_type_d0(rr): lr else: rr
         if lk != TypeKind.TY_INT or rk != TypeKind.TY_INT:
             return 0 as TypeId
-        if self.int_narrowing_requires_cast(lr, rr) == 0:
+        if self.int_narrowing_requires_cast(lr, rr) == false:
             return lr
-        if self.int_narrowing_requires_cast(rr, lr) == 0:
+        if self.int_narrowing_requires_cast(rr, lr) == false:
             return rr
         0 as TypeId
 
@@ -16657,19 +16657,19 @@ impl Sema:
                 return false
         true
 
-    mut fn field_let_binds_as_view(value: i32, is_mut: i32, ann_type: TypeId) -> i32:
+    mut fn field_let_binds_as_view(value: i32, is_mut: i32, ann_type: TypeId) -> bool:
         if ann_type != 0:
-            return 0
+            return false
         var expr = value
         while expr != 0 and self.ast.kind(expr) == NodeKind.NK_GROUPED:
             expr = self.ast.get_data0(expr)
         if expr == 0 or self.ast.kind(expr) != NodeKind.NK_FIELD_ACCESS:
-            return 0
+            return false
         // A Drop-implementing owner keeps the §2.4 outside-drop diagnostic
         // (err_partial_move_drop_field): the marking path emits it.
         let v_owner = self.drop_owner_for_field_access(expr)
         if v_owner != 0 and self.has_drop_method(v_owner) != 0:
-            return 0
+            return false
         // A field whose TYPE carries a user Drop impl (directly or
         // transitively — W, List[W]) stays a MOVE: RAII resources want
         // explicit ownership transfer (err_use_after_move_*_field pins).
@@ -16677,15 +16677,15 @@ impl Sema:
         let v_fty_opt = self.typed_expr_types.get(expr)
         let v_fty = if v_fty_opt.is_some(): v_fty_opt.unwrap() else: self.field_access_type_no_diagnostic(expr)
         if v_fty != 0 and self.type_carries_user_drop(v_fty) != 0:
-            return 0
+            return false
         // D144: `let i = self.idx` takes the isize; `self.idx += 1` after it
         // is fine (the annotation that forced the copy, #1531, is no longer
         // written). A `var` of plain bits is the value too; of anything else
         // it keeps the value semantics it had.
         if v_fty != 0 and self.type_is_plain_bits(v_fty):
-            return 0
+            return false
         if is_mut != 0:
-            return 0
+            return false
         var vbase = self.ast.get_data0(expr)
         while vbase != 0:
             let vbk = self.ast.kind(vbase)
@@ -16693,26 +16693,26 @@ impl Sema:
                 vbase = self.ast.get_data0(vbase)
                 continue
             if vbk == NodeKind.NK_IDENT:
-                return if self.scope_has(self.ast.get_data0(vbase)): 1 else: 0
-            return 0
-        0
+                return self.scope_has(self.ast.get_data0(vbase))
+            return false
+        false
 
-    mut fn drop_body_field_observation(value: i32, is_mut: i32, ann_type: TypeId) -> i32:
+    mut fn drop_body_field_observation(value: i32, is_mut: i32, ann_type: TypeId) -> bool:
         if is_mut != 0 or self.current_drop_type_sym == 0:
-            return 0
+            return false
         // #768: an annotation demands what it says. `let taken: Inner =
         // self.inner` consumes the field as the unannotated binding does;
         // refusing every annotation here left MirLower aliasing a field the
         // glue then skipped, so nobody dropped it. A `&` annotation observes.
         if ann_type != 0 and self.get_type_kind(self.resolve_alias(ann_type)) == TypeKind.TY_REF:
-            return 0
+            return false
         var expr = value
         while expr != 0 and self.ast.kind(expr) == NodeKind.NK_GROUPED:
             expr = self.ast.get_data0(expr)
         if expr == 0 or self.ast.kind(expr) != NodeKind.NK_FIELD_ACCESS:
-            return 0
+            return false
         if self.drop_owner_for_field_access(expr) != self.current_drop_type_sym:
-            return 0
+            return false
         // The base chain must bottom out at a named binding (the receiver);
         // an rvalue base (call result) is a temporary, not an observed place.
         var base = self.ast.get_data0(expr)
@@ -16722,9 +16722,9 @@ impl Sema:
                 base = self.ast.get_data0(base)
                 continue
             if bk == NodeKind.NK_IDENT:
-                return if self.scope_has(self.ast.get_data0(base)): 1 else: 0
-            return 0
-        0
+                return self.scope_has(self.ast.get_data0(base))
+            return false
+        false
 
     // #725 (§5.2/§2.4): does this expression call an @[iter_of_self]
     // method on an OWNED rvalue receiver? Such a receiver is a statement
@@ -16786,7 +16786,7 @@ impl Sema:
     // A numeric narrowing was refused by the owned demand that checked the
     // value (reject_implicit_numeric_narrowing, #1803).
     mut fn check_binding_annotation(node: i32, value: i32, ann_type: TypeId, val_type: TypeId):
-        if val_type == 0 or self.int_narrowing_requires_cast(ann_type, val_type) != 0:
+        if val_type == 0 or self.int_narrowing_requires_cast(ann_type, val_type):
             return
         if self.types_compatible(ann_type as i32, val_type as i32) == false and self.has_contextual_copy_adjustment(value) == 0:
             // D93: a typed place demands its collection of a literal's binding.
@@ -17196,7 +17196,7 @@ impl Sema:
         // #725 (§5.2/§2.4): an ephemeral binding whose initializer borrows a
         // statement TEMPORARY outlives its origin — the temp collection dies
         // when this statement ends and the iterator's views dangle.
-        if val_type != 0 and self.type_is_ephemeral_value(val_type as i32) != 0 and self.expr_borrows_owned_temp_iter(value) != 0:
+        if val_type != 0 and self.type_is_ephemeral_value(val_type as i32) and self.expr_borrows_owned_temp_iter(value) != 0:
             self.emit_error_with_help("ephemeral value borrows a temporary that dies at the end of this statement", value, "bind the collection to a named variable first, then iterate the name")
         if ann_type != 0:
             bind_type = ann_type
@@ -17229,12 +17229,12 @@ impl Sema:
             // glue). Record the binding's value node so MirLower binds by
             // move instead of the alias path (the aliasing was the original
             // leak 84ebff6d mis-fixed on the sema side).
-            if self.drop_body_field_observation(value, is_mut, ann_type) != 0:
+            if self.drop_body_field_observation(value, is_mut, ann_type):
                 // §2.4: drop-body field lets CONSUME — record for MirLower's
                 // move binding and mark.
                 self.drop_consumed_binding_values.insert(value, 1)
                 self.mark_moved_if_consumed(value)
-            else if self.field_let_binds_as_view(value, is_mut, ann_type) != 0:
+            else if self.field_let_binds_as_view(value, is_mut, ann_type):
                 // D22 outside drop bodies: the binding OBSERVES (MirLower
                 // alias-binds it) — marking would blank the field and reject
                 // legal later base uses (`let saved = a.buf; a.buf = ...`).
@@ -17301,7 +17301,7 @@ impl Sema:
         self.scope_set_is_ephemeral_task(name, is_ephemeral_task)
         let is_non_send_task = (is_task_val != 0 and (self.type_is_send(bind_type as i32) == false or self.expr_creates_non_send_task(value))) as i32
         self.scope_set_is_non_send_task(name, is_non_send_task)
-        let is_ephemeral_value = (self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(bind_type as i32) != 0) as i32
+        let is_ephemeral_value = self.expr_is_ephemeral_value(value) or self.type_is_ephemeral_value(bind_type as i32)
         self.scope_set_is_ephemeral_value(name, is_ephemeral_value)
         self.scope_set_effect_dep_sym(name, self.expr_transmute_source_param_sym(value))
         if is_task_val != 0 and is_ephemeral_task != 0:
@@ -17319,7 +17319,7 @@ impl Sema:
         // An ephemeral VALUE of a non-ephemeral type — a callable parameter,
         // a variant carrying one, a struct holding a non-move
         // closure — carries its origins on the binding too (#1698).
-        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) or self.type_is_ephemeral_value(bind_type as i32) != 0 or self.closure_expr_has_by_place_captures(value) or (is_ephemeral_value != 0 and self.type_holds_callable(bind_type as i32, 0)):
+        if self.scope_is_view_bound(name) != 0 or self.type_has_drop_impl(bind_type as i32) or self.type_is_ephemeral_value(bind_type as i32) or self.closure_expr_has_by_place_captures(value) or (is_ephemeral_value != 0 and self.type_holds_callable(bind_type as i32, 0)):
             self.record_view_binding_from_expr(name, value)
         else:
             self.clear_binding_view_deps(name)
@@ -18050,7 +18050,7 @@ impl Sema:
                 // binding; a callable parameter is its own origin (§12.4).
                 let param_ty = self.scope_lookup(sym)
                 var param_mask = self.binding_view_origin_mask(sym)
-                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) != 0 or self.callable_param_is_view(sym, param_ty)):
+                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) or self.callable_param_is_view(sym, param_ty)):
                     param_mask = param_mask | sema_param_origin_bit(direct_pi)
                 return param_mask
             let binding_mask = self.binding_view_origin_mask(sym)
@@ -18165,7 +18165,7 @@ impl Sema:
             if direct_pi >= 0:
                 let param_ty = self.scope_lookup(sym)
                 var param_mask = self.binding_view_storage_mask(sym)
-                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) != 0 or self.callable_param_is_view(sym, param_ty)):
+                if param_ty > 0 and (self.type_is_ephemeral_value(param_ty) or self.callable_param_is_view(sym, param_ty)):
                     param_mask = param_mask | sema_param_origin_bit(direct_pi)
                 return param_mask
             if self.binding_view_origin_mask(sym) != 0:
@@ -18368,7 +18368,7 @@ impl Sema:
     // still carries a payload that is a view as a value (#1698).
     mut fn nodes_hold_ephemeral_value(nodes: &List[i32]) -> bool:
         for i in 0..nodes.len():
-            if nodes[i] > 0 and self.expr_is_ephemeral_value(nodes[i]) != 0:
+            if nodes[i] > 0 and self.expr_is_ephemeral_value(nodes[i]):
                 return true
         false
 
@@ -18465,41 +18465,41 @@ impl Sema:
     // observe: the subject stays where it is and MirLower reads it in place.
     // Walks the pattern after check_pattern, while the arm scope holds the
     // bindings' types (same shape as record_pattern_view_bindings).
-    mut fn pattern_binds_owned_value(node: i32) -> i32:
+    mut fn pattern_binds_owned_value(node: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_TYPED_BIND:
             // D144: an identifier that observes its place (check_pattern's
             // mark) takes nothing out of the subject.
             if self.pattern_place_bindings.contains(node):
-                return 0
-            return if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0: 1 else: 0
+                return false
+            return self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0
         // D115: a slice pattern over an owned subject takes it apart.
         if kind == NodeKind.NK_PAT_SLICE:
-            return if self.owned_slice_patterns.contains(node): 1 else: 0
+            return self.owned_slice_patterns.contains(node)
         // A named tuple rest takes the elements it covers (#1366).
         if kind == NodeKind.NK_PAT_REST:
             let rest_name = self.ast.get_data0(node)
-            return if rest_name != 0 and self.is_copy(self.scope_lookup(rest_name) as TypeId) == 0: 1 else: 0
+            return rest_name != 0 and self.is_copy(self.scope_lookup(rest_name) as TypeId) == 0
         if kind == NodeKind.NK_PAT_AT_BINDING:
             if self.is_copy(self.scope_lookup(self.ast.get_data0(node)) as TypeId) == 0:
-                return 1
+                return true
             return self.pattern_binds_owned_value(self.ast.get_data1(node))
         if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
             let start = self.ast.get_data1(node)
             let count = self.ast.get_data2(node)
             for pi in 0..count:
-                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)) != 0:
-                    return 1
-            return 0
+                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)):
+                    return true
+            return false
         if kind == NodeKind.NK_PAT_OR or kind == NodeKind.NK_PAT_TUPLE:
             let start = self.ast.get_data0(node)
             let count = self.ast.get_data1(node)
             for pi in 0..count:
-                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)) != 0:
-                    return 1
-            return 0
+                if self.pattern_binds_owned_value(self.ast.get_extra(start + pi)):
+                    return true
+            return false
         if kind == NodeKind.NK_PAT_STRUCT:
             let start = self.ast.get_data1(node)
             let count = self.ast.get_data2(node)
@@ -18507,12 +18507,12 @@ impl Sema:
                 let field_sym = self.ast.get_extra(start + 1 + pi * 2)
                 let field_pattern = self.ast.get_extra(start + 1 + pi * 2 + 1)
                 if field_pattern != 0:
-                    if self.pattern_binds_owned_value(field_pattern) != 0:
-                        return 1
+                    if self.pattern_binds_owned_value(field_pattern):
+                        return true
                 else if self.is_copy(self.scope_lookup(field_sym) as TypeId) == 0:
-                    return 1
-            return 0
-        0
+                    return true
+            return false
+        false
 
     // A struct/enum pattern on a by-value Drop subject is the #1272 disarm (or
     // an error already reported): it takes the value apart, so it consumes.
@@ -18537,7 +18537,7 @@ impl Sema:
     // field is the D32 implicit-field-move error with its `move`/`.clone()`
     // fix-its, and a temporary or explicit `move` subject needs nothing.
     mut fn mark_pattern_subject_consumed(node: i32, pat: i32, subject: i32, subject_type: i32):
-        if self.pattern_binds_owned_value(pat) == 0 and self.pattern_disarms_drop_subject(pat, subject_type) == 0:
+        if self.pattern_binds_owned_value(pat) == false and self.pattern_disarms_drop_subject(pat, subject_type) == 0:
             return
         self.consuming_pattern_subjects.insert(node, 1)
         self.mark_moved_if_consumed(subject)
@@ -18551,7 +18551,7 @@ impl Sema:
         let subject_by_value = self.pattern_subject_ref_mutability(self.typed_expr_types.get(subject_node) ?? 0) < 0
         for sym in self.pattern_binding_syms(node):
             let sym_ty = self.scope_lookup(sym)
-            if self.type_is_ephemeral_value(sym_ty) != 0:
+            if self.type_is_ephemeral_value(sym_ty):
                 self.record_view_binding_from_expr(sym, subject_node)
                 if subject_by_value and self.type_is_view_handle(sym_ty):
                     self.set_binding_view_storage_mask(sym, 0)
@@ -18607,7 +18607,7 @@ impl Sema:
         if self.get_type_kind(self.resolve_alias(declared_ret as TypeId)) != TypeKind.TY_REF:
             return
         let value_kind = self.get_type_kind(self.resolve_alias(value_ty as TypeId))
-        if value_kind == TypeKind.TY_REF or value_kind == TypeKind.TY_PTR or value_kind == TypeKind.TY_NEVER or self.type_is_ephemeral_value(value_ty as TypeId) != 0:
+        if value_kind == TypeKind.TY_REF or value_kind == TypeKind.TY_PTR or value_kind == TypeKind.TY_NEVER or self.type_is_ephemeral_value(value_ty as TypeId):
             return
         // The value a block yields is its tail's.
         var result = expr_node
@@ -18672,7 +18672,7 @@ impl Sema:
         if gen_fn == 0 or self.generator_local_view_yields.contains(gen_fn):
             return
         let yield_ty = self.resolve_alias(self.current_gen_yield_type)
-        if self.get_type_kind(yield_ty) != TypeKind.TY_REF and self.type_is_ephemeral_value(yield_ty) == 0:
+        if self.get_type_kind(yield_ty) != TypeKind.TY_REF and self.type_is_ephemeral_value(yield_ty) == false:
             return
         if self.view_into_temporary_type(inner_node) != 0:
             self.generator_local_view_yields.insert(gen_fn, yield_node)
@@ -18723,7 +18723,7 @@ impl Sema:
         // value's own storage when it is a place (a binding holding the
         // generator), as record_call_view_origins does for an escaping
         // view parameter.
-        if self.type_is_ephemeral_value(gen_ty as TypeId) != 0:
+        if self.type_is_ephemeral_value(gen_ty as TypeId):
             var deps: List[i32] = List.new()
             deps = self.collect_expr_view_deps(recv, move deps)
             if deps.len() == 0 or self.expr_type_is_value(recv):
@@ -18745,7 +18745,7 @@ impl Sema:
         let recv_ty = self.recorded_expr_type_or_zero(recv)
         if recv_ty == 0 or self.type_is_std_pulled_inst(recv_ty) == 0:
             return
-        if self.type_is_ephemeral_value(ret_ty) == 0 or self.type_is_ephemeral_value(recv_ty) == 0:
+        if self.type_is_ephemeral_value(ret_ty) == false or self.type_is_ephemeral_value(recv_ty) == false:
             return
         var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(recv, move deps)
@@ -18984,7 +18984,7 @@ impl Sema:
                 // ephemeral: the value holds views, and the result that
                 // views the parameter views what the argument did (#1737).
                 let origin_param_ty = self.sig_param_type(sig_idx, origin_pi)
-                if self.param_type_is_by_value(origin_param_ty) and self.type_is_ephemeral_value(origin_param_ty) == 0:
+                if self.param_type_is_by_value(origin_param_ty) and self.type_is_ephemeral_value(origin_param_ty) == false:
                     continue
                 let origin_arg = if origin_pi < args.len(): args[origin_pi] else: 0
                 if origin_arg > 0:
@@ -19011,7 +19011,7 @@ impl Sema:
                     let owning_expr = temp_kind == NodeKind.NK_CALL or (temp_kind == NodeKind.NK_BINARY and self.ast.get_data0(temp_arg) == BinaryOp.OP_DEFAULT)
                     if views_storage and owning_expr and self.typed_expr_types.contains(temp_arg):
                         let arg_ty: i32 = self.typed_expr_types.get(temp_arg).unwrap()
-                        if arg_ty != 0 and unpack_place_kind(self.classify_place(temp_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0 and self.type_is_ephemeral_value(arg_ty) == 0:
+                        if arg_ty != 0 and unpack_place_kind(self.classify_place(temp_arg)) == PlaceKind.PK_NotPlace and self.type_needs_drop(arg_ty) != 0 and self.type_is_view_handle(arg_ty) == 0 and self.type_is_ephemeral_value(arg_ty) == false:
                             self.expr_view_into_temporary.insert(call_node, arg_ty)
                     let carried_temp = self.view_into_temporary_type(origin_arg)
                     if carried_temp != 0:
@@ -19080,7 +19080,7 @@ impl Sema:
         // the result also views the callee's placeholder.
         if self.current_fn_sig_idx >= 0 and self.sig_from_clause_node(sig_idx) == 0 and self.ret_view_read_early(sig_idx):
             let ret = self.sig_return_type(sig_idx)
-            if ret > 0 and (self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0):
+            if ret > 0 and (self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret)):
                 concrete_deps = self.push_unique_i32(move concrete_deps, self.ret_origin_placeholder(sig_idx))
         if union_mask != 0 or concrete_deps.len() > 0:
             self.set_expr_view_deps(call_node, union_mask, concrete_deps)
@@ -19189,7 +19189,7 @@ impl Sema:
         var place_count: i32 = 0
         for pi in 0..param_count:
             let field_ty = self.type_extra[(field_start + pi * 3 + 1)]
-            if self.type_is_ephemeral_value(field_ty) == 0:
+            if self.type_is_ephemeral_value(field_ty) == false:
                 continue
             let arg_index = pi - param_offset
             if arg_index >= arg_count:
@@ -19441,9 +19441,9 @@ impl Sema:
                 if root != 0:
                     self.note_param_view_origin(root, self.compute_expr_view_origin_mask(value), self.compute_expr_storage_origin_mask(value), value)
                 self.check_returned_view_origins(value, node)
-            else if self.has_contextual_copy_adjustment(value) == 0 and self.type_is_ephemeral_value(val_type as i32) == 0 and self.expr_is_ephemeral_value(value) == 0:
+            else if self.has_contextual_copy_adjustment(value) == 0 and self.type_is_ephemeral_value(val_type as i32) == false and self.expr_is_ephemeral_value(value) == false:
                 self.check_returned_owned_as_view(value, val_type as i32, self.current_return_type as i32, node)
-            else if self.has_contextual_copy_adjustment(value) == 0 and (self.type_is_ephemeral_value(val_type as i32) != 0 or self.expr_is_ephemeral_value(value) != 0):
+            else if self.has_contextual_copy_adjustment(value) == 0 and (self.type_is_ephemeral_value(val_type as i32) or self.expr_is_ephemeral_value(value)):
                 self.note_returned_transparent_view_effects(value)
                 self.check_returned_ephemeral_value_origins(value, node)
             self.check_returned_closure_env(value, node)
@@ -19458,18 +19458,18 @@ impl Sema:
                         self.emit_error("return type mismatch", node)
         self.ty_never as i32
 
-    fn expr_is_symbol_value(node: i32, sym: i32) -> i32:
+    fn expr_is_symbol_value(node: i32, sym: i32) -> bool:
         if node == 0 or sym == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
-            return if self.ast.get_data0(node) == sym: 1 else: 0
+            return self.ast.get_data0(node) == sym
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_COPY_ARG or kind == NodeKind.NK_MOVE_ARG or kind == NodeKind.NK_NO_SUSPEND:
             return self.expr_is_symbol_value(self.ast.get_data0(node), sym)
-        0
+        false
 
     fn concat_expr_includes_symbol_value(node: i32, sym: i32) -> i32:
-        if self.expr_is_symbol_value(node, sym) != 0:
+        if self.expr_is_symbol_value(node, sym):
             return 1
         if node == 0 or sym == 0:
             return 0
@@ -19483,7 +19483,7 @@ impl Sema:
         0
 
     fn concat_expr_starts_with_symbol_value(node: i32, sym: i32) -> i32:
-        if self.expr_is_symbol_value(node, sym) != 0:
+        if self.expr_is_symbol_value(node, sym):
             return 1
         if node == 0 or sym == 0:
             return 0
@@ -19719,14 +19719,14 @@ impl Sema:
             self.scope_set_is_ephemeral_task(target_sym, self.expr_is_ephemeral_task(value))
             let assigned_non_send_task = (self.expr_is_task_value(value) != 0 and (self.type_is_send(target_type as i32) == false or self.expr_creates_non_send_task(value))) as i32
             self.scope_set_is_non_send_task(target_sym, assigned_non_send_task)
-            let assigned_ephemeral_value = (self.expr_is_ephemeral_value(value) != 0 or self.type_is_ephemeral_value(target_type as i32) != 0) as i32
+            let assigned_ephemeral_value = self.expr_is_ephemeral_value(value) or self.type_is_ephemeral_value(target_type as i32)
             self.scope_set_is_ephemeral_value(target_sym, assigned_ephemeral_value)
             if self.ast.kind(value) == NodeKind.NK_CLOSURE:
                 self.binding_closure_nodes.insert(target_sym, value)
             else:
                 self.binding_closure_nodes.remove(target_sym)
             let tgt_kind = self.get_type_kind(self.resolve_alias(target_type as TypeId))
-            if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) or self.type_is_ephemeral_value(target_type as i32) != 0 or (assigned_ephemeral_value != 0 and self.type_holds_callable(target_type as i32, 0)):
+            if tgt_kind == TypeKind.TY_REF or self.type_has_drop_impl(target_type as i32) or self.type_is_ephemeral_value(target_type as i32) or (assigned_ephemeral_value != 0 and self.type_holds_callable(target_type as i32, 0)):
                 self.record_view_binding_from_expr(target_sym, value)
             else:
                 self.clear_binding_view_deps(target_sym)
@@ -19965,14 +19965,14 @@ impl Sema:
             self.check_pattern(binding, elem_type)
             self.record_pattern_view_bindings(binding, iterable)
             for sym in self.pattern_binding_syms(binding):
-                if self.type_is_ephemeral_value(self.scope_lookup(sym)) != 0:
+                if self.type_is_ephemeral_value(self.scope_lookup(sym)):
                     self.register_for_binding_borrow(sym, iterable)
         else:
             self.scope_put_at(binding, elem_type, 0, node)
             if range_literal and binding != 0: self.int_local_for_decls.insert(binding, node)
         if yields_views and binding != 0:
             self.scope_set_is_view_bound(binding)
-        if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type) != 0:
+        if binding != 0 and not self.ast.for_binding_is_pattern(node) and self.type_is_ephemeral_value(elem_type):
             self.record_for_binding_view_origins(binding, iterable)
             self.register_for_binding_borrow(binding, iterable)
         let for_meta = self.ast.find_for_meta(node)
@@ -21421,7 +21421,7 @@ impl Sema:
             //     let f = (xs, value) => xs.push(value)
             let static_owner_sym = self.method_owner_symbol_for_type(obj_type as i32)
             if static_owner_sym != 0:
-                let mutating = self.method_has_mut_self_flag(static_owner_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(static_owner_sym, field)
+                let mutating = self.method_has_mut_self_flag(static_owner_sym, field) or self.builtin_method_requires_mutable_receiver(static_owner_sym, field)
                 if mutating:
                     let owner_name: str = with_str_clone_ref(self.pool_resolve(static_type_sym))
                     let method_name: str = with_str_clone_ref(self.pool_resolve(field))
@@ -21852,7 +21852,7 @@ impl Sema:
             self.emit_error("method `" ++ method_name ++ "` count parameter must be `i32`", node)
             return false
         if is_set != 0:
-            if self.method_has_mut_self_flag(owner_sym, method_sym) == 0:
+            if self.method_has_mut_self_flag(owner_sym, method_sym) == false:
                 self.emit_error("method `multi_index_set` receiver must be `mut self: Self` for MultiIndexMut", node)
                 return false
             let value_ty = self.sig_param_type(sig_idx, 3)
@@ -22898,7 +22898,7 @@ impl Sema:
                 self.check_expr_value_context(arm_body)
             self.infer_tail_node = saved_infer_tail
             self.drop_control_flow_depth = saved_drop_cf_arm
-            if match_is_value and self.type_is_ephemeral_value(arm_type as i32) != 0:
+            if match_is_value and self.type_is_ephemeral_value(arm_type as i32):
                 // Join resolution runs after the arm scope is gone. Freeze the
                 // exact projected view facts on the arm expression itself;
                 // patterns remain structural projections, never ownership
@@ -23062,7 +23062,7 @@ impl Sema:
         // An `Ok` the clause's pattern does not match reaches the failure arm
         // with no Err to carry — the reason Result comprehensions take no guard.
         let clause_pattern = self.ast.get_extra(self.ast.get_data1(self.ast.get_data0(self.ast.get_extra(self.ast.get_data1(node)))))
-        if clause_carrier == 2 and self.pattern_is_refutable_for(clause_pattern, self.get_generic_inst_arg(self.resolve_alias(clause_type) as i32, 0)) != 0:
+        if clause_carrier == 2 and self.pattern_is_refutable_for(clause_pattern, self.get_generic_inst_arg(self.resolve_alias(clause_type) as i32, 0)):
             self.emit_error("a Result for-comprehension clause binds with a refutable pattern: an `Ok` it does not match has no Err value (§13.6a); bind the payload and `match` it in the yield", node)
             return
         self.typed_expr_types.insert(value, result_type)
@@ -25450,7 +25450,7 @@ impl Sema:
             // frame) keeps it in the frame: the result cannot outlive the
             // captures any more than the ListIter can outlive its list. A
             // callee that writes a global may have stored it there instead.
-            let kept_in_frame = self.type_is_ephemeral_value(self.sig_return_type(sig_idx)) != 0 and not self.sig_writes_global_directly(sig_idx)
+            let kept_in_frame = self.type_is_ephemeral_value(self.sig_return_type(sig_idx)) and not self.sig_writes_global_directly(sig_idx)
             let escapes = not kept_in_frame and (self.sig_param_effect(sig_idx, param_i) & (EFF_ESCAPE_VALUE | EFF_ESCAPE_VIEW)) != 0
             if escapes and self.ast.is_non_escaping_closure(closure_node):
                 // Direct arguments borrow captures for the call while their
@@ -25461,7 +25461,7 @@ impl Sema:
                 var emitted_capability = false
                 for ci in 0..self.closure_capture_summary_count(closure_node):
                     let cap_ty = self.closure_capture_summary_type(closure_node, ci)
-                    if not emitted_ephemeral and self.type_is_ephemeral_value(cap_ty) != 0:
+                    if not emitted_ephemeral and self.type_is_ephemeral_value(cap_ty):
                         self.emit_error("escaping closure cannot capture ephemeral references", closure_node)
                         emitted_ephemeral = true
                     if not emitted_capability and self.is_tool_capability_type(cap_ty):
@@ -25492,7 +25492,7 @@ impl Sema:
     // Whether a binding's recorded origins name a stack local of this frame
     // (a non-move closure over `xs`, a value holding one).
     fn binding_views_stack_local(sym: i32) -> bool:
-        if self.scope_lookup_is_ephemeral_value(sym) == 0:
+        if self.scope_lookup_is_ephemeral_value(sym) == false:
             return false
         for di in 0..self.binding_view_dep_count(sym):
             if self.view_origin_is_stack_local(self.binding_view_dep_at(sym, di)):
@@ -25911,7 +25911,7 @@ impl Sema:
         if expected_ret_ty != 0 and expected_ret_ty != self.ty_void and body_ty != 0 and body_ty != self.ty_never:
             if body_ty == self.ty_void:
                 let closure_void_results_ok = self.check_body_explicit_value_results(body, 1, expected_ret_ty, "closure return type mismatch")
-                if closure_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body) != 0:
+                if closure_void_results_ok != 0 and self.body_has_explicit_value_result(body, 1) and self.body_can_fall_through(body):
                     self.emit_error("missing return", body)
                 else if self.type_has_default_value(expected_ret_ty) == 0:
                     self.emit_error("closure return type mismatch", body)
@@ -25943,7 +25943,7 @@ impl Sema:
                 let body_root = self.place_root_sym(body)
                 if body_root != 0:
                     self.note_param_view_origin(body_root, self.compute_expr_view_origin_mask(body), self.compute_expr_storage_origin_mask(body), body)
-            else if self.type_is_ephemeral_value(body_ty as i32) != 0:
+            else if self.type_is_ephemeral_value(body_ty as i32):
                 self.note_returned_transparent_view_effects(body)
 
         self.pop_scope()
@@ -26042,7 +26042,7 @@ impl Sema:
                 let cap_sym = self.bind_names[ebi]
                 if not self.binding_index_is_global(ebi, cap_sym) and self.expr_uses_symbol(body, cap_sym) != 0:
                     let cap_ty = self.bind_types[ebi]
-                    if self.type_is_ephemeral_value(cap_ty) != 0:
+                    if self.type_is_ephemeral_value(cap_ty):
                         self.emit_error("escaping closure cannot capture ephemeral references", node)
                         break
                     // §12.4 (#1698): a `move ||` closure may not capture a
@@ -26692,21 +26692,21 @@ impl Sema:
                 return ret_ty
         rhs_ty as i32
 
-    mut fn pipeline_method_has_mut_receiver(node: i32, recv_type: i32, method: i32) -> i32:
+    mut fn pipeline_method_has_mut_receiver(node: i32, recv_type: i32, method: i32) -> bool:
         let resolved_sig = self.resolved_call_sigs.get(node)
         if resolved_sig.is_some():
-            return if self.sig_receiver_mode(resolved_sig.unwrap()) == ReceiverMode.Mut: 1 else: 0
+            return self.sig_receiver_mode(resolved_sig.unwrap()) == ReceiverMode.Mut
         let resolved_recv = self.auto_deref_method_type(recv_type as TypeId, method, 0, 0)
         let owner = self.method_owner_symbol_for_type(resolved_recv as i32)
         if owner == 0:
-            return 0
+            return false
         if self.builtin_method_requires_mutable_receiver(owner, method):
-            return 1
+            return true
         self.method_has_mut_self_flag(owner, method)
 
     mut fn finish_pipeline_method(node: i32, recv_type: i32, method: i32, call_ret: i32) -> i32:
         let resolved_ret = self.resolve_alias(call_ret as TypeId)
-        let carries_receiver = (resolved_ret == self.ty_void and self.pipeline_method_has_mut_receiver(node, recv_type, method) != 0) as i32
+        let carries_receiver = (resolved_ret == self.ty_void and self.pipeline_method_has_mut_receiver(node, recv_type, method)) as i32
         let pipeline_ret = if carries_receiver != 0: recv_type else: call_ret
         self.pipeline_method_calls.insert(node, method)
         self.pipeline_call_return_types.insert(node, call_ret)
@@ -27028,7 +27028,7 @@ impl Sema:
             // value back to what the guard borrows (ScopedMut.with_exit_mut:
             // `Mutex.enter_mut` stores it through its `&self`), so a view `v`
             // holds is stored there, and checked as `Mutex.set` is.
-            if form == WithFormKind.GuardedMut and self.type_is_ephemeral_value(payload_ty) != 0:
+            if form == WithFormKind.GuardedMut and self.type_is_ephemeral_value(payload_ty):
                 let guard_root = self.guard_source_root_sym(source)
                 if guard_root != 0:
                     let written_deps: List[i32] = List.new()
@@ -27036,9 +27036,9 @@ impl Sema:
                         written_deps.push(self.binding_view_dep_at(name, wi))
                     self.note_view_store_into_root(guard_root, written_deps, self.binding_view_origin_mask(name), payload_ty, node, "this call")
             self.pop_scope()
-            if body_ty != 0 and self.type_is_ephemeral_value(body_ty as i32) != 0:
+            if body_ty != 0 and self.type_is_ephemeral_value(body_ty as i32):
                 self.emit_error("guarded with result cannot be ephemeral; clone or copy the value before it leaves the block", body)
-            if self.expr_is_ephemeral_value(body) != 0:
+            if self.expr_is_ephemeral_value(body):
                 self.emit_error("guarded with result cannot be ephemeral; clone or copy the value before it leaves the block", body)
             return body_ty as i32
         self.with_form_kinds.insert(node, WithFormKind.Binding)
@@ -27168,7 +27168,7 @@ impl Sema:
         // time. One that can never match is an error in any let; one that
         // always matches is irrefutable and needs no else (#1367).
         let slice_mismatch = self.report_fixed_array_slice_mismatch(pattern, val_type as i32)
-        if else_body == 0 and not slice_mismatch and self.pattern_is_refutable_for(pattern, val_type as i32) != 0:
+        if else_body == 0 and not slice_mismatch and self.pattern_is_refutable_for(pattern, val_type as i32):
             self.emit_error("let ... else requires an else branch for refutable patterns", node)
         // The else branch runs only when the pattern did not match, so nothing
         // the pattern binds exists there: check it before the pattern binds
@@ -27213,13 +27213,13 @@ impl Sema:
     // decides a slice pattern over a fixed-size array: `[a, b, c]` against
     // `[3]T` always matches. Tuple elements, struct fields and at-bindings
     // pass their own types down; everything else is the untyped rule.
-    mut fn pattern_is_refutable_for(node: i32, subject_type: i32) -> i32:
+    mut fn pattern_is_refutable_for(node: i32, subject_type: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         let shape = if subject_type != 0: self.resolve_alias(self.pattern_subject_shape_type(subject_type) as TypeId) as i32 else: 0
         if kind == NodeKind.NK_PAT_SLICE:
-            return if self.exh_slice_always_matches(node, shape): 0 else: 1
+            return not (self.exh_slice_always_matches(node, shape))
         if kind == NodeKind.NK_PAT_AT_BINDING:
             return self.pattern_is_refutable_for(self.ast.get_data1(node), subject_type)
         if kind == NodeKind.NK_PAT_TUPLE and shape != 0 and self.get_type_kind(shape as TypeId) == TypeKind.TY_TUPLE:
@@ -27230,9 +27230,9 @@ impl Sema:
             for i in 0..count:
                 let si = self.ast.tuple_pattern_subject_index(node, i, elem_count)
                 let elem_ty = if si >= 0 and si < elem_count: self.type_extra[(elem_start + si)] else: 0
-                if self.pattern_is_refutable_for(self.ast.get_extra(start + i), elem_ty) != 0:
-                    return 1
-            return 0
+                if self.pattern_is_refutable_for(self.ast.get_extra(start + i), elem_ty):
+                    return true
+            return false
         if kind == NodeKind.NK_PAT_STRUCT and shape != 0:
             let fstart = self.ast.get_data1(node)
             let fcount = self.ast.get_data2(node)
@@ -27241,9 +27241,9 @@ impl Sema:
                 if field_pat == 0:
                     continue
                 let field_ty = self.struct_field_type(shape, self.ast.get_extra(fstart + 1 + fi * 2))
-                if self.pattern_is_refutable_for(field_pat, field_ty) != 0:
-                    return 1
-            return 0
+                if self.pattern_is_refutable_for(field_pat, field_ty):
+                    return true
+            return false
         self.pattern_is_refutable(node)
 
     // A slice pattern that can never match a fixed-size array (§9.7: `[a, b,
@@ -27291,30 +27291,30 @@ impl Sema:
             return any
         false
 
-    fn pattern_is_refutable(node: i32) -> i32:
+    fn pattern_is_refutable(node: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_PAT_WILDCARD or kind == NodeKind.NK_PAT_IDENT or kind == NodeKind.NK_PAT_REST:
-            return 0
+            return false
         if kind == NodeKind.NK_PAT_TUPLE:
             let start = self.ast.get_data0(node)
             let count = self.ast.get_data1(node)
             for i in 0..count:
-                if self.pattern_is_refutable(self.ast.get_extra(start + i)) != 0:
-                    return 1
-            return 0
+                if self.pattern_is_refutable(self.ast.get_extra(start + i)):
+                    return true
+            return false
         if kind == NodeKind.NK_PAT_STRUCT:
             let start2 = self.ast.get_data1(node)
             let count2 = self.ast.get_data2(node)
             for i2 in 0..count2:
                 let field_pat = self.ast.get_extra(start2 + 1 + i2 * 2 + 1)
-                if field_pat != 0 and self.pattern_is_refutable(field_pat) != 0:
-                    return 1
-            return 0
+                if field_pat != 0 and self.pattern_is_refutable(field_pat):
+                    return true
+            return false
         if kind == NodeKind.NK_PAT_AT_BINDING:
             return self.pattern_is_refutable(self.ast.get_data1(node))
-        1
+        true
 
     mut fn check_tuple_destructure(node: i32) -> i32:
         let extra_start = self.ast.get_data0(node)
@@ -27347,7 +27347,7 @@ impl Sema:
                     bind_ty = self.type_extra[(elem_start + ni)]
                 if n_sym > 0:
                     self.scope_put_at(n_sym, bind_ty, 0, node)
-                    if self.type_is_ephemeral_value(bind_ty) != 0:
+                    if self.type_is_ephemeral_value(bind_ty):
                         self.record_view_binding_from_expr(n_sym, value)
             // Rest binding: bind to sub-tuple of remaining elements
             let rest_sym = 0 - self.ast.get_extra(extra_start + rest_pos)
@@ -27363,7 +27363,7 @@ impl Sema:
                         rest_elems.push(0)
                 let rest_ty = self.ensure_tuple_type(rest_elems, rest_elem_count)
                 self.scope_put_at(rest_sym, rest_ty as i32, 0, node)
-                if self.type_is_ephemeral_value(rest_ty as i32) != 0:
+                if self.type_is_ephemeral_value(rest_ty as i32):
                     self.record_view_binding_from_expr(rest_sym, value)
             else if rest_sym > 0:
                 self.scope_put_at(rest_sym, self.ty_void as i32, 0, node)
@@ -27376,7 +27376,7 @@ impl Sema:
                     bind_ty = self.type_extra[(elem_start + elem_idx)]
                 if n_sym > 0:
                     self.scope_put_at(n_sym, bind_ty, 0, node)
-                    if self.type_is_ephemeral_value(bind_ty) != 0:
+                    if self.type_is_ephemeral_value(bind_ty):
                         self.record_view_binding_from_expr(n_sym, value)
         else:
             var emitted_arity_error = 0
@@ -27391,7 +27391,7 @@ impl Sema:
                         emitted_arity_error = 1
                 if n_sym > 0:
                     self.scope_put_at(n_sym, bind_ty, 0, node)
-                    if self.type_is_ephemeral_value(bind_ty) != 0:
+                    if self.type_is_ephemeral_value(bind_ty):
                         self.record_view_binding_from_expr(n_sym, value)
         // #782 arm 2: destructuring CONSUMES the source — MIR moves every
         // element out, so a later projection (`t.1`) reads blanked storage.
@@ -27725,7 +27725,7 @@ impl Sema:
         // below; this is the value case.
         if closure_node == 0:
             let cv_ret = self.get_type_d2(fn_tid)
-            if cv_ret > 0 and (self.get_type_kind(self.resolve_alias(cv_ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(cv_ret) != 0):
+            if cv_ret > 0 and (self.get_type_kind(self.resolve_alias(cv_ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(cv_ret)):
                 var cv_mask = self.compute_expr_view_origin_mask(callee_expr)
                 // The callable's result views what its captures view (their
                 // pointees), as an argument view does — the environment's
@@ -27735,7 +27735,7 @@ impl Sema:
                 cv_deps = self.collect_expr_view_deps(callee_expr, cv_deps)
                 for cv_ai in 0..global_args.len():
                     let cv_param_ty = self.fn_type_param_type(fn_tid, (cv_ai as i32) + param_offset)
-                    if cv_param_ty == 0 or (self.param_type_is_by_value(cv_param_ty) and self.type_is_ephemeral_value(cv_param_ty) == 0):
+                    if cv_param_ty == 0 or (self.param_type_is_by_value(cv_param_ty) and self.type_is_ephemeral_value(cv_param_ty) == false):
                         continue
                     let cv_arg: i32 = global_args[cv_ai]
                     if cv_arg <= 0:
@@ -29125,7 +29125,7 @@ impl Sema:
             self.comp_resolved.insert(node, resolved_variant_sym)
             self.note_call_callee(node, CallCalleeKind.Variant)
             self.typed_expr_types.insert(node, final_variant_ty as i32)
-            if self.type_is_ephemeral_value(final_variant_ty as i32) != 0 or self.nodes_hold_ephemeral_value(&checked_arg_nodes):
+            if self.type_is_ephemeral_value(final_variant_ty as i32) or self.nodes_hold_ephemeral_value(&checked_arg_nodes):
                 self.record_transparent_view_origins_from_nodes(node, &checked_arg_nodes)
             return final_variant_ty as i32
 
@@ -29581,7 +29581,7 @@ impl Sema:
         let retyped: List[i32] = List.new()
         for ai in 0..arm_nodes.len():
             let arm = arm_nodes[ai]
-            if arm <= 0 or self.body_can_fall_through(arm) == 0:
+            if arm <= 0 or self.body_can_fall_through(arm) == false:
                 continue
             let leaf = self.join_arm_value_node(arm)
             if leaf <= 0 or self.ast.kind(leaf) != NodeKind.NK_CALL or self.ast.get_data2(leaf) != 1:
@@ -30039,7 +30039,7 @@ impl Sema:
         if ek == TypeKind.TY_INT and vk == TypeKind.TY_FLOAT:
             self.emit_error(f"a float where an integer is demanded needs an explicit conversion: `x as {want}` truncates, `x.round() as {want}` rounds (§4.2.6)", node)
             return true
-        if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId) != 0:
+        if ek == TypeKind.TY_INT and vk == TypeKind.TY_INT and self.int_narrowing_requires_cast(expected as TypeId, value as TypeId):
             // D156: a migrated module carries its data model in C_DATA_MODEL;
             // a narrowing in it is a seam where the model's width meets the
             // host's, and the message says which is which.
@@ -30687,7 +30687,7 @@ impl Sema:
             // reached the ephemeral arg gates — heap-owning constructors accepted
             // ephemeral values by value. Route through the same gate; arg node
             // is supplied by the caller because pipelines prepend their lhs.
-            if arg_ty != 0 and self.type_is_ephemeral_value(arg_ty as TypeId) != 0:
+            if arg_ty != 0 and self.type_is_ephemeral_value(arg_ty as TypeId):
                 let eg_arg_node = if pi < arg_nodes.len(): arg_nodes[pi] else: 0
                 self.check_ephemeral_task_arg_escape(if eg_arg_node > 0: eg_arg_node else: call_node, 0, 0, fn_sym, pi)
         if literal_args.len() > 0:
@@ -32857,7 +32857,7 @@ impl Sema:
         // owners) are a fourth checker lane that never reached the ephemeral arg
         // gates. Route each ephemeral arg through the same escape check.
         for egi in 0..arg_count:
-            if egi < arg_types.len() and arg_types[egi] != 0 and self.type_is_ephemeral_value(arg_types[egi] as TypeId) != 0:
+            if egi < arg_types.len() and arg_types[egi] != 0 and self.type_is_ephemeral_value(arg_types[egi] as TypeId):
                 // The argument nodes sit at the caller's `extra_start`: a
                 // call's own list (its d1), or the one slot an `in` or `|>`
                 // node records for the operand it passes (#2009). Only a call
@@ -34568,7 +34568,7 @@ impl Sema:
             return 0
         var pos = self.ast.fn_meta_tp_start(meta)
         for ti in 0..tp_count:
-            if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)) != 0:
+            if self.type_expr_mentions_type_param(ty_node, self.ast.get_extra(pos)):
                 return 0
             pos = pos + 2 + self.ast.get_extra(pos + 1)
         // A template's parameter type stays a parameter type here: `[]mut T`
@@ -34888,7 +34888,7 @@ impl Sema:
         let root = self.place_root_sym(target)
         if root == 0 or self.scope_has(root) == false:
             return
-        let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) != 0 or self.expr_is_ephemeral_value(value) != 0
+        let value_carries = value_ty <= 0 or self.type_can_carry_view(value_ty) or self.expr_is_ephemeral_task(value) or self.expr_is_ephemeral_value(value)
         if not value_carries and not self.type_can_carry_view(slot_ty):
             return
         var value_deps: List[i32] = List.new()
@@ -34987,7 +34987,7 @@ impl Sema:
                 // Rule 7 (§22.1): storage holding a view is ephemeral as a
                 // value, whatever its type says (`List[fn() -> i32]`
                 // holding a non-move closure), so its escapes are checked.
-                self.scope_set_is_ephemeral_value(storage[si], 1)
+                self.scope_set_is_ephemeral_value(storage[si], true)
 
     mut fn emit_view_store_escape(root: i32, origin: i32, value_ty: i32, node: i32, how: &str, shared: bool):
         let rname: str = self.pool_resolve(root)
@@ -35870,7 +35870,7 @@ impl Sema:
         if ret != 0 and self.static_receiver_type_is_known(expr) == false and self.expr_view_dep_count(node) == 0 and self.expr_view_origin_mask(node) == 0:
             let intrinsic_recv: i32 = self.typed_expr_types.get(expr) ?? known_recv_ty
             if intrinsic_recv != 0 and self.builtin_method_intrinsic(intrinsic_recv, self.pool_resolve(field)) != MirIntrinsic.NONE:
-                if self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret) != 0:
+                if self.get_type_kind(self.resolve_alias(ret as TypeId)) == TypeKind.TY_REF or self.type_is_ephemeral_value(ret):
                     self.record_builtin_receiver_view_origins(node, expr)
         let constructed = self.record_method_lowering(expr, field, arg_count, node, ret, known_recv_ty)
         if constructed != 0: constructed else: ret
@@ -36395,7 +36395,7 @@ impl Sema:
                 if field == self.syms.min or field == self.syms.max or self.pool_resolve(field) == "mul_add":
                     let mc_recv_num = self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type))
                     let mc_recv_tk = self.get_type_kind(mc_recv_num)
-                    if (mc_recv_tk == TypeKind.TY_INT or mc_recv_tk == TypeKind.TY_FLOAT) and self.int_narrowing_requires_cast(mc_expected as TypeId, mc_arg_ty as TypeId) != 0:
+                    if (mc_recv_tk == TypeKind.TY_INT or mc_recv_tk == TypeKind.TY_FLOAT) and self.int_narrowing_requires_cast(mc_expected as TypeId, mc_arg_ty as TypeId):
                         self.emit_error("min/max operands must be the same type; use an explicit `as` cast", mc_arg_node)
             if self.method_arg_stores_value(mc_sig_row, obj_type as i32, field, ai):
                 // #1827: the container owns it now; it drops it (§2.4).
@@ -36431,7 +36431,7 @@ impl Sema:
             if mc_sender_elem_ty != 0:
                 if mc_arg_ty as i32 != 0 and self.types_compatible(mc_sender_elem_ty, mc_arg_ty as i32) == false and self.arithmetic_result_type(mc_sender_elem_ty, mc_arg_ty as i32) == 0:
                     self.emit_argument_type_mismatch("Sender.send", 0, ai, ai, mc_sender_elem_ty, mc_arg_ty as i32, mc_arg_node)
-                if self.type_is_send(mc_sender_elem_ty) == false or self.type_is_send(mc_arg_ty as i32) == false or self.expr_is_ephemeral_value(mc_arg_node) != 0 or self.expr_is_ephemeral_task(mc_arg_node) != 0 or self.expr_creates_non_send_task(mc_arg_node):
+                if self.type_is_send(mc_sender_elem_ty) == false or self.type_is_send(mc_arg_ty as i32) == false or self.expr_is_ephemeral_value(mc_arg_node) or self.expr_is_ephemeral_task(mc_arg_node) or self.expr_creates_non_send_task(mc_arg_node):
                     self.emit_task_sendability_error(mc_arg_node, "channel send requires Send value")
                 self.mark_moved_if_consumed(mc_arg_node)
             if mc_is_closure:
@@ -36645,7 +36645,7 @@ impl Sema:
             // `mut self: Self` require a mutable place receiver. Warnings during
             // P7..P11; promoted to errors at P12 lockdown. Builtins are already
             // handled above via the hardcoded list.
-            if self.method_has_mut_self_flag(type_name_sym, field) != 0:
+            if self.method_has_mut_self_flag(type_name_sym, field):
                 // D178: the receiver's write is the callee's footprint under
                 // the receiver's path; the callee is named for the edge.
                 let footprint_callee_sig = mc_sig_idx_for_effect
@@ -36686,11 +36686,11 @@ impl Sema:
                 if self.is_copy(obj_type) == 0:
                     self.note_place_effect(expr, EFF_CONSUME)
                     self.mark_moved_if_consumed(expr)
-            let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) != 0 or self.builtin_method_requires_mutable_receiver(type_name_sym, field)
+            let is_mut_recv_call = self.method_has_mut_self_flag(type_name_sym, field) or self.builtin_method_requires_mutable_receiver(type_name_sym, field)
             if is_mut_recv_call:
                 // D178: a user method's write is its footprint under the
                 // receiver's path (an edge); a builtin's is the path itself.
-                if self.method_has_mut_self_flag(type_name_sym, field) != 0:
+                if self.method_has_mut_self_flag(type_name_sym, field):
                     self.footprint_call_callee_sig = mc_sig_idx_for_effect
                     self.footprint_call_callee_pi = 0
                 self.note_place_effect(expr, EFF_WRITE)
@@ -36740,7 +36740,7 @@ impl Sema:
                             let owner_name = self.type_name(obj_type)
                             let variant_name: str = with_str_clone_ref(self.pool_resolve(field))
                             self.emit_argument_type_mismatch(owner_name ++ "." ++ variant_name, field, ai, ai, expected_ty, arg_ty, if static_payload_arg_node > 0: static_payload_arg_node else: node)
-            if self.type_is_ephemeral_value(mc_static_variant_ty) != 0 or self.nodes_hold_ephemeral_value(&static_payload_nodes):
+            if self.type_is_ephemeral_value(mc_static_variant_ty) or self.nodes_hold_ephemeral_value(&static_payload_nodes):
                 self.record_transparent_view_origins_from_nodes(node, &static_payload_nodes)
             return mc_static_variant_ty
 
@@ -36839,7 +36839,7 @@ impl Sema:
                 // never copied out. With the copy recorded, MIR lowered the
                 // receiver through a shared view and mutated through it (the
                 // emitted C passed 589 `const with_vec *` to mutating calls).
-                if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0 and self.method_has_mut_self_flag(type_name_sym, field) == 0:
+                if call_param_offset == 1 and self.sig_get_param_count(sig_idx) > 0 and self.method_has_mut_self_flag(type_name_sym, field) == false:
                     let exact_receiver_ty = self.recorded_expr_type_or_zero(expr)
                     if exact_receiver_ty != 0:
                         self.record_contextual_copy_adjustment(expr, self.sig_param_type(sig_idx, 0), exact_receiver_ty)
@@ -37322,7 +37322,7 @@ impl Sema:
                     0
                 let option_combinator_ret = self.option_combinator_return_type(recv_type, expr, mc_method_name_raw, arg_types, mc_resolved_arg_count, option_default_node, node)
                 if option_combinator_ret != 0:
-                    if mc_method_name_raw != "cloned" and mc_method_name_raw != "copied" and self.has_contextual_join_decision(node) == 0 and self.type_is_ephemeral_value(option_combinator_ret) != 0:
+                    if mc_method_name_raw != "cloned" and mc_method_name_raw != "copied" and self.has_contextual_join_decision(node) == 0 and self.type_is_ephemeral_value(option_combinator_ret):
                         self.record_transparent_view_origins(node, expr)
                     return option_combinator_ret
                 if mc_method_name_raw == "unwrap_or":
@@ -37381,7 +37381,7 @@ impl Sema:
                     0
                 let result_combinator_ret = self.result_combinator_return_type(recv_type, expr, mc_method_name_raw, arg_types, mc_resolved_arg_count, result_default_node, node)
                 if result_combinator_ret != 0:
-                    if self.has_contextual_join_decision(node) == 0 and self.type_is_ephemeral_value(result_combinator_ret) != 0:
+                    if self.has_contextual_join_decision(node) == 0 and self.type_is_ephemeral_value(result_combinator_ret):
                         self.record_transparent_view_origins(node, expr)
                     return result_combinator_ret
                 if mc_method_name_raw == "unwrap_or":
@@ -37456,7 +37456,7 @@ impl Sema:
                 // arg through the same escape check as free-fn calls.
                 for egi in 0..mc_resolved_arg_count:
                     let eg_arg = if mc_has_resolved_args: self.get_resolved_call_arg(node, egi) else: self.ast.get_extra(extra_start + egi)
-                    if eg_arg > 0 and self.expr_is_ephemeral_value(eg_arg) != 0:
+                    if eg_arg > 0 and self.expr_is_ephemeral_value(eg_arg):
                         self.check_ephemeral_task_arg_escape(eg_arg, 0, 0, method_fn_sym, egi)
                 self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
                 self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, mc_resolved_arg_count, mc_has_resolved_args)
@@ -37659,7 +37659,7 @@ impl Sema:
                     return 0
             let payload_node = self.ast.get_extra(args_start + 1)
             let payload_ty = arg_types[1]
-            if self.expr_is_ephemeral_value(payload_node) != 0 or self.expr_is_ephemeral_task(payload_node) != 0 or self.expr_creates_non_send_task(payload_node) or self.type_is_send(payload_ty) == false:
+            if self.expr_is_ephemeral_value(payload_node) or self.expr_is_ephemeral_task(payload_node) or self.expr_creates_non_send_task(payload_node) or self.type_is_send(payload_ty) == false:
                 self.emit_task_sendability_error(payload_node, "channel send requires Send value")
                 return 0
             if payload_ty != 0:
@@ -39687,15 +39687,15 @@ impl Sema:
     // A zero `sym` matches any binding in the current scope, allowing callers
     // that need only an any-mutation verdict to walk the expression once.
     // Returns 1 if any subexpression assigns to or takes &mut of the variable.
-    fn expr_mutation_root_matches(root: i32, sym: i32) -> i32:
+    fn expr_mutation_root_matches(root: i32, sym: i32) -> bool:
         if root == 0:
-            return 0
+            return false
         if sym != 0:
-            return if root == sym: 1 else: 0
+            return root == sym
         for bi in 0..self.bind_names.len():
             if self.bind_names[bi] == root:
-                return 1
-        0
+                return true
+        false
 
     mut fn expr_mutates_place(node: i32, sym: i32) -> i32:
         if node == 0:
@@ -39704,7 +39704,7 @@ impl Sema:
         // Assignment: check if target is rooted at sym
         if kind == NodeKind.NK_ASSIGN:
             let target = self.ast.get_data0(node)
-            if self.expr_mutation_root_matches(self.place_root_sym(target), sym) != 0:
+            if self.expr_mutation_root_matches(self.place_root_sym(target), sym):
                 return 1
             // Also check value side for nested mutations
             return self.expr_mutates_place(self.ast.get_data1(node), sym)
@@ -39713,7 +39713,7 @@ impl Sema:
             let op = self.ast.get_data0(node)
             if op == UnaryOp.UOP_RAW_REF_MUT:
                 let operand = self.ast.get_data1(node)
-                if self.expr_mutation_root_matches(self.place_root_sym(operand), sym) != 0:
+                if self.expr_mutation_root_matches(self.place_root_sym(operand), sym):
                     return 1
             return self.expr_mutates_place(self.ast.get_data1(node), sym)
         // Recursive cases
@@ -39753,7 +39753,7 @@ impl Sema:
                 let cbase = self.ast.get_data0(callee)
                 if self.ast.kind(cbase) == NodeKind.NK_IDENT:
                     let cbase_sym = self.ast.get_data0(cbase)
-                    if self.expr_mutation_root_matches(cbase_sym, sym) != 0:
+                    if self.expr_mutation_root_matches(cbase_sym, sym):
                         let method_sym = self.ast.get_data1(callee)
                         let cap_ty = self.scope_lookup(cbase_sym)
                         if cap_ty >= 0:
@@ -39766,7 +39766,7 @@ impl Sema:
                             if owner_sym != 0:
                                 if self.builtin_method_requires_mutable_receiver(owner_sym, method_sym):
                                     return 1
-                                if self.method_has_mut_self_flag(owner_sym, method_sym) != 0:
+                                if self.method_has_mut_self_flag(owner_sym, method_sym):
                                     return 1
             if self.expr_mutates_place(callee, sym) != 0:
                 return 1
@@ -39858,7 +39858,7 @@ impl Sema:
                             inner_resolved = self.resolve_alias(self.get_type_d0(inner_resolved) as TypeId)
                         let owner = self.method_owner_symbol_for_type(inner_resolved as i32)
                         if owner != 0:
-                            if self.method_has_mut_self_flag(owner, method) != 0 or self.builtin_method_requires_mutable_receiver(owner, method):
+                            if self.method_has_mut_self_flag(owner, method) or self.builtin_method_requires_mutable_receiver(owner, method):
                                 return 1
             let ea = self.ast.get_data1(node)
             let ac = self.ast.get_data2(node)
@@ -40417,38 +40417,38 @@ impl Sema:
             else:
                 bi = bi + 1
 
-    fn type_is_ephemeral_value(tid: i32) -> i32:
+    fn type_is_ephemeral_value(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE:
-            return 1
+            return true
         if tk == TypeKind.TY_ARRAY:
             return self.type_is_ephemeral_value(self.get_type_d0(resolved))
         if tk == TypeKind.TY_TUPLE:
             let te_start = self.get_type_d0(resolved)
             let elem_count = self.get_type_d1(resolved)
             for ei in 0..elem_count:
-                if self.type_is_ephemeral_value(self.type_extra[(te_start + ei)]) != 0:
-                    return 1
-            return 0
+                if self.type_is_ephemeral_value(self.type_extra[(te_start + ei)]):
+                    return true
+            return false
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_type_d0(resolved)
             if self.ephemeral_types.contains(base_sym):
-                return 1
+                return true
             let arg_count = self.get_type_d2(resolved)
             let arg_start = self.get_type_d1(resolved)
             for ai in 0..arg_count:
-                if self.type_is_ephemeral_value(self.type_extra[(arg_start + ai)]) != 0:
-                    return 1
-            return 0
+                if self.type_is_ephemeral_value(self.type_extra[(arg_start + ai)]):
+                    return true
+            return false
         if tk == TypeKind.TY_STRUCT or tk == TypeKind.TY_ENUM:
             let type_name = self.get_type_d0(resolved)
             if self.ephemeral_types.contains(type_name):
-                return 1
-            return 0
-        0
+                return true
+            return false
+        false
 
     // ── Helper functions ─────────────────────────────────────────────
 
@@ -40838,7 +40838,7 @@ impl Sema:
             if ty == 0:
                 return types
             let kind = self.get_type_kind(self.resolve_alias(ty as TypeId))
-            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == 0):
+            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == false):
                 continue
             if self.join_field_view_candidate(arm_nodes[ai]) == 0:
                 return types
@@ -40847,7 +40847,7 @@ impl Sema:
             return types
         for ai in 0..arm_nodes.len():
             let kind = self.get_type_kind(self.resolve_alias(types[ai] as TypeId))
-            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == 0):
+            if kind == TypeKind.TY_NEVER or kind == TypeKind.TY_REF or (arm_nodes[ai] > 0 and self.body_can_fall_through(arm_nodes[ai]) == false):
                 continue
             let leaf = self.join_field_view_candidate(arm_nodes[ai])
             let view = self.ensure_exact_type(TypeKind.TY_REF, types[ai], 0, 0) as i32
@@ -40899,7 +40899,7 @@ impl Sema:
     // field the join reads as its view, a built-in element (D27) — so a
     // binding of the join is a binding from a place.
     fn join_yields_places(node: i32) -> bool:
-        if node == 0 or self.body_can_fall_through(node) == 0:
+        if node == 0 or self.body_can_fall_through(node) == false:
             return true
         let leaf = self.join_arm_leaf(node)
         if leaf == 0:
@@ -41858,29 +41858,29 @@ impl Sema:
         let fn_sym = self.lookup_method_fn(type_sym, method_sym)
         self.fn_symbol_is_iter_of_self(fn_sym)
 
-    fn method_has_mut_self_flag(type_sym: i32, method_sym: i32) -> i32:
+    fn method_has_mut_self_flag(type_sym: i32, method_sym: i32) -> bool:
         var fn_sym = self.lookup_method_fn(type_sym, method_sym)
         if fn_sym == 0:
             fn_sym = self.lookup_generic_method_fn(type_sym, method_sym)
         if fn_sym == 0:
-            return 0
+            return false
         var fn_node: i32 = 0
         if self.fn_decl_nodes.contains(fn_sym):
             fn_node = self.fn_decl_nodes.get(fn_sym).unwrap()
         else:
             let generic_node = self.generic_fn_node_for_symbol(fn_sym)
             if generic_node == 0:
-                return 0
+                return false
             fn_node = generic_node
         let meta = self.ast.find_fn_meta(fn_node)
         if meta < 0:
-            return 0
+            return false
         let pc = self.ast.fn_meta_param_count(meta)
         if pc == 0:
-            return 0
+            return false
         let ps = self.ast.fn_meta_param_start(meta)
         let pflags = self.ast.fn_param_flags(ps, 0)
-        fn_param_is_mut_self(pflags)
+        fn_param_is_mut_self(pflags) != 0
 
     fn method_has_move_self_flag(type_sym: i32, method_sym: i32) -> i32:
         var fn_sym = self.lookup_method_fn(type_sym, method_sym)

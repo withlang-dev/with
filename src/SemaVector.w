@@ -691,7 +691,7 @@ impl Sema:
         if ek == TypeKind.TY_FLOAT and ak == TypeKind.TY_FLOAT:
             lossless = self.get_type_d0(el) > self.get_type_d0(al)
         else if ek == TypeKind.TY_INT and ak == TypeKind.TY_INT:
-            lossless = self.int_narrowing_requires_cast(el, al) == 0
+            lossless = self.int_narrowing_requires_cast(el, al) == false
         if not lossless:
             self.emit_error(f"implicit narrowing or conversion from `{got}` to `{want}`; use an explicit `as` cast, which converts lane-wise (§4.3d, §4.2.6)", node)
             return true
