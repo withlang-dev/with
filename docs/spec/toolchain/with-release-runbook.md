@@ -69,16 +69,26 @@ resulting With-owned SDK.
 
 ## Release Asset
 
+**Every platform a release ships a compiler for ships that platform's SDK in
+the same release (D180, Eric 2026-11-01).** A release is not done while any
+platform has its compiler asset and not its SDK asset; the SDK is published
+from the same host or lane, by the same `:publish-release-asset`, and a
+platform whose SDK cannot be produced does not get its compiler asset either.
+
 Publish, per release:
 
 ```text
 with-darwin-aarch64                          # Darwin arm64 compiler binary
 with-linux-x86_64                            # Linux x86_64 compiler binary
+with-linux-aarch64                           # Linux aarch64 compiler binary
 with-windows-x86_64.exe                      # Windows x86_64 compiler binary
+with-windows-aarch64.exe                     # Windows aarch64 compiler binary (non-gating, D137)
 with-bootstrap-c-vX.Y.Z.tar.gz               # emitted-C bootstrap bundle
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz    # static LLVM SDK (Darwin arm64)
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz      # static LLVM SDK (Linux x86_64)
+with-llvm-sdk-<llvm-ver>-linux-aarch64.tar.gz     # static LLVM SDK (Linux aarch64)
 with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz    # static LLVM SDK (Windows x86_64)
+with-llvm-sdk-<llvm-ver>-windows-aarch64.tar.gz   # static LLVM SDK (Windows aarch64)
 ```
 
 Do not publish a binary asset named `main`. `src/main` is the local seed path;
@@ -699,11 +709,18 @@ Expected asset list:
 with-bootstrap-c-v0.14.3.tar.gz
 with-darwin-aarch64
 with-linux-x86_64
+with-linux-aarch64
 with-windows-x86_64.exe
+with-windows-aarch64.exe
 with-llvm-sdk-<llvm-ver>-darwin-aarch64.tar.gz
 with-llvm-sdk-<llvm-ver>-linux-x86_64.tar.gz
+with-llvm-sdk-<llvm-ver>-linux-aarch64.tar.gz
 with-llvm-sdk-<llvm-ver>-windows-x86_64.tar.gz
+with-llvm-sdk-<llvm-ver>-windows-aarch64.tar.gz
 ```
+
+Every compiler asset has its SDK asset beside it (D180): a platform with one
+and not the other means the release is not done, whatever the tag says.
 
 Confirm the tag points at the verified commit:
 
