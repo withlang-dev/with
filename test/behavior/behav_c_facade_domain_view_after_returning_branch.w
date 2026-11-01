@@ -1,4 +1,4 @@
-//! expect-stdout: 127
+//! expect-stdout: CHAR_MAX
 //! skip-on: windows issue #800: action/capability/net/process/fs OS-surface fails on native Windows
 
 // #1655 / §16.2b.7: a domain-touching call on a branch that RETURNS does
@@ -18,4 +18,8 @@ fn main:
     if lc.is_none():
         let _ = localeconv()
         return 1
-    print(f"{lc.unwrap().int_frac_digits as i32}")
+    // In the "C" locale int_frac_digits is CHAR_MAX, the target's (255 where
+    // char is unsigned, linux-aarch64): print the fact, not the number.
+    let char_max = if (255 as c_char) as i32 == 255: 255 else: 127
+    let digits = lc.unwrap().int_frac_digits as i32
+    print(if digits == char_max: "CHAR_MAX" else: f"{digits}")

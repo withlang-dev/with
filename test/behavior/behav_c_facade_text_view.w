@@ -18,7 +18,7 @@ c facade notes:
     resource Note wraps *mut note
         from note_new
         drop note_free
-    resource NoteText wraps *mut i8
+    resource NoteText wraps *mut c_char
         from strdup
         drop free
     fn note_id

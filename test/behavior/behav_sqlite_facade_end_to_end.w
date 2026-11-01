@@ -38,7 +38,7 @@ use facades.sqlite3
 use c_import("sqlite3.h", link: "sqlite3")
 
 type Ctx { tag: i32 }
-fn on_row(c: &Ctx, n: c_int, values: *mut *mut i8, names: *mut *mut i8) -> c_int:
+fn on_row(c: &Ctx, n: c_int, values: *mut *mut c_char, names: *mut *mut c_char) -> c_int:
     print(f"row: tag={c.tag} cols={n}")
     if c.tag == 2: 1 else: 0
 

@@ -5,10 +5,10 @@ use std.libc.atoi
 
 // D102 (§16.6): an `extern "C" fn` is never null; the slot that may be
 // empty is `Option` of it.
-var conversions: [3]Option[extern "C" fn(*const i8) -> i32] = [Some(atoi), Some(atoi), None]
+var conversions: [3]Option[extern "C" fn(*const c_char) -> i32] = [Some(atoi), Some(atoi), None]
 
 fn invoke(callback: &fn(i32) -> i32): callback(20)
-fn invoke_c(callback: &extern "C" fn(*const i8) -> i32): callback(c"21".ptr)
+fn invoke_c(callback: &extern "C" fn(*const c_char) -> i32): callback(c"21".ptr)
 
 fn main:
     assert(conversions[0].unwrap()(c"21".ptr) == 21)

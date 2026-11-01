@@ -1,4 +1,4 @@
-//! expect-check-fail: fn 'dprintf': 'selected by param 1' names param 1: *const i8 fmt, which is not an integer or enum; the selector is the parameter whose compile-time value picks the case (§16.2b.5)
+//! expect-check-fail: fn 'dprintf': 'selected by param 1' names param 1: *const c_char fmt, which is not an integer or enum; the selector is the parameter whose compile-time value picks the case (§16.2b.5)
 
 // D66 (spec §16.2b.5): the selector is an integer or enum parameter; a
 // format string selects nothing a case can name.

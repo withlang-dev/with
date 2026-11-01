@@ -12,7 +12,7 @@ fn main:
     assert(unsafe { strtol("42", null, 10) } == 42)
     let text = f"{4}{1}"
     assert(unsafe { strtol(text, null, 10) } == 41)
-    var end: *mut i8 = null
+    var end: *mut c_char = null
     assert(unsafe { strtol("7x", &raw mut end, 10) } == 7)
-    assert(unsafe { *end } == 'x' as i8)
+    assert(unsafe { *end } == 'x' as c_char)
     print("ok")

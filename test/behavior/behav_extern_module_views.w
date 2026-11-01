@@ -11,8 +11,8 @@ use std.fs
 // anything else about a C declaration (D112: 20,000 corpora).
 fn main:
     let case_dir = p7_prepare_case("extern_module_views", "extern_module_views_test")
-    p7_write(case_dir, "lib/views/old_gen.w", "module views.old_gen\nextern fn strlen(s: *const i8) -> i64\npub fn old_len(s: *const i8) -> i64: unsafe { strlen(s) }\n")
-    p7_write(case_dir, "lib/views/new_gen.w", "module views.new_gen\nextern fn strlen(s: *const i8) -> u64\npub fn new_len(s: *const i8) -> u64: unsafe { strlen(s) }\n")
+    p7_write(case_dir, "lib/views/old_gen.w", "module views.old_gen\nextern fn strlen(s: *const c_char) -> i64\npub fn old_len(s: *const c_char) -> i64: unsafe { strlen(s) }\n")
+    p7_write(case_dir, "lib/views/new_gen.w", "module views.new_gen\nextern fn strlen(s: *const c_char) -> u64\npub fn new_len(s: *const c_char) -> u64: unsafe { strlen(s) }\n")
     p7_write(case_dir, "src/main.w", "use views.old_gen\nuse views.new_gen\nfn main:\n    let text = c\"seven_7\"\n    let a = old_len(text.ptr)\n    let b = new_len(text.ptr)\n    assert(a == 7 and b == 7)\n")
     let executed = p7_run(case_dir, "extern_views_run", "run\0src/main.w\0")
     p7_assert_success(executed, "two modules' views of one C symbol")
