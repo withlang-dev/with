@@ -16,6 +16,9 @@ fn main:
     let run = p7_run(case_dir, "emit-c of an await", "build\0src/main.w\0--emit-c\0-o\0out/main.c\0")
     assert(run.rc != 0)
     if not run.stderr.contains("C backend has no lowering for MIR intrinsic") or not run.stderr.contains("called in `main`"):
-        eprint(run.stderr)
+        // The exit code too: a child the runner's ceiling killed has an
+        // empty stderr, and the lane's capture then showed only the
+        // assertion (every release lane but Windows, v0.16.0.4).
+        eprint(f"build --emit-c exited {run.rc}; stderr:\n" ++ run.stderr)
         assert(false)
     print("ok")

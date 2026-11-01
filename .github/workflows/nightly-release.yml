@@ -293,6 +293,17 @@ jobs:
           chmod +x src/main
           src/main version
 
+      - name: Install host packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # bz2, sqlite3, curl: the facade tests c_import the host's bzlib.h,
+          # sqlite3.h and curl/curl.h (a UAT project gets them from `with get`);
+          # the linux-aarch64 lane installs the same. The compiler itself links
+          # nothing of the host (#1915, D81).
+          sudo apt-get install -y --no-install-recommends libbz2-dev libsqlite3-dev libcurl4-openssl-dev
+
       - name: Fetch verified static LLVM SDK
         run: |
           set -euo pipefail
@@ -364,6 +375,7 @@ jobs:
             out/test-graph/**/*.stderr
             out/stdlib-complexity/
             out/command/
+            out/tmp/pre-d-p7-capture/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -532,6 +544,17 @@ jobs:
           chmod +x src/main
           src/main version
 
+      - name: Install host packages (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          # bz2, sqlite3, curl: the facade tests c_import the host's bzlib.h,
+          # sqlite3.h and curl/curl.h (a UAT project gets them from `with get`);
+          # the linux-aarch64 lane installs the same. The compiler itself links
+          # nothing of the host (#1915, D81).
+          sudo apt-get install -y --no-install-recommends libbz2-dev libsqlite3-dev libcurl4-openssl-dev
+
       - name: Fetch verified static LLVM SDK
         run: |
           set -euo pipefail
@@ -599,6 +622,7 @@ jobs:
             out/test-graph/**/*.stderr
             out/stdlib-complexity/
             out/command/
+            out/tmp/pre-d-p7-capture/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -807,6 +831,7 @@ jobs:
             out/test-graph/**/*.stderr
             out/stdlib-complexity/
             out/command/
+            out/tmp/pre-d-p7-capture/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -1053,6 +1078,7 @@ jobs:
             out/test-graph/**/*.stderr
             out/stdlib-complexity/
             out/command/
+            out/tmp/pre-d-p7-capture/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -1253,6 +1279,7 @@ jobs:
             out/test-graph/**/*.stderr
             out/stdlib-complexity/
             out/command/
+            out/tmp/pre-d-p7-capture/
           if-no-files-found: ignore
           retention-days: 7
 

@@ -7,6 +7,14 @@ use std.build
 use std.process
 use std.string.parse
 use std.sysinfo
+
+// The ceiling every child of a selfhost case gets: a hang guard, not a speed
+// budget (#2902). A child still running after thirty minutes is hung; one
+// that takes two minutes on a loaded 4-core runner is slow, and the fixed
+// 120 s ceilings here read `build --emit-c` of a hello program as a failure
+// on the linux-x86_64 release lane (v0.16.0.4).
+const BS_HANG_GUARD_MS: i32 = 1800000
+
 fn selfhost_owned_text(s: &str): s ++ ""
 
 type SelfhostRunResult {
@@ -308,7 +316,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
     let old_out_dir = env("WITH_OUT_DIR") ++ ""
     if set_env("WITH_OUT_DIR", bs_abs(root, bs_join(output_dir, "no-out"))) != 0:
         return bs_fail(ctx, "could not set WITH_OUT_DIR for embedded runtime test")
-    let build_result = ctx.process_runner().run_capture(build_args, bs_abs(root, build_stdout), bs_abs(root, build_stderr), 300000)
+    let build_result = ctx.process_runner().run_capture(build_args, bs_abs(root, build_stdout), bs_abs(root, build_stderr), BS_HANG_GUARD_MS)
     let _restore_out_dir = set_env("WITH_OUT_DIR", old_out_dir)
     if build_result.rc == 124:
         return bs_fail(ctx, "embedded runtime build timed out; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
@@ -319,7 +327,7 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
     let run_stderr = bs_join(output_dir, "run.stderr")
     var run_args: List[str] = List.new()
     run_args |> push(bs_abs(root, bin_path))
-    let run_result = ctx.process_runner().run_capture(run_args, bs_abs(root, run_stdout), bs_abs(root, run_stderr), 60000)
+    let run_result = ctx.process_runner().run_capture(run_args, bs_abs(root, run_stdout), bs_abs(root, run_stderr), BS_HANG_GUARD_MS)
     if run_result.rc == 124:
         return bs_fail(ctx, "embedded runtime output run timed out; stdout=" ++ run_stdout ++ " stderr=" ++ run_stderr)
     if run_result.rc != 0:
@@ -356,11 +364,11 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     var gen_args: List[str] = List.new()
     gen_args |> push("version")
     gen_args |> push("--generation")
-    let generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "generation", &gen_args, 60000).stdout)
+    let generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "generation", &gen_args, BS_HANG_GUARD_MS).stdout)
     var rt_args: List[str] = List.new()
     rt_args |> push("version")
     rt_args |> push("--runtime-generation")
-    let runtime_generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "runtime-generation", &rt_args, 60000).stdout)
+    let runtime_generation = bs_trim_trailing_line_endings(bs_run_cli_capture(ctx, compiler, "runtime-generation", &rt_args, BS_HANG_GUARD_MS).stdout)
     if generation.len() != 64:
         return bs_fail(ctx, "the release compiler carries no generation stamp: '" ++ generation ++ "'")
     if runtime_generation != generation:
@@ -385,12 +393,12 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     build_args |> push("-o")
     build_args |> push(bs_abs(root, bin_path))
     let same_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, "out/lib"))
-    let same = ctx.process_runner().run_capture_with_env(build_args, bs_abs(root, bs_join(output_dir, "same.stdout")), bs_abs(root, bs_join(output_dir, "same.stderr")), 300000, same_env)
+    let same = ctx.process_runner().run_capture_with_env(build_args, bs_abs(root, bs_join(output_dir, "same.stdout")), bs_abs(root, bs_join(output_dir, "same.stderr")), BS_HANG_GUARD_MS, same_env)
     if same.rc != 0:
         return bs_fail(ctx, f"linking through out/lib (this generation) failed with exit code {same.rc}: " ++ same.stderr)
     var run_args: List[str] = List.new()
     run_args |> push(bs_abs(root, bin_path))
-    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(output_dir, "run.stdout")), bs_abs(root, bs_join(output_dir, "run.stderr")), 60000)
+    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(output_dir, "run.stdout")), bs_abs(root, bs_join(output_dir, "run.stderr")), BS_HANG_GUARD_MS)
     if ran.rc != 0 or bs_trim_trailing_line_endings(ran.stdout) != "hello":
         return bs_fail(ctx, f"the program linked through out/lib exited {ran.rc} printing '" ++ ran.stdout ++ "'")
 
@@ -403,7 +411,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     refused_args |> push("-o")
     refused_args |> push(bs_abs(root, refused_bin))
     let foreign_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, foreign_root))
-    let refused = ctx.process_runner().run_capture_with_env(refused_args, bs_abs(root, bs_join(output_dir, "refused.stdout")), bs_abs(root, bs_join(output_dir, "refused.stderr")), 300000, foreign_env)
+    let refused = ctx.process_runner().run_capture_with_env(refused_args, bs_abs(root, bs_join(output_dir, "refused.stdout")), bs_abs(root, bs_join(output_dir, "refused.stderr")), BS_HANG_GUARD_MS, foreign_env)
     if refused.rc == 0 or fs.exists(refused_bin):
         return bs_fail(ctx, "a WITH_RUNTIME_ROOT of another compiler generation linked (exit 0): the D30 check stayed silent")
     if not refused.stderr.contains("would mix compiler generations"):
@@ -429,12 +437,12 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     same_bytes_args |> push("-o")
     same_bytes_args |> push(bs_abs(root, same_bytes_bin))
     let same_bytes_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, same_bytes_root))
-    let same_bytes = ctx.process_runner().run_capture_with_env(same_bytes_args, bs_abs(root, bs_join(output_dir, "same-bytes.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes.stderr")), 300000, same_bytes_env)
+    let same_bytes = ctx.process_runner().run_capture_with_env(same_bytes_args, bs_abs(root, bs_join(output_dir, "same-bytes.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes.stderr")), BS_HANG_GUARD_MS, same_bytes_env)
     if same_bytes.rc != 0:
         return bs_fail(ctx, f"a root of another generation holding this compiler's own runtime objects was refused (exit {same_bytes.rc}): " ++ same_bytes.stderr)
     var same_bytes_run: List[str] = List.new()
     same_bytes_run |> push(bs_abs(root, same_bytes_bin))
-    let ran_same = ctx.process_runner().run_capture(same_bytes_run, bs_abs(root, bs_join(output_dir, "same-bytes-run.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes-run.stderr")), 60000)
+    let ran_same = ctx.process_runner().run_capture(same_bytes_run, bs_abs(root, bs_join(output_dir, "same-bytes-run.stdout")), bs_abs(root, bs_join(output_dir, "same-bytes-run.stderr")), BS_HANG_GUARD_MS)
     if ran_same.rc != 0 or bs_trim_trailing_line_endings(ran_same.stdout) != "hello":
         return bs_fail(ctx, f"the program linked through the same-bytes root exited {ran_same.rc} printing '" ++ ran_same.stdout ++ "'")
     if fs.copy_file("out/lib/cimport_stubs.o", bs_join(same_bytes_root, "rt.o")) != 0:
@@ -447,7 +455,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     differs_args |> push("-o")
     differs_args |> push(bs_abs(root, differs_bin))
     let differs_env = process_env().set("WITH_RUNTIME_ROOT", bs_abs(root, same_bytes_root))
-    let differs = ctx.process_runner().run_capture_with_env(differs_args, bs_abs(root, bs_join(output_dir, "differs.stdout")), bs_abs(root, bs_join(output_dir, "differs.stderr")), 300000, differs_env)
+    let differs = ctx.process_runner().run_capture_with_env(differs_args, bs_abs(root, bs_join(output_dir, "differs.stdout")), bs_abs(root, bs_join(output_dir, "differs.stderr")), BS_HANG_GUARD_MS, differs_env)
     if differs.rc == 0 or fs.exists(differs_bin):
         return bs_fail(ctx, "a root of another generation whose rt.o is not this compiler's linked (exit 0)")
     if not differs.stderr.contains("would mix compiler generations"):
@@ -455,7 +463,7 @@ pub fn run_runtime_generation_regression_action(ctx: ActionCtx) -> i32:
     0
 
 fn bs_run_cli_expect_success(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": cli selfhost command '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -476,13 +484,13 @@ fn bs_assert_stdout_exact(ctx: &ActionCtx, result: &SelfhostRunResult, expected:
     bs_fail(ctx, "stdout mismatch for " ++ label ++ ": expected '" ++ expected ++ "' got '" ++ actual ++ "'")
 
 fn bs_expect_cli_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], expected: &str) -> i32:
-    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
 
 fn bs_expect_cli_input_success_exact(ctx: &ActionCtx, compiler_path: &str, label: &str, args: &List[str], stdin_text: &str, expected: &str) -> i32:
-    let result = bs_run_cli_capture_input(ctx, compiler_path, label, args, stdin_text, 120000)
+    let result = bs_run_cli_capture_input(ctx, compiler_path, label, args, stdin_text, BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, "one-liner '" ++ label ++ f"' failed with exit code {result.rc}")
     bs_assert_stdout_exact(ctx, result, expected, label)
@@ -562,7 +570,7 @@ fn bs_lsp_args() -> List[str]:
     args
 
 fn bs_lsp_run(ctx: &ActionCtx, compiler_path: &str, label: &str, text: &str, request: &str) -> SelfhostRunResult:
-    bs_run_cli_capture_input(ctx, compiler_path, label, bs_lsp_args(), bs_lsp_input(text, request), 10000)
+    bs_run_cli_capture_input(ctx, compiler_path, label, bs_lsp_args(), bs_lsp_input(text, request), BS_HANG_GUARD_MS)
 
 fn bs_lsp_check(ctx: &ActionCtx, compiler_path: &str, label: &str, text: &str, request: &str, needle: &str) -> i32:
     let result = bs_lsp_run(ctx, compiler_path, label, text, request)
@@ -611,7 +619,7 @@ fn bs_check_lsp_parser_recovery(ctx: &ActionCtx, compiler_path: &str) -> i32:
             let args: List[str] = List.new()
             args.push("check")
             args.push(selfhost_owned_text(path))
-            let result = bs_run_cli_capture(ctx, compiler_path, "lsp-parser-" ++ name, args, 60000)
+            let result = bs_run_cli_capture(ctx, compiler_path, "lsp-parser-" ++ name, args, BS_HANG_GUARD_MS)
             let combined = result.stdout ++ result.stderr
             var rc = bs_assert_contains(ctx, combined, "error:", "lsp_parser_recovery_" ++ name)
             if rc != 0: return rc
@@ -1071,7 +1079,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
         return bs_fail(ctx, "could not create missing doc source directory")
     var missing_doc_args: List[str] = List.new()
     missing_doc_args |> push("doc")
-    let missing_doc = bs_run_cli_capture_cwd(ctx, compiler_path, "doc-missing-source", missing_doc_args, 120000, missing_dir)
+    let missing_doc = bs_run_cli_capture_cwd(ctx, compiler_path, "doc-missing-source", missing_doc_args, BS_HANG_GUARD_MS, missing_dir)
     if missing_doc.rc == 0:
         return bs_fail(ctx, "with doc without source unexpectedly succeeded")
     rc = bs_assert_contains(ctx, missing_doc.stderr, "with doc requires a source file or a project with src/main.w", "doc_missing_source")
@@ -1079,13 +1087,13 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
 
     var repl_args: List[str] = List.new()
     repl_args |> push("repl")
-    let repl_run = bs_run_cli_capture_input(ctx, compiler_path, "repl-smoke", repl_args, "print(\"repl-ok\")\n:quit\n", 120000)
+    let repl_run = bs_run_cli_capture_input(ctx, compiler_path, "repl-smoke", repl_args, "print(\"repl-ok\")\n:quit\n", BS_HANG_GUARD_MS)
     if repl_run.rc != 0:
         return bs_fail(ctx, "repl smoke failed with exit code " ++ f"{repl_run.rc}" ++ ": " ++ repl_run.stderr)
     rc = bs_assert_contains(ctx, repl_run.stdout, "repl-ok", "repl_smoke")
     if rc != 0: return rc
 
-    let repl_bad = bs_run_cli_capture_input(ctx, compiler_path, "repl-persistent-decl", repl_args, "let x = 1\n", 120000)
+    let repl_bad = bs_run_cli_capture_input(ctx, compiler_path, "repl-persistent-decl", repl_args, "let x = 1\n", BS_HANG_GUARD_MS)
     if repl_bad.rc == 0:
         return bs_fail(ctx, "repl persistent declaration unexpectedly succeeded")
     bs_assert_contains(ctx, repl_bad.stderr, "persistent declarations are not implemented", "repl_persistent_decl")
@@ -1121,7 +1129,7 @@ fn bs_check_test_directives(ctx: &ActionCtx, compiler_path: &str, test_dir: &str
     let bad_stdout_src = bs_join(test_dir, "test_directives_bad_stdout.w")
     if fs.write_text(bad_stdout_src, "//! expect-stdout: missing\n\nfn main:\n    print(\"ok\")\n") != 0:
         return bs_fail(ctx, "could not write " ++ bad_stdout_src)
-    let bad_stdout_result = bs_run_cli_capture(ctx, compiler_path, "test-directives-bad-stdout", bs_test_args(bad_stdout_src), 120000)
+    let bad_stdout_result = bs_run_cli_capture(ctx, compiler_path, "test-directives-bad-stdout", bs_test_args(bad_stdout_src), BS_HANG_GUARD_MS)
     if bad_stdout_result.rc == 0:
         return bs_fail(ctx, "expected stdout directive failure")
     let stdout_diag = bs_assert_contains(ctx, bad_stdout_result.stderr, "stdout mismatch; missing expected output: missing", "test_runtime_directives")
@@ -1131,7 +1139,7 @@ fn bs_check_test_directives(ctx: &ActionCtx, compiler_path: &str, test_dir: &str
     let bad_exit_src = bs_join(test_dir, "test_directives_bad_exit.w")
     if fs.write_text(bad_exit_src, "//! expect-exit: 7\n\nfn main:\n    print(\"ok\")\n") != 0:
         return bs_fail(ctx, "could not write " ++ bad_exit_src)
-    let bad_exit_result = bs_run_cli_capture(ctx, compiler_path, "test-directives-bad-exit", bs_test_args(bad_exit_src), 120000)
+    let bad_exit_result = bs_run_cli_capture(ctx, compiler_path, "test-directives-bad-exit", bs_test_args(bad_exit_src), BS_HANG_GUARD_MS)
     if bad_exit_result.rc == 0:
         return bs_fail(ctx, "expected exit directive failure")
     let exit_diag = bs_assert_contains(ctx, bad_exit_result.stderr, "exit code 0, expected 7", "test_runtime_directives")
@@ -1150,7 +1158,7 @@ fn bs_expect_test_green(ctx: &ActionCtx, compiler_path: &str, test_dir: &str, na
     let src = bs_write_test_fixture(ctx, test_dir, name, source)
     if src.len() == 0:
         return bs_fail(ctx, "could not write fixture " ++ name)
-    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, name ++ f": the runner failed a test whose stdout matches its expectations (exit code {result.rc})" ++ bs_actual_excerpt(result.stderr))
     0
@@ -1160,7 +1168,7 @@ fn bs_expect_test_red(ctx: &ActionCtx, compiler_path: &str, test_dir: &str, name
     let src = bs_write_test_fixture(ctx, test_dir, name, source)
     if src.len() == 0:
         return bs_fail(ctx, "could not write fixture " ++ name)
-    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, "test-directives-" ++ name, bs_test_args(src), BS_HANG_GUARD_MS)
     if result.rc == 0:
         return bs_fail(ctx, name ++ ": the runner passed a test it must fail: " ++ diagnostic)
     bs_assert_contains(ctx, result.stderr, diagnostic, "test_stdout_" ++ name)
@@ -1211,7 +1219,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     let red_src = bs_join(test_dir, "keep_binary_red.w")
     if fs.write_text(red_src, "fn test_green: assert(true)\n\nfn test_red:\n    let n = 1\n    assert(n == 2)\n") != 0:
         return bs_fail(ctx, "could not write " ++ red_src)
-    let red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-red", bs_test_args(red_src), 120000, env)
+    let red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-red", bs_test_args(red_src), BS_HANG_GUARD_MS, env)
     if red.rc == 0:
         return bs_fail(ctx, "keep-binary red fixture unexpectedly passed")
     let kept = bs_line_after(red.stderr, "test binary kept: ")
@@ -1226,11 +1234,11 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     // The rerun line is honest: under the printed environment the kept
     // binary reproduces the failure, and the green test still passes in it.
     let red_env = process_env().set("WITH_TEST_FILTER", "test_red")
-    let rerun_red = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-red", 60000, red_env)
+    let rerun_red = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-red", BS_HANG_GUARD_MS, red_env)
     if rerun_red.rc == 0:
         return bs_fail(ctx, "kept binary did not reproduce test_red under WITH_TEST_FILTER=test_red")
     let green_env = process_env().set("WITH_TEST_FILTER", "test_green")
-    let rerun_green = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-green", 60000, green_env)
+    let rerun_green = bs_run_binary_capture_with_env(ctx, kept, "test-keep-binary-rerun-green", BS_HANG_GUARD_MS, green_env)
     if rerun_green.rc != 0:
         return bs_fail(ctx, f"kept binary failed test_green under WITH_TEST_FILTER=test_green (exit code {rerun_green.rc})")
 
@@ -1238,7 +1246,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     // passing test's output; a failing test's output is the diagnosis.
     var quiet_args = bs_test_args(red_src)
     quiet_args.push("--quiet")
-    let quiet_red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-quiet-red", quiet_args, 120000, env)
+    let quiet_red = bs_run_cli_capture_with_env(ctx, compiler_path, "test-quiet-red", quiet_args, BS_HANG_GUARD_MS, env)
     if quiet_red.rc == 0:
         return bs_fail(ctx, "quiet red fixture unexpectedly passed")
     rc = bs_assert_contains(ctx, quiet_red.stderr, "assertion failed", "test_quiet_red_shows_output")
@@ -1251,7 +1259,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     verbose_args |> push("test")
     verbose_args |> push("--verbose")
     verbose_args |> push(selfhost_owned_text(green_src))
-    let green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-verbose", verbose_args, 120000, env)
+    let green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-verbose", verbose_args, BS_HANG_GUARD_MS, env)
     if green.rc != 0:
         return bs_fail(ctx, f"keep-binary green fixture failed with exit code {green.rc}")
     let named = bs_line_after(green.stderr, "test binary: ")
@@ -1266,7 +1274,7 @@ fn bs_check_test_keep_binary(ctx: &ActionCtx, compiler_path: &str, test_dir: &st
     keep_args |> push("test")
     keep_args |> push("--keep-binary")
     keep_args |> push(selfhost_owned_text(green_src))
-    let kept_green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-keep", keep_args, 120000, env)
+    let kept_green = bs_run_cli_capture_with_env(ctx, compiler_path, "test-keep-binary-green-keep", keep_args, BS_HANG_GUARD_MS, env)
     if kept_green.rc != 0:
         return bs_fail(ctx, f"--keep-binary green fixture failed with exit code {kept_green.rc}")
     let kept_path = bs_line_after(kept_green.stderr, "test binary kept: ")
@@ -1332,7 +1340,7 @@ fn bs_check_link_missing_sdk(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     args |> push(bs_abs(root, src))
     args |> push("-o")
     args |> push(bs_abs(root, bs_join(case_dir, "hello")))
-    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "link-missing-sdk", args, 120000, env)
+    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "link-missing-sdk", args, BS_HANG_GUARD_MS, env)
     if result.rc == 0:
         return bs_fail(ctx, "missing-sdk: the link succeeded with SDKROOT naming no SDK")
     if not result.stderr.contains("SDKROOT names the macOS SDK") or not result.stderr.contains("which does not exist"):
@@ -1590,7 +1598,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     // A name that starts with `use` is code, not an import.
     rc = bs_expect_cli_input_success_exact(ctx, compiler_path, "one-liner-n-user-is-code", bs_one_liner_args("-n", "let user = line; print(user)"), "a\n", "a")
     if rc != 0: return rc
-    let diag_use = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-after-use", bs_one_liner_args("-n", "use std.time.now_ns; print(missing_name)"), "a\n", 120000)
+    let diag_use = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-after-use", bs_one_liner_args("-n", "use std.time.now_ns; print(missing_name)"), "a\n", BS_HANG_GUARD_MS)
     if diag_use.rc == 0:
         return bs_fail(ctx, "one-liner with an unknown name after a use unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_use.stderr, "<cli -n #1>:2:8", "one_liners")
@@ -1601,25 +1609,25 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     args |> push("print(\"x\")")
     args |> push("-n")
     args |> push("print(line)")
-    let mutual = bs_run_cli_capture(ctx, compiler_path, "one-liner-mutual-exclusion", args, 120000)
+    let mutual = bs_run_cli_capture(ctx, compiler_path, "one-liner-mutual-exclusion", args, BS_HANG_GUARD_MS)
     if mutual.rc == 0:
         return bs_fail(ctx, "one-liner mutual exclusion unexpectedly succeeded")
     rc = bs_assert_contains(ctx, mutual.stderr, "mutually exclusive", "one_liners")
     if rc != 0: return rc
 
-    let diag_e = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-e", bs_one_liner_args("-e", "let x = "), 120000)
+    let diag_e = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-e", bs_one_liner_args("-e", "let x = "), BS_HANG_GUARD_MS)
     if diag_e.rc == 0:
         return bs_fail(ctx, "one-liner malformed -e unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_e.stderr, "<cli -e #1>:1:9", "one_liners")
     if rc != 0: return rc
 
-    let diag_semicolon = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-preserved-semicolon", bs_one_liner_args("-e", "let xs: [i32; 2] = [1; 2]; let bad = "), 120000)
+    let diag_semicolon = bs_run_cli_capture(ctx, compiler_path, "one-liner-diag-preserved-semicolon", bs_one_liner_args("-e", "let xs: [i32; 2] = [1; 2]; let bad = "), BS_HANG_GUARD_MS)
     if diag_semicolon.rc == 0:
         return bs_fail(ctx, "one-liner malformed semicolon mapping unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_semicolon.stderr, "<cli -e #1>:2:", "one_liners")
     if rc != 0: return rc
 
-    let diag_n = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n", bs_one_liner_args("-n", "if line =~ /x/: print($1)"), "x\n", 120000)
+    let diag_n = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n", bs_one_liner_args("-n", "if line =~ /x/: print($1)"), "x\n", BS_HANG_GUARD_MS)
     if diag_n.rc == 0:
         return bs_fail(ctx, "one-liner malformed capture unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_n.stderr, "<cli -n #1>:1:23", "one_liners")
@@ -1628,7 +1636,7 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     // A `;` ends an inline `:` body (§29.13): the error names where `f` was
     // bound, at its place in the user's code (a label was not shifted from
     // the generated program into it), and offers the braced body.
-    let diag_inline = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-inline-body", bs_one_liner_args("-n", "if true: let f = 3; print(f)"), "x\n", 120000)
+    let diag_inline = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-inline-body", bs_one_liner_args("-n", "if true: let f = 3; print(f)"), "x\n", BS_HANG_GUARD_MS)
     if diag_inline.rc == 0:
         return bs_fail(ctx, "one-liner use after an inline body unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_inline.stderr, "label @1:10 `f` is bound here", "one_liners")
@@ -1670,14 +1678,14 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
     mix_args |> push("-e")
     mix_args |> push("print(\"x\")")
     mix_args |> push(src_mix)
-    let mix = bs_run_cli_capture(ctx, compiler_path, "one-liner-source-file-mix", mix_args, 120000)
+    let mix = bs_run_cli_capture(ctx, compiler_path, "one-liner-source-file-mix", mix_args, BS_HANG_GUARD_MS)
     if mix.rc == 0:
         return bs_fail(ctx, "one-liner combined with a source file unexpectedly succeeded")
     rc = bs_assert_contains(ctx, mix.stderr, "cannot combine one-liner code with a source file", "one_liners")
     if rc != 0: return rc
 
     // Diagnostics from a malformed -p fragment map to <cli -p #N>.
-    let diag_p = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-p", bs_one_liner_args("-p", "line = "), "a\n", 120000)
+    let diag_p = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-p", bs_one_liner_args("-p", "line = "), "a\n", BS_HANG_GUARD_MS)
     if diag_p.rc == 0:
         return bs_fail(ctx, "one-liner malformed -p unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_p.stderr, "<cli -p #1>", "one_liners")
@@ -1685,13 +1693,13 @@ pub fn run_cli_selfhost_one_liner_action(ctx: ActionCtx) -> i32:
 
     // A diagnostic on a later line of the code names that line's own column
     // (the indented splice reported `2:5` for a statement at column 1).
-    let diag_line2 = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-line2", bs_one_liner_args("-n", "var a = 1\nlet b: str = a"), "a\n", 120000)
+    let diag_line2 = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-n-line2", bs_one_liner_args("-n", "var a = 1\nlet b: str = a"), "a\n", BS_HANG_GUARD_MS)
     if diag_line2.rc == 0:
         return bs_fail(ctx, "one-liner with a type error on its second line unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_line2.stderr, "<cli -n #1>:2:1", "one_liners")
     if rc != 0: return rc
 
-    let diag_capture = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-fstring-capture", bs_one_liner_args("-n", "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{kind}\")"), "error 42\n", 120000)
+    let diag_capture = bs_run_cli_capture_input(ctx, compiler_path, "one-liner-diag-fstring-capture", bs_one_liner_args("-n", "if line =~ /(?<kind>error|warning) (\\d+)/: print(f\"{kind}\")"), "error 42\n", BS_HANG_GUARD_MS)
     if diag_capture.rc == 0:
         return bs_fail(ctx, "one-liner f-string capture diagnostic unexpectedly succeeded")
     rc = bs_assert_contains(ctx, diag_capture.stderr, "<cli -n #1>:1:", "one_liners")
@@ -1706,7 +1714,7 @@ fn bs_project_args(command: &str) -> List[str]:
     args
 
 fn bs_project_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": project selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -1820,7 +1828,7 @@ fn bs_check_build_rejects_imperative_manifest(ctx: &ActionCtx, compiler_path: &s
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"ok\")\n", "imperative main")
     if rc != 0: return rc
-    let implicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest", bs_project_args("build"), 120000, case_dir)
+    let implicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest", bs_project_args("build"), BS_HANG_GUARD_MS, case_dir)
     if implicit.rc == 0:
         return bs_fail(ctx, "imperative manifest unexpectedly succeeded")
     rc = bs_assert_contains(ctx, implicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest diagnostic")
@@ -1829,7 +1837,7 @@ fn bs_check_build_rejects_imperative_manifest(ctx: &ActionCtx, compiler_path: &s
     var explicit_args: List[str] = List.new()
     explicit_args |> push("build")
     explicit_args |> push(bs_abs(ctx.project_info().project_root(), bs_join(case_dir, "src/main.w")))
-    let explicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest-explicit-source", explicit_args, 120000, case_dir)
+    let explicit = bs_run_cli_capture_cwd(ctx, compiler_path, "imperative-manifest-explicit-source", explicit_args, BS_HANG_GUARD_MS, case_dir)
     if explicit.rc == 0:
         return bs_fail(ctx, "imperative manifest explicit source unexpectedly succeeded")
     bs_assert_contains(ctx, explicit.stderr, "error: invalid with.toml: imperative build configuration belongs in build.w", "imperative manifest explicit source diagnostic")
@@ -1928,7 +1936,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     var c_define_bad_args: List[str] = List.new()
     c_define_bad_args |> push("check")
     c_define_bad_args |> push(bs_abs(root, bs_join(c_define_bad_dir, "src/main.w")))
-    let c_define_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-c-import-define-missing", c_define_bad_args, 120000, c_define_bad_dir)
+    let c_define_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-c-import-define-missing", c_define_bad_args, BS_HANG_GUARD_MS, c_define_bad_dir)
     if c_define_bad.rc == 0:
         return bs_fail(ctx, "c_import define omission unexpectedly succeeded")
     rc = bs_assert_contains(ctx, c_define_bad.stderr, "WITH_CONFIG_TEST", "declarative_c_import_define_missing")
@@ -1944,7 +1952,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     link_bad_args |> push(bs_abs(root, bs_join(link_bad_dir, "src/main.w")))
     link_bad_args |> push("-o")
     link_bad_args |> push(bs_abs(root, bs_join(link_bad_dir, "out/bin/linkbad")))
-    let link_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-link-lib-missing", link_bad_args, 120000, link_bad_dir)
+    let link_bad = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-link-lib-missing", link_bad_args, BS_HANG_GUARD_MS, link_bad_dir)
     if link_bad.rc == 0:
         return bs_fail(ctx, "missing [link].libs library unexpectedly linked")
     rc = bs_assert_contains(ctx, link_bad.stderr, "with_phase1_missing_lib", "declarative_link_lib_missing")
@@ -1969,7 +1977,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(cross_target_dir, "src/main.w"), "fn main:\n    print(\"targetcross\")\n", "cross target default source")
     if rc != 0: return rc
-    let cross_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-cross", bs_project_args("build"), 120000, cross_target_dir)
+    let cross_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-cross", bs_project_args("build"), BS_HANG_GUARD_MS, cross_target_dir)
     if cross_target.rc == 0:
         return bs_fail(ctx, "cross-target manifest default unexpectedly succeeded")
     // Cross targets are becoming real: platforms with runtime support fail
@@ -1986,7 +1994,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(invalid_target_dir, "src/main.w"), "fn main:\n    print(\"targetinvalid\")\n", "invalid target default source")
     if rc != 0: return rc
-    let invalid_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-invalid", bs_project_args("build"), 120000, invalid_target_dir)
+    let invalid_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-default-invalid", bs_project_args("build"), BS_HANG_GUARD_MS, invalid_target_dir)
     if invalid_target.rc == 0:
         return bs_fail(ctx, "invalid target manifest default unexpectedly succeeded")
     rc = bs_assert_contains(ctx, invalid_target.stderr, "unsupported target.default 'thumbv7em-none-eabi'", "declarative_target_default_invalid")
@@ -1997,7 +2005,7 @@ fn bs_check_declarative_manifest_config(ctx: &ActionCtx, compiler_path: &str, ca
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(imperative_target_dir, "src/main.w"), "fn main:\n    print(\"targetimperative\")\n", "imperative target source")
     if rc != 0: return rc
-    let imperative_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-imperative", bs_project_args("build"), 120000, imperative_target_dir)
+    let imperative_target = bs_run_cli_capture_cwd(ctx, compiler_path, "declarative-target-imperative", bs_project_args("build"), BS_HANG_GUARD_MS, imperative_target_dir)
     if imperative_target.rc == 0:
         return bs_fail(ctx, "imperative [target] manifest unexpectedly succeeded")
     bs_assert_contains(ctx, imperative_target.stderr, "imperative build configuration belongs in build.w", "declarative_target_imperative")
@@ -2041,7 +2049,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     let built = bs_project_expect_success(ctx, compiler_path, runtime_dir, "runtime-manifest-build", bs_project_args("build"))
     if built.rc != 0: return built.rc
-    let run = bs_run_binary_capture(ctx, bs_default_bin(runtime_dir, "runtimecfg"), "runtime-manifest-run", 120000)
+    let run = bs_run_binary_capture(ctx, bs_default_bin(runtime_dir, "runtimecfg"), "runtime-manifest-run", BS_HANG_GUARD_MS)
     if run.rc != 0:
         return bs_fail(ctx, f"runtime manifest binary failed with exit code {run.rc}: " ++ run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run.stdout), "runtimecfg", "runtime_manifest_config", "stdout")
@@ -2052,7 +2060,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(bad_stack_dir, "src/main.w"), "fn main:\n    print(\"badstack\")\n", "bad runtime stack source")
     if rc != 0: return rc
-    let bad_stack = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-stack", bs_project_args("build"), 120000, bad_stack_dir)
+    let bad_stack = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-stack", bs_project_args("build"), BS_HANG_GUARD_MS, bad_stack_dir)
     if bad_stack.rc == 0:
         return bs_fail(ctx, "zero runtime fiber stack size unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_stack.stderr, "runtime.fiber_stack_size must be a positive integer", "runtime_manifest_bad_stack")
@@ -2063,7 +2071,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(bad_pool_dir, "src/main.w"), "fn main:\n    print(\"badpool\")\n", "bad runtime pool source")
     if rc != 0: return rc
-    let bad_pool = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-pool", bs_project_args("build"), 120000, bad_pool_dir)
+    let bad_pool = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-pool", bs_project_args("build"), BS_HANG_GUARD_MS, bad_pool_dir)
     if bad_pool.rc == 0:
         return bs_fail(ctx, "negative runtime fiber pool size unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_pool.stderr, "runtime.fiber_pool_size must be a positive integer", "runtime_manifest_bad_pool")
@@ -2078,7 +2086,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(bad_workers_dir, "src/main.w"), "fn main:\n    print(\"badworkers\")\n", "bad runtime worker source")
     if rc != 0: return rc
-    let bad_workers = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-workers", bs_project_args("build"), 120000, bad_workers_dir)
+    let bad_workers = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-bad-workers", bs_project_args("build"), BS_HANG_GUARD_MS, bad_workers_dir)
     if bad_workers.rc == 0:
         return bs_fail(ctx, "invalid runtime fiber worker count unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_workers.stderr, "runtime.fiber_worker_count must be a positive integer between 1 and 8", "runtime_manifest_bad_workers")
@@ -2089,7 +2097,7 @@ fn bs_check_runtime_manifest_config(ctx: &ActionCtx, compiler_path: &str, case_d
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"runtimeunknown\")\n", "unknown runtime source")
     if rc != 0: return rc
-    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-unknown", bs_project_args("build"), 120000, unknown_dir)
+    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "runtime-manifest-unknown", bs_project_args("build"), BS_HANG_GUARD_MS, unknown_dir)
     if unknown.rc == 0:
         return bs_fail(ctx, "unknown [runtime] key unexpectedly succeeded")
     bs_assert_contains(ctx, unknown.stderr, "unknown key 'executor' in [runtime]", "runtime_manifest_unknown")
@@ -2167,7 +2175,7 @@ fn bs_check_runtime_workers(ctx: &ActionCtx, compiler_path: &str, case_dir: &str
     if rc != 0: return rc
     let workers_built = bs_project_expect_success(ctx, compiler_path, scheduler_dir, "runtime-workers-build", bs_project_args("build"))
     if workers_built.rc != 0: return workers_built.rc
-    let workers_run = bs_run_binary_capture(ctx, bs_default_bin(scheduler_dir, "runtimeworkers"), "runtime-workers-run", 120000)
+    let workers_run = bs_run_binary_capture(ctx, bs_default_bin(scheduler_dir, "runtimeworkers"), "runtime-workers-run", BS_HANG_GUARD_MS)
     if workers_run.rc != 0:
         return bs_fail(ctx, f"runtime worker binary failed with exit code {workers_run.rc}: " ++ workers_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(workers_run.stdout), "runtimeworkers", "runtime_workers", "stdout")
@@ -2192,7 +2200,7 @@ fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: &str, c
     if default_build.rc != 0: return default_build.rc
     rc = bs_assert_contains(ctx, default_build.stderr, "warning: large Copy type 'BigDefault' is 136 bytes; implicit copies may be expensive (copy_warn_threshold=128)", "copy_warning_default")
     if rc != 0: return rc
-    let default_run = bs_run_binary_capture(ctx, bs_default_bin(default_dir, "copydefault"), "copy-warning-default-run", 120000)
+    let default_run = bs_run_binary_capture(ctx, bs_default_bin(default_dir, "copydefault"), "copy-warning-default-run", BS_HANG_GUARD_MS)
     if default_run.rc != 0:
         return bs_fail(ctx, f"default copy warning binary failed with exit code {default_run.rc}: " ++ default_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(default_run.stdout), "copydefault", "copy_warning_default_semantics", "stdout")
@@ -2257,7 +2265,7 @@ fn bs_check_copy_warning_manifest_config(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(invalid_dir, "src/main.w"), "fn main:\n    print(\"copyinvalid\")\n", "invalid copy warning source")
     if rc != 0: return rc
-    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "copy-warning-invalid-threshold", bs_project_args("build"), 120000, invalid_dir)
+    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "copy-warning-invalid-threshold", bs_project_args("build"), BS_HANG_GUARD_MS, invalid_dir)
     if invalid.rc == 0:
         return bs_fail(ctx, "negative copy_warn_threshold unexpectedly succeeded")
     bs_assert_contains(ctx, invalid.stderr, "copy_warn_threshold must be a non-negative integer", "copy_warning_invalid_threshold")
@@ -2267,7 +2275,7 @@ fn bs_check_link_libs_manifest_diagnostics(ctx: &ActionCtx, compiler_path: &str,
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "src/main.w"), "fn main:\n    print(\"badlinklibs\")\n", "bad link libs source")
     if rc != 0: return rc
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "link-libs-malformed", bs_project_args("build"), 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "link-libs-malformed", bs_project_args("build"), BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "malformed [link].libs unexpectedly succeeded")
     bs_assert_contains(ctx, result.stderr, "link.libs must be an array of strings", "link_libs_malformed")
@@ -2310,7 +2318,7 @@ fn bs_check_manual_c_dep_manifest(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(unknown_dir, "src/main.w"), "fn main:\n    print(\"manualunknown\")\n", "manual c dep unknown source")
     if rc != 0: return rc
-    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-unknown", bs_project_args("build"), 120000, unknown_dir)
+    let unknown = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-unknown", bs_project_args("build"), BS_HANG_GUARD_MS, unknown_dir)
     if unknown.rc == 0:
         return bs_fail(ctx, "manual C dep unknown key unexpectedly succeeded")
     rc = bs_assert_contains(ctx, unknown.stderr, "unknown key 'includes' in [deps.c.fixture]", "manual_c_dep_unknown")
@@ -2321,7 +2329,7 @@ fn bs_check_manual_c_dep_manifest(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(wrong_shape_dir, "src/main.w"), "fn main:\n    print(\"manualwrongshape\")\n", "manual c dep wrong shape source")
     if rc != 0: return rc
-    let wrong_shape = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-wrong-shape", bs_project_args("build"), 120000, wrong_shape_dir)
+    let wrong_shape = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-wrong-shape", bs_project_args("build"), BS_HANG_GUARD_MS, wrong_shape_dir)
     if wrong_shape.rc == 0:
         return bs_fail(ctx, "manual C dep wrong link shape unexpectedly succeeded")
     rc = bs_assert_contains(ctx, wrong_shape.stderr, "link in [deps.c.fixture] must be an array of library names", "manual_c_dep_wrong_shape")
@@ -2332,7 +2340,7 @@ fn bs_check_manual_c_dep_manifest(ctx: &ActionCtx, compiler_path: &str, case_dir
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(collision_dir, "src/main.w"), "fn main:\n    print(\"manualcollision\")\n", "manual c dep collision source")
     if rc != 0: return rc
-    let collision = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-collision", bs_project_args("build"), 120000, collision_dir)
+    let collision = bs_run_cli_capture_cwd(ctx, compiler_path, "manual-c-dep-collision", bs_project_args("build"), BS_HANG_GUARD_MS, collision_dir)
     if collision.rc == 0:
         return bs_fail(ctx, "manual C dep collision unexpectedly succeeded")
     bs_assert_contains(ctx, collision.stderr, "declared both as a Conan dependency and a manual", "manual_c_dep_collision")
@@ -2451,7 +2459,7 @@ fn bs_check_get_lock_restore(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     let no_lock_dir = bs_join(case_dir, "no_lock")
     var rc = bs_write_project_manifest(ctx, no_lock_dir, "getnolock")
     if rc != 0: return rc
-    let no_lock = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-no-lock", bs_project_args("get"), 120000, no_lock_dir)
+    let no_lock = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-no-lock", bs_project_args("get"), BS_HANG_GUARD_MS, no_lock_dir)
     if no_lock.rc == 0:
         return bs_fail(ctx, "with get without lock unexpectedly succeeded")
     rc = bs_assert_contains(ctx, no_lock.stderr, "no lock file at .with/lock.json", "get_lock_no_lock")
@@ -2480,7 +2488,7 @@ fn bs_check_get_lock_restore(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(mismatch_dir, ".with/deps/c/fixture/1.0/conan_package.tgz"), "fixture archive\n", "mismatch archive")
     if rc != 0: return rc
-    let mismatch = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-mismatch", bs_project_args("get"), 120000, mismatch_dir)
+    let mismatch = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-mismatch", bs_project_args("get"), BS_HANG_GUARD_MS, mismatch_dir)
     if mismatch.rc == 0:
         return bs_fail(ctx, "hash-mismatched lock restore unexpectedly succeeded")
     rc = bs_assert_contains(ctx, mismatch.stderr, "hash mismatch for c.fixture@1.0", "get_lock_mismatch")
@@ -2495,7 +2503,7 @@ fn bs_check_get_lock_restore(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(registry_dir, ".with/lock.json"), "{\n  \"version\": 1,\n  \"deps\": {\n    \"future\": {\n      \"source\": \"registry\",\n      \"version\": \"1.0\"\n    }\n  }\n}\n", "registry lock")
     if rc != 0: return rc
-    let registry = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-registry", bs_project_args("get"), 120000, registry_dir)
+    let registry = bs_run_cli_capture_cwd(ctx, compiler_path, "get-lock-registry", bs_project_args("get"), BS_HANG_GUARD_MS, registry_dir)
     if registry.rc == 0:
         return bs_fail(ctx, "registry lock restore unexpectedly succeeded")
     bs_assert_contains(ctx, registry.stderr, "registry is not available yet", "get_lock_registry")
@@ -2508,7 +2516,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     var json_args: List[str] = List.new()
     json_args |> push("get")
     json_args |> push("json")
-    let json = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-json", json_args, 120000, case_dir)
+    let json = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-json", json_args, BS_HANG_GUARD_MS, case_dir)
     if json.rc == 0:
         return bs_fail(ctx, "with get json unexpectedly succeeded before registry exists")
     rc = bs_assert_contains(ctx, json.stderr, "registry is not available yet", "get_with_package_json")
@@ -2526,7 +2534,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     var http_args: List[str] = List.new()
     http_args |> push("get")
     http_args |> push("http@1.0")
-    let http = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-http", http_args, 120000, case_dir)
+    let http = bs_run_cli_capture_cwd(ctx, compiler_path, "get-with-package-http", http_args, BS_HANG_GUARD_MS, case_dir)
     if http.rc == 0:
         return bs_fail(ctx, "with get http@1.0 unexpectedly succeeded before registry exists")
     rc = bs_assert_contains(ctx, http.stderr, "With package 'http'", "get_with_package_http")
@@ -2535,7 +2543,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     var empty_c_args: List[str] = List.new()
     empty_c_args |> push("get")
     empty_c_args |> push("c.")
-    let empty_c = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-empty-c", empty_c_args, 120000, case_dir)
+    let empty_c = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-empty-c", empty_c_args, BS_HANG_GUARD_MS, case_dir)
     if empty_c.rc == 0:
         return bs_fail(ctx, "with get c. unexpectedly succeeded")
     rc = bs_assert_contains(ctx, empty_c.stderr, "invalid package spec 'c.'", "get_invalid_empty_c")
@@ -2544,7 +2552,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     var invalid_args: List[str] = List.new()
     invalid_args |> push("get")
     invalid_args |> push("Foo/Bar")
-    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-with-package", invalid_args, 120000, case_dir)
+    let invalid = bs_run_cli_capture_cwd(ctx, compiler_path, "get-invalid-with-package", invalid_args, BS_HANG_GUARD_MS, case_dir)
     if invalid.rc == 0:
         return bs_fail(ctx, "with get Foo/Bar unexpectedly succeeded")
     rc = bs_assert_contains(ctx, invalid.stderr, "invalid package spec 'Foo/Bar'", "get_invalid_with_package")
@@ -2555,7 +2563,7 @@ fn bs_check_with_package_registry_surface(ctx: &ActionCtx, compiler_path: &str, 
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(manifest_dir, "src/main.w"), "fn main:\n    print(\"manifestwithpkg\")\n", "with package manifest source")
     if rc != 0: return rc
-    let manifest = bs_run_cli_capture_cwd(ctx, compiler_path, "with-package-manifest-dep", bs_project_args("build"), 120000, manifest_dir)
+    let manifest = bs_run_cli_capture_cwd(ctx, compiler_path, "with-package-manifest-dep", bs_project_args("build"), BS_HANG_GUARD_MS, manifest_dir)
     if manifest.rc == 0:
         return bs_fail(ctx, "bare With package dependency in with.toml unexpectedly built")
     rc = bs_assert_contains(ctx, manifest.stderr, "With package dependency 'json'", "with_package_manifest_dep")
@@ -2583,7 +2591,7 @@ fn bs_check_remove_update_packages(ctx: &ActionCtx, compiler_path: &str, case_di
     if rc != 0: return rc
     rc = bs_expect_absent(ctx, bs_join(remove_dir, ".with/deps/c/opengl"), "remove package dep dir")
     if rc != 0: return rc
-    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "remove-c-package-missing", remove_args, 120000, remove_dir)
+    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "remove-c-package-missing", remove_args, BS_HANG_GUARD_MS, remove_dir)
     if missing.rc == 0:
         return bs_fail(ctx, "removing missing C package unexpectedly succeeded")
     rc = bs_assert_contains(ctx, missing.stderr, "dependency c.opengl is not in with.toml", "remove_c_package_missing")
@@ -2615,7 +2623,7 @@ fn bs_check_get_zlib_versions(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     var latest_args: List[str] = List.new()
     latest_args |> push("get")
     latest_args |> push("c.zlib@1.3.2")
-    let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-2", latest_args, 300000, pinned_latest_dir)
+    let latest = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-2", latest_args, BS_HANG_GUARD_MS, pinned_latest_dir)
     if latest.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-zlib-1-3-2' failed with exit code {latest.rc}")
     rc = bs_assert_contains(ctx, latest.stderr, "resolving zlib/1.3.2", "get_zlib_1_3_2")
@@ -2633,7 +2641,7 @@ fn bs_check_get_zlib_versions(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     var pinned_args: List[str] = List.new()
     pinned_args |> push("get")
     pinned_args |> push("c.zlib@1.3.1")
-    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-1", pinned_args, 300000, pinned_dir)
+    let pinned = bs_run_cli_capture_cwd(ctx, compiler_path, "get-zlib-1-3-1", pinned_args, BS_HANG_GUARD_MS, pinned_dir)
     if pinned.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ f": project selfhost case 'get-zlib-1-3-1' failed with exit code {pinned.rc}")
     rc = bs_assert_contains(ctx, pinned.stderr, "resolving zlib/1.3.1", "get_zlib_1_3_1")
@@ -2708,7 +2716,7 @@ fn bs_check_build_cache_tracks_env_input(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn stamp(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(ctx.args()[0]) != 0:\n        return 1\n    fs.write_text(ctx.output(), \"stamped\")\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    var out = ctx.new_build()\n    let dir = \"out/\" ++ ctx.env_input(\"CACHE_ENV_DIR\")\n    var t = target_new(.Action, \"stamp\", \"\").output(dir ++ \"/stamp.txt\")\n    t.action = stamp\n    t = t.arg(dir)\n    t = t.write_scope(\"out\")\n    out = out.add_target(t)\n    out.default(\"stamp\")\n", "cache env build")
     if rc != 0: return rc
-    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-first", bs_project_args("build"), 120000, case_dir, process_env().set("CACHE_ENV_DIR", "first"))
+    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-first", bs_project_args("build"), BS_HANG_GUARD_MS, case_dir, process_env().set("CACHE_ENV_DIR", "first"))
     if first.rc != 0:
         return bs_fail(ctx, f"build cache env first run failed with exit code {first.rc}: " ++ first.stderr)
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/first/stamp.txt"), "stamped", "build cache env first output")
@@ -2717,7 +2725,7 @@ fn bs_check_build_cache_tracks_env_input(ctx: &ActionCtx, compiler_path: &str, c
     // out/second: with the first output gone, the declaration fails.
     if ctx.fs().remove_tree(bs_join(case_dir, "out/first")) != 0:
         return bs_fail(ctx, "could not remove the first run's output")
-    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-second", bs_project_args("build"), 120000, case_dir, process_env().set("CACHE_ENV_DIR", "second"))
+    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "build-cache-env-second", bs_project_args("build"), BS_HANG_GUARD_MS, case_dir, process_env().set("CACHE_ENV_DIR", "second"))
     if second.rc != 0:
         return bs_fail(ctx, f"build cache env second run failed with exit code {second.rc}: " ++ second.stderr)
     bs_expect_file_contains(ctx, bs_join(case_dir, "out/second/stamp.txt"), "stamped", "build cache env invalidation (#1925)")
@@ -2739,7 +2747,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
     if first.rc != 0: return first.rc
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/embedcache.state"), "dep:src/data.txt:", "build cache embed dep")
     if rc != 0: return rc
-    let first_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-first-run", 120000)
+    let first_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-first-run", BS_HANG_GUARD_MS)
     if first_run.rc != 0:
         return bs_fail(ctx, f"embed cache first binary failed with exit code {first_run.rc}: " ++ first_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(first_run.stdout), "first", "build_cache_embed_first", "stdout")
@@ -2752,7 +2760,7 @@ fn bs_check_build_cache_tracks_embed_file(ctx: &ActionCtx, compiler_path: &str, 
     rebuild_args |> push(":embedcache")
     let second = bs_project_expect_success(ctx, compiler_path, case_dir, "build-cache-embed-second", rebuild_args)
     if second.rc != 0: return second.rc
-    let second_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-second-run", 120000)
+    let second_run = bs_run_binary_capture(ctx, bs_default_bin(case_dir, "embedcache"), "build-cache-embed-second-run", BS_HANG_GUARD_MS)
     if second_run.rc != 0:
         return bs_fail(ctx, f"embed cache second binary failed with exit code {second_run.rc}: " ++ second_run.stderr)
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(second_run.stdout), "second", "build_cache_embed_second", "stdout")
@@ -2771,7 +2779,7 @@ fn bs_check_build_graph_inferred_edge(ctx: &ActionCtx, compiler_path: &str, case
     var args: List[str] = List.new()
     args |> push("build")
     args |> push(":b")
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-graph-inferred-edge", args, 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-graph-inferred-edge", args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         return bs_fail(ctx, "consumer-only build failed (#700 inferred edge): " ++ result.stderr)
     if ctx.fs().read_text(bs_join(case_dir, "out/a.txt")) != "a":
@@ -2793,7 +2801,7 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
     var args: List[str] = List.new()
     args |> push("check")
     args |> push("src/main.w")
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "imported-module-diag-location", args, 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "imported-module-diag-location", args, BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "imported module with a syntax error was accepted (rc 0)")
     if not result.stderr.contains("expected expression"):
@@ -2807,7 +2815,7 @@ fn bs_check_imported_module_diag_location(ctx: &ActionCtx, compiler_path: &str, 
 fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     var rc = bs_write_project_manifest(ctx, case_dir, "effectaudit")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args()[1]\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: List[str] = List.new()\n    argv.push(ctx.args()[0].clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", 120000)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
+    rc = bs_write_fixture(ctx, bs_join(case_dir, "build.w"), "use std.build\n\nfn generate(ctx: ActionCtx) -> i32:\n    let fs = ctx.fs()\n    if fs.mkdir_all(\"out\") != 0:\n        return 1\n    let value = ctx.env_input(\"WITH_EFFECT_FLAG\")\n    let graph_value = ctx.args()[1]\n    if fs.write_text(\"out/effect.txt\", value ++ \"/\" ++ graph_value) != 0:\n        return 1\n    let argv: List[str] = List.new()\n    argv.push(ctx.args()[0].clone())\n    argv.push(\"version\")\n    let result = ctx.process_runner().run_capture(argv, \"out/proc.stdout\", \"out/proc.stderr\", BS_HANG_GUARD_MS)\n    result.rc\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let graph_value = ctx.env_input(\"WITH_GRAPH_FLAG\")\n    var out = ctx.new_build()\n    var target = target_new(.Action, \"effect\", \"\").output(\"out/effect.txt\")\n    target.action = generate\n    target = target.write_scope(\"out\")\n    target = target.arg(\"" ++ compiler_path ++ "\")\n    target = target.arg(graph_value)\n    out = out.add_target(target)\n    out.default(\"effect\")\n", "effect audit build")
     if rc != 0: return rc
 
     var env_one = ProcessEnv { vars: List.new() }
@@ -2816,7 +2824,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let build_args: List[str] = List.new()
     build_args |> push("build")
     build_args |> push(":effect")
-    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-first", build_args, 120000, case_dir, env_one)
+    let first = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-first", build_args, BS_HANG_GUARD_MS, case_dir, env_one)
     if first.rc != 0:
         return bs_fail(ctx, "effects first build failed: " ++ first.stderr)
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/.build-state/effect.state"), "env:WITH_EFFECT_FLAG:", "effects env state")
@@ -2833,7 +2841,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let audit_args: List[str] = List.new()
     audit_args |> push("build")
     audit_args |> push(":effects")
-    let audit = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-audit", audit_args, 120000, case_dir)
+    let audit = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-audit", audit_args, BS_HANG_GUARD_MS, case_dir)
     if audit.rc != 0:
         return bs_fail(ctx, "effects audit failed: " ++ audit.stderr)
     rc = bs_assert_contains(ctx, audit.stdout, "target build.w", "effects_audit_build_target")
@@ -2850,7 +2858,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     var env_two = ProcessEnv { vars: List.new() }
     env_two.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "two" })
     env_two.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-two" })
-    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-second", build_args, 120000, case_dir, env_two)
+    let second = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-second", build_args, BS_HANG_GUARD_MS, case_dir, env_two)
     if second.rc != 0:
         return bs_fail(ctx, "effects second build failed: " ++ second.stderr)
     rc = bs_expect_file_contains(ctx, bs_join(case_dir, "out/effect.txt"), "two/graph-two", "effects env invalidation")
@@ -2859,7 +2867,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     let strict_dir = bs_join(case_dir, "strict")
     rc = bs_write_project_manifest(ctx, strict_dir, "effectstrict")
     if rc != 0: return rc
-    rc = bs_write_fixture(ctx, bs_join(strict_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let argv: List[str] = List.new()\n    argv.push(\"" ++ compiler_path ++ "\")\n    argv.push(\"version\")\n    let _ = ctx.process_runner().run_capture(argv, \"out/strict.stdout\", \"out/strict.stderr\", 120000)\n    ctx.new_build()\n", "strict effects build")
+    rc = bs_write_fixture(ctx, bs_join(strict_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx as ctx:\npub fn build -> Build:\n    let argv: List[str] = List.new()\n    argv.push(\"" ++ compiler_path ++ "\")\n    argv.push(\"version\")\n    let _ = ctx.process_runner().run_capture(argv, \"out/strict.stdout\", \"out/strict.stderr\", BS_HANG_GUARD_MS)\n    ctx.new_build()\n", "strict effects build")
     if rc != 0: return rc
     let strict_args: List[str] = List.new()
     strict_args |> push("build")
@@ -2868,7 +2876,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     var env_strict = ProcessEnv { vars: List.new() }
     env_strict.vars.push(ProcessEnvVar { name: "WITH_EFFECT_FLAG", value: "one" })
     env_strict.vars.push(ProcessEnvVar { name: "WITH_GRAPH_FLAG", value: "graph-one" })
-    let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, 120000, strict_dir, env_strict)
+    let strict = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "effects-strict", strict_args, BS_HANG_GUARD_MS, strict_dir, env_strict)
     if strict.rc == 0:
         return bs_fail(ctx, "strict effects build unexpectedly succeeded")
     rc = bs_assert_contains(ctx, strict.stderr, "no declared action inputs or outputs in strict mode", "effects_strict_process")
@@ -2883,7 +2891,7 @@ fn bs_check_build_effects_audit(ctx: &ActionCtx, compiler_path: &str, case_dir: 
     strict_env_args |> push("build")
     strict_env_args |> push("--strict-effects")
     strict_env_args |> push(":bad")
-    let strict_env = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-strict-env", strict_env_args, 120000, strict_env_dir)
+    let strict_env = bs_run_cli_capture_cwd(ctx, compiler_path, "effects-strict-env", strict_env_args, BS_HANG_GUARD_MS, strict_env_dir)
     if strict_env.rc == 0:
         return bs_fail(ctx, "strict env effects build unexpectedly succeeded")
     // D104: the refusal names the chain to the extern the build body reaches.
@@ -2966,7 +2974,7 @@ fn bs_edge_assert_exact(ctx: &ActionCtx, actual: &str, expected: &str, label: &s
     ctx.diagnostics().error(ctx.target_name() ++ ": " ++ stream_name ++ " mismatch for " ++ label ++ "\nexpected: '" ++ expected ++ "'\nactual: '" ++ actual ++ "'")
 
 fn bs_edge_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": edge selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -2987,7 +2995,7 @@ fn bs_check_pointer_index_rejected(ctx: &ActionCtx, compiler_path: &str, case_di
     let obj = bs_join(case_dir, "pointer_index_rejected.o")
     var rc = bs_write_fixture(ctx, src, "fn main:\n    var arr: [4]i32 = [0 as i32; 4]\n    var p: *const i32 = null\n    let value = arr[p]\n    value\n", "pointer index source")
     if rc != 0: return rc
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "pointer-index-rejected", bs_edge_build_obj_args(bs_abs(root, src), bs_abs(root, obj)), 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "pointer-index-rejected", bs_edge_build_obj_args(bs_abs(root, src), bs_abs(root, obj)), BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "accepted pointer index expression")
     rc = bs_assert_contains(ctx, result.stderr, "index expression must be an integer", "pointer_index_rejected")
@@ -3255,7 +3263,7 @@ fn bs_check_partial_statement_match_lint(ctx: &ActionCtx, compiler_path: &str, c
     if rc != 0: return rc
     var invalid_args = bs_project_args("check")
     invalid_args |> push(bs_abs(root, bs_join(invalid_dir, "src/main.w")))
-    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "partial-statement-match-invalid", invalid_args, 120000, invalid_dir)
+    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "partial-statement-match-invalid", invalid_args, BS_HANG_GUARD_MS, invalid_dir)
     if invalid_result.rc == 0:
         return bs_fail(ctx, "invalid partial_statement_match lint setting unexpectedly succeeded")
     bs_assert_contains(ctx, invalid_result.stderr, "lint.partial_statement_match must be true or false", "partial_statement_match_invalid")
@@ -3277,7 +3285,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     if built.rc != 0: return built.rc
     if not ctx.fs().exists(bin_path):
         return bs_fail(ctx, "build options binary output missing: " ++ bin_path)
-    let run_result = bs_run_binary_capture(ctx, bin_path, "build-options-binary-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin_path, "build-options-binary-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0:
         return bs_fail(ctx, f"build options binary failed with exit code {run_result.rc}: " ++ run_result.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "build-options", "build_options_binary", "stdout")
@@ -3321,7 +3329,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     conflict_args |> push(bs_abs(root, src))
     conflict_args |> push("--emit-c")
     conflict_args |> push("--emit-obj")
-    let conflict = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-emit-conflict", conflict_args, 120000, case_dir)
+    let conflict = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-emit-conflict", conflict_args, BS_HANG_GUARD_MS, case_dir)
     if conflict.rc == 0:
         return bs_fail(ctx, "build options emit conflict unexpectedly succeeded")
     rc = bs_assert_contains(ctx, conflict.stderr, "--emit-c and --emit-obj are mutually exclusive", "build_options_emit_conflict")
@@ -3331,7 +3339,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     bad_prelude_args |> push("build")
     bad_prelude_args |> push(bs_abs(root, src))
     bad_prelude_args |> push("--prelude=bogus")
-    let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, 120000, case_dir)
+    let bad_prelude = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-bad-prelude", bad_prelude_args, BS_HANG_GUARD_MS, case_dir)
     if bad_prelude.rc == 0:
         return bs_fail(ctx, "build options bad prelude unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_prelude.stderr, "invalid --prelude value 'bogus' (expected full|alloc|core|none)", "build_options_bad_prelude")
@@ -3348,7 +3356,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     target_native_args |> push(bs_abs(root, target_native_bin))
     let target_native = bs_edge_expect_success(ctx, compiler_path, case_dir, "build-options-target-native", target_native_args)
     if target_native.rc != 0: return target_native.rc
-    let target_native_run = bs_run_binary_capture(ctx, target_native_bin, "build-options-target-native-run", 120000)
+    let target_native_run = bs_run_binary_capture(ctx, target_native_bin, "build-options-target-native-run", BS_HANG_GUARD_MS)
     if target_native_run.rc != 0:
         return bs_fail(ctx, f"--target native binary failed with exit code {target_native_run.rc}: " ++ target_native_run.stderr)
     rc = bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(target_native_run.stdout), "build-options", "build_options_target_native", "stdout")
@@ -3375,7 +3383,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     cross_args |> push(bs_cross_target_triple())
     cross_args |> push("-o")
     cross_args |> push(bs_abs(root, cross_bin))
-    let cross = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-cross", cross_args, 120000, case_dir)
+    let cross = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-cross", cross_args, BS_HANG_GUARD_MS, case_dir)
     if cross.rc == 0:
         return bs_fail(ctx, "cross-target build unexpectedly succeeded")
     // Same two-way pin as declarative_target_default_cross: platforms with
@@ -3391,7 +3399,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     unknown_target_args |> push(bs_abs(root, src))
     unknown_target_args |> push("--target")
     unknown_target_args |> push("thumbv7em-none-eabi")
-    let unknown_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-unknown", unknown_target_args, 120000, case_dir)
+    let unknown_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-unknown", unknown_target_args, BS_HANG_GUARD_MS, case_dir)
     if unknown_target.rc == 0:
         return bs_fail(ctx, "unknown target triple unexpectedly succeeded")
     rc = bs_assert_contains(ctx, unknown_target.stderr, "unsupported target triple 'thumbv7em-none-eabi'", "build_options_target_unknown")
@@ -3402,7 +3410,7 @@ fn bs_check_build_options_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &s
     missing_target_args |> push("build")
     missing_target_args |> push(bs_abs(root, src))
     missing_target_args |> push("--target")
-    let missing_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-missing", missing_target_args, 120000, case_dir)
+    let missing_target = bs_run_cli_capture_cwd(ctx, compiler_path, "build-options-target-missing", missing_target_args, BS_HANG_GUARD_MS, case_dir)
     if missing_target.rc == 0:
         return bs_fail(ctx, "missing --target value unexpectedly succeeded")
     rc = bs_assert_contains(ctx, missing_target.stderr, "--target requires a target triple argument", "build_options_target_missing")
@@ -3428,7 +3436,7 @@ fn bs_check_whole_program_extern_var_redecl(ctx: &ActionCtx, compiler_path: &str
     args |> push(bs_abs(root, bin))
     let build_result = bs_edge_expect_success(ctx, compiler_path, case_dir, "whole-program-extern-var-redecl", args)
     if build_result.rc != 0: return build_result.rc
-    let run_result = bs_run_binary_capture(ctx, bin, "whole-program-extern-var-redecl-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin, "whole-program-extern-var-redecl-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "ok", "whole_program_extern_var_redecl", "stdout")
 
@@ -3569,7 +3577,7 @@ fn bs_run_emit_c_compile(ctx: &ActionCtx, compiler_path: &str, root: &str, case_
     let stdout_path = bs_capture_path(root, case_dir, label ++ "-compile", "stdout")
     let stderr_path = bs_capture_path(root, case_dir, label ++ "-compile", "stderr")
     let fibers = bs_emit_c_needs_fiber_runtime(ctx.fs().read_text(c_path))
-    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, bin, true, fibers), stdout_path, stderr_path, 120000)
+    ctx.process_runner().run_capture(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, bin, true, fibers), stdout_path, stderr_path, BS_HANG_GUARD_MS)
 
 fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -3605,7 +3613,7 @@ fn bs_check_emit_c_receiver_abi(ctx: &ActionCtx, compiler_path: &str, case_dir: 
 
     rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-receiver-abi")
     if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-receiver-abi-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_receiver_abi", "stdout")
 
@@ -3792,7 +3800,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
             argv.push("test")
             argv.push(bs_abs(root, c.src))
             native_job.push(jobs.len() as i32)
-            jobs.push(par_job(argv, bs_capture_path(root, c.dir, "native", "stdout"), bs_capture_path(root, c.dir, "native", "stderr"), 300000))
+            jobs.push(par_job(argv, bs_capture_path(root, c.dir, "native", "stdout"), bs_capture_path(root, c.dir, "native", "stderr"), BS_HANG_GUARD_MS))
         else:
             native_job.push(-1)
         var argv: List[str] = List.new()
@@ -3839,7 +3847,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
         // case is 19 MB of C and takes 112 s on the release host with this
         // target running alone; at 120 s it timed out (exit 124) in every
         // battery that ran the other test targets beside it.
-        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), 600000))
+        cc_jobs.push(par_job(bs_emit_c_cc_args(ctx, compiler_path, root, c_path, ec_bin(c), c.libm, fibers), bs_capture_path(root, c.dir, "compile", "stdout"), bs_capture_path(root, c.dir, "compile", "stderr"), BS_HANG_GUARD_MS))
     let cc_rcs = par_run(ctx, &cc_jobs, par_width(&cc_jobs))
 
     for k in 0..cc_case.len():
@@ -3859,7 +3867,7 @@ fn ec_run_cases(ctx: &ActionCtx, compiler_path: &str, cases: &List[EcCase]) -> (
         // debug allocator, so a double free or a leak in the C backend's
         // drops fails the case, not only a wrong line of output.
         let run_env = if c.debug_alloc.len() > 0: process_env().set("WITH_DEBUG_ALLOC", "1") else: process_env()
-        let run = ctx.process_runner().run_capture_with_env(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), 120000, run_env)
+        let run = ctx.process_runner().run_capture_with_env(argv, bs_capture_path(root, c.dir, "run", "stdout"), bs_capture_path(root, c.dir, "run", "stderr"), BS_HANG_GUARD_MS, run_env)
         if c.debug_alloc.len() > 0 and not run.stderr.contains(c.debug_alloc):
             failed += 1
             report = report ++ "\n" ++ c.name ++ ": the debug allocator did not report '" ++ c.debug_alloc ++ "'" ++ bs_actual_excerpt(run.stderr)
@@ -3905,7 +3913,7 @@ fn bs_check_emit_c_array_fill_rvalue(ctx: &ActionCtx, compiler_path: &str, case_
     if emit_result.rc != 0: return emit_result.rc
     rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-fill-rvalue")
     if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-fill-rvalue-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-fill-rvalue-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "ok", "emit_c_array_fill_rvalue", "stdout")
 
@@ -3936,7 +3944,7 @@ fn bs_check_emit_c_array_ref(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     if emit_result.rc != 0: return emit_result.rc
     rc = bs_compile_emit_c_output(ctx, compiler_path, root, case_dir, c_path, bin, "emit-c-array-ref")
     if rc != 0: return rc
-    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-ref-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin, "emit-c-array-ref-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, run_result.stdout, "", "emit_c_array_ref", "stdout")
 
@@ -4007,7 +4015,7 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     cc_args |> push(bs_abs(root, helper_c))
     cc_args |> push("-o")
     cc_args |> push(bs_abs(root, helper_obj))
-    let cc_result = ctx.process_runner().run_capture(cc_args, cc_stdout, cc_stderr, 120000)
+    let cc_result = ctx.process_runner().run_capture(cc_args, cc_stdout, cc_stderr, BS_HANG_GUARD_MS)
     if cc_result.rc != 0:
         return bs_fail(ctx, f"direct aggregate ABI C helper compile failed with exit code {cc_result.rc}: " ++ cc_result.stderr)
 
@@ -4023,11 +4031,11 @@ fn bs_check_darwin_arm64_c_abi_direct_aggregates(ctx: &ActionCtx, compiler_path:
     link_args |> push(bs_abs(root, "out/lib/fiber_asm.o"))
     link_args |> push(bs_abs(root, "out/lib/cimport_stubs.o"))
     link_args |> push(bs_abs(root, "out/lib/embedded_objects.o"))
-    let link_result = ctx.process_runner().run_capture(link_args, link_stdout, link_stderr, 120000)
+    let link_result = ctx.process_runner().run_capture(link_args, link_stdout, link_stderr, BS_HANG_GUARD_MS)
     if link_result.rc != 0:
         return bs_fail(ctx, f"direct aggregate ABI link failed with exit code {link_result.rc}: " ++ link_result.stderr)
 
-    let run_result = bs_run_binary_capture(ctx, bin, "darwin-arm64-c-abi-direct-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, bin, "darwin-arm64-c-abi-direct-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     bs_edge_assert_exact(ctx, bs_trim_trailing_line_endings(run_result.stdout), "", "darwin_arm64_c_abi_direct_aggregates", "stdout")
 
@@ -4219,7 +4227,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     var args: List[str] = List.new()
     args |> push("test")
     args |> push(bs_abs(root, src))
-    let single = bs_run_cli_capture_cwd(ctx, compiler_path, "parallel-same-source-single", args, 120000, root)
+    let single = bs_run_cli_capture_cwd(ctx, compiler_path, "parallel-same-source-single", args, BS_HANG_GUARD_MS, root)
     if single.rc != 0:
         return single.rc
     if single.stderr.len() != 0:
@@ -4243,7 +4251,7 @@ pub fn run_cli_selfhost_parallel_action(ctx: ActionCtx) -> i32:
     var failed = false
     for i in 0..jobs:
         let pid = pids[i]
-        let job_rc = ctx.process_runner().wait(pid, 120000)
+        let job_rc = ctx.process_runner().wait(pid, BS_HANG_GUARD_MS)
         if job_rc != 0:
             let stdout_rel = bs_join(output_dir, f"job-{i}.stdout")
             let stderr_rel = bs_join(output_dir, f"job-{i}.stderr")
@@ -4300,7 +4308,7 @@ fn bs_count_occurrences(text: &str, needle: &str) -> i32:
     count
 
 fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": migrator selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -4424,7 +4432,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     bad_args |> push("mini")
     bad_args |> push("--facts")
     bad_args |> push(bs_abs(root, bs_join(case_dir, "bad_facts.w")))
-    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-facade-uncited-fact", &bad_args, 180000, case_dir)
+    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-facade-uncited-fact", &bad_args, BS_HANG_GUARD_MS, case_dir)
     if bad.rc == 0: return bs_fail(ctx, "a registry fact without its citation was accepted")
     rc = bs_assert_contains(ctx, bad.stderr, "bad_facts.w:3: a fact needs its citation after `//`", "registry: an uncited fact is refused with its line")
     if rc != 0: return rc
@@ -4557,7 +4565,7 @@ fn bs_check_migrate_facade_by_evidence(ctx: &ActionCtx, compiler_path: &str, cas
     var fetched_args: List[str] = List.new()
     fetched_args |> push("check")
     fetched_args |> push("src/main.w")
-    let fetched = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "check-fetched-facade", &fetched_args, 180000, proj, process_env().set("WITH_DUMP_FACADE", "1"))
+    let fetched = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, "check-fetched-facade", &fetched_args, BS_HANG_GUARD_MS, proj, process_env().set("WITH_DUMP_FACADE", "1"))
     if fetched.rc != 0:
         return bs_fail(ctx, "a program using the fetched facade with a project override did not check: " ++ fetched.stderr)
     rc = bs_assert_contains(ctx, fetched.stderr, "pool_drop(", "fetched facade: the project's drop renders")
@@ -5054,7 +5062,7 @@ fn bs_migrate_expect_refusal(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     args |> push("--no-c-export")
     args |> push("-o")
     args |> push(bs_abs(root, bs_join(case_dir, label ++ ".w")))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0: return bs_fail(ctx, label ++ ": the migration was expected to refuse the record")
     bs_assert_contains(ctx, result.stderr, needle, label)
 
@@ -5079,7 +5087,7 @@ fn bs_migrate_check_run(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, la
     if built.rc != 0: return built.rc
     var run_args: List[str] = List.new()
     run_args |> push(bs_abs(root, binary))
-    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(case_dir, label ++ ".stdout")), bs_abs(root, bs_join(case_dir, label ++ ".stderr")), 120000)
+    let ran = ctx.process_runner().run_capture(run_args, bs_abs(root, bs_join(case_dir, label ++ ".stdout")), bs_abs(root, bs_join(case_dir, label ++ ".stderr")), BS_HANG_GUARD_MS)
     if ran.rc != 0: return bs_fail(ctx, label ++ f" exited {ran.rc}: " ++ ran.stdout ++ ran.stderr)
     0
 
@@ -6239,7 +6247,7 @@ fn bs_check_migrate_unprototyped_declaration(ctx: &ActionCtx, compiler_path: &st
     bad_args |> push("--no-c-export")
     bad_args |> push("-o")
     bad_args |> push(bs_abs(root, bad_w))
-    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unprototyped-disagree", bad_args, 180000, case_dir)
+    let bad = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unprototyped-disagree", bad_args, BS_HANG_GUARD_MS, case_dir)
     if bad.rc == 0:
         return bs_fail(ctx, "migration of disagreeing unprototyped calls unexpectedly succeeded")
     bs_assert_contains(ctx, bad.stderr, "migrate: 'knr' is declared without a prototype and its calls pass different arguments", "unprototyped_declaration")
@@ -6324,7 +6332,7 @@ fn bs_check_migrate_setjmp_rejected(ctx: &ActionCtx, compiler_path: &str, case_d
     args |> push("--no-c-export")
     args |> push("-o")
     args |> push(bs_abs(root, out_w))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-setjmp-rejected", args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-setjmp-rejected", args, BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "setjmp migration unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'guarded': setjmp/longjmp", "setjmp_rejected")
@@ -6402,7 +6410,7 @@ fn bs_check_migrate_longjmp_rejected(ctx: &ActionCtx, compiler_path: &str, case_
     args |> push("--no-c-export")
     args |> push("-o")
     args |> push(bs_abs(root, out_w))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-longjmp-rejected", args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-longjmp-rejected", args, BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "longjmp migration unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'bail': setjmp/longjmp", "longjmp_rejected")
@@ -6424,7 +6432,7 @@ fn bs_check_migrate_unsupported_statement_rejected(ctx: &ActionCtx, compiler_pat
     args |> push("--no-c-export")
     args |> push("-o")
     args |> push(bs_abs(root, out_w))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unsupported-statement-rejected", args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unsupported-statement-rejected", args, BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "unsupported statement migration unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "migrate: untranslatable function 'unsupported_asm': bailed at GCCAsmStmt", "unsupported_statement_rejected")
@@ -6848,7 +6856,7 @@ fn bs_check_migrate_builtin_overflow(ctx: &ActionCtx, compiler_path: &str, case_
     rejected_args |> push("--no-c-export")
     rejected_args |> push("-o")
     rejected_args |> push(bs_abs(root, rejected_out))
-    let rejected = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unsupported-builtin", rejected_args, 180000, case_dir)
+    let rejected = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-unsupported-builtin", rejected_args, BS_HANG_GUARD_MS, case_dir)
     if rejected.rc == 0:
         return bs_fail(ctx, "unsupported compiler builtin migration unexpectedly succeeded")
     rc = bs_assert_contains(ctx, rejected.stderr, "unsupported compiler builtin '__builtin_bitreverse32': no structural lowering", "unsupported_builtin_rejected")
@@ -7488,7 +7496,7 @@ fn bs_blob_to_args(blob: &str) -> List[str]:
     args
 
 fn bs_build_w_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -7512,7 +7520,7 @@ fn bs_build_w_nm_smoke(ctx: &ActionCtx, obj_path: &str, label: &str) -> i32:
     var args: List[str] = List.new()
     args |> push(bs_nm_tool(ctx, "nm"))
     args |> push(bs_abs(root, obj_path))
-    let result = ctx.process_runner().run_capture(args, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
+    let result = ctx.process_runner().run_capture(args, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, "nm failed for " ++ label)
     let _remove_stdout = ctx.fs().remove_file(stdout_rel)
@@ -7537,7 +7545,7 @@ fn bs_check_build_w_not_ignored(ctx: &ActionCtx, compiler_path: &str, case_dir: 
         ctx.diagnostics().error("error: build_w_not_ignored missing custom-build output")
     if ctx.fs().exists(bs_default_bin(case_dir, "buildwdemo")):
         ctx.diagnostics().error("error: build_w_not_ignored unexpectedly produced default package output")
-    let run_result = bs_run_binary_capture(ctx, custom_bin, "build-w-not-ignored-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, custom_bin, "build-w-not-ignored-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     rc = bs_assert_contains(ctx, run_result.stdout, "custom build", "build_w_not_ignored")
     if rc != 0: return rc
@@ -7558,7 +7566,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
     let canonical_bin = bs_default_bin(canonical_dir, "canonical")
     if not ctx.fs().exists(canonical_bin):
         return bs_fail(ctx, "missing canonical comptime-with output")
-    let canonical_run = bs_run_binary_capture(ctx, canonical_bin, "build-w-comptime-with-canonical-run", 120000)
+    let canonical_run = bs_run_binary_capture(ctx, canonical_bin, "build-w-comptime-with-canonical-run", BS_HANG_GUARD_MS)
     if canonical_run.rc != 0: return canonical_run.rc
     rc = bs_assert_contains(ctx, canonical_run.stdout, "canonical comptime with", "build_w_comptime_with_canonical")
     if rc != 0: return rc
@@ -7575,7 +7583,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
     let shorthand_bin = bs_default_bin(shorthand_dir, "shorthand")
     if not ctx.fs().exists(shorthand_bin):
         return bs_fail(ctx, "missing shorthand comptime-with output")
-    let shorthand_run = bs_run_binary_capture(ctx, shorthand_bin, "build-w-comptime-with-shorthand-run", 120000)
+    let shorthand_run = bs_run_binary_capture(ctx, shorthand_bin, "build-w-comptime-with-shorthand-run", BS_HANG_GUARD_MS)
     if shorthand_run.rc != 0: return shorthand_run.rc
     rc = bs_assert_contains(ctx, shorthand_run.stdout, "shorthand comptime with", "build_w_comptime_with_shorthand")
     if rc != 0: return rc
@@ -7587,7 +7595,7 @@ fn bs_check_build_w_comptime_with_entry(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(duplicate_dir, "build.w"), "use std.build\n\ncomptime with BuildCtx, ActionCtx:\npub fn build -> Build:\n    ctx.new_build().executable(\"duplicate\", \"src/main.w\")\n", ctx.target_name(), "duplicate comptime-with build.w")
     if rc != 0: return rc
-    let duplicate = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-comptime-with-duplicate", bs_blob_to_args(bs_argv_append("", "build")), 120000, duplicate_dir)
+    let duplicate = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-comptime-with-duplicate", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, duplicate_dir)
     if duplicate.rc == 0:
         return bs_fail(ctx, "duplicate comptime-with default binding unexpectedly succeeded")
     bs_assert_contains(ctx, duplicate.stderr, "duplicate capability binding", "build_w_comptime_with_duplicate")
@@ -7614,7 +7622,7 @@ fn bs_force_comptime_evaluator(ctx: &ActionCtx, case_dir: &str) -> i32:
 fn bs_build_w_in_evaluator(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
     let env = process_env().set("WITH_BUILD_RUNNER_DIR", bs_abs(ctx.project_info().project_root(), bs_join(case_dir, ".runners")))
     // A hang guard (#2371): the battery runs this beside every other lane.
-    let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, 600000, case_dir, &env)
+    let result = bs_run_cli_capture_cwd_with_env(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir, &env)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": build.w selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     else if bs_assert_contains(ctx, result.stderr, "actions evaluate in the driver's comptime evaluator", label ++ "_said_evaluator") != 0:
@@ -8035,7 +8043,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(bad_linker_dir, "build.w"), bad_linker_build, ctx.target_name(), "workspace bad linker build.w")
     if rc != 0: return rc
-    let bad_linker_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-linker", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_linker_dir)
+    let bad_linker_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-linker", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, bad_linker_dir)
     if bad_linker_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_bad_linker unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_linker_result.stderr, "Workspace.set_link_command cannot change linker without ProcessRunner authority", "build_w_workspace_bad_linker")
@@ -8067,7 +8075,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(drop_output_dir, "build.w"), drop_output_build, ctx.target_name(), "workspace drop outputs build.w")
     if rc != 0: return rc
-    let drop_output_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-drop-outputs", bs_blob_to_args(bs_argv_append("", "build")), 120000, drop_output_dir)
+    let drop_output_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-drop-outputs", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, drop_output_dir)
     if drop_output_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_drop_outputs unexpectedly succeeded")
     rc = bs_assert_contains(ctx, drop_output_result.stderr, "Workspace.set_link_command replacement must preserve declared outputs", "build_w_workspace_drop_outputs")
@@ -8098,7 +8106,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(bad_cwd_dir, "build.w"), bad_cwd_build, ctx.target_name(), "workspace bad cwd build.w")
     if rc != 0: return rc
-    let bad_cwd_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-cwd", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_cwd_dir)
+    let bad_cwd_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-bad-cwd", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, bad_cwd_dir)
     if bad_cwd_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_bad_cwd unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_cwd_result.stderr, "bad cwd prelink missing", "build_w_workspace_bad_cwd")
@@ -8128,7 +8136,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(add_string_prelink_dir, "build.w"), add_string_prelink_build, ctx.target_name(), "workspace add_string prelink build.w")
     if rc != 0: return rc
-    let add_string_prelink_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-add-string-prelink", bs_blob_to_args(bs_argv_append("", "build")), 120000, add_string_prelink_dir)
+    let add_string_prelink_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-add-string-prelink", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, add_string_prelink_dir)
     if add_string_prelink_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_add_string_prelink unexpectedly succeeded")
     rc = bs_assert_contains(ctx, add_string_prelink_result.stderr, "Workspace.add_string during PRE_LINK is not supported in Phase D", "build_w_workspace_add_string_prelink")
@@ -8392,7 +8400,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(parallel_partial_intercept_dir, "build.w"), parallel_partial_intercept_build, ctx.target_name(), "workspace parallel partial intercept build.w")
     if rc != 0: return rc
-    let parallel_partial_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-partial-intercept", bs_blob_to_args(bs_argv_append("", "build")), 120000, parallel_partial_intercept_dir)
+    let parallel_partial_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-parallel-partial-intercept", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, parallel_partial_intercept_dir)
     if parallel_partial_intercept_result.rc == 0:
         return bs_fail(ctx, "build_w_workspace_parallel_partial_intercept unexpectedly succeeded")
     rc = bs_assert_contains(ctx, parallel_partial_intercept_result.stderr, "parallel does not support partially consumed intercepted workspaces yet", "build_w_workspace_parallel_partial_intercept")
@@ -8445,7 +8453,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(open_intercept_dir, "build.w"), open_intercept_build, ctx.target_name(), "workspace open intercept build.w")
     if rc != 0: return rc
-    let open_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-open", bs_blob_to_args(bs_argv_append("", "build")), 120000, open_intercept_dir)
+    let open_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-open", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, open_intercept_dir)
     if open_intercept_result.rc == 0:
         ctx.diagnostics().error("error: build_w_workspace_intercept_open unexpectedly succeeded")
     rc = bs_assert_contains(ctx, open_intercept_result.stderr, "incomplete workspace interception for 'open-intercept'", "build_w_workspace_intercept_open")
@@ -8472,7 +8480,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(unread_intercept_dir, "build.w"), unread_intercept_build, ctx.target_name(), "workspace unread intercept build.w")
     if rc != 0: return rc
-    let unread_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-unread", bs_blob_to_args(bs_argv_append("", "build")), 120000, unread_intercept_dir)
+    let unread_intercept_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-unread", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, unread_intercept_dir)
     if unread_intercept_result.rc == 0:
         ctx.diagnostics().error("error: build_w_workspace_intercept_unread unexpectedly succeeded")
     rc = bs_assert_contains(ctx, unread_intercept_result.stderr, "incomplete workspace interception for 'unread-intercept'", "build_w_workspace_intercept_unread")
@@ -8500,7 +8508,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build()\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(end_unread_dir, "build.w"), end_unread_build, ctx.target_name(), "workspace end unread intercept build.w")
     if rc != 0: return rc
-    let end_unread_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-end-unread", bs_blob_to_args(bs_argv_append("", "build")), 120000, end_unread_dir)
+    let end_unread_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-intercept-end-unread", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, end_unread_dir)
     if end_unread_result.rc == 0:
         ctx.diagnostics().error("error: build_w_workspace_intercept_end_unread unexpectedly succeeded")
     rc = bs_assert_contains(ctx, end_unread_result.stderr, "Workspace.end_intercept called before terminal message was consumed", "build_w_workspace_intercept_end_unread")
@@ -8546,7 +8554,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
     let enum_bin = bs_default_bin(enum_dir, "workspace-enum")
     if not ctx.fs().exists(enum_bin):
         return bs_fail(ctx, "missing workspace enum output")
-    let enum_run = bs_run_binary_capture(ctx, enum_bin, "build-w-comptime-payload-enum-run", 120000)
+    let enum_run = bs_run_binary_capture(ctx, enum_bin, "build-w-comptime-payload-enum-run", BS_HANG_GUARD_MS)
     if enum_run.rc != 0: return enum_run.rc
     rc = bs_assert_contains(ctx, enum_run.stdout, "workspace enum", "build_w_comptime_payload_enum")
     if rc != 0: return rc
@@ -8564,7 +8572,7 @@ fn bs_check_build_w_workspace_api(ctx: &ActionCtx, compiler_path: &str, base_dir
         "    ctx.new_build().executable(\"should-not-build\", \"src/main.w\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(current_dir, "build.w"), current_build, ctx.target_name(), "workspace current build.w")
     if rc != 0: return rc
-    let current_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-current-before-create", bs_blob_to_args(bs_argv_append("", "build")), 120000, current_dir)
+    let current_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-workspace-current-before-create", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, current_dir)
     if current_result.rc == 0:
         return bs_fail(ctx, "current_workspace before create unexpectedly succeeded")
     bs_assert_contains(ctx, current_result.stderr, "current_workspace called before create_workspace", "build_w_workspace_current")
@@ -8629,7 +8637,7 @@ fn bs_check_build_w_library_and_targets(ctx: &ActionCtx, compiler_path: &str, ba
     let host_bin = bs_default_bin(host_dir, "host-target")
     if not ctx.fs().exists(host_bin):
         ctx.diagnostics().error("error: build_w_explicit_host_target missing binary: " ++ host_bin)
-    let host_run = bs_run_binary_capture(ctx, host_bin, "build-w-explicit-host-run", 120000)
+    let host_run = bs_run_binary_capture(ctx, host_bin, "build-w-explicit-host-run", BS_HANG_GUARD_MS)
     if host_run.rc != 0: return host_run.rc
     rc = bs_assert_contains(ctx, host_run.stdout, "explicit host target", "build_w_explicit_host_target")
     if rc != 0: return rc
@@ -8641,7 +8649,7 @@ fn bs_check_build_w_library_and_targets(ctx: &ActionCtx, compiler_path: &str, ba
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(non_native_dir, "build.w"), "use std.build\nuse std.sysinfo\n\npub fn build(ctx: BuildCtx) -> Build:\n    var non_native = BuildTarget.linux_x86_64\n    if os() == \"Linux\" and arch() == \"x86_64\":\n        non_native = BuildTarget.darwin_aarch64\n    var target = target_new(.Executable, \"wrong-target\", \"src/main.w\")\n    target = target.target(non_native)\n    var out = ctx.new_build()\n    out.add_target(target)\n", ctx.target_name(), "non-native build.w")
     if rc != 0: return rc
-    let non_native_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-non-native-target", bs_blob_to_args(bs_argv_append("", "build")), 120000, non_native_dir)
+    let non_native_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-non-native-target", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, non_native_dir)
     if non_native_result.rc == 0:
         ctx.diagnostics().error("error: build_w_non_native_target unexpectedly succeeded")
     bs_assert_contains(ctx, non_native_result.stderr, "build.w cross-target platform", "build_w_non_native_target")
@@ -8660,7 +8668,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     let generated_bin = bs_default_bin(gen_dir, "generated-app")
     if not ctx.fs().exists(generated_source) or not ctx.fs().exists(generated_bin):
         ctx.diagnostics().error("error: build_w_generated_source missing generated source or binary")
-    let run_result = bs_run_binary_capture(ctx, generated_bin, "build-w-generated-source-run", 120000)
+    let run_result = bs_run_binary_capture(ctx, generated_bin, "build-w-generated-source-run", BS_HANG_GUARD_MS)
     if run_result.rc != 0: return run_result.rc
     rc = bs_assert_contains(ctx, run_result.stdout, "generated source", "build_w_generated_source")
     if rc != 0: return rc
@@ -8672,7 +8680,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(invalid_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    var generated = ctx.new_build()\n    generated = generated.generated_source(\"../outside.w\", \"fn main: print(\\\"bad\\\")\n\")\n    generated.executable(\"invalid-generated\", \"src/main.w\")\n", ctx.target_name(), "invalid generated build.w")
     if rc != 0: return rc
-    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-invalid-generated-source", bs_blob_to_args(bs_argv_append("", "build")), 120000, invalid_dir)
+    let invalid_result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-invalid-generated-source", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, invalid_dir)
     if invalid_result.rc == 0:
         ctx.diagnostics().error("error: build_w_invalid_generated_source unexpectedly succeeded")
     rc = bs_assert_contains(ctx, invalid_result.stderr, "invalid build.w generated source path", "build_w_invalid_generated_source")
@@ -8715,7 +8723,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().read_text(\"../outside.txt\")\n    ctx.new_build().executable(\"toolfs-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs escape build.w")
     if rc != 0: return rc
-    let toolfs_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_escape_dir)
+    let toolfs_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-escape", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, toolfs_escape_dir)
     if toolfs_escape.rc == 0:
         ctx.diagnostics().error("error: build_w_toolfs_escape unexpectedly succeeded")
     rc = bs_assert_contains(ctx, toolfs_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_escape")
@@ -8744,9 +8752,9 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     var link_args: List[str] = List.new()
     link_args.push("-e")
     link_args.push(link_program)
-    let linked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-setup", &link_args, 120000, gen_link_dir)
+    let linked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-setup", &link_args, BS_HANG_GUARD_MS, gen_link_dir)
     if linked.rc != 0: return bs_fail(ctx, "could not link out/gen in " ++ gen_link_dir)
-    let gen_link = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link", bs_blob_to_args(bs_argv_append("", "build")), 120000, gen_link_dir)
+    let gen_link = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, gen_link_dir)
     if gen_link.rc == 0:
         ctx.diagnostics().error("error: build_w_gen_link unexpectedly succeeded")
     rc = bs_assert_contains(ctx, gen_link.stderr, "out/gen is a symlink", "build_w_gen_link")
@@ -8760,7 +8768,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     var unlink_args: List[str] = List.new()
     unlink_args.push("-e")
     unlink_args.push(unlink_program)
-    let unlinked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-cleanup", &unlink_args, 120000, gen_link_dir)
+    let unlinked = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-gen-link-cleanup", &unlink_args, BS_HANG_GUARD_MS, gen_link_dir)
     if unlinked.rc != 0: return bs_fail(ctx, "could not remove the out/gen link in " ++ gen_link_dir)
 
     let toolfs_file_escape_dir = bs_join(base_dir, "toolfs_file_escape")
@@ -8770,7 +8778,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_file_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().copy_file(\"../outside.txt\", \"out/bad.txt\")\n    ctx.new_build().executable(\"toolfs-file-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs file escape build.w")
     if rc != 0: return rc
-    let toolfs_file_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-file-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_file_escape_dir)
+    let toolfs_file_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-file-escape", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, toolfs_file_escape_dir)
     if toolfs_file_escape.rc == 0:
         ctx.diagnostics().error("error: build_w_toolfs_file_escape unexpectedly succeeded")
     rc = bs_assert_contains(ctx, toolfs_file_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_file_escape")
@@ -8783,7 +8791,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_tree_escape_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let _ = ctx.fs().copy_tree(\"../outside\", \"out/bad\")\n    ctx.new_build().executable(\"toolfs-tree-escape\", \"src/main.w\")\n", ctx.target_name(), "toolfs tree escape build.w")
     if rc != 0: return rc
-    let toolfs_tree_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-tree-escape", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_tree_escape_dir)
+    let toolfs_tree_escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-tree-escape", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, toolfs_tree_escape_dir)
     if toolfs_tree_escape.rc == 0:
         ctx.diagnostics().error("error: build_w_toolfs_tree_escape unexpectedly succeeded")
     rc = bs_assert_contains(ctx, toolfs_tree_escape.stderr, "ToolFs path escapes project root", "build_w_toolfs_tree_escape")
@@ -8799,7 +8807,7 @@ fn bs_check_build_w_generated_source(ctx: &ActionCtx, compiler_path: &str, base_
     if rc != 0: return rc
     rc = bs_build_w_write_fixture(ctx, bs_join(toolfs_read_missing_dir, "build.w"), "use std.build\n\npub fn build(ctx: BuildCtx) -> Build:\n    let fs = ctx.fs()\n    assert(fs.read_text_opt(\"missing.txt\").is_none())\n    assert(fs.read_text_opt(\"src/main.w\").unwrap() == fs.read_text(\"src/main.w\"))\n    fs.read_text(\"missing.txt\")\n    ctx.new_build().executable(\"toolfs-read-missing\", \"src/main.w\")\n", ctx.target_name(), "toolfs read missing build.w")
     if rc != 0: return rc
-    let toolfs_read_missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-read-missing", bs_blob_to_args(bs_argv_append("", "build")), 120000, toolfs_read_missing_dir)
+    let toolfs_read_missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-toolfs-read-missing", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, toolfs_read_missing_dir)
     if toolfs_read_missing.rc == 0:
         ctx.diagnostics().error("error: build_w_toolfs_read_missing unexpectedly succeeded")
     rc = bs_assert_contains(ctx, toolfs_read_missing.stderr, "read_text: ", "build_w_toolfs_read_missing")
@@ -8824,7 +8832,7 @@ fn bs_check_comptime_string_budget(ctx: &ActionCtx, compiler_path: &str, case_di
     args |> push(source_path)
     var child_env = process_env()
     child_env = child_env.set("WITH_COMPTIME_STRING_BUDGET_BYTES", "128")
-    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "comptime-string-budget", args, 120000, child_env)
+    let result = bs_run_cli_capture_with_env(ctx, compiler_path, "comptime-string-budget", args, BS_HANG_GUARD_MS, child_env)
     if result.rc == 0:
         return bs_fail(ctx, "comptime string budget check unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "comptime string construction budget exceeded", "comptime_string_budget")
@@ -8946,7 +8954,7 @@ fn bs_check_build_w_graph_v2(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
     no_deps_args |> push("build")
     no_deps_args |> push(":two")
     no_deps_args |> push("--no-deps")
-    let non_action = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-no-deps-non-action", no_deps_args, 120000, case_dir)
+    let non_action = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-no-deps-non-action", no_deps_args, BS_HANG_GUARD_MS, case_dir)
     if non_action.rc == 0:
         ctx.diagnostics().error("error: build_w_no_deps_non_action unexpectedly succeeded")
     rc = bs_assert_contains(ctx, non_action.stderr, "--no-deps is only supported for build.w action, test and corpus-test targets", "build_w_no_deps_non_action")
@@ -9043,7 +9051,7 @@ fn bs_check_removed_build_kind_diagnostic(ctx: &ActionCtx, compiler_path: &str, 
         "    out.default(\"old-generated-source\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build_text, ctx.target_name(), "removed kind build.w")
     if rc != 0: return rc
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-removed-kind", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-removed-kind", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         ctx.diagnostics().error("error: build_w_removed_kind unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "removed_generated_source", "build_w_removed_kind")
@@ -9084,7 +9092,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    assert(ctx.project_info().package_name() == \"buildwaction\")\n" ++
         "    assert(ctx.inputs()[0] == \"src/input.txt\")\n" ++
         "    assert(ctx.args()[0] == \"hello\")\n" ++
-        "    assert(ctx.timeout() == 12345)\n" ++
+        "    assert(ctx.timeout() == 1234567)\n" ++
         "    assert(ctx.working_dir() == \"fixtures/work\")\n" ++
         "    assert(ctx.env().len() == 2)\n" ++
         "    assert(ctx.env()[0] == \"WITH_DECLARED_ONE=1\")\n" ++
@@ -9138,7 +9146,10 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    generate_target = generate_target.extra_output(\"out/action/extra.txt\")\n" ++
         "    generate_target = generate_target.input(\"src/input.txt\")\n" ++
         "    generate_target = generate_target.arg(\"hello\")\n" ++
-        "    generate_target = generate_target.timeout(12345)\n" ++
+        // A distinctive value the explain output is checked for, and a hang
+        // guard, not a budget: the action runs seven child compiles, and at
+        // 12345 ms the release lanes' 4-core runners read it as timed out.
+        "    generate_target = generate_target.timeout(1234567)\n" ++
         "    generate_target = generate_target.working_dir(\"fixtures/work\")\n" ++
         "    generate_target = generate_target.with_env(\"WITH_DECLARED_ONE\", \"1\")\n" ++
         "    generate_target = generate_target.with_env(\"WITH_DECLARED_TWO\", \"two\")\n" ++
@@ -9155,7 +9166,7 @@ fn bs_check_build_w_action_target(ctx: &ActionCtx, compiler_path: &str, case_dir
     let explain_args = bs_blob_to_args(bs_argv_append(bs_argv_append(bs_argv_append("", "build"), "--explain"), "generate"))
     let explain = bs_build_w_expect_success(ctx, compiler_path, case_dir, "build-w-action-explain", explain_args)
     if explain.rc != 0: return explain.rc
-    rc = bs_assert_contains(ctx, explain.stdout, "timeout_ms: 12345", "build_w_action_explain_timeout")
+    rc = bs_assert_contains(ctx, explain.stdout, "timeout_ms: 1234567", "build_w_action_explain_timeout")
     if rc != 0: return rc
     rc = bs_assert_contains(ctx, explain.stdout, "cwd: fixtures/work", "build_w_action_explain_cwd")
     if rc != 0: return rc
@@ -9235,7 +9246,7 @@ fn bs_check_build_w_action_no_deps(ctx: &ActionCtx, compiler_path: &str, case_di
     var dep_args: List[str] = List.new()
     dep_args |> push("build")
     dep_args |> push(":leaf")
-    let with_deps = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-with-deps-fails", dep_args, 120000, case_dir)
+    let with_deps = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-with-deps-fails", dep_args, BS_HANG_GUARD_MS, case_dir)
     if with_deps.rc == 0:
         ctx.diagnostics().error("error: build_w_action_no_deps normal dependency build unexpectedly succeeded")
     rc = bs_assert_contains(ctx, with_deps.stderr, "prepare", "build_w_action_no_deps_failure")
@@ -9262,7 +9273,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"generate\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(missing_dir, "build.w"), missing_build, ctx.target_name(), "action missing build.w")
     if rc != 0: return rc
-    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-missing-input", bs_blob_to_args(bs_argv_append("", "build")), 120000, missing_dir)
+    let missing = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-missing-input", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, missing_dir)
     if missing.rc == 0:
         ctx.diagnostics().error("error: build_w_action_missing_input unexpectedly succeeded")
     rc = bs_assert_contains(ctx, missing.stderr, "missing declared input", "build_w_action_missing_input")
@@ -9285,7 +9296,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"fail\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(failure_dir, "build.w"), failure_build, ctx.target_name(), "action failure build.w")
     if rc != 0: return rc
-    let failure = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-failure", bs_blob_to_args(bs_argv_append("", "build")), 120000, failure_dir)
+    let failure = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-failure", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, failure_dir)
     if failure.rc == 0:
         ctx.diagnostics().error("error: build_w_action_failure unexpectedly succeeded")
     rc = bs_assert_contains(ctx, failure.stderr, "failed with exit code 7", "build_w_action_failure")
@@ -9309,7 +9320,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-write\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(undeclared_dir, "build.w"), undeclared_build, ctx.target_name(), "action undeclared build.w")
     if rc != 0: return rc
-    let undeclared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-undeclared-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, undeclared_dir)
+    let undeclared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-undeclared-output", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, undeclared_dir)
     if undeclared.rc == 0:
         ctx.diagnostics().error("error: build_w_action_undeclared_output unexpectedly succeeded")
     rc = bs_assert_contains(ctx, undeclared.stderr, "not a declared action output", "build_w_action_undeclared_output")
@@ -9333,7 +9344,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-install-write\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(install_path_dir, "build.w"), install_path_build, ctx.target_name(), "action install path build.w")
     if rc != 0: return rc
-    let install_path = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-install-path-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, install_path_dir)
+    let install_path = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-install-path-denied", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, install_path_dir)
     if install_path.rc == 0:
         ctx.diagnostics().error("error: build_w_action_install_path_denied unexpectedly succeeded")
     rc = bs_assert_contains(ctx, install_path.stderr, "not a declared action output", "build_w_action_install_path_denied")
@@ -9357,7 +9368,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-escape\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(escape_dir, "build.w"), escape_build, ctx.target_name(), "action escape build.w")
     if rc != 0: return rc
-    let escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-escape-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, escape_dir)
+    let escape = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-escape-output", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, escape_dir)
     if escape.rc == 0:
         ctx.diagnostics().error("error: build_w_action_escape_output unexpectedly succeeded")
     rc = bs_assert_contains(ctx, escape.stderr, "ToolFs path escapes project root", "build_w_action_escape_output")
@@ -9384,7 +9395,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-network\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(network_dir, "build.w"), network_build, ctx.target_name(), "action network build.w")
     if rc != 0: return rc
-    let network = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, network_dir)
+    let network = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-denied", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, network_dir)
     if network.rc == 0:
         ctx.diagnostics().error("error: build_w_action_network_denied unexpectedly succeeded")
     rc = bs_assert_contains(ctx, network.stderr, "without target.allow_network()", "build_w_action_network_denied")
@@ -9414,7 +9425,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-network-helper\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(network_helper_dir, "build.w"), network_helper_build, ctx.target_name(), "action network helper build.w")
     if rc != 0: return rc
-    let network_helper = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-helper-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, network_helper_dir)
+    let network_helper = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-network-helper-denied", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, network_helper_dir)
     if network_helper.rc == 0:
         ctx.diagnostics().error("error: build_w_action_network_helper_denied unexpectedly succeeded")
     rc = bs_assert_contains(ctx, network_helper.stderr, "without target.allow_network()", "build_w_action_network_helper_denied")
@@ -9477,7 +9488,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-capture\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(capture_dir, "build.w"), capture_build, ctx.target_name(), "action capture build.w")
     if rc != 0: return rc
-    let capture = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-capture-output-denied", bs_blob_to_args(bs_argv_append("", "build")), 120000, capture_dir)
+    let capture = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-capture-output-denied", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, capture_dir)
     if capture.rc == 0:
         ctx.diagnostics().error("error: build_w_action_capture_output_denied unexpectedly succeeded")
     rc = bs_assert_contains(ctx, capture.stderr, "ProcessRunner.run_capture", "build_w_action_capture_output_denied")
@@ -9523,7 +9534,7 @@ fn bs_check_build_w_action_failures(ctx: &ActionCtx, compiler_path: &str, base_d
         "    out.default(\"bad-spec\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(bad_spec_dir, "build.w"), bad_spec_build, ctx.target_name(), "action bad spec build.w")
     if rc != 0: return rc
-    let bad_spec = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-bad-process-spec", bs_blob_to_args(bs_argv_append("", "build")), 120000, bad_spec_dir)
+    let bad_spec = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-action-bad-process-spec", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, bad_spec_dir)
     if bad_spec.rc == 0:
         ctx.diagnostics().error("error: build_w_action_bad_process_spec unexpectedly succeeded")
     rc = bs_assert_contains(ctx, bad_spec.stderr, "non-capturing stdout/stderr is not implemented", "build_w_action_bad_process_spec")
@@ -9568,7 +9579,7 @@ pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
         args |> push(bs_abs(root, source))
         args |> push("-o")
         args |> push(bs_abs(root, bs_join(output_dir, name)))
-        let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, 600000)
+        let result = ctx.process_runner().run_capture(args, stdout_path, stderr_path, BS_HANG_GUARD_MS)
         if result.rc != 0:
             return bs_fail(ctx, f"{source} failed to build with exit code {result.rc}: " ++ bs_error_lines(result.stderr))
         if not fs.exists(bs_join(output_dir, name)):
@@ -9655,7 +9666,7 @@ fn bs_check_build_w_shared_output(ctx: &ActionCtx, compiler_path: &str, case_dir
         "    out.default(\"writer-a\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build, ctx.target_name(), "shared output build.w")
     if rc != 0: return rc
-    let shared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-shared-output", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    let shared = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-shared-output", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, case_dir)
     if shared.rc == 0:
         return bs_fail(ctx, "build_w_shared_output: building one of two targets that declare one output unexpectedly succeeded")
     rc = bs_assert_contains(ctx, shared.stderr, "is declared by both target 'writer-a' and target 'writer-b'", "build_w_shared_output")
@@ -9695,13 +9706,13 @@ fn bs_check_build_w_early_return_stops_lanes(ctx: &ActionCtx, compiler_path: &st
         "    out.default(\"all\")\n"
     rc = bs_build_w_write_fixture(ctx, bs_join(case_dir, "build.w"), build, ctx.target_name(), "early return build.w")
     if rc != 0: return rc
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return", bs_blob_to_args(bs_argv_append("", "build")), 120000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return", bs_blob_to_args(bs_argv_append("", "build")), BS_HANG_GUARD_MS, case_dir)
     if result.rc == 0:
         return bs_fail(ctx, "build_w_early_return: a build with a missing install source unexpectedly succeeded")
     rc = bs_assert_contains(ctx, result.stderr, "build: stopping 'slow', still running when the build ended", "build_w_early_return")
     if rc != 0: return rc
     // Outlast the action's sleep, then look for what an orphan would write.
-    let waited = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return-wait", bs_blob_to_args(bs_argv_append(bs_argv_append("", "run"), "fixtures/sleep.w")), 120000, case_dir)
+    let waited = bs_run_cli_capture_cwd(ctx, compiler_path, "build-w-early-return-wait", bs_blob_to_args(bs_argv_append(bs_argv_append("", "run"), "fixtures/sleep.w")), BS_HANG_GUARD_MS, case_dir)
     if waited.rc != 0:
         return bs_fail(ctx, "build_w_early_return: the sleep child failed")
     if ctx.fs().exists(bs_join(case_dir, "out/slow.txt")):
@@ -9728,7 +9739,7 @@ fn bs_drop_first_lines(text: &str, count: i32) -> str:
     ""
 
 fn bs_pcre2_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &str, label: &str, args: &List[str]) -> SelfhostRunResult:
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, 180000, case_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, label, args, BS_HANG_GUARD_MS, case_dir)
     if result.rc != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": pcre2 prep selfhost case '" ++ label ++ f"' failed with exit code {result.rc}")
     result
@@ -9860,7 +9871,7 @@ fn bs_check_opaque_field_access_rejected(ctx: &ActionCtx, compiler_path: &str, b
     var args: List[str] = List.new()
     args |> push("check")
     args |> push(bs_abs(root, src))
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "opaque-field-access", args, 120000, base_dir)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "opaque-field-access", args, BS_HANG_GUARD_MS, base_dir)
     if result.rc == 0:
         return bs_fail(ctx, "accepted opaque field access")
     bs_assert_contains(ctx, result.stderr, "field access requires a concrete struct or union type; this type is opaque", "opaque_field_access")
@@ -9926,7 +9937,7 @@ fn bs_check_pcre2_jit_no_support(ctx: &ActionCtx, compiler_path: &str, base_dir:
     args |> push(bs_abs(root, bin))
     let built = bs_pcre2_expect_success(ctx, compiler_path, base_dir, "pcre2-jit-no-support", args)
     if built.rc != 0: return built.rc
-    let ran = bs_run_binary_capture(ctx, bs_abs(root, bin), "pcre2-jit-no-support-run", 120000)
+    let ran = bs_run_binary_capture(ctx, bs_abs(root, bin), "pcre2-jit-no-support-run", BS_HANG_GUARD_MS)
     if ran.rc != 0:
         return bs_fail(ctx, f"pcre2 jit-unsupported contract failed with exit code {ran.rc}: " ++ ran.stderr)
     0
@@ -9950,7 +9961,7 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
     args |> push(bs_abs(root, src))
     args |> push("--bundle-corpus")
     args |> push("std/engines/pcre2")
-    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-two-sources", args, 120000, root)
+    let result = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-two-sources", args, BS_HANG_GUARD_MS, root)
     if result.rc == 0:
         return bs_fail(ctx, "compiled std.engines.pcre2.defs from two files in one compilation")
     rc = bs_assert_contains(ctx, result.stderr, "module 'std.engines.pcre2.defs' is loaded from two files in one compilation", "std_module_two_sources")
@@ -9961,7 +9972,7 @@ fn bs_check_std_module_two_sources(ctx: &ActionCtx, compiler_path: &str, base_di
     ok_args |> push("--bundle-corpus")
     ok_args |> push("std/engines/pcre2")
     ok_args |> push("--no-prelude")
-    let ok = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-one-source", ok_args, 120000, root)
+    let ok = bs_run_cli_capture_cwd(ctx, compiler_path, "std-module-one-source", ok_args, BS_HANG_GUARD_MS, root)
     if ok.rc != 0:
         return bs_fail(ctx, "the harness did not compile on its own tree with --no-prelude: " ++ ok.stderr)
     0
@@ -10087,7 +10098,7 @@ fn bs_nm_output(ctx: &ActionCtx, nm_tool: &str, obj_path: &str, label: &str) -> 
     var argv: List[str] = List.new()
     argv |> push(selfhost_owned_text(nm_tool))
     argv |> push(bs_abs(root, obj_path))
-    var result = ctx.process_runner().run_capture(argv, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), 120000)
+    var result = ctx.process_runner().run_capture(argv, bs_abs(root, stdout_rel), bs_abs(root, stderr_rel), BS_HANG_GUARD_MS)
     if result.rc == 0:
         let _remove_stdout = ctx.fs().remove_file(stdout_rel)
         let _remove_stderr = ctx.fs().remove_file(stderr_rel)
@@ -10164,7 +10175,7 @@ fn bs_build_emit_obj(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path
     args |> push("-O1")
     args |> push("-o")
     args |> push(selfhost_owned_text(obj_path))
-    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, f"failed to build object for {label} with exit code {result.rc}")
     0
@@ -10304,7 +10315,7 @@ fn bs_expect_wi_check_error(ctx: &ActionCtx, compiler_path: &str, label: &str, w
     var args: List[str] = List.new()
     args |> push("check")
     args |> push(selfhost_owned_text(wi_path))
-    let result = bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    let result = bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
     if result.rc == 0:
         return bs_fail(ctx, "expected `with check " ++ wi_path ++ "` to fail (" ++ label ++ ")")
     bs_assert_contains(ctx, result.stderr, needle, label)
@@ -10317,7 +10328,7 @@ fn bs_dump_abi(ctx: &ActionCtx, compiler_path: &str, label: &str, src: &str, bun
     if bundle.len() > 0:
         args |> push("--link-bundle")
         args |> push(selfhost_owned_text(bundle))
-    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
 
 // The `param[0] ...` line under `fn <name> [` in a --dump-abi dump.
 fn bs_dump_abi_param_line(dump: &str, name: &str) -> str:
@@ -10354,7 +10365,7 @@ fn bs_build_bundle(ctx: &ActionCtx, compiler_path: &str, label: &str, src_path: 
     args |> push("-O1")
     args |> push("-o")
     args |> push(selfhost_owned_text(obj_path))
-    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
 
 // `with check <wi> --bundle-corpus … --bundle-fingerprint <out>`: the
 // interface-side fingerprint pass, out of process like the bundle build's.
@@ -10366,7 +10377,7 @@ fn bs_check_wi_fingerprint(ctx: &ActionCtx, compiler_path: &str, label: &str, wi
     args |> push(selfhost_owned_text(corpus))
     args |> push("--bundle-fingerprint")
     args |> push(selfhost_owned_text(fingerprint_path))
-    bs_run_cli_capture(ctx, compiler_path, label, args, 120000)
+    bs_run_cli_capture(ctx, compiler_path, label, args, BS_HANG_GUARD_MS)
 
 // The rows of a manifest's tab-keyed lines (`import\t…`, `provides\t…`,
 // D138), each without the key; and a field of such a row.
@@ -10580,7 +10591,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     var abi_args: List[str] = List.new()
     abi_args |> push("version")
     abi_args |> push("--abi-sha")
-    let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, 120000)
+    let abi = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-abi-sha", abi_args, BS_HANG_GUARD_MS)
     if abi.rc != 0: return bs_fail(ctx, "with version --abi-sha failed")
     let abi_sha = bs_trim_trailing_line_endings(abi.stdout)
     if abi_sha.len() != 64 or abi_sha.starts_with("WITHABISHASTAMP"):
@@ -10601,9 +10612,9 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // (3d) The consumer against the EMITTED interface: builds, links the
     // bundle, runs.
     let consumer = bs_join(case_dir, "consumer")
-    let built = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-build", bs_bundle_build_args(main_src, bundle, consumer, false), 120000)
+    let built = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-build", bs_bundle_build_args(main_src, bundle, consumer, false), BS_HANG_GUARD_MS)
     if built.rc != 0: return bs_fail(ctx, f"consumer build against the bundle interface failed with exit code {built.rc}")
-    let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", 120000)
+    let ran = bs_run_binary_capture(ctx, consumer, "bundle-interface-consumer-run", BS_HANG_GUARD_MS)
     if ran.rc != 0: return bs_fail(ctx, f"consumer linked against the bundle failed with exit code {ran.rc}")
     rc = bs_assert_stdout_exact(ctx, ran, "18 7 80 3 7 2 6 200 3 3 6 42 5 4 6 23 10", "bundle interface consumer")
     if rc != 0: return rc
@@ -10627,7 +10638,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     if drifted_manifest == manifest: return bs_fail(ctx, "could not rewrite the import row of `" ++ rt_symbol ++ "`")
     if ctx.fs().write_text(drifted ++ ".manifest", drifted_manifest) != 0 or ctx.fs().write_text(drifted ++ ".wi", ctx.fs().read_text(wi_path)) != 0 or ctx.fs().write_text(drifted ++ ".o", ctx.fs().read_text(obj_path)) != 0:
         return bs_fail(ctx, "could not write the drifted bundle under " ++ drifted_dir)
-    let drifted_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-import-drift", bs_bundle_build_args(main_src, drifted, bs_join(case_dir, "consumer_drift"), false), 120000)
+    let drifted_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-import-drift", bs_bundle_build_args(main_src, drifted, bs_join(case_dir, "consumer_drift"), false), BS_HANG_GUARD_MS)
     if drifted_build.rc == 0: return bs_fail(ctx, "a bundle whose recorded contract for `" ++ rt_symbol ++ "` is not this runtime's was linked")
     rc = bs_assert_contains(ctx, drifted_build.stderr, "calls the runtime symbol `" ++ rt_symbol ++ "` as `" ++ rt_symbol ++ "(drifted: i32:1", "import drift refused, naming the bundle's contract")
     if rc != 0: return rc
@@ -10640,7 +10651,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let bump_src = bs_join(case_dir, "view_across_bump.w")
     rc = bs_write_fixture(ctx, bump_src, "use std.wi_demo\nfn main:\n    let r = &COUNTER\n    bump()\n    print(*r)\n", "view of a bundle global across a bundle function that declares writing it")
     if rc != 0: return rc
-    let bump_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-writes-refused", bs_bundle_build_args(bump_src, bundle, bs_join(case_dir, "view_across_bump"), false), 120000)
+    let bump_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-writes-refused", bs_bundle_build_args(bump_src, bundle, bs_join(case_dir, "view_across_bump"), false), BS_HANG_GUARD_MS)
     if bump_build.rc == 0: return bs_fail(ctx, "a view of COUNTER live across `bump`, which declares `writes COUNTER`, was accepted")
     rc = bs_assert_contains(ctx, bump_build.stderr, "call to `bump` mutates global `COUNTER` while `r` is a live view into it", "view refused across a bundle function that declares writing the global")
     if rc != 0: return rc
@@ -10653,7 +10664,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let raise_src = bs_join(case_dir, "view_across_raise.w")
     rc = bs_write_fixture(ctx, raise_src, "use std.wi_demo\nfn main:\n    let r: &i32 = level()\n    raise()\n    print(*r)\n", "view of a private origin global across a bundle function that declares writing it")
     if rc != 0: return rc
-    let raise_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-refused", bs_bundle_build_args(raise_src, bundle, bs_join(case_dir, "view_across_raise"), false), 120000)
+    let raise_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-refused", bs_bundle_build_args(raise_src, bundle, bs_join(case_dir, "view_across_raise"), false), BS_HANG_GUARD_MS)
     if raise_build.rc == 0: return bs_fail(ctx, "a view `level` returns of LEVEL, live across `raise`, which declares `writes LEVEL`, was accepted")
     rc = bs_assert_contains(ctx, raise_build.stderr, "call to `raise` mutates global `LEVEL` while `r` is a live view into it", "view of a private origin global refused across its writer")
     if rc != 0: return rc
@@ -10661,9 +10672,9 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_write_fixture(ctx, level_src, "use std.wi_demo\nfn main:\n    let r: &i32 = level()\n    print(*r)\n    raise()\n    print(*level())\n", "view of a private origin global ended before its writer")
     if rc != 0: return rc
     let level_bin = bs_join(case_dir, "level_ok")
-    let level_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-ok-build", bs_bundle_build_args(level_src, bundle, level_bin, false), 120000)
+    let level_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-ok-build", bs_bundle_build_args(level_src, bundle, level_bin, false), BS_HANG_GUARD_MS)
     if level_build.rc != 0: return bs_fail(ctx, "a view of LEVEL ended before `raise` failed to build:\n" ++ level_build.stderr)
-    let level_ran = bs_run_binary_capture(ctx, level_bin, "bundle-interface-origin-ok-run", 120000)
+    let level_ran = bs_run_binary_capture(ctx, level_bin, "bundle-interface-origin-ok-run", BS_HANG_GUARD_MS)
     if level_ran.rc != 0: return bs_fail(ctx, f"the origin-global consumer failed with exit code {level_ran.rc}")
     rc = bs_assert_stdout_exact(ctx, level_ran, "3\n4", "origin-global consumer")
     if rc != 0: return rc
@@ -10675,7 +10686,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let keep_src = bs_join(case_dir, "keep_captures_ref.w")
     rc = bs_write_fixture(ctx, keep_src, "use std.wi_demo\ntype RawFn0I32 { fn_ptr: *mut u8, ctx: *mut u8 }\nfn keep(worker: fn() -> i32) -> Unit:\n    let raw: RawFn0I32 = unsafe transmute[RawFn0I32](worker)\n    wi_demo_keep(raw.fn_ptr, raw.ctx)\nfn bad:\n    let x = 42\n    let r = &x\n    keep(() => *r)\nfn main:\n    bad()\n", "closure holding a view of its frame handed to a bundle extern pinned escape_value")
     if rc != 0: return rc
-    let keep_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-pin-refused", bs_bundle_build_args(keep_src, bundle, bs_join(case_dir, "keep_captures_ref"), false), 120000)
+    let keep_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-pin-refused", bs_bundle_build_args(keep_src, bundle, bs_join(case_dir, "keep_captures_ref"), false), BS_HANG_GUARD_MS)
     if keep_build.rc == 0: return bs_fail(ctx, "a closure holding a view of its frame, handed to `wi_demo_keep` (pinned `ctx: escape_value` in the interface), was accepted")
     rc = bs_assert_contains(ctx, keep_build.stderr, "escaping closure cannot capture ephemeral references", "closure refused through the interface's @[effect] pin")
     if rc != 0: return rc
@@ -10685,16 +10696,16 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_write_fixture(ctx, static_src, "use std.wi_demo\nfn main:\n    let g = greeting()\n    bump()\n    raise()\n    print(g)\n", "a view of static data across global writes")
     if rc != 0: return rc
     let static_bin = bs_join(case_dir, "static_ok")
-    let static_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-static-build", bs_bundle_build_args(static_src, bundle, static_bin, false), 120000)
+    let static_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-static-build", bs_bundle_build_args(static_src, bundle, static_bin, false), BS_HANG_GUARD_MS)
     if static_build.rc != 0: return bs_fail(ctx, "a view `from static` live across global writes failed to build:\n" ++ static_build.stderr)
-    let static_ran = bs_run_binary_capture(ctx, static_bin, "bundle-interface-static-run", 120000)
+    let static_ran = bs_run_binary_capture(ctx, static_bin, "bundle-interface-static-run", BS_HANG_GUARD_MS)
     if static_ran.rc != 0: return bs_fail(ctx, f"the `from static` consumer failed with exit code {static_ran.rc}")
     rc = bs_assert_stdout_exact(ctx, static_ran, "hello", "`from static` consumer")
     if rc != 0: return rc
     let private_src = bs_join(case_dir, "name_private_origin.w")
     rc = bs_write_fixture(ctx, private_src, "use std.wi_demo\nfn main: print(LEVEL)\n", "a consumer naming a private origin global")
     if rc != 0: return rc
-    let private_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-private", bs_bundle_build_args(private_src, bundle, bs_join(case_dir, "name_private_origin"), false), 120000)
+    let private_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-origin-private", bs_bundle_build_args(private_src, bundle, bs_join(case_dir, "name_private_origin"), false), BS_HANG_GUARD_MS)
     if private_build.rc == 0: return bs_fail(ctx, "a consumer named LEVEL, which the interface declares only as an origin, without `pub`")
     rc = bs_assert_contains(ctx, private_build.stderr, "symbol 'LEVEL' is private to its package", "a private origin global stays private")
     if rc != 0: return rc
@@ -10706,7 +10717,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let twice_src = bs_join(case_dir, "consume_twice.w")
     rc = bs_write_fixture(ctx, twice_src, "use std.wi_demo\ntype Tok { id: i32 }\nimpl Drop for Tok:\n    move fn drop(): {}\nfn owned_len(v: List[Tok]) -> i32: v.len() as i32\nfn main:\n    let word: List[Tok] = [Tok { id: 1 }, Tok { id: 2 }]\n    print(call_twice(() => owned_len(word)))\n", "consuming closure to a plain bundle parameter")
     if rc != 0: return rc
-    let twice_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-once-refused", bs_bundle_build_args(twice_src, bundle, bs_join(case_dir, "consume_twice"), false), 120000)
+    let twice_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-once-refused", bs_bundle_build_args(twice_src, bundle, bs_join(case_dir, "consume_twice"), false), BS_HANG_GUARD_MS)
     if twice_build.rc == 0: return bs_fail(ctx, "a consuming closure passed across the bundle boundary to a parameter not declared `once` was accepted")
     rc = bs_assert_contains(ctx, twice_build.stderr, "its parameter is not declared `once`", "consuming closure refused at a plain bundle parameter")
     if rc != 0: return rc
@@ -10717,7 +10728,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     let unused_src = bs_join(case_dir, "unused.w")
     rc = bs_write_fixture(ctx, unused_src, "use std.wi_demo\nfn main: print(\"unused\")\n", "unused interface consumer")
     if rc != 0: return rc
-    let unused = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-unused-build", bs_bundle_build_args(unused_src, bundle, bs_join(case_dir, "unused"), false), 120000)
+    let unused = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-unused-build", bs_bundle_build_args(unused_src, bundle, bs_join(case_dir, "unused"), false), BS_HANG_GUARD_MS)
     if unused.rc != 0: return bs_fail(ctx, f"consumer with no demanded bundle declarations failed with exit code {unused.rc}")
 
     // A tampered interface never pairs with the object (interface-sha).
@@ -10727,7 +10738,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     rc = bs_write_fixture(ctx, tampered ++ ".manifest", manifest, "tampered manifest")
     if rc != 0: return rc
     if ctx.fs().copy_file(obj_path, tampered ++ ".o") != 0: return bs_fail(ctx, "could not copy the bundle object for the tamper check")
-    let tampered_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-tampered-build", bs_bundle_build_args(main_src, tampered, bs_join(case_dir, "consumer-tampered"), false), 120000)
+    let tampered_build = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-tampered-build", bs_bundle_build_args(main_src, tampered, bs_join(case_dir, "consumer-tampered"), false), BS_HANG_GUARD_MS)
     if tampered_build.rc == 0: return bs_fail(ctx, "a consumer built against an interface whose sha differs from the manifest's interface-sha")
     rc = bs_assert_contains(ctx, tampered_build.stderr, "is not the interface", "interface-sha pairing check")
     if rc != 0: return rc
@@ -10789,7 +10800,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     // Declaration only: the consumer's object references the bundle's
     // symbols and defines none of them.
     let consumer_obj = bs_join(case_dir, "consumer.o")
-    let built_obj = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-object", bs_bundle_build_args(main_src, bundle, consumer_obj, true), 120000)
+    let built_obj = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-consumer-object", bs_bundle_build_args(main_src, bundle, consumer_obj, true), BS_HANG_GUARD_MS)
     if built_obj.rc != 0: return bs_fail(ctx, f"consumer object build against the bundle interface failed with exit code {built_obj.rc}")
     let consumer_nm = bs_nm_output(ctx, nm_tool, consumer_obj, "bundle-interface-consumer-object")
     if consumer_nm.rc != 0: return bs_fail(ctx, "nm failed for the consumer object")
@@ -10827,7 +10838,7 @@ fn bs_check_bundle_interface(ctx: &ActionCtx, compiler_path: &str, nm_tool: &str
     analyze_args |> push("audit:all")
     analyze_args |> push("--link-bundle")
     analyze_args |> push(selfhost_owned_text(bundle))
-    let audited = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-audit", analyze_args, 120000)
+    let audited = bs_run_cli_capture(ctx, compiler_path, "bundle-interface-audit", analyze_args, BS_HANG_GUARD_MS)
     if audited.rc != 0: return bs_fail(ctx, f"analyze audit:all on the consumer failed with exit code {audited.rc}")
 
     // .wi diagnostics: elision ambiguity, a body, an initializer.
@@ -10919,7 +10930,7 @@ fn bs_check_lsp_memory_flat(ctx: &ActionCtx, compiler_path: &str) -> i32:
     input = input ++ bs_lsp_frame(bs_lsp_memory_request(101))
     input = input ++ bs_lsp_frame("{\"jsonrpc\":\"2.0\",\"id\":9,\"method\":\"shutdown\",\"params\":{}}")
     input = input ++ bs_lsp_frame("{\"jsonrpc\":\"2.0\",\"method\":\"exit\",\"params\":{}}")
-    let result = bs_run_cli_capture_input(ctx, compiler_path, "lsp-memory-flat", bs_lsp_args(), input, 60000)
+    let result = bs_run_cli_capture_input(ctx, compiler_path, "lsp-memory-flat", bs_lsp_args(), input, BS_HANG_GUARD_MS)
     if result.rc != 0:
         return bs_fail(ctx, "lsp-memory-flat: the server exited " ++ f"{result.rc}: " ++ result.stderr)
     let before = bs_lsp_committed_bytes(result.stdout, 100)
