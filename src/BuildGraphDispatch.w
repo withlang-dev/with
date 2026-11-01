@@ -59,7 +59,7 @@ fn build_graph_validate_outputs(root: &str, graph: &BuildGraph, output_path: &st
         shared = shared + seen.claim(path, owner)
         for oi in 0..target.extra_outputs.len():
             shared = shared + seen.claim(build_graph_resolve_project_path(root, target.extra_outputs[oi]), owner)
-    if shared > 0: 1 else: 0
+    (shared > 0) as i32
 
 fn build_graph_write_generated_sources(root: &str, graph: &BuildGraph) -> i32:
     for gi in 0..graph.generated_sources.len():

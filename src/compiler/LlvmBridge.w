@@ -990,7 +990,7 @@ fn wl_build_store(b: i64, val: i64, ptr: i64) -> i64:
 
 fn wl_set_volatile(inst: i64, is_volatile: i32):
     unsafe:
-        LLVMSetVolatile(inst as *mut u8, if is_volatile != 0: 1 else: 0)
+        LLVMSetVolatile(inst as *mut u8, (is_volatile != 0) as i32)
 
 // The alignment a load, store or alloca promises for its address (#1958:
 // an Option payload accessed at the model's alignment, below LLVM's for
@@ -1802,8 +1802,8 @@ fn wl_get_inline_asm(fn_ty: i64, asm_str: &str, constraints: &str, has_side_effe
         LLVMGetInlineAsm(fn_ty as *mut u8,
             ap, asm_str.len() as u64,
             cp, constraints.len() as u64,
-            if has_side_effects != 0: 1 else: 0,
-            if is_align_stack != 0: 1 else: 0,
+            (has_side_effects != 0) as i32,
+            (is_align_stack != 0) as i32,
             LLVM_InlineAsmDialectATT, 0) as i64
 
 // ── Standalone file compilation ─────────────────────────────────

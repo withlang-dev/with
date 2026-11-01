@@ -426,7 +426,7 @@ fn type_decl_pack_bits(n: i32) -> i32:
 // The N of @[repr(packed(N))], or 0.
 fn type_decl_pack_cap(packed: i32) -> i32:
     let e = (packed / TDK_PACK_UNIT) % 32
-    if e == 0: 0 else: 1 << ((e - 1) as u32)
+    (not (e == 0)) as i32 << ((e - 1) as u32)
 
 // @[repr(C)] layout. @[repr(packed)] and @[repr(packed(N))] imply repr(C)
 // per §16.4.
@@ -1453,7 +1453,7 @@ impl AstPool:
             let inner = self.int_literal_exact_expr(self.get_data1(node))
             if inner.ok == 0 or inner.overflow != 0:
                 return inner
-            return ExactIntExpr { ok: 1, overflow: 0, negative: if inner.negative != 0: 0 else: 1, lo: inner.lo, hi: inner.hi }
+            return ExactIntExpr { ok: 1, overflow: 0, negative: (not (inner.negative != 0)) as i32, lo: inner.lo, hi: inner.hi }
         if kind != NodeKind.NK_INT_LIT:
             return ExactIntExpr { ok: 0, overflow: 1, negative: 0, lo: 0, hi: 0 }
         if self.has_int_literal_exact(node):

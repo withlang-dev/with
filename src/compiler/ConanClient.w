@@ -91,7 +91,7 @@ fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
     if url.starts_with("file://"):
         let local = conan_file_url_path(url)
         if runtime_file_exists(local) == 0 or runtime_is_dir(local) != 0: return 1
-        return if runtime_write_file(path, runtime_read_file(local)) == 0: 0 else: 1
+        return (not (runtime_write_file(path, runtime_read_file(local)) == 0)) as i32
     if not url.starts_with("https://"):
         runtime_eprint("error: Conan download needs an https:// or file:// URL: " ++ url)
         return 1
@@ -107,7 +107,7 @@ fn conan_https_to_file(url: &str, path: &str, timeout_ms: i32) -> i32:
     for attempt in 1..6:
         let response = https_get_response_timeout(url.to_owned(), 5, connect_ms, idle_ms)
         if response.status == 200:
-            return if runtime_write_file(path, response.body) == 0: 0 else: 1
+            return (not (runtime_write_file(path, response.body) == 0)) as i32
         last_status = response.status
         if attempt < 5: runtime_nanosleep(2 * attempt as i64 * 1000000000)
     let why = if last_status < 0: "no connection or no response (a resolver or network failure)" else: f"the server answered status {last_status}"

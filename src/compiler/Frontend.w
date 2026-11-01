@@ -1976,12 +1976,12 @@ impl Zcu:
         sema.source_texts = sema_clone_str_list(&self.source_texts)
         sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
         sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
-        sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+        sema.runtime_available = (self.project_config.runtime_available) as i32
         sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
         sema.runtime_fiber_pool_size = self.project_config.runtime_fiber_pool_size
         sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
         sema.copy_warn_threshold = self.project_config.copy_warn_threshold
-        sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
+        sema.lint_partial_statement_match = (self.project_config.lint_partial_statement_match) as i32
         sema.emit_config_warnings = 1
         sema.overflow_mode = self.project_config.overflow_mode
         if self.project_config.no_std:
@@ -2176,7 +2176,7 @@ impl Zcu:
             // a shared header is a teardown double-free.
             pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
             pre_sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
-            pre_sema.runtime_available = if self.project_config.runtime_available: 1 else: 0
+            pre_sema.runtime_available = (self.project_config.runtime_available) as i32
             // The pre-sema collects every declaration the comptime transform
             // demands and diagnoses them with the same tier flags as the
             // checker below; without `no_std` here a `--no-std` program's
@@ -2190,7 +2190,7 @@ impl Zcu:
             pre_sema.runtime_fiber_worker_count = self.project_config.runtime_fiber_worker_count
             pre_sema.copy_warn_threshold = self.project_config.copy_warn_threshold
             pre_sema.emit_config_warnings = 0
-            pre_sema.lint_partial_statement_match = if self.project_config.lint_partial_statement_match: 1 else: 0
+            pre_sema.lint_partial_statement_match = (self.project_config.lint_partial_statement_match) as i32
             pre_sema.overflow_mode = self.project_config.overflow_mode
             let profile_comptime = runtime_getenv("WITH_PROFILE").len() > 0
             let t_prepare = runtime_clock_nanos()
@@ -2856,7 +2856,7 @@ impl Zcu:
 
         // Phase 2: Process root-file decls. With the #682-inc1 prefix they
         // start after it; legacy entries start right after the use decl.
-        let user_start = if self.prelude_prefix_decls > 0: self.prelude_prefix_decls else: if has_prelude: 1 else: 0
+        let user_start = if self.prelude_prefix_decls > 0: self.prelude_prefix_decls else: (has_prelude) as i32
         for ui in user_start..initial_count:
             let decl = merged_pool.get_decl(ui)
             let kind = merged_pool.kind(decl)
@@ -3217,7 +3217,7 @@ fn frontend_displace_fn_decl(pool: &AstPool, intern: &InternPool, decl: i32, pat
 fn frontend_global_decl_mut(pool: &AstPool, decl: i32) -> i32:
     let kind = pool.kind(decl)
     if kind == NodeKind.NK_EXTERN_VAR:
-        return if pool.get_data2(decl) != 0: 1 else: 0
+        return (pool.get_data2(decl) != 0) as i32
     if kind == NodeKind.NK_LET_DECL:
         return pool.get_data2(decl) % 2
     -1

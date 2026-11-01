@@ -193,7 +193,7 @@ fn slice_aggregate_verdict(dest_is_slice: bool) -> str:
     var mir_mod = MirModule.init()
     for kind in [0, TypeKind.TY_INT, TypeKind.TY_ARRAY, TypeKind.TY_SLICE]:
         mir_mod.sema_type_kinds.push(kind)
-        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_INT: 0 else: 1)
+        mir_mod.sema_type_d0.push((not (kind == TypeKind.TY_INT)) as i32)
         mir_mod.sema_type_d1.push(if kind == TypeKind.TY_ARRAY: 2 else: 0)
         mir_mod.sema_type_d2.push(0)
     let int_ty = 1
@@ -663,7 +663,7 @@ fn move_through_verdict(pointer_kind: i32, moves: bool, drops: bool) -> str:
     var mir_mod = MirModule.init()
     for kind in [0, TypeKind.TY_INT, pointer_kind]:
         mir_mod.sema_type_kinds.push(kind)
-        mir_mod.sema_type_d0.push(if kind == pointer_kind: 1 else: 0)
+        mir_mod.sema_type_d0.push((kind == pointer_kind) as i32)
         mir_mod.sema_type_d1.push(0)
         mir_mod.sema_type_d2.push(0)
     let value_ty = 1
@@ -730,7 +730,7 @@ fn deref_projection_verdict(base_is_value: bool) -> str:
     var mir_mod = MirModule.init()
     for kind in [0, TypeKind.TY_INT, TypeKind.TY_REF]:
         mir_mod.sema_type_kinds.push(kind)
-        mir_mod.sema_type_d0.push(if kind == TypeKind.TY_REF: 1 else: 0)
+        mir_mod.sema_type_d0.push((kind == TypeKind.TY_REF) as i32)
         mir_mod.sema_type_d1.push(0)
         mir_mod.sema_type_d2.push(0)
     let int_ty = 1
@@ -762,7 +762,7 @@ fn task_operand_verdict(operand_is_task: bool) -> str:
         mir_mod.sema_type_kinds.push(kind)
         mir_mod.sema_type_d0.push(if kind == TypeKind.TY_GENERIC_INST: 9 else: 0)
         mir_mod.sema_type_d1.push(0)
-        mir_mod.sema_type_d2.push(if kind == TypeKind.TY_GENERIC_INST: 1 else: 0)
+        mir_mod.sema_type_d2.push((kind == TypeKind.TY_GENERIC_INST) as i32)
     mir_mod.sema_type_extra.push(1)
     mir_mod.sema_task_sym = 9
     let int_ty = 1
@@ -1142,7 +1142,7 @@ fn drop_state_verdict(shape: i32, drops: bool) -> str:
     let init = body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, no_field_table, 0)
     let move_op = body.new_operand(OperandKind.OK_MOVE, value)
     let take = body.new_rvalue(RvalueKind.RK_USE, move_op, 0, 0)
-    body.push_stmt(entry, StmtKind.StorageLive, value_local, if shape == 5: 1 else: 0, 0)
+    body.push_stmt(entry, StmtKind.StorageLive, value_local, (shape == 5) as i32, 0)
     if shape != 4 and shape != 5 and shape != 8:
         body.push_stmt(entry, StmtKind.Assign, value, init, 0)
     if shape == 0 or shape == 1 or shape == 7:
@@ -1468,7 +1468,7 @@ fn consuming_param_verdict(consumes: bool, moved: bool, dropped: bool, never: bo
     mir_mod.sema_sig_param_starts.insert(7, 0)
     mir_mod.sema_sig_param_data.push(1)
     mir_mod.sema_sig_param_data.push(value_ty)
-    mir_mod.sema_sig_param_data.push(if consumes: 1 else: 0)
+    mir_mod.sema_sig_param_data.push((consumes) as i32)
     if never: mir_mod.sema_never_returning_syms.insert(7, 1)
     var body = MirBody.init_for_fn(1)
     let value_local = body.new_temp(value_ty)

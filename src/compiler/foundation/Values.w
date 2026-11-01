@@ -36,7 +36,7 @@ fn value_key_int(v: i32) -> ValueKey:
 fn value_key_bool(v: bool) -> ValueKey:
     ValueKey {
         tag: VALUE_KEY_BOOL(),
-        int_value: if v: 1 else: 0,
+        int_value: (v) as i32,
         text_value: "",
         type_ref: -1,
     }

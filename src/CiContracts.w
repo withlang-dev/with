@@ -152,7 +152,7 @@ impl CiProject:
             if self.symbols[si].kind != CiProjectSymbolKind.CIPS_FN or self.symbols[si].has_definition == 0: continue
             while self.symbols[si].param_readonly.len() < self.symbols[si].param_ty.len(): self.symbols[si].param_readonly.push(0)
             for pi in 0..self.symbols[si].param_ty.len():
-                self.symbols[si].param_readonly[pi] = if ct_is_pointer(self.symbols[si].param_ty[pi]) and self.ct_read_only_local(si as i32, pi).len() == 0: 1 else: 0
+                self.symbols[si].param_readonly[pi] = (ct_is_pointer(self.symbols[si].param_ty[pi]) and self.ct_read_only_local(si as i32, pi).len() == 0) as i32
         var shrinking = true
         while shrinking:
             shrinking = false

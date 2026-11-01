@@ -2876,7 +2876,7 @@ fn ci_render_bitfield_accessors(session: i64, idx: i32, safe_name: &str, plan: &
         if m.ty == "bool":
             // A `_Bool` member is its one bit.
             out = out ++ "    pub fn " ++ member ++ "() -> bool: ((" ++ storage ++ " >> " ++ i64_to_string(m.shift as i64) ++ ") & 1) != 0\n"
-            out = out ++ "    pub mut fn set_" ++ member ++ "(v: bool): " ++ storage ++ " = (" ++ storage ++ " & ~((1 as " ++ utype ++ ") << " ++ i64_to_string(m.shift as i64) ++ ")) | ((if v: 1 else: 0) << " ++ i64_to_string(m.shift as i64) ++ ")\n"
+            out = out ++ "    pub mut fn set_" ++ member ++ "(v: bool): " ++ storage ++ " = (" ++ storage ++ " & ~((1 as " ++ utype ++ ") << " ++ i64_to_string(m.shift as i64) ++ ")) | (((v) as i32) << " ++ i64_to_string(m.shift as i64) ++ ")\n"
             continue
         if m.signed:
             let left = unit.bits - m.width - m.shift
@@ -5015,7 +5015,7 @@ fn ci_parse_unary_expr(s: &str, params: &str, known: &str) -> str:
     if c0 == 33 and (t.len() < 2 or t[1] != 61):
         let inner = ci_parse_cast_expr(t.slice(1, t.len()), params, known)
         if inner.len() > 0:
-            return "(if " ++ inner ++ " != 0: 0 else: 1)"
+            return "((not (" ++ inner ++ " != 0)) as i32)"
         return ""
     // Bitwise NOT: ~expr
     if c0 == 126:
@@ -7660,7 +7660,7 @@ impl CiExprPool:
         let other_text = ci_print_type(types, other_ty)
         if not ci_type_text_is_fn_ptr(other_text) or ci_nullable_fn_ptr_inner(other_text).len() > 0: return 0
         ci_note_rule("D107 a non-null fn-pointer parameter compared with NULL folds", other_text)
-        if as_bool: return self.bool_lit(if is_eq: 0 else: 1, 0)
+        if as_bool: return self.bool_lit((not (is_eq)) as i32, 0)
         let folded = self.add_string(if is_eq: "0" else: "1")
         self.int_lit(folded, 0)
 
@@ -8850,7 +8850,7 @@ impl CiExprPool:
         if ty == "bool":
             if self.kind(value_id) == CiExprKind.CIE_INT_LIT:
                 let text = self.get_string(self.get_d0(value_id))
-                return self.bool_lit(if text == "0": 0 else: 1, types.type_from_translated_text("bool"))
+                return self.bool_lit((not (text == "0")) as i32, types.type_from_translated_text("bool"))
             let vt = self.get_type(value_id)
             if vt != 0 and ci_print_type(types, vt) != "bool":
                 return self.cast(types.type_from_translated_text("bool"), value_id)
@@ -16826,7 +16826,7 @@ fn ci_pp_eval_defined(expr: &str) -> i32:
         name = ci_first_ident(rest)
     if name.len() == 0:
         return -1
-    if ci_macro_name_is_defined(name): 1 else: 0
+    (ci_macro_name_is_defined(name)) as i32
 
 // Evaluate a `#if` expression we understand (defined / !defined); -1 otherwise.
 fn ci_pp_eval_if_expr(expr: &str) -> i32:
@@ -16837,7 +16837,7 @@ fn ci_pp_eval_if_expr(expr: &str) -> i32:
         let inner = ci_pp_eval_defined(ci_trim(t.slice(1, t.len())))
         if inner < 0:
             return -1
-        return if inner == 1: 0 else: 1
+        return (not (inner == 1)) as i32
     ci_pp_eval_defined(t)
 
 // Evaluate an #ifndef/#ifdef/#if directive line (trimmed); -1 if unevaluable.
@@ -16846,12 +16846,12 @@ fn ci_pp_eval_ifdir(t: &str) -> i32:
         let name = ci_first_ident(t.slice(7, t.len()))
         if name.len() == 0:
             return -1
-        return if ci_macro_name_is_defined(name): 0 else: 1
+        return (not (ci_macro_name_is_defined(name))) as i32
     if ci_starts_with(t, "#ifdef"):
         let name = ci_first_ident(t.slice(6, t.len()))
         if name.len() == 0:
             return -1
-        return if ci_macro_name_is_defined(name): 1 else: 0
+        return (ci_macro_name_is_defined(name)) as i32
     if ci_starts_with(t, "#if"):
         return ci_pp_eval_if_expr(t.slice(3, t.len()))
     -1

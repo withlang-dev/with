@@ -1140,7 +1140,7 @@ impl MirBuilder:
             if needs_reset:
                 self.pending_reset_locals.push(local_id)
                 self.pending_reset_operands.push(operand_id)
-                self.pending_reset_temp_cancelled.push(if temp_cancelled: 1 else: 0)
+                self.pending_reset_temp_cancelled.push((temp_cancelled) as i32)
                 let frames = self.stmt_frame_stmt_starts.len()
                 self.pending_reset_stmt_marks.push(if frames > 0: self.stmt_frame_stmt_starts[frames - 1] else: 0)
                 self.pending_reset_bb_marks.push(if frames > 0: self.stmt_frame_bb_starts[frames - 1] else: 0)
@@ -2920,7 +2920,7 @@ impl MirBuilder:
     // guessed it from a pointer meeting an LLVM `{ptr, ptr}`.
     mut fn fn_const_operand(fn_sym: i32, const_ty: i32, node: i32) -> i32:
         let callable = node != 0 and self.sema.fn_callable_values.contains(node)
-        let c = self.body.new_const(ConstKind.CK_FN, fn_sym, if callable: 1 else: 0, 0, const_ty)
+        let c = self.body.new_const(ConstKind.CK_FN, fn_sym, (callable) as i32, 0, const_ty)
         self.body.new_operand(OperandKind.OK_CONSTANT, c)
 
     mut fn int_const_operand(value: i64, type_id: i32) -> i32:
@@ -4543,7 +4543,7 @@ impl MirBuilder:
     mut fn set_string_local_may_alias(local_id: i32, flag: i32):
         let old = self.string_local_flags(local_id)
         let owned = old & 2
-        self.set_string_local_flags(local_id, owned | (if flag != 0: 1 else: 0))
+        self.set_string_local_flags(local_id, owned | ((flag != 0) as i32))
 
     fn string_local_may_alias(local_id: i32) -> i32:
         self.string_local_flags(local_id) & 1
@@ -4679,7 +4679,7 @@ impl MirBuilder:
     mut fn set_string_place_may_alias(place: i32, flag: i32):
         let old = self.string_place_flags(place)
         let owned = old & 2
-        self.set_string_place_flags(place, owned | (if flag != 0: 1 else: 0))
+        self.set_string_place_flags(place, owned | ((flag != 0) as i32))
 
     fn string_place_may_alias(place: i32) -> i32:
         self.string_place_flags(place) & 1
@@ -5016,7 +5016,7 @@ impl MirBuilder:
         let lk = self.ast.kind(l)
         let rk = self.ast.kind(r)
         if lk == NodeKind.NK_IDENT and rk == NodeKind.NK_IDENT:
-            if self.ast.get_data0(l) == self.ast.get_data0(r): 1 else: 0
+            (self.ast.get_data0(l) == self.ast.get_data0(r)) as i32
         else if lk == NodeKind.NK_FIELD_ACCESS and rk == NodeKind.NK_FIELD_ACCESS:
             if self.ast.get_data1(l) != self.ast.get_data1(r):
                 return 0
@@ -5040,7 +5040,7 @@ impl MirBuilder:
             return 0
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
-            if self.ast.get_data0(node) == sym: 1 else: 0
+            (self.ast.get_data0(node) == sym) as i32
         else if kind == NodeKind.NK_LABEL:
             self.expr_mentions_symbol(self.ast.get_data1(node), sym)
         else if kind == NodeKind.NK_CLOSURE or kind == NodeKind.NK_ASYNC_BLOCK or kind == NodeKind.NK_ASYNC_SCOPE or kind == NodeKind.NK_SCOPE:
@@ -6731,7 +6731,7 @@ impl MirBuilder:
             let base_place = self.sequence_place_through_reference(base_held)
             if base_kind == TypeKind.TY_ARRAY:
                 let n = self.sema.get_type_d1(base_ty)
-                let start_op = self.int_const_operand(if n > 0: 1 else: 0, self.sema.ty_i64)
+                let start_op = self.int_const_operand((n > 0) as i32, self.sema.ty_i64)
                 let slice_rv = self.body.new_rvalue(RvalueKind.RK_SLICE, base_place, start_op, self.int_const_operand(n, self.sema.ty_i64))
                 self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, slice_rv, span)
                 return finish
@@ -8301,7 +8301,7 @@ impl MirBuilder:
         // cancels a binding's scheduled drop via last_if_result_view. Mixed
         // owned/view arms keep owned typing (residual: the view arm still
         // bit-copies; see handoff 03g).
-        self.last_if_result_view = if self.sema.is_copy_frozen(result_ty) == 0 and self.operand_is_view_read(then_op) and self.operand_is_view_read(else_op): 1 else: 0
+        self.last_if_result_view = (self.sema.is_copy_frozen(result_ty) == 0 and self.operand_is_view_read(then_op) and self.operand_is_view_read(else_op)) as i32
         if self.last_if_result_view != 0:
             return self.body.new_operand(OperandKind.OK_COPY, result_place)
         self.register_stmt_temp(result_local, result_ty)
@@ -9075,7 +9075,7 @@ impl MirBuilder:
             self.terminate(TermKind.TK_GOTO, goto_target.break_bb, 0, 0, 0)
             return self.unit_operand()
         let is_continue = kind == GEN_EXIT_CONTINUE
-        let target = self.find_control_target(label, if is_continue: 1 else: 0)
+        let target = self.find_control_target(label, (is_continue) as i32)
         let target_bb = if is_continue: target.continue_bb else: target.break_bb
         if target_bb >= 0:
             self.emit_cleanup_to_target(target)
@@ -9735,7 +9735,7 @@ impl MirBuilder:
         let out_resolved = self.sema.resolve_alias(out_ty)
         if self.sema.get_type_kind(out_resolved) == TypeKind.TY_GENERIC_INST:
             if self.sema.get_generic_inst_arg_count(out_resolved as i32) > 0:
-                elem_ty = self.sema.get_generic_inst_arg(out_resolved as i32, if self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION: 1 else: 0)
+                elem_ty = self.sema.get_generic_inst_arg(out_resolved as i32, (self.ast.kind(comp_node) == NodeKind.NK_MAP_COMPREHENSION) as i32)
         if elem_ty == 0:
             elem_ty = self.sema.ty_i32 as i32
 
@@ -10681,7 +10681,7 @@ impl MirBuilder:
 
     mut fn assign_bool_to_local(local_id: i32, value: bool):
         let place = self.place_for_local(local_id)
-        let op = self.lower_bool_lit(if value: 1 else: 0)
+        let op = self.lower_bool_lit((value) as i32)
         self.assign_operand_to_place(place, op, 0)
 
     mut fn lower_return(node: i32) -> i32:
@@ -12307,7 +12307,7 @@ impl MirBuilder:
             // The observed flag covers only THIS match's pattern lowering: a
             // match nested in the arm body decides for its own subject.
             let saved_observed = self.pattern_subject_observed
-            self.pattern_subject_observed = if observed_place >= 0: 1 else: 0
+            self.pattern_subject_observed = (observed_place >= 0) as i32
             self.lower_pattern_match(scrutinee_place, pat_node, arm_bb, fail_bb)
 
             self.switch_to(arm_bb)
@@ -18375,7 +18375,7 @@ fn cow_transfer_stmt(body: &MirBody, candidates: &List[i32], ref_root: &List[i32
     let d1 = body.stmt_data1(stmt_id)
     if kind == StmtKind.StorageLive:
         if d0 >= 0 and d0 < candidates.len() and candidates[d0] != 0:
-            state[d0] = if d1 != 0: 1 else: 0
+            state[d0] = (d1 != 0) as i32
         return state
     if kind == StmtKind.StorageDead or kind == StmtKind.Drop:
         let direct = if kind == StmtKind.StorageDead: d0 else: suspend_direct_place_local(body, d0)
@@ -18448,7 +18448,7 @@ fn cow_transfer_term(sema: &Sema, body: &MirBody, candidates: &List[i32], ref_ro
                     state[root] = 0
         let dst = suspend_direct_place_local(body, body.term_data2(bb))
         if dst >= 0 and dst < candidates.len() and candidates[dst] != 0:
-            state[dst] = if cow_intrinsic_creates_unique(intr): 1 else: 0
+            state[dst] = (cow_intrinsic_creates_unique(intr)) as i32
     state
 
 fn cow_compute_reachable_and_preds(body: &MirBody) -> (List[i32], List[List[i32]]):

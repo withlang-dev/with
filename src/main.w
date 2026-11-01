@@ -2523,7 +2523,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
         return build_action_run_result(1)
     // The evaluator consumes its List params (write_scope frees them); the
     // target still owns these buffers, so pass independent clones (#715 class).
-    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_list(&target.inputs), target.output, bg_clone_str_list(&target.extra_outputs), bg_clone_str_list(&target.args), bg_clone_str_list(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_list(&target.env), target.network, if options.strict_effects: 1 else: 0)
+    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_list(&target.inputs), target.output, bg_clone_str_list(&target.extra_outputs), bg_clone_str_list(&target.args), bg_clone_str_list(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_list(&target.env), target.network, (options.strict_effects) as i32)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -2563,7 +2563,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // on disk from the eval that wrote the cache; if their products are
     // manually deleted, targets fail loudly on missing declared inputs —
     // delete out/.build-state/build-graph.cache to force a re-eval.
-    let graph_cache_key = build_cache_graph_key(root, options.target_kind, if options.strict_effects: 1 else: 0)
+    let graph_cache_key = build_cache_graph_key(root, options.target_kind, (options.strict_effects) as i32)
     let worker_name = with_getenv_str("WITH_BUILD_ACTION_WORKER")
     let cached = build_cache_graph_try_read(root, graph_cache_key)
     if cached.ok:
@@ -2601,7 +2601,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     // non-idempotent comptime filesystem mutations (e.g. extract_tar's symlink
     // -> EEXIST). Re-evaluate only to rebuild the declarative graph.
     let suppress_side_effects = (build_action_worker_env_enabled() or build_test_worker_env_enabled()) as i32
-    var eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, if options.strict_effects: 1 else: 0, suppress_side_effects) }
+    var eval_result = unsafe { comptime_eval_tool_build_result(&raw mut sema as *mut Sema, sema.ast, sema.pool, entry_sym, cfg.package_name, cfg.package_version, root, (options.strict_effects) as i32, suppress_side_effects) }
     if eval_result.error_msg.len() > 0:
         graph.ok = false
         graph.error_msg = move eval_result.error_msg
@@ -2610,7 +2610,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     build_cache_record_build_effects(root, eval_result.effect_records)
     // Keyed on the environment this evaluation just read (#1925), not the
     // previous one's.
-    build_cache_graph_write(root, build_cache_graph_key(root, options.target_kind, if options.strict_effects: 1 else: 0), &materialized.graph)
+    build_cache_graph_write(root, build_cache_graph_key(root, options.target_kind, (options.strict_effects) as i32), &materialized.graph)
     BuildGraphLoadResult { graph: move materialized.graph, sema: move materialized.sema }
 
 fn build_graph_find_build_root(start_dir: &str) -> str:
@@ -3174,7 +3174,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if drain_rc == 0:
                         completed_targets.push(move drain.name)
                 return 1
-            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000, if via_runner: 1 else: 0, effects_path, lane_slot)
+            pool.push(with_str_clone_ref(target.name), pid, spawn_t0, worker_stdout, worker_stderr, if target.timeout_ms > 0: target.timeout_ms else: 1200000, (via_runner) as i32, effects_path, lane_slot)
             continue
         if times_top_level:
             // #747: the timing label is retained across the iteration while
@@ -4211,7 +4211,7 @@ fn dump_drop_plan_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
 fn ceremony_census_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     with_write(comp.ceremony_census_file(source_file))
-    if comp.has_errors(): 1 else: 0
+    (comp.has_errors()) as i32
 
 fn dump_abi_artifact(source_file: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
@@ -4481,9 +4481,9 @@ fn test_gate_value_is_arch(value: &str) -> bool:
 // 1 = host matches, 0 = host does not match, -1 = invalid value.
 fn test_gate_matches(value: &str) -> i32:
     if test_gate_value_is_os(value):
-        return if test_gate_os_matches(value): 1 else: 0
+        return (test_gate_os_matches(value)) as i32
     if test_gate_value_is_arch(value):
-        return if test_arch_matches(value, with_sysinfo_arch()): 1 else: 0
+        return (test_arch_matches(value, with_sysinfo_arch())) as i32
     var dash = -1
     var gi = 0
     while gi < value.len():
@@ -4496,7 +4496,7 @@ fn test_gate_matches(value: &str) -> i32:
         let arch_part = value.slice((dash + 1) as i64, value.len())
         if test_gate_value_is_os(os_part) and test_gate_value_is_arch(arch_part):
             let m = test_gate_os_matches(os_part) and test_arch_matches(arch_part, with_sysinfo_arch())
-            return if m: 1 else: 0
+            return (m) as i32
     -1
 
 fn test_arch_matches(required: &str, host: &str) -> bool:

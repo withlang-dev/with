@@ -564,7 +564,7 @@ fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_p
         sig.symbol = sym
         sig.type_id = sema.sig_ret_types[si]
         sig.index = sema.sig_get_param_count(si)
-        sig.flags = if sema.sig_variadic[si] != 0: 1 else: 0
+        sig.flags = (sema.sig_variadic[si] != 0) as i32
         sig.path = analysis_sig_path(sema, sym, source_path)
         sig.name = with_str_clone_ref(name)
         let decl = sema.receiver_decl_node_for_sig(si)
@@ -580,7 +580,7 @@ fn analysis_collect_signatures(mut report: AnalysisReport, sema: &Sema, source_p
             param.index = pi
             param.type_id = sema.sig_param_type(si, pi)
             param.effects = sema.sig_param_effect(si, pi)
-            param.flags = if sema.sig_param_uses_value_ref_abi(si, pi) != 0: 1 else: 0
+            param.flags = (sema.sig_param_uses_value_ref_abi(si, pi) != 0) as i32
             param.path = with_str_clone_ref(sig.path)
             param.name = with_str_clone_ref(name)
             // The declared type's span (D172: a `&T` parameter whose body
@@ -868,7 +868,7 @@ fn analysis_collect_diagnostics(mut report: AnalysisReport, sema: &Sema, diagnos
 fn analysis_collect_phase(mut report: AnalysisReport, sema: &Sema):
     var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Phase)
     fact.id = 0
-    fact.flags = (if sema.symbols_frozen != 0: 1 else: 0) | (if sema.types_frozen != 0: 2 else: 0)
+    fact.flags = ((sema.symbols_frozen != 0) as i32) | (if sema.types_frozen != 0: 2 else: 0)
     fact.index = sema.type_kinds.len() as i32
     fact.name = "sema-freeze"
     fact.detail = f"symbols={sema.symbols_frozen} types={sema.types_frozen} type-count={fact.index}"
@@ -935,7 +935,7 @@ fn analysis_collect_mir_call(mut report: AnalysisReport, mir_mod: &MirModule, bo
     call.body_sym = body.fn_sym
     call.symbol = mono
     call.index = count
-    call.flags = (if required: 1 else: 0) | ((intrinsic as i32) << 8)
+    call.flags = ((required) as i32) | ((intrinsic as i32) << 8)
     call.name = with_str_clone_ref(name)
     call.detail = f"sig={sig} mono={mono} args={count} required={required} intrinsic={intrinsic as i32}"
     let caller_path = analysis_sig_path(sema, body.fn_sym, source_path)
@@ -1193,7 +1193,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
     var fact = AnalysisFact.new(AnalysisStage.Sema, AnalysisFactKind.Invariant)
     fact.id = node_count
     fact.index = resolved_calls
-    fact.flags = if node_count > 65535: 1 else: 0
+    fact.flags = (node_count > 65535) as i32
     fact.name = "resolved-call-storage"
     fact.detail = f"nodes={node_count} calls={resolved_calls} args={resolved_args} start-count=separate default-key=i64x32 large-node-proof={fact.flags}"
     report.note(fact.detail)
@@ -2025,7 +2025,7 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
     if okind != OperandKind.OK_COPY and okind != OperandKind.OK_MOVE:
         return none
     let place_id = body.operand_d0[operand]
-    let class = analysis_seam_place_class(sema, body, place_id, if okind == OperandKind.OK_MOVE: 1 else: 0)
+    let class = analysis_seam_place_class(sema, body, place_id, (okind == OperandKind.OK_MOVE) as i32)
     if class.len() == 0:
         return none
     let place_text = mir_place_text(body, place_id)
@@ -2035,7 +2035,7 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
         else if class == "copy-view-drop": 3
         else: 4
     let place_ty = body.place_sema_types[place_id]
-    let actionable = analysis_seam_context_is_actionable(context, if okind == OperandKind.OK_MOVE: 1 else: 0)
+    let actionable = analysis_seam_context_is_actionable(context, (okind == OperandKind.OK_MOVE) as i32)
     let tier = if actionable != 0: "actionable" else: "observed"
     SeamRow {
         ok: 1,

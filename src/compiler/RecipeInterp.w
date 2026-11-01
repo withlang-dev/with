@@ -740,7 +740,7 @@ impl PyParser:
         let plist = self.mk(N_LIST, -1, -1, -1, "", params, line)
         let why = if unreadable == 1: self.err.clone() else: ""
         if unreadable == 1: self.err = ""
-        let node = self.mk(N_DEF, plist, if is_property: 1 else: 0, unreadable, name, if unreadable == 1: List.new() else: body, line)
+        let node = self.mk(N_DEF, plist, (is_property) as i32, unreadable, name, if unreadable == 1: List.new() else: body, line)
         if unreadable == 1: self.nodes[node].s = name ++ "\n" ++ why
         node
 
@@ -886,7 +886,7 @@ fn pv(k: i32, n: i64, s: &str): PyVal { k, n, s: s.to_owned() }
 fn pv_copy(v: &PyVal): PyVal { k: v.k, n: v.n, s: v.s.clone() }
 fn pv_unknown(): pv(V_UNKNOWN, 0, "")
 fn pv_none(): pv(V_NONE, 0, "")
-fn pv_bool(b: bool): pv(V_BOOL, if b: 1 else: 0, "")
+fn pv_bool(b: bool): pv(V_BOOL, (b) as i32, "")
 fn pv_str(s: &str): pv(V_STR, 0, s)
 fn pv_sink(): pv(V_SINK, 0, "")
 
@@ -1033,11 +1033,11 @@ impl PyInterp:
         let v = self.plain(v0)
         if v.k == V_UNKNOWN or v.k == V_SINK or v.k == V_NAMED: return -1
         if v.k == V_NONE: return 0
-        if v.k == V_BOOL or v.k == V_INT: return if v.n != 0: 1 else: 0
-        if v.k == V_STR or v.k == V_VER: return if v.s.len() > 0: 1 else: 0
-        if v.k == V_OPT: return if v.s == "False" or v.s == "None" or v.s == "" or v.s == "0": 0 else: 1
-        if v.k == V_LIST: return if self.lists[v.n as i32].items.len() > 0: 1 else: 0
-        if v.k == V_DICT: return if self.dkeys[v.n as i32].items.len() > 0: 1 else: 0
+        if v.k == V_BOOL or v.k == V_INT: return (v.n != 0) as i32
+        if v.k == V_STR or v.k == V_VER: return (v.s.len() > 0) as i32
+        if v.k == V_OPT: return (not (v.s == "False" or v.s == "None" or v.s == "" or v.s == "0")) as i32
+        if v.k == V_LIST: return (self.lists[v.n as i32].items.len() > 0) as i32
+        if v.k == V_DICT: return (self.dkeys[v.n as i32].items.len() > 0) as i32
         1
 
     // 1 equal, 0 not, -1 not known.
@@ -1048,14 +1048,14 @@ impl PyInterp:
         if a.k == V_OPT or b.k == V_OPT:
             let x = py_option_text(&a)
             let y = py_option_text(&b)
-            return if x == y: 1 else: 0
+            return (x == y) as i32
         if a.k == V_VER or b.k == V_VER:
             if (a.k != V_VER and a.k != V_STR and a.k != V_INT) or (b.k != V_VER and b.k != V_STR and b.k != V_INT): return 0
-            return if py_version_order(py_option_text(&a), py_option_text(&b)) == 0: 1 else: 0
+            return (py_version_order(py_option_text(&a), py_option_text(&b)) == 0) as i32
         if a.k != b.k: return 0
         if a.k == V_NONE: return 1
-        if a.k == V_BOOL or a.k == V_INT: return if a.n == b.n: 1 else: 0
-        if a.k == V_STR: return if a.s == b.s: 1 else: 0
+        if a.k == V_BOOL or a.k == V_INT: return (a.n == b.n) as i32
+        if a.k == V_STR: return (a.s == b.s) as i32
         if a.k == V_LIST:
             let n = self.lists[a.n as i32].items.len()
             if n != self.lists[b.n as i32].items.len(): return 0
@@ -1063,7 +1063,7 @@ impl PyInterp:
                 let e = self.equal(&self.lists[a.n as i32].items[i], &self.lists[b.n as i32].items[i])
                 if e != 1: return e
             return 1
-        if a.n == b.n: 1 else: 0
+        (a.n == b.n) as i32
 
     // -1, 0, 1, or 2 when the two do not order.
     fn order(a0: &PyVal, b0: &PyVal) -> i32:
@@ -1072,8 +1072,8 @@ impl PyInterp:
         if a.k == V_VER or b.k == V_VER:
             if (a.k != V_VER and a.k != V_STR and a.k != V_INT) or (b.k != V_VER and b.k != V_STR and b.k != V_INT): return 2
             return py_version_order(py_option_text(&a), py_option_text(&b))
-        if a.k == V_INT and b.k == V_INT: return if a.n < b.n: -1 else: if a.n > b.n: 1 else: 0
-        if (a.k == V_STR or a.k == V_OPT) and (b.k == V_STR or b.k == V_OPT): return if a.s < b.s: -1 else: if a.s > b.s: 1 else: 0
+        if a.k == V_INT and b.k == V_INT: return if a.n < b.n: -1 else: (a.n > b.n) as i32
+        if (a.k == V_STR or a.k == V_OPT) and (b.k == V_STR or b.k == V_OPT): return if a.s < b.s: -1 else: (a.s > b.s) as i32
         2
 
     // 1 contained, 0 not, -1 not known.
@@ -1091,7 +1091,7 @@ impl PyInterp:
             for i in 0..self.dkeys[container.n as i32].items.len():
                 if self.equal(&item, &self.dkeys[container.n as i32].items[i]) == 1: return 1
             return if item.k == V_UNKNOWN: -1 else: 0
-        if (container.k == V_STR or container.k == V_OPT) and (item.k == V_STR or item.k == V_OPT): return if container.s.contains(item.s): 1 else: 0
+        if (container.k == V_STR or container.k == V_OPT) and (item.k == V_STR or item.k == V_OPT): return (container.s.contains(item.s)) as i32
         -1
 
     // The text `str(v)` gives, or Unknown.

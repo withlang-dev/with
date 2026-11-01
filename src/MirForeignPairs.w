@@ -104,7 +104,7 @@ fn pairs_switch_otherwise_value(body: &MirBody, table: i32) -> i64:
     var has_zero = false
     for i in 0..count:
         if body.switch_table_vals[(start + i)] == 0: has_zero = true
-    if has_zero: 1 else: 0
+    (has_zero) as i32
 
 fn pairs_list_i32(count: i32, value: i32) -> List[i32]:
     let out: List[i32] = List.new()
@@ -332,7 +332,7 @@ impl PairsBody:
             if guard < 0 or self.guard_ok[guard] < 0 or self.guard_ok[guard] != value:
                 continue
             self.cond_guard[dest] = guard
-            self.cond_is_eq[dest] = if bop == BinaryOp.OP_EQ: 1 else: 0
+            self.cond_is_eq[dest] = (bop == BinaryOp.OP_EQ) as i32
 
     // A moved operand: a resource's state moves with it (and escapes with
     // it into the return place or a projection); a retained origin cannot

@@ -330,7 +330,7 @@ impl Codegen:
             return 0
 
         let places: List[i32] = List.new()
-        for api in 0..param_types.len(): places.push(if api == 0: 1 else: 0)
+        for api in 0..param_types.len(): places.push((api == 0) as i32)
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, FN_ABI_WITH, 0)
         self.fn_abis[abi_index].llvm_ty
 
@@ -2126,7 +2126,7 @@ impl Codegen:
                 return const_int_ok(arith.value)
             if op == UnaryOp.UOP_BIT_NOT: return const_int_ok(0 - inner_val - 1)
             if op == UnaryOp.UOP_NOT:
-                return const_int_ok(if inner_val == 0: 1 else: 0)
+                return const_int_ok((inner_val == 0) as i32)
             return const_int_fail()
         if kind == NodeKind.NK_BINARY:
             let op = self.pool.get_data0(node)

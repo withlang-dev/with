@@ -4696,7 +4696,7 @@ impl Sema:
         self.named_type_candidate_pub.push(is_pub)
         let di = if decl_node != 0: self.find_decl_index(decl_node) else: -1
         let from_c_import = di >= 0 and di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
-        self.named_type_candidate_ci.push(if from_c_import: 1 else: 0)
+        self.named_type_candidate_ci.push((from_c_import) as i32)
 
     // The modules that write `use c_import(...)`, by path symbol. Registered
     // before declarations are collected: a c_import expansion's types are
@@ -5041,7 +5041,7 @@ impl Sema:
         out
 
     mut fn explain_one_candidate(what: &str, sym: i32, path: &str, is_pub: i32) -> str:
-        var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0})\n"
+        var out = "  " ++ what ++ " declared in " ++ (if path.len() > 0: with_str_clone_ref(path) else: "<no module path: the registration-time module was unset>".to_owned()) ++ " (package " ++ self.package_of(path) ++ f", pub={is_pub}, engine={self.engine_corpus_id(path)}, prelude-closure={self.module_in_prelude_closure(path)}, corpus-private={(self.corpus_private_modules.contains(path)) as i32})\n"
         g_vis_explain_log = []
         g_vis_explain_on = true
         self.module_visibility_cache = Memo.new()
@@ -5066,7 +5066,7 @@ impl Sema:
                 for ei in 0..self.module_import_counts[from]:
                     if self.module_import_targets[start + ei] == mi:
                         importers = importers ++ (if importers.len() > 0: ", " else: "") ++ self.module_paths[from]
-            out = out ++ f"  [{mi}] " ++ path ++ " package=" ++ self.package_of(path) ++ f" engine={self.engine_corpus_id(path)} prelude-closure={self.module_in_prelude_closure(path)} corpus-private={if self.corpus_private_modules.contains(path): 1 else: 0}" ++ (if importers.len() > 0: " imported-by: " ++ importers else: " imported-by: (root)") ++ "\n"
+            out = out ++ f"  [{mi}] " ++ path ++ " package=" ++ self.package_of(path) ++ f" engine={self.engine_corpus_id(path)} prelude-closure={self.module_in_prelude_closure(path)} corpus-private={(self.corpus_private_modules.contains(path)) as i32}" ++ (if importers.len() > 0: " imported-by: " ++ importers else: " imported-by: (root)") ++ "\n"
         out
     // #2211: one resolved name use, for the analyzer's `reference` facts. The
     // referencing module is the current one; `node` is 0 for a type name
@@ -5157,7 +5157,7 @@ impl Sema:
             return 0
         if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)): self.vis_note("  §18.2 enumerated prelude name: the gate allows it")
         if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) == false:
-            self.vis_note(f"  not an enumerated prelude name; engine={self.engine_corpus_id(target_path)} prelude-closure={self.module_in_prelude_closure(target_path)} corpus-private={if self.corpus_private_modules.contains(target_path): 1 else: 0}")
+            self.vis_note(f"  not an enumerated prelude name; engine={self.engine_corpus_id(target_path)} prelude-closure={self.module_in_prelude_closure(target_path)} corpus-private={(self.corpus_private_modules.contains(target_path)) as i32}")
             if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path):
                 if self.module_visible_no_prelude(target_path) == 0:
                     self.vis_note("  refused: an engine or prelude-closure module needs an explicit import path (no-prelude walk found none)")
@@ -7815,7 +7815,7 @@ impl Sema:
         if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN: resolved else: 0
 
     fn type_uses_c_va_list_place(tid: i32) -> i32:
-        if self.type_is_c_va_list(tid) and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
+        (self.type_is_c_va_list(tid) and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch())) as i32
 
     fn callable_param_uses_value_ref_abi(tid: i32, pi: i32) -> i32:
         let resolved = self.callable_type_resolved(tid)
@@ -8773,7 +8773,7 @@ impl Sema:
                 let nm = self.pool_resolve(self.bind_names[i])
                 // old_verdict = the pre-#696 check (current-MOVED alone, ignores entry);
                 // new_verdict = the corrected check (LIVE at entry, MOVED at back-edge).
-                with_eprint(f"[trace-move]   #{i} `{nm}` entry={entry_state} at_continue={cur_state} needs_drop={nd} old_verdict={if cur_state == VarState.MOVED and nd != 0: 1 else: 0} new_verdict={self.is_loop_carried_move(entry_state, cur_state, nd)}")
+                with_eprint(f"[trace-move]   #{i} `{nm}` entry={entry_state} at_continue={cur_state} needs_drop={nd} old_verdict={(cur_state == VarState.MOVED and nd != 0) as i32} new_verdict={self.is_loop_carried_move(entry_state, cur_state, nd)}")
             if self.is_loop_carried_move(entry_state, cur_state, nd):
                 self.emit_loop_carried_move_error(i, node)
             i = i + 1
@@ -10064,7 +10064,7 @@ impl Sema:
     mut fn note_param_view_fact(pi: i32, storage: bool, node: i32):
         self.param_view_fact_sigs.push(self.current_fn_sig_idx)
         self.param_view_fact_params.push(pi)
-        self.param_view_fact_storage.push(if storage: 1 else: 0)
+        self.param_view_fact_storage.push((storage) as i32)
         self.param_view_fact_nodes.push(node)
         self.param_view_fact_files.push(self.local_file_id)
 
@@ -10578,7 +10578,7 @@ impl Sema:
         let root_owned: List[i32] = List.new()
         for i in 0..self.sig_param_effects.len():
             let direct = if i < self.sig_param_direct_effects.len(): self.sig_param_direct_effects[i] else: 0
-            root_owned.push(if (direct & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: 1 else: 0)
+            root_owned.push(((direct & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0) as i32)
         var changed = true
         while changed:
             changed = false
@@ -12015,7 +12015,7 @@ impl Sema:
         let name = self.get_type_d0(resolved)
         if name <= 0: return 0
         if self.select_trait_impl(name, self.syms.clone_trait) != 0: return 1
-        if self.lookup_method_sig(name, self.pool_intern("clone")) >= 0: 1 else: 0
+        (self.lookup_method_sig(name, self.pool_intern("clone")) >= 0) as i32
 
     // D120 (§2.3, stage 3): every field of the struct (or struct instance)
     // is a value; a cyclic field reads as not (the visit stack breaks it).

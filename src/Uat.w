@@ -328,9 +328,9 @@ fn uat_platform_arch_matches(required: &str, host: &str) -> bool:
 
 fn uat_platform_matches(value: &str) -> i32:
     if uat_platform_is_os(value):
-        return if uat_host_platform() == value: 1 else: 0
+        return (uat_host_platform() == value) as i32
     if uat_platform_is_arch(value):
-        return if uat_platform_arch_matches(value, target_spec_arch()): 1 else: 0
+        return (uat_platform_arch_matches(value, target_spec_arch())) as i32
     var dash = -1
     var i = 0
     while i < value.len():
@@ -343,7 +343,7 @@ fn uat_platform_matches(value: &str) -> i32:
         let arch_part = value.slice((dash + 1) as i64, value.len())
         if uat_platform_is_os(os_part) and uat_platform_is_arch(arch_part):
             let m = uat_host_platform() == os_part and uat_platform_arch_matches(arch_part, target_spec_arch())
-            return if m: 1 else: 0
+            return (m) as i32
     -1
 
 fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
@@ -685,4 +685,4 @@ fn run_uat_command(argv: &List[str]) -> i32:
         print("human checks for this host:")
         print(uat_trim_trailing_line_endings(human_all))
         let _ = uat_write_text(uat_join(root, "out/uat/human-checks.txt"), human_all)
-    if fail > 0: 1 else: 0
+    (fail > 0) as i32

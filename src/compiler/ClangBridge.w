@@ -797,7 +797,7 @@ unsafe fn copy_first_line_to_buf(text: &str, dst: *mut u8, cap: i64) -> i32:
         *((dst as i64 + i) as *mut u8) = ch
         i = i + 1
     *((dst as i64 + i) as *mut u8) = 0
-    if i > 0: 1 else: 0
+    (i > 0) as i32
 
 unsafe fn c_path_to_str(path: *const u8) -> str:
     make_str(path)
@@ -2030,7 +2030,7 @@ unsafe fn collect_field(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i3
     (*fi).name = if is_anon_member != 0: c_strdup("\0" as *const u8) else: c_strdup(clang_getCString(name))
     (*fi).type_spelling = c_strdup(clang_getCString(type_str))
     (*fi).clang_type = ty
-    (*fi).is_bitfield = if clang_Cursor_isBitField(cursor) != 0: 1 else: 0
+    (*fi).is_bitfield = (clang_Cursor_isBitField(cursor) != 0) as i32
     (*fi).bit_width = if clang_Cursor_isBitField(cursor) != 0: clang_getFieldDeclBitWidth(cursor) else: 0
     (*fi).cursor = cursor
     (*fc).count = (*fc).count + 1
@@ -3385,9 +3385,9 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
                 let actual_real = realpath(presumed_name as *const c_char, actual_buf as *mut c_char)
                 let target_real = realpath(c_path as *const c_char, target_buf as *mut c_char)
                 if actual_real as i64 != 0 and target_real as i64 != 0:
-                    presumed_matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
+                    presumed_matches = (c_strcmp(actual_real as *const u8, target_real as *const u8) == 0) as i32
                 else:
-                    presumed_matches = if make_path_str(presumed_name) == make_path_str(c_path as *const u8): 1 else: 0
+                    presumed_matches = (make_path_str(presumed_name) == make_path_str(c_path as *const u8)) as i32
             if actual_buf as i64 != 0:
                 with_free(actual_buf)
             if target_buf as i64 != 0:
@@ -3417,9 +3417,9 @@ fn with_ci_cursor_in_file(session: i64, cursor_idx: i32, path: &str) -> i32:
             let actual_real = realpath(fname_str as *const c_char, actual_buf as *mut c_char)
             let target_real = realpath(c_path as *const c_char, target_buf as *mut c_char)
             if actual_real as i64 != 0 and target_real as i64 != 0:
-                matches = if c_strcmp(actual_real as *const u8, target_real as *const u8) == 0: 1 else: 0
+                matches = (c_strcmp(actual_real as *const u8, target_real as *const u8) == 0) as i32
             else:
-                matches = if make_path_str(fname_str) == make_path_str(c_path as *const u8): 1 else: 0
+                matches = (make_path_str(fname_str) == make_path_str(c_path as *const u8)) as i32
         clang_disposeString(fname)
         if actual_buf as i64 != 0:
             with_free(actual_buf)
