@@ -5531,6 +5531,14 @@ impl Sema:
         let saved_expected_et: i32 = self.expected_expr_type
         let saved_has_et: i32 = self.has_expected_type
         let saved_body_value_root: i32 = self.current_value_expr_root
+        // A body checked on demand (D43: a callee with an inferred return is
+        // typed before its caller) starts with no expectation of its own: the
+        // caller's leaked into it, and an unsafe fn's brace body — one `if`
+        // under the unsafe node, which propagates an expectation — was refused
+        // as a value if without else (stc's cstr_drop).
+        self.has_expected_type = 0
+        self.expected_expr_type = 0 as TypeId
+        self.current_value_expr_root = 0
         let saved_loop_depth: i32 = self.loop_depth
         self.loop_depth = 0
         let saved_label_registry = self.save_label_registry()

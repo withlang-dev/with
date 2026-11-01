@@ -6640,7 +6640,8 @@ fn bs_check_migrate_ternary_in_initializer_call(ctx: &ActionCtx, compiler_path: 
     let migrate = ["migrate", bs_abs(root, src), "--no-c-export", "-o", bs_abs(root, out_w)]
     rc = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-ternary-in-initializer-call", migrate).rc
     if rc != 0: return rc
-    rc = bs_assert_contains(ctx, ctx.fs().read_text(out_w), "if 1 != 0: __param_c else: ", "ternary_in_initializer_call")
+    // D177: the literal condition folds to its chosen arm (`1 ? c : -1` is `c`).
+    rc = bs_assert_contains(ctx, ctx.fs().read_text(out_w), "with_alloc(((((__param_c as u64)", "ternary_in_initializer_call")
     if rc != 0: return rc
     let check = ["check", bs_abs(root, out_w)]
     bs_migrate_expect_success(ctx, compiler_path, case_dir, "check-ternary-in-initializer-call", check).rc
