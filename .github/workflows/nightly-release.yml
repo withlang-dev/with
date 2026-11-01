@@ -350,6 +350,23 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: src/main build :test
 
+      # A red battery leaves its evidence on the runner: the per-test captures
+      # and the complexity rows are what a fix needs (D137: a red run is filed
+      # with its captures). The v0.16.0.4 windows-aarch64 job failed three
+      # targets whose stderr never reached the log.
+      - name: Upload test captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/test-graph/**/*.stdout
+            out/test-graph/**/*.stderr
+            out/stdlib-complexity/
+            out/command/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
@@ -568,6 +585,23 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: src/main build :test
 
+      # A red battery leaves its evidence on the runner: the per-test captures
+      # and the complexity rows are what a fix needs (D137: a red run is filed
+      # with its captures). The v0.16.0.4 windows-aarch64 job failed three
+      # targets whose stderr never reached the log.
+      - name: Upload test captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/test-graph/**/*.stdout
+            out/test-graph/**/*.stderr
+            out/stdlib-complexity/
+            out/command/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
@@ -758,6 +792,23 @@ jobs:
         # last-green requires the test-green evidence `:test` records; driven
         # with the seed as the selfhost lane does.
         run: ./src/main.exe build :test
+
+      # A red battery leaves its evidence on the runner: the per-test captures
+      # and the complexity rows are what a fix needs (D137: a red run is filed
+      # with its captures). The v0.16.0.4 windows-aarch64 job failed three
+      # targets whose stderr never reached the log.
+      - name: Upload test captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/test-graph/**/*.stdout
+            out/test-graph/**/*.stderr
+            out/stdlib-complexity/
+            out/command/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Record last-green (the release UAT gate reads it)
         run: ./src/main.exe build :last-green
@@ -988,6 +1039,23 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: ./src/main build :test
 
+      # A red battery leaves its evidence on the runner: the per-test captures
+      # and the complexity rows are what a fix needs (D137: a red run is filed
+      # with its captures). The v0.16.0.4 windows-aarch64 job failed three
+      # targets whose stderr never reached the log.
+      - name: Upload test captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/test-graph/**/*.stdout
+            out/test-graph/**/*.stderr
+            out/stdlib-complexity/
+            out/command/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Record last-green (the release UAT gate reads it)
         env:
           WITH: ${{ github.workspace }}/src/main
@@ -1170,6 +1238,23 @@ jobs:
         # last-green requires the test-green evidence `:test` records; driven
         # with the seed as the selfhost lane does.
         run: ./src/main.exe build :test
+
+      # A red battery leaves its evidence on the runner: the per-test captures
+      # and the complexity rows are what a fix needs (D137: a red run is filed
+      # with its captures). The v0.16.0.4 windows-aarch64 job failed three
+      # targets whose stderr never reached the log.
+      - name: Upload test captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/test-graph/**/*.stdout
+            out/test-graph/**/*.stderr
+            out/stdlib-complexity/
+            out/command/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Record last-green (the release UAT gate reads it)
         run: ./src/main.exe build :last-green
