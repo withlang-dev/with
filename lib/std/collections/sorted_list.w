@@ -32,7 +32,7 @@ impl[T: Ord] SortedList[T]:
             let right = unsafe { &(*(b as *const Slot[T])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> isize: unsafe { sortedarray_length(self.array) } as isize
+    pub fn len() -> isize: unsafe { (*self.array).sortedarray_length() } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     unsafe fn slot_at(index: isize) -> *mut Slot[T]:
@@ -79,7 +79,7 @@ impl[T: Ord] SortedList[T]:
             let value: T = unsafe { move slot.value }
             drop(value)
             with_free(slot as *mut u8)
-        unsafe { sortedarray_clear(self.array) }
+        unsafe { (*self.array).sortedarray_clear() }
 
     /// An ephemeral cursor over the values in order, yielding views.
     pub fn iter() -> SortedListIter[T]:
@@ -87,7 +87,7 @@ impl[T: Ord] SortedList[T]:
 
 impl[T] Drop for SortedList[T]:
     move fn drop():
-        let len = unsafe { sortedarray_length(self.array) } as i32
+        let len = unsafe { (*self.array).sortedarray_length() } as i32
         for index in 0..len:
             var slot = unsafe { sortedarray_get(self.array, index as c_uint) } as *mut Slot[T]
             let value: T = unsafe { move slot.value }

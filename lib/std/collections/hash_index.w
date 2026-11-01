@@ -49,7 +49,7 @@ pub type HashIndex[K, V] { map: *mut tommy_hashdyn_struct, probe: *mut HashSlot[
 
 pub fn HashIndex.new[K: Key, V]() -> HashIndex[K, V]:
     let map = with_alloc(sizeof[tommy_hashdyn_struct]() as i64) as *mut tommy_hashdyn_struct
-    unsafe { tommy_hashdyn_init(map) }
+    unsafe { (*map).tommy_hashdyn_init() }
     let probe = with_alloc(sizeof[HashSlot[K, V]]() as i64) as *mut HashSlot[K, V]
     HashIndex { map: map, probe: probe }
 
@@ -79,7 +79,7 @@ impl[K, V] HashIndex[K, V]:
     pub mut fn clear() -> Unit:
         self.release_all()
         unsafe { tommy_hashdyn_done(self.map) }
-        unsafe { tommy_hashdyn_init(self.map) }
+        unsafe { (*self.map).tommy_hashdyn_init() }
 
     /// An ephemeral cursor over the entries in bucket order.
     pub fn iter() -> HashIndexIter[K, V]:

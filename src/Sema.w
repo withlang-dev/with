@@ -9807,6 +9807,7 @@ impl Sema:
     // ── Function signature management ────────────────────────────────
 
     mut fn add_sig(name: i32, fn_tid: i32, ret: i32, param_start: i32, param_count: i32, variadic: i32):
+        if name == 0: panic("compiler bug: a signature registered without a name")
         let idx = self.sig_names.len() as i32
         self.sig_names.push(name)
         // get_visible_sig matches by resolved text; chain the signatures
@@ -10529,6 +10530,7 @@ impl Sema:
             let required_mode = receiver_required_mode_text(required)
             // One diagnostic per declaration, named as the source names it:
             // whichever specialization is visited first must not show.
+
             let name = self.sig_source_name(si)
             if declared == ReceiverMode.Missing:
                 let keyword = if required_mode == "read": "fn" else: required_mode ++ " fn"

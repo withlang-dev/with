@@ -7,6 +7,7 @@ use InternPool
 use Diagnostic
 use Source
 use Overflow
+use ConstLiteral
 use AnalysisTypes
 use MirCore
 use MirLower
@@ -2199,12 +2200,8 @@ impl Codegen:
             // `sizeof(a) / sizeof(a[0])` in a global initializer (stc's
             // `nr16: Cc_range16.len()`) is initialized storage, never a
             // runtime init a bundle object would refuse (#2219).
-            if callee_kind == NodeKind.NK_FIELD_ACCESS and self.pool.get_data2(node) == 0 and self.intern.resolve(self.pool.get_data1(callee)) == "len":
-                let receiver = self.pool.get_data0(callee)
-                if self.pool.kind(receiver) == NodeKind.NK_IDENT:
-                    let seq = self.unwrap_const_expr_node(self.module_const_value_node(self.pool.get_data0(receiver)))
-                    if seq != 0 and self.pool.kind(seq) == NodeKind.NK_ARRAY_LIT and self.pool.get_data2(seq) == 0:
-                        return const_int_ok(self.pool.get_data1(seq) as i64)
+            let count = const_literal_len(self.pool, self.sema, node)
+            if count >= 0: return const_int_ok(count)
             return const_int_fail()
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(node)
@@ -2221,39 +2218,9 @@ impl Codegen:
             return const_int_fail()
         const_int_fail()
 
-    // The literal node an expression over module constants denotes: a name
-    // is its initializer, `XS[i]` with a constant `i` the element written
-    // there, `P.field` the field's value (by name, or by position in a
-    // positional literal); 0 when any step is not a literal.
-    mut fn const_literal_part_node(node: i32) -> i32:
-        let cur = self.unwrap_const_expr_node(node)
-        if cur == 0: return 0
-        let kind = self.pool.kind(cur)
-        if kind == NodeKind.NK_IDENT:
-            return self.unwrap_const_expr_node(self.module_const_value_node(self.pool.get_data0(cur)))
-        if kind == NodeKind.NK_INDEX:
-            let seq = self.const_literal_part_node(self.pool.get_data0(cur))
-            if seq == 0 or self.pool.kind(seq) != NodeKind.NK_ARRAY_LIT or self.pool.get_data2(seq) != 0: return 0
-            let index = self.try_eval_const_int(self.pool.get_data1(cur))
-            if not index.ok or index.value < 0 or index.value >= self.pool.get_data1(seq) as i64: return 0
-            return self.pool.get_extra(self.pool.get_data0(seq) + index.value as i32)
-        if kind == NodeKind.NK_FIELD_ACCESS:
-            let receiver = self.pool.get_data0(cur)
-            let lit = self.const_literal_part_node(receiver)
-            if lit == 0 or self.pool.kind(lit) != NodeKind.NK_STRUCT_LIT: return 0
-            let field_name = self.pool.get_data1(cur)
-            var field_index = -1
-            let recv_ty = self.sema_type_of_node(receiver)
-            if recv_ty != 0:
-                let resolved = self.sema.resolve_alias(recv_ty as TypeId)
-                if self.sema.get_type_kind(resolved) == TypeKind.TY_STRUCT:
-                    let te_start = self.sema.get_type_d1(resolved)
-                    let count = self.sema.get_type_d2(resolved)
-                    for fi in 0..count:
-                        if self.sema.type_extra[(te_start + fi * 3)] == field_name: field_index = fi
-            return self.struct_literal_field_value_node(lit, field_name, field_index)
-        0
-
+    // D65: the literal a module-constant expression denotes has one owner
+    // (ConstLiteral).
+    fn const_literal_part_node(node: i32) -> i32: const_literal_part_node(self.pool, self.sema, node)
     // #2219: a fold that fails leaves the innermost sub-expression it stopped
     // at in `const_fold_unfolded_node` (the first failing leaf sets it; the
     // enclosing levels leave it), so a refusal can name `side()` rather than
