@@ -70,9 +70,9 @@ jobs:
             mesa_sha256: 418f1938dc48d401538cf6440d3c718e2f456ef2023e44133105263f483e903f
           - arch: aarch64
             runner: windows-11-arm
-            seed_version: nightly-20261020-local-3-763d0e54c82a
+            seed_version: seed-windows-aarch64
             seed_asset: with-windows-aarch64.exe
-            seed_sha256: d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
+            seed_sha256: b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
             mesa_arch: arm64
             mesa_sha256: bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1
     steps:
@@ -1053,9 +1053,9 @@ jobs:
       WITH_SEED_REPO: withlang-dev/with
       # CI-produced by seed-windows-aarch64.yml (cross-built on Linux, published
       # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
-      WITH_SEED_VERSION: nightly-20261020-local-3-763d0e54c82a
+      WITH_SEED_VERSION: seed-windows-aarch64
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: d729f1bb45a018cb7cb285fe257dd9798d0c9f9bf2fafac2ba2c168158a509ce
+      WITH_SEED_SHA256: b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
