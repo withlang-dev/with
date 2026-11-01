@@ -421,15 +421,36 @@ fn btree_set_str_descending(n: i32): btree_set_str_work(n, true)
 //
 // A CPU clock can be coarse: Windows counts process time in scheduler ticks
 // (15.6 ms), so one short run read 0. The work repeats until the clock has
-// moved at least SAMPLE_NS, and a sample is the mean run.
+// moved at least the sample length, and a sample is the mean run. The
+// sample is at least SAMPLE_NS and at least SAMPLE_TICKS of the clock's own
+// tick (#2894: three ticks of sample carried a tick of error per run into a
+// three-run large sample, and a linear row read 7.8x at n×4 on Windows);
+// a fine clock keeps the 50 ms sample.
 const SAMPLE_NS = 50000000
+const SAMPLE_TICKS = 20
+
+// The clock's tick: the smallest step it reports, read by spinning until it
+// moves twice. 0 when it moves at the first read (a fine clock).
+fn clock_tick_ns():
+    let start = cpu_time_ns()
+    var first = start
+    while first == start: first = cpu_time_ns()
+    var second = first
+    while second == first: second = cpu_time_ns()
+    let tick = second - first
+    if tick < 1000000: 0 else: tick
+
+fn sample_ns():
+    let by_ticks = clock_tick_ns() * SAMPLE_TICKS
+    if by_ticks > SAMPLE_NS: by_ticks else: SAMPLE_NS
 
 fn elapsed(work: &fn(i32) -> i32, n: i32):
     let start = cpu_time_ns()
     assert(start >= 0, "cpu_time_ns: this platform reports no CPU time")
+    let at_least = sample_ns()
     var runs = 0
     var finish = start
-    while runs == 0 or finish - start < SAMPLE_NS:
+    while runs == 0 or finish - start < at_least:
         assert(work(n) > 0)
         runs = runs + 1
         finish = cpu_time_ns()
