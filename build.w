@@ -4688,6 +4688,12 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var tests = target_new(.Group, "test", "")
     tests = tests.dep("seed-driver")
+    // test-green's evidence includes selfcheck's state (build/retention.w),
+    // so `:test` runs selfcheck: a lane that ran `:test` alone (the release
+    // workflow's battery step) otherwise ends with "missing build state
+    // out/.build-state/selfcheck.state" after every test passed (v0.16.0.5,
+    // windows-x86_64).
+    tests = tests.dep("selfcheck")
     tests = tests.dep("reseed-check-build-w")
     tests = tests.dep("behavior-tests")
     tests = tests.dep("d-acceptance-tests")
