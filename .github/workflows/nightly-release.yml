@@ -72,7 +72,7 @@ jobs:
             runner: windows-11-arm
             seed_version: seed-windows-aarch64
             seed_asset: with-windows-aarch64.exe
-            seed_sha256: b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
+            seed_sha256: 63a571ef195d24d23e98f4e38fb4333c18b554cad495b615c86adebe4d9b2a69
             mesa_arch: arm64
             mesa_sha256: bd1c00a49504b3efe20037cf29fa437380cfb5cbe73f196272624b94938330f1
     steps:
@@ -1079,7 +1079,7 @@ jobs:
       # to the seed-windows-aarch64 prerelease) -- never a hand-uploaded asset.
       WITH_SEED_VERSION: seed-windows-aarch64
       WITH_SEED_ASSET: with-windows-aarch64.exe
-      WITH_SEED_SHA256: b0cfb2bef916aba0b4f3c54cc1a916ca23f21a9240f83cdfa6ea589c8c981989
+      WITH_SEED_SHA256: 63a571ef195d24d23e98f4e38fb4333c18b554cad495b615c86adebe4d9b2a69
       WITH_SDK_REPO: withlang-dev/with
       WITH_SDK_VERSION: sdk-windows-aarch64
       WITH_SDK_ASSET: with-llvm-sdk-22.1.6-windows-aarch64.tar.gz
