@@ -294,15 +294,15 @@ fn comptime_value_string_builder(type_id: i32, builder: i32, byte_count: i64) ->
         extra_count: 0,
     }
 
-fn comptime_value_is_valid(value: &ComptimeValue) -> i32:
+fn comptime_value_is_valid(value: &ComptimeValue) -> bool:
     if value.kind == ComptimeValueKind.CV_INVALID:
-        return 0
-    1
+        return false
+    true
 
-fn comptime_value_is_intlike(value: &ComptimeValue) -> i32:
+fn comptime_value_is_intlike(value: &ComptimeValue) -> bool:
     if value.kind == ComptimeValueKind.CV_INT or value.kind == ComptimeValueKind.CV_BOOL:
-        return 1
-    0
+        return true
+    false
 
 fn comptime_value_intlike(value: &ComptimeValue) -> i64:
     value.data0

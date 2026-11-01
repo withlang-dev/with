@@ -364,7 +364,7 @@ impl Sema:
             if node == 0 or self.ast.kind(node) != NodeKind.NK_TYPE_DECL:
                 continue
             let same_module = path == self.current_module_path
-            let imported = not same_module and (sema_tier_path_is_std_implementation(path) == 0 or self.module_visible_no_prelude(path) != 0) and self.decl_visible_from_current_gated(path, is_pub, sym) != 0
+            let imported = not same_module and (sema_tier_path_is_std_implementation(path) == false or self.module_visible_no_prelude(path) != 0) and self.decl_visible_from_current_gated(path, is_pub, sym) != 0
             if not same_module and not imported:
                 continue
             let di = self.find_decl_index(node)
@@ -1318,7 +1318,7 @@ impl Sema:
             // §45), or a C string (the #602 raw-call rule, §16.3c).
             let userdata = self.facade_param_is_userdata(fn_sym, sig, a)
             let callable = self.facade_param_is_callable(sig, a)
-            if not userdata and not callable and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a)) == 0:
+            if not userdata and not callable and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, a)) == false:
                 let shown = self.facade_param_display(fn_sym, sig, a)
                 self.emit_error(f"fn '{fname}': retains {shown}; retention is modeled for a callback, its 'void *' userdata, and a C string — nothing else is kept by a resource (§16.2b.9)", clause)
                 return c
@@ -1411,7 +1411,7 @@ impl Sema:
                     if from < 0:
                         return c
                     let origin = self.facade_param_receives(fn_sym, from)
-                    if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == 0 and not self.facade_param_is_text(fn_sym, from):
+                    if origin.len() != 1 and self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from)) == false and not self.facade_param_is_text(fn_sym, from):
                         let shown = self.facade_param_display(fn_sym, sig, from)
                         let why = if origin.len() == 0: "receives no modeled resource and is not a C string" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                         self.emit_error(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause)
@@ -2442,7 +2442,7 @@ impl Sema:
         if target == 0:
             return 0
         // The case function must be visible here, as a bridge must be.
-        if target == self.current_fn_symbol or self.symbol_visible_from_current(target) == 0 or self.get_visible_sig(target) < 0:
+        if target == self.current_fn_symbol or self.symbol_visible_from_current(target) == false or self.get_visible_sig(target) < 0:
             return fn_sym
         target
 
@@ -2592,10 +2592,10 @@ impl Sema:
     fn facade_op_raw_beyond(fn_sym: i32, repr_param: i32, skip_return: bool) -> bool:
         let sig = self.get_sig(fn_sym)
         if sig < 0:
-            return self.ci_function_requires_raw_abi(fn_sym) != 0
+            return self.ci_function_requires_raw_abi(fn_sym)
         if self.sig_is_variadic(sig) != 0:
             return true
-        if not skip_return and self.ci_type_requires_raw_contract(self.sig_return_type(sig)) != 0 and not self.facade_covers_return(fn_sym):
+        if not skip_return and self.ci_type_requires_raw_contract(self.sig_return_type(sig)) and not self.facade_covers_return(fn_sym):
             return true
         let ci = self.facade_contract_for(fn_sym)
         for pi in 0..self.sig_get_param_count(sig):
@@ -2610,7 +2610,7 @@ impl Sema:
             if ci >= 0 and self.facade_contract_pairs(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) != 0 and self.ci_type_is_const_c_string_input(pty) == 0 and not self.facade_param_is_text(fn_sym, pi) and not self.facade_covers_param(fn_sym, pi):
+            if self.ci_type_requires_raw_contract(pty) and self.ci_type_is_const_c_string_input(pty) == false and not self.facade_param_is_text(fn_sym, pi) and not self.facade_covers_param(fn_sym, pi):
                 return true
         false
 
@@ -3026,7 +3026,7 @@ impl Sema:
         let bname: str = self.facade_bridge_of.get(name).unwrap()
         let bsym = self.pool_lookup_symbol(bname)
         // The bridge's own body calls the C name: the raw operation.
-        if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == 0 or (self.get_visible_sig(bsym) < 0 and self.generic_fn_node_for_symbol(bsym) == 0):
+        if bsym == 0 or bsym == self.current_fn_symbol or self.symbol_visible_from_current(bsym) == false or (self.get_visible_sig(bsym) < 0 and self.generic_fn_node_for_symbol(bsym) == 0):
             return fn_sym
         bsym
 
@@ -3103,7 +3103,7 @@ impl Sema:
             if pi == out_param or self.facade_contract_pairs(ci, pi) or self.facade_contract_models_param(ci, pi) or self.facade_contract_nullable_param(ci, pi):
                 continue
             let pty = self.sig_param_type(sig, pi)
-            if self.ci_type_requires_raw_contract(pty) == 0 or self.ci_type_is_const_c_string_input(pty) != 0 or self.facade_param_is_text(fn_sym, pi):
+            if self.ci_type_requires_raw_contract(pty) == false or self.ci_type_is_const_c_string_input(pty) or self.facade_param_is_text(fn_sym, pi):
                 continue
             // A parameter that receives a modeled resource is reached through
             // the resource — the receiver, or a borrow `&P` (a shape a borrow
@@ -4421,7 +4421,7 @@ impl Sema:
                 let pty = self.resolve_alias(ptid as TypeId)
                 if self.get_type_kind(pty) != TypeKind.TY_PTR:
                     continue
-                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0 or self.ci_type_is_const_c_string_input(ptid) != 0 or self.facade_param_is_text(fn_sym, pi) or self.facade_param_is_callable(sig, pi):
+                if self.facade_param_receives(fn_sym, pi).len() > 0 or self.facade_param_receives_record(fn_sym, pi) != 0 or self.ci_type_is_const_c_string_input(ptid) or self.facade_param_is_text(fn_sym, pi) or self.facade_param_is_callable(sig, pi):
                     continue
                 // A paired buffer, its length or a fixed argument (D64) is
                 // the rendering's: the slice, or the literal.
@@ -5264,8 +5264,8 @@ impl Sema:
         var ud_ty = self.resolve_alias(actual_ty as TypeId)
         if self.get_type_kind(ud_ty) == TypeKind.TY_REF:
             ud_ty = self.resolve_alias(self.get_type_d0(ud_ty) as TypeId)
-        let send = self.type_is_send(ud_ty as i32) != 0
-        let sync = self.type_is_sync(ud_ty as i32) != 0
+        let send = self.type_is_send(ud_ty as i32)
+        let sync = self.type_is_sync(ud_ty as i32)
         if send and sync:
             return
         let ci = self.facade_callback_methods[mi].contract

@@ -110,12 +110,40 @@ for line in (read_file("out/pred-census.txt") ?? "").split("\n"):
     site_ends.push(end)
     if not rewritten.contains(bare(name)): rewritten.push(bare(name))
 
-// Every listed name has its callers rewritten, found as a site or not: a
-// wrapper that returns another predicate's result is made `bool` by hand
-// and its callers follow (D177 keeps the rewrite meaning-preserving).
+// A listed name the census did not record is a wrapper: a yes/no function
+// whose results are not all literals (it returns another predicate's
+// result, or tests before a literal). Its declaration is found by name in
+// the tracked sources and rewritten the same way — the return type, the
+// literal results — and its callers follow (D177 keeps the rewrite
+// meaning-preserving).
+var ls_argv: List[str] = ["git", "ls-files", "*.w"]
+let ls = run_to_files(&ls_argv, "out/pred-ls.txt", "out/pred-ls.err", 120000)
+let tracked = (read_file("out/pred-ls.txt") ?? "").split("\n")
 for name in names:
     let b = bare(name)
-    if not rewritten.contains(b): rewritten.push(b)
+    if rewritten.contains(b): continue
+    rewritten.push(b)
+    for path in tracked:
+        let p: str = path
+        if p.len() == 0 or in_corpus(p) or p.starts_with("test/") or p.starts_with("examples/"): continue
+        let text = read_file(p) ?? ""
+        var at: isize = 0
+        while true:
+            let found = text.find("fn " ++ b ++ "(", at)
+            if found < 0: break
+            at = found + 1
+            // The whole declared name: `fn b(` or `fn Owner.b(`, never `fn xb(`.
+            let before = text.byte_at(found - 1)
+            if found > 0 and not (before == ' ' or before == '\n' or before == '\t'): continue
+            var line_start = found
+            while line_start > 0 and text.byte_at(line_start - 1) != '\n': line_start -= 1
+            if not text.slice(line_start, found).trim().ends_with("fn") and text.slice(line_start, found).trim().len() > 0 and not text.slice(line_start, found).trim().ends_with("pub") and not text.slice(line_start, found).trim().ends_with("mut") and not text.slice(line_start, found).trim().ends_with("move") and not text.slice(line_start, found).trim().ends_with("unsafe"): continue
+            var sig_end = found
+            while sig_end < text.len() and text.byte_at(sig_end) != '\n': sig_end += 1
+            if not text.slice(found, sig_end).contains("-> i32"): continue
+            site_paths.push(p)
+            site_starts.push(line_start)
+            site_ends.push(sig_end)
 
 // 1. The declarations, last site first so earlier offsets stay valid.
 var files: List[str] = List.new()
@@ -164,10 +192,10 @@ for path in files:
         exit_code(1)
 
 // 2. The callers, over every tracked .w file that is not a corpus.
-var ls_argv: List[str] = ["git", "ls-files", "*.w"]
-let ls = run_to_files(&ls_argv, "out/pred-ls.txt", "out/pred-ls.err", 120000)
+
+
 var calls = 0
-for path in (read_file("out/pred-ls.txt") ?? "").split("\n"):
+for path in tracked:
     let p: str = path
     if p.len() == 0 or in_corpus(p) or p.starts_with("test/") or p.starts_with("examples/"): continue
     let text = read_file(p) ?? ""

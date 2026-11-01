@@ -1134,7 +1134,7 @@ fn link_stage_make_wasm_llvm_link_command(wasm_ld: &str, obj_path: &str, bin_pat
             args.push("-l" ++ lib)
     for i in 0..link_args.len():
         args.push(with_str_clone_ref(link_args[i]))
-    if wasm_host_emit(bin_path) != 0:
+    if wasm_host_emit(bin_path):
         return LinkStageCommand { linker: "", args: List.new(), cwd: "", env: List.new(), inputs: List.new(), outputs: List.new(), cleanup_files: List.new() }
     outputs.push(wasm_host_js_path(bin_path))
     let cleanup_files = link_stage_collect_cleanup_files(extras)
@@ -1229,10 +1229,10 @@ fn link_stage_embedded_runtime_object(name: &str) -> str:
         return link_stage_embedded_obj_slice(&with_embedded_fiber_asm_o_start as *const u8, &with_embedded_fiber_asm_o_end as *const u8)
     ""
 
-fn link_stage_extract_runtime_obj(name: &str, path: &str) -> i32:
+fn link_stage_extract_runtime_obj(name: &str, path: &str) -> bool:
     let data = link_stage_embedded_runtime_object(name)
     if data.len() == 0:
-        return 1
+        return true
     // Concurrent links (comptime parallel() threads and separate processes)
     // extract to this shared path. Writing it directly truncates the file under
     // a concurrent reader mid-link — empty reads ("cannot read member") or
@@ -1241,18 +1241,18 @@ fn link_stage_extract_runtime_obj(name: &str, path: &str) -> i32:
     // atomically, so readers only ever observe a complete file.
     let existing = runtime_read_file(path)
     if existing.len() == data.len() and existing == data:
-        return 0
+        return false
     let tmp_path = path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.tmp"
     if runtime_write_file(tmp_path, data) != 0:
-        return 1
+        return true
     if runtime_rename(tmp_path, path) != 0:
         let _ = runtime_remove_file(tmp_path)
         // A concurrent extractor may have won the rename; accept its complete copy.
         let after = runtime_read_file(path)
         if after.len() == data.len() and after == data:
-            return 0
-        return 1
-    0
+            return false
+        return true
+    false
 
 fn link_stage_link(obj_path: &str, bin_path: &str) -> bool:
     let extras: List[str] = List.new()
@@ -1786,20 +1786,20 @@ fn link_stage_undefined_symbols_for_object(obj_path: &str) -> str:
     with_eprint(f"warning: link: {obj_path} is no Mach-O, COFF, ELF or wasm object this compiler can read for undefined symbols; linking every embedded bundle\n")
     "<probe-failed>"
 
-fn link_stage_undefined_symbols_need_helpers_runtime(undef: &str) -> i32:
+fn link_stage_undefined_symbols_need_helpers_runtime(undef: &str) -> bool:
     if undef == "<probe-failed>":
-        return 1
+        return true
     if undef.len() == 0:
-        return 0
+        return false
     if link_stage_undef_contains_symbol(undef, "with_"):
-        return 1
+        return true
     if link_stage_undef_contains_symbol(undef, "int_to_string"):
-        return 1
+        return true
     if link_stage_undef_contains_symbol(undef, "i32_to_str"):
-        return 1
+        return true
     if link_stage_undef_contains_symbol(undef, "str_from_byte"):
-        return 1
-    0
+        return true
+    false
 
 fn link_stage_undefined_symbols_need_fiber_runtime(undef: &str) -> i32:
     if undef == "<probe-failed>":
@@ -1856,22 +1856,22 @@ fn link_stage_bundle_needed(manifest: &str, undef: &str) -> bool:
 
 // Atomic extraction of an embedded blob (the runtime-object discipline: a
 // complete matching file is reused, else unique temp + rename).
-fn link_stage_extract_blob(data: &str, path: &str) -> i32:
+fn link_stage_extract_blob(data: &str, path: &str) -> bool:
     if data.len() == 0:
-        return 1
+        return true
     let existing = runtime_read_file(path)
     if existing.len() == data.len() and existing == data:
-        return 0
+        return false
     let tmp_path = path ++ f".{runtime_getpid()}.{runtime_clock_nanos()}.tmp"
     if runtime_write_file(tmp_path, data) != 0:
-        return 1
+        return true
     if runtime_rename(tmp_path, path) != 0:
         let _ = runtime_remove_file(tmp_path)
         let after = runtime_read_file(path)
         if after.len() == data.len() and after == data:
-            return 0
-        return 1
-    0
+            return false
+        return true
+    false
 
 // The extracted objects of every embedded bundle the program needs, in index
 // order. A needed bundle whose abi-sha or target differs from this link's,
@@ -2068,7 +2068,7 @@ fn link_stage_select_embedded_bundles(undef: &str, needs_runtime: bool) -> List[
         // hid it).
         let obj_path = tmp_dir ++ "/wo_" ++ name ++ "_" ++ manifest_wi_sha.slice(0, 16) ++ ".o"
         let data = link_stage_embedded_obj_slice(embedded_bundle_object_start(bi) as *const u8, embedded_bundle_object_end(bi) as *const u8)
-        if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path) != 0:
+        if runtime_mkdir_p(tmp_dir) != 0 or link_stage_extract_blob(data, obj_path):
             with_eprint("error: could not extract embedded bundle '" ++ name ++ "' to " ++ obj_path)
             let failed: List[str] = List.new()
             failed.push(LINK_BUNDLE_FAILED())
@@ -2304,7 +2304,7 @@ fn link_stage_find_runtime_object_path(name: &str) -> str:
     let generation = compiler_generation()
     let generation_key = if generation.len() > 16: generation.slice(0, 16) else: generation
     let tmp_path = tmp_dir ++ "/" ++ generation_key ++ "_" ++ name
-    if link_stage_extract_runtime_obj(name, tmp_path) == 0:
+    if link_stage_extract_runtime_obj(name, tmp_path) == false:
         return tmp_path
     ""
 
@@ -2485,7 +2485,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     // compiler's (never a silent mixed-ABI link, #761). The program's own
     // objects carry every such reference: a facade (std.regex) compiles in
     // the unit and calls the corpus by its module link names.
-    let bundle_objects = link_stage_select_embedded_bundles(undef, link_stage_undefined_symbols_need_helpers_runtime(undef) != 0)
+    let bundle_objects = link_stage_select_embedded_bundles(undef, link_stage_undefined_symbols_need_helpers_runtime(undef))
     if bundle_objects.len() == 1 and bundle_objects[0] == LINK_BUNDLE_FAILED():
         return link_stage_plan_fail()
     var rt_bundle_joined = false
@@ -2515,7 +2515,7 @@ fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_object
     // .w-derived runtime object links any more). A unit that reaches libc
     // or c_import symbols takes the on-demand cimport_stubs archive, which
     // fills in the C-only symbols; nothing else joins.
-    if link_stage_undefined_symbols_need_helpers_runtime(undef) != 0 and not link_stage_should_use_rt_core_from_undef(undef):
+    if link_stage_undefined_symbols_need_helpers_runtime(undef) and not link_stage_should_use_rt_core_from_undef(undef):
         let stubs_path = link_stage_find_runtime_object_path("cimport_stubs.o")
         if stubs_path.len() > 0:
             let stubs_ar = link_stage_make_archive(stubs_path)

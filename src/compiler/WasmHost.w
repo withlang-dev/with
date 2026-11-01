@@ -27,13 +27,13 @@ fn wasm_host_basename(path: &str) -> str:
         i = i - 1
     path.slice(i as i64, path.len())
 
-fn wasm_host_emit(bin_path: &str) -> i32:
+fn wasm_host_emit(bin_path: &str) -> bool:
     let js_path = wasm_host_js_path(bin_path)
     let text = wasm_host_js_text(wasm_host_basename(bin_path))
     if runtime_write_file(js_path, text) != 0:
         with_eprint("error: could not write wasm host script: " ++ js_path)
-        return 1
-    0
+        return true
+    false
 
 fn wasm_host_js_text(wasm_file: &str) -> str:
     let l: List[str] = List.new()

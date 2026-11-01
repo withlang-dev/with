@@ -3716,7 +3716,7 @@ fn cli_fast_install_blessed(root: &str, target_name: &str) -> i32:
     let gate_rc = reseed_gate_smoke(root, compiler_path)
     if gate_rc != 0:
         return gate_rc
-    if green_publish_ceremony_bar(root, compiler_path, target_name) != 0: return 1
+    if green_publish_ceremony_bar(root, compiler_path, target_name): return 1
     // The .Install kind's own placement, never a write into the existing
     // file: truncating the installed, previously-executed binary in place
     // kept its inode, and macOS SIGKILLed the next launch (2026-09-22, after
@@ -4242,7 +4242,7 @@ fn dump_place_map_artifact(source_file: &str, no_std: bool, alloc_mode: bool, ru
 
 fn trace_cleanup_edge_artifact(source_file: &str, spec: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     // #760: an invalid spec is a hard error, not marker text with rc=0.
-    if mir_cleanup_edge_spec_ok(spec) == 0:
+    if mir_cleanup_edge_spec_ok(spec) == false:
         with_eprint("error: invalid --trace-cleanup-edge spec '" ++ spec ++ "'; expected fn:bbFROM->bbTO")
         return 1
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)

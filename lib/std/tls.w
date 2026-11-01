@@ -658,7 +658,7 @@ unsafe fn tls_recv_server_handshake(
 
                 // Parse the leaf for its public key and for verification.
                 let first_cert_data = cert_buf + evidence.leaf_start as u64
-                if x509_parse(&raw mut evidence.leaf as *mut X509Cert, first_cert_data, evidence.chain_lens[0]) == 0:
+                if x509_parse(&raw mut evidence.leaf as *mut X509Cert, first_cert_data, evidence.chain_lens[0]) == false:
                     return -1
                 if evidence.leaf.key_type == 2:
                     let pt_start = evidence.leaf.key_point_start
@@ -936,9 +936,9 @@ unsafe fn tls_verify_peer(
             str_free_bytes(pem_bytes)
     var ok = 0
     if roots_count > 0:
-        if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()) != 0:
+        if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()):
             let leaf_buf = cert_buf + evidence.leaf_start as u64
-            if x509_verify_hostname(leaf_buf, &evidence.leaf as *const X509Cert, hostname, hostname_len) != 0:
+            if x509_verify_hostname(leaf_buf, &evidence.leaf as *const X509Cert, hostname, hostname_len):
                 ok = 1
     with_free(roots_buf)
     if ok == 0:
@@ -976,11 +976,11 @@ unsafe fn tls_verify_peer(
     if conn.cipher_suite == SUITE_ECDHE_RSA_AES128_GCM:
         if evidence.ske_sig_alg != 1 or leaf.key_type != 1:
             return -1
-        return if rsa_pkcs1_verify(leaf_buf2 + leaf.key_n_start as u64, leaf.key_n_len, leaf_buf2 + leaf.key_e_start as u64, leaf.key_e_len, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len) != 0: 0 else: -1
+        return if rsa_pkcs1_verify(leaf_buf2 + leaf.key_n_start as u64, leaf.key_n_len, leaf_buf2 + leaf.key_e_start as u64, leaf.key_e_len, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len): 0 else: -1
     if conn.cipher_suite == SUITE_ECDHE_ECDSA_AES128_GCM:
         if evidence.ske_sig_alg != 3 or leaf.key_type != 2:
             return -1
-        return if x509_ecdsa_verify_der_bytes(leaf_buf2 + leaf.key_point_start as u64, leaf.key_point_len, leaf.key_curve, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len) != 0: 0 else: -1
+        return if x509_ecdsa_verify_der_bytes(leaf_buf2 + leaf.key_point_start as u64, leaf.key_point_len, leaf.key_curve, &evidence.ske_sig[0] as *const u8, evidence.ske_sig_len, &digest[0] as *const u8, digest_len): 0 else: -1
     -1
 
 // ── Public API: TLS connect ────────────────────────────────────────

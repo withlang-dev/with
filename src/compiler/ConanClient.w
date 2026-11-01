@@ -141,12 +141,12 @@ fn conan_hex_digit(c: u8) -> i32:
     -1
 
 // #1915: a package archive is unpacked in-process (compiler.TarExtract).
-fn conan_extract_tgz(archive: &str, dest: &str) -> i32:
+fn conan_extract_tgz(archive: &str, dest: &str) -> bool:
     let problem = tar_gz_extract(archive, dest, 0)
     if problem.len() > 0:
         runtime_eprint("error: could not unpack " ++ problem)
-        return 1
-    0
+        return true
+    false
 
 fn conan_str_compare(a: &str, b: &str) -> i32:
     let min_len = if a.len() < b.len(): a.len() else: b.len()
@@ -1183,7 +1183,7 @@ fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev: &s
         let _remove = runtime_remove_tree(dep_dir)
         return false
     runtime_eprint("  extracting...")
-    if conan_extract_tgz(tgz_path, dep_dir) != 0:
+    if conan_extract_tgz(tgz_path, dep_dir):
         runtime_eprint("error: failed to extract pinned package for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return false
@@ -1228,7 +1228,7 @@ fn conan_install_binary(name: &str, version: &str, recipe_rev: &str, project_roo
         let _remove = runtime_remove_tree(dep_dir)
         return ""
     runtime_eprint("  extracting...")
-    if conan_extract_tgz(tgz_path, dep_dir) != 0:
+    if conan_extract_tgz(tgz_path, dep_dir):
         runtime_eprint("error: failed to extract package for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
@@ -1382,12 +1382,12 @@ fn conan_write_launcher_named(dir: &str, name: &str, self_exe: &str, command: &s
 
 // #1915: every archive is unpacked in-process (compiler.TarExtract): gzip,
 // xz and bzip2 tarballs and zips, told apart by their first bytes.
-fn conan_extract_any(archive: &str, dest: &str) -> i32:
+fn conan_extract_any(archive: &str, dest: &str) -> bool:
     let problem = archive_extract(archive, dest)
     if problem.len() > 0:
         runtime_eprint("error: could not unpack " ++ problem)
-        return 1
-    0
+        return true
+    false
 
 // An archive usually holds one top-level directory; the source is inside it.
 fn conan_source_root(raw_dir: &str) -> str:
@@ -1653,7 +1653,7 @@ fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedReci
     let picked = conan_pick_archive(fetched.source, work, conan_archive_download, conan_archive_digest)
     let archive = picked.path.clone()
     if archive.len() == 0: return ConanSourceTree { source_dir: "", problem: "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ picked.tried }
-    if conan_extract_any(archive, raw_dir) != 0:
+    if conan_extract_any(archive, raw_dir):
         return ConanSourceTree { source_dir: "", problem: "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")" }
     let source_dir = conan_source_root(raw_dir)
     for patch_file in conan_data_patches(fetched.data, version):

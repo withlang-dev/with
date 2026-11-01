@@ -208,10 +208,10 @@ fn analysis_collect_method_registrations(mut report: AnalysisReport, sema: &Sema
 
         if extension:
             registry_index = analysis_extension_registration_index(sema, owner_key, method, effective, sig)
-            exact = registry_index >= 0 and (not generic or sema.generic_fn_registration_contains(effective, node) != 0)
+            exact = registry_index >= 0 and (not generic or sema.generic_fn_registration_contains(effective, node))
             registry = "extension"
         else if generic:
-            exact = sema.generic_fn_registration_contains(effective, node) != 0
+            exact = sema.generic_fn_registration_contains(effective, node)
             registry = "generic"
         else:
             let mapped_sig = sema.method_lookup.sig_lookup.get(key)
@@ -2055,21 +2055,21 @@ fn analysis_seam_row(sema: &Sema, body: &MirBody, fn_name: &str, path: &str, spa
 // place projection; keying on projections (as the place classifier does) misses
 // it entirely. This walk keys on the call destination instead, then proves
 // retention with a second pass over the same body.
-fn analysis_seam_place_is_unowned_root(sema: &Sema, body: &MirBody, place_id: i32) -> i32:
+fn analysis_seam_place_is_unowned_root(sema: &Sema, body: &MirBody, place_id: i32) -> bool:
     if place_id < 0 or place_id >= body.place_locals.len():
-        return 0
+        return false
     let local = body.place_locals[place_id]
     if local < 0 or local >= body.local_type_ids.len():
-        return 0
+        return false
     let proj_count = body.place_proj_counts[place_id]
     let root_ty = body.local_type_ids[local]
     let root_kind = if root_ty > 0: sema.get_type_kind(sema.resolve_alias(root_ty as TypeId)) else: TypeKind.TY_ERR
     // A borrowed/raw root, or any projection off local 0 (`self`/first param).
     if root_kind == TypeKind.TY_REF or root_kind == TypeKind.TY_PTR:
-        return 1
+        return true
     if local == 1 and proj_count > 0:
-        return 1
-    0
+        return true
+    false
 
 fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path: &str) -> List[str]:
     let rows: List[str] = List.new()
@@ -2105,7 +2105,7 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
             continue
         if body.operand_kinds[recv_op] == OperandKind.OK_MOVE:
             continue
-        if analysis_seam_place_is_unowned_root(sema, body, body.operand_d0[recv_op]) == 0:
+        if analysis_seam_place_is_unowned_root(sema, body, body.operand_d0[recv_op]) == false:
             continue
         candidate_locals.push(body.place_locals[dest])
         candidate_spans.push(body.bb_term_spans[bb])
@@ -2771,7 +2771,7 @@ fn analysis_param_mask_text(mask: i32, param_count: i32) -> str:
         return "all"
     var out = ""
     for pi in 0..param_count:
-        if sema_param_origin_mask_contains(mask, pi) == 0:
+        if sema_param_origin_mask_contains(mask, pi) == false:
             continue
         if out.len() > 0:
             out = out ++ ","

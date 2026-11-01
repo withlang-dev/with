@@ -1930,7 +1930,7 @@ impl Codegen:
             let name_sym = self.pool.get_data0(type_node)
             let g_extra = self.pool.get_data1(type_node)
             let g_count = self.pool.get_data2(type_node)
-            if self.sema.type_symbol_is_std_box(name_sym) != 0 and g_count == 1:
+            if self.sema.type_symbol_is_std_box(name_sym) and g_count == 1:
                 return self.dyn_trait_from_type_node(self.pool.get_extra(g_extra))
         0
 
@@ -1948,17 +1948,17 @@ impl Codegen:
         self.dyn_fat_ptr_type = wl_struct_type(self.context, list_data_i64(&fat_types), 2, 0)
         self.dyn_fat_ptr_type
 
-    fn llvm_type_is_dyn_fat_ptr(ty: i64) -> i32:
+    fn llvm_type_is_dyn_fat_ptr(ty: i64) -> bool:
         if ty == 0 or wl_get_type_kind(ty) != wl_struct_type_kind():
-            return 0
+            return false
         if wl_count_struct_elem_types(ty) != 2:
-            return 0
+            return false
         let ptr_ty = wl_ptr_type(self.context)
         if wl_struct_get_type_at(ty, 0) != ptr_ty:
-            return 0
+            return false
         if wl_struct_get_type_at(ty, 1) != ptr_ty:
-            return 0
-        1
+            return false
+        true
 
     fn get_fn_dyn_param_trait(fn_sym: i32, param_idx: i32) -> i32:
         let base_opt = self.fn_dyn_param_starts.get(fn_sym)
@@ -2073,7 +2073,7 @@ impl Codegen:
         // typed `fn(...)`, CK_FN d1), and the adapter is built where the
         // constant is evaluated. Reading it off LLVM shapes turned a `&dyn`
         // data pointer into a function thunk (#1818).
-        if vk == wl_pointer_type_kind() and self.llvm_type_is_dyn_fat_ptr(target_ty) != 0:
+        if vk == wl_pointer_type_kind() and self.llvm_type_is_dyn_fat_ptr(target_ty):
             sema_phase_bug("BUG: a pointer value coerced to a {ptr, ptr} pair with no Sema fact naming the pair")
 
         val
@@ -3312,7 +3312,7 @@ impl Codegen:
 
     mut fn resolve_generic_type_nodes(name_sym: i32, args: &List[i32], type_node: i32) -> i64:
         let count = args.len()
-        if self.sema.type_symbol_is_std_box(name_sym) != 0 and count == 1:
+        if self.sema.type_symbol_is_std_box(name_sym) and count == 1:
             if self.pool.kind(args[0]) == NodeKind.NK_TYPE_TRAIT_OBJ: return self.get_dyn_fat_ptr_type()
             return wl_ptr_type(self.context)
         if name_sym == self.sym_context_error and count == 1:
@@ -3729,8 +3729,8 @@ impl Codegen:
             if self.sema.named_types.contains(lookup_sym):
                 // D29 (#750): a shadowed name inside a std-tier fn body means
                 // the std decl's tid, not the flat map's newest (user) entry.
-                if self.sema.type_sym_is_shadowed(lookup_sym) != 0 and self.current_fn_is_std_tier() != 0:
-                    let tiered = self.sema.lookup_named_type_for_tier(lookup_sym, 1)
+                if self.sema.type_sym_is_shadowed(lookup_sym) and self.current_fn_is_std_tier():
+                    let tiered = self.sema.lookup_named_type_for_tier(lookup_sym, true)
                     if tiered != 0:
                         return tiered
                 return self.sema.named_types.get(lookup_sym).unwrap() as i32
@@ -3997,7 +3997,7 @@ impl Codegen:
                 let ch_fields: List[i64] = List.new()
                 ch_fields.push(wl_i64_type(self.context))
                 return wl_struct_type(self.context, list_data_i64(&ch_fields), 1, 0)
-            if self.sema.type_symbol_is_std_box(base_sym) != 0 and arg_count == 1:
+            if self.sema.type_symbol_is_std_box(base_sym) and arg_count == 1:
                 let elem_tid = self.sema.get_generic_inst_arg(resolved_tid, 0)
                 let elem_resolved = self.sema.resolve_alias(elem_tid)
                 if self.sema.get_type_kind(elem_resolved) == TypeKind.TY_TRAIT_OBJ:
@@ -4346,18 +4346,18 @@ impl Codegen:
             return 0
         self.sema.pool_lookup_symbol(text)
 
-    fn type_sym_shadowed_cg(sym: i32) -> i32:
+    fn type_sym_shadowed_cg(sym: i32) -> bool:
         let sema_sym = self.codegen_sema_sym_for(sym)
         if sema_sym == 0:
-            return 0
+            return false
         self.sema.type_sym_is_shadowed(sema_sym)
 
     // Registration side: the std-tier decl of a shadowed name registers under
     // `name$std`; interning here is fine (registration runs in mut context).
     fn shadow_reg_sym(name_sym: i32, decl_index: i32) -> i32:
-        if self.type_sym_shadowed_cg(name_sym) == 0:
+        if self.type_sym_shadowed_cg(name_sym) == false:
             return name_sym
-        if sema_tier_path_is_std_implementation(self.sema.decl_index_source_path(decl_index)) == 0:
+        if sema_tier_path_is_std_implementation(self.sema.decl_index_source_path(decl_index)) == false:
             return name_sym
         let alias = self.intern.intern(self.intern.resolve(name_sym) ++ "$std")
         self.shadow_alias_map.insert(name_sym, alias)
@@ -4427,7 +4427,7 @@ impl Codegen:
         let alias = self.nominal_alias_by_tid.get(resolved_tid)
         if alias.is_some():
             return alias.unwrap()
-        if resolved_tid > 0 and self.sema.type_tid_std_tier(resolved_tid) != 0 and self.type_sym_shadowed_cg(cg_sym) != 0:
+        if resolved_tid > 0 and self.sema.type_tid_std_tier(resolved_tid) and self.type_sym_shadowed_cg(cg_sym):
             return self.shadow_alias_for(cg_sym)
         cg_sym
 
@@ -4531,7 +4531,7 @@ impl Codegen:
             return 0
         self.sema_type_to_llvm(split_tid)
 
-    fn current_fn_is_std_tier() -> i32:
+    fn current_fn_is_std_tier() -> bool:
         // #1745: a specialization (`gen_pull__sema__…`,
         // `Mutex.new__receiver__…`) has no declaration under its own name;
         // its tier is its template's, which the emitter recorded as the
@@ -4543,20 +4543,20 @@ impl Codegen:
             if template_sym != 0 and self.sema.fn_decl_source_paths.contains(template_sym):
                 return sema_tier_path_is_std_implementation(self.sema.fn_decl_source_paths.get(template_sym).unwrap())
         if self.current_function_name_sym == 0:
-            return 0
+            return false
         let sema_sym = self.codegen_sema_sym_for(self.current_function_name_sym)
         if sema_sym == 0:
-            return 0
+            return false
         if not self.sema.fn_decl_source_paths.contains(sema_sym):
-            return 0
+            return false
         sema_tier_path_is_std_implementation(self.sema.fn_decl_source_paths.get(sema_sym).unwrap())
 
     // By-name type lookups while generating a std-tier fn body must see the
     // std tier's layout for shadowed names.
     fn shadow_lookup_sym(name_sym: i32) -> i32:
-        if self.type_sym_shadowed_cg(name_sym) == 0:
+        if self.type_sym_shadowed_cg(name_sym) == false:
             return name_sym
-        if self.current_fn_is_std_tier() == 0:
+        if self.current_fn_is_std_tier() == false:
             return name_sym
         self.shadow_alias_for(name_sym)
 
@@ -5761,7 +5761,7 @@ impl Codegen:
         // or methods returning Self need the owner bindings before their LLVM
         // signature can be resolved correctly.
         if method_owner_sym != 0:
-            if self.generic_type_decl_node(method_owner_sym) != 0 and self.sema.fn_node_is_generic_template(fn_node, name_sym) != 0:
+            if self.generic_type_decl_node(method_owner_sym) != 0 and self.sema.fn_node_is_generic_template(fn_node, name_sym):
                 self.generic_struct_methods.insert(name_sym, fn_node)
                 return
 
@@ -6332,7 +6332,7 @@ impl Codegen:
     // clause declaration — the owner type's declaration; -1 when neither
     // names a declaration.
     fn generated_body_decl_index(body_sym: i32) -> i32:
-        let dispatch = if self.sema.fn_is_clause_body_symbol(body_sym) != 0: self.sema.fn_clause_body_dispatch.get(body_sym).unwrap() else: body_sym
+        let dispatch = if self.sema.fn_is_clause_body_symbol(body_sym): self.sema.fn_clause_body_dispatch.get(body_sym).unwrap() else: body_sym
         let group = self.sema.fn_clause_group_index(dispatch)
         if group >= 0 and self.sema.fn_clause_group_clause_count(group) > 0:
             return self.find_decl_index(self.sema.fn_clause_group_clause(group, 0))
@@ -7092,7 +7092,7 @@ impl Codegen:
             let type_sym = self.sema_sym_to_codegen_sym(self.pool.get_data0(decl))
             if type_sym == 0:
                 continue
-            if self.sema.type_symbol_is_std_box(type_sym) == 0 and not self.struct_type_map.get(type_sym).is_some() and not self.enum_type_map.get(type_sym).is_some():
+            if self.sema.type_symbol_is_std_box(type_sym) == false and not self.struct_type_map.get(type_sym).is_some() and not self.enum_type_map.get(type_sym).is_some():
                 continue
             let drop_decl = self.impl_decl_method_named(decl as i32, "drop")
             if drop_decl == 0:
@@ -7923,7 +7923,7 @@ impl Codegen:
             let flags = self.pool.get_data2(decl)
             let meta = self.pool.find_fn_meta(decl)
             let is_sema_generic = self.sema.generic_fn_node_for_symbol(name_sym) != 0
-            let is_generic_struct_method = self.is_method_on_generic_struct(name_sym) and self.sema.fn_node_is_generic_template(decl as i32, name_sym) != 0
+            let is_generic_struct_method = self.is_method_on_generic_struct(name_sym) and self.sema.fn_node_is_generic_template(decl as i32, name_sym)
             // Skip sema-generic functions unless they use the generic-struct
             // lazy path in declare_function(). Blanket impl methods borrow type
             // params from impl context, so eager declaration resolves unbound names.
@@ -7983,7 +7983,7 @@ impl Codegen:
                 let meta = self.pool.find_fn_meta(decl)
                 if meta >= 0:
                     let tp_count = self.pool.fn_meta_tp_count(meta)
-                    let is_generic_struct_method = self.is_method_on_generic_struct(name_sym) and self.sema.fn_node_is_generic_template(decl as i32, name_sym) != 0
+                    let is_generic_struct_method = self.is_method_on_generic_struct(name_sym) and self.sema.fn_node_is_generic_template(decl as i32, name_sym)
                     if tp_count == 0 and self.sema.generic_fn_node_for_symbol(name_sym) == 0 and not is_generic_struct_method:
                         if self.unit_owns(name_sym):
                             self.gen_function_dispatch_at(decl, i)

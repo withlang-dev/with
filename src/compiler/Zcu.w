@@ -27,22 +27,22 @@ fn zcu_new_list_str -> List[str]:
     let out: List[str] = List.new()
     out
 
-fn zcu_debug_init_enabled() -> i32:
+fn zcu_debug_init_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 fn zcu_debug_init(msg: &str):
-    if zcu_debug_init_enabled() == 0:
+    if zcu_debug_init_enabled() == false:
         return
     runtime_eprint("[zcu-init] " ++ msg)
 
-fn zcu_debug_pool_flow_enabled() -> i32:
+fn zcu_debug_pool_flow_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 // Zig Compilation Unit (ZCU) state for the With compiler.
 //
@@ -121,7 +121,7 @@ type Zcu {
     // of (Codegen.bundle_carried_paths), for the manifest's `carried` lines.
     last_bundle_carried_paths: List[str],
     project_config: ProjectConfig,
-    trace_c_import_cache: i32,
+    trace_c_import_cache: bool,
     // Analysis commands preserve diagnostics but may continue past preliminary
     // semantic errors to produce a partial final-Sema fact snapshot.
     analysis_partial_semantics: i32,
@@ -198,7 +198,7 @@ fn Zcu.init -> Zcu:
         last_bundle_unlowered_globals: zcu_new_list_str(),
         last_bundle_carried_paths: zcu_new_list_str(),
         project_config: project_config_default(),
-        trace_c_import_cache: 0,
+        trace_c_import_cache: false,
         analysis_partial_semantics: 0,
         frontend_sema_completed: 0,
         prelude_mode: PRELUDE_FULL(),
@@ -503,7 +503,7 @@ impl Zcu:
         self.last_async_mir_dump = ""
         self.reset_last_link_lib_names()
         self.tracked_input_paths = List.new()
-        self.trace_c_import_cache = 0
+        self.trace_c_import_cache = false
         self.source_text_file_ids = List.new()
         self.source_text_names = List.new()
         self.source_texts = List.new()
@@ -531,7 +531,7 @@ impl Zcu:
         self.frontend_pool = self.pool.clone()
 
     mut fn sync_from_sema(sema: Sema):
-        if zcu_debug_pool_flow_enabled() != 0:
+        if zcu_debug_pool_flow_enabled():
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool.clone()
         var tracked_paths = move self.tracked_input_paths
@@ -542,7 +542,7 @@ impl Zcu:
         // stale allocator contents to be dropped as a Diagnostic (#743).
         sema.diags = DiagnosticList.init()
         self.last_sema = sema
-        if zcu_debug_pool_flow_enabled() != 0:
+        if zcu_debug_pool_flow_enabled():
             runtime_eprint(f"[zcu] sync_from_sema:after zcu.pool={self.pool.symbol_count()} last_sema.pool={self.last_sema.pool.symbol_count()} last_sema.ast.decls={self.last_sema.ast.decl_count()}")
 
     mut fn set_resolve_snapshot(result: &ResolveResult, root_path: &str):
@@ -645,7 +645,7 @@ impl Zcu:
 // outside any manifest belongs to the program's package, with the modules it
 // imports from its own tree.
 fn zcu_package_key(path: &str) -> str:
-    if sema_tier_path_is_std_implementation(path) != 0: return "<std>"
+    if sema_tier_path_is_std_implementation(path): return "<std>"
     var dir = zcu_parent_dir(path)
     while true:
         let manifest = if dir.len() == 0: "with.toml" else: dir ++ "/with.toml"

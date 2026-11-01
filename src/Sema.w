@@ -107,14 +107,14 @@ fn sema_param_origin_bit(pi: i32) -> i32:
         return -1
     ((1 as i64) << (pi as u32)) as i32
 
-fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> i32:
+fn sema_param_origin_mask_contains(mask: i32, pi: i32) -> bool:
     if mask == 0 or pi < 0:
-        return 0
+        return false
     if mask < 0:
-        return 1
+        return true
     if pi >= 31:
-        return 0
-    if (mask & sema_param_origin_bit(pi)) != 0: 1 else: 0
+        return false
+    if (mask & sema_param_origin_bit(pi)) != 0: true else: false
 
 enum LabelFrameKind: i32:
     LFK_BOUNDARY = 0
@@ -1069,7 +1069,7 @@ type Sema {
     // lockstep with impl_extra; type_tid_is_std / type_decl_nodes_by_tid are
     // recorded at type-decl registration; type_sym_tier_mask bits: 1=std, 2=user.
     // All queries stay on the flat path unless the mask reads 3 (shadowed).
-    impl_extra_is_std: List[i32],
+    impl_extra_is_std: List[bool],
     type_decl_nodes_by_tid: HashMap[i32, i32],
     // D100 (§18.3): the `pub` fields, keyed by (type declaration node, field
     // name); a field not here is private to its package (sema_field_key).
@@ -1490,7 +1490,7 @@ type Sema {
     moved_field_path_syms: List[i32],
     bind_is_task: List[i32],
     bind_task_used: List[i32],
-    bind_is_scoped_task: List[i32],
+    bind_is_scoped_task: List[bool],
     bind_is_view_bound: List[i32],
     bind_provenance: List[BindingProvenance],
     binding_decl_nodes: HashMap[i32, i32],
@@ -2256,7 +2256,7 @@ type Sema {
     alloc_site_nodes: List[i32],
     alloc_site_kinds: List[i32],
     alloc_site_fn_syms: List[i32],
-    alloc_site_elided: List[i32],
+    alloc_site_elided: List[bool],
     current_no_alloc_depth: i32,
     current_fn_may_alloc: i32,
     // #1941: calls recorded while bodies are checked, resolved once every
@@ -2668,22 +2668,22 @@ type Sema {
     reachable_decl_indices: HashMap[i32, i32],
 }
 
-fn sema_debug_stage1_enabled -> i32:
+fn sema_debug_stage1_enabled -> bool:
     let raw = with_getenv_str("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
-fn sema_debug_move_enabled -> i32:
+fn sema_debug_move_enabled -> bool:
     let raw = with_getenv_str("WITH_DEBUG_MOVE")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 // WITH_DEBUG_BORROWS=1: the borrow table at every read and mutation check
 // (SemaCheck.w check_read_against_views, register_view_binding_borrows).
-fn sema_debug_borrows_enabled -> i32:
-    if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: 0 else: 1
+fn sema_debug_borrows_enabled -> bool:
+    if with_getenv_str("WITH_DEBUG_BORROWS").len() == 0: false else: true
 
 // WITH_DEBUG_PERMUTE_TAGS=1: a plain enum's variants get their tags in
 // reverse declaration order (deep-debugging-tools.md, "Representation
@@ -2694,7 +2694,7 @@ fn sema_permute_tags_enabled -> bool: with_getenv_str("WITH_DEBUG_PERMUTE_TAGS")
 
 impl Sema:
     fn debug_unknown_type(sym: i32, node: i32, context: &str):
-        if sema_debug_stage1_enabled() == 0:
+        if sema_debug_stage1_enabled() == false:
             return
         let name = self.pool_resolve_symbol(sym)
         let prim = self.primitive_type_by_sym(sym)
@@ -2734,12 +2734,12 @@ impl Sema:
         self.pool.state.symbol_texts.push(owned)
         id
 
-fn sema_tier_path_is_std_implementation(path: &str) -> i32:
+fn sema_tier_path_is_std_implementation(path: &str) -> bool:
     if path.starts_with("lib/std/") or path.starts_with("<embedded-std>/"):
-        return 1
+        return true
     if path.contains("/lib/std/"):
-        return 1
-    0
+        return true
+    false
 
 // Separator-agnostic: a native Windows source path is backslash-separated.
 fn sema_dirname(path: &str) -> str:
@@ -2749,11 +2749,11 @@ fn sema_dirname(path: &str) -> str:
             last_slash = i as i32
     if last_slash <= 0: "" else: path.slice(0, last_slash as i64)
 
-fn sema_list_str_contains(v: &List[str], s: &str) -> i32:
+fn sema_list_str_contains(v: &List[str], s: &str) -> bool:
     for i in 0..v.len():
         if v[i] == s:
-            return 1
-    0
+            return true
+    false
 
 // Whether a named import's selection ("X,Y") names `name`.
 fn sema_selection_names(selected: &str, name: &str) -> bool:
@@ -2789,44 +2789,44 @@ fn sema_std_module_dotted(path: &str) -> str:
 // gate (they register pathless). c_void and assert_matches_failed are
 // compiler-lowering support: c_import emissions and the assert_matches
 // desugaring reference them in user-tier positions the user never spelled.
-fn sema_prelude_gate_allows_name(name: &str) -> i32:
+fn sema_prelude_gate_allows_name(name: &str) -> bool:
     if name == "print" or name == "eprint":
-        return 1
+        return true
     if name == "assert" or name == "assert_eq" or name == "assert_ne":
-        return 1
+        return true
     if name == "require" or name == "check":
-        return 1
+        return true
     if name == "panic" or name == "unreachable" or name == "todo":
-        return 1
+        return true
     if name == "drop":
-        return 1
+        return true
     if name == "Option" or name == "Some" or name == "None":
-        return 1
+        return true
     if name == "Result" or name == "Ok" or name == "Err":
-        return 1
+        return true
     if name == "List" or name == "String" or name == "str" or name == "Unit":
-        return 1
+        return true
     if name == "Eq" or name == "Ord" or name == "Key" or name == "Debug":
-        return 1
+        return true
     if name == "Display" or name == "Default" or name == "Drop":
-        return 1
+        return true
     if name == "c_void" or name == "assert_matches_failed":
-        return 1
-    0
+        return true
+    false
 
-fn sema_path_is_std_box_module(path: &str) -> i32:
+fn sema_path_is_std_box_module(path: &str) -> bool:
     if path == "lib/std/box.w" or path == "<embedded-std>/std/box.w":
-        return 1
+        return true
     if path.ends_with("/lib/std/box.w") or path.ends_with("\\lib\\std\\box.w"):
-        return 1
-    0
+        return true
+    false
 
-fn sema_path_is_std_rc_module(path: &str) -> i32:
+fn sema_path_is_std_rc_module(path: &str) -> bool:
     if path == "lib/std/rc.w" or path == "<embedded-std>/std/rc.w":
-        return 1
+        return true
     if path.ends_with("/lib/std/rc.w") or path.ends_with("\\lib\\std\\rc.w"):
-        return 1
-    0
+        return true
+    false
 
 fn sema_path_is_std_memo_module(path: &str) -> bool:
     path == "lib/std/memo.w" or path == "<embedded-std>/std/memo.w" or path.ends_with("/lib/std/memo.w") or path.ends_with("\\lib\\std\\memo.w")
@@ -2903,126 +2903,126 @@ impl Sema:
         diag.add_help("bind it with `let` instead of `const`")
         self.diags.emit(diag)
 
-    fn current_module_is_std_implementation() -> i32:
+    fn current_module_is_std_implementation() -> bool:
         sema_tier_path_is_std_implementation(self.current_module_path)
 
-    fn type_symbol_is_std_box(sym: i32) -> i32:
+    fn type_symbol_is_std_box(sym: i32) -> bool:
         if with_getenv_str("WITH_DEBUG_BOXSYM").len() > 0:
             let bs_path = self.type_decl_source_path(sym)
-            let bs_eq = if sym == self.syms.box: 1 else: 0
+            let bs_eq = if sym == self.syms.box: true else: false
             with_eprint(f"[boxsym] sym={sym} syms.box={self.syms.box} eq={bs_eq} path='{bs_path}' pathlen={bs_path.len()} verdict={sema_path_is_std_box_module(bs_path)}")
         if sym != self.syms.box:
-            return 0
+            return false
         sema_path_is_std_box_module(self.type_decl_source_path(sym))
 
-    fn type_is_std_box_inst(tid: i32) -> i32:
+    fn type_is_std_box_inst(tid: i32) -> bool:
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
+            return false
         if self.get_generic_inst_arg_count(resolved as i32) != 1:
-            return 0
+            return false
         self.type_symbol_is_std_box(self.get_type_d0(resolved))
 
-    fn fn_symbol_is_std_box_member(fn_sym: i32) -> i32:
+    fn fn_symbol_is_std_box_member(fn_sym: i32) -> bool:
         sema_path_is_std_box_module(self.fn_symbol_source_path(fn_sym))
 
-    fn type_symbol_is_std_rc_owner(sym: i32) -> i32:
+    fn type_symbol_is_std_rc_owner(sym: i32) -> bool:
         let name = self.pool_resolve_symbol(sym)
         if name != "Rc" and name != "Arc":
-            return 0
+            return false
         sema_path_is_std_rc_module(self.type_decl_source_path(sym))
 
-fn sema_tier_std_only_module(path: &str) -> i32:
+fn sema_tier_std_only_module(path: &str) -> bool:
     if path == "std.io" or path.starts_with("std.io."):
-        return 1
+        return true
     if path == "std.fs" or path.starts_with("std.fs."):
-        return 1
+        return true
     if path == "std.net" or path.starts_with("std.net."):
-        return 1
+        return true
     if path == "std.sync" or path.starts_with("std.sync."):
-        return 1
+        return true
     if path == "std.channel" or path.starts_with("std.channel."):
-        return 1
+        return true
     if path == "std.task" or path.starts_with("std.task."):
-        return 1
+        return true
     if path == "std.thread" or path.starts_with("std.thread."):
-        return 1
+        return true
     if path == "std.process" or path.starts_with("std.process."):
-        return 1
+        return true
     if path == "std.os" or path.starts_with("std.os."):
-        return 1
+        return true
     if path == "std.signal" or path.starts_with("std.signal."):
-        return 1
+        return true
     if path == "std.sysinfo" or path.starts_with("std.sysinfo."):
-        return 1
+        return true
     if path == "std.time" or path.starts_with("std.time."):
-        return 1
-    0
+        return true
+    false
 
-fn sema_path_is_compiler_hook_runner(path: &str) -> i32:
+fn sema_path_is_compiler_hook_runner(path: &str) -> bool:
     if path.contains("__with_compiler_hook_runner."):
-        return 1
-    0
+        return true
+    false
 
 impl Sema:
-    fn core_without_alloc() -> i32:
+    fn core_without_alloc() -> bool:
         if self.no_std == 0:
-            return 0
+            return false
         if self.alloc != 0:
-            return 0
-        1
+            return false
+        true
 
-    fn symbol_requires_alloc_tier(sym: i32) -> i32:
+    fn symbol_requires_alloc_tier(sym: i32) -> bool:
         if sym == self.syms.list or sym == self.syms.hashmap or sym == self.syms.hashset or sym == self.syms.slotmap:
-            return 1
-        if self.type_symbol_is_std_box(sym) != 0:
-            return 1
-        if self.type_symbol_is_std_rc_owner(sym) != 0:
-            return 1
+            return true
+        if self.type_symbol_is_std_box(sym):
+            return true
+        if self.type_symbol_is_std_rc_owner(sym):
+            return true
         let name = self.pool_resolve_symbol(sym)
         if name == "String" or name == "StringBuilder":
-            return 1
-        0
+            return true
+        false
 
-    fn symbol_requires_std_tier(sym: i32) -> i32:
+    fn symbol_requires_std_tier(sym: i32) -> bool:
         if sym == self.syms.regex:
-            return 1
+            return true
         let name = self.pool_resolve_symbol(sym)
         if name == "print" or name == "eprint" or name == "write" or name == "ewrite":
-            return 1
+            return true
         if name == "print_i32" or name == "print_i64" or name == "print_bool":
-            return 1
+            return true
         if name == "Task" or name == "ScopedTask" or name == "ScopedJoinHandle":
-            return 1
+            return true
         if name == "Sender" or name == "Receiver" or name == "chan":
-            return 1
+            return true
         if name == "Mutex" or name == "RwLock" or name == "Atomic" or name == "AtomicI64" or name == "Order":
-            return 1
+            return true
         if name == "MutexGuard" or name == "MutexGuardMut" or name == "RwReadGuard" or name == "RwWriteGuard":
-            return 1
-        0
+            return true
+        false
 
-    mut fn require_alloc_tier_for_symbol(sym: i32, node: i32) -> i32:
-        if self.core_without_alloc() == 0:
-            return 1
-        if self.current_module_is_std_implementation() != 0:
-            return 1
-        if self.symbol_requires_alloc_tier(sym) == 0:
-            return 1
+    mut fn require_alloc_tier_for_symbol(sym: i32, node: i32) -> bool:
+        if self.core_without_alloc() == false:
+            return true
+        if self.current_module_is_std_implementation():
+            return true
+        if self.symbol_requires_alloc_tier(sym) == false:
+            return true
         let name: str = with_str_clone_ref(self.pool_resolve_symbol(sym))
         self.emit_error(name ++ " requires alloc; use --alloc or set alloc = true with std = false", node)
-        0
+        false
 
-    mut fn require_std_tier_for_symbol(sym: i32, node: i32) -> i32:
+    mut fn require_std_tier_for_symbol(sym: i32, node: i32) -> bool:
         if self.no_std == 0:
-            return 1
-        if self.current_module_is_std_implementation() != 0:
-            return 1
-        if self.symbol_requires_std_tier(sym) == 0:
-            return 1
+            return true
+        if self.current_module_is_std_implementation():
+            return true
+        if self.symbol_requires_std_tier(sym) == false:
+            return true
         let name: str = with_str_clone_ref(self.pool_resolve_symbol(sym))
         self.emit_error(name ++ " requires std", node)
-        0
+        false
 
 fn sema_new_map_i32_i32 -> HashMap[i32, i32]:
     HashMap.new()
@@ -4419,13 +4419,13 @@ impl Sema:
         let existing = if self.retained_extern_params.contains(name_sym): self.retained_extern_params.get(name_sym).unwrap() else: 0
         self.retained_extern_params.insert(name_sym, existing | (1 << (idx as u32)))
 
-    fn param_is_retained(name_sym: i32, idx: i32) -> i32:
+    fn param_is_retained(name_sym: i32, idx: i32) -> bool:
         if name_sym == 0 or idx < 0 or idx >= 31:
-            return 0
+            return false
         if not self.retained_extern_params.contains(name_sym):
-            return 0
+            return false
         let mask = self.retained_extern_params.get(name_sym).unwrap()
-        if (mask & (1 << (idx as u32))) != 0: 1 else: 0
+        if (mask & (1 << (idx as u32))) != 0: true else: false
 
     // #602: parse a `retains:` entry of the form "fnname(idx)" and register it.
     mut fn register_retains_entry(entry_sym: i32):
@@ -4825,7 +4825,7 @@ impl Sema:
                 if chosen == sym:
                     return sym
         if chosen == 0:
-            if self.decl_visibility_index.contains(sym) and self.symbol_visible_from_current(sym) != 0:
+            if self.decl_visibility_index.contains(sym) and self.symbol_visible_from_current(sym):
                 return sym
             i = head
             while i >= 0 and chosen == 0:
@@ -5088,7 +5088,7 @@ impl Sema:
 
     fn package_of(path: &str) -> str:
         if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
-        if sema_tier_path_is_std_implementation(path) != 0: "<std>" else: "<program>"
+        if sema_tier_path_is_std_implementation(path): "<std>" else: "<program>"
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
         if target_path.len() == 0:
@@ -5097,7 +5097,7 @@ impl Sema:
             return 1
         if target_path == self.current_module_path:
             return 1
-        if sema_path_is_compiler_hook_runner(self.current_module_path) != 0:
+        if sema_path_is_compiler_hook_runner(self.current_module_path):
             return 1
         // The std tier is one implementation: its modules read each other's
         // private declarations (a migrated engine corpus is generated that
@@ -5106,7 +5106,7 @@ impl Sema:
         // guessed from the directory name — so a user project laid out as
         // `src/a.w`, `src/b.w` had privacy only when checked from inside
         // `src/`. The compiler tree now conforms to §18.3 like any project.
-        if sema_tier_path_is_std_implementation(self.current_module_path) != 0 and sema_tier_path_is_std_implementation(target_path) != 0:
+        if sema_tier_path_is_std_implementation(self.current_module_path) and sema_tier_path_is_std_implementation(target_path):
             return 1
         // #2248: a std module loaded only for a corpus's sake is not part of
         // any program's namespace (record_engine_corpora).
@@ -5147,7 +5147,7 @@ impl Sema:
             return 1
         if target_path == self.current_module_path:
             return 1
-        if sema_path_is_compiler_hook_runner(self.current_module_path) != 0:
+        if sema_path_is_compiler_hook_runner(self.current_module_path):
             return 1
         let current_is_std = sema_tier_path_is_std_implementation(self.current_module_path)
         let target_is_std = sema_tier_path_is_std_implementation(target_path)
@@ -5155,10 +5155,10 @@ impl Sema:
         if current_is_std != 0 and target_is_std == 0:
             self.vis_note("  refused: a std module never resolves a user-tier declaration")
             return 0
-        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) != 0: self.vis_note("  §18.2 enumerated prelude name: the gate allows it")
-        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) == 0:
+        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)): self.vis_note("  §18.2 enumerated prelude name: the gate allows it")
+        if current_is_std == 0 and target_is_std != 0 and sema_prelude_gate_allows_name(self.pool_resolve(sym)) == false:
             self.vis_note(f"  not an enumerated prelude name; engine={self.engine_corpus_id(target_path)} prelude-closure={self.module_in_prelude_closure(target_path)} corpus-private={if self.corpus_private_modules.contains(target_path): 1 else: 0}")
-            if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path) != 0:
+            if self.engine_corpus_id(target_path) != 0 or self.module_in_prelude_closure(target_path):
                 if self.module_visible_no_prelude(target_path) == 0:
                     self.vis_note("  refused: an engine or prelude-closure module needs an explicit import path (no-prelude walk found none)")
                     return 0
@@ -5224,8 +5224,8 @@ impl Sema:
             if edge >= 0 and edge < self.module_paths.len() and self.module_paths[edge] == target_path: return true
         false
 
-    fn module_in_prelude_closure(path: &str) -> i32:
-        if self.global_visible_module_paths.contains(path): 1 else: 0
+    fn module_in_prelude_closure(path: &str) -> bool:
+        if self.global_visible_module_paths.contains(path): true else: false
 
     // #1362: the engine corpus a module belongs to, 0 for any other module.
     fn engine_corpus_id(path: &str) -> i32:
@@ -5271,7 +5271,7 @@ impl Sema:
             for mi in 0..count:
                 let path = sema_owned_text(self.module_paths[mi])
                 if self.corpus_private_modules.contains(path) or self.engine_corpus_id(path) != 0: continue
-                if sema_tier_path_is_std_implementation(path) == 0 or self.global_visible_module_paths.contains(path): continue
+                if sema_tier_path_is_std_implementation(path) == false or self.global_visible_module_paths.contains(path): continue
                 var importers = 0
                 var all_corpus = true
                 for from in 0..count:
@@ -5337,7 +5337,7 @@ impl Sema:
             // continues only through the std tier (§18.2 tier 5, #752) and,
             // compiled in-unit, through a bundle corpus's own modules (D39
             // §3.4 above).
-            let current_is_std = current >= 0 and current < self.module_paths.len() and sema_tier_path_is_std_implementation(self.module_paths[current]) != 0
+            let current_is_std = current >= 0 and current < self.module_paths.len() and sema_tier_path_is_std_implementation(self.module_paths[current])
             if current != start_idx and not current_is_std and not self.module_in_bundle_corpus(current):
                 continue
             if current >= 0 and current < self.module_import_starts.len():
@@ -5377,17 +5377,17 @@ impl Sema:
     fn module_in_bundle_corpus(module_idx: i32) -> bool:
         self.bundle_corpus.len() > 0 and module_idx >= 0 and module_idx < self.module_paths.len() and bundle_corpus_contains(self.bundle_corpus, codegen_canonical_module_path(self.module_paths[module_idx]))
 
-    fn symbol_visible_from_current(sym: i32) -> i32:
+    fn symbol_visible_from_current(sym: i32) -> bool:
         let symbol_name = self.pool_resolve(sym)
         if symbol_name.starts_with("with_") or symbol_name.starts_with("rt_") or symbol_name.starts_with("wl_"):
-            return 1
+            return true
         // D29 (#750): an extern declaration names a global C symbol — one
         // contract in every tier, and the frontend dedups the decls across
         // tiers — so tier gating and blindness do not apply.
         if self.extern_fn_names.contains(sym):
-            return 1
+            return true
         if self.ci_syms.contains(sym) and self.is_ci_visible(sym):
-            return 1
+            return true
         var saw_candidate = 0
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
@@ -5399,11 +5399,11 @@ impl Sema:
             let record_di = self.find_decl_index(self.decl_visibility_nodes[i])
             let imported_c = path != self.current_module_path and record_di >= 0 and record_di < self.decl_is_c_import.len() and self.decl_is_c_import[record_di] != 0
             if not imported_c and self.decl_visible_from_current_gated(path, is_pub, sym) != 0:
-                return 1
+                return true
             i = self.decl_visibility_prev[i]
         if saw_candidate == 0:
-            return 1
-        if self.std_fallback_bridge_path(sym).len() > 0: 1 else: 0
+            return true
+        if self.std_fallback_bridge_path(sym).len() > 0: true else: false
 
     // #1362 bridge, until the §18.2 fallback tier lands (#752): a name that
     // resolved from user code only because an engine corpus declared it too
@@ -5414,7 +5414,7 @@ impl Sema:
     // with no engine twin keeps the prelude gate (#750). Returns that
     // declaration's module path, "" when the bridge does not apply.
     fn std_fallback_bridge_path(sym: i32) -> str:
-        if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path) != 0:
+        if sym == 0 or self.current_module_path.len() == 0 or sema_tier_path_is_std_implementation(self.current_module_path):
             return ""
         let paths = sema_new_list_str()
         let pubs: List[i32] = List.new()
@@ -5446,14 +5446,14 @@ impl Sema:
         let modules = sema_new_list_str()
         for pi in 0..paths.len():
             let path = paths[pi]
-            if pubs[pi] == 0 or sema_tier_path_is_std_implementation(path) == 0:
+            if pubs[pi] == 0 or sema_tier_path_is_std_implementation(path) == false:
                 self.vis_note("  bridge: skip " ++ path ++ (if pubs[pi] == 0: " (not pub)" else: " (not std)"))
                 continue
             if self.engine_corpus_id(path) != 0:
                 engine_twin = sema_owned_text(path)
             else if self.corpus_private_modules.contains(path):
                 self.vis_note("  bridge: skip " ++ path ++ " (corpus-private, #2248)")
-            else if sema_list_str_contains(&modules, path) == 0:
+            else if sema_list_str_contains(&modules, path) == false:
                 modules.push(sema_owned_text(path))
         self.vis_note(f"  bridge: {modules.len()} non-engine std module(s) declare it" ++ (if engine_twin.len() > 0: "; engine twin " ++ engine_twin else: "; no engine twin"))
         // Only a name an engine twin displaced takes the bridge: a std name
@@ -5468,7 +5468,7 @@ impl Sema:
             let i: i32 = record.unwrap()
             let path = self.decl_visibility_paths[i]
             // #1744: a named import that does not select it hides it too.
-            if sema_tier_path_is_std_implementation(path) == 0 and path != self.current_module_path and self.unselected_import_path(path, self.decl_visibility_syms[i]).len() > 0:
+            if sema_tier_path_is_std_implementation(path) == false and path != self.current_module_path and self.unselected_import_path(path, self.decl_visibility_syms[i]).len() > 0:
                 return 0
             return self.decl_visible_from_current(path, self.decl_visibility_pub[i])
         1
@@ -5497,7 +5497,7 @@ impl Sema:
         if sym == 0:
             return ""
         let name = self.pool_resolve(sym)
-        if name.len() == 0 or sema_prelude_gate_allows_name(name) != 0:
+        if name.len() == 0 or sema_prelude_gate_allows_name(name):
             return ""
         let paths = sema_new_list_str()
         var i = 0
@@ -5521,9 +5521,9 @@ impl Sema:
             if modules.len() > 0:
                 break
             for path in paths:
-                if sema_tier_path_is_std_implementation(path) != 0 and (closure_only == 0 or self.module_in_prelude_closure(path) != 0):
+                if sema_tier_path_is_std_implementation(path) and (closure_only == 0 or self.module_in_prelude_closure(path)):
                     let dotted = sema_std_module_dotted(path)
-                    if dotted.len() > 0 and sema_list_str_contains(&modules, dotted) == 0:
+                    if dotted.len() > 0 and sema_list_str_contains(&modules, dotted) == false:
                         modules.push(sema_owned_text(dotted))
         if modules.len() == 0:
             return ""
@@ -5554,7 +5554,7 @@ impl Sema:
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
         while i >= 0:
             let decl_path = self.decl_visibility_paths[i]
-            if self.decl_visibility_pub[i] != 0 and sema_tier_path_is_std_implementation(decl_path) == 0:
+            if self.decl_visibility_pub[i] != 0 and sema_tier_path_is_std_implementation(decl_path) == false:
                 let by = self.unselected_import_path(decl_path, sym)
                 if by.len() > 0:
                     let infix = name.index_of("$in$")
@@ -5619,7 +5619,7 @@ impl Sema:
                     // Through a std module the walk continues: every public
                     // std declaration is the lowest resolution tier (§18.2 tier 5,
                     // #752), so what std.build imports is reachable from build.w.
-                    if current == start_idx or sema_tier_path_is_std_implementation(self.module_paths[current]) != 0:
+                    if current == start_idx or sema_tier_path_is_std_implementation(self.module_paths[current]):
                         let target = self.module_import_targets[(edge_start + ei)]
                         // D39 §3.4: a corpus presents its surface, never its
                         // body-only imports — from inside a corpus the walk
@@ -5659,12 +5659,12 @@ impl Sema:
     // candidate declared in the requested tier, ignoring module visibility —
     // codegen runs after checking and needs the layout of a specific tier's
     // decl, not a context-relative resolution.
-    fn lookup_named_type_for_tier(sym: i32, want_std: i32) -> i32:
+    fn lookup_named_type_for_tier(sym: i32, want_std: bool) -> i32:
         var i = self.named_type_candidate_head(sym)
         while i >= 0:
             let path = self.named_type_candidate_paths[i]
             if path.len() > 0:
-                let cand_std = if sema_tier_path_is_std_implementation(path) != 0: 1 else: 0
+                let cand_std = if sema_tier_path_is_std_implementation(path): 1 else: 0
                 if cand_std == want_std:
                     return self.named_type_candidate_tids[i]
             i = self.named_type_candidate_next[i]
@@ -5713,7 +5713,7 @@ impl Sema:
             let candidate_path: str = with_str_clone_ref(self.trait_candidate_paths[i])
             if not visible_only or self.decl_visible_from_current_gated(candidate_path, self.trait_candidate_pubs[i], sym) != 0:
                 if candidate_path == module_path: return i
-                if sema_tier_path_is_std_implementation(candidate_path) != 0:
+                if sema_tier_path_is_std_implementation(candidate_path):
                     if std_candidate < 0: std_candidate = i
                 else if program_candidate < 0:
                     program_candidate = i
@@ -5722,12 +5722,12 @@ impl Sema:
 
     // The trait index of `sym` in one tier (std or user), for the
     // compiler's own demands in another module's context.
-    fn lookup_trait_for_tier(sym: i32, want_std: i32) -> i32:
+    fn lookup_trait_for_tier(sym: i32, want_std: bool) -> i32:
         var i = self.trait_candidate_head(sym)
         while i >= 0:
             let path = self.trait_candidate_paths[i]
             if path.len() > 0:
-                let cand_std = if sema_tier_path_is_std_implementation(path) != 0: 1 else: 0
+                let cand_std = if sema_tier_path_is_std_implementation(path): 1 else: 0
                 if cand_std == want_std:
                     return i
             i = self.trait_candidate_nexts[i]
@@ -5855,12 +5855,12 @@ impl Sema:
             return true
         false
 
-    fn typeinfo_builtin_shadowed(sym: i32) -> i32:
+    fn typeinfo_builtin_shadowed(sym: i32) -> bool:
         if self.scope_lookup(sym) >= 0:
-            return 1
+            return true
         if self.has_named_type_visible(sym):
-            return 1
-        0
+            return true
+        false
 
     fn typeinfo_module_field(callee: i32) -> i32:
         var access = callee
@@ -5877,7 +5877,7 @@ impl Sema:
         let recv_sym = self.ast.get_data0(recv)
         if self.pool_resolve(recv_sym) != "TypeInfo":
             return 0
-        if self.typeinfo_builtin_shadowed(recv_sym) != 0:
+        if self.typeinfo_builtin_shadowed(recv_sym):
             return 0
         self.ast.get_data1(access)
 
@@ -6088,41 +6088,41 @@ impl Sema:
         self.lang_trait_syms.insert(self.pool_intern("ScopedMut"), 1)
         self.lang_trait_syms.insert(self.pool_intern("Error"), 1)
 
-fn sema_is_name_char(ch: i32) -> i32:
+fn sema_is_name_char(ch: i32) -> bool:
     if ch >= 48 and ch <= 57:
-        return 1
+        return true
     if ch >= 65 and ch <= 90:
-        return 1
+        return true
     if ch >= 97 and ch <= 122:
-        return 1
+        return true
     if ch == 95 or ch == 46:
-        return 1
-    0
+        return true
+    false
 
-fn sema_is_ident_start_char(ch: i32) -> i32:
+fn sema_is_ident_start_char(ch: i32) -> bool:
     if ch == 95:
-        return 1
+        return true
     if ch >= 65 and ch <= 90:
-        return 1
+        return true
     if ch >= 97 and ch <= 122:
-        return 1
-    0
+        return true
+    false
 
-fn sema_is_ident_char(ch: i32) -> i32:
+fn sema_is_ident_char(ch: i32) -> bool:
     if ch >= 48 and ch <= 57:
-        return 1
+        return true
     sema_is_ident_start_char(ch)
 
-fn sema_is_space_char(ch: i32) -> i32:
+fn sema_is_space_char(ch: i32) -> bool:
     if ch == 32:
-        return 1
+        return true
     if ch == 9:
-        return 1
+        return true
     if ch == 10:
-        return 1
+        return true
     if ch == 13:
-        return 1
-    return 0
+        return true
+    return false
 
 fn extract_name_after_keyword_in_text(text: &str, keyword: &str) -> str:
     if text.len() == 0 or keyword.len() == 0:
@@ -6132,32 +6132,32 @@ fn extract_name_after_keyword_in_text(text: &str, keyword: &str) -> str:
         if text.slice(i as i64, (i + keyword.len()) as i64) != keyword:
             i = i + 1
             continue
-        if i > 0 and sema_is_ident_char(text[i - 1]) != 0:
+        if i > 0 and sema_is_ident_char(text[i - 1]):
             i = i + 1
             continue
-        if i + keyword.len() < text.len() and sema_is_ident_char(text[i + keyword.len()]) != 0:
+        if i + keyword.len() < text.len() and sema_is_ident_char(text[i + keyword.len()]):
             i = i + 1
             continue
 
         var j = i + keyword.len()
-        while j < text.len() and sema_is_space_char(text[j]) != 0:
+        while j < text.len() and sema_is_space_char(text[j]):
             j = j + 1
 
         // let mut x = ... -> capture x
         if keyword == "let" and j + 3 <= text.len() and text.slice(j as i64, (j + 3) as i64) == "mut":
-            if j + 3 == text.len() or sema_is_ident_char(text[j + 3]) == 0:
+            if j + 3 == text.len() or sema_is_ident_char(text[j + 3]) == false:
                 j = j + 3
-                while j < text.len() and sema_is_space_char(text[j]) != 0:
+                while j < text.len() and sema_is_space_char(text[j]):
                     j = j + 1
 
-        if j >= text.len() or sema_is_ident_start_char(text[j]) == 0:
+        if j >= text.len() or sema_is_ident_start_char(text[j]) == false:
             i = i + 1
             continue
         let start = j
         j = j + 1
         while j < text.len():
             let ch = text[j]
-            if sema_is_name_char(ch) == 0:
+            if sema_is_name_char(ch) == false:
                 break
             j = j + 1
         if j > start:
@@ -6171,9 +6171,9 @@ fn extract_param_name_from_segment(segment: &str) -> str:
 
     var start = 0
     var end = segment.len()
-    while start < end and sema_is_space_char(segment[start]) != 0:
+    while start < end and sema_is_space_char(segment[start]):
         start = start + 1
-    while end > start and sema_is_space_char(segment[end - 1]) != 0:
+    while end > start and sema_is_space_char(segment[end - 1]):
         end = end - 1
     if end <= start:
         return ""
@@ -6188,16 +6188,16 @@ fn extract_param_name_from_segment(segment: &str) -> str:
             else if segment[start] == 93:
                 depth = depth - 1
             start = start + 1
-        while start < end and sema_is_space_char(segment[start]) != 0:
+        while start < end and sema_is_space_char(segment[start]):
             start = start + 1
         if end <= start:
             return ""
 
     // Skip optional mut prefix.
     if start + 3 <= end and segment.slice(start as i64, (start + 3) as i64) == "mut":
-        if start + 3 == end or sema_is_ident_char(segment[start + 3]) == 0:
+        if start + 3 == end or sema_is_ident_char(segment[start + 3]) == false:
             start = start + 3
-            while start < end and sema_is_space_char(segment[start]) != 0:
+            while start < end and sema_is_space_char(segment[start]):
                 start = start + 1
             if end <= start:
                 return ""
@@ -6213,16 +6213,16 @@ fn extract_param_name_from_segment(segment: &str) -> str:
         return ""
 
     var name_end = colon
-    while name_end > start and sema_is_space_char(segment[name_end - 1]) != 0:
+    while name_end > start and sema_is_space_char(segment[name_end - 1]):
         name_end = name_end - 1
     if name_end <= start:
         return ""
 
-    if sema_is_ident_start_char(segment[start]) == 0:
+    if sema_is_ident_start_char(segment[start]) == false:
         return ""
     i = start + 1
     while i < name_end:
-        if sema_is_ident_char(segment[i]) == 0:
+        if sema_is_ident_char(segment[i]) == false:
             return ""
         i = i + 1
     segment.slice(start as i64, name_end as i64)
@@ -6387,7 +6387,7 @@ impl Sema:
             return
         if self.pretty_symbol_names.contains(sym):
             let existing = self.pretty_symbol_names.get(sym).unwrap()
-            if existing.len() > 0 and existing != "_" and existing != "mut" and sema_str_contains_char(existing, 46) != 0:
+            if existing.len() > 0 and existing != "_" and existing != "mut" and sema_str_contains_char(existing, 46):
                 return
             if existing.len() > 0 and existing != "_" and existing != "mut":
                 return
@@ -6466,11 +6466,11 @@ impl Sema:
     mut fn freeze_types():
         self.types_frozen = 1
 
-    fn type_extra_matches(extra_start: i32, values: &List[i32], count: i32) -> i32:
+    fn type_extra_matches(extra_start: i32, values: &List[i32], count: i32) -> bool:
         for i in 0..count:
             if self.type_extra[(extra_start + i)] != values[i]:
-                return 0
-        1
+                return false
+        true
 
     fn find_exact_type(kind: i32, d0: i32, d1: i32, d2: i32) -> TypeId:
         let key = sema_exact_type_hash(kind, d0, d1, d2)
@@ -6499,7 +6499,7 @@ impl Sema:
             if self.type_d1[ti] != elem_count:
                 continue
             let te_start = self.type_d0[ti]
-            if self.type_extra_matches(te_start, elems, elem_count) != 0:
+            if self.type_extra_matches(te_start, elems, elem_count):
                 return ti as TypeId
         0 as TypeId
 
@@ -6532,7 +6532,7 @@ impl Sema:
             if self.callable_type_flags(ti as i32) != flags:
                 continue
             let te_start = self.type_d0[ti]
-            if self.type_extra_matches(te_start, params, param_count) != 0:
+            if self.type_extra_matches(te_start, params, param_count):
                 return ti as TypeId
         0 as TypeId
 
@@ -6573,10 +6573,10 @@ impl Sema:
         tid != 0 and self.variadic_fn_type_set.contains(self.resolve_alias(tid as TypeId) as i32)
 
     // True when a callable type is an unsafe fn/extern fn type.
-    fn fn_type_is_unsafe(tid: i32) -> i32:
+    fn fn_type_is_unsafe(tid: i32) -> bool:
         if tid == 0:
-            return 0
-        if self.unsafe_fn_type_set.contains(self.resolve_alias(tid as TypeId) as i32): 1 else: 0
+            return false
+        if self.unsafe_fn_type_set.contains(self.resolve_alias(tid as TypeId) as i32): true else: false
 
     fn callable_fn_type(tid: TypeId) -> i32:
         var current = tid as i32
@@ -6623,7 +6623,7 @@ impl Sema:
     mut fn unsafe_callable_type(tid: i32) -> i32:
         let resolved = self.resolve_alias(tid as TypeId) as i32
         let kind = self.get_type_kind(resolved)
-        if (kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN) or self.fn_type_is_unsafe(resolved) != 0:
+        if (kind != TypeKind.TY_FN and kind != TypeKind.TY_EXTERN_FN) or self.fn_type_is_unsafe(resolved):
             return resolved
         let param_count = self.get_type_d1(resolved)
         let start = self.get_type_d0(resolved)
@@ -6645,46 +6645,46 @@ impl Sema:
 
     // §16.11: a safe callable type cannot accept an unsafe callable value; safe→
     // unsafe widening and same-unsafe-ness are allowed.
-    fn callable_unsafe_coercion_ok(expected: i32, actual: i32) -> i32:
-        if self.fn_type_is_unsafe(expected) == 0 and self.fn_type_is_unsafe(actual) != 0:
-            return 0
-        1
+    fn callable_unsafe_coercion_ok(expected: i32, actual: i32) -> bool:
+        if self.fn_type_is_unsafe(expected) == false and self.fn_type_is_unsafe(actual):
+            return false
+        true
 
     // A `fn` value is assignable to a `fn` type only when the signatures are
     // the same: the same parameter count, each parameter and the result
     // identical (an integer of another width is a different ABI: an i32
     // result read as i64 is garbage, #1772), plus the §16.11 unsafe rule.
     // An unresolved side (type 0) is not yet known and does not decide.
-    fn fn_types_assignable(expected: i32, actual: i32) -> i32:
-        if self.callable_unsafe_coercion_ok(expected, actual) == 0:
-            return 0
+    fn fn_types_assignable(expected: i32, actual: i32) -> bool:
+        if self.callable_unsafe_coercion_ok(expected, actual) == false:
+            return false
         let param_count = self.get_type_d1(expected)
         if param_count != self.get_type_d1(actual):
-            return 0
+            return false
         let exp_start = self.get_type_d0(expected)
         let act_start = self.get_type_d0(actual)
         for pi in 0..param_count:
             let exp_param = self.type_extra[(exp_start + pi)]
             let act_param = self.type_extra[(act_start + pi)]
             if exp_param != 0 and act_param != 0 and not self.types_identical(exp_param, act_param):
-                return 0
+                return false
         let exp_ret = self.get_type_d2(expected)
         let act_ret = self.get_type_d2(actual)
         if exp_ret != 0 and act_ret != 0 and not self.types_identical(exp_ret, act_ret):
-            return 0
-        1
+            return false
+        true
 
-    mut fn fn_types_compatible(expected: i32, actual: i32) -> i32:
+    mut fn fn_types_compatible(expected: i32, actual: i32) -> bool:
         if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
-            return 0
+            return false
         let param_count = self.get_type_d1(expected)
         let exp_start = self.get_type_d0(expected)
         let act_start = self.get_type_d0(actual)
         for pi in 0..param_count:
             let exp_param: i32 = self.type_extra[(exp_start + pi)]
             let act_param: i32 = self.type_extra[(act_start + pi)]
-            if self.types_compatible(exp_param, act_param) == 0:
-                return 0
+            if self.types_compatible(exp_param, act_param) == false:
+                return false
         self.types_compatible(self.get_type_d2(expected), self.get_type_d2(actual))
 
     // Whether `a` and `b` are the same type. types_compatible is an
@@ -6758,7 +6758,7 @@ impl Sema:
                     let canonical_base = self.canonical_symbol_by_text(base_sym)
                     if (cached_base == base_sym or self.canonical_symbol_by_text(cached_base) == canonical_base) and self.type_d2[cached] == arg_count:
                         let cached_start = self.type_d1[cached]
-                        if self.type_extra_matches(cached_start, args, arg_count) != 0:
+                        if self.type_extra_matches(cached_start, args, arg_count):
                             return cached as TypeId
         let canonical_base2 = self.canonical_symbol_by_text(base_sym)
         let type_count = self.type_kinds.len()
@@ -6771,7 +6771,7 @@ impl Sema:
             if self.type_d2[ti] != arg_count:
                 continue
             let te_start = self.type_d1[ti]
-            if self.type_extra_matches(te_start, args, arg_count) != 0:
+            if self.type_extra_matches(te_start, args, arg_count):
                 self.generic_inst_cache.insert(key, ti as i32)
                 return ti as TypeId
         0 as TypeId
@@ -6901,14 +6901,14 @@ impl Sema:
 
     // A generic inst whose template reflects fields/variants now but whose
     // caches were filled when it reflected none (see eager_type_caches_pass).
-    fn generic_inst_prereg_pending(tid: i32) -> i32:
+    fn generic_inst_prereg_pending(tid: i32) -> bool:
         if self.type_reflection_field_count(tid) > 0 and not self.generic_struct_field_index_type_cache.contains(sema_pair_key(tid, 0)):
-            return 1
+            return true
         if self.type_reflection_variant_count(tid) > 0:
             let first_variant = self.type_reflection_variant_name(tid, 0)
             if first_variant != 0 and not self.generic_enum_payload_cache_starts.contains(sema_pair_key(tid, first_variant)):
-                return 1
-        0
+                return true
+        false
 
     mut fn preregister_mir_types():
         let list_sym = self.syms.list
@@ -6995,7 +6995,7 @@ impl Sema:
             // compute-on-miss fallback that used to repair this at codegen time
             // was a mutable Sema re-entry after freeze.
             for pti in 0..lt_n:
-                if self.type_kinds[pti] == TypeKind.TY_GENERIC_INST and self.generic_inst_prereg_pending(pti as i32) != 0:
+                if self.type_kinds[pti] == TypeKind.TY_GENERIC_INST and self.generic_inst_prereg_pending(pti as i32):
                     self.preregister_generic_struct_fields(pti as i32)
                     self.preregister_generic_enum_payloads(pti as i32)
                     prereg_progress = true
@@ -7006,14 +7006,14 @@ impl Sema:
     // TypeKind.TY_GENERIC_INST: d0=base_sym, d1=extra_start, d2=arg_count
     // Type args stored in type_extra[extra_start..extra_start+arg_count] as TypeIds.
 
-    fn atomic_payload_type_is_valid(tid: i32) -> i32:
+    fn atomic_payload_type_is_valid(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid as TypeId)
         let kind = self.get_type_kind(resolved)
         if kind == TypeKind.TY_INT or kind == TypeKind.TY_PTR:
-            return 1
-        0
+            return true
+        false
 
     // D172 (§19.1): `Memo[K, V]` is for ID-like keys and values. Its key
     // hashes and compares as the compiler generates, so no `key()`
@@ -7154,16 +7154,16 @@ impl Sema:
             for vi in 0..self.type_reflection_variant_count(resolved):
                 for pi in 0..self.type_reflection_variant_payload_count(resolved, vi): parts.push(self.type_reflection_variant_payload_type(resolved, vi, pi))
 
-    mut fn validate_atomic_payload_type(base_sym: i32, args: &List[i32], arg_count: i32, node: i32) -> i32:
+    mut fn validate_atomic_payload_type(base_sym: i32, args: &List[i32], arg_count: i32, node: i32) -> bool:
         if self.pool_resolve_symbol(base_sym) != "Atomic":
-            return 1
+            return true
         if arg_count != 1:
             self.emit_error("Atomic[T] expects exactly one type argument", node)
-            return 0
-        if self.atomic_payload_type_is_valid(args[0]) == 0:
+            return false
+        if self.atomic_payload_type_is_valid(args[0]) == false:
             self.emit_error("Atomic[T] requires integer or pointer T", node)
-            return 0
-        1
+            return false
+        true
 
     mut fn resolve_generic_type(node: i32) -> i32:
         var gi_base_sym = self.ast.get_data0(node)
@@ -7208,9 +7208,9 @@ impl Sema:
                 self.emit_error("'" ++ self.pool_resolve_symbol(gi_base_sym) ++ "' requires an explicit import (§18.1)" ++ gi_gate_note, node)
                 return 0
             if not self.type_decl_nodes.contains(gi_base_sym):
-                if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
+                if self.require_alloc_tier_for_symbol(gi_base_sym, node) == false:
                     return 0
-                if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
+                if self.require_std_tier_for_symbol(gi_base_sym, node) == false:
                     return 0
                 // While the type declarations are being collected, a generic
                 // declared further down is not registered yet: defer, as a
@@ -7224,9 +7224,9 @@ impl Sema:
                 let gi_name: str = with_str_clone_ref(self.pool_resolve_symbol(gi_base_sym))
                 self.emit_error(if gi_name == "Vec": self.vec_is_list_message() else: "unknown type: " ++ gi_name, node)
                 return 0
-        if self.require_alloc_tier_for_symbol(gi_base_sym, node) == 0:
+        if self.require_alloc_tier_for_symbol(gi_base_sym, node) == false:
             return 0
-        if self.require_std_tier_for_symbol(gi_base_sym, node) == 0:
+        if self.require_std_tier_for_symbol(gi_base_sym, node) == false:
             return 0
         let gi_arg_count = self.ast.get_data2(node)
         let gi_extra_start = self.ast.get_data1(node)
@@ -7237,7 +7237,7 @@ impl Sema:
             if gi_arg_tid == 0:
                 return 0
             gi_args.push(gi_arg_tid as i32)
-        if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == 0:
+        if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == false:
             return 0
         // A refused argument is reported and the instance kept, so its uses
         // do not cascade into inference errors.
@@ -7585,10 +7585,10 @@ impl Sema:
             return resolved
         0 as TypeId
 
-    fn type_allows_null_literal(tid: TypeId) -> i32:
+    fn type_allows_null_literal(tid: TypeId) -> bool:
         if self.null_literal_target_type(tid) != 0:
-            return 1
-        0
+            return true
+        false
 
     mut fn try_unwrapped_type(tid: i32) -> i32:
         if tid <= 0:
@@ -7799,10 +7799,10 @@ impl Sema:
             return true
         false
 
-    fn type_is_c_va_list(tid: i32) -> i32:
+    fn type_is_c_va_list(tid: i32) -> bool:
         if tid == 0:
-            return 0
-        if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VA_LIST: 1 else: 0
+            return false
+        if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_VA_LIST: true else: false
 
     // Only C's array-decay mode aliases the caller's storage. The indirect
     // struct mode keeps value semantics and codegen supplies its copy.
@@ -7815,7 +7815,7 @@ impl Sema:
         if kind == TypeKind.TY_FN or kind == TypeKind.TY_EXTERN_FN: resolved else: 0
 
     fn type_uses_c_va_list_place(tid: i32) -> i32:
-        if self.type_is_c_va_list(tid) != 0 and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
+        if self.type_is_c_va_list(tid) and fn_abi_c_va_list_uses_caller_place(target_spec_os(), target_spec_arch()): 1 else: 0
 
     fn callable_param_uses_value_ref_abi(tid: i32, pi: i32) -> i32:
         let resolved = self.callable_type_resolved(tid)
@@ -7842,8 +7842,8 @@ impl Sema:
     // converts values): a `&i32` accepted as `&i64` read eight bytes of a
     // four-byte place, and a `&u32` as `&i32` rereads the bits with the other
     // sign. The numeric pointees of two references must have one layout.
-    fn ref_numeric_pointees_differ(exp_r: i32, act_r: i32) -> i32:
-        if self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)): 1 else: 0
+    fn ref_numeric_pointees_differ(exp_r: i32, act_r: i32) -> bool:
+        if self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)): true else: false
 
     // Two numeric types of different layouts (width, sign, int beside float).
     // A non-numeric type on either side is not this question.
@@ -7880,19 +7880,19 @@ impl Sema:
             return true
         self.enum_repr_type(actual) != 0 and self.get_type_kind(self.resolve_alias(pointee as TypeId)) == TypeKind.TY_INT
 
-    mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> i32:
+    mut fn pointer_pointees_compatible(exp_r: i32, act_r: i32) -> bool:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
-            return 0
+            return false
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee):
-            return 1
+            return true
         // D155 (§16.1): a pointer to one integer type is not a pointer to
         // another; equal width with the other signedness is a different
         // meaning, spelled `p as *const c_char`.
         if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
-            return 0
+            return false
         self.types_compatible(exp_pointee, self.get_type_d0(act_r))
 
     // ── Scope management ─────────────────────────────────────────────
@@ -7976,7 +7976,7 @@ impl Sema:
         self.bind_states.push(VarState.LIVE)
         self.bind_is_task.push(0)
         self.bind_task_used.push(0)
-        self.bind_is_scoped_task.push(0)
+        self.bind_is_scoped_task.push(false)
         self.bind_is_view_bound.push(0)
         self.bind_provenance.push(binding_provenance_empty())
         self.scope_name_map.insert(sym, idx)
@@ -8089,7 +8089,7 @@ impl Sema:
         self.bind_states[idx] = VarState.LIVE
         self.bind_is_task[idx] = 0
         self.bind_task_used[idx] = 0
-        self.bind_is_scoped_task[idx] = 0
+        self.bind_is_scoped_task[idx] = false
         self.bind_is_view_bound[idx] = 0
         let slot_idx = idx as i64
         with self.bind_provenance.slot(slot_idx) as mut slot:
@@ -8104,14 +8104,14 @@ impl Sema:
             return opt.unwrap()
         0
 
-    fn global_value_decl_types_compatible(existing_tid: i32, new_tid: i32) -> i32:
+    fn global_value_decl_types_compatible(existing_tid: i32, new_tid: i32) -> bool:
         if existing_tid == 0 or new_tid == 0:
-            return 1
+            return true
         let existing_resolved = self.resolve_alias(existing_tid as TypeId) as i32
         let new_resolved = self.resolve_alias(new_tid as TypeId) as i32
         if existing_resolved != 0 and existing_resolved == new_resolved:
-            return 1
-        0
+            return true
+        false
 
     mut fn register_top_level_global_decl(sym: i32, tid: i32, is_mut: i32, node: i32, decl_kind: i32):
         if self.is_discard_binding_symbol(sym):
@@ -8149,7 +8149,7 @@ impl Sema:
                 self.bind_states.push(VarState.LIVE)
                 self.bind_is_task.push(0)
                 self.bind_task_used.push(0)
-                self.bind_is_scoped_task.push(0)
+                self.bind_is_scoped_task.push(false)
                 self.bind_is_view_bound.push(0)
                 self.bind_provenance.push(binding_provenance_empty())
                 self.global_value_decl_kinds.insert(sym, decl_kind)
@@ -8184,7 +8184,7 @@ impl Sema:
             return
 
         let existing_tid = self.bind_types[existing_idx]
-        if self.global_value_decl_types_compatible(existing_tid, tid) == 0:
+        if self.global_value_decl_types_compatible(existing_tid, tid) == false:
             let name: str = with_str_clone_ref(self.pool_resolve(sym))
             self.emit_error("conflicting global declaration for '" ++ name ++ "'", node)
             return
@@ -8241,32 +8241,32 @@ impl Sema:
             return self.bind_states[opt.unwrap()]
         VarState.LIVE
 
-    fn moved_field_path_matches(idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> i32:
+    fn moved_field_path_matches(idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> bool:
         if idx < 0 or idx >= self.moved_field_base_syms.len():
-            return 0
+            return false
         if self.moved_field_base_syms[idx] != base_sym:
-            return 0
+            return false
         if self.moved_field_path_counts[idx] != path_count:
-            return 0
+            return false
         let stored_start = self.moved_field_path_starts[idx]
         for pi in 0..path_count:
             if self.moved_field_path_syms[(stored_start + pi)] != self.borrow_path_data[(path_start + pi)]:
-                return 0
-        1
+                return false
+        true
 
-    fn moved_field_path_has_prefix(idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> i32:
+    fn moved_field_path_has_prefix(idx: i32, base_sym: i32, path_start: i32, path_count: i32) -> bool:
         if idx < 0 or idx >= self.moved_field_base_syms.len():
-            return 0
+            return false
         if self.moved_field_base_syms[idx] != base_sym:
-            return 0
+            return false
         let stored_count = self.moved_field_path_counts[idx]
         if stored_count < path_count:
-            return 0
+            return false
         let stored_start = self.moved_field_path_starts[idx]
         for pi in 0..path_count:
             if self.moved_field_path_syms[(stored_start + pi)] != self.borrow_path_data[(path_start + pi)]:
-                return 0
-        1
+                return false
+        true
 
     // The field path an expression names, rooted at a scoped binding, as a
     // record: base_sym 0 when it names none. #1631: this was one i64 with
@@ -8282,7 +8282,7 @@ impl Sema:
         let base_sym = self.place_root_sym(node)
         if base_sym == 0:
             return none
-        if self.scope_has(base_sym) == 0:
+        if self.scope_has(base_sym) == false:
             return none
         let path_start = self.borrow_path_data.len() as i32
         let path_count = self.borrow_collect_path(node)
@@ -8298,7 +8298,7 @@ impl Sema:
         let path_start = path.path_start
         let path_count = path.path_count
         for i in 0..self.moved_field_base_syms.len():
-            if self.moved_field_path_matches(i as i32, base_sym, path_start, path_count) != 0:
+            if self.moved_field_path_matches(i as i32, base_sym, path_start, path_count):
                 return
         let stored_start = self.moved_field_path_syms.len() as i32
         for pi in 0..path_count:
@@ -8309,17 +8309,17 @@ impl Sema:
         if self.marking_explicit_move != 0:
             self.explicitly_partial_syms.insert(base_sym, 1)
 
-    mut fn field_is_moved(node: i32) -> i32:
+    mut fn field_is_moved(node: i32) -> bool:
         let path = self.field_move_path_for_expr(node)
         if path.base_sym == 0:
-            return 0
+            return false
         let base_sym = path.base_sym
         let path_start = path.path_start
         let path_count = path.path_count
         for i in 0..self.moved_field_base_syms.len():
-            if self.moved_field_path_matches(i as i32, base_sym, path_start, path_count) != 0:
-                return 1
-        0
+            if self.moved_field_path_matches(i as i32, base_sym, path_start, path_count):
+                return true
+        false
 
     mut fn remove_moved_field_entry(idx: i32):
         let last = self.moved_field_base_syms.len() - 1
@@ -8335,11 +8335,11 @@ impl Sema:
 
     // #782: whether any field path rooted at this binding is currently
     // moved-out (the whole value is no longer intact).
-    fn binding_has_moved_field(sym: i32) -> i32:
+    fn binding_has_moved_field(sym: i32) -> bool:
         for i in 0..self.moved_field_base_syms.len():
             if self.moved_field_base_syms[i] == sym:
-                return 1
-        0
+                return true
+        false
 
     // First moved field's leaf sym for diagnostics (0 when unknown).
     fn first_moved_field_sym(sym: i32) -> i32:
@@ -8368,7 +8368,7 @@ impl Sema:
         let path_count = path.path_count
         var i = self.moved_field_base_syms.len() as i32 - 1
         while i >= 0:
-            if self.moved_field_path_has_prefix(i, base_sym, path_start, path_count) != 0:
+            if self.moved_field_path_has_prefix(i, base_sym, path_start, path_count):
                 self.remove_moved_field_entry(i)
             i = i - 1
 
@@ -8396,13 +8396,13 @@ impl Sema:
             let idx: i32 = opt.unwrap()
             self.bind_is_task[idx] = is_task as i32
 
-    fn scope_lookup_is_scoped_task(sym: i32) -> i32:
+    fn scope_lookup_is_scoped_task(sym: i32) -> bool:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             return self.bind_is_scoped_task[opt.unwrap()]
-        0
+        false
 
-    mut fn scope_set_is_scoped_task(sym: i32, is_scoped_task: i32):
+    mut fn scope_set_is_scoped_task(sym: i32, is_scoped_task: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx: i32 = opt.unwrap()
@@ -8424,11 +8424,11 @@ impl Sema:
                 provenance.is_ephemeral_task = is_ephemeral_task
                 slot.set(provenance)
 
-    fn scope_lookup_is_non_send_task(sym: i32) -> i32:
+    fn scope_lookup_is_non_send_task(sym: i32) -> bool:
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
-            return self.bind_provenance[opt.unwrap()].is_non_send_task
-        0
+            return self.bind_provenance[opt.unwrap()].is_non_send_task != 0
+        false
 
     fn scope_set_is_non_send_task(sym: i32, is_non_send_task: i32):
         let opt = self.scope_name_map.get(sym)
@@ -8485,7 +8485,7 @@ impl Sema:
             self.bind_is_view_bound[idx] = 1
 
     mut fn scope_set_state(sym: i32, state: i32):
-        if sema_debug_move_enabled() != 0:
+        if sema_debug_move_enabled():
             let dbg_name = with_str_clone_ref(self.pool_resolve(sym))
             with_eprint(f"[state] sym=" ++ dbg_name ++ f" -> {state}")
         let opt = self.scope_name_map.get(sym).copied()
@@ -8497,9 +8497,9 @@ impl Sema:
                 self.clear_moved_fields_for_binding(sym)
             self.bind_states[opt.unwrap()] = state
 
-    fn scope_has(sym: i32) -> i32:
-        if self.scope_name_map.contains(sym): return 1
-        0
+    fn scope_has(sym: i32) -> bool:
+        if self.scope_name_map.contains(sym): return true
+        false
 
     fn scope_binding_index(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
@@ -8520,18 +8520,18 @@ impl Sema:
         if self.move_control_flow_supports_drop_flags.len() > 0:
             self.move_control_flow_supports_drop_flags.pop()
 
-    fn outer_binding_has_unsupported_move_context(sym: i32) -> i32:
+    fn outer_binding_has_unsupported_move_context(sym: i32) -> bool:
         let bind_idx = self.scope_binding_index(sym)
         if bind_idx < 0:
-            return 0
+            return false
         let ctx_count = self.move_control_flow_binding_starts.len()
         var ci = 0
         while ci < ctx_count:
             let start = self.move_control_flow_binding_starts[ci]
             if bind_idx < start and self.move_control_flow_supports_drop_flags[ci] == 0:
-                return 1
+                return true
             ci = ci + 1
-        0
+        false
 
     // Snapshot current bind_states so early-returning if/else branches don't
     // permanently mark outer variables as MOVED.
@@ -8952,12 +8952,12 @@ impl Sema:
         let start = provenance.view_dep_start
         self.binding_view_dep_data[(start + idx)]
 
-    fn binding_depends_on_origin(sym: i32, origin_sym: i32) -> i32:
+    fn binding_depends_on_origin(sym: i32, origin_sym: i32) -> bool:
         let count = self.binding_view_dep_count(sym)
         for i in 0..count:
             if self.binding_view_dep_at(sym, i) == origin_sym:
-                return 1
-        0
+                return true
+        false
 
     fn mark_binding_poisoned_by_origin(view_sym: i32, origin_sym: i32, origin_node: i32):
         let opt = self.scope_name_map.get(view_sym)
@@ -9000,7 +9000,7 @@ impl Sema:
                 continue
             if self.bind_states[bi] != VarState.LIVE:
                 continue
-            if self.binding_depends_on_origin(view_sym, origin_sym) != 0:
+            if self.binding_depends_on_origin(view_sym, origin_sym):
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
                 continue
             // A value expression that mentions `&raw const origin` poisons the
@@ -9010,13 +9010,13 @@ impl Sema:
             // is independent of `a`; poisoning it made a later read of `g`
             // "may originate from `a`" (§21.1 Rule 6) in another function.
             let view_ty = self.bind_types[bi]
-            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) != 0 or self.type_is_ephemeral_value(view_ty) != 0)
-            if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym) != 0:
+            let can_hold_view = view_ty != 0 and (self.get_type_kind(self.resolve_alias(view_ty as TypeId)) == TypeKind.TY_REF or self.type_has_drop_impl(view_ty) or self.type_is_ephemeral_value(view_ty) != 0)
+            if can_hold_view and self.binding_value_depends_on_origin(view_sym, origin_sym):
                 self.mark_binding_poisoned_by_origin(view_sym, origin_sym, origin_node)
 
-    mut fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> i32:
+    mut fn expr_view_depends_on_origin(node: i32, origin_sym: i32) -> bool:
         if node == 0 or origin_sym == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_IDENT:
             return self.binding_depends_on_origin(self.ast.get_data0(node), origin_sym)
@@ -9024,7 +9024,7 @@ impl Sema:
             let op = self.ast.get_data0(node)
             if op == UnaryOp.UOP_REF or op == UnaryOp.UOP_RAW_REF_CONST or op == UnaryOp.UOP_RAW_REF_MUT:
                 if self.place_root_sym(self.ast.get_data1(node)) == origin_sym:
-                    return 1
+                    return true
             return self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym)
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME or kind == NodeKind.NK_NO_SUSPEND:
             return self.expr_view_depends_on_origin(self.ast.get_data0(node), origin_sym)
@@ -9033,14 +9033,14 @@ impl Sema:
         if kind == NodeKind.NK_BLOCK:
             return self.expr_view_depends_on_origin(self.ast.get_data2(node), origin_sym)
         if kind == NodeKind.NK_IF_EXPR:
-            if self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym) != 0:
-                return 1
+            if self.expr_view_depends_on_origin(self.ast.get_data1(node), origin_sym):
+                return true
             return self.expr_view_depends_on_origin(self.ast.get_data2(node), origin_sym)
         if kind == NodeKind.NK_CALL:
             let dep_count = self.expr_view_dep_count(node)
             for i in 0..dep_count:
                 if self.expr_view_dep_at(node, i) == origin_sym:
-                    return 1
+                    return true
             let callee = self.ast.get_data0(node)
             if self.ast.kind(callee) == NodeKind.NK_IDENT:
                 let fn_sym_raw = self.ast.get_data0(callee)
@@ -9059,54 +9059,54 @@ impl Sema:
                             continue
                         let origin_mask = self.sig_param_view_origin(sig_idx, pi)
                         for origin_pi in 0..param_count:
-                            if sema_param_origin_mask_contains(origin_mask, origin_pi) == 0:
+                            if sema_param_origin_mask_contains(origin_mask, origin_pi) == false:
                                 continue
                             if origin_pi >= arg_count:
                                 continue
                             let origin_arg = if has_resolved != 0: self.get_resolved_call_arg(node, origin_pi) else: self.ast.get_extra(extra_start + origin_pi)
-                            if self.place_root_sym(origin_arg) == origin_sym or self.expr_view_depends_on_origin(origin_arg, origin_sym) != 0:
-                                return 1
-            return 0
+                            if self.place_root_sym(origin_arg) == origin_sym or self.expr_view_depends_on_origin(origin_arg, origin_sym):
+                                return true
+            return false
         if kind == NodeKind.NK_STRUCT_LIT:
             let extra_start = self.ast.get_data1(node)
             let field_count = self.ast.get_data2(node)
             for fi in 0..field_count:
-                if self.expr_view_depends_on_origin(self.ast.get_extra(extra_start + fi * 2 + 1), origin_sym) != 0:
-                    return 1
-            return 0
+                if self.expr_view_depends_on_origin(self.ast.get_extra(extra_start + fi * 2 + 1), origin_sym):
+                    return true
+            return false
         let dep_count = self.expr_view_dep_count(node)
         for i in 0..dep_count:
             if self.expr_view_dep_at(node, i) == origin_sym:
-                return 1
-        0
+                return true
+        false
 
-    mut fn binding_value_depends_on_origin(sym: i32, origin_sym: i32) -> i32:
+    mut fn binding_value_depends_on_origin(sym: i32, origin_sym: i32) -> bool:
         if not self.binding_value_nodes.contains(sym):
-            return 0
+            return false
         self.expr_view_depends_on_origin(self.binding_value_nodes.get(sym).unwrap(), origin_sym)
 
     // D29 scaffolding (#750): shadow-case tier plumbing. A sym is shadowed when
     // both a prelude-closure module and user code declare a type under it; only
     // then do impl/drop queries discriminate by tier (registration-time truth,
     // valid in frozen phases too). Unshadowed syms take the flat path unchanged.
-    fn type_sym_is_shadowed(sym: i32) -> i32:
+    fn type_sym_is_shadowed(sym: i32) -> bool:
         if sym == 0 or not self.type_sym_tier_mask.contains(sym):
-            return 0
-        if self.type_sym_tier_mask.get(sym).unwrap() == 3: 1 else: 0
+            return false
+        if self.type_sym_tier_mask.get(sym).unwrap() == 3: true else: false
 
-    fn type_tid_std_tier(tid: i32) -> i32:
+    fn type_tid_std_tier(tid: i32) -> bool:
         if not self.type_tid_is_std.contains(tid):
-            return 0
-        self.type_tid_is_std.get(tid).unwrap()
+            return false
+        self.type_tid_is_std.get(tid).unwrap() != 0
 
-    fn impl_record_matches_tier(record_idx: i32, want_std: i32) -> i32:
+    fn impl_record_matches_tier(record_idx: i32, want_std: bool) -> bool:
         if record_idx < 0 or record_idx >= self.impl_extra_is_std.len():
-            return 1
-        if self.impl_extra_is_std[record_idx] == want_std: 1 else: 0
+            return true
+        self.impl_extra_is_std[record_idx] == want_std
 
-    fn type_has_drop_impl(tid: i32) -> i32:
+    fn type_has_drop_impl(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid as TypeId)
         // A reference or raw pointer is Copy and owns nothing (§3): it never
         // has a Drop impl, whatever its pointee has. get_type_name names the
@@ -9114,25 +9114,25 @@ impl Sema:
         // `mut self` receiver instead of copied (#1492).
         let kind = self.get_type_kind(resolved)
         if kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR:
-            return 0
+            return false
         var owner_sym = self.get_type_name(resolved)
         if owner_sym == 0 and self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
             owner_sym = self.get_generic_inst_base(resolved as i32)
-        if owner_sym != 0 and self.type_sym_is_shadowed(owner_sym) != 0:
+        if owner_sym != 0 and self.type_sym_is_shadowed(owner_sym):
             let want_std = self.type_tid_std_tier(resolved as i32)
             if self.select_trait_impl_tiered(owner_sym, self.syms.drop, want_std) != 0:
-                return 1
-            return 0
+                return true
+            return false
         if owner_sym != 0 and self.has_drop_method(owner_sym) != 0:
-            return 1
+            return true
         if owner_sym != 0 and self.impl_lookup.contains(owner_sym):
             let idx = self.impl_lookup.get(owner_sym).unwrap()
             let start = self.impl_starts[idx]
             let count = self.impl_counts[idx]
             for i in 0..count:
                 if self.impl_extra[(start + i)] == self.syms.drop:
-                    return 1
-        0
+                    return true
+        false
 
     // Transitive needs-drop: does a value of this type run any destructor effect on
     // drop? True if the type has its own `impl Drop`, is a channel endpoint, or any
@@ -9146,7 +9146,7 @@ impl Sema:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
-        if self.type_has_drop_impl(resolved as i32) != 0:
+        if self.type_has_drop_impl(resolved as i32):
             return 1
         let tk = self.get_type_kind(resolved)
         // #747 / D28 ruling 1: an owned str frees its buffer at scope end.
@@ -9283,14 +9283,14 @@ impl Sema:
         let packed = self.ast.get_data2(decl)
         if type_decl_sub_kind(packed) != TypeDeclKind.Struct or type_decl_is_packed(packed) != 0 or type_decl_is_bitpacked(packed) != 0 or type_decl_is_repr_c(packed) != 0:
             return 0
-        if self.type_has_drop_impl(tid) == 0:
+        if self.type_has_drop_impl(tid) == false:
             return 0
         let extra_start = self.ast.get_data1(decl)
         let field_count = self.ast.get_extra(extra_start)
         for fi in 0..field_count:
             if field_align_value(self.ast.get_extra(extra_start + 1 + field_count * 3 + fi)) != 0:
                 return 0
-            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl) != 0:
+            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl):
                 return 0
         1
 
@@ -9299,15 +9299,15 @@ impl Sema:
     // the enclosing struct's zero storage is the sentinel. A droppable field
     // fails the second half (D82): `move v.field` resets it to its empty
     // value with `v` live, so it never proves the whole.
-    mut fn type_node_zero_is_sentinel(node: i32, decl: i32) -> i32:
+    mut fn type_node_zero_is_sentinel(node: i32, decl: i32) -> bool:
         if node == 0:
-            return 0
+            return false
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_EXTERN_FN or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_TRAIT_OBJ:
-            return 1
+            return true
         // A `fn` value may own a closure environment (D63): droppable.
         if kind == NodeKind.NK_TYPE_OPTIONAL or kind == NodeKind.NK_TYPE_FN:
-            return 0
+            return false
         if kind == NodeKind.NK_TYPE_ARRAY:
             return self.type_node_zero_is_sentinel(self.ast.get_data0(node), decl)
         if kind == NodeKind.NK_TYPE_TUPLE:
@@ -9315,29 +9315,29 @@ impl Sema:
             let count = self.ast.get_data1(node)
             for ei in 0..count:
                 if self.type_node_may_need_drop(self.ast.get_extra(start + ei), decl) != 0:
-                    return 0
+                    return false
             for ei in 0..count:
-                if self.type_node_zero_is_sentinel(self.ast.get_extra(start + ei), decl) != 0:
-                    return 1
-            return 0
+                if self.type_node_zero_is_sentinel(self.ast.get_extra(start + ei), decl):
+                    return true
+            return false
         if kind == NodeKind.NK_TYPE_NAMED:
             let sym = self.ast.get_data0(node)
             let tp_start = self.type_decl_tp_start(decl)
             for ti in 0..self.type_decl_tp_count(decl):
                 if self.ast.get_extra(tp_start + ti) == sym:
-                    return 0
+                    return false
             // Every primitive is live at zero (a number) or droppable (str).
             if self.primitive_type_by_sym(sym) != 0:
-                return 0
+                return false
             let named = self.lookup_named_type_visible(sym)
             if named == 0:
-                return 0
+                return false
             return self.type_zero_is_sentinel(named)
         // A generic instance — a container, a Box, an Rc, a user generic —
         // is droppable or depends on its argument; a type this walk cannot
         // classify is treated the same way. The byte is added, never
         // withheld.
-        0
+        false
 
     // Whether a field of this declared type may need drop glue, so an
     // explicit `move` of it is a vacate that resets its storage. Answers 1
@@ -9374,47 +9374,47 @@ impl Sema:
     // The same for a resolved type: a droppable type proves nothing (D82);
     // otherwise a pointer-shaped type, or an aggregate holding one, is
     // non-zero whenever live.
-    mut fn type_zero_is_sentinel(tid: i32) -> i32:
+    mut fn type_zero_is_sentinel(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid as TypeId)
         if self.type_needs_drop(resolved as i32) != 0:
-            return 0
+            return false
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF or tk == TypeKind.TY_SLICE or tk == TypeKind.TY_EXTERN_FN or tk == TypeKind.TY_GENERIC_FN or tk == TypeKind.TY_TRAIT_OBJ:
-            return 1
+            return true
         if tk == TypeKind.TY_ARRAY or tk == TypeKind.TY_RANGE:
             return self.type_zero_is_sentinel(self.get_type_d0(resolved))
         if tk == TypeKind.TY_TUPLE:
             let te_start = self.get_type_d0(resolved)
             for ei in 0..self.get_type_d1(resolved):
-                if self.type_zero_is_sentinel(self.type_extra[(te_start + ei)]) != 0:
-                    return 1
-            return 0
+                if self.type_zero_is_sentinel(self.type_extra[(te_start + ei)]):
+                    return true
+            return false
         if tk == TypeKind.TY_GENERIC_INST:
             let base_sym = self.get_generic_inst_base(resolved as i32)
             if self.named_types.contains(base_sym) and self.get_type_kind(self.resolve_alias(self.named_types.get(base_sym).unwrap())) == TypeKind.TY_STRUCT:
                 return self.struct_zero_is_sentinel(base_sym)
-            return 0
+            return false
         if tk == TypeKind.TY_STRUCT:
             return self.struct_zero_is_sentinel(self.get_type_d0(resolved))
-        0
+        false
 
     // A plain (non-droppable) struct is the sum of its fields. A Drop
     // struct never reaches here as a field: it is droppable, so a vacate
     // can zero it (D82).
-    mut fn struct_zero_is_sentinel(name_sym: i32) -> i32:
+    mut fn struct_zero_is_sentinel(name_sym: i32) -> bool:
         if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
-            return 0
+            return false
         let decl: i32 = self.type_decl_nodes.get(name_sym).unwrap()
         if type_decl_sub_kind(self.ast.get_data2(decl)) != TypeDeclKind.Struct:
-            return 0
+            return false
         let extra_start = self.ast.get_data1(decl)
         let field_count = self.ast.get_extra(extra_start)
         for fi in 0..field_count:
-            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl) != 0:
-                return 1
-        0
+            if self.type_node_zero_is_sentinel(self.ast.get_extra(extra_start + 1 + fi * 3 + 1), decl):
+                return true
+        false
 
     // Whether a value of this type transitively carries a USER Drop impl
     // (W, List[W], Holder{item: W}). Narrower than `type_needs_drop`: pure
@@ -9433,7 +9433,7 @@ impl Sema:
         let tk = self.get_type_kind(resolved)
         if tk == TypeKind.TY_REF or tk == TypeKind.TY_PTR:
             return 0
-        if self.type_has_drop_impl(resolved as i32) != 0:
+        if self.type_has_drop_impl(resolved as i32):
             return 1
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
@@ -9473,7 +9473,7 @@ impl Sema:
         if tid == 0:
             return 0
         let resolved = self.resolve_alias(tid as TypeId)
-        if self.type_has_drop_impl(resolved as i32) != 0:
+        if self.type_has_drop_impl(resolved as i32):
             return 1
         if self.needs_drop_visit.contains(resolved as i32):
             return 0
@@ -9605,13 +9605,13 @@ impl Sema:
             return self.binding_decl_nodes.get(sym).unwrap()
         0
 
-    fn binding_has_active_borrow_from(view_sym: i32, origin_sym: i32) -> i32:
+    fn binding_has_active_borrow_from(view_sym: i32, origin_sym: i32) -> bool:
         for bi in 0..self.borrow_refs.len():
             let ref_sym: i32 = self.borrow_refs[bi]
             let place_sym: i32 = self.borrow_places[bi]
             if ref_sym == view_sym and place_sym == origin_sym:
-                return 1
-        0
+                return true
+        false
 
     mut fn check_live_views_for_origin(origin_sym: i32, node: i32):
         if origin_sym == 0:
@@ -9619,7 +9619,7 @@ impl Sema:
         // The migrated PCRE2 regex implementation predates view-origin
         // tracking and is goto-lowered C; it carries the same explicit
         // path exemption as the raw-pointer field rule.
-        if sema_path_is_migrated_regex_implementation(self.current_module_path) != 0:
+        if sema_path_is_migrated_regex_implementation(self.current_module_path):
             return
         for bi in 0..self.bind_names.len():
             let view_sym: i32 = self.bind_names[bi]
@@ -9634,8 +9634,8 @@ impl Sema:
             // that depends on the origin neither way cannot outlive it, so
             // its type is not walked: every live binding is asked at every
             // scope exit, and the walk was half of `check src/main.w`.
-            let depends = self.binding_depends_on_origin(view_sym, origin_sym) != 0
-            if not depends and self.binding_value_depends_on_origin(view_sym, origin_sym) == 0:
+            let depends = self.binding_depends_on_origin(view_sym, origin_sym)
+            if not depends and self.binding_value_depends_on_origin(view_sym, origin_sym) == false:
                 continue
             // Rule 7's "variable implementing Drop" is any value whose drop
             // runs a destructor retaining the borrow: `Option[S]`, `(i32,
@@ -9644,7 +9644,7 @@ impl Sema:
             // type_has_drop_impl let an `Option[S]` declared before its
             // origin drop after it.
             let view_has_drop = self.type_owns_user_drop(view_ty)
-            let active_view = depends and self.binding_has_active_borrow_from(view_sym, origin_sym) != 0
+            let active_view = depends and self.binding_has_active_borrow_from(view_sym, origin_sym)
             if active_view or view_has_drop != 0:
                 let err_node = if node != 0: node else: self.binding_decl_node(view_sym)
                 let moved = node != 0 and node == self.move_site_node
@@ -9744,8 +9744,8 @@ impl Sema:
     // 1 when calling the closure moves capture `idx` out of its place (§12.4:
     // the body consumes or returns it) — MirLower keeps that local's drop
     // guard, since the body blanks the place through the capture (#1481).
-    fn closure_capture_consumes(closure_node: i32, idx: i32) -> i32:
-        if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: 1 else: 0
+    fn closure_capture_consumes(closure_node: i32, idx: i32) -> bool:
+        if (self.closure_capture_summary_eff(closure_node, idx) & (EFF_CONSUME | EFF_ESCAPE_VALUE)) != 0: true else: false
 
     // D62/D65: Sema's capture mode for capture `idx` of a closure — by place
     // (a pointer to the creating frame's slot, Copy or not) unless the
@@ -10411,7 +10411,7 @@ impl Sema:
             let caller_kind = self.get_type_kind(self.resolve_alias(caller_ty))
             if caller_kind == TypeKind.TY_REF or caller_kind == TypeKind.TY_PTR:
                 trans = trans & EFF_RAW_PTR_VALIDITY
-        if self.type_is_raw_pointer_value(caller_ty) == 0:
+        if self.type_is_raw_pointer_value(caller_ty) == false:
             trans = trans & ~EFF_RAW_PTR_VALIDITY
         trans
 
@@ -10791,42 +10791,42 @@ impl Sema:
             return -1
         var i = if self.sig_text_index.contains(target): self.sig_text_index.get(target).unwrap() else: -1
         while i >= 0:
-            if self.symbol_visible_from_current(self.sig_names[i]) != 0:
+            if self.symbol_visible_from_current(self.sig_names[i]):
                 return i
             i = self.sig_text_prev[i]
         -1
 
-    fn generic_fn_node_matches_symbol(node: i32, sym: i32, target: &str) -> i32:
+    fn generic_fn_node_matches_symbol(node: i32, sym: i32, target: &str) -> bool:
         if node == 0:
-            return 0
+            return false
         if self.ast.kind(node) != NodeKind.NK_FN_DECL:
-            return 0
+            return false
         let parsed = self.ast.get_data0(node)
         let source_name = self.extract_decl_name_after(node, "fn")
         if source_name.len() > 0:
             if source_name == target:
-                return 1
+                return true
             if parsed == sym or self.pool_resolve_symbol(parsed) == target:
-                return 1
+                return true
             let di2 = self.find_decl_index(node)
             let semantic2 = self.fn_decl_semantic_symbol_at(node, parsed, di2)
             if semantic2 != parsed and (semantic2 == sym or self.pool_resolve_symbol(semantic2) == target):
-                return 1
-            return 0
+                return true
+            return false
         if parsed == sym or self.pool_resolve_symbol(parsed) == target:
-            return 1
+            return true
         let di = self.find_decl_index(node)
         let semantic = self.fn_decl_semantic_symbol_at(node, parsed, di)
         if semantic == sym or self.pool_resolve_symbol(semantic) == target:
-            return 1
-        0
+            return true
+        false
 
-    fn fn_node_is_generic_template(node: i32, sym: i32) -> i32:
+    fn fn_node_is_generic_template(node: i32, sym: i32) -> bool:
         if node == 0 or self.ast.kind(node) != NodeKind.NK_FN_DECL:
-            return 0
+            return false
         let meta = self.ast.find_fn_meta(node)
         if meta >= 0 and self.ast.fn_meta_tp_count(meta) > 0:
-            return 1
+            return true
 
         let impl_direct = self.impl_node_for_method_decl(node)
         if impl_direct != 0:
@@ -10834,7 +10834,7 @@ impl Sema:
             if impl_direct_tp_meta >= 0:
                 let impl_direct_tp_count = self.ast.state.impl_type_params[(impl_direct_tp_meta + 2)]
                 if impl_direct_tp_count > 0:
-                    return 1
+                    return true
             let impl_direct_target = self.ast.find_impl_target_type_node(impl_direct as NodeId)
             if impl_direct_target != 0:
                 let impl_direct_target_kind = self.ast.kind(impl_direct_target)
@@ -10851,7 +10851,7 @@ impl Sema:
             if impl_tp_meta >= 0:
                 let impl_tp_count = self.ast.state.impl_type_params[(impl_tp_meta + 2)]
                 if impl_tp_count > 0:
-                    return 1
+                    return true
 
         // The owner's generic-ness is the impl target type's own
         // declaration (#750 follow-up): splitting the symbol text and
@@ -10864,7 +10864,7 @@ impl Sema:
         if owner_impl != 0:
             let target_tid = self.impl_decl_target_types.get(owner_impl) ?? 0
             if target_tid != 0:
-                return if self.type_tid_decl_tp_count(target_tid) > 0: 1 else: 0
+                return if self.type_tid_decl_tp_count(target_tid) > 0: true else: false
         var fn_name = self.extract_decl_name_after(node, "fn")
         if fn_name.len() == 0:
             fn_name = with_str_clone_ref(self.pool_resolve_symbol(parsed))
@@ -10873,9 +10873,9 @@ impl Sema:
                 let owner_name = fn_name.slice(0, ci as i64)
                 let owner_sym = self.pool_lookup_symbol(owner_name)
                 if owner_sym != 0 and self.type_decl_type_param_count(owner_sym) > 0:
-                    return 1
-                return 0
-        0
+                    return true
+                return false
+        false
 
     mut fn register_generic_fn_node(sym: i32, node: i32):
         for i in 0..self.generic_fn_candidate_syms.len():
@@ -10900,12 +10900,12 @@ impl Sema:
             return canonical
         sym
 
-    fn generic_fn_registration_contains(sym: i32, node: i32) -> i32:
+    fn generic_fn_registration_contains(sym: i32, node: i32) -> bool:
         let key = self.generic_fn_candidate_key(sym)
         for i in 0..self.generic_fn_candidate_syms.len():
             if self.generic_fn_candidate_syms[i] == key and self.generic_fn_candidate_nodes[i] == node:
-                return 1
-        0
+                return true
+        false
 
     fn generic_fn_node_for_symbol(sym: i32) -> i32:
         if sym == 0:
@@ -10915,12 +10915,12 @@ impl Sema:
             return 0
         if self.generic_fn_nodes.contains(sym):
             let node = self.generic_fn_nodes.get(sym).unwrap()
-            if self.generic_fn_node_matches_symbol(node, sym, target) != 0 and self.fn_node_is_generic_template(node, sym) != 0:
+            if self.generic_fn_node_matches_symbol(node, sym, target) and self.fn_node_is_generic_template(node, sym):
                 return node
         let canonical = self.pool_lookup_symbol(target)
         if canonical != 0 and canonical != sym and self.generic_fn_nodes.contains(canonical):
             let node2 = self.generic_fn_nodes.get(canonical).unwrap()
-            if self.generic_fn_node_matches_symbol(node2, sym, target) != 0 and self.fn_node_is_generic_template(node2, canonical) != 0:
+            if self.generic_fn_node_matches_symbol(node2, sym, target) and self.fn_node_is_generic_template(node2, canonical):
                 return node2
         let dot = sema_str_find_char(target, 46)
         if dot >= 0:
@@ -10934,7 +10934,7 @@ impl Sema:
                 if impl_node != 0:
                     let impl_owner_sym = self.ast.get_data0(impl_node)
                     if impl_owner_sym == owner_sym or self.canonical_symbol_by_text(impl_owner_sym) == owner_sym:
-                        if self.fn_node_is_generic_template(method_node, method_sym) != 0:
+                        if self.fn_node_is_generic_template(method_node, method_sym):
                             return method_node
         0
 
@@ -10964,15 +10964,15 @@ impl Sema:
             out.push(self.c_promoted_arg_data[(start + 1 + i)])
         out
 
-    fn sig_idx_valid(idx: i32) -> i32:
+    fn sig_idx_valid(idx: i32) -> bool:
         if idx < 0:
-            return 0
+            return false
         if idx >= self.sig_names.len():
-            return 0
-        1
+            return false
+        true
 
     mut fn set_sig_return_type(idx: i32, ret: i32):
-        if self.sig_idx_valid(idx) == 0:
+        if self.sig_idx_valid(idx) == false:
             return
         self.sig_ret_types[idx] = ret
         let fn_tid: i32 = self.sig_type_ids[idx]
@@ -10980,7 +10980,7 @@ impl Sema:
             self.type_d2[fn_tid] = ret
 
     mut fn copy_sig_alias(alias: i32, source_sig: i32):
-        if self.sig_idx_valid(source_sig) == 0:
+        if self.sig_idx_valid(source_sig) == false:
             return
         let fn_tid = self.sig_type_ids[source_sig]
         let ret = self.sig_ret_types[source_sig]
@@ -10997,20 +10997,20 @@ impl Sema:
             self.set_sig_param_view_through(alias_sig, pi, self.sig_param_view_through(source_sig, pi))
             self.set_sig_param_value_ref_abi(alias_sig, pi, self.sig_param_uses_value_ref_abi(source_sig, pi))
 
-    fn signatures_match(a_sig: i32, b_sig: i32) -> i32:
-        if self.sig_idx_valid(a_sig) == 0 or self.sig_idx_valid(b_sig) == 0:
-            return 0
+    fn signatures_match(a_sig: i32, b_sig: i32) -> bool:
+        if self.sig_idx_valid(a_sig) == false or self.sig_idx_valid(b_sig) == false:
+            return false
         if self.sig_return_type(a_sig) != self.sig_return_type(b_sig):
-            return 0
+            return false
         let a_count = self.sig_get_param_count(a_sig)
         if a_count != self.sig_get_param_count(b_sig):
-            return 0
+            return false
         for pi in 0..a_count:
             if self.sig_param_type(a_sig, pi) != self.sig_param_type(b_sig, pi):
-                return 0
+                return false
         if self.sig_is_variadic(a_sig) != self.sig_is_variadic(b_sig):
-            return 0
-        1
+            return false
+        true
 
     fn fn_clause_group_index(dispatch_sym: i32) -> i32:
         if self.fn_clause_group_lookup.contains(dispatch_sym):
@@ -11051,8 +11051,8 @@ impl Sema:
         let start = self.fn_clause_group_starts[group]
         self.fn_clause_group_decls[(start + clause_i)]
 
-    fn fn_is_clause_body_symbol(sym: i32) -> i32:
-        if self.fn_clause_body_dispatch.contains(sym): 1 else: 0
+    fn fn_is_clause_body_symbol(sym: i32) -> bool:
+        if self.fn_clause_body_dispatch.contains(sym): true else: false
 
     // ── Main entry point ─────────────────────────────────────────────
 
@@ -11153,24 +11153,24 @@ fn sema_module_stem_self_name(path: &str) -> str:
         out = "_" ++ out
     out
 
-fn sema_str_has_data(text: &str) -> i32:
+fn sema_str_has_data(text: &str) -> bool:
 
     if text.len() <= 0:
-        return 0
+        return false
     let data_ptr = unsafe *(text as *const str as *const *const u8)
     if data_ptr as i64 == 0:
-        return 0
-    1
+        return false
+    true
 
-fn sema_str_contains_char(text: &str, needle: i32) -> i32:
-    if sema_str_has_data(text) == 0:
-        return 0
+fn sema_str_contains_char(text: &str, needle: i32) -> bool:
+    if sema_str_has_data(text) == false:
+        return false
     var i = 0
     while i < text.len():
         if text[i] == needle:
-            return 1
+            return true
         i = i + 1
-    0
+    false
 
 // ── "Did you mean?" suggestions ─────────────────────────────────
 
@@ -11231,7 +11231,7 @@ impl Sema:
         best_name
 
     fn suggest_type_name(target: &str, node: i32) -> str:
-        if target.len() == 0 or sema_str_has_data(target) == 0:
+        if target.len() == 0 or sema_str_has_data(target) == false:
             return ""
         let max_dist: i32 = if target.len() <= 3: 1 else: 2
         var best_name = ""
@@ -11243,7 +11243,7 @@ impl Sema:
                 let sym = self.type_d0[ti]
                 if sym > 0 and sym < self.pool.state.symbol_texts.len():
                     let name = self.pool_resolve(sym)
-                    if sema_str_has_data(name) != 0 and not sema_str_contains_char(name, 46) != 0:
+                    if sema_str_has_data(name) and not sema_str_contains_char(name, 46):
                         let d = sema_levenshtein(target, name, max_dist)
                         if d < best_dist:
                             best_dist = d
@@ -11271,112 +11271,112 @@ impl Sema:
         let pk = self.get_type_kind(self.resolve_alias(pointee as TypeId))
         pk == TypeKind.TY_FN or pk == TypeKind.TY_EXTERN_FN or self.type_has_unresolved_parts(pointee) != 0
 
-    mut fn types_compatible_fast(expected: TypeId, actual: TypeId) -> i32:
+    mut fn types_compatible_fast(expected: TypeId, actual: TypeId) -> bool:
         if expected == actual:
-            return 1
+            return true
         if expected == 0 or actual == 0:
-            return 1
+            return true
 
         let exp_r = self.resolve_alias(expected)
         let act_r = self.resolve_alias(actual)
         if exp_r == act_r:
-            return 1
+            return true
 
         let exp_k = self.get_type_kind(exp_r)
         let act_k = self.get_type_kind(act_r)
 
         if act_k == TypeKind.TY_NEVER:
-            return 1
+            return true
         if exp_k == TypeKind.TY_BOOL and act_k == TypeKind.TY_BOOL:
-            return 1
+            return true
         if exp_k == TypeKind.TY_VOID and act_k == TypeKind.TY_VOID:
-            return 1
+            return true
         if exp_k == TypeKind.TY_STR and act_k == TypeKind.TY_STR:
-            return 1
+            return true
         if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_INT:
-            return 1
+            return true
         if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_ENUM:
             let act_repr = self.enum_repr_type(act_r)
             if act_repr != 0:
                 return self.types_compatible_fast(expected, act_repr)
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_FLOAT:
-            return 1
+            return true
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_INT:
-            return 1
+            return true
         // §4 (#1220): a float where an integer is demanded is a narrowing
         // (truncate or round: two meanings), spelled with `as`; accepted here,
         // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
-            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
-                return 0
+            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == false:
+                return false
             return self.fn_types_compatible(exp_r, act_r)
         // §4.3d: a vector converts lane-wise under §4.2.6, so its lanes are
         // assignable as scalars are (reject_implicit_numeric_narrowing
         // refuses the narrowings); the lane counts agree. A mask is exact.
         if exp_k == TypeKind.TY_VECTOR and act_k == TypeKind.TY_VECTOR:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
-                return 0
+                return false
             let exp_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r) as TypeId))
             let act_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(act_r) as TypeId))
-            return if exp_lane_k == act_lane_k: 1 else: 0
+            return if exp_lane_k == act_lane_k: true else: false
         if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): true else: false
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_FN:
-            return 1
+            return true
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_PTR:
-            return 1
+            return true
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_FN:
-            return if self.ref_admits_fn_value(exp_r): 1 else: 0
+            return if self.ref_admits_fn_value(exp_r): true else: false
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
-            return if self.ref_admits_fn_value(act_r): 1 else: 0
+            return if self.ref_admits_fn_value(act_r): true else: false
         if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible_fast(opt_payload, actual)
         if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_STRUCT:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): true else: false
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): true else: false
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_ENUM:
-            if self.generic_inst_accepts_unit_enum_value(exp_r, act_r) != 0:
-                return 1
+            if self.generic_inst_accepts_unit_enum_value(exp_r, act_r):
+                return true
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
-            if self.generic_inst_accepts_unit_enum_value(act_r, exp_r) != 0:
-                return 1
+            if self.generic_inst_accepts_unit_enum_value(act_r, exp_r):
+                return true
         // A range's bounds and a generic instance's arguments are part of
         // its layout: their numeric types match exactly (#1368).
         if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r) or self.numeric_types_differ(self.get_type_d0(exp_r), self.get_type_d0(act_r)):
-                return 0
+                return false
             return self.types_compatible_fast(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         // TypeKind.TY_GENERIC_INST: compatible if same base and all args compatible
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
             if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
                 let gi_ac = self.get_type_d2(exp_r)
                 if gi_ac == self.get_type_d2(act_r):
-                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ac == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) and gi_ac == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)):
                         let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
                         let box_act_arg = self.get_generic_inst_arg(act_r, 0)
                         let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
-                            if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
-                                return 1
-                    var gi_all_match: i32 = 1
+                            if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)):
+                                return true
+                    var gi_all_match = true
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
                         if gi_exp_arg != self.ty_void and gi_act_arg != self.ty_void:
-                            if self.numeric_types_differ(gi_exp_arg, gi_act_arg) or self.types_compatible_fast(gi_exp_arg, gi_act_arg) == 0:
-                                gi_all_match = 0
+                            if self.numeric_types_differ(gi_exp_arg, gi_act_arg) or self.types_compatible_fast(gi_exp_arg, gi_act_arg) == false:
+                                gi_all_match = false
                     return gi_all_match
-            return 0
-        0
+            return false
+        false
 
-    mut fn types_compatible(expected: TypeId, actual: TypeId) -> i32:
-        if self.types_compatible_fast(expected, actual) != 0:
-            return 1
+    mut fn types_compatible(expected: TypeId, actual: TypeId) -> bool:
+        if self.types_compatible_fast(expected, actual):
+            return true
 
         let exp_r = self.resolve_alias(expected)
         let act_r = self.resolve_alias(actual)
@@ -11394,45 +11394,45 @@ impl Sema:
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
             return self.pointer_pointees_compatible(exp_r, act_r)
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
-            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
-                return 0
-            if self.pointer_pointees_compatible(exp_r, act_r) != 0:
-                return 1
+            if self.ref_numeric_pointees_differ(exp_r, act_r):
+                return false
+            if self.pointer_pointees_compatible(exp_r, act_r):
+                return true
             return self.ref_to_dyn_pointee_coercible(exp_r, act_r)
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_PTR:
             return self.pointer_pointees_compatible(exp_r, act_r)
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
-            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
-                return 0
+            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == false:
+                return false
             return self.fn_types_compatible(exp_r, act_r)
         if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
             if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
-                return 0
+                return false
             // A slice views its elements in place, as a reference views its
             // pointee: an `[]i64` accepted as `[]i32` read half of each
             // element (§4.2.6 converts values, never a view's elements).
-            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
-                return 0
+            if self.ref_numeric_pointees_differ(exp_r, act_r):
+                return false
             return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
-                return 0
+                return false
             return self.types_compatible(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_TUPLE and act_k == TypeKind.TY_TUPLE:
             let exp_count = self.get_type_d1(exp_r)
             let act_count = self.get_type_d1(act_r)
             if exp_count != act_count:
-                return 0
+                return false
             let exp_start = self.get_type_d0(exp_r)
             let act_start = self.get_type_d0(act_r)
             for ei in 0..exp_count:
                 let exp_elem: i32 = self.type_extra[(exp_start + ei)]
                 let act_elem: i32 = self.type_extra[(act_start + ei)]
-                if self.types_compatible(exp_elem, act_elem) == 0:
-                    return 0
-            return 1
+                if self.types_compatible(exp_elem, act_elem) == false:
+                    return false
+            return true
 
         // TypeKind.TY_GENERIC_INST structural comparison (different TypeIds, same structure)
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
@@ -11440,13 +11440,13 @@ impl Sema:
                 let gi_ec = self.get_type_d2(exp_r)
                 let gi_ac2 = self.get_type_d2(act_r)
                 if gi_ec == gi_ac2:
-                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ec == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) and gi_ec == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)):
                         let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
                         let box_act_arg = self.get_generic_inst_arg(act_r, 0)
                         let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
-                            if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
-                                return 1
+                            if self.type_implements_trait(box_act_arg, self.get_type_d0(box_exp_arg_r)):
+                                return true
                     var gi_all_ok = 1
                     for gi_i in 0..gi_ec:
                         // A type argument is part of the layout: an
@@ -11456,11 +11456,11 @@ impl Sema:
                         if self.numeric_types_differ(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)):
                             gi_all_ok = 0
                             break
-                        if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:
+                        if self.types_compatible(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == false:
                             gi_all_ok = 0
                             break
                     if gi_all_ok != 0:
-                        return 1
+                        return true
         // Auto-referencing: T → &T. A narrower argument widens into the
         // pointee (§4.2.6; #2336 materializes it); a wider one or another
         // sign would be an implicit narrowing, which no position makes.
@@ -11468,37 +11468,37 @@ impl Sema:
             if self.get_type_d1(exp_r) == 0:
                 let auto_pointee = self.get_type_d0(exp_r)
                 if self.auto_ref_narrows(auto_pointee, act_r as i32):
-                    return 0
-                if self.types_compatible(self.get_type_d0(exp_r), act_r) != 0:
-                    return 1
-        0
+                    return false
+                if self.types_compatible(self.get_type_d0(exp_r), act_r):
+                    return true
+        false
 
     // §10.6/§10.8: `&Concrete -> &dyn Trait` coerces when Concrete implements
     // Trait — the checker side of codegen's dyn-fat-pointer construction from
     // a ref place (mir_build_dyn_trait_value_from_ref_place). Mirrors the
     // Box[Concrete] -> Box[dyn Trait] case above. A mutable dyn ref still
     // requires a mutable source.
-    mut fn ref_to_dyn_pointee_coercible(exp_r: TypeId, act_r: TypeId) -> i32:
+    mut fn ref_to_dyn_pointee_coercible(exp_r: TypeId, act_r: TypeId) -> bool:
         if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
-            return 0
+            return false
         let exp_pointee = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
         if self.get_type_kind(exp_pointee) != TypeKind.TY_TRAIT_OBJ:
-            return 0
+            return false
         let act_pointee = self.get_type_d0(act_r)
         if act_pointee == 0:
-            return 0
+            return false
         if self.get_type_kind(self.resolve_alias(act_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
-            return 0
+            return false
         let dyn_trait_sym = self.get_type_d0(exp_pointee)
-        if self.type_implements_trait(act_pointee, dyn_trait_sym) == 0:
-            return 0
+        if self.type_implements_trait(act_pointee, dyn_trait_sym) == false:
+            return false
         // A generic-inst concrete (blanket impl) has no pre-monomorphized
         // Type__Arg.method functions; specialize the trait methods now so
         // codegen can build the vtable.
         let act_p_res = self.resolve_alias(act_pointee as TypeId) as i32
         if self.get_type_kind(act_p_res) == TypeKind.TY_GENERIC_INST:
             self.register_dyn_impl_specializations(act_p_res, dyn_trait_sym)
-        1
+        true
 
     // Codegen queries (text-keyed: codegen and sema intern in different
     // pools). Returns the row index into the dyn_impl flat vecs, or -1.
@@ -11521,145 +11521,145 @@ impl Sema:
 
     // Frozen twin for MIR lowering; sema's acceptance of the coercion during
     // checking preregistered any generic-inst impl answer it needs.
-    fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> i32:
+    fn ref_to_dyn_pointee_coercible_frozen(exp_r: TypeId, act_r: TypeId) -> bool:
         if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
-            return 0
+            return false
         let exp_pointee = self.resolve_alias(self.get_type_d0(exp_r) as TypeId)
         if self.get_type_kind(exp_pointee) != TypeKind.TY_TRAIT_OBJ:
-            return 0
+            return false
         let act_pointee = self.get_type_d0(act_r)
         if act_pointee == 0:
-            return 0
+            return false
         if self.get_type_kind(self.resolve_alias(act_pointee as TypeId)) == TypeKind.TY_TRAIT_OBJ:
-            return 0
+            return false
         self.type_implements_trait_frozen(act_pointee, self.get_type_d0(exp_pointee))
 
-    fn fn_types_compatible_frozen(expected: i32, actual: i32) -> i32:
+    fn fn_types_compatible_frozen(expected: i32, actual: i32) -> bool:
         if self.get_type_d1(expected) != self.get_type_d1(actual) or self.fn_type_is_variadic(expected) != self.fn_type_is_variadic(actual):
-            return 0
+            return false
         let param_count = self.get_type_d1(expected)
         let exp_start = self.get_type_d0(expected)
         let act_start = self.get_type_d0(actual)
         for pi in 0..param_count:
             let exp_param = self.type_extra[(exp_start + pi)]
             let act_param = self.type_extra[(act_start + pi)]
-            if self.types_compatible_frozen(exp_param, act_param) == 0:
-                return 0
+            if self.types_compatible_frozen(exp_param, act_param) == false:
+                return false
         self.types_compatible_frozen(self.get_type_d2(expected), self.get_type_d2(actual))
 
-    fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> i32:
+    fn pointer_pointees_compatible_frozen(exp_r: i32, act_r: i32) -> bool:
         let exp_mut = self.get_type_d1(exp_r)
         let act_mut = self.get_type_d1(act_r)
         if exp_mut != 0 and act_mut == 0:
-            return 0
+            return false
         let exp_pointee = self.get_type_d0(exp_r)
         if self.is_c_void_like_type(exp_pointee):
-            return 1
+            return true
         if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
-            return 0
+            return false
         self.types_compatible_frozen(exp_pointee, self.get_type_d0(act_r))
 
-    fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> i32:
+    fn types_compatible_fast_frozen(expected: TypeId, actual: TypeId) -> bool:
         if expected == actual:
-            return 1
+            return true
         if expected == 0 or actual == 0:
-            return 1
+            return true
 
         let exp_r = self.resolve_alias(expected)
         let act_r = self.resolve_alias(actual)
         if exp_r == act_r:
-            return 1
+            return true
 
         let exp_k = self.get_type_kind(exp_r)
         let act_k = self.get_type_kind(act_r)
 
         if act_k == TypeKind.TY_NEVER:
-            return 1
+            return true
         if exp_k == TypeKind.TY_BOOL and act_k == TypeKind.TY_BOOL:
-            return 1
+            return true
         if exp_k == TypeKind.TY_VOID and act_k == TypeKind.TY_VOID:
-            return 1
+            return true
         if exp_k == TypeKind.TY_STR and act_k == TypeKind.TY_STR:
-            return 1
+            return true
         if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_INT:
-            return 1
+            return true
         if exp_k == TypeKind.TY_INT and act_k == TypeKind.TY_ENUM:
             let act_repr = self.enum_repr_type(act_r)
             if act_repr != 0:
                 return self.types_compatible_fast_frozen(expected, act_repr)
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_FLOAT:
-            return 1
+            return true
         if exp_k == TypeKind.TY_FLOAT and act_k == TypeKind.TY_INT:
-            return 1
+            return true
         // §4 (#1220): a float where an integer is demanded is a narrowing
         // (truncate or round: two meanings), spelled with `as`; accepted here,
         // it surfaced as codegen's "wrong argument type" with no location.
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
-            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
-                return 0
+            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == false:
+                return false
             return self.fn_types_compatible_frozen(exp_r, act_r)
         // §4.3d: the twin of types_compatible_fast's vector and mask rule.
         if exp_k == TypeKind.TY_VECTOR and act_k == TypeKind.TY_VECTOR:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
-                return 0
+                return false
             let exp_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(exp_r) as TypeId))
             let act_lane_k = self.get_type_kind(self.resolve_alias(self.get_type_d0(act_r) as TypeId))
-            return if exp_lane_k == act_lane_k: 1 else: 0
+            return if exp_lane_k == act_lane_k: true else: false
         if exp_k == TypeKind.TY_MASK and act_k == TypeKind.TY_MASK:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r) and self.get_type_d1(exp_r) == self.get_type_d1(act_r): true else: false
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_FN:
-            return 1
+            return true
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_PTR:
-            return 1
+            return true
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_FN:
-            return if self.ref_admits_fn_value(exp_r): 1 else: 0
+            return if self.ref_admits_fn_value(exp_r): true else: false
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
-            return if self.ref_admits_fn_value(act_r): 1 else: 0
+            return if self.ref_admits_fn_value(act_r): true else: false
         if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible_fast_frozen(opt_payload, actual)
         if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_STRUCT:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): true else: false
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
-            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): 1 else: 0
+            return if self.get_type_d0(exp_r) == self.get_type_d0(act_r): true else: false
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_ENUM:
-            if self.generic_inst_accepts_unit_enum_value(exp_r, act_r) != 0:
-                return 1
+            if self.generic_inst_accepts_unit_enum_value(exp_r, act_r):
+                return true
         if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_GENERIC_INST:
-            if self.generic_inst_accepts_unit_enum_value(act_r, exp_r) != 0:
-                return 1
+            if self.generic_inst_accepts_unit_enum_value(act_r, exp_r):
+                return true
         if exp_k == TypeKind.TY_RANGE and act_k == TypeKind.TY_RANGE:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
-                return 0
+                return false
             return self.types_compatible_fast_frozen(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
             if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
                 let gi_ac = self.get_type_d2(exp_r)
                 if gi_ac == self.get_type_d2(act_r):
-                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ac == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) and gi_ac == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)):
                         let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
                         let box_act_arg = self.get_generic_inst_arg(act_r, 0)
                         let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
-                            if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
-                                return 1
-                    var gi_all_match: i32 = 1
+                            if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)):
+                                return true
+                    var gi_all_match = true
                     for gi_i in 0..gi_ac:
                         let gi_exp_arg = self.get_generic_inst_arg(exp_r, gi_i)
                         let gi_act_arg = self.get_generic_inst_arg(act_r, gi_i)
                         if gi_exp_arg != self.ty_void and gi_act_arg != self.ty_void:
-                            if self.types_compatible_fast_frozen(gi_exp_arg, gi_act_arg) == 0:
-                                gi_all_match = 0
+                            if self.types_compatible_fast_frozen(gi_exp_arg, gi_act_arg) == false:
+                                gi_all_match = false
                     return gi_all_match
-            return 0
-        0
+            return false
+        false
 
-    fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> i32:
-        if self.types_compatible_fast_frozen(expected, actual) != 0:
-            return 1
+    fn types_compatible_frozen(expected: TypeId, actual: TypeId) -> bool:
+        if self.types_compatible_fast_frozen(expected, actual):
+            return true
 
         let exp_r = self.resolve_alias(expected)
         let act_r = self.resolve_alias(actual)
@@ -11676,10 +11676,10 @@ impl Sema:
         if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
             return self.pointer_pointees_compatible_frozen(exp_r, act_r)
         if exp_k == TypeKind.TY_REF and act_k == TypeKind.TY_REF:
-            if self.ref_numeric_pointees_differ(exp_r, act_r) != 0:
-                return 0
-            if self.pointer_pointees_compatible_frozen(exp_r, act_r) != 0:
-                return 1
+            if self.ref_numeric_pointees_differ(exp_r, act_r):
+                return false
+            if self.pointer_pointees_compatible_frozen(exp_r, act_r):
+                return true
             // §10.6 ref-to-dyn coercion — mirrors the mut types_compatible arm.
             // bf6f09e2 created this frozen twin but never wired it in; the gap
             // made MirLower's autoderef probe (which gates on frozen compat)
@@ -11693,57 +11693,57 @@ impl Sema:
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN:
             return self.fn_types_assignable(exp_r as i32, act_r as i32)
         if exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN:
-            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == 0:
-                return 0
+            if self.callable_unsafe_coercion_ok(exp_r as i32, act_r as i32) == false:
+                return false
             return self.fn_types_compatible_frozen(exp_r, act_r)
         if exp_k == TypeKind.TY_SLICE and act_k == TypeKind.TY_SLICE:
             if self.get_type_d1(exp_r) != 0 and self.get_type_d1(act_r) == 0:
-                return 0
+                return false
             return self.types_compatible_frozen(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
             if self.get_type_d1(exp_r) != self.get_type_d1(act_r):
-                return 0
+                return false
             return self.types_compatible_frozen(self.get_type_d0(exp_r), self.get_type_d0(act_r))
         if exp_k == TypeKind.TY_TUPLE and act_k == TypeKind.TY_TUPLE:
             let exp_count = self.get_type_d1(exp_r)
             let act_count = self.get_type_d1(act_r)
             if exp_count != act_count:
-                return 0
+                return false
             let exp_start = self.get_type_d0(exp_r)
             let act_start = self.get_type_d0(act_r)
             for ei in 0..exp_count:
                 let exp_elem = self.type_extra[(exp_start + ei)]
                 let act_elem = self.type_extra[(act_start + ei)]
-                if self.types_compatible_frozen(exp_elem, act_elem) == 0:
-                    return 0
-            return 1
+                if self.types_compatible_frozen(exp_elem, act_elem) == false:
+                    return false
+            return true
 
         if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
             if self.get_type_d0(exp_r) == self.get_type_d0(act_r):
                 let gi_ec = self.get_type_d2(exp_r)
                 let gi_ac2 = self.get_type_d2(act_r)
                 if gi_ec == gi_ac2:
-                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) != 0 and gi_ec == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)) != 0:
+                    if self.type_symbol_is_std_box(self.get_type_d0(exp_r)) and gi_ec == 1 and self.type_symbol_is_std_box(self.get_type_d0(act_r)):
                         let box_exp_arg = self.get_generic_inst_arg(exp_r, 0)
                         let box_act_arg = self.get_generic_inst_arg(act_r, 0)
                         let box_exp_arg_r = self.resolve_alias(box_exp_arg as TypeId)
                         if self.get_type_kind(box_exp_arg_r) == TypeKind.TY_TRAIT_OBJ:
-                            if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)) != 0:
-                                return 1
+                            if self.type_implements_trait_frozen(box_act_arg, self.get_type_d0(box_exp_arg_r)):
+                                return true
                     var gi_all_ok = 1
                     for gi_i in 0..gi_ec:
-                        if self.types_compatible_frozen(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == 0:
+                        if self.types_compatible_frozen(self.get_generic_inst_arg(exp_r, gi_i), self.get_generic_inst_arg(act_r, gi_i)) == false:
                             gi_all_ok = 0
                             break
                     if gi_all_ok != 0:
-                        return 1
+                        return true
         if exp_k == TypeKind.TY_REF:
             if self.get_type_d1(exp_r) == 0:
                 if self.auto_ref_narrows(self.get_type_d0(exp_r), act_r as i32):
-                    return 0
-                if self.types_compatible_frozen(self.get_type_d0(exp_r), act_r) != 0:
-                    return 1
-        0
+                    return false
+                if self.types_compatible_frozen(self.get_type_d0(exp_r), act_r):
+                    return true
+        false
 
     // #604 stage 1: a List[T] / [T; N] argument may coerce to a []T / []mut T
     // parameter — the first collection→slice coercion (slice→slice compat,
@@ -11770,26 +11770,26 @@ impl Sema:
         let elem = self.collection_slice_element(actual)
         if elem != 0 and self.resolve_alias(elem as TypeId) == self.resolve_alias(self.get_type_d0(exp_r) as TypeId): true else: false
 
-    fn generic_inst_accepts_unit_enum_value(generic_tid: TypeId, enum_tid: TypeId) -> i32:
+    fn generic_inst_accepts_unit_enum_value(generic_tid: TypeId, enum_tid: TypeId) -> bool:
         if self.get_type_kind(generic_tid) != TypeKind.TY_GENERIC_INST or self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:
-            return 0
+            return false
         let base_sym = self.get_type_d0(generic_tid)
         if base_sym == 0 or self.get_type_d0(enum_tid) != base_sym:
-            return 0
+            return false
         if not self.type_decl_nodes.contains(base_sym):
-            return 0
+            return false
         let type_decl = self.type_decl_nodes.get(base_sym).unwrap()
         if self.type_decl_tp_count(type_decl) <= 0:
-            return 0
+            return false
         let extra_start = self.get_type_d1(enum_tid)
         let variant_count = self.get_type_d2(enum_tid)
         var pos = extra_start
         for _ in 0..variant_count:
             let payload_count = self.type_extra[(pos + 1)]
             if payload_count == 0:
-                return 1
+                return true
             pos = pos + 2 + payload_count
-        0
+        false
 
     fn arithmetic_result_type(lhs: TypeId, rhs: TypeId) -> TypeId:
         if lhs == 0:
@@ -11884,18 +11884,18 @@ impl Sema:
             let name = self.get_type_d0(resolved)
             // D29 scaffolding (#750): a shadowed sym's Copy/Drop verdicts come
             // from the tid's own tier — the flat caches would conflate them.
-            if name > 0 and self.type_sym_is_shadowed(name) != 0:
+            if name > 0 and self.type_sym_is_shadowed(name):
                 let want_std = self.type_tid_std_tier(resolved as i32)
                 if self.select_trait_impl_tiered(name, self.syms.drop, want_std) != 0:
                     return 0
                 return self.select_trait_impl_tiered(name, self.syms.copy_trait, want_std)
             if self.has_drop_method(name) != 0:
-                if sema_debug_move_enabled() != 0:
+                if sema_debug_move_enabled():
                     with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=drop")
                 return 0
             // D120 (§4.3): declared a resource.
             if name > 0 and self.resource_type_names.contains(name):
-                if sema_debug_move_enabled() != 0:
+                if sema_debug_move_enabled():
                     with_eprint("[noncopy] type=" ++ self.pool_resolve(name) ++ " reason=resource type")
                 return 0
             // A distinct wrapper's Copy-ness follows its inner type — the
@@ -11992,7 +11992,7 @@ impl Sema:
             // type has a Drop impl or is declared a resource.
             if generic_base > 0 and self.resource_type_names.contains(generic_base):
                 return 0
-            if self.type_has_drop_impl(resolved as i32) != 0 or self.has_drop_method(generic_base) != 0:
+            if self.type_has_drop_impl(resolved as i32) or self.has_drop_method(generic_base) != 0:
                 return 0
             // A SlotMap addresses its slots by Handle: the handles are its
             // identity, and the runtime keeps no holder count for one.

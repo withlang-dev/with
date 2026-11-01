@@ -144,7 +144,7 @@ fn resolution_sema_answer(sema: &Sema, mir_mod: &MirModule, pool: &InternPool, b
         if sema.generic_fn_node_for_symbol(sema_sym) != 0:
             answer.kind = CalleeResolutionKind.Generic
             return answer
-    if node_valid and sema.call_callee_is_builtin(node) != 0:
+    if node_valid and sema.call_callee_is_builtin(node):
         answer.kind = CalleeResolutionKind.Intrinsic
         return answer
     if mir_mod.find_body(sym) >= 0:
@@ -326,7 +326,7 @@ fn resolution_is_drop_impl_call(sema: &Sema, node: i32) -> bool:
     if callee <= 0 or callee >= sema.ast.node_count() or sema.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS: return false
     if sema.ast.get_data1(callee) != sema.syms.drop_items: return false
     let recv_ty = sema.typed_expr_types.get(sema.ast.get_data0(callee))
-    recv_ty.is_some() and sema.type_has_drop_impl(recv_ty.unwrap()) != 0
+    recv_ty.is_some() and sema.type_has_drop_impl(recv_ty.unwrap())
 
 // D65 phase 3 (#1647): a type with its references and raw pointers peeled,
 // the nominal a field projection reads through.
@@ -564,7 +564,7 @@ fn resolution_audit_call_effects(mut report: AnalysisReport, sema: &Sema, mir_mo
                 let owned = param_ty > 0 and sema.is_copy_frozen(param_ty as TypeId) == 0
                 let place_ty = body.place_sema_types[place]
                 let place_owned = place_ty > 0 and sema.is_copy_frozen(place_ty as TypeId) == 0 and sema.get_type_kind(sema.resolve_alias(place_ty as TypeId)) != TypeKind.TY_REF
-                let borrows = sema.sig_param_uses_value_ref_abi(sig, ai) != 0 or sema.extern_param_is_bit_copy(callee, sig, ai) != 0
+                let borrows = sema.sig_param_uses_value_ref_abi(sig, ai) != 0 or sema.extern_param_is_bit_copy(callee, sig, ai)
                 checked = checked + 1
                 if named and place_owned:
                     judged = judged + 1

@@ -16,7 +16,7 @@ fn main:
         assert(result.stdout == "42\n")
         let facts = p7_run(dir, f"unsafe_generic_raw_facts_{reverse_order}", "analyze\0" ++ flags ++ "src/main.w\0select:stage=sema,kind=signature,name~load__sema__\0")
         assert(facts.rc == 0)
-        assert(facts.stdout.contains("declared-unsafe=1"))
+        assert(facts.stdout.contains("declared-unsafe=true"))
 
     p7_write(dir, "src/main.w", leaf ++ "fn wrapper(p: *const i32) -> i32: unsafe { load(p) }\nfn main: print(0)\n")
     let forward = p7_run(dir, "unsafe_generic_wrapper_forward", "check\0src/main.w\0")

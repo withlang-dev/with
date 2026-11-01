@@ -28,7 +28,7 @@ impl MirModule:
         self.sema_result_sym = sema.syms.result
         self.sema_task_sym = sema.syms.task
         self.sema_scoped_task_sym = sema.syms.scoped_task
-        if sema.type_symbol_is_std_box(sema.syms.box) != 0:
+        if sema.type_symbol_is_std_box(sema.syms.box):
             self.sema_box_sym = sema.syms.box
             self.sema_option_sym = sema.syms.option
         self.snapshot_moved_drop_types(sema)
@@ -79,7 +79,7 @@ impl MirModule:
             for pi in 0..count:
                 let param_ty = sema.sig_param_type(si, pi)
                 let kind = sema.get_type_kind(sema.resolve_alias(param_ty as TypeId))
-                let borrows = kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR or sema.sig_param_uses_value_ref_abi(si, pi) != 0 or sema.extern_param_is_bit_copy(sema_sym, si, pi) != 0
+                let borrows = kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR or sema.sig_param_uses_value_ref_abi(si, pi) != 0 or sema.extern_param_is_bit_copy(sema_sym, si, pi)
                 self.sema_sig_param_data.push(param_ty)
                 self.sema_sig_param_data.push(if borrows: 0 else: 1)
 

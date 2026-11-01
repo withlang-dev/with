@@ -412,7 +412,7 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
     else if c.returns_static_tid != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_STATIC, 0)
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, -1, "returns", "static CStr; valid for the whole program, no origin", contract_clause_at(sema, &site, clause))
-    else if sema.ci_type_requires_raw_contract(sema.sig_return_type(sig)) != 0:
+    else if sema.ci_type_requires_raw_contract(sema.sig_return_type(sig)):
         contract_row(report, sema, &site, subject, CONTRACT_FN, node, c.fn_sym, owner, -1, "returns", f"{ret}; raw: no origin is stated, so the pointer stays unsafe and nullable", "default:unknown origin is not invented (§16.2b.7)")
     else:
         contract_row(report, sema, &site, subject, CONTRACT_FN, node, c.fn_sym, owner, -1, "returns", ret, "default:as declared")

@@ -83,15 +83,15 @@ unsafe fn der_skip(buf: *const u8, buf_len: i32, pos: i32) -> i32:
     cs + cl
 
 // Check if an OID at (buf+pos, oid_len) matches a known OID.
-unsafe fn oid_match(buf: *const u8, pos: i32, oid_len: i32, expected: *const u8, expected_len: i32) -> i32:
+unsafe fn oid_match(buf: *const u8, pos: i32, oid_len: i32, expected: *const u8, expected_len: i32) -> bool:
     if oid_len != expected_len:
-        return 0
+        return false
     var i = 0
     while i < oid_len:
         if *(buf + (pos + i) as u64) != *(expected + i as u64):
-            return 0
+            return false
         i = i + 1
-    1
+    true
 
 // ── Known OIDs ─────────────────────────────────────────────────────
 
@@ -288,7 +288,7 @@ unsafe fn der_time_unix(buf: *const u8, start: i32, len: i32, tag: u8) -> i64:
 
 // Parse a DER-encoded X.509 certificate.
 // Returns 1 on success, 0 on parse error.
-unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
+unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> bool:
     var tag: u8 = 0u8
     var cs: i32 = 0
     var cl: i32 = 0
@@ -299,13 +299,13 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     // Outer SEQUENCE
     der_read_tl(buf, buf_len, 0, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
 
     // tbsCertificate SEQUENCE
     let tbs_outer_start = cs
     der_read_tl(buf, buf_len, cs, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     let tbs_content_end = cs + cl
     // tbs includes the tag+length header
     cert.tbs_start = tbs_outer_start
@@ -324,13 +324,13 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
 
     // serialNumber INTEGER
     if cs < 0 or tag != ASN1_INTEGER:
-        return 0
+        return false
     pos = cs + cl
 
     // signature AlgorithmIdentifier SEQUENCE
     der_read_tl(buf, buf_len, pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     // Parse OID inside
     let sig_alg_end = cs + cl
     var alg_pos = cs
@@ -343,21 +343,21 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     cert.issuer_start = pos
     pos = der_skip(buf, buf_len, pos)
     if pos < 0:
-        return 0
+        return false
     cert.issuer_len = pos - cert.issuer_start
 
     // validity SEQUENCE { notBefore, notAfter }
     der_read_tl(buf, buf_len, pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     let validity_end = cs + cl
     der_read_tl(buf, buf_len, cs, tp, csp, clp)
     if cs < 0:
-        return 0
+        return false
     cert.not_before = der_time_unix(buf, cs, cl, tag)
     der_read_tl(buf, buf_len, cs + cl, tp, csp, clp)
     if cs < 0:
-        return 0
+        return false
     cert.not_after = der_time_unix(buf, cs, cl, tag)
     pos = validity_end
 
@@ -365,20 +365,20 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     cert.subject_start = pos
     pos = der_skip(buf, buf_len, pos)
     if pos < 0:
-        return 0
+        return false
     cert.subject_len = pos - cert.subject_start
 
     // subjectPublicKeyInfo SEQUENCE
     der_read_tl(buf, buf_len, pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     let spki_end = cs + cl
     var spki_pos = cs
 
     // algorithm AlgorithmIdentifier SEQUENCE
     der_read_tl(buf, buf_len, spki_pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     let alg_id_end = cs + cl
     // Parse key algorithm OID
     der_read_tl(buf, buf_len, cs, tp, csp, clp)
@@ -397,7 +397,7 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     // subjectPublicKey BIT STRING
     der_read_tl(buf, buf_len, spki_pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_BIT_STRING:
-        return 0
+        return false
     // Skip unused-bits byte
     let key_bits_start = cs + 1
     let key_bits_len = cl - 1
@@ -406,11 +406,11 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
         // RSA public key is a SEQUENCE { INTEGER n, INTEGER e }
         der_read_tl(buf, buf_len, key_bits_start, tp, csp, clp)
         if cs < 0 or tag != ASN1_SEQUENCE:
-            return 0
+            return false
         // n
         der_read_tl(buf, buf_len, cs, tp, csp, clp)
         if cs < 0 or tag != ASN1_INTEGER:
-            return 0
+            return false
         // Skip leading zero byte if present (unsigned encoding)
         var n_start = cs
         var n_len = cl
@@ -422,7 +422,7 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
         // e
         der_read_tl(buf, buf_len, cs + cl, tp, csp, clp)
         if cs < 0 or tag != ASN1_INTEGER:
-            return 0
+            return false
         var e_start = cs
         var e_len = cl
         if e_len > 0 and *(buf + e_start as u64) == 0x00u8:
@@ -441,37 +441,37 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     while ext_pos < tbs_content_end:
         der_read_tl(buf, buf_len, ext_pos, tp, csp, clp)
         if cs < 0:
-            return 0
+            return false
         if tag == 0xA3u8:
             // Extensions SEQUENCE inside the explicit wrapper.
             der_read_tl(buf, buf_len, cs, tp, csp, clp)
             if cs < 0 or tag != ASN1_SEQUENCE:
-                return 0
+                return false
             let exts_end = cs + cl
             var ep = cs
             while ep < exts_end:
                 der_read_tl(buf, buf_len, ep, tp, csp, clp)
                 if cs < 0 or tag != ASN1_SEQUENCE:
-                    return 0
+                    return false
                 let one_end = cs + cl
                 // extnID OID
                 der_read_tl(buf, buf_len, cs, tp, csp, clp)
                 if cs < 0 or tag != ASN1_OID:
-                    return 0
+                    return false
                 let oid_start = cs
                 let oid_len = cl
                 var value_pos = cs + cl
                 // optional critical BOOLEAN, then extnValue OCTET STRING
                 der_read_tl(buf, buf_len, value_pos, tp, csp, clp)
                 if cs < 0:
-                    return 0
+                    return false
                 if tag == 0x01u8:
                     value_pos = cs + cl
                     der_read_tl(buf, buf_len, value_pos, tp, csp, clp)
                     if cs < 0:
-                        return 0
+                        return false
                 if tag != ASN1_OCTET_STRING:
-                    return 0
+                    return false
                 if oid_len == 3 and *(buf + oid_start as u64) == 0x55u8 and *(buf + (oid_start + 1) as u64) == 0x1Du8:
                     let kind = *(buf + (oid_start + 2) as u64)
                     if kind == 0x11u8:
@@ -495,38 +495,38 @@ unsafe fn x509_parse(cert: *mut X509Cert, buf: *const u8, buf_len: i32) -> i32:
     // signatureAlgorithm (skip, already parsed from tbs)
     pos = der_skip(buf, buf_len, pos)
     if pos < 0:
-        return 0
+        return false
 
     // signatureValue BIT STRING
     der_read_tl(buf, buf_len, pos, tp, csp, clp)
     if cs < 0 or tag != ASN1_BIT_STRING:
-        return 0
+        return false
     // Skip unused-bits byte
     cert.sig_start = cs + 1
     cert.sig_len = cl - 1
 
-    1
+    true
 
 // Identify signature algorithm from OID
 unsafe fn identify_sig_alg(buf: *const u8, oid_start: i32, oid_len: i32) -> i32:
     var oid_buf: [u8; 9] = [0u8; 9]
     oid_sha_rsa(&raw mut oid_buf[0] as *mut u8, 0x0Bu8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN):
         return SIG_ALG_SHA256_RSA
     oid_sha_rsa(&raw mut oid_buf[0] as *mut u8, 0x0Cu8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN):
         return SIG_ALG_SHA384_RSA
     oid_sha_rsa(&raw mut oid_buf[0] as *mut u8, 0x0Du8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_SHA_RSA_LEN):
         return SIG_ALG_SHA512_RSA
     oid_ecdsa_sha(&raw mut oid_buf[0] as *mut u8, 0x02u8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN):
         return SIG_ALG_ECDSA_SHA256
     oid_ecdsa_sha(&raw mut oid_buf[0] as *mut u8, 0x03u8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN):
         return SIG_ALG_ECDSA_SHA384
     oid_ecdsa_sha(&raw mut oid_buf[0] as *mut u8, 0x04u8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_ECDSA_SHA_LEN):
         return SIG_ALG_ECDSA_SHA512
     SIG_ALG_UNKNOWN
 
@@ -544,14 +544,14 @@ unsafe fn identify_ec_curve(buf: *const u8, oid_start: i32, oid_len: i32) -> i32
     oid_buf[5] = 0x03u8
     oid_buf[6] = 0x01u8
     oid_buf[7] = 0x07u8
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, 8) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, 8):
         return 256
     oid_buf[0] = 0x2Bu8
     oid_buf[1] = 0x81u8
     oid_buf[2] = 0x04u8
     oid_buf[3] = 0x00u8
     oid_buf[4] = 0x22u8
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, 5) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, 5):
         return 384
     0
 
@@ -559,10 +559,10 @@ unsafe fn identify_ec_curve(buf: *const u8, oid_start: i32, oid_len: i32) -> i32
 unsafe fn identify_key_type(buf: *const u8, oid_start: i32, oid_len: i32) -> i32:
     var oid_buf: [u8; 9] = [0u8; 9]
     oid_rsa_enc(&raw mut oid_buf[0] as *mut u8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_RSA_ENC_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_RSA_ENC_LEN):
         return KEY_TYPE_RSA
     oid_ec_pub(&raw mut oid_buf[0] as *mut u8)
-    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_EC_PUB_LEN) != 0:
+    if oid_match(buf, oid_start, oid_len, &oid_buf[0] as *const u8, OID_EC_PUB_LEN):
         return KEY_TYPE_EC
     KEY_TYPE_UNKNOWN
 
@@ -575,12 +575,12 @@ unsafe fn x509_verify_signature(
     cert: *const X509Cert,
     issuer_buf: *const u8,
     issuer: *const X509Cert,
-) -> i32:
+) -> bool:
     // Hash the tbsCertificate with the signature algorithm's digest.
     let sig_alg = cert.sig_alg
     let digest_len = sig_alg_digest_len(sig_alg)
     if digest_len == 0:
-        return 0
+        return false
     var tbs_hash: [u8; 64] = [0u8; 64]
     let tbs_ptr = cert_buf + cert.tbs_start as u64
     if digest_len == 32:
@@ -601,16 +601,16 @@ unsafe fn x509_verify_signature(
     if sig_alg_is_ecdsa(sig_alg) and issuer.key_type == KEY_TYPE_EC:
         return ecdsa_verify_der_sig(cert_buf, cert, issuer_buf, issuer, &tbs_hash[0] as *const u8, digest_len)
 
-    0
+    false
 
 // Extract r and s from a DER ECDSA-Sig-Value into width-byte,
-// right-aligned buffers. Returns 1 on success.
+// right-aligned buffers; whether the value parsed.
 // #1057: a scalar is at most `width` bytes once its sign byte is
 // stripped; a longer INTEGER is not a signature (it indexed below 0).
 unsafe fn ecdsa_der_components(
     sig: *const u8, sig_len: i32, width: i32,
     r_out: *mut u8, s_out: *mut u8,
-) -> i32:
+) -> bool:
     var tag: u8 = 0u8
     var cs: i32 = 0
     var cl: i32 = 0
@@ -619,20 +619,20 @@ unsafe fn ecdsa_der_components(
     let clp = &raw mut cl as *mut i32
     der_read_tl(sig, sig_len, 0, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     var which = 0
     var pos = cs
     while which < 2:
         der_read_tl(sig, sig_len, pos, tp, csp, clp)
         if cs < 0 or tag != ASN1_INTEGER:
-            return 0
+            return false
         var v_start = cs
         var v_len = cl
         if v_len > 0 and *(sig + v_start as u64) == 0x00u8:
             v_start = v_start + 1
             v_len = v_len - 1
         if v_len > width or v_len <= 0:
-            return 0
+            return false
         let dst = if which == 0: r_out else: s_out
         let off = width - v_len
         var i = 0
@@ -641,7 +641,7 @@ unsafe fn ecdsa_der_components(
             i = i + 1
         pos = cs + cl
         which = which + 1
-    1
+    true
 
 // Verify an ECDSA signature against an uncompressed point on the named
 // curve (256 or 384 bits). The message integer is the digest's leftmost
@@ -650,34 +650,34 @@ unsafe fn ecdsa_verify_point(
     point: *const u8, point_len: i32, curve_bits: i32,
     hash: *const u8, hash_len: i32,
     sig_r: *const u8, sig_s: *const u8,
-) -> i32:
+) -> bool:
     let width = curve_bits / 8
     if point_len != 1 + 2 * width or *(point + 0u64) != 0x04u8:
-        return 0
+        return false
     let x_ptr = point + 1u64
     let y_ptr = point + (1 + width) as u64
     if curve_bits == 256:
         // ecdsa_p256_verify reads a 32-byte digest.
         if hash_len < 32:
-            return 0
+            return false
         return ecdsa_p256_verify(x_ptr, y_ptr, hash, sig_r, sig_s)
     if curve_bits == 384:
         return ecdsa_p384_verify(x_ptr, y_ptr, hash, hash_len, sig_r, sig_s)
-    0
+    false
 
 // Helper to verify a certificate's ECDSA signature under its issuer.
 unsafe fn ecdsa_verify_der_sig(
     cert_buf: *const u8, cert: *const X509Cert,
     issuer_buf: *const u8, issuer: *const X509Cert,
     hash: *const u8, hash_len: i32,
-) -> i32:
+) -> bool:
     let curve_bits = issuer.key_curve
     if curve_bits != 256 and curve_bits != 384:
-        return 0
+        return false
     var r_bytes: [u8; 48] = [0u8; 48]
     var s_bytes: [u8; 48] = [0u8; 48]
-    if ecdsa_der_components(cert_buf + cert.sig_start as u64, cert.sig_len, curve_bits / 8, &raw mut r_bytes[0] as *mut u8, &raw mut s_bytes[0] as *mut u8) == 0:
-        return 0
+    if ecdsa_der_components(cert_buf + cert.sig_start as u64, cert.sig_len, curve_bits / 8, &raw mut r_bytes[0] as *mut u8, &raw mut s_bytes[0] as *mut u8) == false:
+        return false
     ecdsa_verify_point(
         issuer_buf + issuer.key_point_start as u64, issuer.key_point_len, curve_bits,
         hash, hash_len,
@@ -688,23 +688,23 @@ unsafe fn ecdsa_verify_der_sig(
 // ── Chain and hostname verification (#1061) ────────────────────────
 
 // Byte equality of two DER Name elements.
-unsafe fn x509_name_equal(a_buf: *const u8, a_start: i32, a_len: i32, b_buf: *const u8, b_start: i32, b_len: i32) -> i32:
+unsafe fn x509_name_equal(a_buf: *const u8, a_start: i32, a_len: i32, b_buf: *const u8, b_start: i32, b_len: i32) -> bool:
     if a_len <= 0 or a_len != b_len:
-        return 0
+        return false
     var i = 0
     while i < a_len:
         if *(a_buf + (a_start + i) as u64) != *(b_buf + (b_start + i) as u64):
-            return 0
+            return false
         i = i + 1
-    1
+    true
 
 // Whether `cert` is inside its validity window at `now` (Unix seconds).
-fn x509_valid_at(cert: &X509Cert, now: i64) -> i32:
+fn x509_valid_at(cert: &X509Cert, now: i64) -> bool:
     if cert.not_before < 0 or cert.not_after < 0:
-        return 0
+        return false
     if now < cert.not_before or now > cert.not_after:
-        return 0
-    1
+        return false
+    true
 
 // Verify a presented chain (leaf first) against trust anchors. Each
 // certificate on the built path must be in its validity window, each
@@ -720,52 +720,52 @@ unsafe fn x509_verify_chain_at(
     chain_buf: *const u8, chain_starts: *const i32, chain_lens: *const i32, chain_count: i32,
     roots_buf: *const u8, roots_starts: *const i32, roots_lens: *const i32, roots_count: i32,
     now: i64,
-) -> i32:
+) -> bool:
     if chain_count <= 0 or roots_count <= 0:
-        return 0
+        return false
     var cert = X509Cert.new()
     var issuer = X509Cert.new()
     var idx = 0
     while idx < chain_count:
         let start = *(chain_starts + idx as u64)
         let len = *(chain_lens + idx as u64)
-        if x509_parse(&raw mut cert as *mut X509Cert, chain_buf + start as u64, len) == 0:
-            return 0
-        if x509_valid_at(cert, now) == 0:
-            return 0
+        if x509_parse(&raw mut cert as *mut X509Cert, chain_buf + start as u64, len) == false:
+            return false
+        if x509_valid_at(cert, now) == false:
+            return false
         let cert_buf_at = chain_buf + start as u64
         // Anchor here if a stored root issued this certificate.
         var r = 0
         while r < roots_count:
             let rstart = *(roots_starts + r as u64)
             let rlen = *(roots_lens + r as u64)
-            if x509_parse(&raw mut issuer as *mut X509Cert, roots_buf + rstart as u64, rlen) != 0:
-                if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, roots_buf + rstart as u64, issuer.subject_start, issuer.subject_len) != 0:
-                    if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, roots_buf + rstart as u64, &issuer as *const X509Cert) != 0:
-                        return 1
+            if x509_parse(&raw mut issuer as *mut X509Cert, roots_buf + rstart as u64, rlen):
+                if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, roots_buf + rstart as u64, issuer.subject_start, issuer.subject_len):
+                    if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, roots_buf + rstart as u64, &issuer as *const X509Cert):
+                        return true
             r = r + 1
         // Otherwise the next presented certificate must issue this one.
         if idx + 1 >= chain_count:
-            return 0
+            return false
         let istart = *(chain_starts + (idx + 1) as u64)
         let ilen = *(chain_lens + (idx + 1) as u64)
-        if x509_parse(&raw mut issuer as *mut X509Cert, chain_buf + istart as u64, ilen) == 0:
-            return 0
+        if x509_parse(&raw mut issuer as *mut X509Cert, chain_buf + istart as u64, ilen) == false:
+            return false
         if issuer.bc_ca != 1:
-            return 0
-        if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, chain_buf + istart as u64, issuer.subject_start, issuer.subject_len) == 0:
-            return 0
-        if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, chain_buf + istart as u64, &issuer as *const X509Cert) == 0:
-            return 0
+            return false
+        if x509_name_equal(cert_buf_at, cert.issuer_start, cert.issuer_len, chain_buf + istart as u64, issuer.subject_start, issuer.subject_len) == false:
+            return false
+        if x509_verify_signature(cert_buf_at, &cert as *const X509Cert, chain_buf + istart as u64, &issuer as *const X509Cert) == false:
+            return false
         idx = idx + 1
-    0
+    false
 
 // Case-insensitive equality of a SAN dNSName against the host, with
 // one left-most wildcard label ("*.example.com" matches
 // "a.example.com", not "example.com" or "a.b.example.com").
-unsafe fn x509_dns_match(pat: *const u8, pat_len: i32, host: *const u8, host_len: i32) -> i32:
+unsafe fn x509_dns_match(pat: *const u8, pat_len: i32, host: *const u8, host_len: i32) -> bool:
     if pat_len <= 0 or host_len <= 0:
-        return 0
+        return false
     var poff = 0
     var hoff = 0
     if pat_len > 2 and *(pat + 0u64) == 0x2Au8 and *(pat + 1u64) == 0x2Eu8:
@@ -774,11 +774,11 @@ unsafe fn x509_dns_match(pat: *const u8, pat_len: i32, host: *const u8, host_len
         while dot < host_len and *(host + dot as u64) != 0x2Eu8:
             dot = dot + 1
         if dot == 0 or dot >= host_len:
-            return 0
+            return false
         poff = 1
         hoff = dot
     if pat_len - poff != host_len - hoff:
-        return 0
+        return false
     var i = 0
     while poff + i < pat_len:
         var pc = *(pat + (poff + i) as u64)
@@ -786,12 +786,12 @@ unsafe fn x509_dns_match(pat: *const u8, pat_len: i32, host: *const u8, host_len
         if pc >= 0x41u8 and pc <= 0x5Au8: pc = pc + 32
         if hc >= 0x41u8 and hc <= 0x5Au8: hc = hc + 32
         if pc != hc:
-            return 0
+            return false
         i = i + 1
-    1
+    true
 
 // Whether `host` is a dotted-quad IPv4 literal; fills out4 when it is.
-unsafe fn x509_parse_ipv4(host: *const u8, host_len: i32, out4: *mut u8) -> i32:
+unsafe fn x509_parse_ipv4(host: *const u8, host_len: i32, out4: *mut u8) -> bool:
     var part = 0
     var value = 0
     var digits = 0
@@ -800,7 +800,7 @@ unsafe fn x509_parse_ipv4(host: *const u8, host_len: i32, out4: *mut u8) -> i32:
         let c = if i < host_len: *(host + i as u64) else: 0x2Eu8
         if c == 0x2Eu8:
             if digits == 0 or value > 255 or part >= 4:
-                return 0
+                return false
             *(out4 + part as u64) = value as u8
             part = part + 1
             value = 0
@@ -809,18 +809,18 @@ unsafe fn x509_parse_ipv4(host: *const u8, host_len: i32, out4: *mut u8) -> i32:
             value = value * 10 + (c as i32 - 48)
             digits = digits + 1
             if digits > 3:
-                return 0
+                return false
         else:
-            return 0
+            return false
         i = i + 1
-    if part == 4: 1 else: 0
+    if part == 4: true else: false
 
 // Whether the certificate names `host` in subjectAltName (dNSName or
 // iPAddress). No SAN extension, no match: the CN is not consulted.
-unsafe fn x509_verify_hostname(buf: *const u8, cert: *const X509Cert, host: *const u8, host_len: isize) -> i32:
+unsafe fn x509_verify_hostname(buf: *const u8, cert: *const X509Cert, host: *const u8, host_len: isize) -> bool:
     // A DNS name is at most 253 bytes; the DER walk below is i32.
     if cert.san_len <= 0 or host_len <= 0 or host_len > 253:
-        return 0
+        return false
     let hlen = host_len as i32
     var tag: u8 = 0u8
     var cs: i32 = 0
@@ -831,7 +831,7 @@ unsafe fn x509_verify_hostname(buf: *const u8, cert: *const X509Cert, host: *con
     let san_end = cert.san_start + cert.san_len
     der_read_tl(buf, san_end, cert.san_start, tp, csp, clp)
     if cs < 0 or tag != ASN1_SEQUENCE:
-        return 0
+        return false
     var ipv4: [u8; 4] = [0u8; 4]
     let is_ip = x509_parse_ipv4(host, hlen, &raw mut ipv4[0] as *mut u8)
     let names_end = cs + cl
@@ -839,10 +839,10 @@ unsafe fn x509_verify_hostname(buf: *const u8, cert: *const X509Cert, host: *con
     while pos < names_end:
         der_read_tl(buf, san_end, pos, tp, csp, clp)
         if cs < 0:
-            return 0
+            return false
         if tag == 0x82u8 and is_ip == 0:
-            if x509_dns_match(buf + cs as u64, cl, host, hlen) != 0:
-                return 1
+            if x509_dns_match(buf + cs as u64, cl, host, hlen):
+                return true
         else if tag == 0x87u8 and is_ip != 0 and cl == 4:
             var same = 1
             var i = 0
@@ -851,9 +851,9 @@ unsafe fn x509_verify_hostname(buf: *const u8, cert: *const X509Cert, host: *con
                     same = 0
                 i = i + 1
             if same == 1:
-                return 1
+                return true
         pos = cs + cl
-    0
+    false
 
 // ── PEM certificate bundles ────────────────────────────────────────
 
@@ -941,10 +941,10 @@ pub fn x509_verify_chain_pem(chain_pem: &str, roots_pem: &str, hostname: &str, n
         let roots_count = x509_pem_parse_certs(roots_text, roots_pem.len(), roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
         var ok = false
         if chain_count > 0 and roots_count > 0:
-            if x509_verify_chain_at(chain_buf, &chain_starts[0] as *const i32, &chain_lens[0] as *const i32, chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, now_unix) != 0:
+            if x509_verify_chain_at(chain_buf, &chain_starts[0] as *const i32, &chain_lens[0] as *const i32, chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, now_unix):
                 var leaf = X509Cert.new()
-                if x509_parse(&raw mut leaf as *mut X509Cert, chain_buf, chain_lens[0]) != 0:
-                    ok = x509_verify_hostname(chain_buf, &leaf as *const X509Cert, host_text, hostname.len()) != 0
+                if x509_parse(&raw mut leaf as *mut X509Cert, chain_buf, chain_lens[0]):
+                    ok = x509_verify_hostname(chain_buf, &leaf as *const X509Cert, host_text, hostname.len())
         with_free(chain_buf)
         with_free(roots_buf)
         str_free_bytes(chain_text)
@@ -959,13 +959,13 @@ unsafe fn x509_ecdsa_verify_der_bytes(
     point: *const u8, point_len: i32, curve_bits: i32,
     sig: *const u8, sig_len: i32,
     hash: *const u8, hash_len: i32,
-) -> i32:
+) -> bool:
     if curve_bits != 256 and curve_bits != 384:
-        return 0
+        return false
     var r_bytes: [u8; 48] = [0u8; 48]
     var s_bytes: [u8; 48] = [0u8; 48]
-    if ecdsa_der_components(sig, sig_len, curve_bits / 8, &raw mut r_bytes[0] as *mut u8, &raw mut s_bytes[0] as *mut u8) == 0:
-        return 0
+    if ecdsa_der_components(sig, sig_len, curve_bits / 8, &raw mut r_bytes[0] as *mut u8, &raw mut s_bytes[0] as *mut u8) == false:
+        return false
     ecdsa_verify_point(
         point, point_len, curve_bits, hash, hash_len,
         &r_bytes[0] as *const u8, &s_bytes[0] as *const u8,

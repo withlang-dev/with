@@ -12,7 +12,7 @@ use std.crypto.sha256
 // SHA-256: LL=31 VV=01 HH=20; SHA-384: 41 02 30; SHA-512: 51 03 40.
 let DIGESTINFO_LEN: i32 = 19
 
-unsafe fn write_digestinfo(dst: *mut u8, hash_len: i32) -> i32:
+unsafe fn write_digestinfo(dst: *mut u8, hash_len: i32) -> bool:
     *(dst + 0u64) = 0x30u8
     *(dst + 2u64) = 0x30u8
     *(dst + 3u64) = 0x0Du8
@@ -33,66 +33,66 @@ unsafe fn write_digestinfo(dst: *mut u8, hash_len: i32) -> i32:
         *(dst + 1u64) = 0x31u8
         *(dst + 14u64) = 0x01u8
         *(dst + 18u64) = 0x20u8
-        return 1
+        return true
     if hash_len == 48:
         *(dst + 1u64) = 0x41u8
         *(dst + 14u64) = 0x02u8
         *(dst + 18u64) = 0x30u8
-        return 1
+        return true
     if hash_len == 64:
         *(dst + 1u64) = 0x51u8
         *(dst + 14u64) = 0x03u8
         *(dst + 18u64) = 0x40u8
-        return 1
-    0
+        return true
+    false
 
 // Check PKCS#1 v1.5 padding structure of a decrypted EM block.
 // em: the decrypted block (em_len bytes, big-endian)
 // hash: expected digest (32, 48 or 64 bytes)
 // Returns 1 if valid, 0 if invalid.
-unsafe fn rsa_check_pkcs1(em: *const u8, em_len: i32, hash: *const u8, hash_len: i32) -> i32:
+unsafe fn rsa_check_pkcs1(em: *const u8, em_len: i32, hash: *const u8, hash_len: i32) -> bool:
     // Save pointer params to locals (workaround for codegen pointer-in-loop bug)
     let em_p = em
     let hash_p = hash
 
     // Structure: 0x00 0x01 [0xFF padding >= 8 bytes] 0x00 [DigestInfo] [hash]
     if em_len < 11 + DIGESTINFO_LEN + hash_len:
-        return 0
+        return false
     let b0 = *(em_p + 0u64)
     if b0 != 0x00u8:
-        return 0
+        return false
     let b1 = *(em_p + 1u64)
     if b1 != 0x01u8:
-        return 0
+        return false
 
     let t_len = DIGESTINFO_LEN + hash_len
     let ps_len = em_len - 3 - t_len
     if ps_len < 8:
-        return 0
+        return false
 
     // Check PS bytes are all 0xFF
     var i = 2
     while i < 2 + ps_len:
         let b = *(em_p + i as u64)
         if b != 0xFFu8:
-            return 0
+            return false
         i = i + 1
 
     // Check separator byte
     let sep = *(em_p + (2 + ps_len) as u64)
     if sep != 0x00u8:
-        return 0
+        return false
 
     // Check DigestInfo prefix
     var di_prefix: [u8; 19] = [0u8; 19]
-    if write_digestinfo(&raw mut di_prefix[0] as *mut u8, hash_len) == 0:
-        return 0
+    if write_digestinfo(&raw mut di_prefix[0] as *mut u8, hash_len) == false:
+        return false
     let t_start = 3 + ps_len
     i = 0
     while i < DIGESTINFO_LEN:
         let em_b = *(em_p + (t_start + i) as u64)
         if em_b != di_prefix[i]:
-            return 0
+            return false
         i = i + 1
 
     // Check hash matches
@@ -102,10 +102,10 @@ unsafe fn rsa_check_pkcs1(em: *const u8, em_len: i32, hash: *const u8, hash_len:
         let em_b = *(em_p + (hash_start + i) as u64)
         let h_b = *(hash_p + i as u64)
         if em_b != h_b:
-            return 0
+            return false
         i = i + 1
 
-    1
+    true
 
 // Verify an RSA PKCS#1 v1.5 signature over a digest.
 //
@@ -113,17 +113,17 @@ unsafe fn rsa_check_pkcs1(em: *const u8, em_len: i32, hash: *const u8, hash_len:
 // sig: signature (big-endian bytes, must be same length as n)
 // hash: expected digest; hash_len 32, 48 or 64 selects SHA-256/384/512.
 //
-// Returns 1 on success, 0 on failure.
+// Whether the signature verifies.
 unsafe fn rsa_pkcs1_verify(
     n: *const u8, n_len: i32,
     e: *const u8, e_len: i32,
     sig: *const u8, sig_len: i32,
     hash: *const u8, hash_len: i32,
-) -> i32:
+) -> bool:
     if sig_len != n_len:
-        return 0
+        return false
     if n_len < 64 or n_len > 512:
-        return 0
+        return false
 
     // Max limb count for 4096-bit key: (4096+30)/31 = 133 words + 1 header = 134
     var m: [u32; I31_MAX_WORDS] = [0u32; I31_MAX_WORDS]
@@ -160,7 +160,7 @@ unsafe fn rsa_pkcs1_sha256_verify(
     e: *const u8, e_len: i32,
     sig: *const u8, sig_len: i32,
     hash: *const u8,
-) -> i32:
+) -> bool:
     rsa_pkcs1_verify(n, n_len, e, e_len, sig, sig_len, hash, 32)
 
 // #1052: an RSA-4096 known answer, the PKCS#1 v1.5 SHA-256 signature of
@@ -185,10 +185,10 @@ pub fn rsa4096_pkcs1_sha256_kat() -> i32:
     var hash: [u8; 32] = [0u8; 32]
     sha256_hash_str("abc", &raw mut hash[0] as *mut u8)
     let good = unsafe { rsa_pkcs1_sha256_verify(&n[0] as *const u8, 512, &e[0] as *const u8, 3, &sig[0] as *const u8, 512, &hash[0] as *const u8) }
-    if good != 1:
+    if not good:
         return 1
     sig[100] = sig[100] ^ 1u8
     let bad = unsafe { rsa_pkcs1_sha256_verify(&n[0] as *const u8, 512, &e[0] as *const u8, 3, &sig[0] as *const u8, 512, &hash[0] as *const u8) }
-    if bad != 0:
+    if bad:
         return 2
     0

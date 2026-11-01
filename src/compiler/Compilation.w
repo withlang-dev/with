@@ -55,25 +55,25 @@ fn profile_emit(name: &str, start: i64, counters: &str):
     else:
         runtime_eprint(f"[profile] {name}  {ms_whole}.{ms_frac} ms")
 
-fn compilation_debug_init_enabled() -> i32:
+fn compilation_debug_init_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_STAGE1_TRACE")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 fn compilation_debug_init(msg: &str):
-    if compilation_debug_init_enabled() == 0:
+    if compilation_debug_init_enabled() == false:
         return
     runtime_eprint("[comp-init] " ++ msg)
 
-fn compilation_debug_pool_flow_enabled() -> i32:
+fn compilation_debug_pool_flow_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_POOL_FLOW")
     if raw.len() == 0:
-        return 0
-    1
+        return false
+    true
 
 fn compilation_debug_pool_flow(label: &str, pool: &InternPool, typed_pool: &AstPool, sema: &Sema):
-    if compilation_debug_pool_flow_enabled() == 0:
+    if compilation_debug_pool_flow_enabled() == false:
         return
     runtime_eprint(f"[comp] {label} pool.symbols={pool.state.symbol_texts.len()} typed.decls={typed_pool.decl_count()} sema.pool.symbols={sema.pool.state.symbol_texts.len()} sema.ast.decls={sema.ast.decl_count()}")
 
@@ -132,16 +132,16 @@ fn compilation_run_dsymutil_best_effort(bin_path: &str):
         let which = if own and self_exe.len() > 0: "this compiler's dsymutil" else: "no dsymutil of its own (its LLVM SDK predates it, #1915) and the host's `dsymutil`"
         runtime_eprint(f"warning: no .dSYM for {bin_path}: {which} exited {rc}; its debug info is not collected")
 
-fn compilation_debug_type_names_enabled() -> i32:
+fn compilation_debug_type_names_enabled() -> bool:
     let raw = runtime_getenv("WITH_DEBUG_TYPE_NAMES")
     if raw.len() == 0:
-        return 0
+        return false
     if raw == "0":
-        return 0
-    1
+        return false
+    true
 
 fn compilation_dump_type_names(stage: &str, pool: &AstPool, intern: &InternPool):
-    if compilation_debug_type_names_enabled() == 0:
+    if compilation_debug_type_names_enabled() == false:
         return
     runtime_eprint(f"[type-names] stage={stage} decls={pool.decl_count()}")
     for di in 0..pool.decl_count():

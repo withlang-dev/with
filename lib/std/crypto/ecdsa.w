@@ -19,9 +19,9 @@ unsafe fn ecdsa_verify_impl(
     width: i32, p: *const u32, n: *const u32,
     pm2: *const u8, nm2: *const u8,
     gx: *const u32, gy: *const u32,
-) -> i32:
+) -> bool:
     if hash_len <= 0:
-        return 0
+        return false
     let z_len = if hash_len < width: hash_len else: width
     let n0i = i31_ninv31(*(n + 1u64))
     let p0i = i31_ninv31(*(p + 1u64))
@@ -32,9 +32,9 @@ unsafe fn ecdsa_verify_impl(
     i31_decode_reduce(&raw mut r[0] as *mut u32, sig_r, width, n)
     i31_decode_reduce(&raw mut s[0] as *mut u32, sig_s, width, n)
     if i31_is_zero(&r[0] as *const u32) != 0u32:
-        return 0
+        return false
     if i31_is_zero(&s[0] as *const u32) != 0u32:
-        return 0
+        return false
 
     // w = s^(-1) mod n (via modpow: s^(n-2) mod n)
     var w: [u32; 16] = [0u32; 16]
@@ -98,7 +98,7 @@ unsafe fn ecdsa_verify_impl(
 
     // If R is identity, verification fails
     if point_is_zero(&result_pt[0] as *const u32) != 0u32:
-        return 0
+        return false
 
     // Convert R to affine, get x-coordinate
     var rx_bytes: [u8; 48] = [0u8; 48]
@@ -115,22 +115,22 @@ unsafe fn ecdsa_verify_impl(
     i31_encode(&raw mut v_bytes[0] as *mut u8, width, &v[0] as *const u32)
     i31_encode(&raw mut r_bytes[0] as *mut u8, width, &r[0] as *const u32)
 
-    var match_val: i32 = 1
+    var match_val = true
     var ci = 0
     while ci < width:
         if v_bytes[ci] != r_bytes[ci]:
-            match_val = 0
+            match_val = false
         ci = ci + 1
 
     match_val
 
 // Verify an ECDSA-P256 signature over a SHA-256 digest.
-// pub_x, pub_y, sig_r, sig_s: 32 bytes each, big-endian. 1 = valid.
+// pub_x, pub_y, sig_r, sig_s: 32 bytes each, big-endian.
 unsafe fn ecdsa_p256_verify(
     pub_x: *const u8, pub_y: *const u8,
     hash: *const u8,
     sig_r: *const u8, sig_s: *const u8,
-) -> i32:
+) -> bool:
     var n: [u32; 16] = [0u32; 16]
     var p: [u32; 16] = [0u32; 16]
     var gx: [u32; 16] = [0u32; 16]
@@ -149,12 +149,12 @@ unsafe fn ecdsa_p256_verify(
     ecdsa_verify_impl(pub_x, pub_y, hash, 32, sig_r, sig_s, 32, &p[0] as *const u32, &n[0] as *const u32, &P256_PM2[0] as *const u8, &nm2[0] as *const u8, &gx[0] as *const u32, &gy[0] as *const u32)
 
 // Verify an ECDSA-P384 signature over a digest of at least 48 bytes.
-// pub_x, pub_y, sig_r, sig_s: 48 bytes each, big-endian. 1 = valid.
+// pub_x, pub_y, sig_r, sig_s: 48 bytes each, big-endian.
 unsafe fn ecdsa_p384_verify(
     pub_x: *const u8, pub_y: *const u8,
     hash: *const u8, hash_len: i32,
     sig_r: *const u8, sig_s: *const u8,
-) -> i32:
+) -> bool:
     var n: [u32; 16] = [0u32; 16]
     var p: [u32; 16] = [0u32; 16]
     var gx: [u32; 16] = [0u32; 16]

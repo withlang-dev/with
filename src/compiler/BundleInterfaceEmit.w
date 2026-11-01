@@ -593,7 +593,7 @@ impl BundleEmitter:
         if meta < 0:
             self.refuse("has no function metadata")
             return ""
-        if ast.fn_meta_tp_count(meta) > 0 or sema.fn_node_is_generic_template(node, fn_sym) != 0:
+        if ast.fn_meta_tp_count(meta) > 0 or sema.fn_node_is_generic_template(node, fn_sym):
             self.omit_generic_fn(mod_path, full)
             return ""
         let cc_sym = ast.fn_meta_tp_start(meta)
@@ -757,7 +757,7 @@ impl BundleEmitter:
                         return ""
                     for xi in 0..entries.len():
                         from_row = from_row ++ "global:" ++ entries[xi] ++ ";"
-        let is_unsafe = sema.fn_symbol_is_unsafe(fn_sym) != 0
+        let is_unsafe = sema.fn_symbol_is_unsafe(fn_sym)
         let must_use = (flags / FnFlags.MUST_USE) % 2 != 0
         var printed_name = with_str_clone_ref(full)
         if in_impl:
