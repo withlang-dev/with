@@ -17,6 +17,7 @@ use InternPool
 use Diagnostic
 use ForeignPairState
 use compiler.FacadeRender
+use render
 use SemaTypes
 use Span
 use std.string.parse
@@ -1934,11 +1935,26 @@ impl Sema:
             return spelled.slice(8, spelled.len())
         spelled
 
-    // §57: every positional diagnostic prints the resolved C parameter.
+    // §57: every positional diagnostic prints the C parameter as the header
+    // spells it: the declaration's type spelling (`*const c_char`, the alias
+    // c_import emits for `char`), never the resolved width, which is the
+    // target's (c_char is u8 on linux-aarch64, D156) and would make one
+    // diagnostic and one contract view per target.
     fn facade_param_display(fn_sym: i32, sig: i32, pi: i32) -> str:
         let pname = self.facade_param_c_name(fn_sym, pi)
-        let tn: str = self.type_name(self.sig_param_type(sig, pi))
+        let tn: str = self.facade_param_spelling(fn_sym, sig, pi)
         f"param {pi}: {tn} {pname}"
+
+    // The declared spelling of a facade parameter's type; the resolved type's
+    // name when the declaration is not at hand.
+    fn facade_param_spelling(fn_sym: i32, sig: i32, pi: i32) -> str:
+        let decl = self.facade_fn_decl_node(fn_sym)
+        if decl != 0:
+            let meta = self.ast.find_fn_meta(decl)
+            if meta >= 0:
+                let tnode = self.ast.fn_param_type(self.ast.fn_meta_param_start(meta), pi)
+                if tnode != 0: return render_type_expr(self.ast, self.pool, tnode)
+        self.type_name(self.sig_param_type(sig, pi))
 
     // `param name`, `param N` (zero-based) or `param type T`: one parameter,
     // or -1 after the diagnostic.

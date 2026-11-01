@@ -1,4 +1,4 @@
-//! expect-check-fail: resource 'Tokens': 'borrows' names param 0: *const i8 text of 'tk_new', which receives no modeled resource; a resource depends on the parent resources its producer receives, and With does not invent an origin for anything else (§16.2b.6, §16.2b.7)
+//! expect-check-fail: resource 'Tokens': 'borrows' names param 0: *const c_char text of 'tk_new', which receives no modeled resource; a resource depends on the parent resources its producer receives, and With does not invent an origin for anything else (§16.2b.6, §16.2b.7)
 
 // D51 stage 6 (ruling §27, §31; spec §16.2b.6-7): a dependency's parent is a
 // modeled resource the producer receives; a borrowed foreign pointer has a

@@ -32,7 +32,7 @@ fn sqlite3_prepare_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn
     role: producer of Statement  [clause:resource@test/contract/ok_sqlite_shaped.w:18]
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
-    effect: param 1: *const i8 zSql: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: *const c_char zSql: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 2: i32 nByte: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 3: *mut *mut sqlite3_stmt ppStmt: out parameter producing Statement  [clause:from@test/contract/ok_sqlite_shaped.w:19]
     returns: i32  [default:as declared]
@@ -70,7 +70,7 @@ fn sqlite3_db_handle; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@
 fn sqlite3_create_function_v2; facade:sqlite@test/contract/ok_sqlite_shaped.w; clause:fn@test/contract/ok_sqlite_shaped.w:39
     callbacks: may invoke applicable callbacks  [default:conservatively reentrant (§16.2b.9)]
     effect: param 0: *mut sqlite3 db: lend, the described fn's assertion; receives Database  [default:a described fn lends its parameters (§16.2b.5)]
-    effect: param 1: *const i8 zName: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
+    effect: param 1: *const c_char zName: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 2: i32 nArg: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 3: i32 eTextRep: lend, the described fn's assertion  [default:a described fn lends its parameters (§16.2b.5)]
     effect: param 4: *mut c_void pApp: consumes; destroyed by the callback param 6: extern "C" fn(*mut c_void) -> Unit xDestroy  [clause:consumes@test/contract/ok_sqlite_shaped.w:40]
