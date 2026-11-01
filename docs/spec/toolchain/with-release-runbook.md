@@ -500,6 +500,13 @@ next one the same way and verify it here before pinning it.
 
 ## Publish
 
+Write the release's notes first, as `docs/releases/<tag>.md` in the tree the
+tag will point at (`docs/releases/v0.16.0.0.md`): what the release changes,
+by what a program sees, with the two checklist items below when they apply.
+`:publish-release-asset` places that file first on the release page and
+regenerates the asset table under it after every upload; notes typed on the
+page itself are erased by the next platform's upload.
+
 Create an annotated tag at the verified commit:
 
 ```sh

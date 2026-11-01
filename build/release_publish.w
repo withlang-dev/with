@@ -93,10 +93,13 @@ fn rp_sidecar_digest(fs: &ToolFs, asset: &str) -> str:
 
 /// The release notes: what a reader needs to trust each asset, regenerated
 /// from the provenance sidecars present on the release after every upload.
-fn rp_notes(channel: &str, version: &str, source_sha: &str, rows: &List[str]) -> str:
+/// The human part — what the release changes — is `docs/releases/<tag>.md`
+/// in the released tree, placed first when it exists; the regeneration
+/// after each upload would otherwise erase notes written on the page.
+fn rp_notes(prose: &str, channel: &str, version: &str, source_sha: &str, rows: &List[str]) -> str:
     let publication = if channel == "release": "release" else: "prerelease"
     let automation = if channel == "release": "Automated compiler " else: "Automated " ++ channel ++ " compiler "
-    var notes = automation ++ publication ++ ".\n\n" ++
+    var notes = prose ++ automation ++ publication ++ ".\n\n" ++
         "Source commit: " ++ source_sha ++ "\n" ++
         "Compiler version: " ++ version ++ "\n\n" ++
         "Assets are published per platform as each finishes its fixpoint-verified build; " ++
@@ -120,6 +123,8 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let root = ctx.project_info().project_root()
     let tag = env("RELEASE_TAG")
+    let prose_path = rp_join(root, "docs/releases/" ++ tag ++ ".md")
+    let prose = if fs.exists(prose_path): fs.read_text(prose_path).trim() ++ "\n\n---\n\n" else: ""
     let title = env("RELEASE_TITLE")
     let channel = env("RELEASE_CHANNEL")
     let assets = rp_split_commas(env("RELEASE_ASSETS"))
@@ -191,7 +196,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     if view.rc != 0:
         let notes_path = rp_join(scratch, "notes.md")
         let no_rows: List[str] = List.new()
-        let _ = fs.write_text(notes_path, rp_notes(channel, tag, source_sha, &no_rows))
+        let _ = fs.write_text(notes_path, rp_notes(prose, channel, tag, source_sha, &no_rows))
         var create_rest: List[str] = List.new()
         create_rest.push("--target")
         create_rest.push(source_sha ++ "")
@@ -334,7 +339,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
             let text = fs.read_text(path)
             rows.push("| " ++ rp_field(text, "asset") ++ " | " ++ rp_field(text, "builder") ++ " | " ++ rp_field(text, "built_at") ++ " |")
     let notes_path = rp_join(scratch, "notes.md")
-    if fs.write_text(notes_path, rp_notes(channel, tag, source_sha, &rows)) != 0:
+    if fs.write_text(notes_path, rp_notes(prose, channel, tag, source_sha, &rows)) != 0:
         return rp_fail(&ctx, "could not write " ++ notes_path)
     var edit_rest: List[str] = List.new()
     edit_rest.push("--notes-file")
