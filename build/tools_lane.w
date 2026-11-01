@@ -63,12 +63,14 @@ pub fn run_tools_tests_action(ctx: ActionCtx) -> i32:
         var args: List[str] = List.new()
         args.push(compiler.clone())
         var label = ""
-        var timeout_ms: i32 = 600000
+        // The hang guard a test gets (#2362), not a speed budget: a check of
+        // tools/annotate_receivers.w crossed a 300 s ceiling on the 4-core
+        // windows-aarch64 runner and the lane read it as a failure (#2902).
+        let timeout_ms: i32 = 1800000
         if tl_checked_only(fs, source):
             args.push("check")
             args.push(tl_abs(root, source))
             label = slug ++ ".check"
-            timeout_ms = 300000
         else:
             args.push("build")
             args.push(tl_abs(root, source))
