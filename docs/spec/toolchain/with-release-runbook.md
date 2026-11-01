@@ -264,7 +264,10 @@ c.raylib` builds raylib from source on rlsw, raylib's software rasterizer,
 drawing into a real window without a GPU; Linux runs under `xvfb-run` with
 Mesa's llvmpipe (`LIBGL_ALWAYS_SOFTWARE=1`); Windows names a Mesa llvmpipe
 `opengl32.dll` in `WITH_UAT_OPENGL32_DLL`, which the spiral UAT places
-beside the program it builds. A pass on one platform says nothing about another: the Windows
+beside the program it builds (keep that DLL outside `out/release-uat`: the
+target clears that directory before its scenarios run, so a DLL placed there
+is gone by the time the scenario copies it; the lanes use `out/uat-mesa`).
+A pass on one platform says nothing about another: the Windows
 gate found a C-runtime mismatch (prebuilt Conan libraries expect the DLL
 runtime) that macOS could never show.
 

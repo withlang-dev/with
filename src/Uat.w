@@ -371,6 +371,10 @@ fn uat_unmet(req: &str, scratch: &str) -> str:
         let host = uat_host_platform()
         if host == "linux" and env("DISPLAY").len() == 0 and env("WAYLAND_DISPLAY").len() == 0: return "requires " ++ req ++ ": none"
         if host == "darwin" and env("SSH_CONNECTION").len() > 0: return "requires " ++ req ++ ": none (ssh session)"
+        // Windows: an ssh session runs in session 0, which has no desktop;
+        // with nobody logged on the console there is no monitor either, and
+        // GLFW fails to initialize its platform (v0.16.0.1 Windows leg).
+        if host == "windows" and env("SSH_CONNECTION").len() > 0: return "requires " ++ req ++ ": none (ssh session)"
         // A locked session has a display online and no window can open on
         // it: GLFW finds no monitor and the scenario failed red, with the
         // compiler blameless (2026-10-05 battery). The session's own record
