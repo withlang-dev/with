@@ -6,6 +6,7 @@
 // (a full device) must report failure, never 0.
 use std.fs
 use std.process
+use std.os
 
 fn main:
     let dir = "out/tmp/da_fs_wrappers_" ++ f"{pid()}"
@@ -23,4 +24,7 @@ fn main:
     assert(rename_file(path, moved) == 0)
     assert(remove_file(moved) == 0)
     assert(remove_dir(dir) == 0)
-    assert(write_file("/dev/full", "payload") != 0)
+    // #951's short write needs a full device, which only Linux has: on
+    // Windows `/dev/full` is `<drive>:\dev\full`, written as an ordinary
+    // file when that folder exists (#2843), as behav_zlib_gunzip_owned guards.
+    if os() == "Linux": assert(write_file("/dev/full", "payload") != 0)

@@ -45,3 +45,15 @@ docs/with-abi.sha256 text eol=lf
 # every platform.
 test/contract/*.expected text eol=lf
 test/uat/**/*.txt text eol=lf
+
+# The promoted engine corpora and the spec are read line-by-line by the build
+# layer: corpus.stamp's module hash is split on "\n" (corpus_stamp_field),
+# contracts.tsv is hashed whole, the spec's fenced blocks are found by "```\n"
+# (comp_first_fenced_block), and `with init`'s AI guide is compared to
+# docs/spec/guide/with_for_ai.md byte for byte. Under core.autocrlf=true a
+# native Windows checkout rewrites them to CRLF, and eight battery targets go
+# red on Windows only (#2832): the six corpus integrity checks,
+# spec-inventory-check and cli-selfhost-project-tests. Every file under these
+# two trees is text; pin LF so each reads the same bytes on every platform.
+lib/std/engines/** text eol=lf
+docs/spec/** text eol=lf
