@@ -2548,16 +2548,37 @@ impl Zcu:
     // its declarations, so they are an owner of their own. A same-owner
     // duplicate keeps one name (Sema's "shadowing is not allowed"), and
     // interface storage keeps its own table (D39).
+    // #2815: a header's `extern var` IS the C symbol — `stdin` is libc's
+    // whatever With names it — so it keeps its name (as a header's extern fn
+    // does, D29) and a With value that shares the name is the one displaced:
+    // std.io's `stdin` beside glibc's `extern FILE *stdin` met as one global
+    // declared twice ("conflicting global declaration"), and displacing the
+    // extern instead gave LLVM two globals named `stdin`. §18.2 then binds
+    // each reference by import order (resolve_displaced_global_ident), so
+    // `stdin` is the import written last's and `io.stdin` std.io's. Two
+    // headers' externs of one symbol are that symbol declared twice, which
+    // Sema accepts (collect_extern_var).
     fn displace_colliding_globals(pool: &AstPool):
         let taken: HashMap[i32, str] = HashMap.new()
-        for pass in 0..2:
+        for pass in 0..3:
             for di in 0..pool.decl_count():
                 let decl = pool.get_decl(di) as i32
-                if pool.kind(decl) != NodeKind.NK_LET_DECL or pool.let_decl_is_interface_provided(decl as NodeId):
+                let kind = pool.kind(decl)
+                if kind != NodeKind.NK_LET_DECL and kind != NodeKind.NK_EXTERN_VAR:
+                    continue
+                if kind == NodeKind.NK_LET_DECL and pool.let_decl_is_interface_provided(decl as NodeId):
                     continue
                 let from_c_import = di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0
                 let path = self.decl_source_path_frontend(di)
-                if (pass == 0) != (not from_c_import and path == self.current_source_path):
+                // Pass 0: externs take their names; 1: the root module's
+                // own values; 2: every other owner's, in declaration order.
+                // A With module's own `extern var` reaches another module's
+                // definition (#113, #2335): it is that symbol declared twice,
+                // never a displacement (collect_extern_var accepts it).
+                if kind == NodeKind.NK_EXTERN_VAR and not from_c_import:
+                    continue
+                let wanted_pass = if kind == NodeKind.NK_EXTERN_VAR: 0 else if not from_c_import and path == self.current_source_path: 1 else: 2
+                if pass != wanted_pass:
                     continue
                 // Each c_import is an owner of its own (#1753): two headers
                 // that define one constant are two imports (D70).
@@ -2565,7 +2586,7 @@ impl Zcu:
                 let name = pool.get_data0(decl)
                 if not taken.contains(name):
                     taken.insert(name, frontend_owned_text(owner))
-                else if taken.get(name).unwrap() != owner:
+                else if kind != NodeKind.NK_EXTERN_VAR and taken.get(name).unwrap() != owner:
                     frontend_displace_fn_decl(pool, self.pool, decl, owner)
 
     // #1663: a c_import's modeled wrapper — the safe `fn` CImport renders
