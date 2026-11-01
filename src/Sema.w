@@ -2897,7 +2897,7 @@ impl Sema:
     // A constant is an immutable static (D127); the marker's contents
     // change through a shared view, so no constant holds one (§19.1).
     mut fn reject_interior_constant(decl: i32, name: i32, ty: i32):
-        if self.ast.is_const_decl_node(decl as NodeId) == 0 or not self.type_holds_interior(ty):
+        if self.ast.is_const_decl_node(decl as NodeId) == false or not self.type_holds_interior(ty):
             return
         var diag = Diagnostic.err(f"constant `{self.pool_resolve(name)}` holds an `Interior`, whose contents change through a shared view; a constant is an immutable static (§19.1)", Span { file: self.local_file_id, start: self.ast.get_start(decl), end: self.ast.get_end(decl) })
         diag.add_help("bind it with `let` instead of `const`")
@@ -5386,7 +5386,7 @@ impl Sema:
         // tiers — so tier gating and blindness do not apply.
         if self.extern_fn_names.contains(sym):
             return 1
-        if self.ci_syms.contains(sym) and self.is_ci_visible(sym) != 0:
+        if self.ci_syms.contains(sym) and self.is_ci_visible(sym):
             return 1
         var saw_candidate = 0
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
@@ -5473,8 +5473,8 @@ impl Sema:
             return self.decl_visible_from_current(path, self.decl_visibility_pub[i])
         1
 
-    fn has_extern_var_decl(sym: i32) -> i32:
-        if self.extern_var_texts.contains(self.pool_resolve(sym)): 1 else: 0
+    fn has_extern_var_decl(sym: i32) -> bool:
+        if self.extern_var_texts.contains(self.pool_resolve(sym)): true else: false
 
     fn private_symbol_path_from_current(sym: i32) -> str:
         var i = if self.decl_visibility_index.contains(sym): self.decl_visibility_index.get(sym).unwrap() else: -1
@@ -5850,15 +5850,15 @@ impl Sema:
             return global_tid
         0
 
-    fn has_named_type_visible(sym: i32) -> i32:
+    fn has_named_type_visible(sym: i32) -> bool:
         if self.lookup_named_type_visible(sym) != 0:
-            return 1
-        0
+            return true
+        false
 
     fn typeinfo_builtin_shadowed(sym: i32) -> i32:
         if self.scope_lookup(sym) >= 0:
             return 1
-        if self.has_named_type_visible(sym) != 0:
+        if self.has_named_type_visible(sym):
             return 1
         0
 
@@ -6831,15 +6831,15 @@ impl Sema:
             return self.range_type_constructor_inclusive(canonical)
         -1
 
-    fn is_fixed_string_symbol(sym: i32) -> i32:
+    fn is_fixed_string_symbol(sym: i32) -> bool:
         if sym == self.syms.fixed_string:
-            return 1
+            return true
         let canonical = self.canonical_symbol_by_text(sym)
         if canonical == self.syms.fixed_string:
-            return 1
+            return true
         if self.pool_resolve_symbol(sym) == "FixedString":
-            return 1
-        0
+            return true
+        false
 
     mut fn fixed_string_type_from_length_node(length_node: i32) -> i32:
         let length = self.int_literal_i64_value(length_node)
@@ -7173,7 +7173,7 @@ impl Sema:
             let vg_a0 = if vg_count > 0: self.ast.get_extra(vg_start) else: 0
             let vg_a1 = if vg_count > 1: self.ast.get_extra(vg_start + 1) else: 0
             return self.resolve_vector_generic(gi_base_sym, vg_count, vg_a0, vg_a1, node)
-        if self.is_fixed_string_symbol(gi_base_sym) != 0:
+        if self.is_fixed_string_symbol(gi_base_sym):
             let gi_arg_count = self.ast.get_data2(node)
             if gi_arg_count != 1:
                 self.emit_error("FixedString expects exactly one length argument", node)
@@ -7551,25 +7551,25 @@ fn sema_node_is_bitwise_adaptable_literal(ast: &AstPool, node: i32) -> bool:
     false
 
 impl Sema:
-    fn is_option_pointer_type(tid: i32) -> i32:
+    fn is_option_pointer_type(tid: i32) -> bool:
         if tid <= 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_GENERIC_INST:
-            return 0
+            return false
         if self.get_type_d0(resolved) != self.syms.option:
-            return 0
+            return false
         if self.get_type_d2(resolved) <= 0:
-            return 0
+            return false
         let payload = self.get_generic_inst_arg(resolved, 0)
         let payload_resolved = self.resolve_alias(payload)
         let payload_kind = self.get_type_kind(payload_resolved)
         if payload_kind == TypeKind.TY_PTR or payload_kind == TypeKind.TY_EXTERN_FN:
-            return 1
-        0
+            return true
+        false
 
     fn option_pointer_payload_type(tid: i32) -> i32:
-        if self.is_option_pointer_type(tid) == 0:
+        if self.is_option_pointer_type(tid) == false:
             return 0
         let resolved = self.resolve_alias(tid)
         self.get_generic_inst_arg(resolved, 0)
@@ -7581,7 +7581,7 @@ impl Sema:
         let kind = self.get_type_kind(resolved)
         // D102 (§16.6): an `extern "C" fn` is never null; the nullable form is
         // `Option` of it, which is_option_pointer_type admits.
-        if kind == TypeKind.TY_PTR or self.is_option_pointer_type(resolved) != 0:
+        if kind == TypeKind.TY_PTR or self.is_option_pointer_type(resolved):
             return resolved
         0 as TypeId
 
@@ -7783,21 +7783,21 @@ impl Sema:
                 return current
         current
 
-    fn is_opaque_value_type(tid: i32) -> i32:
+    fn is_opaque_value_type(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid)
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let name_sym = self.get_type_d0(resolved)
         if name_sym == 0 or not self.type_decl_nodes.contains(name_sym):
-            return 0
+            return false
         let decl = self.type_decl_nodes.get(name_sym).unwrap()
         if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL:
-            return 0
+            return false
         if type_decl_sub_kind(self.ast.get_data2(decl)) == TypeDeclKind.Opaque:
-            return 1
-        0
+            return true
+        false
 
     fn type_is_c_va_list(tid: i32) -> i32:
         if tid == 0:
@@ -7825,18 +7825,18 @@ impl Sema:
     fn sig_param_is_c_va_list_by_place(sig_idx: i32, pi: i32) -> i32:
         self.type_uses_c_va_list_place(self.sig_param_type(sig_idx, pi))
 
-    fn is_c_void_like_type(tid: i32) -> i32:
+    fn is_c_void_like_type(tid: i32) -> bool:
         if tid == 0:
-            return 0
+            return false
         let resolved = self.resolve_alias(tid as TypeId)
         if self.get_type_kind(resolved) == TypeKind.TY_VOID:
-            return 1
+            return true
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
-            return 0
+            return false
         let name_sym = self.get_type_d0(resolved)
         if name_sym != 0 and self.pool_resolve(name_sym) == "c_void":
-            return 1
-        0
+            return true
+        false
 
     // A reference views its pointee in place and cannot convert it (§4.2.6
     // converts values): a `&i32` accepted as `&i64` read eight bytes of a
@@ -7886,7 +7886,7 @@ impl Sema:
         if exp_mut != 0 and act_mut == 0:
             return 0
         let exp_pointee = self.get_type_d0(exp_r)
-        if self.is_c_void_like_type(exp_pointee) != 0:
+        if self.is_c_void_like_type(exp_pointee):
             return 1
         // D155 (§16.1): a pointer to one integer type is not a pointer to
         // another; equal width with the other signedness is a different
@@ -7961,12 +7961,12 @@ impl Sema:
             self.clear_binding_view_deps(removed_sym)
         self.scope_starts.pop()
 
-    fn is_discard_binding_symbol(sym: i32) -> i32:
+    fn is_discard_binding_symbol(sym: i32) -> bool:
         if sym == 0:
-            return 1
+            return true
         if self.discard_sym != 0 and sym == self.discard_sym:
-            return 1
-        0
+            return true
+        false
 
     mut fn scope_insert_at(sym: i32, tid: i32, is_mut: i32):
         let idx = self.bind_names.len() as i32
@@ -7997,7 +7997,7 @@ impl Sema:
 
 
     mut fn scope_put_at(sym: i32, tid: i32, is_mut: i32, node: i32):
-        if self.is_discard_binding_symbol(sym) != 0:
+        if self.is_discard_binding_symbol(sym):
             return
         self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
@@ -8062,7 +8062,7 @@ impl Sema:
         self.scope_insert_at(sym, tid, is_mut)
 
     mut fn scope_put_consuming_rebind_at(sym: i32, tid: i32, is_mut: i32, node: i32) -> i32:
-        if self.is_discard_binding_symbol(sym) != 0:
+        if self.is_discard_binding_symbol(sym):
             return 1
         self.refuse_receiver_field_shadow(sym, node)
         let existing = self.scope_name_map.get(sym)
@@ -8114,7 +8114,7 @@ impl Sema:
         0
 
     mut fn register_top_level_global_decl(sym: i32, tid: i32, is_mut: i32, node: i32, decl_kind: i32):
-        if self.is_discard_binding_symbol(sym) != 0:
+        if self.is_discard_binding_symbol(sym):
             return
         // A bundle interface's storage and constants (D39) are reachable
         // only through an import, so they stay out of the flat global scope:
@@ -8390,11 +8390,11 @@ impl Sema:
             return self.bind_task_used[opt.unwrap()]
         0
 
-    mut fn scope_set_is_task(sym: i32, is_task: i32):
+    mut fn scope_set_is_task(sym: i32, is_task: bool):
         let opt = self.scope_name_map.get(sym)
         if opt.is_some():
             let idx: i32 = opt.unwrap()
-            self.bind_is_task[idx] = is_task
+            self.bind_is_task[idx] = is_task as i32
 
     fn scope_lookup_is_scoped_task(sym: i32) -> i32:
         let opt = self.scope_name_map.get(sym)
@@ -8751,8 +8751,8 @@ impl Sema:
     // per edge is exactly how #696 happened (the continue edge dropped the
     // entry==LIVE guard). `needs_drop` is passed in (callers already compute it) so
     // this stays a pure predicate. See README.md.
-    fn is_loop_carried_move(entry_state: i32, cur_state: i32, needs_drop: i32) -> i32:
-        if entry_state == VarState.LIVE and cur_state == VarState.MOVED and needs_drop != 0: 1 else: 0
+    fn is_loop_carried_move(entry_state: i32, cur_state: i32, needs_drop: i32) -> bool:
+        if entry_state == VarState.LIVE and cur_state == VarState.MOVED and needs_drop != 0: true else: false
 
     // A `continue` jumps to the loop's back-edge: any outer binding moved (and not
     // reinitialized) at the continue would be used moved on the next iteration.
@@ -8774,7 +8774,7 @@ impl Sema:
                 // old_verdict = the pre-#696 check (current-MOVED alone, ignores entry);
                 // new_verdict = the corrected check (LIVE at entry, MOVED at back-edge).
                 with_eprint(f"[trace-move]   #{i} `{nm}` entry={entry_state} at_continue={cur_state} needs_drop={nd} old_verdict={if cur_state == VarState.MOVED and nd != 0: 1 else: 0} new_verdict={self.is_loop_carried_move(entry_state, cur_state, nd)}")
-            if self.is_loop_carried_move(entry_state, cur_state, nd) != 0:
+            if self.is_loop_carried_move(entry_state, cur_state, nd):
                 self.emit_loop_carried_move_error(i, node)
             i = i + 1
 
@@ -8807,7 +8807,7 @@ impl Sema:
                 if trace_move and (e_state == VarState.MOVED or cur_state == VarState.MOVED):
                     let nm = self.pool_resolve(self.bind_names[i])
                     with_eprint(f"[trace-move]   #{i} `{nm}` entry={e_state} body_end={cur_state} needs_drop={nd} carried_move={self.is_loop_carried_move(e_state, cur_state, nd)}")
-                if self.is_loop_carried_move(e_state, cur_state, nd) != 0:
+                if self.is_loop_carried_move(e_state, cur_state, nd):
                     self.emit_loop_carried_move_error(i, loop_node)
                 i = i + 1
         var post: List[i32] = if has_condition_exit != 0:
@@ -9778,31 +9778,31 @@ impl Sema:
         let start = self.closure_capture_summary_starts.get(closure_node).unwrap()
         self.closure_capture_summary_data[(start + idx * 3 + 2)]
 
-    fn is_mutable_global(sym: i32) -> i32:
-        if self.mutable_global_syms.contains(sym): return 1
-        0
+    fn is_mutable_global(sym: i32) -> bool:
+        if self.mutable_global_syms.contains(sym): return true
+        false
 
     // mut.md Rev 8 §15.12 — declared via `global X = ...`, no `var`.
     // Rebinding such a symbol is the §15.12 diagnostic.
-    fn is_stable_global(sym: i32) -> i32:
-        if self.stable_global_syms.contains(sym): return 1
-        0
+    fn is_stable_global(sym: i32) -> bool:
+        if self.stable_global_syms.contains(sym): return true
+        false
 
-    fn is_active_async_scope_symbol(sym: i32) -> i32:
+    fn is_active_async_scope_symbol(sym: i32) -> bool:
         var i = self.async_scope_names.len() - 1
         while i >= 0:
             if self.async_scope_names[i] == sym:
-                return 1
+                return true
             i = i - 1
-        0
+        false
 
-    fn is_active_sync_scope_symbol(sym: i32) -> i32:
+    fn is_active_sync_scope_symbol(sym: i32) -> bool:
         var i = self.sync_scope_names.len() - 1
         while i >= 0:
             if self.sync_scope_names[i] == sym:
-                return 1
+                return true
             i = i - 1
-        0
+        false
 
     // ── Function signature management ────────────────────────────────
 
@@ -11221,7 +11221,7 @@ impl Sema:
         // Search function signatures
         for si in 0..self.sig_names.len():
             let sym = self.sig_names[si]
-            if self.is_ci_visible(sym) != 0:
+            if self.is_ci_visible(sym):
                 let name = self.pool_resolve(sym)
                 if name.len() > 0:
                     let d = sema_levenshtein(target, name, max_dist)
@@ -11331,7 +11331,7 @@ impl Sema:
             return if self.ref_admits_fn_value(exp_r): 1 else: 0
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
             return if self.ref_admits_fn_value(act_r): 1 else: 0
-        if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
+        if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible_fast(opt_payload, actual)
@@ -11383,7 +11383,7 @@ impl Sema:
         let exp_k = self.get_type_kind(exp_r)
         let act_k = self.get_type_kind(act_r)
 
-        if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
+        if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible(opt_payload, actual)
@@ -11553,7 +11553,7 @@ impl Sema:
         if exp_mut != 0 and act_mut == 0:
             return 0
         let exp_pointee = self.get_type_d0(exp_r)
-        if self.is_c_void_like_type(exp_pointee) != 0:
+        if self.is_c_void_like_type(exp_pointee):
             return 1
         if self.numeric_types_differ(exp_pointee, self.get_type_d0(act_r)):
             return 0
@@ -11617,7 +11617,7 @@ impl Sema:
             return if self.ref_admits_fn_value(exp_r): 1 else: 0
         if exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_REF:
             return if self.ref_admits_fn_value(act_r): 1 else: 0
-        if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
+        if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible_fast_frozen(opt_payload, actual)
@@ -11666,7 +11666,7 @@ impl Sema:
         let exp_k = self.get_type_kind(exp_r)
         let act_k = self.get_type_kind(act_r)
 
-        if self.is_option_pointer_type(exp_r) != 0 and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
+        if self.is_option_pointer_type(exp_r) and (act_k == TypeKind.TY_PTR or act_k == TypeKind.TY_REF or act_k == TypeKind.TY_FN or act_k == TypeKind.TY_EXTERN_FN):
             let opt_payload = self.option_pointer_payload_type(exp_r)
             if opt_payload != 0:
                 return self.types_compatible_frozen(opt_payload, actual)
@@ -11763,12 +11763,12 @@ impl Sema:
             return self.get_generic_inst_arg(act_r as i32, 0)
         0
 
-    fn can_coerce_collection_to_slice(expected: TypeId, actual: TypeId) -> i32:
+    fn can_coerce_collection_to_slice(expected: TypeId, actual: TypeId) -> bool:
         let exp_r = self.resolve_alias(expected)
         if self.get_type_kind(exp_r) != TypeKind.TY_SLICE:
-            return 0
+            return false
         let elem = self.collection_slice_element(actual)
-        if elem != 0 and self.resolve_alias(elem as TypeId) == self.resolve_alias(self.get_type_d0(exp_r) as TypeId): 1 else: 0
+        if elem != 0 and self.resolve_alias(elem as TypeId) == self.resolve_alias(self.get_type_d0(exp_r) as TypeId): true else: false
 
     fn generic_inst_accepts_unit_enum_value(generic_tid: TypeId, enum_tid: TypeId) -> i32:
         if self.get_type_kind(generic_tid) != TypeKind.TY_GENERIC_INST or self.get_type_kind(enum_tid) != TypeKind.TY_ENUM:

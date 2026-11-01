@@ -1302,10 +1302,10 @@ impl CCodegen:
         self.body_fn_name_map.insert(with_str_clone_ref(name), out)
         out
 
-    mut fn has_body_for_sym(fn_sym: i32) -> i32:
+    mut fn has_body_for_sym(fn_sym: i32) -> bool:
         if self.canonical_body_sym(fn_sym) != 0:
-            return 1
-        0
+            return true
+        false
 
     mut fn body_sig_index(fn_sym: i32) -> i32:
         let direct = self.sema.get_sig(fn_sym)
@@ -1342,16 +1342,16 @@ impl CCodegen:
         let fn_sym = self.call_callee_fn_sym(body, callee_operand)
         self.fn_param_is_c_pointer(fn_sym, param_idx)
 
-    fn is_void_tid(tid: i32) -> i32:
+    fn is_void_tid(tid: i32) -> bool:
         if tid == 0:
-            return 1
+            return true
         let resolved = self.sema.resolve_alias(tid)
         if resolved == 0:
-            return 0
+            return false
         let kind = self.sema.get_type_kind(resolved)
         if kind == TypeKind.TY_VOID or kind == TypeKind.TY_NEVER:
-            return 1
-        0
+            return true
+        false
 
     mut fn struct_c_name(tid: i32) -> str:
         if self.check_interrupted() != 0:
@@ -1795,7 +1795,7 @@ impl CCodegen:
             let target = if body_sym != 0: self.fn_c_name(body_sym) else: self.extern_sym_c_name(fn_sym)
             let thunk_decl = self.return_decl(ret_tid, self.fat_thunk_name(fn_sym, tid) ++ "(" ++ params ++ ")")
             out = out ++ "static " ++ thunk_decl ++ " " ++ cc_lbrace() ++ " (void)__with_ctx; "
-            if self.is_void_tid(ret_tid) != 0 or self.returns_array(ret_tid):
+            if self.is_void_tid(ret_tid) or self.returns_array(ret_tid):
                 out = out ++ target ++ "(" ++ args ++ "); "
             else:
                 out = out ++ "return " ++ target ++ "(" ++ args ++ "); "
@@ -1885,7 +1885,7 @@ impl CCodegen:
     mut fn place_tid(body: &MirBody, place_id: i32) -> i32:
         let lid = self.place_local_id(body, place_id)
         var base_tid = self.local_effective_tid(body, lid)
-        if self.is_void_tid(base_tid) != 0:
+        if self.is_void_tid(base_tid):
             base_tid = self.place_local_tid(body, place_id)
         if base_tid == 0:
             return 0
@@ -1987,7 +1987,7 @@ impl CCodegen:
     mut fn place_ref_target_tid(body: &MirBody, place_id: i32) -> i32:
         let lid = self.place_local_id(body, place_id)
         var base_tid = self.local_effective_tid(body, lid)
-        if self.is_void_tid(base_tid) != 0:
+        if self.is_void_tid(base_tid):
             base_tid = self.place_local_tid(body, place_id)
         if base_tid == 0:
             return 0
@@ -2210,22 +2210,22 @@ impl CCodegen:
             return 0
         self.type_match(e, a)
 
-    fn is_scalar_like_tid(tid: i32) -> i32:
+    fn is_scalar_like_tid(tid: i32) -> bool:
         let resolved = self.sema.resolve_alias(tid)
         let tk = self.sema.get_type_kind(resolved)
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_FLOAT or tk == TypeKind.TY_ENUM:
-            return 1
+            return true
         if self.type_is_distinct(resolved as i32) != 0:
-            return 1
-        0
+            return true
+        false
 
     mut fn prefer_inferred_tid(current_tid: i32, candidate_tid: i32) -> i32:
         let cand = self.sema.resolve_alias(candidate_tid as TypeId) as i32
-        if cand == 0 or self.is_void_tid(cand) != 0:
+        if cand == 0 or self.is_void_tid(cand):
             return current_tid
         if self.sema.get_type_kind(cand as TypeId) == TypeKind.TY_ERR:
             return current_tid
-        if current_tid == 0 or self.is_void_tid(current_tid) != 0:
+        if current_tid == 0 or self.is_void_tid(current_tid):
             return cand
         if self.strict_type_match(current_tid, cand) != 0:
             return current_tid
@@ -2494,7 +2494,7 @@ impl CCodegen:
         if field_name != "ptr":
             return 0
         let elem_tid = self.list_element_tid(resolved)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             return 0
         let const_ptr = self.sema.find_exact_type(TypeKind.TY_PTR, elem_tid, 0, 0) as i32
         if const_ptr != 0:
@@ -2507,13 +2507,13 @@ impl CCodegen:
     mut fn list_new_elem_size_text(body: &MirBody, dest_place: i32) -> str:
         var list_tid = self.place_tid_no_infer(body, dest_place)
         var elem_tid = self.list_element_tid(list_tid)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             list_tid = self.call_dest_expected_tid(body, dest_place)
             elem_tid = self.list_element_tid(list_tid)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             let dst_local = self.place_local_id(body, dest_place)
             elem_tid = self.list_local_element_tid(body, dst_local)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             "0"
         else:
             "sizeof(" ++ self.c_type(elem_tid, 0) ++ ")"
@@ -2644,19 +2644,19 @@ impl CCodegen:
         var key_tid = self.hashmap_key_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
         if key_tid == 0:
             key_tid = self.operand_tid(body, key_operand)
-        if key_tid == 0 or self.is_void_tid(key_tid) != 0:
+        if key_tid == 0 or self.is_void_tid(key_tid):
             key_tid = self.sema.ty_i64 as i32
         key_tid
 
     fn option_tid_for_payload(payload_tid: i32) -> i32:
-        if payload_tid == 0 or self.is_void_tid(payload_tid) != 0:
+        if payload_tid == 0 or self.is_void_tid(payload_tid):
             return 0
         let args: List[i32] = List.new()
         args.push(payload_tid)
         self.sema.find_generic_inst_type(self.sema.syms.option, args, 1) as i32
 
     fn option_ref_tid_for_payload(payload_tid: i32) -> i32:
-        if payload_tid == 0 or self.is_void_tid(payload_tid) != 0:
+        if payload_tid == 0 or self.is_void_tid(payload_tid):
             return 0
         let ref_tid = self.sema.find_exact_type(TypeKind.TY_REF, payload_tid, 0, 0) as i32
         if ref_tid == 0:
@@ -2690,7 +2690,7 @@ impl CCodegen:
             if insert_recv != recv_text:
                 continue
             let value_tid = self.operand_tid(body, self.call_arg_operand(body, call_args_id, 2))
-            if value_tid == 0 or self.is_void_tid(value_tid) != 0:
+            if value_tid == 0 or self.is_void_tid(value_tid):
                 continue
             if out == 0:
                 out = value_tid
@@ -2725,7 +2725,7 @@ impl CCodegen:
                         if self.place_is_direct_local(body, src_place, local_id) != 0:
                             continue
                 let src_elem_tid = self.list_element_tid(self.operand_tid(body, src_operand))
-                if src_elem_tid == 0 or self.is_void_tid(src_elem_tid) != 0:
+                if src_elem_tid == 0 or self.is_void_tid(src_elem_tid):
                     continue
                 if out == 0:
                     out = src_elem_tid
@@ -2742,7 +2742,7 @@ impl CCodegen:
             if self.place_is_direct_local(body, recv_place, local_id) == 0:
                 continue
             let elem_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 1))
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 continue
             if out == 0:
                 out = elem_tid
@@ -2761,7 +2761,7 @@ impl CCodegen:
         let declared = body.local_type_ids[local_id]
         if local_id <= 0:
             return declared
-        if self.is_void_tid(declared) == 0:
+        if self.is_void_tid(declared) == false:
             return declared
         let sig_idx = self.body_sig_index(body.fn_sym)
         if sig_idx < 0:
@@ -2791,13 +2791,13 @@ impl CCodegen:
         let declared_resolved = self.sema.resolve_alias(declared)
         let declared_kind = self.sema.get_type_kind(declared_resolved)
         let call_ret = self.local_direct_call_return_tid(body, local_id)
-        if call_ret != 0 and self.is_void_tid(call_ret) == 0:
+        if call_ret != 0 and self.is_void_tid(call_ret) == false:
             let call_ret_resolved = self.sema.resolve_alias(call_ret)
             let call_ret_kind = self.sema.get_type_kind(call_ret_resolved)
             if self.type_is_payload_enum(call_ret) != 0:
                 self.local_effective_cache.insert(cache_key, call_ret)
                 return call_ret
-            if self.is_void_tid(declared) != 0 or declared_resolved == 0 or declared_kind == TypeKind.TY_ERR:
+            if self.is_void_tid(declared) or declared_resolved == 0 or declared_kind == TypeKind.TY_ERR:
                 self.local_effective_cache.insert(cache_key, call_ret)
                 return call_ret
             if declared_kind != call_ret_kind or self.strict_type_match(declared, call_ret) == 0:
@@ -2805,23 +2805,23 @@ impl CCodegen:
                     self.local_effective_cache.insert(cache_key, call_ret)
                     return call_ret
         let copied_payload_enum_tid = self.local_copied_payload_enum_tid(body, local_id)
-        if copied_payload_enum_tid != 0 and self.is_void_tid(copied_payload_enum_tid) == 0:
+        if copied_payload_enum_tid != 0 and self.is_void_tid(copied_payload_enum_tid) == false:
             self.local_effective_cache.insert(cache_key, copied_payload_enum_tid)
             return copied_payload_enum_tid
         let downcast_opt_tid = self.local_payload_downcast_option_tid(body, local_id)
-        if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == 0:
+        if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == false:
             self.local_effective_cache.insert(cache_key, downcast_opt_tid)
             return downcast_opt_tid
-        if self.is_void_tid(declared) == 0 and (declared_resolved == 0 or declared_kind != TypeKind.TY_ERR):
+        if self.is_void_tid(declared) == false and (declared_resolved == 0 or declared_kind != TypeKind.TY_ERR):
             if declared_kind == TypeKind.TY_GENERIC_INST:
                 let inferred_generic = self.infer_local_tid(body, local_id)
-                if inferred_generic != 0 and self.is_void_tid(inferred_generic) == 0 and self.type_is_payload_enum(inferred_generic) != 0:
+                if inferred_generic != 0 and self.is_void_tid(inferred_generic) == false and self.type_is_payload_enum(inferred_generic) != 0:
                     self.local_effective_cache.insert(cache_key, inferred_generic)
                     return inferred_generic
             self.local_effective_cache.insert(cache_key, declared)
             return declared
         let inferred = self.infer_local_tid(body, local_id)
-        if inferred != 0 and self.is_void_tid(inferred) == 0:
+        if inferred != 0 and self.is_void_tid(inferred) == false:
             self.local_effective_cache.insert(cache_key, inferred)
             return inferred
         self.local_effective_cache.insert(cache_key, declared)
@@ -2837,7 +2837,7 @@ impl CCodegen:
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
         if local_id <= param_count:
             return declared
-        if self.is_void_tid(declared) == 0:
+        if self.is_void_tid(declared) == false:
             let resolved = self.sema.resolve_alias(declared)
             let kind = self.sema.get_type_kind(resolved)
             if resolved == 0 or kind != TypeKind.TY_ERR:
@@ -2871,7 +2871,7 @@ impl CCodegen:
             else:
                 self.call_builtin_kind(body, callee_operand, args_id, dest_place)
             let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
-            if ret_tid == 0 or self.is_void_tid(ret_tid) != 0:
+            if ret_tid == 0 or self.is_void_tid(ret_tid):
                 continue
             if self.type_is_payload_enum(ret_tid) == 0:
                 continue
@@ -3024,7 +3024,7 @@ impl CCodegen:
     mut fn record_local_tid(values: List[i32], local_id: i32, tid: i32) -> List[i32]:
         if local_id < 0 or local_id >= values.len():
             return values
-        if tid == 0 or self.is_void_tid(tid) != 0:
+        if tid == 0 or self.is_void_tid(tid):
             return values
         let current = values[local_id]
         if current < 0:
@@ -3372,7 +3372,7 @@ impl CCodegen:
         let base_local = body.place_locals[place_id]
         var out = self.local_base_text(body, base_local)
         var current_tid = self.local_effective_tid(body, base_local)
-        if self.is_void_tid(current_tid) != 0:
+        if self.is_void_tid(current_tid):
             current_tid = self.place_local_tid(body, place_id)
         let start = body.place_proj_starts[place_id]
         let count = body.place_proj_counts[place_id]
@@ -4345,9 +4345,9 @@ impl CCodegen:
         if recv_tk == TypeKind.TY_PTR or recv_tk == TypeKind.TY_REF:
             recv_tid = self.sema.resolve_alias(self.sema.get_type_d0(recv_tid))
         var elem_tid = self.list_element_tid(recv_tid as i32)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             elem_tid = self.list_local_element_tid(body, self.place_local_id(body, body.operand_d0[recv_operand]))
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             self.fail("a List helper's receiver has no element type (D115 Amendment 1 sizes every helper call statically)")
             return "0"
         "sizeof(" ++ self.c_type(elem_tid, 0) ++ ")"
@@ -4366,7 +4366,7 @@ impl CCodegen:
         else:
             list_tid = self.place_local_tid(body, dest_place)
         let elem_tid = self.list_element_tid(list_tid)
-        if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+        if elem_tid == 0 or self.is_void_tid(elem_tid):
             self.fail("`++` over sequences without an element type (D116)")
             return "    abort();"
         let elem_c = self.c_type(elem_tid, 0)
@@ -4800,7 +4800,7 @@ impl CCodegen:
         if dst_local >= 1 and dst_local <= param_count:
             return dest_tid
         let hinted = self.local_usage_hint_tid(body, dst_local)
-        if hinted != 0 and self.is_void_tid(hinted) == 0:
+        if hinted != 0 and self.is_void_tid(hinted) == false:
             return hinted
         let resolved = self.sema.resolve_alias(dest_tid)
         let tk = self.sema.get_type_kind(resolved)
@@ -4836,7 +4836,7 @@ impl CCodegen:
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sig_matches_call_name(sym, fn_sym) == 0:
                 continue
@@ -4844,16 +4844,16 @@ impl CCodegen:
                 continue
             let sym_text = cc_intern_resolve(self.intern, sym)
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 var arg_tid = self.operand_tid_no_infer(body, arg_operand)
-                if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -4863,7 +4863,7 @@ impl CCodegen:
                 score = score + 4
             if cc_str_contains_dot(raw) == 0 and cc_str_ends_with(sym_text, "." ++ raw) != 0:
                 score = score + 2
-            if self.has_body_for_sym(sym) != 0:
+            if self.has_body_for_sym(sym):
                 score = score + 1
             if score > match_score:
                 match_score = score
@@ -4908,16 +4908,16 @@ impl CCodegen:
             if self.sema.sig_get_param_count(sig_idx) != argc:
                 continue
             let ret_tid = self.c_sig_return_type(sig_idx)
-            if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
             for ai in 0..argc:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 var arg_tid = self.operand_tid_no_infer(body, arg_operand)
-                if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(sig_idx, ai)
-                if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -4945,29 +4945,29 @@ impl CCodegen:
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 var arg_tid = self.operand_tid_no_infer(body, arg_operand)
-                if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
                     params_ok = 0
                     break
             if params_ok == 0:
                 continue
             var score = 0
-            if self.has_body_for_sym(sym) != 0:
+            if self.has_body_for_sym(sym):
                 score = score + 2
-            if self.is_void_tid(want_ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false:
                 score = score + 1
             if score > match_score:
                 match_score = score
@@ -4981,7 +4981,7 @@ impl CCodegen:
         var kept = 0
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
@@ -5016,7 +5016,7 @@ impl CCodegen:
         var out = ""
         for si in 0..self.sema.sig_names.len():
             let sym = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sema.sig_get_param_count(si as i32) != arg_count:
                 continue
@@ -5157,7 +5157,7 @@ impl CCodegen:
         self.field_cache_tids.push(tid)
 
     mut fn field_cache_record(struct_tid: i32, field_sym: i32, tid: i32):
-        if tid == 0 or self.is_void_tid(tid) != 0:
+        if tid == 0 or self.is_void_tid(tid):
             return
         if self.field_cache_lookup(struct_tid, field_sym) != -1234567:
             return
@@ -5289,14 +5289,14 @@ impl CCodegen:
                 if ai < 0 or ai >= param_count:
                     continue
                 let p_tid = self.sema.sig_param_type(sig_idx, ai)
-                if p_tid == 0 or self.is_void_tid(p_tid) != 0:
+                if p_tid == 0 or self.is_void_tid(p_tid):
                     continue
-                if hint_tid == 0 or self.is_void_tid(hint_tid) != 0:
+                if hint_tid == 0 or self.is_void_tid(hint_tid):
                     hint_tid = p_tid
                     continue
                 if self.type_match(hint_tid, p_tid) != 0:
                     continue
-            if hint_tid != 0 and self.is_void_tid(hint_tid) == 0:
+            if hint_tid != 0 and self.is_void_tid(hint_tid) == false:
                 self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
                 return hint_tid
 
@@ -5334,7 +5334,7 @@ impl CCodegen:
                     if name_sym == 0:
                         continue
                     let field_tid = self.struct_field_tid(dst_resolved as i32, name_sym)
-                    if field_tid == 0 or self.is_void_tid(field_tid) != 0:
+                    if field_tid == 0 or self.is_void_tid(field_tid):
                         continue
                     hint_tid = field_tid
                     self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
@@ -5366,7 +5366,7 @@ impl CCodegen:
                 if self.place_is_direct_local(body, dst_place, local_id) != 0:
                     continue
                 let dst_tid = self.place_tid_no_infer(body, dst_place)
-                if dst_tid == 0 or self.is_void_tid(dst_tid) != 0:
+                if dst_tid == 0 or self.is_void_tid(dst_tid):
                     continue
                 hint_tid = dst_tid
                 self.local_usage_hint_cache_store(body.fn_sym, local_id, hint_tid)
@@ -5524,7 +5524,7 @@ impl CCodegen:
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sema.sig_get_param_count(si) != arg_count:
                 continue
@@ -5534,18 +5534,18 @@ impl CCodegen:
             let owner = cc_owner_prefix(sym_text)
             let owner_matched = if preferred_owner.len() > 0 and owner == preferred_owner: 1 else: 0
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
             for ai in 0..arg_count:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 var arg_tid = self.operand_tid_no_infer(body, arg_operand)
-                if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
                 if ai == 0 and owner_matched != 0:
                     continue
-                if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -5553,7 +5553,7 @@ impl CCodegen:
             var score = 0
             if owner_matched != 0:
                 score = score + 4
-            if self.has_body_for_sym(sym) != 0:
+            if self.has_body_for_sym(sym):
                 score = score + 2
             if score > match_score:
                 match_score = score
@@ -5599,7 +5599,7 @@ impl CCodegen:
         var match_score = -1
         for si in 0..self.sema.sig_names.len() as i32:
             let sym: i32 = self.sema.sig_names[si]
-            if only_local_defs != 0 and self.has_body_for_sym(sym) == 0:
+            if only_local_defs != 0 and self.has_body_for_sym(sym) == false:
                 continue
             if self.sema.sig_get_param_count(si) != argc:
                 continue
@@ -5610,16 +5610,16 @@ impl CCodegen:
             if owner != owner_text and cc_str_ends_with(owner, "." ++ owner_text) == 0:
                 continue
             let ret_tid = self.c_sig_return_type(si)
-            if self.is_void_tid(want_ret_tid) == 0 and self.strict_type_match(want_ret_tid, ret_tid) == 0:
+            if self.is_void_tid(want_ret_tid) == false and self.strict_type_match(want_ret_tid, ret_tid) == 0:
                 continue
             var params_ok = 1
             for ai in 0..argc:
                 let arg_operand = self.call_arg_operand(body, args_id, ai)
                 var arg_tid = self.operand_tid_no_infer(body, arg_operand)
-                if self.is_void_tid(arg_tid) != 0 and self.infer_local_depth == 0:
+                if self.is_void_tid(arg_tid) and self.infer_local_depth == 0:
                     arg_tid = self.operand_tid(body, arg_operand)
                 let p_tid = self.sema.sig_param_type(si, ai)
-                if self.is_void_tid(arg_tid) == 0 and self.strict_type_match(p_tid, arg_tid) == 0:
+                if self.is_void_tid(arg_tid) == false and self.strict_type_match(p_tid, arg_tid) == 0:
                     params_ok = 0
                     break
             if params_ok == 0:
@@ -5627,7 +5627,7 @@ impl CCodegen:
             var score = 0
             if owner == owner_text:
                 score = score + 4
-            if self.has_body_for_sym(sym) != 0:
+            if self.has_body_for_sym(sym):
                 score = score + 2
             if score > match_score:
                 match_score = score
@@ -6023,20 +6023,20 @@ impl CCodegen:
             return self.place_tid_no_infer(body, dest_place)
         if kind == CcBuiltin.LIST_SLOT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_PUSH:
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) != 0:
+            if dst != 0 and self.is_void_tid(dst):
                 return self.sema.ty_void as i32
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
         // `remove` transfers the element out (D27).
@@ -6048,30 +6048,30 @@ impl CCodegen:
             return self.sema.ty_void as i32
         if kind == CcBuiltin.VECSLOT_GET:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let slot_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
             let elem_tid = self.listslot_element_tid(slot_tid)
             if elem_tid != 0:
                 return elem_tid
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_POP:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_GET:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.LIST_LEN:
@@ -6098,32 +6098,32 @@ impl CCodegen:
             let dst_local = self.place_local_id(body, dest_place)
             if dst_local >= 0:
                 let downcast_opt_tid = self.local_payload_downcast_option_tid(body, dst_local)
-                if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == 0:
+                if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == false:
                     return downcast_opt_tid
             let opt_tid = self.call_hashmap_get_option_tid(body, args_id)
-            if opt_tid != 0 and self.is_void_tid(opt_tid) == 0:
+            if opt_tid != 0 and self.is_void_tid(opt_tid) == false:
                 return opt_tid
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0 and self.type_is_payload_enum(hinted) != 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false and self.type_is_payload_enum(hinted) != 0:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0 and self.type_is_payload_enum(dst) != 0:
+            if dst != 0 and self.is_void_tid(dst) == false and self.type_is_payload_enum(dst) != 0:
                 return dst
-            if hinted != 0 and self.is_void_tid(hinted) == 0 and self.is_scalar_like_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false and self.is_scalar_like_tid(hinted) == false:
                 let hinted_opt = self.option_tid_for_payload(hinted)
-                if hinted_opt != 0 and self.is_void_tid(hinted_opt) == 0:
+                if hinted_opt != 0 and self.is_void_tid(hinted_opt) == false:
                     return hinted_opt
-            if dst != 0 and self.is_void_tid(dst) == 0 and self.is_scalar_like_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false and self.is_scalar_like_tid(dst) == false:
                 let dst_opt = self.option_tid_for_payload(dst)
-                if dst_opt != 0 and self.is_void_tid(dst_opt) == 0:
+                if dst_opt != 0 and self.is_void_tid(dst_opt) == false:
                     return dst_opt
-            if dst != 0 and self.is_void_tid(dst) == 0 and self.is_scalar_like_tid(dst) != 0:
+            if dst != 0 and self.is_void_tid(dst) == false and self.is_scalar_like_tid(dst):
                 return dst
-            if hinted != 0 and self.is_void_tid(hinted) == 0 and self.is_scalar_like_tid(hinted) != 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false and self.is_scalar_like_tid(hinted):
                 return hinted
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.MAP_CONTAINS:
@@ -6140,10 +6140,10 @@ impl CCodegen:
             let owner = self.call_first_arg_owner_text(body, args_id)
             if owner == "HashMap":
                 let hinted = self.call_dest_expected_tid(body, dest_place)
-                if hinted != 0 and self.is_void_tid(hinted) == 0:
+                if hinted != 0 and self.is_void_tid(hinted) == false:
                     return hinted
                 let dst = self.place_local_tid(body, dest_place)
-                if dst != 0 and self.is_void_tid(dst) == 0:
+                if dst != 0 and self.is_void_tid(dst) == false:
                     return dst
                 return self.sema.ty_i64 as i32
             return self.sema.ty_bool as i32
@@ -6153,20 +6153,20 @@ impl CCodegen:
             return self.sema.ty_bool as i32
         if kind == CcBuiltin.OPT_UNWRAP or kind == CcBuiltin.OPT_EXPECT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.ATOMIC_LOAD or kind == CcBuiltin.ATOMIC_SWAP or kind == CcBuiltin.ATOMIC_FETCH_ADD or kind == CcBuiltin.ATOMIC_FETCH_SUB or kind == CcBuiltin.ATOMIC_FETCH_AND or kind == CcBuiltin.ATOMIC_FETCH_OR or kind == CcBuiltin.ATOMIC_FETCH_XOR or kind == CcBuiltin.ATOMIC_FETCH_MIN or kind == CcBuiltin.ATOMIC_FETCH_MAX:
             return self.atomic_recv_value_tid(body, args_id)
         if kind == CcBuiltin.ATOMIC_CAS or kind == CcBuiltin.ATOMIC_CAS_WEAK:
             let hinted_atomic = self.call_dest_expected_tid(body, dest_place)
-            if hinted_atomic != 0 and self.is_void_tid(hinted_atomic) == 0:
+            if hinted_atomic != 0 and self.is_void_tid(hinted_atomic) == false:
                 return hinted_atomic
             let dst_atomic = self.place_local_tid(body, dest_place)
-            if dst_atomic != 0 and self.is_void_tid(dst_atomic) == 0:
+            if dst_atomic != 0 and self.is_void_tid(dst_atomic) == false:
                 return dst_atomic
             let payload = self.atomic_recv_value_tid(body, args_id)
             let args: List[i32] = List.new()
@@ -6199,10 +6199,10 @@ impl CCodegen:
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.STR_SPLIT:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return CC_PSEUDO_TID_LIST
         if kind == CcBuiltin.STR_TO_UPPER or kind == CcBuiltin.STR_TO_LOWER or kind == CcBuiltin.STR_REPLACE or kind == CcBuiltin.STR_REPEAT:
@@ -6217,29 +6217,29 @@ impl CCodegen:
             return self.sema.ty_u32 as i32
         if kind == CcBuiltin.ROTATE_LEFT or kind == CcBuiltin.ROTATE_RIGHT or kind == CcBuiltin.INT_SWAP_BYTES or kind == CcBuiltin.POPCOUNT or kind == CcBuiltin.CLZ or kind == CcBuiltin.CTZ or kind == CcBuiltin.BITREVERSE:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_i32 as i32
         if kind == CcBuiltin.MIN or kind == CcBuiltin.MAX or kind == CcBuiltin.ABS or kind == CcBuiltin.MATH_FN:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             let operand_tid = self.operand_tid(body, self.call_arg_operand(body, args_id, 0))
-            if operand_tid != 0 and self.is_void_tid(operand_tid) == 0:
+            if operand_tid != 0 and self.is_void_tid(operand_tid) == false:
                 return operand_tid
             return self.sema.ty_i64 as i32
         if kind == CcBuiltin.FMA:
             let hinted = self.call_dest_expected_tid(body, dest_place)
-            if hinted != 0 and self.is_void_tid(hinted) == 0:
+            if hinted != 0 and self.is_void_tid(hinted) == false:
                 return hinted
             let dst = self.place_local_tid(body, dest_place)
-            if dst != 0 and self.is_void_tid(dst) == 0:
+            if dst != 0 and self.is_void_tid(dst) == false:
                 return dst
             return self.sema.ty_f64 as i32
         if kind == CcBuiltin.CLOSURE_CLONE:
@@ -6493,7 +6493,7 @@ impl CCodegen:
         let declared = self.local_declared_tid(body, local_id)
         let declared_resolved = self.sema.resolve_alias(declared)
         let allow_container_receiver_infer =
-            if self.is_void_tid(declared) == 0 and self.sema.get_type_kind(declared_resolved) != TypeKind.TY_ERR:
+            if self.is_void_tid(declared) == false and self.sema.get_type_kind(declared_resolved) != TypeKind.TY_ERR:
                 0
             else:
                 1
@@ -6526,11 +6526,11 @@ impl CCodegen:
                             return self.sema.ty_bool as i32
                         if call_kind == CcBuiltin.MAP_GET:
                             let rt = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
-                            if rt != 0 and self.is_void_tid(rt) == 0:
+                            if rt != 0 and self.is_void_tid(rt) == false:
                                 return rt
                         return self.sema.ty_i64 as i32
                     let rt = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
-                    if rt != 0 and self.is_void_tid(rt) == 0:
+                    if rt != 0 and self.is_void_tid(rt) == false:
                         return rt
 
             let start = body.bb_stmt_starts[bb]
@@ -6551,7 +6551,7 @@ impl CCodegen:
                 let d2 = body.rval_d2[rval_id]
                 if rk == RvalueKind.RK_USE:
                     let t = self.operand_tid(body, d0)
-                    if t != 0 and self.is_void_tid(t) == 0:
+                    if t != 0 and self.is_void_tid(t) == false:
                         return t
                     continue
                 if rk == RvalueKind.RK_BIN_OP:
@@ -6560,10 +6560,10 @@ impl CCodegen:
                     if d0 == BinaryOp.OP_CONCAT:
                         return self.sema.ty_str as i32
                     let lt = self.operand_tid(body, d1)
-                    if lt != 0 and self.is_void_tid(lt) == 0:
+                    if lt != 0 and self.is_void_tid(lt) == false:
                         return lt
                     let rt = self.operand_tid(body, d2)
-                    if rt != 0 and self.is_void_tid(rt) == 0:
+                    if rt != 0 and self.is_void_tid(rt) == false:
                         return rt
                     continue
                 if rk == RvalueKind.RK_STR_CONCAT_N:
@@ -6572,11 +6572,11 @@ impl CCodegen:
                     if d0 == UnaryOp.UOP_NOT:
                         return self.sema.ty_bool as i32
                     let t = self.operand_tid(body, d1)
-                    if t != 0 and self.is_void_tid(t) == 0:
+                    if t != 0 and self.is_void_tid(t) == false:
                         return t
                     continue
                 if rk == RvalueKind.RK_CAST:
-                    if d1 != 0 and self.is_void_tid(d1) == 0:
+                    if d1 != 0 and self.is_void_tid(d1) == false:
                         return d1
                     continue
                 if rk == RvalueKind.RK_DISCRIMINANT:
@@ -6592,7 +6592,7 @@ impl CCodegen:
                     if base_kind == TypeKind.TY_SLICE:
                         return base_resolved as i32
 
-        if recv_hint != 0 and self.is_void_tid(recv_hint) == 0:
+        if recv_hint != 0 and self.is_void_tid(recv_hint) == false:
             return recv_hint
         0
 
@@ -6610,7 +6610,7 @@ impl CCodegen:
             return declared
         let sig_idx = self.body_sig_index(body.fn_sym)
         let param_count = if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
-        if local_id >= 1 and local_id <= param_count and self.is_void_tid(declared) == 0:
+        if local_id >= 1 and local_id <= param_count and self.is_void_tid(declared) == false:
             self.local_infer_cache_store(body.fn_sym, local_id, declared)
             return declared
         var active = 0
@@ -6631,8 +6631,8 @@ impl CCodegen:
         self.active_local_body_fns.pop()
         self.infer_local_depth = self.infer_local_depth - 1
         let hinted = self.local_usage_hint_tid(body, local_id)
-        if hinted != 0 and self.is_void_tid(hinted) == 0:
-            if inferred == 0 or self.is_void_tid(inferred) != 0:
+        if hinted != 0 and self.is_void_tid(hinted) == false:
+            if inferred == 0 or self.is_void_tid(inferred):
                 self.local_infer_cache_store(body.fn_sym, local_id, hinted)
                 return hinted
             if self.strict_type_match(inferred, hinted) == 0:
@@ -6641,7 +6641,7 @@ impl CCodegen:
                 if inferred_scalar != 0 and hinted_scalar != 0:
                     self.local_infer_cache_store(body.fn_sym, local_id, hinted)
                     return hinted
-        if inferred != 0 and self.is_void_tid(inferred) == 0:
+        if inferred != 0 and self.is_void_tid(inferred) == false:
             self.local_infer_cache_store(body.fn_sym, local_id, inferred)
             return inferred
         self.local_infer_cache_store(body.fn_sym, local_id, declared)
@@ -6684,7 +6684,7 @@ impl CCodegen:
         if cc_str_starts_with(arg_text, "WITH_STR_LIT(") != 0:
             return "&(" ++ arg_text ++ ")"
         var lit_tid = self.operand_tid(body, op_id)
-        if lit_tid == 0 or self.is_void_tid(lit_tid) != 0:
+        if lit_tid == 0 or self.is_void_tid(lit_tid):
             lit_tid = self.sema.ty_i64 as i32
         "&((" ++ self.c_type(lit_tid, 0) ++ ")" ++ cc_lbrace() ++ arg_text ++ cc_rbrace() ++ ")"
 
@@ -6873,7 +6873,7 @@ impl CCodegen:
         let cd = body.operand_d0[callee_op]
         if cd < 0 or cd >= body.const_kinds.len() or body.const_kinds[cd] != ConstKind.CK_FN:
             return false
-        self.has_body_for_sym(body.const_d0[cd]) == 0
+        self.has_body_for_sym(body.const_d0[cd]) == false
 
     mut fn callee_sig_from_operand(body: &MirBody, callee_op: i32) -> i32:
         if callee_op < 0 or callee_op >= body.operand_kinds.len():
@@ -7099,9 +7099,9 @@ impl CCodegen:
                 return "    abort();"
             let recv = self.operand_text(body, self.call_arg_operand(body, args_id, 0))
             var elem_tid = ret_tid
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
             var out = ""
@@ -7126,9 +7126,9 @@ impl CCodegen:
             let val_operand = self.call_arg_operand(body, args_id, 1)
             let val = self.operand_text(body, val_operand)
             var elem_tid = self.operand_tid(body, val_operand)
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.listslot_element_tid(self.operand_tid(body, self.call_arg_operand(body, args_id, 0)))
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
             let slot = "((" ++ elem_ty ++ "*)(intptr_t)((" ++ recv ++ ").data_ptr))[(" ++ recv ++ ").index]"
@@ -7147,7 +7147,7 @@ impl CCodegen:
             let elem_operand = self.call_arg_operand(body, args_id, 1)
             let elem_text = self.operand_text(body, elem_operand)
             var elem_tid = self.operand_tid(body, elem_operand)
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.sema.ty_i64 as i32
             let elem_ty = self.c_type(elem_tid, 0)
             var out = "    " ++ cc_lbrace() ++ " " ++ elem_ty ++ " __with_tmp = " ++ elem_text ++ "; with_vec_push_es(" ++ recv_ptr ++ ", &__with_tmp, sizeof(" ++ elem_ty ++ ")); " ++ cc_rbrace() ++ "\n"
@@ -7318,7 +7318,7 @@ impl CCodegen:
                 // A set's value is a present marker, i64 as a set literal's is.
                 let is_set = key_tid != 0 and self.generic_inst_base_name(self.sema.resolve_alias(dst_tid) as i32) == "HashSet"
                 let val_tid = self.hashmap_value_tid(dst_tid)
-                if key_tid == 0 or self.is_void_tid(key_tid) != 0 or (not is_set and (val_tid == 0 or self.is_void_tid(val_tid) != 0)):
+                if key_tid == 0 or self.is_void_tid(key_tid) or (not is_set and (val_tid == 0 or self.is_void_tid(val_tid))):
                     self.fail(f"emit-c: `HashMap.new()` in `{cc_intern_resolve(self.intern, body.fn_sym)}` has no map type at its destination (MIR type {dst_tid})")
                     return ""
                 let key_ty = self.c_type(key_tid, 0)
@@ -7345,7 +7345,7 @@ impl CCodegen:
                 let val_operand = self.call_arg_operand(body, args_id, 2)
                 val_text = self.operand_text(body, val_operand)
                 val_tid = self.operand_tid(body, val_operand)
-                if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+                if val_tid == 0 or self.is_void_tid(val_tid):
                     val_tid = self.sema.ty_i64 as i32
             let key_ty = self.c_type(key_tid, 0)
             let val_ty = self.c_type(val_tid, 0)
@@ -7959,7 +7959,7 @@ impl CCodegen:
                 let at_fn = if intrinsic == MirIntrinsic.MAP_KEY_AT: "with_hashmap_key_ptr_at" else: "with_hashmap_value_ptr_at"
                 let at = at_fn ++ "(" ++ map_ptr ++ ", " ++ slot ++ ")"
                 let dest_tid = self.place_tid_no_infer(body, dest_place)
-                if dest_tid == 0 or self.is_void_tid(dest_tid) != 0:
+                if dest_tid == 0 or self.is_void_tid(dest_tid):
                     self.fail("emit-c: a map slot's key or value has no destination type")
                     return "    abort();"
                 let dest_is_view = self.sema.get_type_kind(self.sema.resolve_alias(dest_tid)) == TypeKind.TY_REF
@@ -8050,7 +8050,7 @@ impl CCodegen:
             let elem_operand = self.call_arg_operand(body, args_id, 1)
             let elem_text = self.operand_text(body, elem_operand)
             var elem_tid = self.operand_tid(body, elem_operand)
-            if elem_tid == 0 or self.is_void_tid(elem_tid) != 0:
+            if elem_tid == 0 or self.is_void_tid(elem_tid):
                 elem_tid = self.sema.ty_i64 as i32
             // Each element is compared by its type's `==` (§11.7): a str by
             // its text, an aggregate part by part. By its bytes, a str
@@ -8413,7 +8413,7 @@ impl CCodegen:
             let val_operand = self.call_arg_operand(body, args_id, 0)
             let val_text = self.operand_text(body, val_operand)
             var val_tid = self.operand_tid(body, val_operand)
-            if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            if val_tid == 0 or self.is_void_tid(val_tid):
                 val_tid = self.sema.ty_i64 as i32
             let resolved = self.sema.resolve_alias(val_tid as TypeId)
             let tk = self.fmt_value_kind(resolved as i32)
@@ -8470,7 +8470,7 @@ impl CCodegen:
             let val_operand = self.call_arg_operand(body, args_id, 0)
             let val_text = self.operand_text(body, val_operand)
             var val_tid = self.operand_tid(body, val_operand)
-            if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            if val_tid == 0 or self.is_void_tid(val_tid):
                 val_tid = self.sema.ty_i64 as i32
             // D61: MirLower sends only the inline rows (numbers, bool, str,
             // raw pointers) here; debug_format_expr formats them exactly as
@@ -8495,7 +8495,7 @@ impl CCodegen:
             let width_text = self.operand_text(body, self.call_arg_operand(body, args_id, 2))
             let prec_text = self.operand_text(body, self.call_arg_operand(body, args_id, 3))
             var val_tid = self.operand_tid(body, val_operand)
-            if val_tid == 0 or self.is_void_tid(val_tid) != 0:
+            if val_tid == 0 or self.is_void_tid(val_tid):
                 val_tid = self.sema.ty_i64 as i32
             let resolved = self.sema.resolve_alias(val_tid as TypeId)
             let tk = self.fmt_value_kind(resolved as i32)
@@ -8743,7 +8743,7 @@ impl CCodegen:
         let _ = bb
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
-        let has_ret: i32 = if self.is_void_tid(ret_tid) == 0: 1 else: 0
+        let has_ret: i32 = if self.is_void_tid(ret_tid) == false: 1 else: 0
         if kind == CcBuiltin.VA_START or kind == CcBuiltin.VA_ARG or kind == CcBuiltin.VA_END:
             return self.emit_c_variadic_call_term(body, kind, args_id, dest_place, next_bb)
 
@@ -8788,7 +8788,7 @@ impl CCodegen:
         if lid < 0 or lid >= body.local_type_ids.len():
             return 0
         let base_tid = self.local_declared_tid(body, lid)
-        if self.is_void_tid(base_tid) != 0:
+        if self.is_void_tid(base_tid):
             return 0
         let base_resolved = self.sema.resolve_alias(base_tid)
         let want_resolved = self.sema.resolve_alias(struct_tid)
@@ -8826,7 +8826,7 @@ impl CCodegen:
             if d0 == BinaryOp.OP_CONCAT:
                 return self.sema.ty_str as i32
             let lt = if no_infer != 0: self.operand_tid_no_infer(body, d1) else: self.operand_tid(body, d1)
-            if lt != 0 and self.is_void_tid(lt) == 0:
+            if lt != 0 and self.is_void_tid(lt) == false:
                 return lt
             if no_infer != 0:
                 return self.operand_tid_no_infer(body, d2)
@@ -8874,7 +8874,7 @@ impl CCodegen:
         if lid < 0 or lid >= body.local_type_ids.len():
             return
         var base_tid = self.local_effective_tid(body, lid)
-        if self.is_void_tid(base_tid) != 0:
+        if self.is_void_tid(base_tid):
             base_tid = self.local_declared_tid(body, lid)
         let base_resolved = self.sema.resolve_alias(base_tid)
         if self.sema.get_type_kind(base_resolved) != TypeKind.TY_STRUCT:
@@ -9078,7 +9078,7 @@ impl CCodegen:
 
     mut fn effective_field_tid(struct_tid: i32, field_sym: i32, raw_field_tid: i32) -> i32:
         let resolved = self.sema.resolve_alias(raw_field_tid as TypeId) as i32
-        if resolved != 0 and self.is_void_tid(resolved) == 0 and self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_ERR:
+        if resolved != 0 and self.is_void_tid(resolved) == false and self.sema.get_type_kind(resolved as TypeId) != TypeKind.TY_ERR:
             return resolved
         if self.in_field_cache_build != 0:
             if resolved != 0:
@@ -9090,7 +9090,7 @@ impl CCodegen:
             if cached == -1234567:
                 self.build_field_cache_from_usage()
                 cached = self.field_cache_lookup(owner_tid, field_sym)
-            if cached != -1234567 and cached != 0 and self.is_void_tid(cached) == 0:
+            if cached != -1234567 and cached != 0 and self.is_void_tid(cached) == false:
                 let cached_resolved = self.sema.resolve_alias(cached as TypeId) as i32
                 if cached_resolved != 0 and self.sema.get_type_kind(cached_resolved as TypeId) != TypeKind.TY_ERR:
                     return cached_resolved
@@ -9132,24 +9132,24 @@ impl CCodegen:
                     return self.sema.ty_i64 as i32
         raw_field_tid
 
-    fn is_unit_rvalue(body: &MirBody, rval_id: i32) -> i32:
+    fn is_unit_rvalue(body: &MirBody, rval_id: i32) -> bool:
         let _ = self
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
-            return 0
+            return false
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
-            return 0
+            return false
         let op = body.rval_d0[rval_id]
         if op < 0 or op >= body.operand_kinds.len():
-            return 0
+            return false
         if body.operand_kinds[op] != OperandKind.OK_CONSTANT:
-            return 0
+            return false
         let const_id = body.operand_d0[op]
         if const_id < 0 or const_id >= body.const_kinds.len():
-            return 0
+            return false
         let ck = body.const_kinds[const_id]
         if ck == ConstKind.CK_UNIT or ck == ConstKind.CK_ZERO_SIZED:
-            return 1
-        0
+            return true
+        false
 
     fn rvalue_direct_local_id(body: &MirBody, rval_id: i32) -> i32:
         let _ = self
@@ -9275,7 +9275,7 @@ impl CCodegen:
                 let fat_sym = self.rvalue_ck_fn_sym(body, d1)
                 if fat_sym != 0:
                     return "    " ++ dst_place ++ " = " ++ self.fat_fn_literal(fat_sym, dst_resolved as i32) ++ ";"
-            if self.is_unit_rvalue(body, d1) != 0:
+            if self.is_unit_rvalue(body, d1):
                 if dst_tk == TypeKind.TY_ARRAY:
                     return "    memset(" ++ dst_place ++ ", 0, sizeof(" ++ dst_place ++ "));"
                 return "    " ++ dst_place ++ " = " ++ self.zero_value_text(dst_tid) ++ ";"
@@ -9447,7 +9447,7 @@ impl CCodegen:
             let sig_idx = self.body_sig_index(body.fn_sym)
             let ret_tid = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else:
                 if body.local_type_ids.len() > 0: body.local_type_ids[0] else: self.sema.ty_void
-            if self.is_void_tid(ret_tid) != 0:
+            if self.is_void_tid(ret_tid):
                 return "    return;"
             if self.returns_array(ret_tid):
                 return "    memcpy(__with_ret, _0, sizeof(_0));\n    return;"
@@ -9488,7 +9488,7 @@ impl CCodegen:
             if lead.len() > 0:
                 args = if args.len() > 0: lead ++ ", " ++ args else: lead
             var call_line = ""
-            if self.is_void_tid(ret_tid) != 0 or self.returns_array(ret_tid):
+            if self.is_void_tid(ret_tid) or self.returns_array(ret_tid):
                 call_line = callee ++ "(" ++ args ++ ");"
             else:
                 call_line = self.place_text(body, d2) ++ " = " ++ callee ++ "(" ++ args ++ ");"
@@ -9736,11 +9736,11 @@ impl CCodegen:
                 let recv_operand = self.call_arg_operand(body, args_id, 0)
                 let recv_tid = self.operand_tid_no_infer(body, recv_operand)
                 let value_tid = self.hashmap_value_tid(recv_tid)
-                if value_tid != 0 and self.is_void_tid(value_tid) == 0:
+                if value_tid != 0 and self.is_void_tid(value_tid) == false:
                     let opt_tid = self.option_ref_tid_for_payload(value_tid)
                     acc = self.collect_struct_types_from_tid(move acc, opt_tid)
                 let dst_tid = self.place_local_tid(body, body.term_data2(bb))
-                if dst_tid != 0 and self.is_void_tid(dst_tid) == 0 and self.is_scalar_like_tid(dst_tid) == 0:
+                if dst_tid != 0 and self.is_void_tid(dst_tid) == false and self.is_scalar_like_tid(dst_tid) == false:
                     let dst_opt_tid = self.option_ref_tid_for_payload(dst_tid)
                     acc = self.collect_struct_types_from_tid(move acc, dst_opt_tid)
             for li in 0..body.local_type_ids.len():
@@ -10009,7 +10009,7 @@ impl CCodegen:
                 out = out ++ self.layout_static_asserts(resolved, name, &elem_names) ++ "\n"
                 continue
             let generic_base_name = self.generic_inst_base_name(resolved as i32)
-            if self.sema.is_opaque_value_type(resolved as i32) != 0:
+            if self.sema.is_opaque_value_type(resolved as i32):
                 continue
             if generic_base_name == "ListSlot":
                 out = out ++ "struct " ++ name ++ " " ++ cc_lbrace() ++ "\n"
@@ -10411,9 +10411,9 @@ impl CCodegen:
         name == "with_write" or name == "with_ewrite" or name == "with_panic" or name == "with_bool_to_str" or
         name == "with_i64_to_str" or name == "with_runtime_configure_fibers" or name == "with_str"
 
-    fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> i32:
+    fn should_emit_extern_fn_decl(fn_sym: i32, referenced: &HashMap[i32, i32]) -> bool:
         if not referenced.contains(fn_sym):
-            return 0
+            return false
         let linked = self.extern_link_name(fn_sym)
         let name = if linked.len() > 0: linked else: self.canonical_extern_name(cc_intern_resolve(self.intern, fn_sym))
         // A with_* runtime function the fixed block below declares (the str,
@@ -10423,12 +10423,12 @@ impl CCodegen:
         // the runtime has since changed (#1038: the fs/exec wrappers took
         // `&str` in 7d8d085e while the header still said `with_str`).
         if self.prelude_block_declares(name):
-            return 0
+            return false
         if cc_str_starts_with(name, "wl_") != 0:
-            return 0
+            return false
         if self.extern_declared_by_included_headers(name):
-            return 0
-        1
+            return false
+        true
 
     // The header's spelling of a `c_char` pointer chain two or more deep,
     // "" for any other type. `c_char` is the target's i8 or u8 (D155),
@@ -10518,7 +10518,7 @@ impl CCodegen:
             let interface_fn = self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.fn_decl_body_is_interface(decl)
             if self.ast.kind(decl) != NodeKind.NK_EXTERN_FN and not interface_fn:
                 continue
-            if self.should_emit_extern_fn_decl(self.ast.get_data0(decl), referenced) == 0:
+            if self.should_emit_extern_fn_decl(self.ast.get_data0(decl), referenced) == false:
                 continue
             out = out ++ self.emit_extern_fn_decl(decl)
         if out.len() > 0:
@@ -10577,11 +10577,11 @@ impl CCodegen:
                 let recv_operand = self.call_arg_operand(body, args_id, 0)
                 let recv_tid = self.operand_tid_no_infer(body, recv_operand)
                 let value_tid = self.hashmap_value_tid(recv_tid)
-                if value_tid != 0 and self.is_void_tid(value_tid) == 0:
+                if value_tid != 0 and self.is_void_tid(value_tid) == false:
                     let _ = self.option_ref_tid_for_payload(value_tid)
                 let dest_place = body.term_data2(bb)
                 let dst_tid = self.place_local_tid(body, dest_place)
-                if dst_tid != 0 and self.is_void_tid(dst_tid) == 0 and self.is_scalar_like_tid(dst_tid) == 0:
+                if dst_tid != 0 and self.is_void_tid(dst_tid) == false and self.is_scalar_like_tid(dst_tid) == false:
                     let _ = self.option_ref_tid_for_payload(dst_tid)
 
     mut fn local_receives_ref(body: &MirBody, local_id: i32) -> bool:
@@ -10658,7 +10658,7 @@ impl CCodegen:
                 if self.place_is_direct_local(body, copied_place, copied_local) == 0:
                     continue
                 let copied_tid = self.local_ref_target_tid(body, copied_local)
-                if copied_tid == 0 or self.is_void_tid(copied_tid) != 0:
+                if copied_tid == 0 or self.is_void_tid(copied_tid):
                     continue
                 if out == 0:
                     out = copied_tid
@@ -10669,7 +10669,7 @@ impl CCodegen:
             else:
                 continue
             let src_tid = self.place_ref_target_tid(body, src_place)
-            if src_tid == 0 or self.is_void_tid(src_tid) != 0:
+            if src_tid == 0 or self.is_void_tid(src_tid):
                 continue
             if out == 0:
                 out = src_tid
@@ -11248,7 +11248,7 @@ impl CCodegen:
             let declared_resolved = self.sema.resolve_alias(declared_tid)
             let declared_kind = self.sema.get_type_kind(declared_resolved)
             var needs_override = 0
-            if self.is_void_tid(declared_tid) != 0 or declared_resolved == 0 or declared_kind == TypeKind.TY_ERR:
+            if self.is_void_tid(declared_tid) or declared_resolved == 0 or declared_kind == TypeKind.TY_ERR:
                 needs_override = 1
             if declared_kind == TypeKind.TY_GENERIC_INST:
                 needs_override = 1
@@ -11270,7 +11270,7 @@ impl CCodegen:
                 ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
             else:
                 ret_tid = self.call_return_tid(body, bb, callee_operand, args_id, dest_place)
-            if ret_tid == 0 or self.is_void_tid(ret_tid) != 0:
+            if ret_tid == 0 or self.is_void_tid(ret_tid):
                 continue
             var seen = 0
             for oi in 0..call_override_locals.len():
@@ -11297,7 +11297,7 @@ impl CCodegen:
             var use_tid = declared_tid
             let declared_resolved = self.sema.resolve_alias(declared_tid)
             let declared_kind = self.sema.get_type_kind(declared_resolved)
-            if self.is_void_tid(declared_tid) == 0 and declared_resolved != 0 and declared_kind != TypeKind.TY_ERR:
+            if self.is_void_tid(declared_tid) == false and declared_resolved != 0 and declared_kind != TypeKind.TY_ERR:
                 for oi in 0..call_override_locals.len():
                     if call_override_locals[oi] != li:
                         continue
@@ -11308,28 +11308,28 @@ impl CCodegen:
                         use_tid = override_tid
                     break
             let downcast_opt_tid = cc_list_tid_at(downcast_option_tids, li)
-            if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == 0:
+            if downcast_opt_tid != 0 and self.is_void_tid(downcast_opt_tid) == false:
                 use_tid = downcast_opt_tid
             let copied_payload_enum_tid = cc_list_tid_at(copied_payload_enum_tids, li)
-            if copied_payload_enum_tid != 0 and self.is_void_tid(copied_payload_enum_tid) == 0:
+            if copied_payload_enum_tid != 0 and self.is_void_tid(copied_payload_enum_tid) == false:
                 use_tid = copied_payload_enum_tid
             let use_resolved_before_infer = self.sema.resolve_alias(use_tid)
             let use_kind_before_infer = self.sema.get_type_kind(use_resolved_before_infer)
             var should_infer_local = 0
-            if self.is_void_tid(use_tid) != 0 or use_resolved_before_infer == 0 or use_kind_before_infer == TypeKind.TY_ERR:
+            if self.is_void_tid(use_tid) or use_resolved_before_infer == 0 or use_kind_before_infer == TypeKind.TY_ERR:
                 should_infer_local = 1
             if use_kind_before_infer == TypeKind.TY_GENERIC_INST and self.type_is_payload_enum(use_tid) == 0:
                 should_infer_local = 1
             if should_infer_local != 0:
                 let inferred_tid = self.infer_local_tid(body, li)
-                if inferred_tid != 0 and self.is_void_tid(inferred_tid) == 0:
+                if inferred_tid != 0 and self.is_void_tid(inferred_tid) == false:
                     let inferred_kind = self.sema.get_type_kind(self.sema.resolve_alias(inferred_tid))
-                    if self.is_void_tid(use_tid) != 0 or use_kind_before_infer != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
+                    if self.is_void_tid(use_tid) or use_kind_before_infer != inferred_kind or self.strict_type_match(use_tid, inferred_tid) == 0:
                         use_tid = inferred_tid
             self.local_effective_cache.insert(cc_body_local_cache_key(body.fn_sym, li), use_tid)
             let use_resolved = self.sema.resolve_alias(use_tid)
             let use_kind = self.sema.get_type_kind(use_resolved)
-            var local_ty = if li == 0 and self.is_void_tid(use_tid) != 0: "int32_t" else: self.c_type(use_tid, 0)
+            var local_ty = if li == 0 and self.is_void_tid(use_tid): "int32_t" else: self.c_type(use_tid, 0)
             // If this local is assigned from RK_REF/RK_ADDR_OF, declare as pointer
             let ref_target_tid = cc_list_tid_at(ref_target_tids, li)
             if ref_target_tid != 0 and use_kind != TypeKind.TY_PTR and use_kind != TypeKind.TY_REF:
@@ -11438,7 +11438,7 @@ impl CCodegen:
         out = out ++ self.emit_runtime_fiber_config_call()
         out = out ++ "    with_runtime_init();\n"
         out = out ++ self.global_init_calls_text(skipped_inits)
-        if self.is_void_tid(ret_tid) != 0:
+        if self.is_void_tid(ret_tid):
             out = out ++ "    " ++ main_name ++ "();\n"
             out = out ++ "    with_runtime_shutdown();\n"
             out = out ++ "    return 0;\n"

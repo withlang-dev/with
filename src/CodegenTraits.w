@@ -2300,7 +2300,7 @@ impl Codegen:
         // `p`'s constant. Without this a `Some(fn)` in one field of a C
         // record (a migrated `malloc: Some(default_malloc)`) demoted the
         // whole global to runtime init, which a standalone object never ran.
-        if tk == TypeKind.TY_GENERIC_INST and self.sema.is_option_pointer_type(resolved as i32) != 0:
+        if tk == TypeKind.TY_GENERIC_INST and self.sema.is_option_pointer_type(resolved as i32):
             return self.try_eval_const_option_pointer_llvm(cur, resolved as i32)
 
         if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL:

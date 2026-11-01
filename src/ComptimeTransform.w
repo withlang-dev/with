@@ -214,7 +214,7 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
 
     for ni in 1..src.node_count():
         let node = ni as NodeId
-        if src.has_call_named_args(node) != 0:
+        if src.has_call_named_args(node):
             out.set_call_named_args(node, src.state.call_named_args.get(ni).unwrap())
         // §9.3.1 (#2326): node ids and extra slots are kept, so the `it`
         // argument links copy as they are.
@@ -852,7 +852,7 @@ impl AstPool:
             if kind == NodeKind.NK_CALL:
                 let callee = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
                 let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), callee, new_extra, count, self.literal_suffix(node))
-                if self.has_call_named_args(node as NodeId) != 0:
+                if self.has_call_named_args(node as NodeId):
                     let old_names: i32 = self.state.call_named_args.get(node).unwrap()
                     let new_names = self.extra_len()
                     for ni in 0..count:
@@ -1129,11 +1129,11 @@ impl AstPool:
                 self.add_extra(self.get_extra(base + 1))
             let body = self.ct_clone_tree_with_subst(self.get_data0(node), subst_sym, subst_node, index_sym, index_node)
             let cloned = self.ct_new_node_copy(kind, self.get_start(node), self.get_end(node), body, new_extra, param_count, self.literal_suffix(node))
-            if self.is_move_closure(node) != 0:
+            if self.is_move_closure(node):
                 self.mark_move_closure(cloned as NodeId)
-            if self.is_non_escaping_closure(node) != 0:
+            if self.is_non_escaping_closure(node):
                 self.mark_non_escaping_closure(cloned as NodeId)
-            if self.is_by_place_closure(node) != 0:
+            if self.is_by_place_closure(node):
                 self.mark_by_place_closure(cloned as NodeId)
             // The declared `-> T` (§12, #1508) is a type node, shared like
             // the parameter types.
@@ -1304,7 +1304,7 @@ impl Sema:
                             let inner = pool.get_data0(value)
                             if inner != 0:
                                 self.typed_expr_types.insert(inner, ann_type as i32)
-                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) != 0 and self.local_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
+                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) and self.local_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
                     pool.set_untyped_const_init(node, pool.get_data0(value))
                 let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
                 let folded = self.ct_transform_expr(pool, intern, value)
@@ -3298,7 +3298,7 @@ impl Sema:
                 // D88: an unannotated `const` whose initializer is numeric
                 // literals and names keeps that initializer beside its folded
                 // value: each use is typed from it (Sema: untyped_const_init).
-                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) != 0 and self.top_level_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
+                if pool.kind(value) == NodeKind.NK_COMPTIME and pool.is_const_decl_node(node) and self.top_level_let_type_ann_extra(pool.get_data2(node)) < 0 and ct_untyped_numeric_candidate(pool, pool.get_data0(value)):
                     pool.set_untyped_const_init(node, pool.get_data0(value))
                 let was_comptime = pool.kind(value) == NodeKind.NK_COMPTIME
                 let folded = self.ct_transform_expr(pool, intern, value)

@@ -23,7 +23,7 @@ fn main:
     assert(kept_reverse.stderr.contains("escaping closure cannot capture ephemeral references"))
     let facts = p7_run(dir, "closure_order_keep_facts", "analyze\0src/main.w\0select:stage=sema,kind=expression,detail~closure\0--sema-body-order-reverse\0")
     assert(facts.rc != 0)
-    assert(facts.stdout.contains("non-escaping=0"))
+    assert(facts.stdout.contains("non-escaping=false"))
     assert(facts.stdout.contains("ephemeral=1"))
     assert(facts.stdout.contains("callee=keep"))
 

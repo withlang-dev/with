@@ -90,7 +90,7 @@ impl Sema:
         let node = self.facade_resources[ri].node
         let repr = self.resolve_alias(self.facade_resources[ri].repr_tid as TypeId)
         let pointee = if self.get_type_kind(repr) == TypeKind.TY_PTR: self.resolve_alias(self.get_type_d0(repr) as TypeId) else: 0 as TypeId
-        let record = pointee != 0 and not self.facade_type_is_void_ptr(repr as i32) and not self.facade_type_is_c_string_ptr(repr as i32) and (self.get_type_kind(pointee) == TypeKind.TY_STRUCT or self.is_opaque_value_type(pointee) != 0)
+        let record = pointee != 0 and not self.facade_type_is_void_ptr(repr as i32) and not self.facade_type_is_c_string_ptr(repr as i32) and (self.get_type_kind(pointee) == TypeKind.TY_STRUCT or self.is_opaque_value_type(pointee))
         if not record:
             let rt: str = self.type_name(self.facade_resources[ri].repr_tid)
             self.emit_error(f"handle '{hname}' wraps {rt}; a callback-scope handle wraps the pointer to a C record that C passes a callback (`*mut sqlite3_context`) — not `void *`, which every pointer converts to, nor text or a value (§16.2b.9)", node)
@@ -1577,7 +1577,7 @@ impl Sema:
             if not releases and free_sym == 0:
                 let var_node = self.facade_extern_var_named(named)
                 let var_tid: i32 = if var_node != 0: self.extern_var_type_ids.get(var_node) ?? 0 else: 0
-                let fn_tid = if self.is_option_pointer_type(var_tid) != 0: self.callable_any_fn_type(self.option_pointer_payload_type(var_tid) as TypeId) else: self.callable_any_fn_type(var_tid as TypeId)
+                let fn_tid = if self.is_option_pointer_type(var_tid): self.callable_any_fn_type(self.option_pointer_payload_type(var_tid) as TypeId) else: self.callable_any_fn_type(var_tid as TypeId)
                 if fn_tid != 0 and self.get_type_d1(fn_tid as TypeId) == 1 and self.get_type_kind(self.resolve_alias(self.fn_type_param_type(fn_tid, 0) as TypeId)) == TypeKind.TY_PTR:
                     free_sym = self.ast.get_data0(var_node)
                     releases = true
@@ -1633,7 +1633,7 @@ impl Sema:
                 return c
             if elements != 0:
                 let element = self.resolve_alias(self.get_type_d0(ptype) as TypeId)
-                if self.is_c_void_like_type(element as i32) != 0 or self.is_opaque_value_type(element as i32) != 0:
+                if self.is_c_void_like_type(element as i32) or self.is_opaque_value_type(element as i32):
                     let shown = self.facade_param_display(fn_sym, sig, p)
                     self.emit_error(f"fn '{fname}': 'buffer param {p} … elements' names {shown}, whose element size is unknown; an element-count buffer requires a complete element type (§16.2b.8)", clause)
                     return c
@@ -2011,7 +2011,7 @@ impl Sema:
         self.facade_same_type(self.get_type_d0(ra), self.get_type_d0(rb))
 
     fn facade_void_ptr_accepts(p0: i32, repr: i32) -> bool:
-        if self.get_type_kind(p0) != TypeKind.TY_PTR or self.is_c_void_like_type(self.get_type_d0(p0)) == 0:
+        if self.get_type_kind(p0) != TypeKind.TY_PTR or self.is_c_void_like_type(self.get_type_d0(p0)) == false:
             return false
         if self.get_type_kind(repr) != TypeKind.TY_PTR:
             return false
@@ -2039,7 +2039,7 @@ impl Sema:
 
     fn facade_type_is_void_ptr(tid: i32) -> bool:
         let r = self.resolve_alias(tid as TypeId)
-        self.get_type_kind(r) == TypeKind.TY_PTR and self.is_c_void_like_type(self.get_type_d0(r)) != 0
+        self.get_type_kind(r) == TypeKind.TY_PTR and self.is_c_void_like_type(self.get_type_d0(r))
 
     // The one `void *` parameter of the callable parameter `pi`'s
     // signature — where its userdata arrives — or -1 when it has none or
@@ -2414,7 +2414,7 @@ impl Sema:
         let ci: i32 = self.facade_variadic_ops.get(key).unwrap()
         let p = self.foreign_contracts[ci].variadic_selector
         // The receiver is C's param 0: the selector is argument p - 1.
-        if arg_count < p or self.ast.has_call_named_args(node) != 0:
+        if arg_count < p or self.ast.has_call_named_args(node):
             return field
         self.facade_variadic_pick(ci, with_str_clone_ref(self.pool_resolve(field)), self.ast.get_extra(extra_start + p - 1), node)
 
@@ -2435,7 +2435,7 @@ impl Sema:
         if self.facade_method_host(self.foreign_contracts[ci].fn_sym).len() == 1:
             return fn_sym
         let p = self.foreign_contracts[ci].variadic_selector
-        if arg_count <= p or self.ast.has_call_named_args(node) != 0:
+        if arg_count <= p or self.ast.has_call_named_args(node):
             return fn_sym
         let base = if self.foreign_contracts[ci].rename != 0: name.clone() else: facade_render_bridge_name(name)
         let target = self.facade_variadic_pick(ci, base, self.ast.get_extra(extra_start + p), node)
@@ -3032,7 +3032,7 @@ impl Sema:
 
     fn facade_type_is_byte(tid: i32) -> bool:
         let r = self.resolve_alias(tid as TypeId)
-        r == self.ty_u8 or r == self.ty_i8 or self.is_c_void_like_type(r as i32) != 0
+        r == self.ty_u8 or r == self.ty_i8 or self.is_c_void_like_type(r as i32)
 
     mut fn verify_facade_buffer_item(ci: i32):
         self.update_decl_source_context(self.foreign_contracts[ci].decl)

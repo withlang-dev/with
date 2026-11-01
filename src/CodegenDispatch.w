@@ -17514,7 +17514,7 @@ impl Codegen:
             // MIR's own, by place.
             let protocol = ci < closure_body.anonymous_capture_kinds.len() and closure_body.anonymous_capture_kinds[ci] == MIR_CAPTURE_PROTOCOL
             let by_place = protocol or self.sema.closure_capture_by_place(node, ci)
-            let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == 0, self.current_function_name_sym, node): 1 else: 0
+            let by_ref: i32 = if self.mode_decide(MODE_SITE_CAPTURE_BY_PLACE, by_place, self.pool.is_move_closure(node) == false, self.current_function_name_sym, node): 1 else: 0
             capture_ref_modes.push(by_ref)
 
         // Build capture struct type from captured variable types

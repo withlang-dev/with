@@ -1519,8 +1519,8 @@ impl AstPool:
         self.state.compiler_hook_fn_set.insert(node as i32, 1)
         self.state.compiler_hook_phase_map.insert(node as i32, phase_sym)
 
-    fn is_compiler_hook_fn(node: NodeId) -> i32:
-        if self.state.compiler_hook_fn_set.contains(node as i32): 1 else: 0
+    fn is_compiler_hook_fn(node: NodeId) -> bool:
+        if self.state.compiler_hook_fn_set.contains(node as i32): true else: false
 
     fn compiler_hook_phase(node: NodeId) -> i32:
         if self.state.compiler_hook_phase_map.contains(node as i32):
@@ -1540,9 +1540,9 @@ impl AstPool:
         self.state.global_allocator_decl_nodes.push(node as i32)
         self.state.global_allocator_decl_set.insert(node as i32, 1)
 
-    fn is_global_allocator_decl(node: NodeId) -> i32:
-        if self.state.global_allocator_decl_set.contains(node as i32): return 1
-        0
+    fn is_global_allocator_decl(node: NodeId) -> bool:
+        if self.state.global_allocator_decl_set.contains(node as i32): return true
+        false
 
     fn get_extra(idx: isize) -> i32:
         self.state.extra[idx]
@@ -2127,8 +2127,8 @@ impl AstPool:
             return self.get_extra(start + arg_idx)
         0
 
-    fn has_call_named_args(call_node: NodeId) -> i32:
-        if self.state.call_named_args.contains(call_node as i32): 1 else: 0
+    fn has_call_named_args(call_node: NodeId) -> bool:
+        if self.state.call_named_args.contains(call_node as i32): true else: false
 
     mut fn add_type_meta(node: NodeId, derive_start: i32, derive_count: i32):
         let idx = self.state.type_meta.len() as i32
@@ -2165,25 +2165,25 @@ impl AstPool:
         self.state.must_use_type_nodes.push(node as i32)
         self.state.must_use_type_set.insert(node as i32, 1)
 
-    fn is_must_use_type_node(node: NodeId) -> i32:
-        if self.state.must_use_type_set.contains(node as i32): return 1
-        0
+    fn is_must_use_type_node(node: NodeId) -> bool:
+        if self.state.must_use_type_set.contains(node as i32): return true
+        false
 
     mut fn mark_no_await_guard_type(node: NodeId):
         self.state.no_await_guard_type_nodes.push(node as i32)
         self.state.no_await_guard_type_set.insert(node as i32, 1)
 
-    fn is_no_await_guard_type_node(node: NodeId) -> i32:
-        if self.state.no_await_guard_type_set.contains(node as i32): return 1
-        0
+    fn is_no_await_guard_type_node(node: NodeId) -> bool:
+        if self.state.no_await_guard_type_set.contains(node as i32): return true
+        false
 
     mut fn mark_no_alloc_fn(node: NodeId):
         self.state.no_alloc_fn_nodes.push(node as i32)
         self.state.no_alloc_fn_set.insert(node as i32, 1)
 
-    fn is_no_alloc_fn_node(node: NodeId) -> i32:
-        if self.state.no_alloc_fn_set.contains(node as i32): return 1
-        0
+    fn is_no_alloc_fn_node(node: NodeId) -> bool:
+        if self.state.no_alloc_fn_set.contains(node as i32): return true
+        false
 
     mut fn mark_fn_target_arch(node: NodeId, arch_sym: i32):
         self.state.fn_target_arch.insert(node as i32, arch_sym)
@@ -2202,25 +2202,25 @@ impl AstPool:
 
     fn is_variadic_fn_type_node(node: NodeId) -> bool: self.state.variadic_fn_type_nodes.contains(node as i32)
 
-    fn is_unsafe_fn_type_node(node: NodeId) -> i32:
-        if self.state.unsafe_fn_type_nodes.contains(node as i32): return 1
-        0
+    fn is_unsafe_fn_type_node(node: NodeId) -> bool:
+        if self.state.unsafe_fn_type_nodes.contains(node as i32): return true
+        false
 
     mut fn mark_iter_of_self_fn(node: NodeId):
         self.state.iter_of_self_fn_nodes.push(node as i32)
         self.state.iter_of_self_fn_set.insert(node as i32, 1)
 
-    fn is_iter_of_self_fn_node(node: NodeId) -> i32:
-        if self.state.iter_of_self_fn_set.contains(node as i32): return 1
-        0
+    fn is_iter_of_self_fn_node(node: NodeId) -> bool:
+        if self.state.iter_of_self_fn_set.contains(node as i32): return true
+        false
 
     mut fn mark_sealed_trait(node: NodeId):
         self.state.sealed_trait_nodes.push(node as i32)
         self.state.sealed_trait_set.insert(node as i32, 1)
 
-    fn is_sealed_trait_node(node: NodeId) -> i32:
-        if self.state.sealed_trait_set.contains(node as i32): return 1
-        0
+    fn is_sealed_trait_node(node: NodeId) -> bool:
+        if self.state.sealed_trait_set.contains(node as i32): return true
+        false
 
     mut fn mark_generated_debug_type(type_sym: i32):
         if not self.is_generated_debug_type(type_sym):
@@ -2236,17 +2236,17 @@ impl AstPool:
         self.state.extend_impl_nodes.push(node as i32)
         self.state.extend_impl_set.insert(node as i32, 1)
 
-    fn is_extend_impl_node(node: NodeId) -> i32:
-        if self.state.extend_impl_set.contains(node as i32): return 1
-        0
+    fn is_extend_impl_node(node: NodeId) -> bool:
+        if self.state.extend_impl_set.contains(node as i32): return true
+        false
 
     mut fn mark_comptime_decl(node: NodeId):
         self.state.comptime_decl_nodes.push(node as i32)
         self.state.comptime_decl_set.insert(node as i32, 1)
 
-    fn is_comptime_decl_node(node: NodeId) -> i32:
-        if self.state.comptime_decl_set.contains(node as i32): return 1
-        0
+    fn is_comptime_decl_node(node: NodeId) -> bool:
+        if self.state.comptime_decl_set.contains(node as i32): return true
+        false
 
     mut fn mark_const_decl(node: NodeId):
         self.state.const_decl_nodes.push(node as i32)
@@ -2259,17 +2259,17 @@ impl AstPool:
         if self.state.untyped_const_inits.contains(decl as i32): return self.state.untyped_const_inits.get(decl as i32).unwrap()
         0
 
-    fn is_const_decl_node(node: NodeId) -> i32:
-        if self.state.const_decl_set.contains(node as i32): return 1
-        0
+    fn is_const_decl_node(node: NodeId) -> bool:
+        if self.state.const_decl_set.contains(node as i32): return true
+        false
 
     mut fn mark_move_closure(node: NodeId):
         self.state.move_closure_nodes.push(node as i32)
         self.state.move_closure_set.insert(node as i32, 1)
 
-    fn is_move_closure(node: NodeId) -> i32:
-        if self.state.move_closure_set.contains(node as i32): return 1
-        0
+    fn is_move_closure(node: NodeId) -> bool:
+        if self.state.move_closure_set.contains(node as i32): return true
+        false
 
     mut fn mark_mut_arg(node: NodeId):
         self.state.mut_arg_nodes.push(node as i32)
@@ -2289,17 +2289,17 @@ impl AstPool:
                 self.state.non_escaping_closure_nodes.remove(i)
                 return
 
-    fn is_non_escaping_closure(node: NodeId) -> i32:
-        if self.state.non_escaping_closure_set.contains(node as i32): return 1
-        0
+    fn is_non_escaping_closure(node: NodeId) -> bool:
+        if self.state.non_escaping_closure_set.contains(node as i32): return true
+        false
 
     mut fn mark_by_place_closure(node: NodeId):
         self.state.by_place_closure_nodes.push(node as i32)
         self.state.by_place_closure_set.insert(node as i32, 1)
 
-    fn is_by_place_closure(node: NodeId) -> i32:
-        if self.state.by_place_closure_set.contains(node as i32): return 1
-        0
+    fn is_by_place_closure(node: NodeId) -> bool:
+        if self.state.by_place_closure_set.contains(node as i32): return true
+        false
 
     // §12 (#1508): the type node of a closure's `-> T`, which Sema checks
     // like a declared return type; 0 when the closure states none.

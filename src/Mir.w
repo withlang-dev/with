@@ -24,7 +24,7 @@ impl MirModule:
         for (tid, repr) in sema.disc_repr_types: self.sema_disc_repr_types.insert(tid, repr)
         for (sym, name) in sema.distinct_type_names: self.sema_distinct_type_names.insert(sym, name)
         for tid in 1..sema.type_kinds.len():
-            if sema.is_c_void_like_type(tid as i32) != 0: self.sema_c_void_like_types.insert(tid as i32, 1)
+            if sema.is_c_void_like_type(tid as i32): self.sema_c_void_like_types.insert(tid as i32, 1)
         self.sema_result_sym = sema.syms.result
         self.sema_task_sym = sema.syms.task
         self.sema_scoped_task_sym = sema.syms.scoped_task

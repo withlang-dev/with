@@ -403,18 +403,18 @@ impl Sema:
                     if not self.method_decl_origins.contains(di):
                         self.method_has_inherent.insert(fn_name, 1)
 
-    fn is_method_symbol(sym: i32) -> i32:
+    fn is_method_symbol(sym: i32) -> bool:
         if sym <= 0:
-            return 0
+            return false
         if self.method_symbol_flags.contains(sym):
-            return 1
-        return 0
+            return true
+        return false
 
-    fn should_skip_trait_method(decl_idx: i32, fn_sym: i32) -> i32:
+    fn should_skip_trait_method(decl_idx: i32, fn_sym: i32) -> bool:
         let decl = self.ast.get_decl(decl_idx)
         let semantic = self.method_decl_base_symbol(decl, fn_sym)
-        if self.is_method_symbol(semantic) == 0:
-            return 0
+        if self.is_method_symbol(semantic) == false:
+            return false
         if self.method_decl_origins.contains(decl_idx):
             let origin = self.method_decl_origins.get(decl_idx).unwrap()
             if origin == 1:
@@ -425,8 +425,8 @@ impl Sema:
                 if key != 0 and method != 0:
                     let inherent = self.pool_lookup_symbol(self.pool_resolve(key) ++ "." ++ self.pool_resolve(method))
                     if inherent != 0 and self.method_has_inherent.contains(inherent):
-                        return 1
-        0
+                        return true
+        false
 
     // ── D39 lazy interface collection ────────────────────────────────
     // A registered .wi section's declarations are collected only when the
@@ -607,7 +607,7 @@ impl Sema:
             if self.decl_is_lazy_skipped(di):
                 continue
             let decl = self.ast.get_decl(di)
-            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.is_const_decl_node(decl) != 0:
+            if self.ast.kind(decl) == NodeKind.NK_LET_DECL and self.ast.is_const_decl_node(decl):
                 self.const_global_syms.insert(self.ast.get_data0(decl), 1)
         // Pass 1: collect named types and traits first so functions can refer
         // to imported or forward-declared types regardless of declaration order.
@@ -651,7 +651,7 @@ impl Sema:
             let is_local = self.is_local_decl(di)
             if kind == NodeKind.NK_FN_DECL:
                 let fn_name = self.ast.get_data0(decl)
-                if self.should_skip_trait_method(di, fn_name) == 0:
+                if self.should_skip_trait_method(di, fn_name) == false:
                     self.collect_fn_decl(decl, is_local, di)
             if kind == NodeKind.NK_EXTERN_FN:
                 self.collect_extern_fn(decl, is_local)
@@ -757,7 +757,7 @@ impl Sema:
             return
         let resolved = self.resolve_type_expr(type_node)
         if resolved != 0:
-            if self.is_opaque_value_type(resolved) != 0:
+            if self.is_opaque_value_type(resolved):
                 self.emit_error(opaque_message, type_node)
             self.type_extra[slot] = resolved
 
@@ -874,28 +874,28 @@ impl Sema:
             if is_ephemeral == 0 and inner_tid != 0 and self.type_is_ephemeral_value(inner_tid) != 0:
                 self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node, inner_tid, decl)
 
-    fn is_local_decl(decl_index: i32) -> i32:
+    fn is_local_decl(decl_index: i32) -> bool:
         let limit = self.ast.local_decl_count()
         if limit < 0:
-            return 1
+            return true
         // After import merging, decl order is: prelude → user imports → root.
         // Root (local) decls are the last `limit` entries in the merged pool.
         let total = self.ast.decl_count()
         if decl_index >= total - limit:
-            return 1
-        0
+            return true
+        false
 
-    fn is_local_or_prelude_decl(decl_index: i32) -> i32:
-        if self.is_local_decl(decl_index) != 0:
-            return 1
+    fn is_local_or_prelude_decl(decl_index: i32) -> bool:
+        if self.is_local_decl(decl_index):
+            return true
         // Prelude decls are also "ours" for orphan rule purposes
         let prelude_limit = self.ast.prelude_decl_count()
         if prelude_limit < 0:
-            return 0
+            return false
         let total = self.ast.decl_count()
         if decl_index >= total - prelude_limit:
-            return 1
-        0
+            return true
+        false
 
     mut fn rebuild_decl_index():
         self.decl_index_by_node = sema_new_map_i32_i32()
@@ -1018,17 +1018,17 @@ impl Sema:
                         let payload_count = self.ast.get_extra(pos)
                         pos = pos + 1 + payload_count
 
-    fn is_ci_visible(sym: i32) -> i32:
+    fn is_ci_visible(sym: i32) -> bool:
         // Check if a symbol is visible from the current module context.
         // Returns 1 if visible, 0 if hidden by c_import scoping.
         if self.scoping_active == 0:
-            return 1
+            return true
         if not self.ci_syms.contains(sym):
-            return 1
+            return true
         // Symbol is c_import-origin. It's visible only if the current module
         // itself has c_import declarations (meaning it directly uses c_import).
         if self.current_module_has_ci != 0:
-            return 1
+            return true
         // Also visible if the user explicitly declared it (extern fn, fn, type, etc.)
         // in a non-c_import context. User declarations override c_import scoping.
         var di: i32 = 0
@@ -1041,9 +1041,9 @@ impl Sema:
             let kind = self.ast.kind(decl)
             if kind == NodeKind.NK_FN_DECL or kind == NodeKind.NK_EXTERN_FN or kind == NodeKind.NK_EXTERN_VAR or kind == NodeKind.NK_LET_DECL or kind == NodeKind.NK_TYPE_DECL:
                 if self.ast.get_data0(decl) == sym:
-                    return 1
+                    return true
             di = di + 1
-        0
+        false
 
     fn ci_type_requires_raw_contract(tid: i32) -> i32:
         if tid == 0:
@@ -1201,9 +1201,9 @@ impl Sema:
                     let width = if self.get_type_d1(f_tid) != 0: "i" else: "u"
                     self.emit_warning(f"field `{self.pool_resolve(self.type_extra[te_start + fi * 3])}` of {layout} struct `{self.pool_resolve(name)}` is `{self.type_name(f_tid as i32)}`, whose width is the target's; a value that leaves the process has a fixed width, such as `{width}64` (§4.1, D114)", decl)
 
-    mut fn collect_type_decl(node: i32, is_local: i32):
+    mut fn collect_type_decl(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
-        if is_local != 0:
+        if is_local:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "type"))
         // #750: same rule as record_named_type_with_pub for the flat
         // decl-node map downstream template lookups still consult: a
@@ -1258,7 +1258,7 @@ impl Sema:
                             let f_type_tid = self.resolve_type_expr(f_type_node) as i32
                             self.emit_ephemeral_storage_error("ephemeral type '" ++ self.pool_resolve(f_type_sym) ++ "' cannot be stored in non-ephemeral struct", f_type_node, f_type_tid, node)
                 let f_tid = self.resolve_type_expr(f_type_node)
-                if self.is_opaque_value_type(f_tid) != 0:
+                if self.is_opaque_value_type(f_tid):
                     self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", f_type_node)
                 if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral structs", f_type_node, f_tid as i32, node)
@@ -1325,7 +1325,7 @@ impl Sema:
                     let pt_node = self.ast.get_extra(epos)
                     epos = epos + 1
                     let pt_tid = self.resolve_type_expr(pt_node)
-                    if self.is_opaque_value_type(pt_tid) != 0:
+                    if self.is_opaque_value_type(pt_tid):
                         self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
                     if is_generic_decl != 0 and not is_ephemeral and pt_tid != 0 and self.type_is_ephemeral_value(pt_tid as i32) != 0:
                         self.emit_ephemeral_storage_error("ephemeral values cannot be stored in enum payloads", pt_node, pt_tid as i32, node)
@@ -1425,7 +1425,7 @@ impl Sema:
                     let pt_node = self.ast.get_extra(epos)
                     epos = epos + 1
                     let pt_tid = self.resolve_type_expr(pt_node)
-                    if self.is_opaque_value_type(pt_tid) != 0:
+                    if self.is_opaque_value_type(pt_tid):
                         self.emit_error("opaque types cannot be stored in enum payloads by value; use a pointer or reference", pt_node)
                     payload_tids.push(pt_tid as i32)
             let te_start = self.type_extra.len() as i32
@@ -1483,7 +1483,7 @@ impl Sema:
         if sub_kind == TypeDeclKind.Distinct:
             let inner_node = self.ast.get_extra(extra_start)
             let inner = self.resolve_type_expr(inner_node)
-            if self.is_opaque_value_type(inner) != 0:
+            if self.is_opaque_value_type(inner):
                 self.emit_error("opaque types cannot be wrapped by value in distinct types; use a pointer or reference", inner_node)
             if is_generic_decl != 0 and not is_ephemeral and inner != 0 and self.type_is_ephemeral_value(inner as i32) != 0:
                 self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral distinct types", inner_node, inner as i32, node)
@@ -1517,7 +1517,7 @@ impl Sema:
                 let f_type_node = self.ast.get_extra(base + 1)
                 let f_default = self.ast.get_extra(base + 2)
                 let f_tid = self.resolve_type_expr(f_type_node)
-                if self.is_opaque_value_type(f_tid) != 0:
+                if self.is_opaque_value_type(f_tid):
                     self.emit_error("opaque types cannot be stored in union fields; use a pointer or reference", f_type_node)
                 if is_generic_decl != 0 and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32) != 0:
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral unions", f_type_node, f_tid as i32, node)
@@ -1539,12 +1539,12 @@ impl Sema:
             self.record_type_decl_tid(node, tid as i32)
             self.record_pub_fields(node, extra_start, field_count, &field_names)
 
-        if self.ast.is_must_use_type_node(node) != 0:
+        if self.ast.is_must_use_type_node(node):
             self.must_use_types.insert(name, 1)
-        if self.ast.is_no_await_guard_type_node(node) != 0:
+        if self.ast.is_no_await_guard_type_node(node):
             self.no_await_guard_types.insert(name, 1)
 
-        if is_local != 0:
+        if is_local:
             self.local_type_names.insert(name, 1)
 
     // ── Type dependency cycle detection ──────────────────────────────
@@ -2091,7 +2091,7 @@ impl Sema:
         if self.ast.state.fn_stack_sizes.contains(node):
             self.fn_stack_sizes.insert(fn_name, self.ast.state.fn_stack_sizes.get(node).unwrap())
 
-    mut fn collect_fn_decl(node: i32, is_local: i32, decl_index: i32):
+    mut fn collect_fn_decl(node: i32, is_local: bool, decl_index: i32):
         let parsed_fn_name = self.ast.get_data0(node)
         // D117 (§9.5): a `move fn` twin's symbol texts (`Owner.name$move`,
         // `name$move`) enter Sema's pool here; the parser's pool alone held
@@ -2120,7 +2120,7 @@ impl Sema:
             if method_impl_node != 0:
                 self.method_impl_nodes.insert(fn_name, method_impl_node)
             self.method_symbol_flags.insert(fn_name, 1)
-        if is_local != 0:
+        if is_local:
             self.set_pretty_symbol(fn_name, self.extract_decl_name_after(node, "fn"))
         let fn_flags = self.ast.get_data2(node)
         let decl_is_pub: i32 = if (fn_flags / FnFlags.PUB) % 2 == 1: 1 else: 0
@@ -2160,7 +2160,7 @@ impl Sema:
                         let fn_name_str: str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
-        if self.ast.is_no_alloc_fn_node(node as NodeId) != 0:
+        if self.ast.is_no_alloc_fn_node(node as NodeId):
             self.no_alloc_fns.insert(fn_name, 1)
 
         // Look up fn_meta for parameter info
@@ -2328,7 +2328,7 @@ impl Sema:
         let implicit_type_ids: List[i32] = List.new()
         for pi in 0..param_count:
             let p_name_sym = self.ast.fn_param_name(param_start, pi)
-            if is_local != 0:
+            if is_local:
                 self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
             let p_type_node = self.ast.fn_param_type(param_start, pi)
             self.refuse_dyn_by_value_params(p_type_node, true)
@@ -2345,7 +2345,7 @@ impl Sema:
             let p_flags = self.ast.fn_param_flags(param_start, pi)
             // A D7 mut receiver spells `Self` but uses the share-place ABI: the
             // caller passes an address, so no opaque value is materialized.
-            if self.is_opaque_value_type(p_tid) != 0 and self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) == 0:
+            if self.is_opaque_value_type(p_tid) and self.fn_param_uses_value_ref_abi(param_start, pi, method_owner_sym, self_type_id) == 0:
                 self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
             // §12.4 (D75): `once` is a promise about invoking a callable.
             if fn_param_is_once(p_flags) and p_tid != 0 and self.get_type_kind(self.resolve_alias(p_tid)) != TypeKind.TY_FN:
@@ -2360,7 +2360,7 @@ impl Sema:
 
         self.refuse_dyn_by_value_params(ret_node, false)
         var ret_type = self.resolve_type_expr(ret_node)
-        if self.is_opaque_value_type(ret_type) != 0:
+        if self.is_opaque_value_type(ret_type):
             self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
         if ret_node == 0:
             ret_type = self.ty_void
@@ -2442,9 +2442,9 @@ impl Sema:
             return self.type_expr_names_c_longdouble(self.ast.get_data0(type_node))
         false
 
-    mut fn collect_extern_fn(node: i32, is_local: i32):
+    mut fn collect_extern_fn(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
-        if is_local != 0:
+        if is_local:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "fn"))
         self.record_decl_visibility(name, node, 1)
         // An interface's declaration of a name a source module owns keeps
@@ -2475,7 +2475,7 @@ impl Sema:
                 // Find the decl index of the existing function to check its origin
                 for edi in 0..self.ast.decl_count():
                     if self.ast.get_decl(edi) == existing_node:
-                        if self.is_local_or_prelude_decl(edi) != 0:
+                        if self.is_local_or_prelude_decl(edi):
                             let fn_name_str: str = self.pool_resolve(name)
                             self.emit_error(f"'{fn_name_str}' is already defined as a function; extern fn would shadow it", node)
                             return
@@ -2522,10 +2522,10 @@ impl Sema:
         for pi in 0..param_count:
             let p_name_sym = self.ast.fn_param_name(param_start, pi)
             let p_type_node = self.ast.fn_param_type(param_start, pi)
-            if is_local != 0:
+            if is_local:
                 self.set_pretty_symbol(p_name_sym, self.extract_fn_param_name(node, pi))
             let p_tid = self.resolve_type_expr(p_type_node)
-            if self.is_opaque_value_type(p_tid) != 0:
+            if self.is_opaque_value_type(p_tid):
                 self.emit_error("opaque types cannot be passed by value; use a pointer or reference", p_type_node)
             self.reject_c_abi_array(p_tid as i32, p_type_node, false, "an `extern fn`")
             self.sig_params.push(p_tid as i32)
@@ -2534,7 +2534,7 @@ impl Sema:
         // resolve_type_expr(0) is TY_ERR and would leak an untyped MIR call
         // destination for every `extern fn f(...)` without `->`.
         let ret_type = if ret_node != 0: self.resolve_type_expr(ret_node) else: self.ty_void
-        if self.is_opaque_value_type(ret_type) != 0:
+        if self.is_opaque_value_type(ret_type):
             self.emit_error("opaque types cannot be returned by value; use a pointer or reference", ret_node)
         self.reject_c_abi_array(ret_type as i32, ret_node, true, "an `extern fn`")
 
@@ -2570,14 +2570,14 @@ impl Sema:
         self.extern_chain_prev.insert(sig_idx, previous)
         self.extern_chain_head.insert(sema_owned_text(text), sig_idx)
 
-    mut fn collect_extern_var(node: i32, is_local: i32):
+    mut fn collect_extern_var(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
         self.record_decl_visibility(name, node, 1)
         self.extern_var_texts.insert(sema_owned_text(self.pool_resolve(name)), 1)
         let type_node = self.ast.get_data1(node)
         let tid = self.resolve_type_expr(type_node)
         self.extern_var_type_ids.insert(node, tid as i32)
-        if self.is_opaque_value_type(tid) != 0:
+        if self.is_opaque_value_type(tid):
             self.emit_error("opaque types cannot be declared as extern values; use a pointer or reference", type_node)
         // Register the extern var for scope lookup
         let is_mut: i32 = if self.ast.get_data2(node) != 0: 1 else: 0
@@ -2705,10 +2705,10 @@ impl Sema:
     fn fn_decl_semantic_symbol_at(node: i32, fallback: i32, decl_index: i32) -> i32:
         self.fn_decl_semantic_symbol(node, fallback)
 
-    fn method_decl_is_extension(node: i32) -> i32:
+    fn method_decl_is_extension(node: i32) -> bool:
         let impl_node = self.impl_node_for_method_decl(node)
         if impl_node == 0:
-            return 0
+            return false
         self.ast.is_extend_impl_node(impl_node as NodeId)
 
     mut fn register_extension_method_candidate(node: i32, fn_sym: i32, parsed_fn_sym: i32, sig_idx: i32, decl_index: i32) -> i32:
@@ -3066,9 +3066,9 @@ impl Sema:
             return -1
         packed - 1
 
-    mut fn collect_let_decl(node: i32, is_local: i32):
+    mut fn collect_let_decl(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
-        if is_local != 0:
+        if is_local:
             var bind_name = self.extract_decl_name_after(node, "let")
             if bind_name.len() == 0:
                 bind_name = self.extract_decl_name_after(node, "var")
@@ -3091,7 +3091,7 @@ impl Sema:
         if type_extra >= 0:
             let type_node = self.ast.get_extra(type_extra)
             bind_ty = self.resolve_type_expr(type_node)
-            if self.is_opaque_value_type(bind_ty) != 0:
+            if self.is_opaque_value_type(bind_ty):
                 self.emit_error("opaque values cannot be stored by value; use a pointer or reference", type_node)
             if bind_ty != 0 and self.type_is_ephemeral_value(bind_ty as i32) != 0:
                 self.emit_ephemeral_storage_error("ephemeral values cannot be stored in global storage", type_node, bind_ty as i32, node)
@@ -3101,7 +3101,7 @@ impl Sema:
         self.register_top_level_global_decl(name, bind_ty as i32, is_mut, node, decl_kind)
         // An annotated constant is refused before its value is evaluated.
         if bind_ty != 0: self.reject_interior_constant(node, name, bind_ty as i32)
-        if self.ast.is_const_decl_node(node) != 0:
+        if self.ast.is_const_decl_node(node):
             self.const_global_syms.insert(name, 1)
             if flags / 16 == 0:
                 if self.untyped_const_decls.contains(name): self.untyped_const_alt_decls.push(node)
@@ -3110,13 +3110,13 @@ impl Sema:
         self.typed_binding_names.insert(node, name)
         self.typed_binding_muts.insert(node, is_mut)
 
-    mut fn collect_trait_decl(node: i32, is_local: i32):
+    mut fn collect_trait_decl(node: i32, is_local: bool):
         let name = self.ast.get_data0(node)
         // First-wins, matching find_trait_decl_node's decl-order scan; decl
         // node ids are stable within a Sema instance so the memo never stales.
         if not self.trait_decl_node_cache.contains(name):
             self.trait_decl_node_cache.insert(name, node)
-        if is_local != 0:
+        if is_local:
             self.set_pretty_symbol(name, self.extract_decl_name_after(node, "trait"))
         let extra_start = self.ast.get_data1(node)
         // Store trait info
@@ -3205,9 +3205,9 @@ impl Sema:
         self.trait_decl_paths.push(with_str_clone_ref(self.current_module_path))
         self.trait_decl_nodes.push(node)
         self.trait_idx_by_decl_node.insert(node, trait_idx)
-        if self.ast.is_sealed_trait_node(node) != 0:
+        if self.ast.is_sealed_trait_node(node):
             self.sealed_traits.insert(name, 1)
-        if is_local != 0:
+        if is_local:
             self.local_trait_names.insert(name, 1)
 
     // The type-parameter count of the declaration `tid` itself denotes,
@@ -3313,7 +3313,7 @@ impl Sema:
             let name: str = self.pool_resolve(type_name)
             self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
-    mut fn collect_impl_decl(node: i32, is_local_impl: i32) -> Unit:
+    mut fn collect_impl_decl(node: i32, is_local_impl: bool):
         let type_name = self.ast.get_data0(node)
         let trait_sym = self.ast.get_data2(node)
         let declared_target = self.lookup_named_type_visible(type_name)
@@ -3335,7 +3335,7 @@ impl Sema:
             return
 
         // Orphan rule: only enforced for local (user) impls, not prelude/imported
-        if is_local_impl != 0:
+        if is_local_impl:
             let trait_is_local = self.local_trait_names.contains(trait_sym) or is_lang_trait
             let type_is_local = self.local_type_names.contains(type_name)
             if not trait_is_local and not type_is_local:
@@ -3789,7 +3789,7 @@ impl Sema:
             let sym = self.ast.get_data0(node)
             if self.primitive_type_by_sym(sym) != 0:
                 return
-            if self.has_named_type_visible(sym) != 0:
+            if self.has_named_type_visible(sym):
                 return
             if self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, sym) != 0:
                 return
@@ -3841,7 +3841,7 @@ impl Sema:
             let base_prim = self.primitive_type_by_sym(base_sym)
             // `Range[T]` / `RangeInclusive[T]` are the built-in range
             // constructors (§4.7), spellable in a generic signature.
-            if base_prim == 0 and self.has_named_type_visible(base_sym) == 0 and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, base_sym) == 0 and self.canonical_range_type_constructor_inclusive(base_sym) < 0:
+            if base_prim == 0 and self.has_named_type_visible(base_sym) == false and self.type_param_exists_in_impl_context(tp_start, tp_count, impl_node, base_sym) == 0 and self.canonical_range_type_constructor_inclusive(base_sym) < 0:
                 self.debug_unknown_type(base_sym, node, "validate_type_generic")
                 self.emit_unknown_type_error(base_sym, node)
             let extra_start = self.ast.get_data1(node)

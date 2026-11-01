@@ -771,7 +771,7 @@ fn analysis_collect_resolved_calls(mut report: AnalysisReport, sema: &Sema, sour
         fact.id = node
         fact.parent = sig
         fact.symbol = mono
-        fact.index = if sema.has_resolved_call_args(node) != 0: sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
+        fact.index = if sema.has_resolved_call_args(node): sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
         fact.name = if mono != 0: with_str_clone_ref(sema.pool_resolve(mono)) else: "<unresolved>"
         fact.detail = f"resolved-call sig={sig} mono={mono} args={fact.index}"
         fact = analysis_with_node_location(move fact, sema, node, source_path, source_text)
@@ -911,7 +911,7 @@ fn analysis_call_receiver_node(sema: &Sema, call_node: i32) -> i32:
 
 fn analysis_call_argument_node(sema: &Sema, call_node: i32, arg_index: i32, mir_count: i32) -> i32:
     if call_node <= 0 or call_node >= sema.ast.node_count() or sema.ast.kind(call_node) != NodeKind.NK_CALL: return 0
-    let resolved = sema.has_resolved_call_args(call_node) != 0
+    let resolved = sema.has_resolved_call_args(call_node)
     let source_count = if resolved: sema.get_resolved_call_arg_count(call_node) else: sema.ast.get_data2(call_node)
     let receiver_offset: i32 = if source_count + 1 == mir_count: 1 else: 0
     if receiver_offset == 1 and arg_index == 0: return analysis_call_receiver_node(sema, call_node)
@@ -1241,7 +1241,7 @@ fn analysis_audit_storage(mut report: AnalysisReport, sema: &Sema):
         if sema.ast.kind(impl_node) != NodeKind.NK_IMPL_DECL:
             continue
         impl_count = impl_count + 1
-        let marked_extend = sema.ast.is_extend_impl_node(impl_node as NodeId) != 0
+        let marked_extend = sema.ast.is_extend_impl_node(impl_node as NodeId)
         if marked_extend: extend_count = extend_count + 1
         let source = sema.source_text_for_file_id(sema.decl_source_file_id_for_index(di))
         let start = sema.ast.get_start(impl_node)
