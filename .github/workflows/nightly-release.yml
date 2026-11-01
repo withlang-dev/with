@@ -264,6 +264,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # unit-return-review (build :test) diffs the tree against origin/main;
+      # a tag checkout at the default depth has no main (#2902), so every
+      # release verify job failed there.
+      - name: Fetch main for unit-return-review
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
       - name: Resolve and verify version
         run: |
           set -euo pipefail
@@ -483,6 +489,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # unit-return-review (build :test) diffs the tree against origin/main;
+      # a tag checkout at the default depth has no main (#2902), so every
+      # release verify job failed there.
+      - name: Fetch main for unit-return-review
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
       - name: Resolve and verify version
         run: |
           set -euo pipefail
@@ -669,6 +681,12 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # unit-return-review (build :test) diffs the tree against origin/main;
+      # a tag checkout at the default depth has no main (#2902), so every
+      # release verify job failed there.
+      - name: Fetch main for unit-return-review
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
 
       - name: Resolve and verify version
         run: |
@@ -903,6 +921,12 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
+      # unit-return-review (build :test) diffs the tree against origin/main;
+      # a tag checkout at the default depth has no main (#2902), so every
+      # release verify job failed there.
+      - name: Fetch main for unit-return-review
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
+
       - name: Resolve and verify version
         run: |
           set -euo pipefail
@@ -1067,6 +1091,12 @@ jobs:
     steps:
       - name: Checkout source
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      # unit-return-review (build :test) diffs the tree against origin/main;
+      # a tag checkout at the default depth has no main (#2902), so every
+      # release verify job failed there.
+      - name: Fetch main for unit-return-review
+        run: git fetch --no-tags --depth=1 origin +refs/heads/main:refs/remotes/origin/main
 
       - name: Resolve and verify version
         run: |

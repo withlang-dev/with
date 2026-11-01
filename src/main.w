@@ -4734,13 +4734,14 @@ fn run_test_compiler_command(target: &str, command_name: &str, directives: &Test
         argv = build_graph_argv_append(argv, capture_dir ++ "/out")
     argv = test_append_extra_args(argv, directives.extra_args)
     argv = build_graph_argv_append(argv, target)
-    // The same ceiling as the build graph gives a whole test file (300s): a
+    // The same hang guard the build graph gives a whole test file (#2362): a
     // lower one here is not a guard, it is a second, invisible verdict. A
     // `--dump-typed` of the compiler's Frontend (700k lines) runs 19s idle on
     // a 2-core box and 47s with three siblings beside it; on a slow CI runner
     // with four workers it crossed a 60s limit and reported as a plain check
-    // failure (#1086, windows x86_64).
-    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
+    // failure (#1086, windows x86_64), and a 300 s ceiling the same way on a
+    // 4-core arm64 runner (#2902).
+    let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, TEST_HANG_GUARD_MS)
     let out_text = with_fs_read_file(stdout_path)
     let err_text = with_fs_read_file(stderr_path)
     let _remove_stdout = with_fs_remove_file(stdout_path)
@@ -4757,7 +4758,7 @@ fn test_output_contains_expected(actual: &str, expected: &str) -> bool:
 // 124 is the capture's own verdict (the child was killed at the ceiling),
 // not the compiler's; name it so a slow run never reads as a compile error.
 fn test_check_failure_message(rc: i32) -> str:
-    if rc == 124: return "check timed out after 300s"
+    if rc == 124: return f"check was still running after {TEST_HANG_GUARD_MS / 60000} minutes, so the hang guard stopped it"
     f"check failed with exit code {rc}"
 
 // The child's own words follow the verdict: "check failed with exit code 1"

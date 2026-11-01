@@ -31,18 +31,31 @@ use std.time.now_ns
 // expected line and passed). `report` is stderr then stdout.
 type DebugAllocRun { rc: i32, report: str, stdout: str }
 
+// The fixture's file name, the part of its path after the last separator.
+fn capture_stem(repro: &str) -> str:
+    var start = 0
+    for i in 0..repro.len():
+        if repro[i] == '/' or repro[i] == '\\': start = i + 1
+    repro.slice(start, repro.len())
+
 fn run_under_debug_alloc(with_bin: &str, repro: &str, filter: &str) -> DebugAllocRun:
-    // Per process: concurrent lanes (two batteries, an agent's run) shared
-    // one capture file and read each other's half-written report (#2004).
-    let outp = f"/tmp/debug_drop_{pid()}_out.txt"
-    let errp = f"/tmp/debug_drop_{pid()}_err.txt"
+    // Per process and per test: concurrent lanes (two batteries, an agent's
+    // run) shared one capture file and read each other's half-written report
+    // (#2004); one path for every test of a lane let a program a timed-out
+    // test left running write its report line into the next test's capture
+    // through the handle it inherited (#2902, windows-aarch64).
+    let outp = f"/tmp/debug_drop_{pid()}_{capture_stem(repro)}_out.txt"
+    let errp = f"/tmp/debug_drop_{pid()}_{capture_stem(repro)}_err.txt"
     var argv: List[str] = List.new()
     argv.push(with_bin.clone())
     argv.push("run")
     argv.push("--debug-alloc")
     if filter.len() > 0: argv.push("--debug-alloc-filter=" ++ filter)
     argv.push(repro.clone())
-    let finished = run_to_files(&argv, outp, errp, 60000)
+    // The hang guard a test binary gets (#2362, TEST_HANG_GUARD_MS), not a
+    // speed budget: at 60 s a passing fixture failed on a loaded 4-core
+    // runner with nothing captured (#2902).
+    let finished = run_to_files(&argv, outp, errp, 1800000)
     let stdout = read_file(outp) ?? ""
     DebugAllocRun { rc: finished.code, report: (read_file(errp) ?? "") ++ "\n" ++ stdout, stdout }
 

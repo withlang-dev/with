@@ -145,7 +145,7 @@ fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget, com
     let stdout_path = resolve_join(capture_dir, base ++ ".stdout")
     let stderr_path = resolve_join(capture_dir, base ++ ".stderr")
     let argv = build_graph_external_test_argv(root, target, compiler_path, test_path, true)
-    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, 300000)
+    let rc = build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, TEST_HANG_GUARD_MS)
     if rc == 124:
         build_graph_rt_eprint("error: build.w test target '" ++ target.name ++ "' timed out in '" ++ test_path ++ "'; stdout=" ++ stdout_path ++ " stderr=" ++ stderr_path)
         return 124
@@ -158,7 +158,7 @@ fn build_graph_run_external_test_file(root: &str, target: &BuildGraphTarget, com
     0
 
 fn build_graph_wait_external_test_job(target: &BuildGraphTarget, job: &BuildGraphExternalTestJob) -> i32:
-    build_graph_finish_external_test_job(target, job, build_graph_rt_exec_wait(job.pid, 300000))
+    build_graph_finish_external_test_job(target, job, build_graph_rt_exec_wait(job.pid, TEST_HANG_GUARD_MS))
 
 // A test child's exit code is its verdict: report a failure with its
 // captured tail, drop a pass's captures. 124 is the timeout.
@@ -261,9 +261,11 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
             let idx = live[li]
             var rc = build_graph_rt_exec_try_wait(active[idx].pid)
             if rc == -2:
-                // Still running: the same 300 s budget the blocking wait had,
+                // Still running: the same hang guard the blocking wait has
+                // (#2362: a guard, never a speed budget; a 300 s ceiling
+                // failed passing tests on a loaded 4-core runner, #2902),
                 // counted from spawn; expiry kills the child (rc 124).
-                if build_graph_rt_clock_nanos() - started_ns[idx] < 300000 as i64 * 1000000:
+                if build_graph_rt_clock_nanos() - started_ns[idx] < TEST_HANG_GUARD_MS as i64 * 1000000:
                     li = li + 1
                     continue
                 rc = build_graph_rt_exec_wait(active[idx].pid, 1)

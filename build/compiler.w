@@ -1656,11 +1656,11 @@ fn comp_process_state_alterers(state: &str) -> str:
     // realpath may open descriptors of their own; exec closes the
     // close-on-exec ones.
     if state == "fds":
-        return "|open|__open|openat|creat|close|dup|dup2|dup3|fcntl|pipe|socket|accept|mkstemp|opendir|fdopendir|closedir|getaddrinfo|realpath|execv|execvp|execve|CreateFileW|CloseHandle|FindFirstFileW|FindClose|OpenProcess|CreateProcessW|CreateThread|closesocket|path_open|fd_close|fd_renumber|"
+        return "|open|__open|openat|creat|close|dup|dup2|dup3|fcntl|pipe|socket|accept|mkstemp|opendir|fdopendir|closedir|getaddrinfo|realpath|execv|execvp|execve|CreateFileW|CloseHandle|FindFirstFileW|FindClose|OpenProcess|CreateProcessW|CreateJobObjectW|CreateThread|closesocket|path_open|fd_close|fd_renumber|"
     if state == "rlimits":
         return "|setrlimit|prlimit|"
     if state == "children":
-        return "|fork|vfork|execv|execvp|execve|posix_spawn|posix_spawnp|wait|waitpid|wait4|setpgid|setsid|CreateProcessW|TerminateProcess|"
+        return "|fork|vfork|execv|execvp|execve|posix_spawn|posix_spawnp|wait|waitpid|wait4|setpgid|setsid|CreateProcessW|AssignProcessToJobObject|ResumeThread|TerminateProcess|TerminateJobObject|"
     // The streams' buffers and positions.
     if state == "stdio":
         return "|fopen|fdopen|freopen|fclose|fflush|fseek|fseeko|_fseeki64|setvbuf|setbuf|ungetc|"
