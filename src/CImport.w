@@ -13312,7 +13312,9 @@ impl CiStmtPool:
                         var pure_else = exprs.coerce_value_expr_for_target(session, pure_ty, else_cursor, else_v.value_expr, types)
                         if pure_else != 0 and exprs.kind(pure_else) == CiExprKind.CIE_NULL_PTR: pure_else = exprs.cast(pure_ty, pure_else)
                         if pure_cond != 0 and pure_then != 0 and pure_else != 0:
-                            return CiValueExprIR { value_expr: exprs.add(CiExprKind.CIE_TERNARY, pure_cond as i32, pure_then as i32, pure_else as i32, 0) }
+                            // A literal condition (`1 ? c : -1`, M*LIB's M_IF) is its
+                            // chosen arm here as in callee position.
+                            return CiValueExprIR { value_expr: exprs.fold_literal_ternary(exprs.add(CiExprKind.CIE_TERNARY, pure_cond as i32, pure_then as i32, pure_else as i32, 0)) }
                 let result_name = ci_expr_temp_name(session, cursor, "ternary")
                 let result_ty = types.type_from_libclang(session, with_ci_cursor_type(session, cursor))
                 if result_ty == 0:
