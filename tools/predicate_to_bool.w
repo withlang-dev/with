@@ -171,6 +171,10 @@ for path in files:
         decl = /\breturn 0\b/.replace_all(decl, "return false")
         decl = /\breturn 1\b/.replace_all(decl, "return true")
         decl = decl.replace(": 1 else: 0", ": true else: false").replace(": 0 else: 1", ": false else: true")
+        // A tail or return that is `if c: true else: false` is `c` (`not c` for
+        // the other order): the test's result, not a bool spelled twice.
+        decl = /(\n[ \t]*(return )?)if ([^\n:]+): true else: false(\n|$)/.replace_all(decl, "$1$3$4")
+        decl = /(\n[ \t]*(return )?)if ([^\n:]+): false else: true(\n|$)/.replace_all(decl, "$1not ($3)$4")
         decl = /(\n[ \t]*)1[ \t]*(?=\n|$)/.replace_all(decl, "$1true")
         decl = /(\n[ \t]*)0[ \t]*(?=\n|$)/.replace_all(decl, "$1false")
         // A line-final `: 1` / `: 0` is a result only on a line that binds

@@ -8104,7 +8104,7 @@ impl MirBuilder:
                 // them). Left in the enclosing statement's frame, their drop
                 // landed past the block's join, where a `break` to the label
                 // reached it with the temp never written.
-                let diverging_frame = if self.sema.body_can_fall_through(tail_expr) == 0: self.push_stmt_temp_frame() else: -1
+                let diverging_frame = if self.sema.body_can_fall_through(tail_expr) == false: self.push_stmt_temp_frame() else: -1
                 result = self.lower_expr(tail_expr)
                 if diverging_frame >= 0:
                     self.finish_stmt_temp_frame(diverging_frame)
@@ -8235,7 +8235,7 @@ impl MirBuilder:
         // A diverging branch has no value to contribute to the join. lower_return
         // leaves a Unit operand in its unreachable continuation; assigning that
         // operand to the if result place corrupts typed MIR.
-        if want_result != 0 and self.sema.body_can_fall_through(then_expr) != 0:
+        if want_result != 0 and self.sema.body_can_fall_through(then_expr):
             self.assign_operand_to_place(result_place, then_op, self.ast.get_start(then_expr))
         self.leave_body_scope(then_scoped)
         self.finish_stmt_temp_frame(then_temp_frame)
@@ -8249,7 +8249,7 @@ impl MirBuilder:
         self.field_move_in_branch = self.field_move_in_branch - 1
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
         let str_then = self.save_string_flow_facts()
-        let then_falls = self.sema.body_can_fall_through(then_expr) != 0
+        let then_falls = self.sema.body_can_fall_through(then_expr)
         self.restore_string_flow_facts(&str_entry)
 
         self.restore_move_state(&branch_move_state)
@@ -8262,7 +8262,7 @@ impl MirBuilder:
             if want_result != 0: self.lower_expr(else_expr_opt) else: self.lower_expr_discard(else_expr_opt)
         else:
             self.unit_operand()
-        if want_result != 0 and (else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt) != 0):
+        if want_result != 0 and (else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt)):
             self.assign_operand_to_place(result_place, else_op, self.ast.get_start(node))
         self.leave_body_scope(else_scoped)
         self.finish_stmt_temp_frame(else_temp_frame)
@@ -8273,7 +8273,7 @@ impl MirBuilder:
         self.restore_move_state(&branch_move_state)
 
         self.expected_type = saved_expected
-        let else_falls = else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt) != 0
+        let else_falls = else_expr_opt == 0 or self.sema.body_can_fall_through(else_expr_opt)
 
         self.switch_to(join_bb)
         // #1491: the join merges the arms' facts. Forgetting them marked every
@@ -12376,7 +12376,7 @@ impl MirBuilder:
                 // lower_if, lower_return leaves Unit in its unreachable
                 // continuation; assigning that placeholder to the match result
                 // corrupts typed MIR when the result type is non-Unit.
-                if self.sema.body_can_fall_through(body_node) != 0:
+                if self.sema.body_can_fall_through(body_node):
                     self.assign_operand_to_place(result_place, arm_value, self.ast.get_start(body_node))
             self.finish_stmt_temp_frame(arm_temp_frame)
             // Reset-on-move (spec §2.5.1): flush this arm's pending source-resets
@@ -14686,7 +14686,7 @@ impl MirBuilder:
         // result is the void-into-int/str invalid MIR the validator rejects.
         let dq_arm = self.begin_lazy_arm()
         let default_op = self.lower_expr(default_expr)
-        if self.sema.body_can_fall_through(default_expr) != 0:
+        if self.sema.body_can_fall_through(default_expr):
             self.assign_operand_to_place(result_place, default_op, self.ast.get_start(default_expr))
         self.end_lazy_arm(&dq_arm)
         self.terminate(TermKind.TK_GOTO, join_bb, 0, 0, 0)
@@ -18293,7 +18293,7 @@ impl MirBuilder:
                 let arm_temp_frame = self.push_stmt_temp_frame()
                 let arm_scoped = self.enter_body_scope(arm_body)
                 let body_op = self.lower_expr(arm_body)
-                if self.sema.body_can_fall_through(arm_body) != 0:
+                if self.sema.body_can_fall_through(arm_body):
                     self.assign_operand_to_place(result_place, body_op, span)
                 self.leave_body_scope(arm_scoped)
                 self.finish_stmt_temp_frame(arm_temp_frame)

@@ -6467,10 +6467,10 @@ impl Codegen:
             return
         if self.sema.task_fns.contains(fn_sym):
             return
-        if self.sema.type_is_ephemeral_value(self.sema.sig_return_type(sig_idx)) != 0:
+        if self.sema.type_is_ephemeral_value(self.sema.sig_return_type(sig_idx)):
             return
         for pi in 0..param_count:
-            if not self.sig_param_is_explicit_ref(sig_idx, pi) and self.sema.type_is_ephemeral_value(self.sema.sig_param_type(sig_idx, pi)) != 0:
+            if not self.sig_param_is_explicit_ref(sig_idx, pi) and self.sema.type_is_ephemeral_value(self.sema.sig_param_type(sig_idx, pi)):
                 return
         let fn_type = wl_global_get_value_type(function)
         if fn_type == 0 or wl_count_param_types(fn_type) < 0:

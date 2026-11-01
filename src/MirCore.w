@@ -3781,34 +3781,34 @@ fn mir_validate_enum_payload_type(mir_mod: &MirModule, enum_tid: i32, variant_id
         return mir_validate_enum_payload_type(mir_mod, base_tid, variant_idx, field_idx)
     0
 
-fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual: i32) -> i32:
+fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual: i32) -> bool:
     if expected <= 0 or actual <= 0:
-        return 0
+        return false
     if expected == actual:
-        return 1
+        return true
     let exp_r = mir_mod.mir_resolve_alias(expected)
     let act_r = mir_mod.mir_resolve_alias(actual)
     if exp_r == act_r:
-        return 1
+        return true
     let exp_k = mir_mod.mir_get_type_kind(exp_r)
     let act_k = mir_mod.mir_get_type_kind(act_r)
     if act_k == TypeKind.TY_NEVER:
-        return 1
+        return true
     if exp_k == TypeKind.TY_STRUCT and act_k == TypeKind.TY_STRUCT:
-        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+        return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r)
     if exp_k == TypeKind.TY_ENUM and act_k == TypeKind.TY_ENUM:
-        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+        return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r)
     if (exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_FN) or (exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_EXTERN_FN) or (exp_k == TypeKind.TY_FN and act_k == TypeKind.TY_EXTERN_FN) or (exp_k == TypeKind.TY_EXTERN_FN and act_k == TypeKind.TY_FN):
         // Sema does not intern fn types canonically; mirror its structural
         // fn_types_compatible rule (d0=params extra, d1=count, d2=ret).
         if mir_mod.mir_get_type_d1(exp_r) != mir_mod.mir_get_type_d1(act_r):
-            return 0
+            return false
         let fn_param_count = mir_mod.mir_get_type_d1(exp_r)
         let exp_ps = mir_mod.mir_get_type_d0(exp_r)
         let act_ps = mir_mod.mir_get_type_d0(act_r)
         for fpi in 0..fn_param_count:
-            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_ps + fpi), mir_mod.mir_get_type_extra(act_ps + fpi)) == 0:
-                return 0
+            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_ps + fpi), mir_mod.mir_get_type_extra(act_ps + fpi)) == false:
+                return false
         return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d2(exp_r), mir_mod.mir_get_type_d2(act_r))
     if exp_k == TypeKind.TY_GENERIC_INST and act_k == TypeKind.TY_GENERIC_INST:
         if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r):
@@ -3817,14 +3817,14 @@ fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual:
                 for ai in 0..arg_count:
                     let exp_arg = mir_validate_get_generic_inst_arg(mir_mod, exp_r, ai)
                     let act_arg = mir_validate_get_generic_inst_arg(mir_mod, act_r, ai)
-                    if mir_validate_type_compatible_fast(mir_mod, exp_arg, act_arg) == 0:
-                        return 0
-                return 1
-        return 0
+                    if mir_validate_type_compatible_fast(mir_mod, exp_arg, act_arg) == false:
+                        return false
+                return true
+        return false
     if exp_k == TypeKind.TY_GENERIC_INST and (act_k == TypeKind.TY_STRUCT or act_k == TypeKind.TY_ENUM):
-        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+        return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r)
     if (exp_k == TypeKind.TY_STRUCT or exp_k == TypeKind.TY_ENUM) and act_k == TypeKind.TY_GENERIC_INST:
-        return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
+        return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r)
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_PTR:
         return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
     if exp_k == TypeKind.TY_PTR and act_k == TypeKind.TY_REF:
@@ -3837,32 +3837,32 @@ fn mir_validate_type_compatible_fast(mir_mod: &MirModule, expected: i32, actual:
         return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
     if exp_k == TypeKind.TY_ARRAY and act_k == TypeKind.TY_ARRAY:
         if mir_mod.mir_get_type_d1(exp_r) != mir_mod.mir_get_type_d1(act_r):
-            return 0
+            return false
         return mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_d0(exp_r), mir_mod.mir_get_type_d0(act_r))
     if exp_k == TypeKind.TY_TUPLE and act_k == TypeKind.TY_TUPLE:
         let exp_count = mir_mod.mir_get_type_d1(exp_r)
         let act_count = mir_mod.mir_get_type_d1(act_r)
         if exp_count != act_count:
-            return 0
+            return false
         let exp_start = mir_mod.mir_get_type_d0(exp_r)
         let act_start = mir_mod.mir_get_type_d0(act_r)
         for ei in 0..exp_count:
-            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_start + ei), mir_mod.mir_get_type_extra(act_start + ei)) == 0:
-                return 0
-        return 1
+            if mir_validate_type_compatible_fast(mir_mod, mir_mod.mir_get_type_extra(exp_start + ei), mir_mod.mir_get_type_extra(act_start + ei)) == false:
+                return false
+        return true
     // Primitive types: same kind means compatible (str, int, bool, float, void)
     if exp_k == act_k:
         if exp_k == TypeKind.TY_STR or exp_k == TypeKind.TY_BOOL or exp_k == TypeKind.TY_VOID:
-            return 1
+            return true
         if exp_k == TypeKind.TY_INT:
             // Same width and signedness
-            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r) and mir_mod.mir_get_type_d1(exp_r) == mir_mod.mir_get_type_d1(act_r): 1 else: 0
+            return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r) and mir_mod.mir_get_type_d1(exp_r) == mir_mod.mir_get_type_d1(act_r)
         if exp_k == TypeKind.TY_FLOAT:
-            return if mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r): 1 else: 0
-    0
+            return mir_mod.mir_get_type_d0(exp_r) == mir_mod.mir_get_type_d0(act_r)
+    false
 
 fn mir_validate_use_assign_compatible(mir_mod: &MirModule, expected: i32, actual: i32) -> bool:
-    if mir_validate_type_compatible_fast(mir_mod, expected, actual) != 0:
+    if mir_validate_type_compatible_fast(mir_mod, expected, actual):
         return true
     let expected_inner = mir_validate_distinct_inner(mir_mod, expected)
     if expected_inner > 0 and expected_inner != expected:
@@ -3876,10 +3876,10 @@ fn mir_validate_use_assign_compatible(mir_mod: &MirModule, expected: i32, actual
     let actual_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(actual))
     if expected_kind == TypeKind.TY_INT and actual_kind == TypeKind.TY_ENUM:
         let actual_repr = mir_validate_enum_repr_type(mir_mod, actual)
-        return actual_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected, actual_repr) != 0
+        return actual_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected, actual_repr)
     if expected_kind == TypeKind.TY_ENUM and actual_kind == TypeKind.TY_INT:
         let expected_repr = mir_validate_enum_repr_type(mir_mod, expected)
-        return expected_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected_repr, actual) != 0
+        return expected_repr > 0 and mir_validate_type_compatible_fast(mir_mod, expected_repr, actual)
     // §10.6/§10.8: a shared ref to a CONCRETE type may assign into a
     // ref-to-dyn destination — the RK_REF/use of `&x` in ref-to-dyn position
     // is the fat-pointer build (codegen keys on the DESTINATION type; sema
@@ -4498,8 +4498,8 @@ fn mir_validate_cast_supported(mir_mod: &MirModule, src_ty: i32, dst_ty: i32) ->
     // from the enum value, and this rule let one through to it.
     if src_kind == TypeKind.TY_ENUM and (dst_kind == TypeKind.TY_INT or dst_kind == TypeKind.TY_FLOAT):
         return false
-    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) != 0 or
-       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty) != 0:
+    if mir_validate_type_compatible_fast(mir_mod, dst_ty, src_ty) or
+       mir_validate_type_compatible_fast(mir_mod, src_ty, dst_ty):
         return true
     if src_kind == TypeKind.TY_NEVER:
         return true
@@ -4742,8 +4742,8 @@ fn validate_typed_mir_body(mir_mod: &MirModule, body: &MirBody) -> MirValidation
                 if lhs_ty > 0 and rhs_ty > 0 and
                    mir_validate_compare_sensitive_type(mir_mod, lhs_ty) and
                    mir_validate_compare_sensitive_type(mir_mod, rhs_ty) and
-                   mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == 0 and
-                   mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == 0:
+                   mir_validate_type_compatible_fast(mir_mod, lhs_ty, rhs_ty) == false and
+                   mir_validate_type_compatible_fast(mir_mod, rhs_ty, lhs_ty) == false:
                     let lhs_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(lhs_ty)) as i32
                     let rhs_kind = mir_mod.mir_get_type_kind(mir_mod.mir_resolve_alias(rhs_ty)) as i32
                     return mir_validation_fail(body.fn_sym, span, f"comparison operands have incompatible MIR types (lhs ty={lhs_ty} kind={lhs_kind}, rhs ty={rhs_ty} kind={rhs_kind})")

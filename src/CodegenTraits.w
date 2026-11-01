@@ -218,40 +218,40 @@ impl Codegen:
                 return i
         -1
 
-fn codegen_type_node_mentions_self(pool: &AstPool, self_sym: i32, type_node: i32) -> i32:
+fn codegen_type_node_mentions_self(pool: &AstPool, self_sym: i32, type_node: i32) -> bool:
     if type_node == 0:
-        return 0
+        return false
     let kind = pool.kind(type_node)
     if kind == NodeKind.NK_TYPE_NAMED:
-        return if pool.get_data0(type_node) == self_sym: 1 else: 0
+        return pool.get_data0(type_node) == self_sym
     if kind == NodeKind.NK_TYPE_ASSOC:
-        return if pool.get_data0(type_node) == self_sym: 1 else: 0
+        return pool.get_data0(type_node) == self_sym
     if kind == NodeKind.NK_TYPE_REF or kind == NodeKind.NK_TYPE_PTR or kind == NodeKind.NK_TYPE_ARRAY or kind == NodeKind.NK_TYPE_SLICE or kind == NodeKind.NK_TYPE_OPTIONAL:
         return codegen_type_node_mentions_self(pool, self_sym, pool.get_data0(type_node))
     if kind == NodeKind.NK_TYPE_TUPLE:
         let extra_start = pool.get_data0(type_node)
         let elem_count = pool.get_data1(type_node)
         for ei in 0..elem_count:
-            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ei)) != 0:
-                return 1
-        return 0
+            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ei)):
+                return true
+        return false
     if kind == NodeKind.NK_TYPE_FN or kind == NodeKind.NK_TYPE_EXTERN_FN:
         let extra_start = pool.get_data0(type_node)
         let param_count = pool.get_data1(type_node)
         let ret_node = pool.get_data2(type_node)
         for pi in 0..param_count:
-            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + pi)) != 0:
-                return 1
+            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + pi)):
+                return true
         return codegen_type_node_mentions_self(pool, self_sym, ret_node)
     if kind == NodeKind.NK_TYPE_GENERIC:
         if pool.get_data0(type_node) == self_sym:
-            return 1
+            return true
         let extra_start = pool.get_data1(type_node)
         let arg_count = pool.get_data2(type_node)
         for ai in 0..arg_count:
-            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ai)) != 0:
-                return 1
-    0
+            if codegen_type_node_mentions_self(pool, self_sym, pool.get_extra(extra_start + ai)):
+                return true
+    false
 
 impl Codegen:
     // report_errors=false makes the skippable cases (a method whose signature
@@ -289,7 +289,7 @@ impl Codegen:
         var pi: i32 = 1
         while pi < param_count:
             let p_type_node = self.pool.fn_param_type(param_start, pi)
-            if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node) != 0:
+            if codegen_type_node_mentions_self(self.pool, self.sym_Self, p_type_node):
                 if report_errors:
                     with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because a non-receiver parameter mentions Self")
                     self.had_error = 1
@@ -307,7 +307,7 @@ impl Codegen:
 
         var ret_sema_ty = self.sema.ty_void as i32
         if ret_node != 0:
-            if codegen_type_node_mentions_self(self.pool, self.sym_Self, ret_node) != 0:
+            if codegen_type_node_mentions_self(self.pool, self.sym_Self, ret_node):
                 if report_errors:
                     with_eprint("error: cannot lower dyn trait method '" ++ self.intern.resolve(method_sym) ++ "' because its return type mentions Self")
                     self.had_error = 1

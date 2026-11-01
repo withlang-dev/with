@@ -1807,7 +1807,7 @@ impl ComptimeEvaluator:
         if kind == TypeKind.TY_INT:
             return comptime_value_int(resolved as i32, 0)
         if kind == TypeKind.TY_BOOL:
-            return comptime_value_bool(0)
+            return comptime_value_bool(false)
         if kind == TypeKind.TY_STR:
             return comptime_value_str("")
         if kind == TypeKind.TY_ENUM and self.sema.enum_repr_type(resolved as i32) != 0:
@@ -1874,7 +1874,7 @@ impl ComptimeEvaluator:
                 let resolved = self.sema.resolve_alias(ret_type as TypeId)
                 if self.sema.get_type_kind(resolved) != TypeKind.TY_VOID:
                     let body = self.ast.get_data1(fn_node)
-                    if self.sema.body_has_explicit_value_result(body, 1) and self.sema.body_can_fall_through(body) != 0:
+                    if self.sema.body_has_explicit_value_result(body, 1) and self.sema.body_can_fall_through(body):
                         return self.fail(fn_node, "missing return")
                     let default_value = self.default_value_for_type(ret_type, fn_node)
                     if default_value.kind == ComptimeValueKind.CV_INVALID:
@@ -1951,16 +1951,16 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_str(""))
         self.extra_values.push(comptime_value_int(output_kind_type, 0))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 1))
-        self.extra_values.push(comptime_value_bool(1))
-        self.extra_values.push(comptime_value_bool(0))
-        self.extra_values.push(comptime_value_bool(0))
+        self.extra_values.push(comptime_value_bool(true))
+        self.extra_values.push(comptime_value_bool(false))
+        self.extra_values.push(comptime_value_bool(false))
         self.extra_values.push(comptime_value_int(prelude_mode_type, 0))
-        self.extra_values.push(comptime_value_bool(0))
+        self.extra_values.push(comptime_value_bool(false))
         self.extra_values.push(comptime_value_int(target_type, 0))
         self.extra_values.push(include_paths)
         self.extra_values.push(defines)
         self.extra_values.push(link_libs)
-        self.extra_values.push(comptime_value_bool(1))
+        self.extra_values.push(comptime_value_bool(true))
         comptime_value_struct(options_type, start, 14)
 
     mut fn default_migrate_options_value(node: i32) -> ComptimeValue:
@@ -1980,18 +1980,18 @@ impl ComptimeEvaluator:
         self.extra_values.push(forced_includes)
         self.extra_values.push(defines)
         self.extra_values.push(exclude_basenames)
-        self.extra_values.push(comptime_value_bool(0))
-        self.extra_values.push(comptime_value_bool(0))
-        self.extra_values.push(comptime_value_bool(0))
-        self.extra_values.push(comptime_value_bool(1))
-        self.extra_values.push(comptime_value_bool(0))
-        self.extra_values.push(comptime_value_bool(0))
+        self.extra_values.push(comptime_value_bool(false))
+        self.extra_values.push(comptime_value_bool(false))
+        self.extra_values.push(comptime_value_bool(false))
+        self.extra_values.push(comptime_value_bool(true))
+        self.extra_values.push(comptime_value_bool(false))
+        self.extra_values.push(comptime_value_bool(false))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 0))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, 8))
         self.extra_values.push(comptime_value_str(""))
         self.extra_values.push(comptime_value_str(""))
         self.extra_values.push(comptime_value_str(""))
-        self.extra_values.push(comptime_value_bool(0))
+        self.extra_values.push(comptime_value_bool(false))
         comptime_value_struct(options_type, start, 18)
 
     mut fn new_workspace_record(name: &str, node: i32) -> ComptimeWorkspaceRecord:
@@ -2677,7 +2677,7 @@ impl ComptimeEvaluator:
         if method == "is_empty":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.is_empty() takes no arguments")
-            return comptime_control_value(comptime_value_bool(if self.string_builder_len(&builder) == 0: 1 else: 0))
+            return comptime_control_value(comptime_value_bool(self.string_builder_len(&builder) == 0))
         if method == "to_str":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.to_str() takes no arguments")
@@ -3041,7 +3041,7 @@ impl ComptimeEvaluator:
             let payload_count = self.sema.type_reflection_variant_payload_count(type_id, vi)
             payload_values.push(comptime_value_str(self.pool.resolve(variant_sym)))
             payload_values.push(comptime_value_int(self.sema.ty_i64 as i32, self.sema.type_reflection_variant_discriminant(type_id, vi)))
-            payload_values.push(comptime_value_bool(if payload_count > 0: 1 else: 0))
+            payload_values.push(comptime_value_bool(payload_count > 0))
             payload_values.push(comptime_value_str(self.variant_payload_name(type_id, vi)))
         for pi in 0..payload_values.len():
             self.extra_values.push(comptime_value_clone(payload_values[pi]))
@@ -3094,8 +3094,8 @@ impl ComptimeEvaluator:
             let needle_byte = comptime_value_intlike(needle_signal.value) as i32
             for i in 0..recv_value.text.len():
                 if recv_value.text[i] as i32 == needle_byte:
-                    return comptime_control_value(comptime_value_bool(1))
-            return comptime_control_value(comptime_value_bool(0))
+                    return comptime_control_value(comptime_value_bool(true))
+            return comptime_control_value(comptime_value_bool(false))
         if method == "pop":
             if arg_count != 0:
                 return self.fail(node, "List[u8].pop() takes no arguments")
@@ -3182,9 +3182,9 @@ impl ComptimeEvaluator:
                 return needle_signal
             for i in 0..recv_value.extra_count:
                 let item = self.extra_value_at((recv_value.extra_start + i) as i64)
-                if comptime_values_equal(item, needle_signal.value, self.extra_values) != 0:
-                    return comptime_control_value(comptime_value_bool(1))
-            return comptime_control_value(comptime_value_bool(0))
+                if comptime_values_equal(item, needle_signal.value, self.extra_values):
+                    return comptime_control_value(comptime_value_bool(true))
+            return comptime_control_value(comptime_value_bool(false))
 
         if method == "get":
             if arg_count != 1:
@@ -3308,7 +3308,7 @@ impl ComptimeEvaluator:
                 let base = recv_value.extra_start + i * 2
                 let old_key = self.extra_value_at(base as i64)
                 self.extra_values.push(comptime_value_clone(old_key))
-                if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                if comptime_values_equal(old_key, key_signal.value, self.extra_values):
                     self.extra_values.push(comptime_value_clone(value_signal.value))
                     replaced = 1
                 else:
@@ -3334,9 +3334,9 @@ impl ComptimeEvaluator:
             for i in 0..recv_value.extra_count:
                 let base = recv_value.extra_start + i * 2
                 let old_key = self.extra_value_at(base as i64)
-                if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
-                    return comptime_control_value(comptime_value_bool(1))
-            return comptime_control_value(comptime_value_bool(0))
+                if comptime_values_equal(old_key, key_signal.value, self.extra_values):
+                    return comptime_control_value(comptime_value_bool(true))
+            return comptime_control_value(comptime_value_bool(false))
 
         if method == "get":
             if arg_count != 1:
@@ -3356,7 +3356,7 @@ impl ComptimeEvaluator:
             for i in 0..recv_value.extra_count:
                 let base = recv_value.extra_start + i * 2
                 let old_key = self.extra_value_at(base as i64)
-                if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                if comptime_values_equal(old_key, key_signal.value, self.extra_values):
                     let some_start = self.extra_values.len() as i32
                     self.extra_values.push(self.extra_value_at((base + 1) as i64))
                     return comptime_control_value(comptime_value_enum(get_opt_tid, self.sema.syms.some, some_start, 1))
@@ -3386,7 +3386,7 @@ impl ComptimeEvaluator:
                 let base = recv_value.extra_start + i * 2
                 let old_key = self.extra_value_at(base as i64)
                 let old_value = self.extra_value_at((base + 1) as i64)
-                if comptime_values_equal(old_key, key_signal.value, self.extra_values) != 0:
+                if comptime_values_equal(old_key, key_signal.value, self.extra_values):
                     found = 1
                     removed = old_value
                     continue
@@ -3443,7 +3443,7 @@ impl ComptimeEvaluator:
         // §10.5's non-closure combinators. The closure-taking ones (map,
         // and_then, filter) wait on comptime closure evaluation (#665.3).
         let method = self.pool.resolve(field)
-        let is_some = (recv_value.data0 as i32 == self.sema.syms.some) as i32
+        let is_some = recv_value.data0 as i32 == self.sema.syms.some
 
         if method == "is_some":
             if arg_count != 0:
@@ -3452,7 +3452,7 @@ impl ComptimeEvaluator:
         if method == "is_none":
             if arg_count != 0:
                 return self.fail(node, "Option.is_none() takes no arguments")
-            return comptime_control_value(comptime_value_bool(1 - is_some))
+            return comptime_control_value(comptime_value_bool(not is_some))
         if method == "unwrap":
             if arg_count != 0:
                 return self.fail(node, "Option.unwrap() takes no arguments")
@@ -3547,11 +3547,11 @@ impl ComptimeEvaluator:
                 return self.fail(node, "str." ++ method ++ "() argument must be a string")
             let needle = with_str_clone_ref(needle_signal.value.text)
             if method == "contains":
-                return comptime_control_value(comptime_value_bool(if comptime_str_find(text, needle) >= 0: 1 else: 0))
+                return comptime_control_value(comptime_value_bool(comptime_str_find(text, needle) >= 0))
             if method == "starts_with":
-                return comptime_control_value(comptime_value_bool(if text.starts_with(needle): 1 else: 0))
+                return comptime_control_value(comptime_value_bool(text.starts_with(needle)))
             if method == "ends_with":
-                return comptime_control_value(comptime_value_bool(if text.ends_with(needle): 1 else: 0))
+                return comptime_control_value(comptime_value_bool(text.ends_with(needle)))
         if method == "replace":
             if arg_count != 2:
                 return self.fail(node, "str.replace() expects exactly two arguments")
@@ -3791,7 +3791,7 @@ impl ComptimeEvaluator:
             let resolved_recv = self.sema.auto_deref_method_type(recv.type_id as TypeId, method, 0, 0)
             let owner = self.sema.method_owner_symbol_for_type(resolved_recv as i32)
             let call_ret = self.sema.builtin_intrinsic_method_return_type(resolved_recv as i32, owner, method)
-            if call_ret != 0 and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void and self.sema.pipeline_method_has_mut_receiver(node, recv.type_id, method) != 0:
+            if call_ret != 0 and self.sema.resolve_alias(call_ret as TypeId) == self.sema.ty_void and self.sema.pipeline_method_has_mut_receiver(node, recv.type_id, method):
                 threads_receiver = 1
         if threads_receiver != 0:
             self.pipeline_receiver_carrier_depth = self.pipeline_receiver_carrier_depth + 1
@@ -3905,7 +3905,7 @@ impl ComptimeEvaluator:
         if method == "is_copy":
             if arg_count != 0:
                 return self.fail(node, "type.is_copy() takes no arguments")
-            return comptime_control_value(comptime_value_bool(self.sema.is_copy(recv_type)))
+            return comptime_control_value(comptime_value_bool(self.sema.is_copy(recv_type) != 0))
         if method == "implements":
             if arg_count != 1:
                 return self.fail(node, "type.implements() expects exactly one trait argument")
@@ -3918,7 +3918,7 @@ impl ComptimeEvaluator:
             let trait_sym = self.ast.get_data0(trait_node)
             if not self.sema.lang_trait_syms.contains(trait_sym) and not self.sema.trait_name_known(trait_sym):
                 return self.fail(trait_node, "unknown trait '" ++ self.pool.resolve(trait_sym) ++ "'")
-            return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym) as i32))
+            return comptime_control_value(comptime_value_bool(self.sema.type_implements_trait(recv_type, trait_sym)))
         if method == "fields":
             if arg_count != 0:
                 return self.fail(node, "type.fields() takes no arguments")
@@ -4159,7 +4159,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
         self.extra_values.push(comptime_value_str(with_fs_read_file(stdout_path)))
         self.extra_values.push(comptime_value_str(with_fs_read_file(stderr_path)))
-        self.extra_values.push(comptime_value_bool(if rc == 124: 1 else: 0))
+        self.extra_values.push(comptime_value_bool(rc == 124))
         comptime_control_value(comptime_value_struct(result_type, start, 4))
 
     mut fn workspace_record_index(recv_value: &ComptimeValue, method: &str, node: i32) -> i32:
@@ -4373,7 +4373,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_str(module_name))
         self.extra_values.push(comptime_value_str(name))
         self.extra_values.push(comptime_value_str(module_name ++ "." ++ name))
-        self.extra_values.push(comptime_value_bool(if is_pub: 1 else: 0))
+        self.extra_values.push(comptime_value_bool(is_pub))
         self.extra_values.push(comptime_value_str(""))
         self.extra_values.push(comptime_value_str("fn"))
         self.extra_values.push(comptime_value_str(return_type))
@@ -4418,7 +4418,7 @@ impl ComptimeEvaluator:
         self.extra_values.push(comptime_value_str(module_name))
         self.extra_values.push(comptime_value_str(name))
         self.extra_values.push(comptime_value_str(module_name ++ "." ++ name))
-        self.extra_values.push(comptime_value_bool(if is_pub: 1 else: 0))
+        self.extra_values.push(comptime_value_bool(is_pub))
         self.extra_values.push(comptime_value_str(""))
         self.extra_values.push(comptime_value_str(type_text))
         self.extra_values.push(comptime_value_str(""))
@@ -5787,9 +5787,9 @@ impl ComptimeEvaluator:
             if not comptime_toolfs_method_is_mutating(method):
                 self.record_read_effect(record, resolved)
             if method == "exists":
-                return comptime_control_value(comptime_value_bool(if with_fs_file_exists(resolved) != 0: 1 else: 0))
+                return comptime_control_value(comptime_value_bool(with_fs_file_exists(resolved) != 0))
             if method == "is_dir":
-                return comptime_control_value(comptime_value_bool(if with_fs_is_dir(resolved) != 0: 1 else: 0))
+                return comptime_control_value(comptime_value_bool(with_fs_is_dir(resolved) != 0))
             // #953: read_text mirrors ToolFs.read_text's native contract — a
             // file that cannot be read is a build-tool defect reported with
             // the OS error, never ""; read_text_opt is the optional-file probe.
@@ -5857,7 +5857,7 @@ impl ComptimeEvaluator:
             self.record_read_effect(record, path)
             if method == "host_read_text":
                 return comptime_control_value(comptime_value_str(with_fs_read_file(path)))
-            return comptime_control_value(comptime_value_bool(if with_fs_file_exists(path) != 0: 1 else: 0))
+            return comptime_control_value(comptime_value_bool(with_fs_file_exists(path) != 0))
         if method == "host_list_files":
             if not self.capability_expect_arg_count(arg_count, 1, method, node):
                 return comptime_control_error()
@@ -6275,7 +6275,7 @@ impl ComptimeEvaluator:
         if method == "env":
             return comptime_control_value(self.str_list_value(record.env, node))
         if method == "network":
-            return comptime_control_value(comptime_value_bool(if record.network != 0: 1 else: 0))
+            return comptime_control_value(comptime_value_bool(record.network != 0))
         let child_kind: i32 =
             if method == "project_info":
                 CapabilityKind.CK_BUILD_PROJECT_INFO
@@ -7023,7 +7023,7 @@ impl ComptimeEvaluator:
             let truthy = comptime_value_truthy(inner.value)
             if truthy < 0:
                 return self.fail(node, "logical not requires bool or integer comptime values")
-            return comptime_control_value(comptime_value_bool(if truthy == 0: 1 else: 0))
+            return comptime_control_value(comptime_value_bool(truthy == 0))
         if op == UnaryOp.UOP_DEREF or op == UnaryOp.UOP_REF:
             // Comptime values are pure values (no reference kind), so `*x`
             // and `&x` in value position are identity — e.g. std.build's
@@ -7041,55 +7041,55 @@ impl ComptimeEvaluator:
             // has the sign bit set — `u64::MAX < 1` compared signed is `-1 < 1`,
             // i.e. true. Equality is unaffected: it compares bit patterns.
             let cmp_unsigned = self.comptime_int_is_unsigned(if lhs.type_id != 0: lhs.type_id else: rhs.type_id)
-            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
-            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
-            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(lv, rv) else: lv < rv): 1 else: 0))
-            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lt(rv, lv) else: lv > rv): 1 else: 0))
-            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(lv, rv) else: lv <= rv): 1 else: 0))
-            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if (if cmp_unsigned: exact_int_uword_lte(rv, lv) else: lv >= rv): 1 else: 0))
+            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(lv == rv))
+            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(lv != rv))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool((if cmp_unsigned: exact_int_uword_lt(lv, rv) else: lv < rv)))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool((if cmp_unsigned: exact_int_uword_lt(rv, lv) else: lv > rv)))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool((if cmp_unsigned: exact_int_uword_lte(lv, rv) else: lv <= rv)))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool((if cmp_unsigned: exact_int_uword_lte(rv, lv) else: lv >= rv)))
         if lhs.kind == ComptimeValueKind.CV_STR and rhs.kind == ComptimeValueKind.CV_STR:
             if op == BinaryOp.OP_EQ:
                 return comptime_control_value(comptime_value_bool(comptime_values_equal(lhs, rhs, self.extra_values)))
             if op == BinaryOp.OP_NEQ:
-                return comptime_control_value(comptime_value_bool(if comptime_values_equal(lhs, rhs, self.extra_values) != 0: 0 else: 1))
-            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lhs.text < rhs.text: 1 else: 0))
-            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lhs.text > rhs.text: 1 else: 0))
-            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lhs.text <= rhs.text: 1 else: 0))
-            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lhs.text >= rhs.text: 1 else: 0))
+                return comptime_control_value(comptime_value_bool(not comptime_values_equal(lhs, rhs, self.extra_values)))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(lhs.text < rhs.text))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(lhs.text > rhs.text))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(lhs.text <= rhs.text))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(lhs.text >= rhs.text))
         if lhs.kind == ComptimeValueKind.CV_BOOL and rhs.kind == ComptimeValueKind.CV_BOOL:
             let lv = lhs.data0
             let rv = rhs.data0
-            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lv == rv: 1 else: 0))
-            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lv != rv: 1 else: 0))
+            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(lv == rv))
+            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(lv != rv))
         if (lhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(lhs)) and (rhs.kind == ComptimeValueKind.CV_FLOAT or comptime_value_is_intlike(rhs)) and (lhs.kind == ComptimeValueKind.CV_FLOAT or rhs.kind == ComptimeValueKind.CV_FLOAT):
             let lf = comptime_float_of(lhs)
             let rf = comptime_float_of(rhs)
-            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(if lf == rf: 1 else: 0))
-            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(if lf != rf: 1 else: 0))
-            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(if lf < rf: 1 else: 0))
-            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(if lf > rf: 1 else: 0))
-            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(if lf <= rf: 1 else: 0))
-            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(if lf >= rf: 1 else: 0))
+            if op == BinaryOp.OP_EQ: return comptime_control_value(comptime_value_bool(lf == rf))
+            if op == BinaryOp.OP_NEQ: return comptime_control_value(comptime_value_bool(lf != rf))
+            if op == BinaryOp.OP_LT: return comptime_control_value(comptime_value_bool(lf < rf))
+            if op == BinaryOp.OP_GT: return comptime_control_value(comptime_value_bool(lf > rf))
+            if op == BinaryOp.OP_LTE: return comptime_control_value(comptime_value_bool(lf <= rf))
+            if op == BinaryOp.OP_GTE: return comptime_control_value(comptime_value_bool(lf >= rf))
         self.fail(node, "comparison requires comptime scalar values")
 
     mut fn eval_binary_membership(node: i32, lhs: &ComptimeValue, rhs: &ComptimeValue, negate: i32) -> ComptimeControl:
-        var matched: i32 = 0
+        var matched = false
         if rhs.kind == ComptimeValueKind.CV_ARRAY or rhs.kind == ComptimeValueKind.CV_TUPLE or rhs.kind == ComptimeValueKind.CV_LIST:
             for i in 0..rhs.extra_count:
                 let item = self.extra_value_at((rhs.extra_start + i) as i64)
-                if comptime_values_equal(lhs, item, self.extra_values) != 0:
-                    matched = 1
+                if comptime_values_equal(lhs, item, self.extra_values):
+                    matched = true
                     break
         else if rhs.kind == ComptimeValueKind.CV_RANGE and comptime_value_is_intlike(lhs):
             let value = comptime_value_intlike(lhs)
             if rhs.extra_start != 0:
-                matched = if value >= rhs.data0 and value <= rhs.data1: 1 else: 0
+                matched = value >= rhs.data0 and value <= rhs.data1
             else:
-                matched = if value >= rhs.data0 and value < rhs.data1: 1 else: 0
+                matched = value >= rhs.data0 and value < rhs.data1
         else:
             return self.fail(node, "'in' requires an array, tuple, or range in comptime")
         if negate != 0:
-            matched = if matched != 0: 0 else: 1
+            matched = not matched
         comptime_control_value(comptime_value_bool(matched))
 
     fn is_comptime_concat_node(node: i32) -> bool:
@@ -7133,16 +7133,16 @@ impl ComptimeEvaluator:
             if lhs_truthy < 0:
                 return self.fail(node, "logical operators require bool or integer comptime values")
             if op == BinaryOp.OP_AND and lhs_truthy == 0:
-                return comptime_control_value(comptime_value_bool(0))
+                return comptime_control_value(comptime_value_bool(false))
             if op == BinaryOp.OP_OR and lhs_truthy != 0:
-                return comptime_control_value(comptime_value_bool(1))
+                return comptime_control_value(comptime_value_bool(true))
             let rhs_signal = self.eval_expr(self.ast.get_data2(node))
             if rhs_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return rhs_signal
             let rhs_truthy = comptime_value_truthy(rhs_signal.value)
             if rhs_truthy < 0:
                 return self.fail(node, "logical operators require bool or integer comptime values")
-            return comptime_control_value(comptime_value_bool(rhs_truthy))
+            return comptime_control_value(comptime_value_bool(rhs_truthy != 0))
 
         if op == BinaryOp.OP_DEFAULT:
             // `opt ?? fallback` (#2386): the payload of a Some, else the
@@ -7265,7 +7265,7 @@ impl ComptimeEvaluator:
         if value_signal.kind != ComptimeControlKind.CTL_VALUE:
             return value_signal
         let slot_start = self.slot_syms.len()
-        if self.match_pattern(self.ast.get_data0(head), move value_signal.value, node) != 0:
+        if self.match_pattern(self.ast.get_data0(head), move value_signal.value, node):
             if self.ast.get_data1(head) % 2 != 0:
                 for i in slot_start..self.slot_muts.len():
                     self.slot_muts[i] = 1
@@ -7368,45 +7368,45 @@ impl ComptimeEvaluator:
             return self.eval_expr(else_node)
         comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
 
-    mut fn match_pattern(pat: i32, value: ComptimeValue, node: i32) -> i32:
+    mut fn match_pattern(pat: i32, value: ComptimeValue, node: i32) -> bool:
         if pat == 0:
-            return 1
+            return true
         let kind = self.ast.kind(pat)
         if kind == NodeKind.NK_PAT_WILDCARD:
-            return 1
+            return true
         if kind == NodeKind.NK_PAT_IDENT:
             self.bind_value(self.ast.get_data0(pat), value, 0)
-            return 1
+            return true
         if kind == NodeKind.NK_PAT_TYPED_BIND:
             self.bind_value(self.ast.get_data0(pat), value, 0)
-            return 1
+            return true
         if kind == NodeKind.NK_PAT_INT:
             if comptime_value_is_intlike(value) == false:
-                return 0
+                return false
             if comptime_value_intlike(value) == self.ast.int_lit_value(pat):
-                return 1
-            return 0
+                return true
+            return false
         if kind == NodeKind.NK_PAT_BOOL:
             if value.kind != ComptimeValueKind.CV_BOOL:
-                return 0
+                return false
             if value.data0 == self.ast.get_data0(pat) as i64:
-                return 1
-            return 0
+                return true
+            return false
         if kind == NodeKind.NK_PAT_STRING:
             if value.kind != ComptimeValueKind.CV_STR:
-                return 0
+                return false
             if value.text == self.pool.resolve(self.ast.get_data0(pat)):
-                return 1
-            return 0
+                return true
+            return false
         if kind == NodeKind.NK_PAT_RANGE:
             if comptime_value_is_intlike(value) == false:
-                return 0
+                return false
             let v = comptime_value_intlike(value)
             let start_value = self.ast.get_data0(pat) as i64
             let end_value = self.ast.get_data1(pat) as i64
             if self.ast.get_data2(pat) != 0:
-                return if v >= start_value and v <= end_value: 1 else: 0
-            return if v >= start_value and v < end_value: 1 else: 0
+                return v >= start_value and v <= end_value
+            return if v >= start_value and v < end_value: true else: false
         if kind == NodeKind.NK_PAT_AT_BINDING:
             self.bind_value(self.ast.get_data0(pat), comptime_value_share(value), 0)
             return self.match_pattern(self.ast.get_data1(pat), value, node)
@@ -7419,25 +7419,25 @@ impl ComptimeEvaluator:
                     self.slot_syms.pop()
                     self.slot_values.pop()
                     self.slot_muts.pop()
-                if self.match_pattern(self.ast.get_extra(extra_start + i), comptime_value_share(value), node) != 0:
-                    return 1
+                if self.match_pattern(self.ast.get_extra(extra_start + i), comptime_value_share(value), node):
+                    return true
             while self.slot_syms.len() > start:
                 self.slot_syms.pop()
                 self.slot_values.pop()
                 self.slot_muts.pop()
-            return 0
+            return false
         if kind == NodeKind.NK_PAT_TUPLE:
             if value.kind != ComptimeValueKind.CV_TUPLE:
-                return 0
+                return false
             let count = self.ast.get_data1(pat)
             let extra_start = self.ast.get_data0(pat)
             // §9.7 tuple rest (#1366): `..` covers the middle elements and
             // `..name` binds them as a tuple, as check_pattern types it.
             let rest = self.ast.tuple_pattern_rest_index(pat)
             if rest < 0 and value.extra_count != count:
-                return 0
+                return false
             if rest >= 0 and value.extra_count < count - 1:
-                return 0
+                return false
             for i in 0..count:
                 let elem_pat = self.ast.get_extra(extra_start + i)
                 if i == rest:
@@ -7451,44 +7451,44 @@ impl ComptimeEvaluator:
                     continue
                 let si = self.ast.tuple_pattern_subject_index(pat, i, value.extra_count)
                 let elem_value = self.extra_value_at((value.extra_start + si) as i64)
-                if self.match_pattern(elem_pat, elem_value, node) == 0:
-                    return 0
-            return 1
+                if self.match_pattern(elem_pat, elem_value, node) == false:
+                    return false
+            return true
         if kind == NodeKind.NK_PAT_VARIANT or kind == NodeKind.NK_PAT_ENUM_SHORTHAND:
             var variant_sym = self.ast.get_data0(pat)
             if self.sema.comp_resolved.contains(pat):
                 variant_sym = self.sema.comp_resolved.get(pat).unwrap()
             if value.kind == ComptimeValueKind.CV_ENUM:
                 if value.data0 as i32 != variant_sym:
-                    return 0
+                    return false
                 let bind_count = self.ast.get_data2(pat)
                 if bind_count != value.extra_count:
-                    return 0
+                    return false
                 let extra_start = self.ast.get_data1(pat)
                 for i in 0..bind_count:
                     let inner_pat = self.ast.get_extra(extra_start + i)
                     let inner_value = self.extra_value_at((value.extra_start + i) as i64)
-                    if self.match_pattern(inner_pat, inner_value, node) == 0:
-                        return 0
-                return 1
+                    if self.match_pattern(inner_pat, inner_value, node) == false:
+                        return false
+                return true
             if comptime_value_is_intlike(value):
                 let variant_value = self.eval_disc_variant_sym(variant_sym, pat)
                 if variant_value.kind == ComptimeControlKind.CTL_VALUE and comptime_value_is_intlike(variant_value.value):
-                    return if comptime_value_intlike(value) == comptime_value_intlike(variant_value.value): 1 else: 0
-            return 0
+                    return comptime_value_intlike(value) == comptime_value_intlike(variant_value.value)
+            return false
         if kind == NodeKind.NK_FIELD_ACCESS:
             // Qualified enum constant as a pattern (`Direction.North =>`):
             // evaluate the pattern expression and compare values.
             let qp = self.eval_expr(pat)
             if qp.kind == ComptimeControlKind.CTL_VALUE:
                 if comptime_value_is_intlike(value) and comptime_value_is_intlike(qp.value):
-                    return if comptime_value_intlike(value) == comptime_value_intlike(qp.value): 1 else: 0
+                    return comptime_value_intlike(value) == comptime_value_intlike(qp.value)
                 if value.kind == ComptimeValueKind.CV_ENUM and qp.value.kind == ComptimeValueKind.CV_ENUM:
-                    return if value.data0 == qp.value.data0 and value.extra_count == 0 and qp.value.extra_count == 0: 1 else: 0
-            return 0
+                    return value.data0 == qp.value.data0 and value.extra_count == 0 and qp.value.extra_count == 0
+            return false
         if self.require_success != 0:
             let _ = self.fail(pat, "pattern is not comptime-evaluable yet")
-        0
+        false
 
     mut fn eval_match(node: i32) -> ComptimeControl:
         let subject_signal = self.eval_expr(self.ast.get_data0(node))
@@ -7503,9 +7503,9 @@ impl ComptimeEvaluator:
             // Share per arm: passing the field by value MOVED the subject
             // into arm 1's match; arms 2+ compared a move-blanked struct
             // (kind=0) and nothing ever matched past the first arm.
-            if self.match_pattern(pat, comptime_value_share(subject_signal.value), arm) != 0:
+            if self.match_pattern(pat, comptime_value_share(subject_signal.value), arm):
                 let guard = self.ast.get_data2(arm)
-                var guard_ok = 1
+                var guard_ok = true
                 if guard != 0:
                     let guard_signal = self.eval_expr(guard)
                     if guard_signal.kind != ComptimeControlKind.CTL_VALUE:
@@ -7515,8 +7515,8 @@ impl ComptimeEvaluator:
                     if truthy < 0:
                         self.pop_scope()
                         return self.fail(guard, "match guard must be bool or integer in comptime")
-                    guard_ok = truthy
-                if guard_ok != 0:
+                    guard_ok = truthy != 0
+                if guard_ok:
                     let body_signal = self.eval_expr(self.ast.get_data1(arm))
                     self.pop_scope()
                     return body_signal
@@ -7647,7 +7647,7 @@ impl ComptimeEvaluator:
             else:
                 let elem = if is_map: comptime_value_tuple(0, iterable_signal.value.extra_start + i * 2, 2) else: self.extra_value_at((iterable_signal.value.extra_start + i) as i64)
                 if binds_pattern:
-                    if self.match_pattern(binding, elem, node) == 0:
+                    if self.match_pattern(binding, elem, node) == false:
                         self.pop_scope()
                         self.loop_labels.pop()
                         return self.fail(node, "comptime for pattern does not match the element")
@@ -8181,7 +8181,7 @@ impl ComptimeEvaluator:
                     with_str_starts_with_ref(with_str_clone_ref(text.text), with_str_clone_ref(needle.text))
                 else:
                     with_str_ends_with_ref(with_str_clone_ref(text.text), with_str_clone_ref(needle.text))
-            return comptime_control_value(comptime_value_bool(result))
+            return comptime_control_value(comptime_value_bool(result != 0))
         // #2460: host facts and jobserver plumbing a tool action reaches
         // through std's free functions. The evaluator in tool mode *is* the
         // build process, so its own pid is the slot owner a native runner
@@ -8440,7 +8440,7 @@ impl ComptimeEvaluator:
                     let param_idx = self.lookup_slot_index(param_name)
                     if param_idx >= 0:
                         let param_value: ComptimeValue = comptime_value_clone(self.slot_values[param_idx])
-                        if self.match_pattern(ppat, param_value, ppat) == 0:
+                        if self.match_pattern(ppat, param_value, ppat) == false:
                             self.pop_scope()
                             self.active_fn_syms.pop()
                             self.sema.local_file_id = saved_file
@@ -8675,7 +8675,7 @@ impl ComptimeEvaluator:
             let text = self.ast.get_string(self.ast.get_data0(node))
             return comptime_control_value(comptime_value_float(self.node_type_or(node, self.sema.ty_f64 as i32), comptime_parse_float(text), text))
         if kind == NodeKind.NK_BOOL_LIT:
-            return comptime_control_value(comptime_value_bool(self.ast.get_data0(node)))
+            return comptime_control_value(comptime_value_bool(self.ast.get_data0(node) != 0))
         if kind == NodeKind.NK_STRING_LIT:
             return comptime_control_value(comptime_value_str(comptime_decode_string_escapes(self.pool.resolve(self.ast.get_data0(node)))))
         if kind == NodeKind.NK_FSTRING:
