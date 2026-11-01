@@ -445,7 +445,7 @@ impl Codegen:
     mut fn callable_fn_abi(sema_ty: i32, closure: bool) -> i32:
         let resolved = self.sema.callable_type_resolved(sema_ty)
         if resolved == 0: return -1
-        let key: i64 = resolved * 2 + (if closure: 1 else: 0)
+        let key: i64 = resolved * 2 + ((closure) as i32)
         let cached = self.fn_abi_callables.get(key)
         if cached.is_some(): return cached.unwrap()
         let kind = self.sema.get_type_kind(resolved)
@@ -3794,7 +3794,7 @@ impl Codegen:
         if rhs_sema == 0 and lhs_sema != 0:
             rhs_unsigned = lhs_unsigned
         if (op == BinaryOp.OP_EQ or op == BinaryOp.OP_NEQ) and with_getenv_str("WITH_TRACE_CMP").len() > 0:
-            with_eprint(f"[cmp] op={op} lhs_sema={lhs_sema} rhs_sema={rhs_sema} lu={if lhs_unsigned: 1 else: 0} ru={if rhs_unsigned: 1 else: 0} lw={wl_get_int_type_width(lty)} rw={wl_get_int_type_width(rty)}")
+            with_eprint(f"[cmp] op={op} lhs_sema={lhs_sema} rhs_sema={rhs_sema} lu={(lhs_unsigned) as i32} ru={if rhs_unsigned: 1 else: 0} lw={wl_get_int_type_width(lty)} rw={wl_get_int_type_width(rty)}")
         let l = self.coerce_int_ext(lhs, wider_ty, lhs_unsigned)
         let r = self.coerce_int_ext(rhs, wider_ty, rhs_unsigned)
         let arith_unsigned = lhs_unsigned or rhs_unsigned
@@ -4127,7 +4127,7 @@ impl Codegen:
                 let a: List[i64] = List.new()
                 a.push(self.int128_word(val, false))
                 a.push(self.int128_word(val, true))
-                a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
+                a.push(wl_const_int(i32_ty, (is_unsigned) as i32, 0))
                 return self.call_internal_runtime_fn("with_fmt_int128", pts, a, 3, str_ty)
             else:
                 fn_name = if is_unsigned: "with_fmt_u64" else: "with_fmt_i64"
@@ -4204,7 +4204,7 @@ impl Codegen:
         let func = wl_add_function(self.llmod, name, fn_type)
         if has_sret:
             wl_add_sret_attr(self.context, func, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(func, byval_types, param_count, if has_sret: 1 else: 0)
+        self.apply_c_abi_byval_attrs(func, byval_types, param_count, (has_sret) as i32)
         self.bind_fn_abi(sym, abi_index, func)
         self.fn_values.insert(sym, func)
         self.fn_fn_types.insert(sym, fn_type)
@@ -4448,7 +4448,7 @@ impl Codegen:
             let a: List[i64] = List.new()
             a.push(self.int128_word(val, false))
             a.push(self.int128_word(val, true))
-            a.push(wl_const_int(i32_ty, if is_unsigned: 1 else: 0, 0))
+            a.push(wl_const_int(i32_ty, (is_unsigned) as i32, 0))
             a.push(wl_const_int(i64_ty, flags as i64, 0))
             a.push(wl_const_int(i32_ty, width as i64, 0))
             a.push(wl_const_int(i32_ty, precision as i64, 0))
@@ -4458,7 +4458,7 @@ impl Codegen:
         if vk == wl_integer_type_kind():
             // Integer spec: with_fmt_int_spec(val, is_unsigned, flags, width, precision, mode)
             var coerced_val = self.coerce_int_ext(val, i64_ty, is_unsigned)
-            let unsigned_flag: i64 = if is_unsigned: 1 else: 0
+            let unsigned_flag: i64 = (is_unsigned) as i32
             let fn_name = "with_fmt_int_spec"
             let sym = self.intern.intern(fn_name)
             let fv = self.fn_values.get(sym)
@@ -4715,7 +4715,7 @@ impl Codegen:
         let ptr_ty = wl_ptr_type(self.context)
         let i32_ty = wl_i32_type(self.context)
         let i64_ty = wl_i64_type(self.context)
-        let unsigned_flag: i64 = if is_unsigned: 1 else: 0
+        let unsigned_flag: i64 = (is_unsigned) as i32
 
         if vk == wl_integer_type_kind() and wl_get_int_type_width(val_ty) > 64:
             let pts: List[i64] = List.new()
@@ -9348,9 +9348,9 @@ impl Codegen:
             wl_build_store(self.builder, start_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 1))
             wl_build_store(self.builder, stop_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 2))
             wl_build_store(self.builder, step_val, wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 3))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if d0 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 4))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if d1 != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 5))
-            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), if step_node != 0: 1 else: 0, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 6))
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (d0 != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 4))
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (d1 != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 5))
+            wl_build_store(self.builder, wl_const_int(wl_i1_type(ctx), (step_node != 0) as i32, 0), wl_build_struct_gep(self.builder, spec_ty, elem_ptr, 6))
 
         let data_indices: List[i64] = List.new()
         data_indices.push(zero_i32)
@@ -10812,7 +10812,7 @@ impl Codegen:
                     let map_val_alloca = self.create_entry_alloca(wl_type_of(val))
                     wl_build_store(self.builder, val, map_val_alloca)
                     map_val_alloca
-            let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+            let is_str_val = wl_const_int(i64_ty, (self.is_str_type(wl_type_of(key))) as i32, 0)
             let params: List[i64] = List.new()
             params.push(ptr_ty)
             params.push(ptr_ty)
@@ -10840,7 +10840,7 @@ impl Codegen:
             let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
-            let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+            let is_str_val = wl_const_int(i64_ty, (self.is_str_type(wl_type_of(key))) as i32, 0)
             let fn_val = self.ensure_hm_fn("with_hashmap_get_ptr", ptr_ty)
             let get_params: List[i64] = List.new()
             get_params.push(ptr_ty)
@@ -10867,7 +10867,7 @@ impl Codegen:
             let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
-            let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+            let is_str_val = wl_const_int(i64_ty, (self.is_str_type(wl_type_of(key))) as i32, 0)
             let fn_val = self.ensure_hm_fn("with_hashmap_contains", wl_i32_type(self.context))
             let params: List[i64] = List.new()
             params.push(ptr_ty)
@@ -10978,7 +10978,7 @@ impl Codegen:
             let key = self.mir_intrinsic_value_as(body, args_id, 1, key_raw, key_ty)
             let key_alloca = self.create_entry_alloca(wl_type_of(key))
             wl_build_store(self.builder, key, key_alloca)
-            let is_str_val = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(key)): 1 else: 0, 0)
+            let is_str_val = wl_const_int(i64_ty, (self.is_str_type(wl_type_of(key))) as i32, 0)
             let recv_base_sym = self.mir_map_recv_base_sym(body, recv_op)
             // #1189: a stored key that owns memory is transported out by the
             // runtime and dropped here with its real type; the value goes to
@@ -11426,7 +11426,7 @@ impl Codegen:
             let oi_map_ptr = wl_build_load(self.builder, ptr_ty, oi_mp)
             let oi_kp = wl_build_struct_gep(self.builder, oi_entry_ty, oi_ptr, 1)
             let oi_key = wl_build_load(self.builder, oi_key_ty, oi_kp)
-            let oi_is_str = wl_const_int(i64_ty, if self.is_str_type(oi_key_ty): 1 else: 0, 0)
+            let oi_is_str = wl_const_int(i64_ty, (self.is_str_type(oi_key_ty)) as i32, 0)
             let oi_key_alloca = self.create_entry_alloca(oi_key_ty)
             wl_build_store(self.builder, oi_key, oi_key_alloca)
             let oi_val_alloca = self.create_entry_alloca(oi_val_ty)
@@ -11522,7 +11522,7 @@ impl Codegen:
             let eg_map_ptr = wl_build_load(self.builder, ptr_ty, eg_mp)
             let eg_kp = wl_build_struct_gep(self.builder, eg_entry_ty, eg_ptr, 1)
             let eg_key = wl_build_load(self.builder, eg_key_ty, eg_kp)
-            let eg_is_str = wl_const_int(i64_ty, if self.is_str_type(eg_key_ty): 1 else: 0, 0)
+            let eg_is_str = wl_const_int(i64_ty, (self.is_str_type(eg_key_ty)) as i32, 0)
             let eg_key_alloca = self.create_entry_alloca(eg_key_ty)
             wl_build_store(self.builder, eg_key, eg_key_alloca)
             let eg_out_alloca = self.create_entry_alloca(eg_val_ty)
@@ -11569,7 +11569,7 @@ impl Codegen:
             let es_map_ptr = wl_build_load(self.builder, ptr_ty, es_mp)
             let es_kp = wl_build_struct_gep(self.builder, es_entry_ty, es_ptr, 1)
             let es_key = wl_build_load(self.builder, es_key_ty, es_kp)
-            let es_is_str = wl_const_int(i64_ty, if self.is_str_type(es_key_ty): 1 else: 0, 0)
+            let es_is_str = wl_const_int(i64_ty, (self.is_str_type(es_key_ty)) as i32, 0)
             let es_key_alloca = self.create_entry_alloca(es_key_ty)
             wl_build_store(self.builder, es_key, es_key_alloca)
             self.mir_emit_copy_glue_ptr(es_key_alloca, es_key_ty, es_key_tid)
@@ -12391,7 +12391,7 @@ impl Codegen:
                             asm_out_tys.push(asm_ot)
                         asm_ret_ty = wl_struct_type(self.context, list_data_i64(&asm_out_tys), asm_out_count, 0)
                 let asm_fn_ty = wl_function_type(asm_ret_ty, list_data_i64(&asm_param_tys), asm_param_tys.len() as i32, 0)
-                let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, if asm_is_volatile: 1 else: 0, 0)
+                let asm_val = wl_get_inline_asm(asm_fn_ty, asm_tmpl, asm_constr, (asm_is_volatile) as i32, 0)
                 let asm_call_result = wl_build_call(self.builder, asm_fn_ty, asm_val, list_data_i64(&asm_input_vals), asm_input_vals.len())
                 if asm_has_output:
                     result = asm_call_result
@@ -12572,7 +12572,7 @@ impl Codegen:
             let ids_ptr = wl_build_gep(self.builder, arr_ty, ids_alloca, list_data_i64(&zero_idx), 2)
             sa.push(ids_ptr)
             sa.push(wl_const_int(i32_ty, arg_count as i64, 0))
-            sa.push(wl_const_int(i32_ty, if intrinsic == MirIntrinsic.FIBER_SELECT_BIASED: 1 else: 0, 0))
+            sa.push(wl_const_int(i32_ty, (intrinsic == MirIntrinsic.FIBER_SELECT_BIASED) as i32, 0))
             sa.push(winner_alloca)
             wl_build_call(self.builder, sel_ft2, select_fn, list_data_i64(&sa), 4)
 
@@ -12826,7 +12826,7 @@ impl Codegen:
                 insert_args.push(handle)
                 insert_args.push(key_alloca)
                 insert_args.push(val_alloca)
-                insert_args.push(wl_const_int(i64_ty, if self.is_str_type(key_ty): 1 else: 0, 0))
+                insert_args.push(wl_const_int(i64_ty, (self.is_str_type(key_ty)) as i32, 0))
                 let value_sema = if intrinsic == MirIntrinsic.MAP_LITERAL: second_tid else: 0
                 self.mir_emit_owned_map_insert(insert_fn, insert_ty, insert_args, first_tid, value_sema, key_ty, val_ty)
             result = map_value
@@ -12919,7 +12919,7 @@ impl Codegen:
             let k7 = self.mir_intrinsic_arg_as(body, args_id, 1, kt7)
             let ka7 = self.create_entry_alloca(wl_type_of(k7))
             wl_build_store(self.builder, k7, ka7)
-            let is7 = wl_const_int(i64_ty, if self.is_str_type(wl_type_of(k7)): 1 else: 0, 0)
+            let is7 = wl_const_int(i64_ty, (self.is_str_type(wl_type_of(k7))) as i32, 0)
             let f7 = self.ensure_hm_fn(if intrinsic == MirIntrinsic.MAP_INCREMENT: "with_hashmap_increment" else: "with_hashmap_decrement", wl_void_type(self.context))
             let p7: List[i64] = List.new()
             p7.push(wl_ptr_type(self.context))
@@ -12949,7 +12949,7 @@ impl Codegen:
                 upd_val_ty = wl_type_of(upd_default_raw)
             let upd_default = self.mir_intrinsic_value_as(body, args_id, 2, upd_default_raw, upd_val_ty)
             let upd_val_alloca = self.create_entry_alloca(upd_val_ty)
-            let upd_is_str = wl_const_int(i64_ty, if self.is_str_type(upd_key_ty): 1 else: 0, 0)
+            let upd_is_str = wl_const_int(i64_ty, (self.is_str_type(upd_key_ty)) as i32, 0)
             let upd_get_fn = self.ensure_hm_fn("with_hashmap_get", wl_i32_type(self.context))
             let upd_hm_params: List[i64] = List.new()
             upd_hm_params.push(wl_ptr_type(self.context))
@@ -15529,7 +15529,7 @@ impl Codegen:
             var expected_ty: i64 = 0
             let param_offset = if is_indirect: ai + 1 else: ai
             // Account for sret param shift when looking up expected types
-            let abi_param_offset = param_offset + (if abi_has_sret != 0: 1 else: 0)
+            let abi_param_offset = param_offset + ((abi_has_sret != 0) as i32)
             if abi_param_offset < param_count:
                 expected_ty = param_types[abi_param_offset]
             var expected_sema_ty: i32 = 0
@@ -15654,7 +15654,7 @@ impl Codegen:
             return spawn_result
 
         let call_val = wl_build_call(self.builder, call_ft, actual_callee, list_data_i64(&args), actual_arg_count)
-        self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_types, arg_count, if is_indirect: 1 else: 0)
+        self.apply_c_abi_call_attrs(call_val, abi_has_sret, abi_sret_ty, abi_byval_types, arg_count, (is_indirect) as i32)
         // Guaranteed mutual @[tailrec] edges are emitted as musttail.
         if self.mir_emit_mutual_tail_call != 0 and call_val != 0 and call_temp_cleanups.len() == 0:
             wl_set_musttail_call(call_val)
@@ -15710,7 +15710,7 @@ impl Codegen:
                 dst_ty = ret_ty
             self.mir_local_types.insert(dst_local, self.mir_storage_type_for_value(dst_ty))
             if self.debug_mir_codegen_enabled():
-                with_eprint(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={if self.is_str_type(dst_ty): 1 else: 0}")
+                with_eprint(f"[mir-call-ret] dst_local={dst_local} ret_ty_kind={wl_get_type_kind(ret_ty)} dst_ty_kind={wl_get_type_kind(dst_ty)} is_str={(self.is_str_type(dst_ty)) as i32}")
             let dst_ptr = self.mir_place_ptr(body, dest_place, true, dst_ty)
             if dst_ptr == 0:
                 return false
@@ -16100,7 +16100,7 @@ impl Codegen:
                     self.pool.fn_param_type(param_start, pi)
                 else:
                     0
-            let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
+            let actual_pi = pi + ((fn_has_sret != 0) as i32)
             let param_val = wl_get_param(function, actual_pi)
             var param_type = wl_type_of(param_val)
             if self.bind_fn_abi_owned_place(body, name_sym, pi, p_name, param_val): continue
@@ -16547,7 +16547,7 @@ impl Codegen:
                     self.pool.fn_param_type(param_start, pi)
                 else:
                     0
-            let actual_pi = pi + (if fn_has_sret != 0: 1 else: 0)
+            let actual_pi = pi + ((fn_has_sret != 0) as i32)
             let param_val = wl_get_param(function, actual_pi)
             var param_type = wl_type_of(param_val)
             if self.bind_fn_abi_owned_place(body, mono_sym, pi, p_name, param_val): continue
@@ -17561,7 +17561,7 @@ impl Codegen:
         let closure_abi_index = self.compute_fn_abi(ret_ty, param_types, closure_places, if is_extern_closure: FN_ABI_C else: FN_ABI_CLOSURE, 0)
         let closure_abi: FnAbi = self.fn_abis[closure_abi_index]
         let closure_has_sret = closure_abi.ret.pass == PM_INDIRECT
-        let closure_param_offset: i32 = (if is_extern_closure: 0 else: 1) + (if closure_has_sret: 1 else: 0)
+        let closure_param_offset: i32 = ((not (is_extern_closure)) as i32) + ((closure_has_sret) as i32)
         let fn_ty = closure_abi.llvm_ty
         let closure_fn = wl_add_function(self.llmod, "__closure", fn_ty)
         // A closure is reached only through the value its enclosing function

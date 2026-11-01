@@ -49,7 +49,7 @@ impl Zcu:
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
         cg.add_bundle_prefixes(&self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
-        cg.module_object_mode = if module_object_mode: 1 else: 0
+        cg.module_object_mode = (module_object_mode) as i32
         if not debug_info:
             cg.debug_info = 0
         cg.release = release

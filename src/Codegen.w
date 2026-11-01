@@ -729,7 +729,7 @@ impl Codegen:
         self.analysis_report.render_facts(self.analysis_query) ++ self.analysis_report.render_verdict("codegen-contract-audit")
 
     fn analysis_status() -> i32:
-        if self.analysis_report.ok(): 0 else: 1
+        (not (self.analysis_report.ok())) as i32
 
     fn analysis_has_call_argument(body_sym: i32, args_id: i32, param_index: i32) -> bool:
         for i in 0..self.analysis_report.facts.len():
@@ -768,7 +768,7 @@ impl Codegen:
                         continue
                     let arg = self.fn_abi_arg(descriptor, pi)
                     let source_ty = self.abi_param_source_type(si, pi)
-                    let incoming = wl_get_param(function, pi + (if abi.ret.pass == PM_INDIRECT: 1 else: 0))
+                    let incoming = wl_get_param(function, pi + ((abi.ret.pass == PM_INDIRECT) as i32))
                     if arg.source_ty != source_ty or incoming == 0 or wl_type_of(incoming) != arg.llvm_ty:
                         self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: finalized source type or LLVM parameter disagrees with FnAbi")
                     let expected_byval = if arg.pass == PM_INDIRECT and not arg.owned_place and self.fn_abi_byval(descriptor): arg.source_ty else: 0
@@ -784,7 +784,7 @@ impl Codegen:
                     let sret_raw = self.fn_abi_has_sret(sema_sym)
                     let sret_cg = self.fn_abi_has_sret(cg_sym)
                     let sret = if sret_raw.is_some(): sret_raw.unwrap() else if sret_cg.is_some(): sret_cg.unwrap() else: 0
-                    let incoming = wl_get_param(function, pi + (if sret != 0: 1 else: 0))
+                    let incoming = wl_get_param(function, pi + ((sret != 0) as i32))
                     llvm_pointer = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
                 var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Invariant)
                 fact.id = si
@@ -3481,7 +3481,7 @@ impl Codegen:
         fields.push(ptr_ty)
         fields.push(ptr_ty)
         let tag_ty = wl_struct_type(self.context, list_data_i64(&fields), 4, 0)
-        let offset_field = wl_build_struct_gep(self.builder, tag_ty, list_ptr, if is_fp: 1 else: 0)
+        let offset_field = wl_build_struct_gep(self.builder, tag_ty, list_ptr, (is_fp) as i32)
         let offset = wl_build_load(self.builder, i32_ty, offset_field)
         let fits = wl_build_icmp(self.builder, wl_int_ule(), offset, wl_const_int(i32_ty, if is_fp: 160 else: 40, 0))
         let function = wl_get_insert_function(self.builder)
@@ -5355,7 +5355,7 @@ impl Codegen:
         let idx = self.disc_enum_repr_types.len() as i32
         self.disc_enum_name_syms.push(name_sym)
         self.disc_enum_repr_types.push(repr_ty)
-        self.disc_enum_repr_unsigned.push(if self.sema.is_unsigned_int_type(repr_sema_ty): 1 else: 0)
+        self.disc_enum_repr_unsigned.push((self.sema.is_unsigned_int_type(repr_sema_ty)) as i32)
         let v_start = self.disc_enum_variant_names.len() as i32
         self.disc_enum_variant_starts.push(v_start)
         self.disc_enum_variant_counts.push(variant_count)
@@ -5442,7 +5442,7 @@ impl Codegen:
         for vi in 0..v_count:
             let disc_val: i64 = self.disc_enum_variant_values[(v_start + vi)]
             let case_bb = wl_append_bb(self.context, self.current_function, "from_int.case")
-            wl_add_case(sw, wl_const_int(cmp_ty, disc_val, if repr_unsigned: 0 else: 1), case_bb)
+            wl_add_case(sw, wl_const_int(cmp_ty, disc_val, (not (repr_unsigned)) as i32), case_bb)
             wl_position_at_end(self.builder, case_bb)
             wl_build_store(self.builder, self.build_option_some(wl_const_int(repr_ty, disc_val, 1), opt_ty), result_alloca)
             wl_build_br(self.builder, end_bb)
@@ -5887,10 +5887,10 @@ impl Codegen:
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
         if has_sret:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret: 1 else: 0)
-        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, (has_sret) as i32)
+        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, (has_sret) as i32)
         if not uses_c_abi and is_variadic == 0:
-            self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, if has_sret: 1 else: 0)
+            self.apply_capture_param_attrs(function, name_sym, sema_sig_idx, param_count, (has_sret) as i32)
 
         // Whole-program codegen internalizes ordinary With functions, including
         // the stdlib: foreign archives can define the same bare names. Imported
@@ -6086,7 +6086,7 @@ impl Codegen:
         for pi in 0..target.arg_count:
             let arg = self.fn_abi_arg(target_index, pi)
             sources.push(arg.source_ty)
-            places.push((if arg.pass == PM_INDIRECT_PLACE: 1 else: 0) | (if arg.reference: 2 else: 0) | (if arg.owned_place: 4 else: 0))
+            places.push(((arg.pass == PM_INDIRECT_PLACE) as i32) | (if arg.reference: 2 else: 0) | (if arg.owned_place: 4 else: 0))
         let thunk_ret = if spawn_sym != 0: task_ty else: target.ret.source_ty
         let thunk_index = self.compute_fn_abi(thunk_ret, sources, places, FN_ABI_CLOSURE, 0)
         let thunk_abi: FnAbi = self.fn_abis[thunk_index]
@@ -6828,7 +6828,7 @@ impl Codegen:
     fn fn_abi_has_sret(sym: i32) -> Option[i32]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
         if index < 0: return .None
-        .Some(if self.fn_abis[index].ret.pass == PM_INDIRECT: 1 else: 0)
+        .Some((self.fn_abis[index].ret.pass == PM_INDIRECT) as i32)
 
     fn fn_abi_sret_type(sym: i32) -> Option[i64]:
         let index = self.fn_abi_symbols.get(sym) ?? -1
@@ -6983,11 +6983,11 @@ impl Codegen:
 
         if has_sret:
             wl_add_sret_attr(self.context, function, 0, sret_ty)
-        self.apply_c_abi_byval_attrs(function, byval_types, param_count, if has_sret: 1 else: 0)
+        self.apply_c_abi_byval_attrs(function, byval_types, param_count, (has_sret) as i32)
 
         self.bind_fn_abi(name_sym, abi_index, function)
 
-        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, if has_sret: 1 else: 0)
+        self.apply_noalias_param_attrs_with_offset(function, param_start, param_count, (has_sret) as i32)
 
         // Apply calling convention or c_export if specified
         if cc_name.len() > 0:
@@ -7577,9 +7577,9 @@ impl Codegen:
             let fn_node = self.sema.concrete_specialization_nodes[specialization.unwrap()]
             let meta = self.pool.find_fn_meta(fn_node)
             if meta >= 0:
-                self.apply_noalias_param_attrs_with_offset(function, self.pool.fn_meta_param_start(meta), param_count, if has_sret: 1 else: 0)
+                self.apply_noalias_param_attrs_with_offset(function, self.pool.fn_meta_param_start(meta), param_count, (has_sret) as i32)
         if not is_async:
-            self.apply_capture_param_attrs(function, sema_sym, sig_idx, param_count, if has_sret: 1 else: 0)
+            self.apply_capture_param_attrs(function, sema_sym, sig_idx, param_count, (has_sret) as i32)
         self.fn_values.insert(mono_sym, function)
         self.fn_fn_types.insert(mono_sym, fn_type)
         if is_async:

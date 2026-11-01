@@ -152,10 +152,10 @@ impl BuildGraphMaterializer:
         target.env = self.string_list_field(value, "env")
         let network_field = self.field_value(value, "network")
         if network_field.kind == ComptimeValueKind.CV_BOOL:
-            target.network = if network_field.data0 != 0: 1 else: 0
+            target.network = (network_field.data0 != 0) as i32
         let parallel_field = self.field_value(value, "parallel")
         if parallel_field.kind == ComptimeValueKind.CV_BOOL:
-            target.parallel = if parallel_field.data0 != 0: 1 else: 0
+            target.parallel = (parallel_field.data0 != 0) as i32
         let action = self.field_value(value, "action")
         if kind == 23:
             if action.kind != ComptimeValueKind.CV_FN:

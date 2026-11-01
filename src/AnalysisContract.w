@@ -97,7 +97,7 @@ fn contract_item_at(sema: &Sema, site: &ContractSite, what: &str, item: i32) -> 
 // with its `wraps` type), or 0. Sema's vectors are filled in clause order,
 // so the i-th `consumes` record is the i-th `consumes` clause.
 fn contract_clause(sema: &Sema, item: i32, kind: i32, nth: i32) -> i32:
-    let start = sema.ast.get_data1(item) + (if sema.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE: 1 else: 0)
+    let start = sema.ast.get_data1(item) + ((sema.ast.kind(item) == NodeKind.NK_FACADE_RESOURCE) as i32)
     var seen = 0
     for k in 0..sema.ast.get_data2(item):
         let clause = sema.ast.get_extra(start + k)

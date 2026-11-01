@@ -1032,7 +1032,7 @@ fn last_use_term_event(body: &MirBody, bb: i32, local: i32, drops_read: bool) ->
             return 1
         return 0
     if kind == TermKind.TK_RETURN:
-        return if local == 0: 1 else: 0
+        return (local == 0) as i32
     if kind == TermKind.TK_SWITCH_INT:
         let op = body.term_data0(bb)
         if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE) and suspend_place_root_local(body, body.operand_d0[op]) == local:
@@ -1078,7 +1078,7 @@ fn last_use_live_in(body: &MirBody, local: i32, drops_read: bool) -> List[i32]:
             event = last_use_term_event(body, bb, local, drops_read)
         first.push(event)
     var live: List[i32] = List.new()
-    for bb in 0..bb_count: live.push(if first[bb] == 1: 1 else: 0)
+    for bb in 0..bb_count: live.push((first[bb] == 1) as i32)
     var changed = true
     while changed:
         changed = false

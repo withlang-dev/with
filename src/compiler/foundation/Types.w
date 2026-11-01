@@ -55,7 +55,7 @@ fn type_key_ptr(inner: TypeId, is_mut: bool) -> TypeKey:
         name: "",
         arg0: type_id_raw(inner),
         arg1: 0,
-        flags: if is_mut: 1 else: 0,
+        flags: (is_mut) as i32,
     }
 
 fn type_key_ref(inner: TypeId, is_mut: bool) -> TypeKey:
@@ -64,7 +64,7 @@ fn type_key_ref(inner: TypeId, is_mut: bool) -> TypeKey:
         name: "",
         arg0: type_id_raw(inner),
         arg1: 0,
-        flags: if is_mut: 1 else: 0,
+        flags: (is_mut) as i32,
     }
 
 fn type_key_slice(inner: TypeId) -> TypeKey:
@@ -136,7 +136,7 @@ fn type_key_fn_sig(param_pack: &str, ret: TypeId, arity: i32, is_variadic: bool)
         name: with_str_clone_ref(param_pack),
         arg0: type_id_raw(ret),
         arg1: arity,
-        flags: if is_variadic: 1 else: 0,
+        flags: (is_variadic) as i32,
     }
 
 fn type_key_trait_object(trait_name: &str) -> TypeKey:

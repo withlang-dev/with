@@ -920,7 +920,7 @@ impl MirBody:
     mut fn note_let_binding(node: i32, alias_place: i32):
         if node <= 0: return
         self.let_binding_nodes.push(node)
-        self.let_binding_aliases.push(if alias_place >= 0: 1 else: 0)
+        self.let_binding_aliases.push((alias_place >= 0) as i32)
         self.let_binding_places.push(alias_place)
 
     mut fn note_unwritten_at_return(bb: i32, local: i32):
@@ -2803,7 +2803,7 @@ fn validate_read_after_drop(body: &MirBody) -> str:
 fn mir_dropped_input(out: &List[i32], pred_start: &List[i32], pred_list: &List[i32], bb: i32, width: i32) -> MirDroppedSet:
     var flags: List[i32] = List.new()
     for _ in 0..width:
-        flags.push(if bb == 0: 0 else: 1)
+        flags.push((not (bb == 0)) as i32)
     if bb != 0:
         for pi in pred_start[bb]..pred_start[bb + 1]:
             let p = pred_list[pi]
@@ -3054,7 +3054,7 @@ fn mir_rvalue_is_zero_fill(body: &MirBody, rv: i32) -> i32:
     let cid = body.operand_d0[op]
     if cid < 0 or cid >= body.const_kinds.len():
         return 0
-    if body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED: 1 else: 0
+    (body.const_kinds[cid] == ConstKind.CK_ZERO_SIZED) as i32
 
 // The only successor of `bb`, or -1 when it branches / ends. A chain of
 // single-successor blocks is the one case where "the blank happens before the

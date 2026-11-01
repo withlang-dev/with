@@ -81,7 +81,7 @@ impl MirModule:
                 let kind = sema.get_type_kind(sema.resolve_alias(param_ty as TypeId))
                 let borrows = kind == TypeKind.TY_REF or kind == TypeKind.TY_PTR or sema.sig_param_uses_value_ref_abi(si, pi) != 0 or sema.extern_param_is_bit_copy(sema_sym, si, pi)
                 self.sema_sig_param_data.push(param_ty)
-                self.sema_sig_param_data.push(if borrows: 0 else: 1)
+                self.sema_sig_param_data.push((not (borrows)) as i32)
 
     // #1394, #1414: the drop-bearing types of every place a body moves out
     // of — a vacated sub-place (#1394) and a move of an already-moved place

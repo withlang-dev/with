@@ -93,7 +93,7 @@ fn lld_link(flavor: &str, args: &List[str]) -> i32:
             with_lld_wasm_link(lld_args, with_llvm_outs(), with_llvm_errs(), true, false)
         else:
             with_lld_elf_link(lld_args, with_llvm_outs(), with_llvm_errs(), true, false)
-        if ok: 0 else: 1
+        (not (ok)) as i32
 
 // argv[0] is `with`, argv[1] is `__ld`.
 fn with_ld_main() -> i32:

@@ -3257,7 +3257,7 @@ impl Parser:
         if value == 0:
             return 0
         let kind = self.pool.kind(value)
-        if kind == NodeKind.NK_INT_LIT: return if self.pool.literal_suffix(value) == LiteralSuffix.None: 1 else: 0
+        if kind == NodeKind.NK_INT_LIT: return (self.pool.literal_suffix(value) == LiteralSuffix.None) as i32
         if kind == NodeKind.NK_FLOAT_LIT: return if self.pool.literal_suffix(value) == LiteralSuffix.None: 2 else: 0
         if kind == NodeKind.NK_GROUPED: return self.untyped_numeric_default_kind(self.pool.get_data0(value))
         if kind == NodeKind.NK_UNARY and self.pool.get_data0(value) == UnaryOp.UOP_NEGATE: return self.untyped_numeric_default_kind(self.pool.get_data1(value))
@@ -5320,10 +5320,10 @@ impl Parser:
                 return 0
             ops.push(p)
             ops.push(l)
-            ops.push(if is_cap: 1 else: 0)
+            ops.push((is_cap) as i32)
             let elements = self.current_ident_is("elements")
             if elements: self.advance()
-            ops.push(if elements: 1 else: 0)
+            ops.push((elements) as i32)
         else if word == "variadic":
             // `variadic param N selected by param P:` with `case CONST:
             // <type>` lines beneath it (D66, §16.2b.5): the closed set of
@@ -5844,7 +5844,7 @@ impl Parser:
             align = fstring_spec_align(spec_text[at])
             if align != 0: at = at + 1
         if at < slen and (spec_text[at] == '+' or spec_text[at] == '-'):
-            sign_plus = if spec_text[at] == '+': 1 else: 0
+            sign_plus = (spec_text[at] == '+') as i32
             at = at + 1
         if at < slen and spec_text[at] == '#':
             alternate = 1
@@ -8328,7 +8328,7 @@ impl Parser:
     // A pattern let keeps `var` and the annotation on its head (#1354): the
     // bindings a `var` pattern introduces are mutable (§9.7).
     mut fn let_pattern_node(start: i32, pat: NodeId, value: NodeId, else_body: NodeId, is_mut: bool, type_ann: NodeId) -> NodeId:
-        let head = self.pool.add_node(NodeKind.NK_LET_PATTERN, start, self.prev_end(), pat, if is_mut: 1 else: 0, type_ann)
+        let head = self.pool.add_node(NodeKind.NK_LET_PATTERN, start, self.prev_end(), pat, (is_mut) as i32, type_ann)
         self.pool.add_node(NodeKind.NK_LET_ELSE, start, self.prev_end(), head, value, else_body)
 
     // `[: TYPE] = value [else: body]` after a destructuring let pattern.

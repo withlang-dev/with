@@ -470,11 +470,11 @@ impl Sema:
                 if path == last_path:
                     flag = last_flag
                 else:
-                    flag = if bundle_interface_text(path).len() > 0: 1 else: 0
+                    flag = (bundle_interface_text(path).len() > 0) as i32
                     last_path = with_str_clone_ref(path)
                     last_flag = flag
             self.decl_is_iface.push(flag)
-            self.decl_iface_demanded.push(if flag != 0 and not eager: 0 else: 1)
+            self.decl_iface_demanded.push((not (flag != 0 and not eager)) as i32)
             if flag == 0:
                 let source_decl = self.ast.get_decl(di)
                 // An alias (std.libc's `c_int = i32`) coexists with the
@@ -1385,7 +1385,7 @@ impl Sema:
                 self.check_duplicate_variant(name, &variant_names, v_name, node)
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
-                var disc_value: i64 = if doubling: 1 else: 0
+                var disc_value: i64 = (doubling) as i32
                 var disc_ok = true
                 if disc_node != 0:
                     // #1452: a u64 value above i64::MAX is its 64 bits.
@@ -2151,7 +2151,7 @@ impl Sema:
                 let current_di = self.find_decl_index(node)
                 if self.decls_share_source_file(existing_di, current_di):
                     let is_clause_group = if self.fn_clause_group_index(fn_name) >= 0: 1 else:
-                        if self.fn_decl_has_refutable_param_pattern(existing_node) or self.fn_decl_has_refutable_param_pattern(node): 1 else: 0
+                        (self.fn_decl_has_refutable_param_pattern(existing_node) or self.fn_decl_has_refutable_param_pattern(node)) as i32
                     if is_clause_group != 0:
                         dispatch_fn_name = fn_name
                         self.prepare_fn_clause(dispatch_fn_name, existing_node, existing_di)

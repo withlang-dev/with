@@ -2631,7 +2631,7 @@ impl ComptimeEvaluator:
 // map surface eval_map_method_call handles). Unknown methods still fail
 // inside the handlers with a named diagnostic.
 fn comptime_pipeline_builtin_method(name: &str) -> i32:
-    if name == "push" or name == "pop" or name == "get" or name == "set" or name == "clear" or name == "len" or name == "is_empty" or name == "capacity" or name == "contains" or name == "insert" or name == "remove" or name == "clone" or name == "first" or name == "last" or name == "rest" or name == "join" or name == "iter" or name == "iter_ref" or name == "into_iter" or name == "enumerate" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "fold" or name == "reduce" or name == "any" or name == "all" or name == "none" or name == "count" or name == "sum" or name == "product" or name == "find" or name == "position" or name == "for_each" or name == "collect" or name == "keys" or name == "into_keys" or name == "values" or name == "into_values" or name == "drain" or name == "increment" or name == "decrement": 1 else: 0
+    (name == "push" or name == "pop" or name == "get" or name == "set" or name == "clear" or name == "len" or name == "is_empty" or name == "capacity" or name == "contains" or name == "insert" or name == "remove" or name == "clone" or name == "first" or name == "last" or name == "rest" or name == "join" or name == "iter" or name == "iter_ref" or name == "into_iter" or name == "enumerate" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "fold" or name == "reduce" or name == "any" or name == "all" or name == "none" or name == "count" or name == "sum" or name == "product" or name == "find" or name == "position" or name == "for_each" or name == "collect" or name == "keys" or name == "into_keys" or name == "values" or name == "into_values" or name == "drain" or name == "increment" or name == "decrement") as i32
 
 fn comptime_string_builder_constructor_method(name: &str) -> str:
     if name == "StringBuilder.new" or name.ends_with(".StringBuilder.new"):
@@ -4264,7 +4264,7 @@ impl ComptimeEvaluator:
             artifacts = comptime_value_list(artifact_list_type, list_start, 1)
 
         let result_start = self.extra_values.len() as i32
-        self.extra_values.push(comptime_value_int(build_status_type, if rc == 0: 0 else: 1))
+        self.extra_values.push(comptime_value_int(build_status_type, (not (rc == 0)) as i32))
         self.extra_values.push(comptime_value_int(self.sema.ty_i32 as i32, rc as i64))
         self.extra_values.push(comptime_value_str(workspace_name))
         self.extra_values.push(artifacts)
@@ -5009,7 +5009,7 @@ fn comptime_execute_workspace_compile_plan(plan: &ComptimeWorkspaceCompilePlan) 
                 success = true
         else:
             return comptime_workspace_native_compile_invalid()
-    comptime_workspace_native_compile_result(if success: 0 else: 1, artifact_path, move comp, 0)
+    comptime_workspace_native_compile_result((not (success)) as i32, artifact_path, move comp, 0)
 
 impl ComptimeEvaluator:
     mut fn compile_workspace_record(record: &ComptimeWorkspaceRecord, capability: &ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
@@ -5123,7 +5123,7 @@ impl ComptimeEvaluator:
         out.pending_link_bin_path = move link_plan.bin_path
         out.pending_link_output_path = final_output
         out.pending_link_output_kind = output_kind
-        out.pending_link_debug_info = if self.workspace_bool_option(options, "debug_info", true): 1 else: 0
+        out.pending_link_debug_info = (self.workspace_bool_option(options, "debug_info", true)) as i32
         out.pending_link_command = move link_plan.command
         out
 
@@ -6462,7 +6462,7 @@ impl ComptimeEvaluator:
         if method == "compile":
             if not self.capability_expect_arg_count(arg_count, 0, method, node):
                 return comptime_control_error()
-            var compiled = self.compile_workspace_record(record, capability, node, if record.intercept_active != 0: 1 else: 0)
+            var compiled = self.compile_workspace_record(record, capability, node, (record.intercept_active != 0) as i32)
             let result = move compiled.result
             if result.kind == ComptimeValueKind.CV_INVALID:
                 return comptime_control_error()
@@ -8511,7 +8511,7 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             plans.push(move plan)
             workspace_ids.push(workspace_id)
-            intercepted.push(if record.intercept_active != 0: 1 else: 0)
+            intercepted.push((record.intercept_active != 0) as i32)
         let native_results: List[ComptimeWorkspaceNativeCompileResult] = List.new()
         if plans.len() == 1:
             native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[0])))

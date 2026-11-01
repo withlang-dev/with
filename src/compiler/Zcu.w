@@ -475,7 +475,7 @@ impl Zcu:
     fn configure_tracked_input_sema(sema: Sema) -> Sema:
         sema.set_tracked_input_context(self.tracked_input_root(), &self.tracked_input_paths)
         sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
-        sema.interface_eager = if self.interface_eager or self.bundle_corpus.len() > 0: 1 else: 0
+        sema.interface_eager = (self.interface_eager or self.bundle_corpus.len() > 0) as i32
         sema
 
     mut fn set_extra_sources(names: List[str], texts: List[str]):

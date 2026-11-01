@@ -1815,12 +1815,12 @@ impl Compilation:
         sema.source_text_names = sema_clone_str_list(&taken_zcu.source_text_names)
         sema.source_texts = sema_clone_str_list(&taken_zcu.source_texts)
         sema.tool_mode_entry_path = with_str_clone_ref(taken_zcu.tool_mode_entry_path)
-        sema.runtime_available = if taken_zcu.project_config.runtime_available: 1 else: 0
+        sema.runtime_available = (taken_zcu.project_config.runtime_available) as i32
         sema.runtime_fiber_stack_size = taken_zcu.project_config.runtime_fiber_stack_size
         sema.runtime_fiber_pool_size = taken_zcu.project_config.runtime_fiber_pool_size
         sema.runtime_fiber_worker_count = taken_zcu.project_config.runtime_fiber_worker_count
         sema.copy_warn_threshold = taken_zcu.project_config.copy_warn_threshold
-        sema.lint_partial_statement_match = if taken_zcu.project_config.lint_partial_statement_match: 1 else: 0
+        sema.lint_partial_statement_match = (taken_zcu.project_config.lint_partial_statement_match) as i32
         sema.overflow_mode = taken_zcu.project_config.overflow_mode
         if taken_zcu.project_config.no_std or self.config.no_std:
             sema.no_std = 1
@@ -2149,12 +2149,12 @@ impl Compilation:
             sema.source_text_names = sema_clone_str_list(&self.zcu.source_text_names)
             sema.source_texts = sema_clone_str_list(&self.zcu.source_texts)
             sema.tool_mode_entry_path = with_str_clone_ref(self.zcu.tool_mode_entry_path)
-            sema.runtime_available = if self.zcu.project_config.runtime_available: 1 else: 0
+            sema.runtime_available = (self.zcu.project_config.runtime_available) as i32
             sema.runtime_fiber_stack_size = self.zcu.project_config.runtime_fiber_stack_size
             sema.runtime_fiber_pool_size = self.zcu.project_config.runtime_fiber_pool_size
             sema.runtime_fiber_worker_count = self.zcu.project_config.runtime_fiber_worker_count
             sema.copy_warn_threshold = self.zcu.project_config.copy_warn_threshold
-            sema.lint_partial_statement_match = if self.zcu.project_config.lint_partial_statement_match: 1 else: 0
+            sema.lint_partial_statement_match = (self.zcu.project_config.lint_partial_statement_match) as i32
             sema.overflow_mode = self.zcu.project_config.overflow_mode
             sema.init_module_graph(&self.zcu.last_resolved)
             if self.zcu.project_config.no_std or self.config.no_std:

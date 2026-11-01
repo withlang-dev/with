@@ -3967,7 +3967,7 @@ impl Sema:
                 if owner == FACADE_DEP_INIT and self.facade_resources[ri].preinit != 0:
                     shift = self.sig_get_param_count(self.get_sig(self.facade_resources[ri].preinit))
                 let slot = self.facade_owner_skip(ri, owner)
-                let raw_mask = self.facade_touch_params_mask(f, ci, if owner == FACADE_DEP_INIT: 1 else: 0)
+                let raw_mask = self.facade_touch_params_mask(f, ci, (owner == FACADE_DEP_INIT) as i32)
                 var mask: i32 = 0
                 // #1977: the C parameter each presented one came from — the
                 // projection below, kept so a presented bit names its source
@@ -4939,7 +4939,7 @@ impl Sema:
             for wi in 0..wrapped.len():
                 let projected = self.facade_presented_param_index(ci, wrapped[wi])
                 if projected >= receiver_params: wrapped_params.push(projected - receiver_params)
-            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: if self.facade_contract_userdata_retained(ci): 1 else: 0, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
+            self.facade_callback_methods.push(FacadeCallbackMethod { contract: ci, receiver_params, userdata_param: ud_r, callback_param: cb_r, thread_any: self.foreign_contracts[ci].callback_thread_any, retained: (self.facade_contract_userdata_retained(ci)) as i32, consumed: if self.facade_contract_userdata_consumed(ci): 1 else: 0, nullable, wrapped_params })
 
     // The callback method a symbol names, or -1.
     fn facade_callback_method_for(fn_sym: i32) -> i32:

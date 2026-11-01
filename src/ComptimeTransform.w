@@ -465,7 +465,7 @@ impl Sema:
             return 0
         let type_extra = pool.extra_len()
         pool.add_extra(type_node)
-        let flags = (if is_mut != 0: 1 else: 0) + (type_extra + 1) * 2
+        let flags = ((is_mut != 0) as i32) + (type_extra + 1) * 2
         pool.add_node(NodeKind.NK_LET_BINDING, pool.get_start(node), pool.get_end(node), name_sym, value, flags) as i32
 
     mut fn ct_build_list_value_tree(mut pool: AstPool, intern: &InternPool, value: &ComptimeValue, node: i32, extras: &List[ComptimeValue]) -> i32:
@@ -559,7 +559,7 @@ impl Sema:
                 NodeKind.NK_BOOL_LIT,
                 pool.get_start(node),
                 pool.get_end(node),
-                if value.data0 != 0: 1 else: 0,
+                (value.data0 != 0) as i32,
                 0,
                 0
             ) as i32
@@ -1639,7 +1639,7 @@ impl AstPool:
         self.add_node(NodeKind.NK_INT_LIT, self.get_start(node), self.get_end(node), ast_int_part0(value), ast_int_part1(value), ast_int_part2(value)) as i32
 
     mut fn ct_build_bool_lit(node: i32, value: bool) -> i32:
-        self.add_node(NodeKind.NK_BOOL_LIT, self.get_start(node), self.get_end(node), if value: 1 else: 0, 0, 0) as i32
+        self.add_node(NodeKind.NK_BOOL_LIT, self.get_start(node), self.get_end(node), (value) as i32, 0, 0) as i32
 
     mut fn ct_build_string_lit(intern: &InternPool, node: i32, value: &str) -> i32:
         self.add_node(NodeKind.NK_STRING_LIT, self.get_start(node), self.get_end(node), intern.intern(ct_raw_literal_text(value)), 0, 0) as i32
@@ -1669,7 +1669,7 @@ fn ct_copy_type_params_with_bound(mut pool: AstPool, src_tp_start: i32, tp_count
             if pool.get_extra(src + 2 + bi) == bound_sym:
                 has_bound = 1
         pool.add_extra(tp_name)
-        pool.add_extra(bound_count + if has_bound != 0: 0 else: 1)
+        pool.add_extra(bound_count + (not (has_bound != 0)) as i32)
         for bi2 in 0..bound_count:
             pool.add_extra(pool.get_extra(src + 2 + bi2))
         if has_bound == 0:
@@ -2609,7 +2609,7 @@ impl Sema:
             else:
                 self_type_named
         let ret_type = out.add_node(NodeKind.NK_TYPE_NAMED, start, end, intern.intern("str"), 0, 0)
-        let body = ct_build_fstring_self(out, decl, self_sym, debug_mode, if receiver_flags == FN_PARAM_FLAG_REF_SELF: 1 else: 0)
+        let body = ct_build_fstring_self(out, decl, self_sym, debug_mode, (receiver_flags == FN_PARAM_FLAG_REF_SELF) as i32)
 
         let param_start = out.extra_len()
         // #727: this receiver is compiler-synthesized — the user never wrote
