@@ -2,6 +2,6 @@
 # produced these modules (a hash of the migrator's sources), a hash of the
 # modules (the integrity check compares it) and the trigger that justified
 # the promotion (the pin moved, a migrator-pin bump, a ruling).
-migrated_by aa3bb6fc3a807d1f060f8b2b5b0291fc07968ba390d8be64683a9961a87a9881
-modules 0186fb5a54ccafc61b679559979e5d01e661dafc816b7c13033e97b851e0e87e
-promoted_for ruling:D155
+migrated_by d3116973412123580f542e7c1a0dd53b402317c53719b01e5c6fd53507b15680
+modules 53c50121b406b5dce2eacb568ec9eb45751232c5da4ae29074e5171f6e7e403f
+promoted_for ruling:D177

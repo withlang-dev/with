@@ -30,10 +30,11 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.libc
 
+// contract: unproved:0:NULL is an accepted argument,unproved:2:out-parameter written conditionally
 pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __param_what: u32, __param_where_: *mut c_void) -> i32 {
     var __local_re: *const pcre2_real_code_8 = __param_code
 
-    if ((if __param_where_ == null: 1 else: 0) != 0) {
+    if (__param_where_ == null) {
         match __param_what {
             0 => {
                 return ((4 as i32))
@@ -120,15 +121,15 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
 
     }
 
-    if ((if __local_re == null: 1 else: 0) != 0) {
+    if (__local_re == null) {
         return -51
     }
 
-    if ((if (*__local_re).magic_number != 1346589253: 1 else: 0) != 0) {
+    if ((*__local_re).magic_number != 1346589253) {
         return -31
     }
 
-    if ((if (((*__local_re).flags as u32) & (1 as u32)) == 0: 1 else: 0) != 0) {
+    if ((((*__local_re).flags as u32) & (1 as u32)) == 0) {
         return -32
     }
 
@@ -152,7 +153,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             21 => {
                 ((*(__param_where_ as *mut u32)) = (*__local_re).limit_depth)
 
-                if ((if (*__local_re).limit_depth == libc.UINT32_MAX: 1 else: 0) != 0) {
+                if ((*__local_re).limit_depth == libc.UINT32_MAX) {
                     return -55
                 }
 
@@ -161,13 +162,13 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
                 ((*(__param_where_ as *mut u32)) = (*__local_re).extra_options)
             },
             6 => {
-                ((*(__param_where_ as *mut u32)) = (((if (if (((*__local_re).flags as u32) & (16 as u32)) != 0: 1 else: 0) != 0: (1 as i32) else: ((if (if (((*__local_re).flags as u32) & (512 as u32)) != 0: 1 else: 0) != 0: (2 as i32) else: (0 as i32)) as i32)) as u32)))
+                ((*(__param_where_ as *mut u32)) = (((if (((*__local_re).flags as u32) & (16 as u32)) != 0: (1 as i32) else: ((if (((*__local_re).flags as u32) & (512 as u32)) != 0: (2 as i32) else: (0 as i32)) as i32)) as u32)))
             },
             5 => {
-                ((*(__param_where_ as *mut u32)) = (((if (if (((*__local_re).flags as u32) & (16 as u32)) != 0: 1 else: 0) != 0: (*__local_re).first_codeunit else: (0 as u32)) as u32)))
+                ((*(__param_where_ as *mut u32)) = (((if (((*__local_re).flags as u32) & (16 as u32)) != 0: (*__local_re).first_codeunit else: (0 as u32)) as u32)))
             },
             7 => {
-                ((*(__param_where_ as *mut *const u8)) = (if (if (((*__local_re).flags as u32) & (64 as u32)) != 0: 1 else: 0) != 0: (&raw const (*__local_re).start_bitmap[0] as *const u8) else: (null as *const u8)))
+                ((*(__param_where_ as *mut *const u8)) = (if (((*__local_re).flags as u32) & (64 as u32)) != 0: (&raw const (*__local_re).start_bitmap[0] as *const u8) else: (null as *const u8)))
             },
             24 => {
                 ((*(__param_where_ as *mut u64)) = (((((offsetof[heapframe](ovector) as usize) as u64) +% ((((((*__local_re).top_bracket as i32) * 2) as u64) *% (sizeof[u64]() as u64)) as u64)) as u64)))
@@ -181,7 +182,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             25 => {
                 ((*(__param_where_ as *mut u32)) = (*__local_re).limit_heap)
 
-                if ((if (*__local_re).limit_heap == libc.UINT32_MAX: 1 else: 0) != 0) {
+                if ((*__local_re).limit_heap == libc.UINT32_MAX) {
                     return -55
                 }
 
@@ -193,10 +194,10 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
                 ((*(__param_where_ as *mut u64)) = ((0 as u64)))
             },
             12 => {
-                ((*(__param_where_ as *mut u32)) = (((if (if (((*__local_re).flags as u32) & (128 as u32)) != 0: 1 else: 0) != 0: (1 as i32) else: (0 as i32)) as u32)))
+                ((*(__param_where_ as *mut u32)) = (((if (((*__local_re).flags as u32) & (128 as u32)) != 0: (1 as i32) else: (0 as i32)) as u32)))
             },
             11 => {
-                ((*(__param_where_ as *mut u32)) = (((if (if (((*__local_re).flags as u32) & (128 as u32)) != 0: 1 else: 0) != 0: (*__local_re).last_codeunit else: (0 as u32)) as u32)))
+                ((*(__param_where_ as *mut u32)) = (((if (((*__local_re).flags as u32) & (128 as u32)) != 0: (*__local_re).last_codeunit else: (0 as u32)) as u32)))
             },
             13 => {
                 ((*(__param_where_ as *mut u32)) = (((if (((*__local_re).flags as u32) & (8192 as u32)) != 0: 1 else: 0) as u32)))
@@ -204,7 +205,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
             14 => {
                 ((*(__param_where_ as *mut u32)) = (*__local_re).limit_match)
 
-                if ((if (*__local_re).limit_match == libc.UINT32_MAX: 1 else: 0) != 0) {
+                if ((*__local_re).limit_match == libc.UINT32_MAX) {
                     return -55
                 }
 
@@ -243,6 +244,7 @@ pub unsafe fn pcre2_pattern_info_8(__param_code: *const pcre2_real_code_8, __par
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, __param_callback: unsafe extern "C" fn(*mut pcre2_callout_enumerate_block_8, *mut c_void) -> i32, __param_callout_data: *mut c_void) -> i32 {
     var __local_re: *const pcre2_real_code_8 = __param_code
 
@@ -252,17 +254,17 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
     var __local_utf: i32
 
-    if ((if __local_re == null: 1 else: 0) != 0) {
+    if (__local_re == null) {
         return -51
     }
 
     (__local_utf = (((if (((*__local_re).overall_options as u32) & (524288 as u32)) != 0: 1 else: 0) as i32)))
 
-    if ((if (*__local_re).magic_number != 1346589253: 1 else: 0) != 0) {
+    if ((*__local_re).magic_number != 1346589253) {
         return -31
     }
 
-    if ((if (((*__local_re).flags as u32) & (1 as u32)) == 0: 1 else: 0) != 0) {
+    if ((((*__local_re).flags as u32) & (1 as u32)) == 0) {
         return -32
     }
 
@@ -270,7 +272,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
     (__local_cc = ((((__local_re as *mut u8) + ((*__local_re).code_start as usize)) as *const u8)))
 
-    while (1 != 0) {
+    while true {
         var __local_rc: i32
 
         while true {
@@ -283,11 +285,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -298,11 +300,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -313,11 +315,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -328,11 +330,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -343,11 +345,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -358,11 +360,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -373,11 +375,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -388,11 +390,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -403,11 +405,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -418,11 +420,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -433,11 +435,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -448,11 +450,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -463,11 +465,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -478,11 +480,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -493,11 +495,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -508,11 +510,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -523,11 +525,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -538,11 +540,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -553,11 +555,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -568,11 +570,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -583,11 +585,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -598,11 +600,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -613,11 +615,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -628,11 +630,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -643,11 +645,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -658,11 +660,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -673,11 +675,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -688,11 +690,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -703,11 +705,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -718,11 +720,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -733,11 +735,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -748,11 +750,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -763,11 +765,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -778,11 +780,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -793,11 +795,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -808,11 +810,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -823,11 +825,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -838,11 +840,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -853,11 +855,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -868,11 +870,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -883,11 +885,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -898,11 +900,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -913,11 +915,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -928,11 +930,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -943,11 +945,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -958,11 +960,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -973,11 +975,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -988,11 +990,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1003,11 +1005,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1018,11 +1020,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1033,11 +1035,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1048,11 +1050,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1063,11 +1065,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1078,11 +1080,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1093,11 +1095,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1108,11 +1110,11 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if (__local_utf != 0) {
-                        (__ci_expr_logic_0 = (if (if (__local_cc[-1]) >= 192: 1 else: 0) != 0: 1 else: 0))
+                    if __local_utf {
+                        (__ci_expr_logic_0 = (if (__local_cc[-1]) >= 192: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         (__local_cc = __local_cc + (((_pcre2_utf8_table4[((((__local_cc[-1]) as i32) as u32) & (63 as u32))] as u32) as usize) as i32))
                     }
 
@@ -1123,13 +1125,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1140,13 +1142,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1157,13 +1159,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1174,13 +1176,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1191,13 +1193,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1208,13 +1210,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1225,13 +1227,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1242,13 +1244,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1259,13 +1261,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1276,13 +1278,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1293,13 +1295,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1310,13 +1312,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1327,13 +1329,13 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     var __ci_expr_logic_1: i32
 
-                    if ((if (__local_cc[-1]) == OP_PROP: 1 else: 0) != 0) {
+                    if ((__local_cc[-1]) == OP_PROP) {
                         (__ci_expr_logic_1 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_1 = (if (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_1 = (if (__local_cc[-1]) == OP_NOTPROP: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         (__local_cc = __local_cc + ((2 as isize) as usize))
                     }
 
@@ -1375,7 +1377,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     (__local_rc = ((__param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as i32)))
 
-                    if ((if __local_rc != 0: 1 else: 0) != 0) {
+                    if (__local_rc != 0) {
                         return __local_rc
                     }
 
@@ -1397,7 +1399,7 @@ pub unsafe fn pcre2_callout_enumerate_8(__param_code: *const pcre2_real_code_8, 
 
                     (__local_rc = ((__param_callback((&raw mut __local_cb as *mut pcre2_callout_enumerate_block_8), __param_callout_data) as i32)))
 
-                    if ((if __local_rc != 0: 1 else: 0) != 0) {
+                    if (__local_rc != 0) {
                         return __local_rc
                     }
 

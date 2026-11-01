@@ -11188,6 +11188,11 @@ impl Sema:
             return self.condition_is_static_true(self.ast.get_data0(node))
         if self.bool_literal_is_true(node) != 0:
             return 1
+        // D177 (§4.2a): an integer tests true when nonzero, so `while 1:` is
+        // the constant-true loop `while true:` is.
+        let lit = self.int_literal_i64_value(node)
+        if lit.ok != 0 and lit.value != 0:
+            return 1
         if node == 0 or self.ast.kind(node) != NodeKind.NK_BINARY:
             return 0
         let op = self.ast.get_data0(node)
@@ -19288,7 +19293,7 @@ impl Sema:
             self.resolved_call_sigs.insert(call_node, sig_idx)
             self.resolved_call_mono_syms.insert(call_node, self.sig_names[sig_idx])
         let param_count = self.sig_get_param_count(sig_idx)
-        if recv_node != 0 and param_offset == 1 and param_count > 0:
+        if recv_node != 0 and param_offset == 1 and param_count > 0 and self.iter_next_receiver_derived == 0:
             self.propagate_call_param_effect(self.sig_param_effect(sig_idx, 0), recv_node)
             self.record_effect_edge(sig_idx, 0, recv_node)
         // #1783 (§21.1): the receiver's storage — `h` in `h.keep(x)`, the
@@ -19830,7 +19835,17 @@ impl Sema:
         var saved_mono_val: i32 = 0
         if saved_mono.is_some(): saved_mono_val = saved_mono.unwrap()
         let no_args: List[i32] = List.new()
+        // The iterable stands in as next()'s receiver node. When the loop's
+        // iterator is a value derived from it (the inserted `iter()`; its
+        // type is not the iterable's), `next` mutates that temporary: its
+        // receiver effect and edge stay off the iterable, as the concrete
+        // next() path records none (D178 would otherwise carry the
+        // iterator's own field writes onto a collection walked in a `fn`).
+        let iterable_ty = self.recorded_expr_type_or_zero(iterable)
+        let derived = iterable_ty != 0 and self.resolve_alias(iterable_ty as TypeId) != self.resolve_alias(iter_type)
+        if derived: self.iter_next_receiver_derived += 1
         let _ = self.check_generic_method_call(owner_sym, iter_type as i32, next_fn, 0, iterable, no_args, 0, 0, key_node)
+        if derived: self.iter_next_receiver_derived -= 1
         let new_sig = self.resolved_call_sigs.get(key_node)
         var new_sig_val: i32 = -1
         if new_sig.is_some(): new_sig_val = new_sig.unwrap()

@@ -30,12 +30,13 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.libc
 
+// contract: unproved:0:out-parameter written conditionally
 pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut u64, __param_a: i32, __param_b: i32) -> i32 {
     var __local_m: i64
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -44,11 +45,11 @@ pub unsafe fn _pcre2_ckd_smul_8(__param_r: *mut u64, __param_a: i32, __param_b: 
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (sizeof[i64]() as usize) > (sizeof[u64]() as usize): 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __local_m > ((libc.UINTPTR_MAX as i64)): 1 else: 0) != 0: 1 else: 0))
+    if ((sizeof[i64]() as usize) > (sizeof[u64]() as usize)) {
+        (__ci_expr_logic_0 = (if __local_m > ((libc.UINTPTR_MAX as i64)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return 1
     }
 

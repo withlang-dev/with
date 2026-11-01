@@ -38,7 +38,7 @@ impl[T: Ord] BinaryHeap[T]:
             let right = unsafe { &(*(b as *const Slot[T])).value }
             if left < right: -1 else if left > right: 1 else: 0
 
-    pub fn len() -> isize: unsafe { binary_heap_num_entries(self.heap) } as isize
+    pub fn len() -> isize: unsafe { (*self.heap).binary_heap_num_entries() } as isize
     pub fn is_empty() -> bool: self.len() == 0
 
     pub mut fn push(value: T) -> Unit:
@@ -48,7 +48,7 @@ impl[T: Ord] BinaryHeap[T]:
 
     /// Transfers the top value out, or `None` when empty.
     pub mut fn pop() -> Option[T]:
-        var slot = unsafe { binary_heap_pop(self.heap) } as *mut Slot[T]
+        var slot = unsafe { (*self.heap).binary_heap_pop() } as *mut Slot[T]
         if slot as i64 == 0: return None
         let value: T = unsafe { move slot.value }
         with_free(slot as *mut u8)
@@ -64,7 +64,7 @@ impl[T] Drop for BinaryHeap[T]:
     move fn drop():
         // The engine's value array is its own; walk it and release every
         // slot before the engine frees the array.
-        let count = unsafe { binary_heap_num_entries(self.heap) } as i32
+        let count = unsafe { (*self.heap).binary_heap_num_entries() } as i32
         for index in 0..count:
             var slot = unsafe { (*self.heap).values[index] } as *mut Slot[T]
             let value: T = unsafe { move slot.value }

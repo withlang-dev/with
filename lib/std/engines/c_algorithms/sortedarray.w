@@ -2,16 +2,17 @@
 use std.engines.c_algorithms.defs
 use std.option
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: u32) -> *mut c_void {
     var __ci_expr_logic_0: i32
 
-    if ((if __param_array == null: 1 else: 0) != 0) {
+    if (__param_array == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_i >= (*__param_array).length: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_i >= (*__param_array).length: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return sortedarray_null_value
 
     }
@@ -21,37 +22,32 @@ pub unsafe fn sortedarray_get(__param_array: *mut _SortedArray, __param_i: u32) 
 
 }
 
-pub unsafe fn sortedarray_length(__param_array: *mut _SortedArray) -> u32 {
-    return (*__param_array).length
-
-}
-
 pub fn sortedarray_new(__param_length: u32, __param_cmp_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> i32]) -> *mut _SortedArray {
     var __local_length = __param_length
     var __local_array: *mut *mut c_void
 
     var __local_sortedarray: *mut _SortedArray
 
-    if ((if __param_cmp_func == null: 1 else: 0) != 0) {
+    if (__param_cmp_func == null) {
         return ((null as *mut _SortedArray))
 
     }
 
-    if ((if __local_length == 0: 1 else: 0) != 0) {
+    if (__local_length == 0) {
         (__local_length = ((16 as u32)))
 
     }
 
     (__local_array = (((with_alloc(((((sizeof[usize]() as u64) *% (__local_length as u64)) as u64) as i64)) as *mut c_void) as *mut *mut c_void)))
 
-    if ((if __local_array == null: 1 else: 0) != 0) {
+    if (__local_array == null) {
         return ((null as *mut _SortedArray))
 
     }
 
     (__local_sortedarray = (((with_alloc(((sizeof[_SortedArray]() as u64) as i64)) as *mut c_void) as *mut _SortedArray)))
 
-    if ((if __local_sortedarray == null: 1 else: 0) != 0) {
+    if (__local_sortedarray == null) {
         with_free(((__local_array as *mut c_void) as *mut u8))
 
         return ((null as *mut _SortedArray))
@@ -70,8 +66,9 @@ pub fn sortedarray_new(__param_length: u32, __param_cmp_func: Option[unsafe exte
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) {
-    if ((if __param_sortedarray != null: 1 else: 0) != 0) {
+    if (__param_sortedarray != null) {
         with_free((((*__param_sortedarray).data as *mut c_void) as *mut u8))
 
         with_free(((__param_sortedarray as *mut c_void) as *mut u8))
@@ -80,28 +77,30 @@ pub unsafe fn sortedarray_free(__param_sortedarray: *mut _SortedArray) {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn sortedarray_remove(__param_sortedarray: *mut _SortedArray, __param_index: u32) -> i32 {
     return sortedarray_remove_range(__param_sortedarray, __param_index, (1 as u32))
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, __param_index: u32, __param_length: u32) -> i32 {
     var __local_length = __param_length
     var __ci_expr_logic_0: i32
 
-    if ((if __param_sortedarray == null: 1 else: 0) != 0) {
+    if (__param_sortedarray == null) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_index >= (*__param_sortedarray).length: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_index >= (*__param_sortedarray).length: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return 0
 
     }
 
 
-    if ((if ((__param_index as u32) +% (__local_length as u32)) > (*__param_sortedarray).length: 1 else: 0) != 0) {
+    if (((__param_index as u32) +% (__local_length as u32)) > (*__param_sortedarray).length) {
         (__local_length = (((((*__param_sortedarray).length as u32) -% (__param_index as u32)) as u32)))
 
     }
@@ -114,6 +113,7 @@ pub unsafe fn sortedarray_remove_range(__param_sortedarray: *mut _SortedArray, _
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,owned:1 — stores an argument; ownership not modeled
 pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> i32 {
     var __local_data = __param_data
     var __local_left: u32
@@ -125,7 +125,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     var __local_order: i32
 
-    if ((if __param_sortedarray == null: 1 else: 0) != 0) {
+    if (__param_sortedarray == null) {
         return 0
 
     }
@@ -136,18 +136,18 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     (__local_index = ((0 as u32)))
 
-    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as u32)) as u32)))
+    (__local_right = (((if __local_right > 1: __local_right else: (0 as u32)) as u32)))
 
-    while ((if __local_left != __local_right: 1 else: 0) != 0) {
+    while (__local_left != __local_right) {
         (__local_index = ((((((__local_left as u32) +% (__local_right as u32)) as u32) / (2 as u32)) as u32)))
 
         (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) as i32)))
 
-        if ((if __local_order < 0: 1 else: 0) != 0) {
+        if (__local_order < 0) {
             (__local_right = __local_index)
 
         } else {
-            if ((if __local_order > 0: 1 else: 0) != 0) {
+            if (__local_order > 0) {
                 (__local_left = ((((__local_index as u32) +% (1 as u32)) as u32)))
 
             } else {
@@ -160,17 +160,17 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (*__param_sortedarray).length > 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0) != 0: 1 else: 0))
+    if ((*__param_sortedarray).length > 0) {
+        (__ci_expr_logic_0 = (if (*__param_sortedarray).cmp_func.unwrap()(__local_data, ((*__param_sortedarray).data[__local_index])) > 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__local_index = (__local_index +% 1))
 
     }
 
 
-    if ((if (((*__param_sortedarray).length as u32) +% (1 as u32)) > (*__param_sortedarray)._alloced: 1 else: 0) != 0) {
+    if ((((*__param_sortedarray).length as u32) +% (1 as u32)) > (*__param_sortedarray)._alloced) {
         var __local_newsize: u32
 
         var __local_data_1: *mut *mut c_void
@@ -179,7 +179,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
         (__local_data_1 = (((with_realloc((((*__param_sortedarray).data as *mut c_void) as *mut u8), (0 as i64), ((((sizeof[usize]() as u64) *% (__local_newsize as u64)) as u64) as i64)) as *mut c_void) as *mut *mut c_void)))
 
-        if ((if __local_data_1 == null: 1 else: 0) != 0) {
+        if (__local_data_1 == null) {
             return 0
 
         }
@@ -200,6 +200,7 @@ pub unsafe fn sortedarray_insert(__param_sortedarray: *mut _SortedArray, __param
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __param_data: *mut c_void) -> i32 {
     var __local_left: u32
 
@@ -210,7 +211,7 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
     var __local_order: i32
 
-    if ((if __param_sortedarray == null: 1 else: 0) != 0) {
+    if (__param_sortedarray == null) {
         return -1
 
     }
@@ -221,18 +222,18 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
     (__local_index = ((0 as u32)))
 
-    (__local_right = (((if (if __local_right > 1: 1 else: 0) != 0: __local_right else: (0 as u32)) as u32)))
+    (__local_right = (((if __local_right > 1: __local_right else: (0 as u32)) as u32)))
 
-    while ((if __local_left != __local_right: 1 else: 0) != 0) {
+    while (__local_left != __local_right) {
         (__local_index = ((((((__local_left as u32) +% (__local_right as u32)) as u32) / (2 as u32)) as u32)))
 
         (__local_order = (((*__param_sortedarray).cmp_func.unwrap()(__param_data, ((*__param_sortedarray).data[__local_index])) as i32)))
 
-        if ((if __local_order < 0: 1 else: 0) != 0) {
+        if (__local_order < 0) {
             (__local_right = __local_index)
 
         } else {
-            if ((if __local_order > 0: 1 else: 0) != 0) {
+            if (__local_order > 0) {
                 (__local_left = ((((__local_index as u32) +% (1 as u32)) as u32)))
 
             } else {
@@ -247,8 +248,18 @@ pub unsafe fn sortedarray_index_of(__param_sortedarray: *mut _SortedArray, __par
 
 }
 
-pub unsafe fn sortedarray_clear(__param_sortedarray: *mut _SortedArray) {
-    ((*__param_sortedarray).length = ((0 as u32)))
+impl _SortedArray {
+    pub fn sortedarray_length() -> u32 {
+        let __param_array: *mut _SortedArray = (self as *const _SortedArray) as *mut _SortedArray
+        return (unsafe *__param_array).length
+
+    }
+
+    pub mut fn sortedarray_clear() {
+        let __param_sortedarray: *mut _SortedArray = self as *mut _SortedArray
+        ((unsafe *__param_sortedarray).length = ((0 as u32)))
+
+    }
 
 }
 

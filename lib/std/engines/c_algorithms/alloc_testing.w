@@ -7,14 +7,14 @@ pub fn alloc_test_malloc(__param_bytes: u64) -> *mut c_void writes allocation_li
 
     var __local_ptr: *mut c_void
 
-    if ((if allocation_limit == 0: 1 else: 0) != 0) {
+    if (allocation_limit == 0) {
         return null
 
     }
 
     (__local_header = (((with_alloc(((((sizeof[_BlockHeader]() as u64) +% (__param_bytes as u64)) as u64) as i64)) as *mut c_void) as *mut _BlockHeader)))
 
-    if ((if __local_header == null: 1 else: 0) != 0) {
+    if (__local_header == null) {
         return null
 
     }
@@ -29,7 +29,7 @@ pub fn alloc_test_malloc(__param_bytes: u64) -> *mut c_void writes allocation_li
 
     (allocated_bytes = (allocated_bytes +% __param_bytes))
 
-    if ((if allocation_limit > 0: 1 else: 0) != 0) {
+    if (allocation_limit > 0) {
         (allocation_limit = allocation_limit - 1)
 
     }
@@ -38,12 +38,13 @@ pub fn alloc_test_malloc(__param_bytes: u64) -> *mut c_void writes allocation_li
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) {
     var __local_header: *mut _BlockHeader
 
     var __local_block_size: u64
 
-    if ((if __param_ptr == null: 1 else: 0) != 0) {
+    if (__param_ptr == null) {
         return
 
     }
@@ -52,7 +53,7 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) {
 
     (__local_block_size = (*__local_header).bytes)
 
-    if (((if not ((if allocated_bytes >= __local_block_size: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (allocated_bytes >= __local_block_size): 1 else: 0) as i64) {
         __assert_rtn(c"alloc_test_free".ptr, c"alloc-testing.c".ptr, (145 as i32), c"allocated_bytes >= block_size".ptr)
     } else {
         0
@@ -68,6 +69,7 @@ pub unsafe fn alloc_test_free(__param_ptr: *mut c_void) {
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: u64) -> *mut c_void writes allocation_limit {
     var __local_header: *mut _BlockHeader
 
@@ -77,17 +79,17 @@ pub unsafe fn alloc_test_realloc(__param_ptr: *mut c_void, __param_bytes: u64) -
 
     (__local_new_ptr = alloc_test_malloc(__param_bytes))
 
-    if ((if __local_new_ptr == null: 1 else: 0) != 0) {
+    if (__local_new_ptr == null) {
         return null
 
     }
 
-    if ((if __param_ptr != null: 1 else: 0) != 0) {
+    if (__param_ptr != null) {
         (__local_header = alloc_test_get_header(__param_ptr))
 
         (__local_bytes_to_copy = (*__local_header).bytes)
 
-        if ((if __local_bytes_to_copy > __param_bytes: 1 else: 0) != 0) {
+        if (__local_bytes_to_copy > __param_bytes) {
             (__local_bytes_to_copy = __param_bytes)
 
         }
@@ -109,7 +111,7 @@ pub fn alloc_test_calloc(__param_nmemb: u64, __param_bytes: u64) -> *mut c_void 
 
     (__local_result = alloc_test_malloc(__local_total_bytes))
 
-    if ((if __local_result == null: 1 else: 0) != 0) {
+    if (__local_result == null) {
         return null
 
     }
@@ -120,12 +122,13 @@ pub fn alloc_test_calloc(__param_nmemb: u64, __param_bytes: u64) -> *mut c_void 
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn alloc_test_strdup(__param_string: *const c_char) -> *mut c_char writes allocation_limit {
     var __local_result: *mut c_char
 
     (__local_result = ((alloc_test_malloc((((strlen(__param_string) as u64) +% (1 as u64)) as u64)) as *mut c_char)))
 
-    if ((if __local_result == null: 1 else: 0) != 0) {
+    if (__local_result == null) {
         return ((null as *mut c_char))
 
     }
@@ -146,12 +149,13 @@ pub fn alloc_test_get_allocated() -> u64 {
 
 }
 
+// contract: unproved:0:returns a pointer loaded from the parameter
 unsafe fn alloc_test_get_header(__param_ptr: *mut c_void) -> *mut _BlockHeader {
     var __local_result: *mut _BlockHeader
 
     (__local_result = (__param_ptr as *mut _BlockHeader) - ((1 as isize) as usize))
 
-    if (((if not ((if (*__local_result).magic_number == 1928102610: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_result).magic_number == 1928102610): 1 else: 0) as i64) {
         __assert_rtn(c"alloc_test_get_header".ptr, c"alloc-testing.c".ptr, (70 as i32), c"result->magic_number == ALLOC_TEST_MAGIC".ptr)
     } else {
         0
@@ -161,6 +165,7 @@ unsafe fn alloc_test_get_header(__param_ptr: *mut c_void) -> *mut _BlockHeader {
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 unsafe fn alloc_test_overwrite(__param_ptr: *mut c_void, __param_length: u64, __param_pattern: u32) {
     var __local_byte_ptr: *mut u8
 
@@ -174,7 +179,7 @@ unsafe fn alloc_test_overwrite(__param_ptr: *mut c_void, __param_length: u64, __
 
     (__local_i = ((0 as u64)))
 
-    while ((if __local_i < __param_length: 1 else: 0) != 0) {
+    while (__local_i < __param_length) {
         (__local_pattern_seq = ((((__local_i as u64) & (3 as u64)) as i32)))
 
         (__local_b = ((((((__param_pattern as u32) >> ((8 * __local_pattern_seq) as u32)) as u32) & (255 as u32)) as u8)))

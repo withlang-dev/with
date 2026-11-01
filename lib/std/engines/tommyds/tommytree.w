@@ -70,15 +70,7 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
-pub unsafe fn tommy_tree_init(__param_tree: *mut tommy_tree_struct, __param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32]) {
-    ((*__param_tree).root = null)
-
-    ((*__param_tree).count = ((0 as u64)))
-
-    ((*__param_tree).cmp = __param_cmp)
-
-}
-
+// contract: receiver-mut:tommy_tree_struct,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_tree_insert(__param_tree: *mut tommy_tree_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut c_void {
     var __local_insert: *mut tommy_node_struct = __param_node
 
@@ -92,7 +84,7 @@ pub unsafe fn tommy_tree_insert(__param_tree: *mut tommy_tree_struct, __param_no
 
     ((*__param_tree).root = tommy_tree_insert_node((*__param_tree).cmp, (*__param_tree).root, (&raw mut __local_insert as *mut *mut tommy_node_struct)))
 
-    if ((if __local_insert == __param_node: 1 else: 0) != 0) {
+    if (__local_insert == __param_node) {
         ((*__param_tree).count = ((*__param_tree).count +% 1))
     }
 
@@ -100,12 +92,13 @@ pub unsafe fn tommy_tree_insert(__param_tree: *mut tommy_tree_struct, __param_no
 
 }
 
+// contract: receiver-mut:tommy_tree_struct,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_tree_remove(__param_tree: *mut tommy_tree_struct, __param_data: *mut c_void) -> *mut c_void {
     var __local_node: *mut tommy_node_struct = null
 
     ((*__param_tree).root = tommy_tree_remove_node((*__param_tree).cmp, (*__param_tree).root, __param_data, (&raw mut __local_node as *mut *mut tommy_node_struct)))
 
-    if ((if not (__local_node != null): 1 else: 0) != 0) {
+    if (not (__local_node != null)) {
         return ((0 as *mut c_void))
     }
 
@@ -115,10 +108,11 @@ pub unsafe fn tommy_tree_remove(__param_tree: *mut tommy_tree_struct, __param_da
 
 }
 
+// contract: unproved:0:tommy_tree_search_node may write through it,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn tommy_tree_search(__param_tree: *mut tommy_tree_struct, __param_data: *mut c_void) -> *mut c_void {
     var __local_node: *mut tommy_node_struct = tommy_tree_search_node((*__param_tree).cmp, (*__param_tree).root, __param_data)
 
-    if ((if not (__local_node != null): 1 else: 0) != 0) {
+    if (not (__local_node != null)) {
         return ((0 as *mut c_void))
     }
 
@@ -126,10 +120,11 @@ pub unsafe fn tommy_tree_search(__param_tree: *mut tommy_tree_struct, __param_da
 
 }
 
+// contract: unproved:0:tommy_tree_search_node may write through it,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *mut c_void) -> *mut c_void {
     var __local_node: *mut tommy_node_struct = tommy_tree_search_node(Some(__param_cmp), (*__param_tree).root, __param_cmp_arg)
 
-    if ((if not (__local_node != null): 1 else: 0) != 0) {
+    if (not (__local_node != null)) {
         return ((0 as *mut c_void))
     }
 
@@ -137,10 +132,11 @@ pub unsafe fn tommy_tree_search_compare(__param_tree: *mut tommy_tree_struct, __
 
 }
 
+// contract: receiver-mut:tommy_tree_struct,unproved:1:read only
 pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_data: *mut c_void = tommy_tree_remove(__param_tree, (*__param_node).data)
 
-    if (((if not ((if __local_data != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_data != 0): 1 else: 0) as i64) {
         __assert_rtn(c"tommy_tree_remove_existing".ptr, c"tommytree.c".ptr, (239 as i32), c"data != 0".ptr)
     } else {
         0
@@ -150,23 +146,15 @@ pub unsafe fn tommy_tree_remove_existing(__param_tree: *mut tommy_tree_struct, _
 
 }
 
+// contract: unproved:0:tommy_tree_foreach_node may write through it
 pub unsafe fn tommy_tree_foreach(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
     tommy_tree_foreach_node((*__param_tree).root, Some(__param_func))
 
 }
 
+// contract: unproved:0:tommy_tree_foreach_arg_node may write through it,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_tree_foreach_arg(__param_tree: *mut tommy_tree_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     tommy_tree_foreach_arg_node((*__param_tree).root, Some(__param_func), __param_arg)
-
-}
-
-pub unsafe fn tommy_tree_count(__param_tree: *mut tommy_tree_struct) -> u64 {
-    return (*__param_tree).count
-
-}
-
-pub unsafe fn tommy_tree_memory_usage(__param_tree: *mut tommy_tree_struct) -> u64 {
-    return ((tommy_tree_count(__param_tree) as u64) *% (32 as u64))
 
 }
 
@@ -182,8 +170,8 @@ unsafe fn tommy_tree_delta(__param_root: *mut tommy_node_struct) -> i64 {
 unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_delta: i64 = ((tommy_tree_delta(__param_root) as i64))
 
-    if ((if __local_delta < -1: 1 else: 0) != 0) {
-        if ((if tommy_tree_delta((*__param_root).next) > 0: 1 else: 0) != 0) {
+    if (__local_delta < -1) {
+        if (tommy_tree_delta((*__param_root).next) > 0) {
             ((*__param_root).next = tommy_tree_rotate_right((*__param_root).next))
         }
 
@@ -191,8 +179,8 @@ unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy
 
     }
 
-    if ((if __local_delta > 1: 1 else: 0) != 0) {
-        if ((if tommy_tree_delta((*__param_root).prev) < 0: 1 else: 0) != 0) {
+    if (__local_delta > 1) {
+        if (tommy_tree_delta((*__param_root).prev) < 0) {
             ((*__param_root).prev = tommy_tree_rotate_left((*__param_root).prev))
         }
 
@@ -205,10 +193,10 @@ unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy
     var __ci_expr_logic_0: i32 = 0
 
     if ((*__param_root).prev != null) {
-        (__ci_expr_logic_0 = (if (if (*(*__param_root).prev).index > (*__param_root).index: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*(*__param_root).prev).index > (*__param_root).index: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         ((*__param_root).index = (*(*__param_root).prev).index)
     }
 
@@ -216,10 +204,10 @@ unsafe fn tommy_tree_balance(__param_root: *mut tommy_node_struct) -> *mut tommy
     var __ci_expr_logic_1: i32 = 0
 
     if ((*__param_root).next != null) {
-        (__ci_expr_logic_1 = (if (if (*(*__param_root).next).index > (*__param_root).index: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*(*__param_root).next).index > (*__param_root).index: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         ((*__param_root).index = (*(*__param_root).next).index)
     }
 
@@ -252,8 +240,9 @@ unsafe fn tommy_tree_rotate_right(__param_root: *mut tommy_node_struct) -> *mut 
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:read only
 unsafe fn tommy_tree_move_right(__param_root: *mut tommy_node_struct, __param_node: *mut tommy_node_struct) -> *mut tommy_node_struct {
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return __param_node
     }
 
@@ -263,23 +252,24 @@ unsafe fn tommy_tree_move_right(__param_root: *mut tommy_node_struct, __param_no
 
 }
 
+// contract: stored-unknown:1,unproved:2:out-parameter written conditionally — stores an argument; ownership not modeled
 unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_c: i32
 
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return (*__param_let_)
     }
 
     (__local_c = ((__param_cmp.unwrap()(((*(*__param_let_)).data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
-    if ((if __local_c < 0: 1 else: 0) != 0) {
+    if (__local_c < 0) {
         ((*__param_root).prev = tommy_tree_insert_node(__param_cmp, (*__param_root).prev, __param_let_))
 
         return ((tommy_tree_balance(__param_root) as *mut tommy_node_struct))
 
     }
 
-    if ((if __local_c > 0: 1 else: 0) != 0) {
+    if (__local_c > 0) {
         ((*__param_root).next = tommy_tree_insert_node(__param_cmp, (*__param_root).next, __param_let_))
 
         return ((tommy_tree_balance(__param_root) as *mut tommy_node_struct))
@@ -292,23 +282,24 @@ unsafe fn tommy_tree_insert_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
+// contract: stored-unknown:1,stored-unknown:2,unproved:3:out-parameter a return before the write — stores an argument; ownership not modeled
 unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_data: *mut c_void, __param_let_: *mut *mut tommy_node_struct) -> *mut tommy_node_struct {
     var __local_c: i32
 
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return ((0 as *mut tommy_node_struct))
     }
 
     (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
-    if ((if __local_c < 0: 1 else: 0) != 0) {
+    if (__local_c < 0) {
         ((*__param_root).prev = tommy_tree_remove_node(__param_cmp, (*__param_root).prev, __param_data, __param_let_))
 
         return ((tommy_tree_balance(__param_root) as *mut tommy_node_struct))
 
     }
 
-    if ((if __local_c > 0: 1 else: 0) != 0) {
+    if (__local_c > 0) {
         ((*__param_root).next = tommy_tree_remove_node(__param_cmp, (*__param_root).next, __param_data, __param_let_))
 
         return ((tommy_tree_balance(__param_root) as *mut tommy_node_struct))
@@ -321,20 +312,21 @@ unsafe fn tommy_tree_remove_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
+// contract: unproved:1:read only,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32], __param_root: *mut tommy_node_struct, __param_data: *mut c_void) -> *mut tommy_node_struct {
     var __local_c: i32
 
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return ((0 as *mut tommy_node_struct))
     }
 
     (__local_c = ((__param_cmp.unwrap()((__param_data as *const c_void), ((*__param_root).data as *const c_void)) as i32)))
 
-    if ((if __local_c < 0: 1 else: 0) != 0) {
+    if (__local_c < 0) {
         return ((tommy_tree_search_node(__param_cmp, (*__param_root).prev, __param_data) as *mut tommy_node_struct))
     }
 
-    if ((if __local_c > 0: 1 else: 0) != 0) {
+    if (__local_c > 0) {
         return ((tommy_tree_search_node(__param_cmp, (*__param_root).next, __param_data) as *mut tommy_node_struct))
     }
 
@@ -342,10 +334,11 @@ unsafe fn tommy_tree_search_node(__param_cmp: Option[unsafe extern "C" fn(*const
 
 }
 
+// contract: unproved:0:tommy_tree_foreach_node may write through it
 unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void) -> Unit]) -> Unit {
     var __local_next: *mut tommy_node_struct
 
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return
     }
 
@@ -359,10 +352,11 @@ unsafe fn tommy_tree_foreach_node(__param_root: *mut tommy_node_struct, __param_
 
 }
 
+// contract: unproved:0:tommy_tree_foreach_arg_node may write through it,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __param_func: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_arg: *mut c_void) -> Unit {
     var __local_next: *mut tommy_node_struct
 
-    if ((if not (__param_root != null): 1 else: 0) != 0) {
+    if (not (__param_root != null)) {
         return
     }
 
@@ -373,5 +367,30 @@ unsafe fn tommy_tree_foreach_arg_node(__param_root: *mut tommy_node_struct, __pa
     __param_func.unwrap()(__param_arg, (*__param_root).data)
 
     tommy_tree_foreach_arg_node(__local_next, __param_func, __param_arg)
+
+}
+
+impl tommy_tree_struct {
+    pub mut fn tommy_tree_init(__param_cmp: Option[unsafe extern "C" fn(*const c_void, *const c_void) -> i32]) {
+        let __param_tree: *mut tommy_tree_struct = self as *mut tommy_tree_struct
+        ((unsafe *__param_tree).root = null)
+
+        ((unsafe *__param_tree).count = ((0 as u64)))
+
+        ((unsafe *__param_tree).cmp = __param_cmp)
+
+    }
+
+    pub fn tommy_tree_count() -> u64 {
+        let __param_tree: *mut tommy_tree_struct = (self as *const tommy_tree_struct) as *mut tommy_tree_struct
+        return (unsafe *__param_tree).count
+
+    }
+
+    pub fn tommy_tree_memory_usage() -> u64 {
+        let __param_tree: *mut tommy_tree_struct = (self as *const tommy_tree_struct) as *mut tommy_tree_struct
+        return ((unsafe { (*__param_tree).tommy_tree_count() } as u64) *% (32 as u64))
+
+    }
 
 }

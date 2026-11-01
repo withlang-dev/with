@@ -7,6 +7,7 @@ use InternPool
 use Diagnostic
 use Source
 use Overflow
+use ConstLiteral
 use AnalysisTypes
 use MirCore
 use MirLower
@@ -2194,6 +2195,13 @@ impl Codegen:
                             if name_sym == self.sym_sizeof or name_sym == self.sym_size_of:
                                 return const_int_ok(wl_abi_size_of(dl, type_val))
                             return const_int_ok(wl_abi_align_of(dl, type_val) as i64)
+            // `XS.len()` of a module constant whose initializer is a literal
+            // sequence is its element count, as data: a migrated C
+            // `sizeof(a) / sizeof(a[0])` in a global initializer (stc's
+            // `nr16: Cc_range16.len()`) is initialized storage, never a
+            // runtime init a bundle object would refuse (#2219).
+            let count = const_literal_len(self.pool, self.sema, node)
+            if count >= 0: return const_int_ok(count)
             return const_int_fail()
         if kind == NodeKind.NK_IDENT:
             let sym = self.pool.get_data0(node)
@@ -2202,8 +2210,17 @@ impl Codegen:
                 if self.const_int_syms[ci] == sym:
                     return const_int_ok(self.const_int_vals[ci])
             return const_int_fail()
+        // `XS[i]` and `P.field` of a module constant's literal: the element
+        // or field written there, folded in turn (`RANGES[0].lo`).
+        if kind == NodeKind.NK_INDEX or kind == NodeKind.NK_FIELD_ACCESS:
+            let part = self.const_literal_part_node(node)
+            if part != 0: return self.try_eval_const_int(part)
+            return const_int_fail()
         const_int_fail()
 
+    // D65: the literal a module-constant expression denotes has one owner
+    // (ConstLiteral).
+    fn const_literal_part_node(node: i32) -> i32: const_literal_part_node(self.pool, self.sema, node)
     // #2219: a fold that fails leaves the innermost sub-expression it stopped
     // at in `const_fold_unfolded_node` (the first failing leaf sets it; the
     // enclosing levels leave it), so a refusal can name `side()` rather than

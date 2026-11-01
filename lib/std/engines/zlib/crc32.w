@@ -14,22 +14,24 @@ use std.engines.zlib.adler32
 use std.engines.zlib.inftrees
 use std.collections
 
+// contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn crc32(__param_crc: u64, __param_buf: *const u8, __param_len: u32) -> u64 {
     return crc32_z(__param_crc, __param_buf, (__param_len as u64))
 
 }
 
+// contract: stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64) -> u64 {
     var __local_crc = __param_crc
     var __local_buf = __param_buf
     var __local_len = __param_len
-    if ((if __local_buf == 0: 1 else: 0) != 0) {
+    if (__local_buf == 0) {
         return ((0 as u64))
     }
 
     (__local_crc = (((((~__local_crc) as u64) & (4294967295 as u64)) as u64)))
 
-    if ((if __local_len >= 47: 1 else: 0) != 0) {
+    if (__local_len >= 47) {
         var __local_blks: u64
 
         var __local_words: *const u64
@@ -41,11 +43,11 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
         while true {
             var __ci_expr_logic_0: i32 = 0
 
-            if (__local_len != 0) {
-                (__ci_expr_logic_0 = (if (if ((__local_buf as u64) & (7 as u64)) != 0: 1 else: 0) != 0: 1 else: 0))
+            if __local_len {
+                (__ci_expr_logic_0 = (if ((__local_buf as u64) & (7 as u64)) != 0: 1 else: 0))
             }
 
-            if (not (__ci_expr_logic_0 != 0)) {
+            if (not __ci_expr_logic_0) {
                 break
             }
 
@@ -67,7 +69,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 
         (__local_endian = ((1 as u32)))
 
-        if ((*((&raw mut __local_endian as *mut u32) as *mut u8)) != 0) {
+        if (*((&raw mut __local_endian as *mut u32) as *mut u8)) {
             var __local_crc0: u32
 
             var __local_word0: u64
@@ -101,7 +103,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
             while true {
                 (__local_blks = (__local_blks -% 1))
 
-                if (not (__local_blks != 0)) {
+                if (not __local_blks) {
                     break
                 }
 
@@ -129,7 +131,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 
                 (__local_k = ((1 as i32)))
 
-                while ((if __local_k < 8: 1 else: 0) != 0) {
+                while (__local_k < 8) {
                     (__local_crc0 = (__local_crc0 as u32) ^ (crc_braid_table[__local_k][((((__local_word0 as u64) >> (((__local_k as i32) << (3 as u32)) as u32)) as u64) & (255 as u64))] as u32))
 
                     (__local_crc1 = (__local_crc1 as u32) ^ (crc_braid_table[__local_k][((((__local_word1 as u64) >> (((__local_k as i32) << (3 as u32)) as u32)) as u64) & (255 as u64))] as u32))
@@ -200,7 +202,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
             while true {
                 (__local_blks = (__local_blks -% 1))
 
-                if (not (__local_blks != 0)) {
+                if (not __local_blks) {
                     break
                 }
 
@@ -228,7 +230,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 
                 (__local_k = ((1 as i32)))
 
-                while ((if __local_k < 8: 1 else: 0) != 0) {
+                while (__local_k < 8) {
                     (__local_crc0_1 = (__local_crc0_1 as u64) ^ (crc_braid_big_table[__local_k][((((__local_word0_1 as u64) >> (((__local_k as i32) << (3 as u32)) as u32)) as u64) & (255 as u64))] as u64))
 
                     (__local_crc1_1 = (__local_crc1_1 as u64) ^ (crc_braid_big_table[__local_k][((((__local_word1_1 as u64) >> (((__local_k as i32) << (3 as u32)) as u32)) as u64) & (255 as u64))] as u64))
@@ -266,7 +268,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 
     }
 
-    while ((if __local_len >= 8: 1 else: 0) != 0) {
+    while (__local_len >= 8) {
         (__local_len = (__local_len -% 8))
 
         var __ci_expr_old_2: *const u8 = __local_buf
@@ -327,7 +329,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 
     }
 
-    while (__local_len != 0) {
+    while __local_len {
         (__local_len = (__local_len -% 1))
 
         var __ci_expr_old_10: *const u8 = __local_buf
@@ -344,7 +346,7 @@ pub unsafe fn crc32_z(__param_crc: u64, __param_buf: *const u8, __param_len: u64
 }
 
 pub fn crc32_combine_op(__param_crc1: u64, __param_crc2: u64, __param_op: u64) -> u64 {
-    if ((if __param_op == 0: 1 else: 0) != 0) {
+    if (__param_op == 0) {
         return ((0 as u64))
     }
 
@@ -373,7 +375,7 @@ pub fn crc32_combine64(__param_crc1: u64, __param_crc2: u64, __param_len2: i64) 
 }
 
 pub fn crc32_combine_gen64(__param_len2: i64) -> u64 {
-    if ((if __param_len2 < 0: 1 else: 0) != 0) {
+    if (__param_len2 < 0) {
         return ((0 as u64))
     }
 
@@ -398,10 +400,10 @@ fn multmodp(__param_a: u64, __param_b: u64) -> u64 {
     (__local_p = ((0 as u64)))
 
     while true {
-        if (((__param_a as u64) & (__local_m as u64)) != 0) {
+        if ((__param_a as u64) & (__local_m as u64)) {
             (__local_p = (__local_p as u64) ^ (__local_b as u64))
 
-            if ((if ((__param_a as u64) & (((__local_m as u64) -% (1 as u64)) as u64)) == 0: 1 else: 0) != 0) {
+            if (((__param_a as u64) & (((__local_m as u64) -% (1 as u64)) as u64)) == 0) {
                 break
             }
 
@@ -409,7 +411,7 @@ fn multmodp(__param_a: u64, __param_b: u64) -> u64 {
 
         (__local_m = __local_m >> (1 as u32))
 
-        (__local_b = (((if ((__local_b as u64) & (1 as u64)) != 0: (((((__local_b as u64) >> (1 as u32)) as u64) ^ (3988292384 as u64)) as u64) else: (((__local_b as u64) >> (1 as u32)) as u64)) as u64)))
+        (__local_b = (((if (__local_b as u64) & (1 as u64): (((((__local_b as u64) >> (1 as u32)) as u64) ^ (3988292384 as u64)) as u64) else: (((__local_b as u64) >> (1 as u32)) as u64)) as u64)))
 
     }
 
@@ -424,8 +426,8 @@ fn x2nmodp(__param_n: i64, __param_k: u32) -> u64 {
 
     (__local_p = ((((1 as u64) << (31 as u32)) as u64)))
 
-    while (__local_n != 0) {
-        if (((__local_n as i64) & (1 as i64)) != 0) {
+    while __local_n {
+        if ((__local_n as i64) & (1 as i64)) {
             (__local_p = ((multmodp((x2n_table[((__local_k as u32) & (31 as u32))] as u64), __local_p) as u64)))
         }
 
@@ -445,7 +447,7 @@ fn crc_word(__param_data: u64) -> u32 {
 
     (__local_k = ((0 as i32)))
 
-    while ((if __local_k < 8: 1 else: 0) != 0) {
+    while (__local_k < 8) {
         (__local_data = ((((((__local_data as u64) >> (8 as u32)) as u64) ^ (crc_table[((__local_data as u64) & (255 as u64))] as u64)) as u64)))
 
         (__local_k = __local_k + 1)
@@ -463,7 +465,7 @@ fn crc_word_big(__param_data: u64) -> u64 {
 
     (__local_k = ((0 as i32)))
 
-    while ((if __local_k < 8: 1 else: 0) != 0) {
+    while (__local_k < 8) {
         (__local_data = ((((((__local_data as u64) << (8 as u32)) as u64) ^ (crc_big_table[((((__local_data as u64) >> ((((8 - 1) as i32) << (3 as u32)) as u32)) as u64) & (255 as u64))] as u64)) as u64)))
 
         (__local_k = __local_k + 1)

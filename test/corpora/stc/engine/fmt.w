@@ -72,7 +72,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
     }
 
     '__ci_bb_2 {
-        if (__local_ch__goto_250_21 != 0) {
+        if __local_ch__goto_250_21 {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_3
@@ -109,7 +109,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_7 {
         (__local_fmt = __local_fmt + 1)
-        if ((if (*__local_fmt) == 125: 1 else: 0) != 0) {
+        if ((*__local_fmt) == 125) {
             goto '__ci_bb_8
         } else {
             goto '__ci_bb_9
@@ -127,7 +127,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_10 {
         (__local_fmt = __local_fmt + 1)
-        if ((if (*__local_fmt) == 123: 1 else: 0) != 0) {
+        if ((*__local_fmt) == 123) {
             goto '__ci_bb_11
         } else {
             goto '__ci_bb_12
@@ -140,7 +140,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_12 {
         (__local_n__goto_251_9 = __local_n__goto_251_9 + 1)
-        if ((if __local_n__goto_251_9 > __param_nargs: 1 else: 0) != 0) {
+        if (__local_n__goto_251_9 > __param_nargs) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_14
@@ -153,10 +153,10 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_14 {
         (__ci_expr_logic_2 = 0)
-        if ((if (*__local_fmt) != 58: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if (*__local_fmt) != 125: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_fmt) != 58) {
+            (__ci_expr_logic_2 = (if (*__local_fmt) != 125: 1 else: 0))
         }
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             goto '__ci_bb_15
         } else {
             goto '__ci_bb_16
@@ -180,7 +180,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
     }
 
     '__ci_bb_17 {
-        if (1 != 0) {
+        if true {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -240,7 +240,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_28 {
         (__local_n__goto_251_9 = __local_n__goto_251_9 + 1)
-        if ((if __local_n__goto_251_9 <= __param_nargs: 1 else: 0) != 0) {
+        if (__local_n__goto_251_9 <= __param_nargs) {
             goto '__ci_bb_29
         } else {
             goto '__ci_bb_30
@@ -314,7 +314,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
     }
 
     '__ci_bb_38 {
-        if ((if strchr(c"csdioxXufFeEaAgGnp".ptr, ((__local_fmt[-1]) as i32)) == null: 1 else: 0) != 0) {
+        if (strchr(c"csdioxXufFeEaAgGnp".ptr, ((__local_fmt[-1]) as i32)) == null) {
             goto '__ci_bb_46
         } else {
             goto '__ci_bb_47
@@ -322,7 +322,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
     }
 
     '__ci_bb_39 {
-        if (__local_empty__goto_251_16 != 0) {
+        if __local_empty__goto_251_16 {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_41
@@ -341,7 +341,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
 
     '__ci_bb_42 {
         (__local_arg__goto_250_11 = __local_arg__goto_250_11 + 1)
-        if (__local_empty__goto_251_16 != 0) {
+        if __local_empty__goto_251_16 {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_44
@@ -375,16 +375,16 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
         if (__local_p0__goto_250_17 != null) {
             var __ci_expr_logic_9: i32
 
-            if ((if (__local_p[-1]) == 115: 1 else: 0) != 0) {
+            if ((__local_p[-1]) == 115) {
                 (__ci_expr_logic_9 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_9 = (if (if (__local_p[-1]) == 99: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_9 = (if (__local_p[-1]) == 99: 1 else: 0))
             }
 
-            (__ci_expr_logic_10 = (if __ci_expr_logic_9 != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if __ci_expr_logic_9: 1 else: 0))
 
         }
-        if (__ci_expr_logic_10 != 0) {
+        if __ci_expr_logic_10 {
             goto '__ci_bb_51
         } else {
             goto '__ci_bb_52
@@ -392,7 +392,7 @@ pub unsafe fn _fmt_parse(__param_p: *mut c_char, __param_nargs: i32, __param_fmt
     }
 
     '__ci_bb_48 {
-        if ((*__local_arg__goto_250_11) != 0) {
+        if (*__local_arg__goto_250_11) {
             goto '__ci_bb_49
         } else {
             goto '__ci_bb_50
@@ -458,7 +458,7 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
     goto '__ci_bb_0
 
     '__ci_bb_0 {
-        if ((if __param_ss == null: 1 else: 0) != 0) {
+        if (__param_ss == null) {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_2
@@ -473,8 +473,8 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
 
     '__ci_bb_2 {
         (__local_args2__goto_229_19 = __local_args__goto_229_13)
-        (__local_n__goto_236_15 = ((vsnprintf((null as *mut c_char), (0 as u64), __param_fmt, __local_args__goto_229_13) as i32)))
-        if ((if __local_n__goto_236_15 < 0: 1 else: 0) != 0) {
+        (__local_n__goto_236_15 = vsnprintf((null as *mut c_char), (0 as u64), __param_fmt, __local_args__goto_229_13))
+        if (__local_n__goto_236_15 < 0) {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_5
@@ -490,9 +490,9 @@ pub unsafe fn _fmt_sprint(__param_ss: *mut fmt_stream, __param_fmt: *const c_cha
     }
 
     '__ci_bb_5 {
-        (__local_pos__goto_238_21 = (((if (*__param_ss).overwrite != 0: (0 as i64) else: (*__param_ss).len) as i64)))
+        (__local_pos__goto_238_21 = (((if (*__param_ss).overwrite: (0 as i64) else: (*__param_ss).len) as i64)))
         ((*__param_ss).len = (((__local_pos__goto_238_21 + __local_n__goto_236_15) as i64)))
-        if ((if (*__param_ss).len > (*__param_ss).cap: 1 else: 0) != 0) {
+        if ((*__param_ss).len > (*__param_ss).cap) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_8

@@ -5,7 +5,7 @@ use std.libc
 fn multimap_new_node() -> *mut multimap_node_s {
     var __local_n: *mut multimap_node_s = (((with_alloc(((sizeof[multimap_node_s]() as u64) as i64)) as *mut c_void) as *mut multimap_node_s))
 
-    if (((if not ((if not ((if __local_n == null: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not (__local_n == null)): 1 else: 0) as i64) {
         abort()
 
     }
@@ -28,40 +28,40 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -71,7 +71,7 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -79,11 +79,11 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -94,8 +94,8 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -107,14 +107,14 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -122,24 +122,24 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -147,32 +147,32 @@ unsafe fn multimap_init(__param_b: *mut multimap_s) {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -187,9 +187,9 @@ unsafe fn multimap_is_leaf(__param_n: *mut multimap_node_s) -> bool {
 unsafe fn multimap_get_num(__param_n: *mut multimap_node_s) -> i32 {
     var __local_num: i32 = (*__param_n).num
 
-    (__local_num = (((if (if __local_num < 0: 1 else: 0) != 0: ((0 - __local_num) as i32) else: __local_num) as i32)))
+    (__local_num = (((if __local_num < 0: ((0 - __local_num) as i32) else: __local_num) as i32)))
 
-    if (((if not ((if __local_num <= 5: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num <= 5): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_get_num".ptr, c"multimap.c".ptr, (5 as i32), c"num <= 5".ptr)
     } else {
         0
@@ -203,40 +203,40 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -246,7 +246,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -254,11 +254,11 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -269,8 +269,8 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -282,14 +282,14 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -297,24 +297,24 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -322,32 +322,32 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -361,7 +361,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
     var __local_np: i32 = ((0 as i32))
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
         var __ci_expr_old_2: i32 = __local_np
 
         (__local_np = __local_np + 1)
@@ -369,7 +369,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
         (__local_pit[0].parent[__ci_expr_old_2] = __local_n)
 
 
-        if (((if not ((if __local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"np <= ((int)(1 + 8*sizeof (size_t)))".ptr)
         } else {
             0
@@ -386,7 +386,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
     (__local_pit[0].parent[__ci_expr_old_3] = __local_n)
 
 
-    if (((if not ((if __local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32))): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"np <= ((int)(1 + 8*sizeof (size_t)))".ptr)
     } else {
         0
@@ -394,17 +394,17 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
     var __local_i: i32 = ((0 as i32))
 
-    while ((if __local_i < __local_np: 1 else: 0) != 0) {
+    while (__local_i < __local_np) {
         (__local_n = (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).parent[__local_i])
 
-        while ((if __local_n != null: 1 else: 0) != 0) {
+        while (__local_n != null) {
             var __local_num: i32 = ((multimap_get_num(__local_n) as i32))
 
             var __local_is_leaf: bool = multimap_is_leaf(__local_n)
 
             var __local_j: i32 = ((0 as i32))
 
-            while ((if __local_j < __local_num: 1 else: 0) != 0) {
+            while (__local_j < __local_num) {
 
                 if __local_is_leaf {
 
@@ -418,7 +418,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             (__local_next = (*__local_n).next)
 
-            if ((if __local_i != 0: 1 else: 0) != 0) {
+            if (__local_i != 0) {
                 with_free(((__local_n as *mut c_void) as *mut u8))
 
             }
@@ -440,40 +440,40 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_4: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_4 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -483,7 +483,7 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -491,11 +491,11 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
                 var __ci_expr_logic_5: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_5 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -506,8 +506,8 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -519,14 +519,14 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -534,24 +534,24 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -559,32 +559,32 @@ unsafe fn multimap_reset(__param_b: *mut multimap_s) {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_reset".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -595,40 +595,40 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -638,7 +638,7 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -646,11 +646,11 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -661,8 +661,8 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -674,14 +674,14 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -689,24 +689,24 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -714,32 +714,32 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_clear".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -752,6 +752,7 @@ unsafe fn multimap_clear(__param_b: *mut multimap_s) {
 
 }
 
+// contract: unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:read only
 unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: *mut multimap_node_s, __param_root: *mut multimap_node_s) -> Unit {
     var __local_n: *mut multimap_node_s = multimap_new_node()
 
@@ -763,7 +764,7 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
     if multimap_is_leaf(__param_o) {
         var __local_i: i32 = ((0 as i32))
 
-        while ((if __local_i < __local_num: 1 else: 0) != 0) {
+        while (__local_i < __local_num) {
             ((*__local_n).key[__local_i] = (((*__param_o).key[__local_i] as i32)))
 
 
@@ -778,7 +779,7 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
 
     } else {
-        if (((if not ((if __local_num != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num != 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"num != 0".ptr)
         } else {
             0
@@ -786,7 +787,7 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         var __local_i_1: i32 = ((0 as i32))
 
-        while ((if __local_i_1 < __local_num: 1 else: 0) != 0) {
+        while (__local_i_1 < __local_num) {
             ((*__local_n).key[__local_i_1] = (((*__param_o).key[__local_i_1] as i32)))
 
 
@@ -798,8 +799,8 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         var __local_i_2: i32 = ((0 as i32))
 
-        while ((if __local_i_2 <= __local_num: 1 else: 0) != 0) {
-            if (((if not ((if (*(&raw const (*__param_o).kind as *const multimap_kind_s)).node[__local_i_2] != __param_root: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        while (__local_i_2 <= __local_num) {
+            if ((if not ((*(&raw const (*__param_o).kind as *const multimap_kind_s)).node[__local_i_2] != __param_root): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"o->kind.node[i] != root".ptr)
             } else {
                 0
@@ -815,7 +816,7 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         var __local_i_3: i32 = ((0 as i32))
 
-        while ((if __local_i_3 < __local_num: 1 else: 0) != 0) {
+        while (__local_i_3 < __local_num) {
             var __local_current: *mut multimap_node_s = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[__local_i_3]
 
             var __local_next: *mut multimap_node_s = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[(__local_i_3 + 1)]
@@ -824,8 +825,8 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
             ((*__local_next).prev = __local_current)
 
-            while ((if not multimap_is_leaf(__local_current): 1 else: 0) != 0) {
-                if (((if not ((if not multimap_is_leaf(__local_next): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (not multimap_is_leaf(__local_current)) {
+                if ((if not (not multimap_is_leaf(__local_next)): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"!multimap_is_leaf(next)".ptr)
                 } else {
                     0
@@ -853,13 +854,13 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
     ((*__local_n).num = (*__param_o).num)
 
     loop {
-        if (((if not ((if __local_n != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_n != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"(n) != ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (if (if __param_o == __param_root: 1 else: 0) != 0: __local_n else: __param_root) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if __param_o == __param_root: __local_n else: __param_root) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"((o==root) ? n : root) != ((void*)0)".ptr)
         } else {
             0
@@ -869,24 +870,24 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-        (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+        (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-        if ((if __local_n == (if (if __param_o == __param_root: 1 else: 0) != 0: __local_n else: __param_root): 1 else: 0) != 0) {
+        if (__local_n == (if __param_o == __param_root: __local_n else: __param_root)) {
             var __ci_expr_logic_0: i32 = 0
 
-            if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (0 <= __local_num2) {
+                (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
             } else {
                 0
             }
 
 
-            if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+            if (__local_num2 == 0) {
+                if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                 } else {
                     0
@@ -896,7 +897,7 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
         } else {
             var __local_c2: i32 = (((5 / 2) as i32))
 
-            if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
             } else {
                 0
@@ -904,11 +905,11 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
             var __ci_expr_logic_1: i32 = 0
 
-            if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (__local_c2 <= __local_num2) {
+                (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
             } else {
                 0
@@ -919,8 +920,8 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         var __local_i2: i32 = ((1 as i32))
 
-        while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-            if (((if not ((if (if (if (*__local_n).key[(__local_i2 - 1)] < (*__local_n).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_i2 - 1)] > (*__local_n).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        while (__local_i2 < __local_num2) {
+            if ((if not ((if (*__local_n).key[(__local_i2 - 1)] < (*__local_n).key[__local_i2]: (-1 as i32) else: ((if (*__local_n).key[(__local_i2 - 1)] > (*__local_n).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[i2-1]) < ((n)->key[i2]) ? -1 : ((n)->key[i2-1]) > ((n)->key[i2])) <= 0".ptr)
             } else {
                 0
@@ -932,14 +933,14 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
         }
 
 
-        if ((if (*__local_n).next != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).next != null) {
+            if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*__local_n).key[(__local_num2 - 1)] < (*(*__local_n).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_num2 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*__local_n).key[(__local_num2 - 1)] < (*(*__local_n).next).key[0]: (-1 as i32) else: ((if (*__local_n).key[(__local_num2 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[num2-1]) < ((n)->next->key[0]) ? -1 : ((n)->key[num2-1]) > ((n)->next->key[0])) <= 0".ptr)
             } else {
                 0
@@ -947,8 +948,8 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         }
 
-        if ((if (*__local_n).prev != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).prev != null) {
+            if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
@@ -956,15 +957,15 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
             var __local_num_prev: i32 = (*(*__local_n).prev).num
 
-            (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+            (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-            if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*(*__local_n).prev).key[(__local_num_prev - 1)] < (*__local_n).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] < (*__local_n).key[0]: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_copy_node".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->prev->key[num_prev-1]) < ((n)->key[0]) ? -1 : ((n)->prev->key[num_prev-1]) > ((n)->key[0])) <= 0".ptr)
             } else {
                 0
@@ -972,51 +973,52 @@ unsafe fn multimap_copy_node(__param_dst: *mut *mut multimap_node_s, __param_o: 
 
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:read only
 unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"((o)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_o[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_o[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"((o)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_o[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_o[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1026,7 +1028,7 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1034,11 +1036,11 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1049,8 +1051,8 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((o)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((o)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((o)->root+0)->key[i2-1]) < (((o)->root+0)->key[i2]) ? -1 : (((o)->root+0)->key[i2-1]) > (((o)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1062,14 +1064,14 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
             }
 
 
-            if ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((o)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((o)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((o)->root+0)->key[num2-1]) < (((o)->root+0)->next->key[0]) ? -1 : (((o)->root+0)->key[num2-1]) > (((o)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1077,24 +1079,24 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             }
 
-            if ((if ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_o[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((o)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((o)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((o)->root+0)->prev->key[num_prev-1]) < (((o)->root+0)->key[0]) ? -1 : (((o)->root+0)->prev->key[num_prev-1]) > (((o)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1102,37 +1104,37 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_o[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_o[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(o)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_o[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_o[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(o)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_o[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_o[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_o[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_o[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_o[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_o[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"-(o)->root->num == (int) (o)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if (&(__param_b[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_b[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"b != ((void*)0)".ptr)
     } else {
         0
@@ -1156,40 +1158,40 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1199,7 +1201,7 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1207,11 +1209,11 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
                 var __ci_expr_logic_3: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1222,8 +1224,8 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1235,14 +1237,14 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1250,24 +1252,24 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1275,32 +1277,32 @@ unsafe fn multimap_init_set(__param_b: *mut multimap_s, __param_o: *mut multimap
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_set".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1311,40 +1313,40 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1354,7 +1356,7 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1362,11 +1364,11 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1377,8 +1379,8 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1390,14 +1392,14 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1405,24 +1407,24 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1430,32 +1432,32 @@ unsafe fn multimap_empty_p(__param_b: *mut multimap_s) -> bool {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_empty_p".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1468,40 +1470,40 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1511,7 +1513,7 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1519,11 +1521,11 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1534,8 +1536,8 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1547,14 +1549,14 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1562,24 +1564,24 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1587,32 +1589,32 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_size".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1621,13 +1623,14 @@ unsafe fn multimap_size(__param_b: *mut multimap_s) -> u64 {
 
 }
 
+// contract: receiver-mut:multimap_parent_it_s,unproved:1:read only
 unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __param_b: *mut multimap_s, __param_key: i32) -> *mut multimap_node_s {
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_b[0]) as *const multimap_s)).root
 
     var __local_np: i32 = ((0 as i32))
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
-        if (((if not ((if __local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
+        if ((if not (__local_np <= ((((1 as u64) +% (((8 as u64) *% (sizeof[u64]() as u64)) as u64)) as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"np <= ((int)(1 + 8*sizeof (size_t)))".ptr)
         } else {
             0
@@ -1638,7 +1641,7 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
         var __local_hi: i32 = (*__local_n).num
 
 
-        if (((if not ((if __local_hi > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_hi > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"hi > 0".ptr)
         } else {
             0
@@ -1646,8 +1649,8 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
         (__local_i = ((0 as i32)))
 
-        while ((if __local_i < __local_hi: 1 else: 0) != 0) {
-            if ((if (if (if __param_key < (*__local_n).key[__local_i]: 1 else: 0) != 0: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0) {
+        while (__local_i < __local_hi) {
+            if ((if __param_key < (*__local_n).key[__local_i]: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) <= 0) {
                 break
             }
 
@@ -1666,20 +1669,20 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
         (__local_n = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[__local_i])
 
-        if (((if not ((if __local_n != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_n != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"n != ((void*)0)".ptr)
         } else {
             0
         }
 
         loop {
-            if (((if not ((if __local_n != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_n != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"(n) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
             } else {
                 0
@@ -1689,24 +1692,24 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if __local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (__local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1716,7 +1719,7 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1724,11 +1727,11 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_2 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1739,8 +1742,8 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if (*__local_n).key[(__local_i2 - 1)] < (*__local_n).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_i2 - 1)] > (*__local_n).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*__local_n).key[(__local_i2 - 1)] < (*__local_n).key[__local_i2]: (-1 as i32) else: ((if (*__local_n).key[(__local_i2 - 1)] > (*__local_n).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[i2-1]) < ((n)->key[i2]) ? -1 : ((n)->key[i2-1]) > ((n)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1752,14 +1755,14 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
             }
 
 
-            if ((if (*__local_n).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*__local_n).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*__local_n).key[(__local_num2 - 1)] < (*(*__local_n).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_num2 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*__local_n).key[(__local_num2 - 1)] < (*(*__local_n).next).key[0]: (-1 as i32) else: ((if (*__local_n).key[(__local_num2 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[num2-1]) < ((n)->next->key[0]) ? -1 : ((n)->key[num2-1]) > ((n)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1767,8 +1770,8 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
             }
 
-            if ((if (*__local_n).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*__local_n).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
@@ -1776,15 +1779,15 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
                 var __local_num_prev: i32 = (*(*__local_n).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*(*__local_n).prev).key[(__local_num_prev - 1)] < (*__local_n).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] < (*__local_n).key[0]: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_i_search_for_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->prev->key[num_prev-1]) < ((n)->key[0]) ? -1 : ((n)->prev->key[num_prev-1]) > ((n)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1792,7 +1795,7 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -1805,44 +1808,45 @@ unsafe fn multimap_i_search_for_leaf(__param_pit: *mut multimap_parent_it_s, __p
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -1852,7 +1856,7 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -1860,11 +1864,11 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -1875,8 +1879,8 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -1888,14 +1892,14 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1903,24 +1907,24 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -1928,32 +1932,32 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1965,13 +1969,13 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
     var __local_cmp: i32 = ((0 as i32))
 
     loop {
-        if (((if not ((if __local_n != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_n != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(n) != ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
@@ -1981,24 +1985,24 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
         var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-        (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+        (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-        if ((if __local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        if (__local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             var __ci_expr_logic_2: i32 = 0
 
-            if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (0 <= __local_num2_1) {
+                (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
             } else {
                 0
             }
 
 
-            if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+            if (__local_num2_1 == 0) {
+                if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                 } else {
                     0
@@ -2008,7 +2012,7 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
         } else {
             var __local_c2_1: i32 = (((5 / 2) as i32))
 
-            if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
             } else {
                 0
@@ -2016,11 +2020,11 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
             var __ci_expr_logic_3: i32 = 0
 
-            if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (__local_c2_1 <= __local_num2_1) {
+                (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
             } else {
                 0
@@ -2031,8 +2035,8 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
         var __local_i2_1: i32 = ((1 as i32))
 
-        while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-            if (((if not ((if (if (if (*__local_n).key[(__local_i2_1 - 1)] < (*__local_n).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_i2_1 - 1)] > (*__local_n).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        while (__local_i2_1 < __local_num2_1) {
+            if ((if not ((if (*__local_n).key[(__local_i2_1 - 1)] < (*__local_n).key[__local_i2_1]: (-1 as i32) else: ((if (*__local_n).key[(__local_i2_1 - 1)] > (*__local_n).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[i2-1]) < ((n)->key[i2]) ? -1 : ((n)->key[i2-1]) > ((n)->key[i2])) <= 0".ptr)
             } else {
                 0
@@ -2044,14 +2048,14 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
         }
 
 
-        if ((if (*__local_n).next != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).next != null) {
+            if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*__local_n).key[(__local_num2_1 - 1)] < (*(*__local_n).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_num2_1 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*__local_n).key[(__local_num2_1 - 1)] < (*(*__local_n).next).key[0]: (-1 as i32) else: ((if (*__local_n).key[(__local_num2_1 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[num2-1]) < ((n)->next->key[0]) ? -1 : ((n)->key[num2-1]) > ((n)->next->key[0])) <= 0".ptr)
             } else {
                 0
@@ -2059,8 +2063,8 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
         }
 
-        if ((if (*__local_n).prev != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).prev != null) {
+            if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
@@ -2068,15 +2072,15 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
             var __local_num_prev_1: i32 = (*(*__local_n).prev).num
 
-            (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+            (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-            if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] < (*__local_n).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] < (*__local_n).key[0]: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->prev->key[num_prev-1]) < ((n)->key[0]) ? -1 : ((n)->prev->key[num_prev-1]) > ((n)->key[0])) <= 0".ptr)
             } else {
                 0
@@ -2084,7 +2088,7 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -2094,17 +2098,17 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
     while true {
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if __local_cmp >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_i < (0 - (*__local_n).num): 1 else: 0) != 0: 1 else: 0))
+        if (__local_cmp >= 0) {
+            (__ci_expr_logic_4 = (if __local_i < (0 - (*__local_n).num): 1 else: 0))
         }
 
-        if (not (__ci_expr_logic_4 != 0)) {
+        if (not __ci_expr_logic_4) {
             break
         }
 
-        (__local_cmp = (((if (if __param_key < (*__local_n).key[__local_i]: 1 else: 0) != 0: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
+        (__local_cmp = (((if __param_key < (*__local_n).key[__local_i]: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
 
-        if ((if __local_cmp == 0: 1 else: 0) != 0) {
+        if (__local_cmp == 0) {
             return (((&raw const (*__local_n).kind.value[__local_i] as *const i32) as *mut i32))
 
         }
@@ -2121,13 +2125,14 @@ unsafe fn multimap_get(__param_b: *mut multimap_s, __param_key: i32) -> *mut i32
 @[repr(C)]
 pub type multimap_cget_literal_anon = union { ptr: *mut i32 = null, cptr: *const i32 = null }
 impl Copy for multimap_cget_literal_anon
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_cget(__param_b: *mut multimap_s, __param_key: i32) -> *const i32 {
     return (multimap_cget_literal_anon { ptr: multimap_get((&(__param_b[0]) as *mut multimap_s), __param_key) } as multimap_cget_literal_anon).cptr
 
 }
 
 unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction_t_anon) {
-    if (((if not ((if (&(__param_records[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_records[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"records != ((void*)0)".ptr)
     } else {
         0
@@ -2135,7 +2140,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
     var __local_j: i32 = ((((*(&raw const (__param_records[0]) as *const m_bptr33_transaction_t_anon)).size - 1) as i32))
 
-    while ((if __local_j >= 0: 1 else: 0) != 0) {
+    while (__local_j >= 0) {
         var __local_record: *mut m_bptr33_transaction_record_t = (((&raw const (__param_records[0]).tab[__local_j] as *const m_bptr33_transaction_record_t) as *mut m_bptr33_transaction_record_t))
 
         while true {
@@ -2155,13 +2160,13 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
                 9 => {
                     var __local_t: *mut multimap_s = (((*__local_record).data_dst as *mut multimap_s))
 
-                    if (((if not ((if __local_t != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not (__local_t != null): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"t != ((void*)0)".ptr)
                     } else {
                         0
                     }
 
-                    if (((if not ((if (*__local_t).size > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not ((*__local_t).size > 0): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"t->size > 0".ptr)
                     } else {
                         0
@@ -2177,11 +2182,11 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if ((if __local_a != null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_0 = (if (if (*__local_a).next == __local_b: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_a != null) {
+                        (__ci_expr_logic_0 = (if (*__local_a).next == __local_b: 1 else: 0))
                     }
 
-                    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"a != ((void*)0) && a->next == b".ptr)
                     } else {
                         0
@@ -2190,11 +2195,11 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __ci_expr_logic_1: i32 = 0
 
-                    if (multimap_is_leaf(__local_a) != 0) {
-                        (__ci_expr_logic_1 = (if multimap_is_leaf(__local_b) != 0: 1 else: 0))
+                    if multimap_is_leaf(__local_a) {
+                        (__ci_expr_logic_1 = (if multimap_is_leaf(__local_b): 1 else: 0))
                     }
 
-                    if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(a) && multimap_is_leaf(b)".ptr)
                     } else {
                         0
@@ -2203,7 +2208,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     ((*__local_a).next = (*__local_b).next)
 
-                    if ((if (*__local_b).next != null: 1 else: 0) != 0) {
+                    if ((*__local_b).next != null) {
                         ((*(*__local_b).next).prev = __local_a)
 
                     }
@@ -2212,7 +2217,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __local_nb: i32 = ((multimap_get_num(__local_b) as i32))
 
-                    if (((if not ((if (__local_na + __local_nb) == (5 + 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not ((__local_na + __local_nb) == (5 + 1)): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"na + nb == 5 + 1".ptr)
                     } else {
                         0
@@ -2232,11 +2237,11 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __ci_expr_logic_2: i32 = 0
 
-                    if ((if __local_a_1 != null: 1 else: 0) != 0) {
-                        (__ci_expr_logic_2 = (if (if (*__local_a_1).next == __local_b_1: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_a_1 != null) {
+                        (__ci_expr_logic_2 = (if (*__local_a_1).next == __local_b_1: 1 else: 0))
                     }
 
-                    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"a != ((void*)0) && a->next == b".ptr)
                     } else {
                         0
@@ -2245,11 +2250,11 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __ci_expr_logic_3: i32 = 0
 
-                    if ((if not multimap_is_leaf(__local_a_1): 1 else: 0) != 0) {
-                        (__ci_expr_logic_3 = (if (if not multimap_is_leaf(__local_b_1): 1 else: 0) != 0: 1 else: 0))
+                    if (not multimap_is_leaf(__local_a_1)) {
+                        (__ci_expr_logic_3 = (if not multimap_is_leaf(__local_b_1): 1 else: 0))
                     }
 
-                    if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"!multimap_is_leaf(a) && !multimap_is_leaf(b)".ptr)
                     } else {
                         0
@@ -2258,7 +2263,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     ((*__local_a_1).next = (*__local_b_1).next)
 
-                    if ((if (*__local_b_1).next != null: 1 else: 0) != 0) {
+                    if ((*__local_b_1).next != null) {
                         ((*(*__local_b_1).next).prev = __local_a_1)
 
                     }
@@ -2267,7 +2272,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                     var __local_nb_1: i32 = ((multimap_get_num(__local_b_1) as i32))
 
-                    if (((if not ((if ((__local_na_1 + __local_nb_1) + 1) == (5 + 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not (((__local_na_1 + __local_nb_1) + 1) == (5 + 1)): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"na + nb + 1 == 5 + 1".ptr)
                     } else {
                         0
@@ -2283,7 +2288,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
                 7 => {
                     var __local_n: *mut multimap_node_s = (((*__local_record).data_dst as *mut multimap_node_s))
 
-                    if (((if not multimap_is_leaf(__local_n): 1 else: 0) as i64) != 0) {
+                    if ((if not multimap_is_leaf(__local_n): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(n)".ptr)
                     } else {
                         0
@@ -2304,7 +2309,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
                 8 => {
                     var __local_n_1: *mut multimap_node_s = (((*__local_record).data_dst as *mut multimap_node_s))
 
-                    if (((if not ((if not multimap_is_leaf(__local_n_1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                    if ((if not (not multimap_is_leaf(__local_n_1)): 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"!multimap_is_leaf(n)".ptr)
                     } else {
                         0
@@ -2323,7 +2328,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 
                 },
                 _ => {
-                    if ((1 as i64) != 0) {
+                    if (1 as i64) {
                         __assert_rtn(c"multimap_rewind_transaction".ptr, c"multimap.c".ptr, (5 as i32), c"0".ptr)
                     } else {
                         0
@@ -2348,7 +2353,7 @@ unsafe fn multimap_rewind_transaction(__param_records: *mut m_bptr33_transaction
 }
 
 unsafe fn multimap_i_search_and_insert_in_leaf(__param_n: *mut multimap_node_s, __param_key: i32, __param_value: i32) -> i32 {
-    if (((if not multimap_is_leaf(__param_n): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf(__param_n): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_and_insert_in_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(n)".ptr)
     } else {
         0
@@ -2360,7 +2365,7 @@ unsafe fn multimap_i_search_and_insert_in_leaf(__param_n: *mut multimap_node_s, 
     var __local_num: i32 = ((multimap_get_num(__param_n) as i32))
 
 
-    if (((if not ((if __local_num <= 5: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num <= 5): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_and_insert_in_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"num <= 5".ptr)
     } else {
         0
@@ -2368,13 +2373,13 @@ unsafe fn multimap_i_search_and_insert_in_leaf(__param_n: *mut multimap_node_s, 
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __local_num: 1 else: 0) != 0) {
+    while (__local_i < __local_num) {
         var __local_cmp: i32
 
-        (__local_cmp = (((if (if __param_key < (*__param_n).key[__local_i]: 1 else: 0) != 0: (-1 as i32) else: ((if __param_key > (*__param_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
+        (__local_cmp = (((if __param_key < (*__param_n).key[__local_i]: (-1 as i32) else: ((if __param_key > (*__param_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
 
 
-        if ((if __local_cmp <= 0: 1 else: 0) != 0) {
+        if (__local_cmp <= 0) {
             with_memmove(((((&raw const (*__param_n).key[(__local_i + 1)] as *const i32) as *mut i32) as *mut c_void) as *mut u8), ((((&raw const (*__param_n).key[__local_i] as *const i32) as *mut i32) as *const c_void) as *const u8), ((((4 as u64) *% (((__local_num - __local_i) as u32) as u64)) as u64) as i64))
 
             with_memmove(((((&raw const (*__param_n).kind.value[(__local_i + 1)] as *const i32) as *mut i32) as *mut c_void) as *mut u8), ((((&raw const (*__param_n).kind.value[__local_i] as *const i32) as *mut i32) as *const c_void) as *const u8), ((((4 as u64) *% (((__local_num - __local_i) as u32) as u64)) as u64) as i64))
@@ -2402,8 +2407,9 @@ unsafe fn multimap_i_search_and_insert_in_leaf(__param_n: *mut multimap_node_s, 
 
 }
 
+// contract: receiver-mut:multimap_node_s,unproved:1:read only,unproved:2:read only
 unsafe fn multimap_i_search_and_insert_in_node(__param_n: *mut multimap_node_s, __param_l: *mut multimap_node_s, __param_key: *mut i32) -> i32 {
-    if (((if not ((if not multimap_is_leaf(__param_n): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not multimap_is_leaf(__param_n)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_and_insert_in_node".ptr, c"multimap.c".ptr, (5 as i32), c"!multimap_is_leaf(n)".ptr)
     } else {
         0
@@ -2415,7 +2421,7 @@ unsafe fn multimap_i_search_and_insert_in_node(__param_n: *mut multimap_node_s, 
     var __local_num: i32 = ((multimap_get_num(__param_n) as i32))
 
 
-    if (((if not ((if __local_num <= 5: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num <= 5): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_and_insert_in_node".ptr, c"multimap.c".ptr, (5 as i32), c"num <= 5".ptr)
     } else {
         0
@@ -2423,8 +2429,8 @@ unsafe fn multimap_i_search_and_insert_in_node(__param_n: *mut multimap_node_s, 
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __local_num: 1 else: 0) != 0) {
-        if ((if (*(&raw const (*__param_n).kind as *const multimap_kind_s)).node[__local_i] == __param_l: 1 else: 0) != 0) {
+    while (__local_i < __local_num) {
+        if ((*(&raw const (*__param_n).kind as *const multimap_kind_s)).node[__local_i] == __param_l) {
             with_memmove(((((&raw const (*__param_n).key[(__local_i + 1)] as *const i32) as *mut i32) as *mut c_void) as *mut u8), ((((&raw const (*__param_n).key[__local_i] as *const i32) as *mut i32) as *const c_void) as *const u8), ((((4 as u64) *% (((__local_num - __local_i) as u32) as u64)) as u64) as i64))
 
             with_memmove(((((&raw const (*__param_n).kind.node[(__local_i + 1)] as *const *mut multimap_node_s) as *mut *mut multimap_node_s) as *mut c_void) as *mut u8), ((((&raw const (*__param_n).kind.node[__local_i] as *const *mut multimap_node_s) as *mut *mut multimap_node_s) as *const c_void) as *const u8), ((((sizeof[usize]() as u64) *% ((((__local_num - __local_i) + 1) as u32) as u64)) as u64) as i64))
@@ -2542,7 +2548,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_2 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_3
@@ -2555,20 +2561,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_4 {
-        if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_8
@@ -2576,7 +2582,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_5 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_6
@@ -2584,17 +2590,17 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_6 {
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -2603,15 +2609,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_7 {
         (__ci_expr_logic_0 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_0 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -2620,16 +2626,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_8 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_1 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_1 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -2643,7 +2649,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_10 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -2656,7 +2662,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_12 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_15
@@ -2664,7 +2670,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_13 {
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -2678,7 +2684,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_15 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_16
         } else {
             goto '__ci_bb_17
@@ -2686,12 +2692,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_16 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -2700,7 +2706,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_17 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -2708,19 +2714,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_18 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -2733,7 +2739,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_20 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
         } else {
             0
@@ -2756,7 +2762,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     '__ci_bb_23 {
         (__local_leaf__goto_5_1 = multimap_i_search_for_leaf((&__local_pit__goto_5_1[0] as *mut multimap_parent_it_s), (&(__param_b[0]) as *mut multimap_s), __param_key))
         (__local_i__goto_5_1 = ((multimap_i_search_and_insert_in_leaf(__local_leaf__goto_5_1, __param_key, __param_value) as i32)))
-        if ((if __local_i__goto_5_1 < 0: 1 else: 0) != 0) {
+        if (__local_i__goto_5_1 < 0) {
             goto '__ci_bb_26
         } else {
             goto '__ci_bb_27
@@ -2779,12 +2785,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     '__ci_bb_27 {
         ((__param_b[0]).size = ((*(&raw const (__param_b[0]) as *const multimap_s)).size +% 1))
         (__local_num__goto_5_1 = (((0 - (*__local_leaf__goto_5_1).num) as i32)))
-        if (((if not ((if __local_num__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num > 0".ptr)
         } else {
             0
         }
-        if (((if not ((if not ((if __local_num__goto_5_1 <= 5: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (not (__local_num__goto_5_1 <= 5)): 1 else: 0) as i64) {
             goto '__ci_bb_50
         } else {
             goto '__ci_bb_51
@@ -2796,7 +2802,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_29 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_28
         } else {
             goto '__ci_bb_30
@@ -2808,20 +2814,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_31 {
-        if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_34
         } else {
             goto '__ci_bb_35
@@ -2829,7 +2835,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_32 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_31
         } else {
             goto '__ci_bb_33
@@ -2837,17 +2843,17 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_33 {
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_47
         } else {
             goto '__ci_bb_48
@@ -2856,15 +2862,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_34 {
         (__ci_expr_logic_2 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_2 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_37
         } else {
             goto '__ci_bb_38
@@ -2873,16 +2879,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_35 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_3 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_3 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -2896,7 +2902,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_37 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -2909,7 +2915,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_39 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_40
         } else {
             goto '__ci_bb_42
@@ -2917,7 +2923,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_40 {
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -2931,7 +2937,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_42 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_43
         } else {
             goto '__ci_bb_44
@@ -2939,12 +2945,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_43 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -2953,7 +2959,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_44 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_45
         } else {
             goto '__ci_bb_46
@@ -2961,19 +2967,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_45 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -2986,7 +2992,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_47 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
         } else {
             0
@@ -3007,7 +3013,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_51 {
-        if (((if not ((if __local_num__goto_5_1 == (5 + 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num__goto_5_1 == (5 + 1)): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num == 5+1".ptr)
         } else {
             0
@@ -3022,7 +3028,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
         ((*__local_nleaf__goto_5_1).next = (*__local_leaf__goto_5_1).next)
         ((*__local_leaf__goto_5_1).next = __local_nleaf__goto_5_1)
         ((*__local_nleaf__goto_5_1).prev = __local_leaf__goto_5_1)
-        if ((if (*__local_nleaf__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_nleaf__goto_5_1).next != null) {
             goto '__ci_bb_73
         } else {
             goto '__ci_bb_74
@@ -3034,7 +3040,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_53 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_52
         } else {
             goto '__ci_bb_54
@@ -3046,20 +3052,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_55 {
-        if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_58
         } else {
             goto '__ci_bb_59
@@ -3067,7 +3073,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_56 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_55
         } else {
             goto '__ci_bb_57
@@ -3075,17 +3081,17 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_57 {
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_71
         } else {
             goto '__ci_bb_72
@@ -3094,15 +3100,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_58 {
         (__ci_expr_logic_4 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_4 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_61
         } else {
             goto '__ci_bb_62
@@ -3111,16 +3117,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_59 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_5 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_5 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -3134,7 +3140,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_61 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -3147,7 +3153,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_63 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_64
         } else {
             goto '__ci_bb_66
@@ -3155,7 +3161,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_64 {
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -3169,7 +3175,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_66 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_67
         } else {
             goto '__ci_bb_68
@@ -3177,12 +3183,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_67 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -3191,7 +3197,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_68 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_69
         } else {
             goto '__ci_bb_70
@@ -3199,19 +3205,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_69 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -3224,7 +3230,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_71 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
         } else {
             0
@@ -3246,20 +3252,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_75 {
-        if (((if not ((if __local_leaf__goto_5_1 != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_leaf__goto_5_1 != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(leaf) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
         }
         (__local_num2__goto_5_1 = (*__local_leaf__goto_5_1).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if __local_leaf__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (__local_leaf__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_78
         } else {
             goto '__ci_bb_79
@@ -3267,7 +3273,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_76 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_75
         } else {
             goto '__ci_bb_77
@@ -3280,15 +3286,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_78 {
         (__ci_expr_logic_6 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_6 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_6 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_6: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_81
         } else {
             goto '__ci_bb_82
@@ -3297,16 +3303,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_79 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_7 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_7 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_7 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_7: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -3320,7 +3326,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_81 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -3333,7 +3339,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_83 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_84
         } else {
             goto '__ci_bb_86
@@ -3341,7 +3347,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_84 {
-        if (((if not ((if (if (if (*__local_leaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_leaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_leaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_leaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_leaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_leaf__goto_5_1).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*__local_leaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_leaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((leaf)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(leaf)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((leaf)->key[i2-1]) < ((leaf)->key[i2]) ? -1 : ((leaf)->key[i2-1]) > ((leaf)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -3355,7 +3361,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_86 {
-        if ((if (*__local_leaf__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_leaf__goto_5_1).next != null) {
             goto '__ci_bb_87
         } else {
             goto '__ci_bb_88
@@ -3363,12 +3369,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_87 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*__local_leaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_leaf__goto_5_1).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_leaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_leaf__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_leaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_leaf__goto_5_1).next).key[0]: (-1 as i32) else: ((if (*__local_leaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_leaf__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((leaf)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(leaf)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((leaf)->key[num2-1]) < ((leaf)->next->key[0]) ? -1 : ((leaf)->key[num2-1]) > ((leaf)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -3377,7 +3383,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_88 {
-        if ((if (*__local_leaf__goto_5_1).prev != null: 1 else: 0) != 0) {
+        if ((*__local_leaf__goto_5_1).prev != null) {
             goto '__ci_bb_89
         } else {
             goto '__ci_bb_90
@@ -3385,19 +3391,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_89 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
         (__local_num_prev__goto_5_1 = (*(*__local_leaf__goto_5_1).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*(*__local_leaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_leaf__goto_5_1).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_leaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_leaf__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*__local_leaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_leaf__goto_5_1).key[0]: (-1 as i32) else: ((if (*(*__local_leaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_leaf__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((leaf)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(leaf)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((leaf)->prev->key[num_prev-1]) < ((leaf)->key[0]) ? -1 : ((leaf)->prev->key[num_prev-1]) > ((leaf)->key[0])) <= 0".ptr)
         } else {
             0
@@ -3410,20 +3416,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_91 {
-        if (((if not ((if __local_nleaf__goto_5_1 != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_nleaf__goto_5_1 != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(nleaf) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
         }
         (__local_num2__goto_5_1 = (*__local_nleaf__goto_5_1).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if __local_nleaf__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (__local_nleaf__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_94
         } else {
             goto '__ci_bb_95
@@ -3431,7 +3437,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_92 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_91
         } else {
             goto '__ci_bb_93
@@ -3445,15 +3451,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_94 {
         (__ci_expr_logic_8 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_8 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_8 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_8 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_8: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_97
         } else {
             goto '__ci_bb_98
@@ -3462,16 +3468,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_95 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_9 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_9 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_9 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_9: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -3485,7 +3491,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_97 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -3498,7 +3504,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_99 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_100
         } else {
             goto '__ci_bb_102
@@ -3506,7 +3512,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_100 {
-        if (((if not ((if (if (if (*__local_nleaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_nleaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_nleaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_nleaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_nleaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_nleaf__goto_5_1).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*__local_nleaf__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_nleaf__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nleaf)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nleaf)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nleaf)->key[i2-1]) < ((nleaf)->key[i2]) ? -1 : ((nleaf)->key[i2-1]) > ((nleaf)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -3520,7 +3526,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_102 {
-        if ((if (*__local_nleaf__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_nleaf__goto_5_1).next != null) {
             goto '__ci_bb_103
         } else {
             goto '__ci_bb_104
@@ -3528,12 +3534,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_103 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*__local_nleaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_nleaf__goto_5_1).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_nleaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_nleaf__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_nleaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_nleaf__goto_5_1).next).key[0]: (-1 as i32) else: ((if (*__local_nleaf__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_nleaf__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nleaf)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nleaf)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nleaf)->key[num2-1]) < ((nleaf)->next->key[0]) ? -1 : ((nleaf)->key[num2-1]) > ((nleaf)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -3542,7 +3548,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_104 {
-        if ((if (*__local_nleaf__goto_5_1).prev != null: 1 else: 0) != 0) {
+        if ((*__local_nleaf__goto_5_1).prev != null) {
             goto '__ci_bb_105
         } else {
             goto '__ci_bb_106
@@ -3550,19 +3556,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_105 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
         (__local_num_prev__goto_5_1 = (*(*__local_nleaf__goto_5_1).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*(*__local_nleaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_nleaf__goto_5_1).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_nleaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_nleaf__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*__local_nleaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_nleaf__goto_5_1).key[0]: (-1 as i32) else: ((if (*(*__local_nleaf__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_nleaf__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nleaf)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nleaf)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nleaf)->prev->key[num_prev-1]) < ((nleaf)->key[0]) ? -1 : ((nleaf)->prev->key[num_prev-1]) > ((nleaf)->key[0])) <= 0".ptr)
         } else {
             0
@@ -3575,7 +3581,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_107 {
-        if (1 != 0) {
+        if true {
             goto '__ci_bb_108
         } else {
             goto '__ci_bb_109
@@ -3583,7 +3589,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_108 {
-        if ((if (*(&raw const __local_pit__goto_5_1[0] as *const multimap_parent_it_s)).num == 0: 1 else: 0) != 0) {
+        if ((*(&raw const __local_pit__goto_5_1[0] as *const multimap_parent_it_s)).num == 0) {
             goto '__ci_bb_110
         } else {
             goto '__ci_bb_111
@@ -3610,7 +3616,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
         (__local_i__goto_5_1 = ((multimap_i_search_and_insert_in_node(__local_parent__goto_5_1, __local_leaf__goto_5_1, __local_key_ptr__goto_5_1) as i32)))
         ((*__local_parent__goto_5_1).kind.node[__local_i__goto_5_1] = __local_leaf__goto_5_1)
         ((*__local_parent__goto_5_1).kind.node[(__local_i__goto_5_1 + 1)] = __local_nleaf__goto_5_1)
-        if (((if not ((if not ((if (*__local_parent__goto_5_1).num <= 5: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (not ((*__local_parent__goto_5_1).num <= 5)): 1 else: 0) as i64) {
             goto '__ci_bb_136
         } else {
             goto '__ci_bb_137
@@ -3639,7 +3645,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_116 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_115
         } else {
             goto '__ci_bb_117
@@ -3651,20 +3657,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_118 {
-        if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_121
         } else {
             goto '__ci_bb_122
@@ -3672,7 +3678,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_119 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_118
         } else {
             goto '__ci_bb_120
@@ -3680,17 +3686,17 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_120 {
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_134
         } else {
             goto '__ci_bb_135
@@ -3699,15 +3705,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_121 {
         (__ci_expr_logic_10 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_10 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_10 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_10: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_124
         } else {
             goto '__ci_bb_125
@@ -3716,16 +3722,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_122 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_11 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_11 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_11 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_11 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_11: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -3739,7 +3745,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_124 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -3752,7 +3758,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_126 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_127
         } else {
             goto '__ci_bb_129
@@ -3760,7 +3766,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_127 {
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -3774,7 +3780,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_129 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_130
         } else {
             goto '__ci_bb_131
@@ -3782,12 +3788,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_130 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -3796,7 +3802,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_131 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_132
         } else {
             goto '__ci_bb_133
@@ -3804,19 +3810,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_132 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -3829,7 +3835,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_134 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
         } else {
             0
@@ -3846,7 +3852,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_137 {
-        if (((if not ((if (*__local_parent__goto_5_1).num == (5 + 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*__local_parent__goto_5_1).num == (5 + 1)): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"parent->num == 5+1".ptr)
         } else {
             0
@@ -3855,13 +3861,13 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
         (__local_np__goto_5_1 = (((5 - __local_nnp__goto_5_1) as i32)))
         (__ci_expr_logic_15 = 0)
         (__ci_expr_logic_14 = 0)
-        if ((if __local_nnp__goto_5_1 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_14 = (if (if __local_np__goto_5_1 > 0: 1 else: 0) != 0: 1 else: 0))
+        if (__local_nnp__goto_5_1 > 0) {
+            (__ci_expr_logic_14 = (if __local_np__goto_5_1 > 0: 1 else: 0))
         }
-        if (__ci_expr_logic_14 != 0) {
-            (__ci_expr_logic_15 = (if (if ((__local_nnp__goto_5_1 + __local_np__goto_5_1) + 1) == (5 + 1): 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_14 {
+            (__ci_expr_logic_15 = (if ((__local_nnp__goto_5_1 + __local_np__goto_5_1) + 1) == (5 + 1): 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_15 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_15: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"nnp > 0 && np > 0 && nnp+np+1 == 5+1".ptr)
         } else {
             0
@@ -3874,7 +3880,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
         ((*__local_nparent__goto_5_1).next = (*__local_parent__goto_5_1).next)
         ((*__local_parent__goto_5_1).next = __local_nparent__goto_5_1)
         ((*__local_nparent__goto_5_1).prev = __local_parent__goto_5_1)
-        if ((if (*__local_nparent__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_nparent__goto_5_1).next != null) {
             goto '__ci_bb_159
         } else {
             goto '__ci_bb_160
@@ -3886,7 +3892,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_139 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_138
         } else {
             goto '__ci_bb_140
@@ -3898,20 +3904,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_141 {
-        if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_144
         } else {
             goto '__ci_bb_145
@@ -3919,7 +3925,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_142 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_141
         } else {
             goto '__ci_bb_143
@@ -3927,17 +3933,17 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_143 {
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_157
         } else {
             goto '__ci_bb_158
@@ -3946,15 +3952,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_144 {
         (__ci_expr_logic_12 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_12 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_12 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_12 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_12: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_147
         } else {
             goto '__ci_bb_148
@@ -3963,16 +3969,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_145 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_13 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_13 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_13 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_13 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_13: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -3986,7 +3992,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_147 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -3999,7 +4005,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_149 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_150
         } else {
             goto '__ci_bb_152
@@ -4007,7 +4013,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_150 {
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -4021,7 +4027,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_152 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_153
         } else {
             goto '__ci_bb_154
@@ -4029,12 +4035,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_153 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -4043,7 +4049,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_154 {
-        if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_155
         } else {
             goto '__ci_bb_156
@@ -4051,19 +4057,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_155 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -4076,7 +4082,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_157 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
         } else {
             0
@@ -4098,20 +4104,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_161 {
-        if (((if not ((if __local_parent__goto_5_1 != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_parent__goto_5_1 != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(parent) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
         }
         (__local_num2__goto_5_1 = (*__local_parent__goto_5_1).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if __local_parent__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (__local_parent__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_164
         } else {
             goto '__ci_bb_165
@@ -4119,7 +4125,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_162 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_161
         } else {
             goto '__ci_bb_163
@@ -4132,15 +4138,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_164 {
         (__ci_expr_logic_16 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_16 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_16 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_16 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_16: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_167
         } else {
             goto '__ci_bb_168
@@ -4149,16 +4155,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_165 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_17 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_17 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_17 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_17 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_17: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -4172,7 +4178,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_167 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -4185,7 +4191,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_169 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_170
         } else {
             goto '__ci_bb_172
@@ -4193,7 +4199,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_170 {
-        if (((if not ((if (if (if (*__local_parent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_parent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_parent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_parent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_parent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_parent__goto_5_1).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*__local_parent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_parent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((parent)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(parent)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((parent)->key[i2-1]) < ((parent)->key[i2]) ? -1 : ((parent)->key[i2-1]) > ((parent)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -4207,7 +4213,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_172 {
-        if ((if (*__local_parent__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_parent__goto_5_1).next != null) {
             goto '__ci_bb_173
         } else {
             goto '__ci_bb_174
@@ -4215,12 +4221,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_173 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*__local_parent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_parent__goto_5_1).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_parent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_parent__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_parent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_parent__goto_5_1).next).key[0]: (-1 as i32) else: ((if (*__local_parent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_parent__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((parent)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(parent)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((parent)->key[num2-1]) < ((parent)->next->key[0]) ? -1 : ((parent)->key[num2-1]) > ((parent)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -4229,7 +4235,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_174 {
-        if ((if (*__local_parent__goto_5_1).prev != null: 1 else: 0) != 0) {
+        if ((*__local_parent__goto_5_1).prev != null) {
             goto '__ci_bb_175
         } else {
             goto '__ci_bb_176
@@ -4237,19 +4243,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_175 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
         (__local_num_prev__goto_5_1 = (*(*__local_parent__goto_5_1).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*(*__local_parent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_parent__goto_5_1).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_parent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_parent__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*__local_parent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_parent__goto_5_1).key[0]: (-1 as i32) else: ((if (*(*__local_parent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_parent__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((parent)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(parent)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((parent)->prev->key[num_prev-1]) < ((parent)->key[0]) ? -1 : ((parent)->prev->key[num_prev-1]) > ((parent)->key[0])) <= 0".ptr)
         } else {
             0
@@ -4262,20 +4268,20 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_177 {
-        if (((if not ((if __local_nparent__goto_5_1 != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_nparent__goto_5_1 != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(nparent) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
         }
         (__local_num2__goto_5_1 = (*__local_nparent__goto_5_1).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if __local_nparent__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (__local_nparent__goto_5_1 == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             goto '__ci_bb_180
         } else {
             goto '__ci_bb_181
@@ -4283,7 +4289,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_178 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_177
         } else {
             goto '__ci_bb_179
@@ -4299,15 +4305,15 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_180 {
         (__ci_expr_logic_18 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_18 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_18 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_18 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_18: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_183
         } else {
             goto '__ci_bb_184
@@ -4316,16 +4322,16 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
 
     '__ci_bb_181 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_19 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_19 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_19 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_19 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_19: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -4339,7 +4345,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_183 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -4352,7 +4358,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_185 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_186
         } else {
             goto '__ci_bb_188
@@ -4360,7 +4366,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_186 {
-        if (((if not ((if (if (if (*__local_nparent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_nparent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_nparent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_nparent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_nparent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] < (*__local_nparent__goto_5_1).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*__local_nparent__goto_5_1).key[(__local_i2__goto_5_1 - 1)] > (*__local_nparent__goto_5_1).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nparent)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nparent)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nparent)->key[i2-1]) < ((nparent)->key[i2]) ? -1 : ((nparent)->key[i2-1]) > ((nparent)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -4374,7 +4380,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_188 {
-        if ((if (*__local_nparent__goto_5_1).next != null: 1 else: 0) != 0) {
+        if ((*__local_nparent__goto_5_1).next != null) {
             goto '__ci_bb_189
         } else {
             goto '__ci_bb_190
@@ -4382,12 +4388,12 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_189 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*__local_nparent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_nparent__goto_5_1).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_nparent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_nparent__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*__local_nparent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] < (*(*__local_nparent__goto_5_1).next).key[0]: (-1 as i32) else: ((if (*__local_nparent__goto_5_1).key[(__local_num2__goto_5_1 - 1)] > (*(*__local_nparent__goto_5_1).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nparent)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nparent)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nparent)->key[num2-1]) < ((nparent)->next->key[0]) ? -1 : ((nparent)->key[num2-1]) > ((nparent)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -4396,7 +4402,7 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_190 {
-        if ((if (*__local_nparent__goto_5_1).prev != null: 1 else: 0) != 0) {
+        if ((*__local_nparent__goto_5_1).prev != null) {
             goto '__ci_bb_191
         } else {
             goto '__ci_bb_192
@@ -4404,19 +4410,19 @@ unsafe fn multimap_set_at(__param_b: *mut multimap_s, __param_key: i32, __param_
     }
 
     '__ci_bb_191 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
         (__local_num_prev__goto_5_1 = (*(*__local_nparent__goto_5_1).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*(*__local_nparent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_nparent__goto_5_1).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_nparent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_nparent__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*__local_nparent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*__local_nparent__goto_5_1).key[0]: (-1 as i32) else: ((if (*(*__local_nparent__goto_5_1).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*__local_nparent__goto_5_1).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_set_at".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((nparent)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(nparent)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((nparent)->prev->key[num_prev-1]) < ((nparent)->key[0]) ? -1 : ((nparent)->prev->key[num_prev-1]) > ((nparent)->key[0])) <= 0".ptr)
         } else {
             0
@@ -4436,40 +4442,40 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -4479,7 +4485,7 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -4487,11 +4493,11 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -4502,8 +4508,8 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -4515,14 +4521,14 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -4530,24 +4536,24 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -4555,39 +4561,39 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_safe_get".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __local_ret: *mut i32 = multimap_get((&(__param_b[0]) as *mut multimap_s), __param_key)
 
-    if ((if __local_ret == null: 1 else: 0) != 0) {
+    if (__local_ret == null) {
         var __local_v: i32
 
         (__local_v = ((0 as i32)))
@@ -4626,7 +4632,7 @@ unsafe fn multimap_safe_get(__param_b: *mut multimap_s, __param_key: i32) -> *mu
 }
 
 unsafe fn multimap_i_search_and_remove_in_leaf(__param_n: *mut multimap_node_s, __param_key: i32) -> i32 {
-    if (((if not multimap_is_leaf(__param_n): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf(__param_n): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_and_remove_in_leaf".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(n)".ptr)
     } else {
         0
@@ -4637,13 +4643,13 @@ unsafe fn multimap_i_search_and_remove_in_leaf(__param_n: *mut multimap_node_s, 
 
     var __local_i: i32 = ((0 as i32))
 
-    while ((if __local_i < __local_num: 1 else: 0) != 0) {
+    while (__local_i < __local_num) {
         var __local_cmp: i32
 
-        (__local_cmp = (((if (if __param_key < (*__param_n).key[__local_i]: 1 else: 0) != 0: (-1 as i32) else: ((if __param_key > (*__param_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
+        (__local_cmp = (((if __param_key < (*__param_n).key[__local_i]: (-1 as i32) else: ((if __param_key > (*__param_n).key[__local_i]: 1 else: 0) as i32)) as i32)))
 
 
-        if ((if __local_cmp == 0: 1 else: 0) != 0) {
+        if (__local_cmp == 0) {
 
 
             with_memmove(((((&raw const (*__param_n).key[__local_i] as *const i32) as *mut i32) as *mut c_void) as *mut u8), ((((&raw const (*__param_n).key[(__local_i + 1)] as *const i32) as *mut i32) as *const c_void) as *const u8), ((((4 as u64) *% ((((__local_num - 1) - __local_i) as u32) as u64)) as u64) as i64))
@@ -4669,11 +4675,11 @@ unsafe fn multimap_i_search_and_remove_in_leaf(__param_n: *mut multimap_node_s, 
 unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k: i32) -> Unit {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __param_parent != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not multimap_is_leaf(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (__param_parent != null) {
+        (__ci_expr_logic_0 = (if not multimap_is_leaf(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"parent != ((void*)0) && !multimap_is_leaf(parent)".ptr)
     } else {
         0
@@ -4682,11 +4688,11 @@ unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k:
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if 0 <= __param_k: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if __param_k < multimap_get_num(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (0 <= __param_k) {
+        (__ci_expr_logic_1 = (if __param_k < multimap_get_num(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= k && k < multimap_get_num(parent)".ptr)
     } else {
         0
@@ -4700,11 +4706,11 @@ unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k:
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __local_left != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if __local_right != null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_left != null) {
+        (__ci_expr_logic_2 = (if __local_right != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"left != ((void*)0) && right != ((void*)0)".ptr)
     } else {
         0
@@ -4715,13 +4721,13 @@ unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k:
 
     var __local_num_right: i32 = ((multimap_get_num(__local_right) as i32))
 
-    if (((if not ((if __local_num_left > (5 / 2): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num_left > (5 / 2)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"num_left > 5/2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if __local_num_right < (5 / 2): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num_right < (5 / 2)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"num_right < 5/2".ptr)
     } else {
         0
@@ -4757,13 +4763,13 @@ unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k:
 
     }
 
-    if (((if not ((if (*__local_right).num != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_right).num != 0): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"right->num != 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if (*__local_left).num != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_left).num != 0): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_left_shift".ptr, c"multimap.c".ptr, (5 as i32), c"left->num != 0".ptr)
     } else {
         0
@@ -4774,11 +4780,11 @@ unsafe fn multimap_i_left_shift(__param_parent: *mut multimap_node_s, __param_k:
 unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k: i32) -> Unit {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __param_parent != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not multimap_is_leaf(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (__param_parent != null) {
+        (__ci_expr_logic_0 = (if not multimap_is_leaf(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"parent != ((void*)0) && !multimap_is_leaf(parent)".ptr)
     } else {
         0
@@ -4787,11 +4793,11 @@ unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if 0 <= __param_k: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if __param_k < multimap_get_num(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (0 <= __param_k) {
+        (__ci_expr_logic_1 = (if __param_k < multimap_get_num(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= k && k < multimap_get_num(parent)".ptr)
     } else {
         0
@@ -4805,11 +4811,11 @@ unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __local_left != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if __local_right != null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_left != null) {
+        (__ci_expr_logic_2 = (if __local_right != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"left != ((void*)0) && right != ((void*)0)".ptr)
     } else {
         0
@@ -4820,13 +4826,13 @@ unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k
 
     var __local_num_right: i32 = ((multimap_get_num(__local_right) as i32))
 
-    if (((if not ((if __local_num_left < (5 / 2): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num_left < (5 / 2)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"num_left < 5/2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if __local_num_right > (5 / 2): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_num_right > (5 / 2)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"num_right > 5/2".ptr)
     } else {
         0
@@ -4864,13 +4870,13 @@ unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k
 
     }
 
-    if (((if not ((if (*__local_right).num != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_right).num != 0): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"right->num != 0".ptr)
     } else {
         0
     }
 
-    if (((if not ((if (*__local_left).num != 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_left).num != 0): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_right_shift".ptr, c"multimap.c".ptr, (5 as i32), c"left->num != 0".ptr)
     } else {
         0
@@ -4881,11 +4887,11 @@ unsafe fn multimap_i_right_shift(__param_parent: *mut multimap_node_s, __param_k
 unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k: i32, __param_leaf: bool) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __param_parent != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if not multimap_is_leaf(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (__param_parent != null) {
+        (__ci_expr_logic_0 = (if not multimap_is_leaf(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_merge_node".ptr, c"multimap.c".ptr, (5 as i32), c"parent != ((void*)0) && !multimap_is_leaf(parent)".ptr)
     } else {
         0
@@ -4894,11 +4900,11 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if 0 <= __param_k: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if __param_k < multimap_get_num(__param_parent): 1 else: 0) != 0: 1 else: 0))
+    if (0 <= __param_k) {
+        (__ci_expr_logic_1 = (if __param_k < multimap_get_num(__param_parent): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_merge_node".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= k && k < multimap_get_num(parent)".ptr)
     } else {
         0
@@ -4911,11 +4917,11 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __local_left != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if __local_right != null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_left != null) {
+        (__ci_expr_logic_2 = (if __local_right != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_merge_node".ptr, c"multimap.c".ptr, (5 as i32), c"left != ((void*)0) && right != ((void*)0)".ptr)
     } else {
         0
@@ -4929,7 +4935,7 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
     var __local_num_right: i32 = ((multimap_get_num(__local_right) as i32))
 
     if __param_leaf {
-        if (((if not ((if (__local_num_left + __local_num_right) <= 5: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((__local_num_left + __local_num_right) <= 5): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_i_merge_node".ptr, c"multimap.c".ptr, (5 as i32), c"num_left + num_right <= 5".ptr)
         } else {
             0
@@ -4942,7 +4948,7 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
         ((*__local_left).num = ((((0 - __local_num_left) - __local_num_right) as i32)))
 
     } else {
-        if (((if not ((if (__local_num_left + __local_num_right) <= (5 - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((__local_num_left + __local_num_right) <= (5 - 1)): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_i_merge_node".ptr, c"multimap.c".ptr, (5 as i32), c"num_left + num_right <= 5 -1".ptr)
         } else {
             0
@@ -4960,7 +4966,7 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
 
     ((*__local_left).next = (*__local_right).next)
 
-    if ((if (*__local_left).next != null: 1 else: 0) != 0) {
+    if ((*__local_left).next != null) {
         ((*(*__local_left).next).prev = __local_left)
 
     }
@@ -4976,8 +4982,9 @@ unsafe fn multimap_i_merge_node(__param_parent: *mut multimap_node_s, __param_k:
 
 }
 
+// contract: receiver:multimap_node_s,unproved:1:read only
 unsafe fn multimap_i_search_for_node(__param_parent: *mut multimap_node_s, __param_child: *mut multimap_node_s) -> i32 {
-    if (((if not ((if not multimap_is_leaf(__param_parent): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not multimap_is_leaf(__param_parent)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_i_search_for_node".ptr, c"multimap.c".ptr, (5 as i32), c"!multimap_is_leaf(parent)".ptr)
     } else {
         0
@@ -4987,8 +4994,8 @@ unsafe fn multimap_i_search_for_node(__param_parent: *mut multimap_node_s, __par
 
     var __local_i: i32 = ((0 as i32))
 
-    while ((if __local_i <= __local_num: 1 else: 0) != 0) {
-        if ((if (*(&raw const (*__param_parent).kind as *const multimap_kind_s)).node[__local_i] == __param_child: 1 else: 0) != 0) {
+    while (__local_i <= __local_num) {
+        if ((*(&raw const (*__param_parent).kind as *const multimap_kind_s)).node[__local_i] == __param_child) {
             return __local_i
         }
 
@@ -5006,40 +5013,40 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -5049,7 +5056,7 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -5057,11 +5064,11 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -5072,8 +5079,8 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -5085,14 +5092,14 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5100,24 +5107,24 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5125,32 +5132,32 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -5161,7 +5168,7 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
     var __local_k: i32 = ((multimap_i_search_and_remove_in_leaf(__local_leaf, __param_key) as i32))
 
-    if ((if __local_k < 0: 1 else: 0) != 0) {
+    if (__local_k < 0) {
         return ((false as bool))
     }
 
@@ -5169,18 +5176,18 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
     var __ci_expr_logic_2: i32
 
-    if (((if not ((if not ((if multimap_get_num(__local_leaf) >= (5 / 2): 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not (multimap_get_num(__local_leaf) >= (5 / 2))): 1 else: 0) as i64) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         return ((true as bool))
     }
 
 
-    if (((if not ((if multimap_get_num(__local_leaf) == ((5 / 2) - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (multimap_get_num(__local_leaf) == ((5 / 2) - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_get_num(leaf) == 5/2-1".ptr)
     } else {
         0
@@ -5188,8 +5195,8 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
     var __local_pass1: bool = true
 
-    while (1 != 0) {
-        if (((if not ((if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while true {
+        if ((if not ((*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"pit->num > 0".ptr)
         } else {
             0
@@ -5200,7 +5207,7 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
             (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).parent[(*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num]
         }
 
-        if (((if not ((if __local_parent != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_parent != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"parent != ((void*)0)".ptr)
         } else {
             0
@@ -5208,7 +5215,7 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
         (__local_k = ((multimap_i_search_for_node(__local_parent, __local_leaf) as i32)))
 
-        if (((if not ((if __local_k >= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_k >= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"k >= 0".ptr)
         } else {
             0
@@ -5216,11 +5223,11 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
         var __ci_expr_logic_3: i32 = 0
 
-        if ((if __local_k > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if multimap_get_num((*(&raw const (*__local_parent).kind as *const multimap_kind_s)).node[(__local_k - 1)]) > (5 / 2): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k > 0) {
+            (__ci_expr_logic_3 = (if multimap_get_num((*(&raw const (*__local_parent).kind as *const multimap_kind_s)).node[(__local_k - 1)]) > (5 / 2): 1 else: 0))
         }
 
-        if (__ci_expr_logic_3 != 0) {
+        if __ci_expr_logic_3 {
             multimap_i_left_shift(__local_parent, ((__local_k - 1) as i32))
 
             return ((true as bool))
@@ -5228,11 +5235,11 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
         }
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if __local_k < multimap_get_num(__local_parent): 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if multimap_get_num((*(&raw const (*__local_parent).kind as *const multimap_kind_s)).node[(__local_k + 1)]) > (5 / 2): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k < multimap_get_num(__local_parent)) {
+            (__ci_expr_logic_4 = (if multimap_get_num((*(&raw const (*__local_parent).kind as *const multimap_kind_s)).node[(__local_k + 1)]) > (5 / 2): 1 else: 0))
         }
 
-        if (__ci_expr_logic_4 != 0) {
+        if __ci_expr_logic_4 {
             multimap_i_right_shift(__local_parent, __local_k)
 
             return ((true as bool))
@@ -5241,17 +5248,17 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
 
 
-        if ((if __local_k == multimap_get_num(__local_parent): 1 else: 0) != 0) {
+        if (__local_k == multimap_get_num(__local_parent)) {
             (__local_k = __local_k - 1)
         }
 
         var __ci_expr_logic_5: i32 = 0
 
-        if ((if __local_k >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if __local_k < multimap_get_num(__local_parent): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k >= 0) {
+            (__ci_expr_logic_5 = (if __local_k < multimap_get_num(__local_parent): 1 else: 0))
         }
 
-        if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_erase".ptr, c"multimap.c".ptr, (5 as i32), c"k >= 0 && k < multimap_get_num(parent)".ptr)
         } else {
             0
@@ -5260,12 +5267,12 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
         multimap_i_merge_node(__local_parent, __local_k, __local_pass1)
 
-        if ((if multimap_get_num(__local_parent) >= (5 / 2): 1 else: 0) != 0) {
+        if (multimap_get_num(__local_parent) >= (5 / 2)) {
             return ((true as bool))
         }
 
-        if ((if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0: 1 else: 0) != 0) {
-            if ((if multimap_get_num(__local_parent) == 0: 1 else: 0) != 0) {
+        if ((*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0) {
+            if (multimap_get_num(__local_parent) == 0) {
                 ((__param_b[0]).root = (*(&raw const (*__local_parent).kind as *const multimap_kind_s)).node[0])
 
                 with_free(((__local_parent as *mut c_void) as *mut u8))
@@ -5284,11 +5291,12 @@ unsafe fn multimap_erase(__param_b: *mut multimap_s, __param_key: i32) -> bool {
 
 }
 
+// contract: unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally
 unsafe fn multimap_pop_at(__param_ptr: *mut i32, __param_b: *mut multimap_s, __param_key: i32) -> bool {
-    if ((if __param_ptr != null: 1 else: 0) != 0) {
+    if (__param_ptr != null) {
         var __local_ref: *mut i32 = multimap_get((&(__param_b[0]) as *mut multimap_s), __param_key)
 
-        if ((if __local_ref == null: 1 else: 0) != 0) {
+        if (__local_ref == null) {
             return ((false as bool))
 
         }
@@ -5301,44 +5309,45 @@ unsafe fn multimap_pop_at(__param_ptr: *mut i32, __param_b: *mut multimap_s, __p
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -5348,7 +5357,7 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -5356,11 +5365,11 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -5371,8 +5380,8 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -5384,14 +5393,14 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5399,24 +5408,24 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5424,43 +5433,43 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_min".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).size == 0: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not ((*(&raw const (__param_b[0]) as *const multimap_s)).size == 0)): 1 else: 0) as i64) {
         return ((null as *mut i32))
     }
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_b[0]) as *const multimap_s)).root
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
         (__local_n = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[0])
 
     }
@@ -5469,44 +5478,45 @@ unsafe fn multimap_min(__param_b: *mut multimap_s) -> *mut i32 {
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -5516,7 +5526,7 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -5524,11 +5534,11 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -5539,8 +5549,8 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -5552,14 +5562,14 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5567,24 +5577,24 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5592,43 +5602,43 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_max".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).size == 0: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not ((*(&raw const (__param_b[0]) as *const multimap_s)).size == 0)): 1 else: 0) as i64) {
         return ((null as *mut i32))
     }
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_b[0]) as *const multimap_s)).root
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
         (__local_n = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[(*__local_n).num])
 
     }
@@ -5640,6 +5650,7 @@ unsafe fn multimap_max(__param_b: *mut multimap_s) -> *mut i32 {
 @[repr(C)]
 pub type multimap_cmin_literal_anon = union { ptr: *mut i32 = null, cptr: *const i32 = null }
 impl Copy for multimap_cmin_literal_anon
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_cmin(__param_tree: *mut multimap_s) -> *const i32 {
     return (multimap_cmin_literal_anon { ptr: multimap_min((&(__param_tree[0]) as *mut multimap_s)) } as multimap_cmin_literal_anon).cptr
 
@@ -5648,49 +5659,51 @@ unsafe fn multimap_cmin(__param_tree: *mut multimap_s) -> *const i32 {
 @[repr(C)]
 pub type multimap_cmax_literal_anon = union { ptr: *mut i32 = null, cptr: *const i32 = null }
 impl Copy for multimap_cmax_literal_anon
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 unsafe fn multimap_cmax(__param_tree: *mut multimap_s) -> *const i32 {
     return (multimap_cmax_literal_anon { ptr: multimap_max((&(__param_tree[0]) as *mut multimap_s)) } as multimap_cmax_literal_anon).cptr
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:out-parameter read before the write
 unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"((ref)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_ref[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_ref[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"((ref)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_ref[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_ref[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -5700,7 +5713,7 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -5708,11 +5721,11 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -5723,8 +5736,8 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->key[i2-1]) < (((ref)->root+0)->key[i2]) ? -1 : (((ref)->root+0)->key[i2-1]) > (((ref)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -5736,14 +5749,14 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
             }
 
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->key[num2-1]) < (((ref)->root+0)->next->key[0]) ? -1 : (((ref)->root+0)->key[num2-1]) > (((ref)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5751,24 +5764,24 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             }
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->prev->key[num_prev-1]) < (((ref)->root+0)->key[0]) ? -1 : (((ref)->root+0)->prev->key[num_prev-1]) > (((ref)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5776,43 +5789,43 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(ref)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(ref)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_ref[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_ref[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"-(ref)->root->num == (int) (ref)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if (&(__param_b[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if (&(__param_b[0]) as *mut multimap_s) != (&(__param_ref[0]) as *mut multimap_s): 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_b[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_2 = (if (&(__param_b[0]) as *mut multimap_s) != (&(__param_ref[0]) as *mut multimap_s): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"b != ((void*)0) && b != ref".ptr)
     } else {
         0
@@ -5830,40 +5843,40 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_3: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -5873,7 +5886,7 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -5881,11 +5894,11 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
                 var __ci_expr_logic_4: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_4 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -5896,8 +5909,8 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -5909,14 +5922,14 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5924,24 +5937,24 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -5949,76 +5962,77 @@ unsafe fn multimap_init_move(__param_b: *mut multimap_s, __param_ref: *mut multi
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_init_move".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:out-parameter read before the write
 unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6028,7 +6042,7 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6036,11 +6050,11 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6051,8 +6065,8 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6064,14 +6078,14 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6079,24 +6093,24 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6104,32 +6118,32 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6137,40 +6151,40 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((ref)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_ref[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_ref[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((ref)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_ref[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_ref[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6180,7 +6194,7 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6188,11 +6202,11 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
                 var __ci_expr_logic_3: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6203,8 +6217,8 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->key[i2-1]) < (((ref)->root+0)->key[i2]) ? -1 : (((ref)->root+0)->key[i2-1]) > (((ref)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6216,14 +6230,14 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             }
 
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->key[num2-1]) < (((ref)->root+0)->next->key[0]) ? -1 : (((ref)->root+0)->key[num2-1]) > (((ref)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6231,24 +6245,24 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if ((if ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_ref[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((ref)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((ref)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((ref)->root+0)->prev->key[num_prev-1]) < (((ref)->root+0)->key[0]) ? -1 : (((ref)->root+0)->prev->key[num_prev-1]) > (((ref)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6256,37 +6270,37 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(ref)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(ref)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_ref[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_ref[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_ref[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"-(ref)->root->num == (int) (ref)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if (&(__param_b[0]) as *mut multimap_s) != (&(__param_ref[0]) as *mut multimap_s): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_b[0]) as *mut multimap_s) != (&(__param_ref[0]) as *mut multimap_s)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"b != ref".ptr)
     } else {
         0
@@ -6299,40 +6313,40 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_2: bool = ((__local_num2_2 <= 0))
 
-            (__local_num2_2 = (((if (if __local_num2_2 < 0: 1 else: 0) != 0: ((0 - __local_num2_2) as i32) else: __local_num2_2) as i32)))
+            (__local_num2_2 = (((if __local_num2_2 < 0: ((0 - __local_num2_2) as i32) else: __local_num2_2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_4: i32 = 0
 
-                if ((if 0 <= __local_num2_2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if (if __local_num2_2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_2) {
+                    (__ci_expr_logic_4 = (if __local_num2_2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_2: 1 else: 0) as i64) != 0) {
+                if (__local_num2_2 == 0) {
+                    if ((if not __local_is_leaf2_2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6342,7 +6356,7 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             } else {
                 var __local_c2_2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6350,11 +6364,11 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
                 var __ci_expr_logic_5: i32 = 0
 
-                if ((if __local_c2_2 <= __local_num2_2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if __local_num2_2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_2 <= __local_num2_2) {
+                    (__ci_expr_logic_5 = (if __local_num2_2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6365,8 +6379,8 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             var __local_i2_2: i32 = ((1 as i32))
 
-            while ((if __local_i2_2 < __local_num2_2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_2 < __local_num2_2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6378,14 +6392,14 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6393,24 +6407,24 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_2: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_2 = (((if (if __local_num_prev_2 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_2) as i32) else: __local_num_prev_2) as i32)))
+                (__local_num_prev_2 = (((if __local_num_prev_2 < 0: ((0 - __local_num_prev_2) as i32) else: __local_num_prev_2) as i32)))
 
-                if (((if not ((if __local_num_prev_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6418,38 +6432,39 @@ unsafe fn multimap_move(__param_b: *mut multimap_s, __param_ref: *mut multimap_s
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_move".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:read only
 unsafe fn multimap_set(__param_b: *mut multimap_s, __param_o: *mut multimap_s) {
     var __local_tmp: [multimap_s; 1]
 
@@ -6468,44 +6483,45 @@ unsafe fn multimap_set(__param_b: *mut multimap_s, __param_o: *mut multimap_s) {
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:out-parameter read before the write
 unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_tree1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6515,7 +6531,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6523,11 +6539,11 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6538,8 +6554,8 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->key[i2-1]) < (((tree1)->root+0)->key[i2]) ? -1 : (((tree1)->root+0)->key[i2-1]) > (((tree1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6551,14 +6567,14 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             }
 
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->key[num2-1]) < (((tree1)->root+0)->next->key[0]) ? -1 : (((tree1)->root+0)->key[num2-1]) > (((tree1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6566,24 +6582,24 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->prev->key[num_prev-1]) < (((tree1)->root+0)->key[0]) ? -1 : (((tree1)->root+0)->prev->key[num_prev-1]) > (((tree1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6591,32 +6607,32 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"-(tree1)->root->num == (int) (tree1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6624,40 +6640,40 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree2)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_tree2[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree2)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree2[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree2[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6667,7 +6683,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6675,11 +6691,11 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
                 var __ci_expr_logic_3: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6690,8 +6706,8 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->key[i2-1]) < (((tree2)->root+0)->key[i2]) ? -1 : (((tree2)->root+0)->key[i2-1]) > (((tree2)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6703,14 +6719,14 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             }
 
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->key[num2-1]) < (((tree2)->root+0)->next->key[0]) ? -1 : (((tree2)->root+0)->key[num2-1]) > (((tree2)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6718,24 +6734,24 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->prev->key[num_prev-1]) < (((tree2)->root+0)->key[0]) ? -1 : (((tree2)->root+0)->prev->key[num_prev-1]) > (((tree2)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6743,32 +6759,32 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree2)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree2)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree2[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree2[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"-(tree2)->root->num == (int) (tree2)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6780,7 +6796,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
         ((__param_tree2[0]).size = __local__tmp)
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6792,7 +6808,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
         ((__param_tree2[0]).root = __local__tmp_1)
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6800,40 +6816,40 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_tree1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_2: i32 = ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_2: i32 = (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_2: bool = ((__local_num2_2 <= 0))
 
-            (__local_num2_2 = (((if (if __local_num2_2 < 0: 1 else: 0) != 0: ((0 - __local_num2_2) as i32) else: __local_num2_2) as i32)))
+            (__local_num2_2 = (((if __local_num2_2 < 0: ((0 - __local_num2_2) as i32) else: __local_num2_2) as i32)))
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_4: i32 = 0
 
-                if ((if 0 <= __local_num2_2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_4 = (if (if __local_num2_2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_2) {
+                    (__ci_expr_logic_4 = (if __local_num2_2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_4 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_4: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_2: 1 else: 0) as i64) != 0) {
+                if (__local_num2_2 == 0) {
+                    if ((if not __local_is_leaf2_2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6843,7 +6859,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             } else {
                 var __local_c2_2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -6851,11 +6867,11 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
                 var __ci_expr_logic_5: i32 = 0
 
-                if ((if __local_c2_2 <= __local_num2_2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if __local_num2_2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_2 <= __local_num2_2) {
+                    (__ci_expr_logic_5 = (if __local_num2_2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -6866,8 +6882,8 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             var __local_i2_2: i32 = ((1 as i32))
 
-            while ((if __local_i2_2 < __local_num2_2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_2 - 1)] < ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_2 - 1)] > ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_2 < __local_num2_2) {
+                if ((if not ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_2 - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_2]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_2 - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->key[i2-1]) < (((tree1)->root+0)->key[i2]) ? -1 : (((tree1)->root+0)->key[i2-1]) > (((tree1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -6879,14 +6895,14 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             }
 
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_2 - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_2 - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_2 - 1)] < (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_2 - 1)] > (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->key[num2-1]) < (((tree1)->root+0)->next->key[0]) ? -1 : (((tree1)->root+0)->key[num2-1]) > (((tree1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6894,24 +6910,24 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if ((if ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_2: i32 = (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_2: i32 = (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_2 = (((if (if __local_num_prev_2 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_2) as i32) else: __local_num_prev_2) as i32)))
+                (__local_num_prev_2 = (((if __local_num_prev_2 < 0: ((0 - __local_num_prev_2) as i32) else: __local_num_prev_2) as i32)))
 
-                if (((if not ((if __local_num_prev_2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_2 - 1)] < ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_2 - 1)] > ((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_2 - 1)] < (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_2 - 1)] > (*((*(&raw const (__param_tree1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree1)->root+0)->prev->key[num_prev-1]) < (((tree1)->root+0)->key[0]) ? -1 : (((tree1)->root+0)->prev->key[num_prev-1]) > (((tree1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -6919,32 +6935,32 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_tree1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"-(tree1)->root->num == (int) (tree1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -6952,40 +6968,40 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree2)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_tree2[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"((tree2)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_3: i32 = ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_3: i32 = (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_3: bool = ((__local_num2_3 <= 0))
 
-            (__local_num2_3 = (((if (if __local_num2_3 < 0: 1 else: 0) != 0: ((0 - __local_num2_3) as i32) else: __local_num2_3) as i32)))
+            (__local_num2_3 = (((if __local_num2_3 < 0: ((0 - __local_num2_3) as i32) else: __local_num2_3) as i32)))
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree2[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_tree2[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_6: i32 = 0
 
-                if ((if 0 <= __local_num2_3: 1 else: 0) != 0) {
-                    (__ci_expr_logic_6 = (if (if __local_num2_3 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_3) {
+                    (__ci_expr_logic_6 = (if __local_num2_3 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_6 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_6: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_3 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_3: 1 else: 0) as i64) != 0) {
+                if (__local_num2_3 == 0) {
+                    if ((if not __local_is_leaf2_3: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -6995,7 +7011,7 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             } else {
                 var __local_c2_3: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_3 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_3 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -7003,11 +7019,11 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
                 var __ci_expr_logic_7: i32 = 0
 
-                if ((if __local_c2_3 <= __local_num2_3: 1 else: 0) != 0) {
-                    (__ci_expr_logic_7 = (if (if __local_num2_3 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_3 <= __local_num2_3) {
+                    (__ci_expr_logic_7 = (if __local_num2_3 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_7 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_7: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -7018,8 +7034,8 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             var __local_i2_3: i32 = ((1 as i32))
 
-            while ((if __local_i2_3 < __local_num2_3: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_3 - 1)] < ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_3]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_3 - 1)] > ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_3]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_3 < __local_num2_3) {
+                if ((if not ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_3 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_3]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_3 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_3]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->key[i2-1]) < (((tree2)->root+0)->key[i2]) ? -1 : (((tree2)->root+0)->key[i2-1]) > (((tree2)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -7031,14 +7047,14 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
             }
 
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_3 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_3 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_3 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_3 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_3 - 1)] < (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_3 - 1)] > (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->key[num2-1]) < (((tree2)->root+0)->next->key[0]) ? -1 : (((tree2)->root+0)->key[num2-1]) > (((tree2)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7046,24 +7062,24 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if ((if ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_3 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_3 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_3: i32 = (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_3: i32 = (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_3 = (((if (if __local_num_prev_3 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_3) as i32) else: __local_num_prev_3) as i32)))
+                (__local_num_prev_3 = (((if __local_num_prev_3 < 0: ((0 - __local_num_prev_3) as i32) else: __local_num_prev_3) as i32)))
 
-                if (((if not ((if __local_num_prev_3 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_3 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_3 - 1)] < ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_3 - 1)] > ((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_3 - 1)] < (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_3 - 1)] > (*((*(&raw const (__param_tree2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((tree2)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((tree2)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((tree2)->root+0)->prev->key[num_prev-1]) < (((tree2)->root+0)->key[0]) ? -1 : (((tree2)->root+0)->prev->key[num_prev-1]) > (((tree2)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7071,76 +7087,77 @@ unsafe fn multimap_swap(__param_tree1: *mut multimap_s, __param_tree2: *mut mult
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree2)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"(tree2)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree2[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_tree2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_tree2[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_swap".ptr, c"multimap.c".ptr, (5 as i32), c"-(tree2)->root->num == (int) (tree2)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
 }
 
+// contract: receiver-mut:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -7150,7 +7167,7 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -7158,11 +7175,11 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -7173,8 +7190,8 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -7186,14 +7203,14 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7201,24 +7218,24 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7226,37 +7243,37 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_it_[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0)".ptr)
     } else {
         0
@@ -7264,7 +7281,7 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_b[0]) as *const multimap_s)).root
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
         (__local_n = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[0])
 
     }
@@ -7275,44 +7292,45 @@ unsafe fn multimap_it(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_
 
 }
 
+// contract: receiver-mut:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -7322,7 +7340,7 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -7330,11 +7348,11 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -7345,8 +7363,8 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -7358,14 +7376,14 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7373,24 +7391,24 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7398,37 +7416,37 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_it_[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it_end".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0)".ptr)
     } else {
         0
@@ -7436,7 +7454,7 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_b[0]) as *const multimap_s)).root
 
-    while ((if not multimap_is_leaf(__local_n): 1 else: 0) != 0) {
+    while (not multimap_is_leaf(__local_n)) {
         (__local_n = (*(&raw const (*__local_n).kind as *const multimap_kind_s)).node[(*__local_n).num])
 
     }
@@ -7447,14 +7465,15 @@ unsafe fn multimap_it_end(__param_it_: *mut multimap_it_s, __param_b: *mut multi
 
 }
 
+// contract: receiver-mut:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it_set(__param_itd: *mut multimap_it_s, __param_its: *mut multimap_it_s) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (&(__param_itd[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (&(__param_its[0]) as *mut c_void) != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_itd[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_0 = (if (&(__param_its[0]) as *mut c_void) != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it_set".ptr, c"multimap.c".ptr, (5 as i32), c"itd != ((void*)0) && its != ((void*)0)".ptr)
     } else {
         0
@@ -7470,18 +7489,18 @@ unsafe fn multimap_it_set(__param_itd: *mut multimap_it_s, __param_its: *mut mul
 unsafe fn multimap_end_p(__param_it_: *mut multimap_it_s) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_it_[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_0 = (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_end_p".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0) && it->node != ((void*)0)".ptr)
     } else {
         0
     }
 
 
-    if (((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_end_p".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(it->node)".ptr)
     } else {
         0
@@ -7491,11 +7510,12 @@ unsafe fn multimap_end_p(__param_it_: *mut multimap_it_s) -> bool {
 
 }
 
+// contract: receiver:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it_equal_p(__param_it1: *mut multimap_it_s, __param_it2: *mut multimap_it_s) -> bool {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (*(&raw const (__param_it1[0]) as *const multimap_it_s)).node == (*(&raw const (__param_it2[0]) as *const multimap_it_s)).node: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw const (__param_it1[0]) as *const multimap_it_s)).idx == (*(&raw const (__param_it2[0]) as *const multimap_it_s)).idx: 1 else: 0) != 0: 1 else: 0))
+    if ((*(&raw const (__param_it1[0]) as *const multimap_it_s)).node == (*(&raw const (__param_it2[0]) as *const multimap_it_s)).node) {
+        (__ci_expr_logic_0 = (if (*(&raw const (__param_it1[0]) as *const multimap_it_s)).idx == (*(&raw const (__param_it2[0]) as *const multimap_it_s)).idx: 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -7506,18 +7526,18 @@ unsafe fn multimap_it_equal_p(__param_it1: *mut multimap_it_s, __param_it2: *mut
 unsafe fn multimap_next(__param_it_: *mut multimap_it_s) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_it_[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_0 = (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_next".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0) && it->node != ((void*)0)".ptr)
     } else {
         0
     }
 
 
-    if (((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_next".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(it->node)".ptr)
     } else {
         0
@@ -7527,11 +7547,11 @@ unsafe fn multimap_next(__param_it_: *mut multimap_it_s) {
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= (0 - (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).num): 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).next != null: 1 else: 0) != 0: 1 else: 0))
+    if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= (0 - (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).num)) {
+        (__ci_expr_logic_1 = (if (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).next != null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         ((__param_it_[0]).node = (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).next)
 
         ((__param_it_[0]).idx = ((0 as i32)))
@@ -7544,18 +7564,18 @@ unsafe fn multimap_next(__param_it_: *mut multimap_it_s) {
 unsafe fn multimap_previous(__param_it_: *mut multimap_it_s) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_it_[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_0 = (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_previous".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0) && it->node != ((void*)0)".ptr)
     } else {
         0
     }
 
 
-    if (((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_previous".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(it->node)".ptr)
     } else {
         0
@@ -7565,11 +7585,11 @@ unsafe fn multimap_previous(__param_it_: *mut multimap_it_s) {
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx < 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).prev != null: 1 else: 0) != 0: 1 else: 0))
+    if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx < 0) {
+        (__ci_expr_logic_1 = (if (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).prev != null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         ((__param_it_[0]).node = (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).prev)
 
         ((__param_it_[0]).idx = ((((0 - (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).num) - 1) as i32)))
@@ -7579,6 +7599,7 @@ unsafe fn multimap_previous(__param_it_: *mut multimap_it_s) {
 
 }
 
+// contract: receiver-mut:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it_last(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_s) {
     multimap_it_end((&(__param_it_[0]) as *mut multimap_it_s), (&(__param_b[0]) as *mut multimap_s))
 
@@ -7589,18 +7610,18 @@ unsafe fn multimap_it_last(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 unsafe fn multimap_ref(__param_it_: *mut multimap_it_s) -> *mut multimap_pair_s {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_it_[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_0 = (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_ref".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0) && it->node != ((void*)0)".ptr)
     } else {
         0
     }
 
 
-    if (((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) != 0) {
+    if ((if not multimap_is_leaf((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_ref".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_is_leaf(it->node)".ptr)
     } else {
         0
@@ -7608,11 +7629,11 @@ unsafe fn multimap_ref(__param_it_: *mut multimap_it_s) -> *mut multimap_pair_s 
 
     var __ci_expr_logic_1: i32 = 0
 
-    if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx <= (0 - (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).num): 1 else: 0) != 0: 1 else: 0))
+    if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= 0) {
+        (__ci_expr_logic_1 = (if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx <= (0 - (*(*(&raw const (__param_it_[0]) as *const multimap_it_s)).node).num): 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_ref".ptr, c"multimap.c".ptr, (5 as i32), c"it->idx >= 0 && it->idx <= -it->node->num".ptr)
     } else {
         0
@@ -7635,44 +7656,45 @@ unsafe fn multimap_cref(__param_it_: *mut multimap_it_s) -> *const multimap_pair
 
 }
 
+// contract: receiver-mut:multimap_it_s,unproved:1:read only
 unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut multimap_s, __param_key: i32) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -7682,7 +7704,7 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -7690,11 +7712,11 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -7705,8 +7727,8 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -7718,14 +7740,14 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7733,24 +7755,24 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -7758,37 +7780,37 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if (((if not ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_it_[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0)".ptr)
     } else {
         0
@@ -7803,13 +7825,13 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
     var __local_i: i32
 
     loop {
-        if (((if not ((if __local_n != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_n != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(n) != ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(b->root) != ((void*)0)".ptr)
         } else {
             0
@@ -7819,24 +7841,24 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
         var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-        (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+        (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-        if ((if __local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        if (__local_n == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
             var __ci_expr_logic_2: i32 = 0
 
-            if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (0 <= __local_num2_1) {
+                (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
             } else {
                 0
             }
 
 
-            if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+            if (__local_num2_1 == 0) {
+                if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                 } else {
                     0
@@ -7846,7 +7868,7 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
         } else {
             var __local_c2_1: i32 = (((5 / 2) as i32))
 
-            if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
             } else {
                 0
@@ -7854,11 +7876,11 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
             var __ci_expr_logic_3: i32 = 0
 
-            if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+            if (__local_c2_1 <= __local_num2_1) {
+                (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
             }
 
-            if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+            if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
             } else {
                 0
@@ -7869,8 +7891,8 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
         var __local_i2_1: i32 = ((1 as i32))
 
-        while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-            if (((if not ((if (if (if (*__local_n).key[(__local_i2_1 - 1)] < (*__local_n).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_i2_1 - 1)] > (*__local_n).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        while (__local_i2_1 < __local_num2_1) {
+            if ((if not ((if (*__local_n).key[(__local_i2_1 - 1)] < (*__local_n).key[__local_i2_1]: (-1 as i32) else: ((if (*__local_n).key[(__local_i2_1 - 1)] > (*__local_n).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[i2-1]) < ((n)->key[i2]) ? -1 : ((n)->key[i2-1]) > ((n)->key[i2])) <= 0".ptr)
             } else {
                 0
@@ -7882,14 +7904,14 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
         }
 
 
-        if ((if (*__local_n).next != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).next != null) {
+            if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*__local_n).key[(__local_num2_1 - 1)] < (*(*__local_n).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(__local_num2_1 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*__local_n).key[(__local_num2_1 - 1)] < (*(*__local_n).next).key[0]: (-1 as i32) else: ((if (*__local_n).key[(__local_num2_1 - 1)] > (*(*__local_n).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->key[num2-1]) < ((n)->next->key[0]) ? -1 : ((n)->key[num2-1]) > ((n)->next->key[0])) <= 0".ptr)
             } else {
                 0
@@ -7897,8 +7919,8 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
         }
 
-        if ((if (*__local_n).prev != null: 1 else: 0) != 0) {
-            if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*__local_n).prev != null) {
+            if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
             } else {
                 0
@@ -7906,15 +7928,15 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
             var __local_num_prev_1: i32 = (*(*__local_n).prev).num
 
-            (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+            (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-            if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (if (if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] < (*__local_n).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] < (*__local_n).key[0]: (-1 as i32) else: ((if (*(*__local_n).prev).key[(__local_num_prev_1 - 1)] > (*__local_n).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_it_from".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic((n)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"(n)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), ((n)->prev->key[num_prev-1]) < ((n)->key[0]) ? -1 : ((n)->prev->key[num_prev-1]) > ((n)->key[0])) <= 0".ptr)
             } else {
                 0
@@ -7922,15 +7944,15 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < (0 - (*__local_n).num): 1 else: 0) != 0) {
-        if ((if (if (if __param_key < (*__local_n).key[__local_i]: 1 else: 0) != 0: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0) {
+    while (__local_i < (0 - (*__local_n).num)) {
+        if ((if __param_key < (*__local_n).key[__local_i]: (-1 as i32) else: ((if __param_key > (*__local_n).key[__local_i]: 1 else: 0) as i32)) <= 0) {
             break
         }
 
@@ -7942,11 +7964,11 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 
     var __ci_expr_logic_4: i32 = 0
 
-    if ((if __local_i == (0 - (*__local_n).num): 1 else: 0) != 0) {
-        (__ci_expr_logic_4 = (if (if (*__local_n).next != null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_i == (0 - (*__local_n).num)) {
+        (__ci_expr_logic_4 = (if (*__local_n).next != null: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         ((__param_it_[0]).node = (*__local_n).next)
 
         (__local_i = ((0 as i32)))
@@ -7959,7 +7981,7 @@ unsafe fn multimap_it_from(__param_it_: *mut multimap_it_s, __param_b: *mut mult
 }
 
 unsafe fn multimap_it_until_p(__param_it_: *mut multimap_it_s, __param_key: i32) -> bool {
-    if (((if not ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_it_[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it_until_p".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0)".ptr)
     } else {
         0
@@ -7967,13 +7989,13 @@ unsafe fn multimap_it_until_p(__param_it_: *mut multimap_it_s, __param_key: i32)
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node
 
-    if ((if (((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx as u32)) >= (((0 - (*__local_n).num) as u32)): 1 else: 0) != 0) {
+    if ((((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx as u32)) >= (((0 - (*__local_n).num) as u32))) {
         return (((((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= 0)) as bool))
     }
 
     var __local_cmp: i32
 
-    (__local_cmp = (((if (if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] < __param_key: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] > __param_key: 1 else: 0) as i32)) as i32)))
+    (__local_cmp = (((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] < __param_key: (-1 as i32) else: ((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] > __param_key: 1 else: 0) as i32)) as i32)))
 
 
     return ((((__local_cmp >= 0)) as bool))
@@ -7981,7 +8003,7 @@ unsafe fn multimap_it_until_p(__param_it_: *mut multimap_it_s, __param_key: i32)
 }
 
 unsafe fn multimap_it_while_p(__param_it_: *mut multimap_it_s, __param_key: i32) -> bool {
-    if (((if not ((if (&(__param_it_[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((&(__param_it_[0]) as *mut c_void) != null): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_it_while_p".ptr, c"multimap.c".ptr, (5 as i32), c"it != ((void*)0)".ptr)
     } else {
         0
@@ -7989,57 +8011,58 @@ unsafe fn multimap_it_while_p(__param_it_: *mut multimap_it_s, __param_key: i32)
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node
 
-    if ((if (((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx as u32)) >= (((0 - (*__local_n).num) as u32)): 1 else: 0) != 0) {
+    if ((((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx as u32)) >= (((0 - (*__local_n).num) as u32))) {
         return (((((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx < 0)) as bool))
     }
 
     var __local_cmp: i32
 
-    (__local_cmp = (((if (if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] < __param_key: 1 else: 0) != 0: (-1 as i32) else: ((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] > __param_key: 1 else: 0) as i32)) as i32)))
+    (__local_cmp = (((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] < __param_key: (-1 as i32) else: ((if (*__local_n).key[(*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx] > __param_key: 1 else: 0) as i32)) as i32)))
 
 
     return ((((__local_cmp <= 0)) as bool))
 
 }
 
+// contract: receiver-mut:multimap_s,unproved:1:out-parameter read before the write
 unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap_it_s) {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_b[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_b[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"((b)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_b[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -8049,7 +8072,7 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -8057,11 +8080,11 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -8072,8 +8095,8 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[i2-1]) < (((b)->root+0)->key[i2]) ? -1 : (((b)->root+0)->key[i2-1]) > (((b)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -8085,14 +8108,14 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
             }
 
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->key[num2-1]) < (((b)->root+0)->next->key[0]) ? -1 : (((b)->root+0)->key[num2-1]) > (((b)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8100,24 +8123,24 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
             }
 
-            if ((if ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_b[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((b)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((b)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((b)->root+0)->prev->key[num_prev-1]) < (((b)->root+0)->key[0]) ? -1 : (((b)->root+0)->prev->key[num_prev-1]) > (((b)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8125,39 +8148,39 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"(b)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_b[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_b[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"-(b)->root->num == (int) (b)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __local_n: *mut multimap_node_s = (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node
 
-    if (((if not ((if (*__local_n).num < 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not ((*__local_n).num < 0): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"n->num < 0".ptr)
     } else {
         0
@@ -8169,11 +8192,11 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if __local_i >= 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if __local_i < __local_num: 1 else: 0) != 0: 1 else: 0))
+    if (__local_i >= 0) {
+        (__ci_expr_logic_2 = (if __local_i < __local_num: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"i >= 0 && i < num".ptr)
     } else {
         0
@@ -8196,11 +8219,11 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
     var __ci_expr_logic_3: i32 = 0
 
-    if ((if __local_i >= (__local_num - 1): 1 else: 0) != 0) {
-        (__ci_expr_logic_3 = (if (if (*__local_n).next != null: 1 else: 0) != 0: 1 else: 0))
+    if (__local_i >= (__local_num - 1)) {
+        (__ci_expr_logic_3 = (if (*__local_n).next != null: 1 else: 0))
     }
 
-    if (((if not ((if not (__ci_expr_logic_3 != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not __ci_expr_logic_3): 1 else: 0) as i64) {
         ((__param_it_[0]).node = (*__local_n).next)
 
         ((__param_it_[0]).idx = ((0 as i32)))
@@ -8210,19 +8233,19 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
     var __ci_expr_logic_4: i32
 
-    if (((if not ((if not ((if multimap_get_num(__local_n) >= (5 / 2): 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not (multimap_get_num(__local_n) >= (5 / 2))): 1 else: 0) as i64) {
         (__ci_expr_logic_4 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_4 = (if (if (*(&raw const (__param_b[0]) as *const multimap_s)).root == __local_n: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_4 = (if (*(&raw const (__param_b[0]) as *const multimap_s)).root == __local_n: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         return
     }
 
 
-    while (((if not ((if not ((if __local_n != __local_leaf: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
-        if (((if not ((if (*__local_leaf).next != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while ((if not (not (__local_n != __local_leaf)): 1 else: 0) as i64) {
+        if ((if not ((*__local_leaf).next != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"leaf->next != ((void*)0)".ptr)
         } else {
             0
@@ -8235,7 +8258,7 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
         var __local_p_n: *mut multimap_node_s = __local_leaf
 
         loop {
-            if (((if not ((if __local_p_num >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (__local_p_num >= 1): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"p_num >= 1".ptr)
             } else {
                 0
@@ -8248,7 +8271,7 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
             var __local_k: i32 = ((multimap_i_search_for_node(__local_parent, __local_p_n) as i32))
 
-            if ((if __local_k >= 0: 1 else: 0) != 0) {
+            if (__local_k >= 0) {
                 break
             }
 
@@ -8256,14 +8279,14 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
             (__local_p_n = (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).parent[__local_p_num])
 
-            if not ((1 != 0)) {
+            if not (true) {
                 break
             }
         }
 
     }
 
-    if (((if not ((if multimap_get_num(__local_leaf) == ((5 / 2) - 1): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (multimap_get_num(__local_leaf) == ((5 / 2) - 1)): 1 else: 0) as i64) {
         __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"multimap_get_num(leaf) == 5/2-1".ptr)
     } else {
         0
@@ -8271,8 +8294,8 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
     var __local_pass1: bool = true
 
-    while (1 != 0) {
-        if (((if not ((if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while true {
+        if ((if not ((*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"pit->num > 0".ptr)
         } else {
             0
@@ -8283,7 +8306,7 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
             (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).parent[(*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num]
         }
 
-        if (((if not ((if __local_parent_1 != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_parent_1 != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"parent != ((void*)0)".ptr)
         } else {
             0
@@ -8291,7 +8314,7 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
         var __local_k_1: i32 = ((multimap_i_search_for_node(__local_parent_1, __local_leaf) as i32))
 
-        if (((if not ((if __local_k_1 >= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_k_1 >= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"k >= 0".ptr)
         } else {
             0
@@ -8299,19 +8322,19 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
         var __ci_expr_logic_5: i32 = 0
 
-        if ((if __local_k_1 > 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_5 = (if (if multimap_get_num((*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 - 1)]) > (5 / 2): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k_1 > 0) {
+            (__ci_expr_logic_5 = (if multimap_get_num((*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 - 1)]) > (5 / 2): 1 else: 0))
         }
 
-        if (__ci_expr_logic_5 != 0) {
+        if __ci_expr_logic_5 {
             multimap_i_left_shift(__local_parent_1, ((__local_k_1 - 1) as i32))
 
-            if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[__local_k_1]: 1 else: 0) != 0) {
+            if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[__local_k_1]) {
                 ((__param_it_[0]).idx = (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx + 1)
 
             } else {
-                if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 - 1)]: 1 else: 0) != 0) {
-                    if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= multimap_get_num((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node): 1 else: 0) != 0) {
+                if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 - 1)]) {
+                    if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx >= multimap_get_num((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node)) {
                         ((__param_it_[0]).idx = ((0 as i32)))
 
                         ((__param_it_[0]).node = (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 - 1)])
@@ -8326,15 +8349,15 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
         }
         var __ci_expr_logic_6: i32 = 0
 
-        if ((if __local_k_1 < multimap_get_num(__local_parent_1): 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if multimap_get_num((*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 + 1)]) > (5 / 2): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k_1 < multimap_get_num(__local_parent_1)) {
+            (__ci_expr_logic_6 = (if multimap_get_num((*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 + 1)]) > (5 / 2): 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if __ci_expr_logic_6 {
             multimap_i_right_shift(__local_parent_1, __local_k_1)
 
-            if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 + 1)]: 1 else: 0) != 0) {
-                if ((if (*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx == 0: 1 else: 0) != 0) {
+            if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).node == (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[(__local_k_1 + 1)]) {
+                if ((*(&raw const (__param_it_[0]) as *const multimap_it_s)).idx == 0) {
                     ((__param_it_[0]).node = (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[__local_k_1])
 
                     ((__param_it_[0]).idx = (((multimap_get_num((*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[__local_k_1]) - 1) as i32)))
@@ -8352,17 +8375,17 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
 
 
-        if ((if __local_k_1 == multimap_get_num(__local_parent_1): 1 else: 0) != 0) {
+        if (__local_k_1 == multimap_get_num(__local_parent_1)) {
             (__local_k_1 = __local_k_1 - 1)
         }
 
         var __ci_expr_logic_7: i32 = 0
 
-        if ((if __local_k_1 >= 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if __local_k_1 < multimap_get_num(__local_parent_1): 1 else: 0) != 0: 1 else: 0))
+        if (__local_k_1 >= 0) {
+            (__ci_expr_logic_7 = (if __local_k_1 < multimap_get_num(__local_parent_1): 1 else: 0))
         }
 
-        if (((if not (__ci_expr_logic_7 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_7: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_remove".ptr, c"multimap.c".ptr, (5 as i32), c"k >= 0 && k < multimap_get_num(parent)".ptr)
         } else {
             0
@@ -8382,12 +8405,12 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
         }
 
-        if ((if multimap_get_num(__local_parent_1) >= (5 / 2): 1 else: 0) != 0) {
+        if (multimap_get_num(__local_parent_1) >= (5 / 2)) {
             return
         }
 
-        if ((if (*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0: 1 else: 0) != 0) {
-            if ((if multimap_get_num(__local_parent_1) == 0: 1 else: 0) != 0) {
+        if ((*(&raw const __local_pit[0] as *const multimap_parent_it_s)).num == 0) {
+            if (multimap_get_num(__local_parent_1) == 0) {
                 ((__param_b[0]).root = (*(&raw const (*__local_parent_1).kind as *const multimap_kind_s)).node[0])
 
                 with_free(((__local_parent_1 as *mut c_void) as *mut u8))
@@ -8406,44 +8429,45 @@ unsafe fn multimap_remove(__param_b: *mut multimap_s, __param_it_: *mut multimap
 
 }
 
+// contract: receiver:multimap_s,unproved:1:read only
 unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multimap_s) -> bool {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -8453,7 +8477,7 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -8461,11 +8485,11 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -8476,8 +8500,8 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -8489,14 +8513,14 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
             }
 
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8504,24 +8528,24 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             }
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8529,32 +8553,32 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -8562,40 +8586,40 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"((t2)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t2[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t2[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"((t2)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t2[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t2[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_2 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -8605,7 +8629,7 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -8613,11 +8637,11 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
                 var __ci_expr_logic_3: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_3 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_3 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_3 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_3: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -8628,8 +8652,8 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t2)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t2)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t2)->root+0)->key[i2-1]) < (((t2)->root+0)->key[i2]) ? -1 : (((t2)->root+0)->key[i2-1]) > (((t2)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -8641,14 +8665,14 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
             }
 
 
-            if ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t2)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t2)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t2)->root+0)->key[num2-1]) < (((t2)->root+0)->next->key[0]) ? -1 : (((t2)->root+0)->key[num2-1]) > (((t2)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8656,24 +8680,24 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             }
 
-            if ((if ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_t2[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t2)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t2)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t2)->root+0)->prev->key[num_prev-1]) < (((t2)->root+0)->key[0]) ? -1 : (((t2)->root+0)->prev->key[num_prev-1]) > (((t2)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8681,41 +8705,41 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(t2)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"(t2)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t2[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t2[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t2[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_equal_p".ptr, c"multimap.c".ptr, (5 as i32), c"-(t2)->root->num == (int) (t2)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).size != (*(&raw const (__param_t2[0]) as *const multimap_s)).size: 1 else: 0) != 0) {
+    if ((*(&raw const (__param_t1[0]) as *const multimap_s)).size != (*(&raw const (__param_t2[0]) as *const multimap_s)).size) {
         return ((false as bool))
     }
 
-    if ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).size == 0: 1 else: 0) != 0) {
+    if ((*(&raw const (__param_t1[0]) as *const multimap_s)).size == 0) {
         return ((true as bool))
     }
 
@@ -8730,11 +8754,11 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
     while true {
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if not multimap_end_p((&__local_it1[0] as *mut multimap_it_s)): 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if not multimap_end_p((&__local_it2[0] as *mut multimap_it_s)): 1 else: 0) != 0: 1 else: 0))
+        if (not multimap_end_p((&__local_it1[0] as *mut multimap_it_s))) {
+            (__ci_expr_logic_4 = (if not multimap_end_p((&__local_it2[0] as *mut multimap_it_s)): 1 else: 0))
         }
 
-        if (not (__ci_expr_logic_4 != 0)) {
+        if (not __ci_expr_logic_4) {
             break
         }
 
@@ -8742,11 +8766,11 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
         var __local_ref2: *const multimap_pair_s = multimap_cref((&__local_it2[0] as *mut multimap_it_s))
 
-        if ((if not ((if (*((*__local_ref1).key_ptr)) == (*((*__local_ref2).key_ptr)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if (not ((*((*__local_ref1).key_ptr)) == (*((*__local_ref2).key_ptr)))) {
             return ((false as bool))
         }
 
-        if ((if not ((if (*((*__local_ref1).value_ptr)) == (*((*__local_ref2).value_ptr)): 1 else: 0) != 0): 1 else: 0) != 0) {
+        if (not ((*((*__local_ref1).value_ptr)) == (*((*__local_ref2).value_ptr)))) {
             return ((false as bool))
         }
 
@@ -8758,8 +8782,8 @@ unsafe fn multimap_equal_p(__param_t1: *mut multimap_s, __param_t2: *mut multima
 
     var __ci_expr_logic_5: i32 = 0
 
-    if (multimap_end_p((&__local_it1[0] as *mut multimap_it_s)) != 0) {
-        (__ci_expr_logic_5 = (if multimap_end_p((&__local_it2[0] as *mut multimap_it_s)) != 0: 1 else: 0))
+    if multimap_end_p((&__local_it1[0] as *mut multimap_it_s)) {
+        (__ci_expr_logic_5 = (if multimap_end_p((&__local_it2[0] as *mut multimap_it_s)): 1 else: 0))
     }
 
     return (((__ci_expr_logic_5 != 0) as bool))
@@ -8771,40 +8795,40 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -8814,7 +8838,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -8822,11 +8846,11 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -8837,8 +8861,8 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -8850,14 +8874,14 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
             }
 
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8865,24 +8889,24 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
             }
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -8890,32 +8914,32 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_hash".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -8926,13 +8950,13 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
     multimap_it((&__local_it1[0] as *mut multimap_it_s), (&(__param_t1[0]) as *mut multimap_s))
 
-    while ((if not multimap_end_p((&__local_it1[0] as *mut multimap_it_s)): 1 else: 0) != 0) {
+    while (not multimap_end_p((&__local_it1[0] as *mut multimap_it_s))) {
         var __local_ref1: *const multimap_pair_s = multimap_cref((&__local_it1[0] as *mut multimap_it_s))
 
         loop {
             (__local_hash = ((((((__local_hash as u64) *% (2166136261 as u64)) as u64) ^ ((((((*((*__local_ref1).key_ptr)) as u32) ^ ((((*((*__local_ref1).key_ptr)) as u32) << (11 as u32)) as u32)) as u64) ^ (0 as u64)) as u64)) as u64)))
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -8940,7 +8964,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
         loop {
             (__local_hash = ((((((__local_hash as u64) *% (2166136261 as u64)) as u64) ^ ((((((*((*__local_ref1).value_ptr)) as u32) ^ ((((*((*__local_ref1).value_ptr)) as u32) << (11 as u32)) as u32)) as u64) ^ (0 as u64)) as u64)) as u64)))
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -8953,6 +8977,7 @@ unsafe fn multimap_hash(__param_t1: *mut multimap_s) -> u64 {
 
 }
 
+// contract: receiver-mut:multimap_s,stored-unknown:1,unproved:2:out-parameter read before the write — stores an argument; ownership not modeled
 unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_char, __param_endp: *mut *const c_char) -> bool {
     var __local_str = __param_str
     var __local_num2__goto_5_1: i32 = 0
@@ -9008,7 +9033,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_2 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_1
         } else {
             goto '__ci_bb_3
@@ -9016,7 +9041,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_3 {
-        if (((if not ((if (&(__local_str[0]) as *mut c_void) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((&(__local_str[0]) as *mut c_void) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"str != ((void*)0)".ptr)
         } else {
             0
@@ -9025,7 +9050,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
         (__ci_expr_old_2 = __local_str)
         (__local_str = __local_str + 1)
         (__local_c__goto_5_1 = (((*(&(__ci_expr_old_2[0]) as *mut c_char)) as i32)))
-        if (((if not ((if not ((if __local_c__goto_5_1 != 91: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (not (__local_c__goto_5_1 != 91)): 1 else: 0) as i64) {
             goto '__ci_bb_22
         } else {
             goto '__ci_bb_23
@@ -9033,20 +9058,20 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_4 {
-        if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
             goto '__ci_bb_7
         } else {
             goto '__ci_bb_8
@@ -9054,7 +9079,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_5 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_4
         } else {
             goto '__ci_bb_6
@@ -9062,17 +9087,17 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_6 {
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_20
         } else {
             goto '__ci_bb_21
@@ -9081,15 +9106,15 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_7 {
         (__ci_expr_logic_0 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_0 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_10
         } else {
             goto '__ci_bb_11
@@ -9098,16 +9123,16 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_8 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_1 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_1 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -9121,7 +9146,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_10 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -9134,7 +9159,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_12 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_13
         } else {
             goto '__ci_bb_15
@@ -9142,7 +9167,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_13 {
-        if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -9156,7 +9181,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_15 {
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_16
         } else {
             goto '__ci_bb_17
@@ -9164,12 +9189,12 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_16 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -9178,7 +9203,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_17 {
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_18
         } else {
             goto '__ci_bb_19
@@ -9186,19 +9211,19 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_18 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -9211,7 +9236,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_20 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
         } else {
             0
@@ -9232,12 +9257,12 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
         (__ci_expr_old_3 = __local_str)
         (__local_str = __local_str + 1)
         (__local_c__goto_5_1 = (((*(&(__ci_expr_old_3[0]) as *mut c_char)) as i32)))
-        if ((if __local_c__goto_5_1 == 93: 1 else: 0) != 0) {
+        if (__local_c__goto_5_1 == 93) {
             (__ci_expr_logic_4 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_4 = (if (if __local_c__goto_5_1 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_4 = (if __local_c__goto_5_1 == 0: 1 else: 0))
         }
-        if (((if not ((if not (__ci_expr_logic_4 != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (not __ci_expr_logic_4): 1 else: 0) as i64) {
             goto '__ci_bb_25
         } else {
             goto '__ci_bb_26
@@ -9284,13 +9309,13 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_31 {
         (__ci_expr_logic_5 = 0)
-        if (__local__local_cont_key5__goto_5_1 != 0) {
+        if __local__local_cont_key5__goto_5_1 {
             (__local_key__goto_5_1 = ((0 as i32)))
 
-            (__ci_expr_logic_5 = (if 1 != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if true: 1 else: 0))
 
         }
-        if (__ci_expr_logic_5 != 0) {
+        if __ci_expr_logic_5 {
             goto '__ci_bb_32
         } else {
             goto '__ci_bb_34
@@ -9354,13 +9379,13 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_43 {
         (__ci_expr_logic_6 = 0)
-        if (__local__local_cont_value5__goto_5_1 != 0) {
+        if __local__local_cont_value5__goto_5_1 {
             (__local_value__goto_5_1 = ((0 as i32)))
 
-            (__ci_expr_logic_6 = (if 1 != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if true: 1 else: 0))
 
         }
-        if (__ci_expr_logic_6 != 0) {
+        if __ci_expr_logic_6 {
             goto '__ci_bb_44
         } else {
             goto '__ci_bb_46
@@ -9404,7 +9429,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     '__ci_bb_51 {
         (__local_b__goto_5_1 = m_core_parse_sint((&raw mut __local_key__goto_5_1 as *mut i32), (&(__local_str[0]) as *mut c_char), ((&raw mut __local_str as *mut []c_char) as *mut *const c_char)))
         (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const c_char)) as i32)))
-        if ((if __local_b__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_b__goto_5_1 == 0) {
             goto '__ci_bb_54
         } else {
             goto '__ci_bb_55
@@ -9412,7 +9437,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_52 {
-        if ((if __local_c__goto_5_1 == 44: 1 else: 0) != 0) {
+        if (__local_c__goto_5_1 == 44) {
             goto '__ci_bb_51
         } else {
             goto '__ci_bb_53
@@ -9429,7 +9454,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_55 {
-        if ((if __local_c__goto_5_1 != 58: 1 else: 0) != 0) {
+        if (__local_c__goto_5_1 != 58) {
             goto '__ci_bb_56
         } else {
             goto '__ci_bb_57
@@ -9444,12 +9469,12 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     '__ci_bb_57 {
         (__local_b__goto_5_1 = m_core_parse_sint((&raw mut __local_value__goto_5_1 as *mut i32), (&(__local_str[0]) as *mut c_char), ((&raw mut __local_str as *mut []c_char) as *mut *const c_char)))
         (__local_c__goto_5_1 = ((m_core_str_nospace(((&raw mut __local_str as *mut []c_char) as *mut *const c_char)) as i32)))
-        if ((if __local_b__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_b__goto_5_1 == 0) {
             (__ci_expr_logic_7 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_7 = (if (if __local_c__goto_5_1 == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_7 = (if __local_c__goto_5_1 == 0: 1 else: 0))
         }
-        if (__ci_expr_logic_7 != 0) {
+        if __ci_expr_logic_7 {
             goto '__ci_bb_58
         } else {
             goto '__ci_bb_59
@@ -9480,7 +9505,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_63 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_62
         } else {
             goto '__ci_bb_64
@@ -9492,20 +9517,20 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_65 {
-        if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
         } else {
             0
         }
-        (__local_num2__goto_5_1 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num)
+        (__local_num2__goto_5_1 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num)
         (__local_is_leaf2__goto_5_1 = ((__local_num2__goto_5_1 <= 0)))
-        (__local_num2__goto_5_1 = (((if (if __local_num2__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+        (__local_num2__goto_5_1 = (((if __local_num2__goto_5_1 < 0: ((0 - __local_num2__goto_5_1) as i32) else: __local_num2__goto_5_1) as i32)))
+        if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
             goto '__ci_bb_68
         } else {
             goto '__ci_bb_69
@@ -9513,7 +9538,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_66 {
-        if (0 != 0) {
+        if false {
             goto '__ci_bb_65
         } else {
             goto '__ci_bb_67
@@ -9521,17 +9546,17 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_67 {
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
             goto '__ci_bb_81
         } else {
             goto '__ci_bb_82
@@ -9540,15 +9565,15 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_68 {
         (__ci_expr_logic_8 = 0)
-        if ((if 0 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_8 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (0 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_8 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_8 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_8: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
         } else {
             0
         }
-        if ((if __local_num2__goto_5_1 == 0: 1 else: 0) != 0) {
+        if (__local_num2__goto_5_1 == 0) {
             goto '__ci_bb_71
         } else {
             goto '__ci_bb_72
@@ -9557,16 +9582,16 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
     '__ci_bb_69 {
         (__local_c2__goto_5_1 = (((5 / 2) as i32)))
-        if (((if not ((if __local_c2__goto_5_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_c2__goto_5_1 > 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
         } else {
             0
         }
         (__ci_expr_logic_9 = 0)
-        if ((if __local_c2__goto_5_1 <= __local_num2__goto_5_1: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if __local_num2__goto_5_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+        if (__local_c2__goto_5_1 <= __local_num2__goto_5_1) {
+            (__ci_expr_logic_9 = (if __local_num2__goto_5_1 <= 5: 1 else: 0))
         }
-        if (((if not (__ci_expr_logic_9 != 0): 1 else: 0) as i64) != 0) {
+        if ((if not __ci_expr_logic_9: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
         } else {
             0
@@ -9580,7 +9605,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_71 {
-        if (((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) != 0) {
+        if ((if not __local_is_leaf2__goto_5_1: 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
         } else {
             0
@@ -9593,7 +9618,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_73 {
-        if ((if __local_i2__goto_5_1 < __local_num2__goto_5_1: 1 else: 0) != 0) {
+        if (__local_i2__goto_5_1 < __local_num2__goto_5_1) {
             goto '__ci_bb_74
         } else {
             goto '__ci_bb_76
@@ -9601,7 +9626,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_74 {
-        if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2__goto_5_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2__goto_5_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
         } else {
             0
@@ -9615,7 +9640,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_76 {
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
             goto '__ci_bb_77
         } else {
             goto '__ci_bb_78
@@ -9623,12 +9648,12 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_77 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2__goto_5_1 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
         } else {
             0
@@ -9637,7 +9662,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_78 {
-        if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
+        if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
             goto '__ci_bb_79
         } else {
             goto '__ci_bb_80
@@ -9645,19 +9670,19 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_79 {
-        if (((if not ((if __local_num2__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (__local_num2__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
         } else {
             0
         }
-        (__local_num_prev__goto_5_1 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num)
-        (__local_num_prev__goto_5_1 = (((if (if __local_num_prev__goto_5_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
-        if (((if not ((if __local_num_prev__goto_5_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        (__local_num_prev__goto_5_1 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num)
+        (__local_num_prev__goto_5_1 = (((if __local_num_prev__goto_5_1 < 0: ((0 - __local_num_prev__goto_5_1) as i32) else: __local_num_prev__goto_5_1) as i32)))
+        if ((if not (__local_num_prev__goto_5_1 >= 1): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
         } else {
             0
         }
-        if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev__goto_5_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev__goto_5_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
         } else {
             0
@@ -9670,7 +9695,7 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
     }
 
     '__ci_bb_81 {
-        if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_parse_str".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
         } else {
             0
@@ -9686,44 +9711,45 @@ unsafe fn multimap_parse_str(__param_t1: *mut multimap_s, __param_str: *mut c_ch
 
 }
 
+// contract: stored-unknown:0,unproved:1:read only — stores an argument; ownership not modeled
 unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut multimap_s) -> i32 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -9733,7 +9759,7 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -9741,11 +9767,11 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -9756,8 +9782,8 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -9769,14 +9795,14 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
             }
 
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -9784,24 +9810,24 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
             }
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -9809,43 +9835,43 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if (&(__param_f[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if (*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_f[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_2 = (if (*(&raw const (__param_f[0]) as *const m_serial_write_s)).m_interface != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_out_serial".ptr, c"multimap.c".ptr, (5 as i32), c"f != ((void*)0) && f->m_interface != ((void*)0)".ptr)
     } else {
         0
@@ -9866,7 +9892,7 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
     multimap_it((&__local_it_[0] as *mut multimap_it_s), (&(__param_t1[0]) as *mut multimap_s))
 
-    while ((if not multimap_end_p((&__local_it_[0] as *mut multimap_it_s)): 1 else: 0) != 0) {
+    while (not multimap_end_p((&__local_it_[0] as *mut multimap_it_s))) {
         (__local_item = multimap_cref((&__local_it_[0] as *mut multimap_it_s)))
 
         if __local_first_done {
@@ -9893,44 +9919,45 @@ unsafe fn multimap_out_serial(__param_f: *mut m_serial_write_s, __param_t1: *mut
 
 }
 
+// contract: receiver-mut:multimap_s,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_serial_read_s) -> i32 {
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2: i32 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2: bool = ((__local_num2 <= 0))
 
-            (__local_num2 = (((if (if __local_num2 < 0: 1 else: 0) != 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
+            (__local_num2 = (((if __local_num2 < 0: ((0 - __local_num2) as i32) else: __local_num2) as i32)))
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if 0 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2) {
+                    (__ci_expr_logic_0 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_0 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_0: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2: 1 else: 0) as i64) != 0) {
+                if (__local_num2 == 0) {
+                    if ((if not __local_is_leaf2: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -9940,7 +9967,7 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
             } else {
                 var __local_c2: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -9948,11 +9975,11 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
                 var __ci_expr_logic_1: i32 = 0
 
-                if ((if __local_c2 <= __local_num2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_1 = (if (if __local_num2 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2 <= __local_num2) {
+                    (__ci_expr_logic_1 = (if __local_num2 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_1 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_1: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -9963,8 +9990,8 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             var __local_i2: i32 = ((1 as i32))
 
-            while ((if __local_i2 < __local_num2: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2 < __local_num2) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -9976,14 +10003,14 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
             }
 
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -9991,24 +10018,24 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             }
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev: i32 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev = (((if (if __local_num_prev < 0: 1 else: 0) != 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
+                (__local_num_prev = (((if __local_num_prev < 0: ((0 - __local_num_prev) as i32) else: __local_num_prev) as i32)))
 
-                if (((if not ((if __local_num_prev >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -10016,43 +10043,43 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __ci_expr_logic_2: i32 = 0
 
-    if ((if (&(__param_f[0]) as *mut c_void) != null: 1 else: 0) != 0) {
-        (__ci_expr_logic_2 = (if (if (*(&raw const (__param_f[0]) as *const m_serial_read_s)).m_interface != null: 1 else: 0) != 0: 1 else: 0))
+    if ((&(__param_f[0]) as *mut c_void) != null) {
+        (__ci_expr_logic_2 = (if (*(&raw const (__param_f[0]) as *const m_serial_read_s)).m_interface != null: 1 else: 0))
     }
 
-    if (((if not (__ci_expr_logic_2 != 0): 1 else: 0) as i64) != 0) {
+    if ((if not __ci_expr_logic_2: 1 else: 0) as i64) {
         __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"f != ((void*)0) && f->m_interface != ((void*)0)".ptr)
     } else {
         0
@@ -10075,14 +10102,14 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
         while true {
             var __ci_expr_logic_3: i32 = 0
 
-            if (__local__local_cont_key5 != 0) {
+            if __local__local_cont_key5 {
                 (__local_key = ((0 as i32)))
 
-                (__ci_expr_logic_3 = (if 1 != 0: 1 else: 0))
+                (__ci_expr_logic_3 = (if true: 1 else: 0))
 
             }
 
-            if (not (__ci_expr_logic_3 != 0)) {
+            if (not __ci_expr_logic_3) {
                 break
             }
 
@@ -10095,47 +10122,47 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
                     while true {
                         var __ci_expr_logic_4: i32 = 0
 
-                        if (__local__local_cont_value5 != 0) {
+                        if __local__local_cont_value5 {
                             (__local_value = ((0 as i32)))
 
-                            (__ci_expr_logic_4 = (if 1 != 0: 1 else: 0))
+                            (__ci_expr_logic_4 = (if true: 1 else: 0))
 
                         }
 
-                        if (not (__ci_expr_logic_4 != 0)) {
+                        if (not __ci_expr_logic_4) {
                             break
                         }
 
                         while __local__local_cont_value5 {
                             (__local_ret = (((*(*(&raw const (__param_f[0]) as *const m_serial_read_s)).m_interface).read_map_start.unwrap()((&__local_local[0] as *mut m_serial_local_s), (&(__param_f[0]) as *mut m_serial_read_s), (&raw mut __local_estimated_size as *mut u64)) as i32)))
 
-                            if (((if not ((if not ((if __local_ret != 1: 1 else: 0) != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                            if ((if not (not (__local_ret != 1)): 1 else: 0) as i64) {
                                 break
                             }
 
                             loop {
                                 (__local_ret = ((m_core_in_serial_sint((&(__param_f[0]) as *mut m_serial_read_s), (&raw mut __local_key as *mut i32)) as i32)))
 
-                                if ((if __local_ret != 0: 1 else: 0) != 0) {
+                                if (__local_ret != 0) {
                                     break
                                 }
 
                                 (__local_ret = (((*(*(&raw const (__param_f[0]) as *const m_serial_read_s)).m_interface).read_map_value.unwrap()((&__local_local[0] as *mut m_serial_local_s), (&(__param_f[0]) as *mut m_serial_read_s)) as i32)))
 
-                                if ((if __local_ret != 1: 1 else: 0) != 0) {
+                                if (__local_ret != 1) {
                                     break
                                 }
 
                                 (__local_ret = ((m_core_in_serial_sint((&(__param_f[0]) as *mut m_serial_read_s), (&raw mut __local_value as *mut i32)) as i32)))
 
-                                if ((if __local_ret != 0: 1 else: 0) != 0) {
+                                if (__local_ret != 0) {
                                     break
                                 }
 
                                 multimap_set_at((&(__param_t1[0]) as *mut multimap_s), __local_key, __local_value)
 
                                 (__local_ret = (((*(*(&raw const (__param_f[0]) as *const m_serial_read_s)).m_interface).read_map_next.unwrap()((&__local_local[0] as *mut m_serial_local_s), (&(__param_f[0]) as *mut m_serial_read_s)) as i32)))
-                                if not (((if __local_ret == 1: 1 else: 0) != 0)) {
+                                if not ((__local_ret == 1)) {
                                     break
                                 }
                             }
@@ -10166,40 +10193,40 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
     loop {
 
         loop {
-            if (((if not ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root+0) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            if (((if not ((if (*(&raw const (__param_t1[0]) as *const multimap_s)).root != null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((if not ((*(&raw const (__param_t1[0]) as *const multimap_s)).root != null): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"((t1)->root) != ((void*)0)".ptr)
             } else {
                 0
             }
 
-            var __local_num2_1: i32 = ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).num
+            var __local_num2_1: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).num
 
             var __local_is_leaf2_1: bool = ((__local_num2_1 <= 0))
 
-            (__local_num2_1 = (((if (if __local_num2_1 < 0: 1 else: 0) != 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
+            (__local_num2_1 = (((if __local_num2_1 < 0: ((0 - __local_num2_1) as i32) else: __local_num2_1) as i32)))
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root: 1 else: 0) != 0) {
+            if (((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)) == (*(&raw const (__param_t1[0]) as *const multimap_s)).root) {
                 var __ci_expr_logic_5: i32 = 0
 
-                if ((if 0 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_5 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (0 <= __local_num2_1) {
+                    (__ci_expr_logic_5 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_5 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_5: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"0 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
                 }
 
 
-                if ((if __local_num2_1 == 0: 1 else: 0) != 0) {
-                    if (((if not __local_is_leaf2_1: 1 else: 0) as i64) != 0) {
+                if (__local_num2_1 == 0) {
+                    if ((if not __local_is_leaf2_1: 1 else: 0) as i64) {
                         __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"is_leaf2".ptr)
                     } else {
                         0
@@ -10209,7 +10236,7 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
             } else {
                 var __local_c2_1: i32 = (((5 / 2) as i32))
 
-                if (((if not ((if __local_c2_1 > 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_c2_1 > 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 > 0".ptr)
                 } else {
                     0
@@ -10217,11 +10244,11 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
                 var __ci_expr_logic_6: i32 = 0
 
-                if ((if __local_c2_1 <= __local_num2_1: 1 else: 0) != 0) {
-                    (__ci_expr_logic_6 = (if (if __local_num2_1 <= 5: 1 else: 0) != 0: 1 else: 0))
+                if (__local_c2_1 <= __local_num2_1) {
+                    (__ci_expr_logic_6 = (if __local_num2_1 <= 5: 1 else: 0))
                 }
 
-                if (((if not (__ci_expr_logic_6 != 0): 1 else: 0) as i64) != 0) {
+                if ((if not __ci_expr_logic_6: 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"c2 <= num2 && num2 <= 5".ptr)
                 } else {
                     0
@@ -10232,8 +10259,8 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             var __local_i2_1: i32 = ((1 as i32))
 
-            while ((if __local_i2_1 < __local_num2_1: 1 else: 0) != 0) {
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_i2_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[__local_i2_1]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            while (__local_i2_1 < __local_num2_1) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_i2_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[__local_i2_1]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[i2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[i2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[i2-1]) < (((t1)->root+0)->key[i2]) ? -1 : (((t1)->root+0)->key[i2-1]) > (((t1)->root+0)->key[i2])) <= 0".ptr)
                 } else {
                     0
@@ -10245,14 +10272,14 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
             }
 
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[(__local_num2_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).next).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] < (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[(__local_num2_1 - 1)] > (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).next).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->key[num2-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->key[num2-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->key[num2-1]) < (((t1)->root+0)->next->key[0]) ? -1 : (((t1)->root+0)->key[num2-1]) > (((t1)->root+0)->next->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -10260,24 +10287,24 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             }
 
-            if ((if ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev != null: 1 else: 0) != 0) {
-                if (((if not ((if __local_num2_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+            if ((*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev != null) {
+                if ((if not (__local_num2_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num2 >= 1".ptr)
                 } else {
                     0
                 }
 
-                var __local_num_prev_1: i32 = (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).num
+                var __local_num_prev_1: i32 = (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).num
 
-                (__local_num_prev_1 = (((if (if __local_num_prev_1 < 0: 1 else: 0) != 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
+                (__local_num_prev_1 = (((if __local_num_prev_1 < 0: ((0 - __local_num_prev_1) as i32) else: __local_num_prev_1) as i32)))
 
-                if (((if not ((if __local_num_prev_1 >= 1: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not (__local_num_prev_1 >= 1): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"num_prev >= 1".ptr)
                 } else {
                     0
                 }
 
-                if (((if not ((if (if (if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] < ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) != 0: (-1 as i32) else: ((if (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).prev).key[(__local_num_prev_1 - 1)] > ((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize)).key[0]: 1 else: 0) as i32)) <= 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+                if ((if not ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] < (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: (-1 as i32) else: ((if (*(*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).prev).key[(__local_num_prev_1 - 1)] > (*((*(&raw const (__param_t1[0]) as *const multimap_s)).root + ((0 as isize) as usize))).key[0]: 1 else: 0) as i32)) <= 0): 1 else: 0) as i64) {
                     __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(((void) sizeof(struct { int M_LIB_NOT_A_BASIC_TYPE; _Static_assert(_Generic(((t1)->root+0)->prev->key[num_prev-1], _Bool: 1, char: 1, unsigned char: 1, signed char: 1, unsigned short: 1, signed short: 1, unsigned int: 1, signed int: 1, unsigned long: 1, signed long: 1, unsigned long long: 1, signed long long:1, float: 1, double:1, long double: 1, char *:1, void*:1, default: 0), \"M_LIB_NOT_A_BASIC_TYPE\" \": \" \"The variable \" \"((t1)->root+0)->prev->key[num_prev-1]\" \" is not a basic C type (int/float), \" \"but the given methods use it like this. \" \"It is likely the given oplist is not the right one.\");})), (((t1)->root+0)->prev->key[num_prev-1]) < (((t1)->root+0)->key[0]) ? -1 : (((t1)->root+0)->prev->key[num_prev-1]) > (((t1)->root+0)->key[0])) <= 0".ptr)
                 } else {
                     0
@@ -10285,32 +10312,32 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 
             }
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).next == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->next == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if (((if not ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).prev == null): 1 else: 0) as i64) {
             __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"(t1)->root->prev == ((void*)0)".ptr)
         } else {
             0
         }
 
-        if ((if (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0: 1 else: 0) != 0) {
-            if (((if not ((if (0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num <= 0) {
+            if ((if not ((0 - (*(*(&raw const (__param_t1[0]) as *const multimap_s)).root).num) == (((*(&raw const (__param_t1[0]) as *const multimap_s)).size as i32))): 1 else: 0) as i64) {
                 __assert_rtn(c"multimap_in_serial".ptr, c"multimap.c".ptr, (5 as i32), c"-(t1)->root->num == (int) (t1)->size".ptr)
             } else {
                 0
             }
         }
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -10322,7 +10349,7 @@ unsafe fn multimap_in_serial(__param_t1: *mut multimap_s, __param_f: *mut m_seri
 unsafe fn fill_in(__param_map: *mut multimap_s) {
     var __local_i: i32 = ((1 as i32))
 
-    while ((if __local_i < 100: 1 else: 0) != 0) {
+    while (__local_i < 100) {
         multimap_set_at((&(__param_map[0]) as *mut multimap_s), __local_i, __local_i)
 
         (__local_i = __local_i + 1)
@@ -10332,7 +10359,7 @@ unsafe fn fill_in(__param_map: *mut multimap_s) {
 
     var __local_i_1: i32 = ((1 as i32))
 
-    while ((if __local_i_1 < 100: 1 else: 0) != 0) {
+    while (__local_i_1 < 100) {
         multimap_set_at((&(__param_map[0]) as *mut multimap_s), __local_i_1, ((__local_i_1 * __local_i_1) as i32))
 
         (__local_i_1 = __local_i_1 + 2)
@@ -10342,7 +10369,7 @@ unsafe fn fill_in(__param_map: *mut multimap_s) {
 
     var __local_i_2: i32 = ((1 as i32))
 
-    while ((if __local_i_2 < 100: 1 else: 0) != 0) {
+    while (__local_i_2 < 100) {
         multimap_set_at((&(__param_map[0]) as *mut multimap_s), __local_i_2, (((__local_i_2 * __local_i_2) * __local_i_2) as i32))
 
         (__local_i_2 = __local_i_2 + 3)
@@ -10374,7 +10401,7 @@ unsafe fn count(__param_map: *mut multimap_s, __param_key: i32) -> i32 {
 unsafe fn print_(__param_map: *mut multimap_s) {
     var __local_i: i32 = ((0 as i32))
 
-    while ((if __local_i < 101: 1 else: 0) != 0) {
+    while (__local_i < 101) {
         printf(c"Key=%d Count=%d ".ptr, __local_i, count((&(__param_map[0]) as *mut multimap_s), __local_i))
 
         var __local_it_: [multimap_it_s; 1]

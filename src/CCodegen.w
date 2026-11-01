@@ -11,6 +11,7 @@ use Sema
 use render
 use compiler.EmbeddedStdlib
 use Overflow
+use ConstLiteral
 use CImport
 use std.collections.HashMap
 use std.string.StringBuilder
@@ -3664,41 +3665,56 @@ impl CCodegen:
     mut fn global_init_text(node: i32, tid: i32, src_text: &str) -> str:
         var expr = node
         while expr != 0:
-            let k = self.ast.kind(expr)
-            if k != NodeKind.NK_COMPTIME and k != NodeKind.NK_GROUPED:
-                break
-            expr = self.ast.get_data0(expr)
+            match self.ast.kind(expr):
+                NodeKind.NK_COMPTIME | NodeKind.NK_GROUPED => expr = self.ast.get_data0(expr)
+                _ => break
         if expr == 0:
             return self.global_zero_text(tid)
-        let kind = self.ast.kind(expr)
-        if kind == NodeKind.NK_INT_LIT or kind == NodeKind.NK_UNARY:
-            return self.exact_int_expr_text(expr, tid)
-        if kind == NodeKind.NK_BOOL_LIT:
-            return if self.ast.get_data0(expr) != 0: "true" else: "false"
-        if kind == NodeKind.NK_FLOAT_LIT:
-            let str_idx = self.ast.get_data0(expr)
-            if str_idx >= 0 and str_idx < self.ast.state.strings.len():
-                return self.float_literal_c_text(self.ast.get_string(str_idx), tid)
-            return ""
-        if kind == NodeKind.NK_STRING_LIT:
-            let text = self.string_literal_node_payload_from_source(expr, src_text)
-            let resolved = self.sema.resolve_alias(tid)
-            let tk = self.sema.get_type_kind(resolved)
-            if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
-                let inner_tid = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
-                if self.sema.get_type_kind(inner_tid) == TypeKind.TY_INT and self.sema.get_type_d0(inner_tid) == 8:
-                    return "((" ++ self.c_type(tid, 0) ++ ")\"" ++ cc_escape_c_string(text) ++ "\")"
-            return "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
-        if kind == NodeKind.NK_C_STRING_LIT:
-            let text = self.c_string_literal_node_payload_from_source(expr, src_text)
-            return self.cstr_literal_ref_expr(text, tid)
-        if kind == NodeKind.NK_NULL_LIT:
-            return "NULL"
-        if kind == NodeKind.NK_ARRAY_LIT:
-            return self.global_array_init_text(expr, tid, src_text)
-        if kind == NodeKind.NK_STRUCT_LIT:
-            return self.global_struct_init_text(expr, tid, src_text)
-        ""
+        match self.ast.kind(expr):
+            NodeKind.NK_INT_LIT | NodeKind.NK_UNARY => self.exact_int_expr_text(expr, tid)
+            NodeKind.NK_BOOL_LIT => if self.ast.get_data0(expr) != 0: "true" else: "false"
+            NodeKind.NK_FLOAT_LIT =>
+                let str_idx = self.ast.get_data0(expr)
+                if str_idx < 0 or str_idx >= self.ast.state.strings.len(): return ""
+                self.float_literal_c_text(self.ast.get_string(str_idx), tid)
+            NodeKind.NK_STRING_LIT =>
+                let text = self.string_literal_node_payload_from_source(expr, src_text)
+                let resolved = self.sema.resolve_alias(tid)
+                let tk = self.sema.get_type_kind(resolved)
+                if tk == TypeKind.TY_PTR or tk == TypeKind.TY_REF:
+                    let inner_tid = self.sema.resolve_alias(self.sema.get_type_d0(resolved) as TypeId)
+                    if self.sema.get_type_kind(inner_tid) == TypeKind.TY_INT and self.sema.get_type_d0(inner_tid) == 8:
+                        return "((" ++ self.c_type(tid, 0) ++ ")\"" ++ cc_escape_c_string(text) ++ "\")"
+                "WITH_STR_LIT(\"" ++ cc_escape_c_string(text) ++ "\")"
+            NodeKind.NK_C_STRING_LIT => self.cstr_literal_ref_expr(self.c_string_literal_node_payload_from_source(expr, src_text), tid)
+            NodeKind.NK_NULL_LIT => "NULL"
+            NodeKind.NK_ARRAY_LIT => self.global_array_init_text(expr, tid, src_text)
+            NodeKind.NK_STRUCT_LIT => self.global_struct_init_text(expr, tid, src_text)
+            // #2219, as the LLVM backend folds (ConstLiteral): a cast of a
+            // constant, `XS.len()` of a literal sequence, and a name, element
+            // or field of another constant's literal — read from that
+            // constant's own source, as its string payloads live there.
+            NodeKind.NK_CAST =>
+                // The operand's type is recorded on the expression inside
+                // its grouping (`((XS.len() as u64) as i32)`).
+                var inner = self.ast.get_data0(expr)
+                while inner != 0 and (self.ast.kind(inner) == NodeKind.NK_GROUPED or self.ast.kind(inner) == NodeKind.NK_COMPTIME): inner = self.ast.get_data0(inner)
+                let inner_tid: i32 = self.sema.typed_expr_types.get(inner) ?? 0
+                if inner_tid <= 0: return ""
+                let inner_text = self.global_init_text(inner, inner_tid, src_text)
+                if inner_text.len() == 0: return ""
+                "((" ++ self.c_type(tid, 0) ++ ")" ++ inner_text ++ ")"
+            NodeKind.NK_CALL =>
+                let count = const_literal_len(self.ast, self.sema, expr)
+                if count < 0: return ""
+                "((" ++ self.c_type(tid, 0) ++ ")" ++ f"{count}" ++ ")"
+            NodeKind.NK_IDENT | NodeKind.NK_INDEX | NodeKind.NK_FIELD_ACCESS =>
+                let root = const_literal_root_sym(self.ast, expr)
+                let decl = if root != 0: module_const_decl_node(self.ast, root) else: 0
+                let part = const_literal_part_node(self.ast, self.sema, expr)
+                if decl == 0 or part == 0: return ""
+                self.global_init_text(part, tid, self.decl_source_text(decl as NodeId))
+            _ => ""
 
     // An array literal whose every element is a C constant is one too, as
     // the LLVM backend folds it (try_eval_const_llvm). Lowered at startup

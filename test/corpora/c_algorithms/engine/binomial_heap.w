@@ -9,7 +9,7 @@ pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: Option[un
 
     (__local_new_heap = ((alloc_test_calloc((1 as u64), (sizeof[_BinomialHeap]() as u64)) as *mut _BinomialHeap)))
 
-    if ((if __local_new_heap == null: 1 else: 0) != 0) {
+    if (__local_new_heap == null) {
         return ((null as *mut _BinomialHeap))
 
     }
@@ -22,12 +22,13 @@ pub fn binomial_heap_new(__param_heap_type: i32, __param_compare_func: Option[un
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn binomial_heap_free(__param_heap: *mut _BinomialHeap) {
     var __local_i: u32
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < (*__param_heap).roots_length: 1 else: 0) != 0) {
+    while (__local_i < (*__param_heap).roots_length) {
         binomial_tree_unref(((*__param_heap).roots[__local_i]))
 
 
@@ -42,6 +43,7 @@ pub unsafe fn binomial_heap_free(__param_heap: *mut _BinomialHeap) {
 
 }
 
+// contract: receiver-mut:_BinomialHeap,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn binomial_heap_insert(__param_heap: *mut _BinomialHeap, __param_value: *mut c_void) -> i32 writes allocation_limit {
     var __local_fake_heap: _BinomialHeap
 
@@ -51,7 +53,7 @@ pub unsafe fn binomial_heap_insert(__param_heap: *mut _BinomialHeap, __param_val
 
     (__local_new_tree = ((alloc_test_malloc((sizeof[_BinomialTree]() as u64)) as *mut _BinomialTree)))
 
-    if ((if __local_new_tree == null: 1 else: 0) != 0) {
+    if (__local_new_tree == null) {
         return 0
 
     }
@@ -76,7 +78,7 @@ pub unsafe fn binomial_heap_insert(__param_heap: *mut _BinomialHeap, __param_val
 
     (__local_result = ((binomial_heap_merge(__param_heap, (&raw mut __local_fake_heap as *mut _BinomialHeap)) as i32)))
 
-    if ((if __local_result != 0: 1 else: 0) != 0) {
+    if (__local_result != 0) {
         ((*__param_heap).num_values = ((*__param_heap).num_values +% 1))
 
     }
@@ -87,91 +89,9 @@ pub unsafe fn binomial_heap_insert(__param_heap: *mut _BinomialHeap, __param_val
 
 }
 
-pub unsafe fn binomial_heap_pop(__param_heap: *mut _BinomialHeap) -> *mut c_void writes allocation_limit {
-    var __local_least_tree: *mut _BinomialTree
-
-    var __local_fake_heap: _BinomialHeap
-
-    var __local_result: *mut c_void
-
-    var __local_i: u32
-
-    var __local_least_index: u32
-
-    if ((if (*__param_heap).num_values == 0: 1 else: 0) != 0) {
-        return binomial_heap_null_value
-
-    }
-
-    (__local_least_index = ((((((2147483647 as u32) *% (2 as u32)) as u32) +% (1 as u32)) as u32)))
-
-    (__local_i = ((0 as u32)))
-
-    while ((if __local_i < (*__param_heap).roots_length: 1 else: 0) != 0) {
-        if ((if ((*__param_heap).roots[__local_i]) == null: 1 else: 0) != 0) {
-            (__local_i = (__local_i +% 1))
-
-            continue
-
-
-        }
-
-        var __ci_expr_logic_0: i32
-
-        if ((if __local_least_index == ((((2147483647 as u32) *% (2 as u32)) as u32) +% (1 as u32)): 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if true: 1 else: 0))
-        } else {
-            (__ci_expr_logic_0 = (if (if binomial_heap_cmp(__param_heap, ((*__param_heap).roots[__local_i]).value, ((*__param_heap).roots[__local_least_index]).value) < 0: 1 else: 0) != 0: 1 else: 0))
-        }
-
-        if (__ci_expr_logic_0 != 0) {
-            (__local_least_index = __local_i)
-
-        }
-
-
-
-        (__local_i = (__local_i +% 1))
-
-    }
-
-
-    (__local_least_tree = ((*__param_heap).roots[__local_least_index]))
-
-    (((*__param_heap).roots[__local_least_index]) = ((null as *mut _BinomialTree)))
-
-    (__local_fake_heap.heap_type = (*__param_heap).heap_type)
-
-    (__local_fake_heap.compare_func = (*__param_heap).compare_func)
-
-    (__local_fake_heap.roots = (*__local_least_tree).subtrees)
-
-    (__local_fake_heap.roots_length = (((*__local_least_tree).order as u32)))
-
-    if (binomial_heap_merge(__param_heap, (&raw mut __local_fake_heap as *mut _BinomialHeap)) != 0) {
-        (__local_result = (*__local_least_tree).value)
-
-        binomial_tree_unref(__local_least_tree)
-
-        ((*__param_heap).num_values = ((*__param_heap).num_values -% 1))
-
-        return __local_result
-
-    }
-    (((*__param_heap).roots[__local_least_index]) = __local_least_tree)
-
-    return binomial_heap_null_value
-
-
-}
-
-pub unsafe fn binomial_heap_num_entries(__param_heap: *mut _BinomialHeap) -> u32 {
-    return (*__param_heap).num_values
-
-}
-
+// contract: receiver:_BinomialHeap,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn binomial_heap_cmp(__param_heap: *mut _BinomialHeap, __param_data1: *mut c_void, __param_data2: *mut c_void) -> i32 {
-    if ((if (*__param_heap).heap_type == 0: 1 else: 0) != 0) {
+    if ((*__param_heap).heap_type == 0) {
         return (*__param_heap).compare_func.unwrap()(__param_data1, __param_data2)
 
     }
@@ -180,28 +100,30 @@ unsafe fn binomial_heap_cmp(__param_heap: *mut _BinomialHeap, __param_data1: *mu
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 unsafe fn binomial_tree_ref(__param_tree: *mut _BinomialTree) {
-    if ((if __param_tree != null: 1 else: 0) != 0) {
+    if (__param_tree != null) {
         ((*__param_tree).refcount = ((*__param_tree).refcount +% 1))
 
     }
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) -> Unit {
     var __local_i: i32
 
-    if ((if __param_tree == null: 1 else: 0) != 0) {
+    if (__param_tree == null) {
         return
 
     }
 
     ((*__param_tree).refcount = ((*__param_tree).refcount -% 1))
 
-    if ((if (*__param_tree).refcount == 0: 1 else: 0) != 0) {
+    if ((*__param_tree).refcount == 0) {
         (__local_i = ((0 as i32)))
 
-        while ((if __local_i < (*__param_tree).order: 1 else: 0) != 0) {
+        while (__local_i < (*__param_tree).order) {
             binomial_tree_unref(((*__param_tree).subtrees[__local_i]))
 
 
@@ -218,6 +140,7 @@ unsafe fn binomial_tree_unref(__param_tree: *mut _BinomialTree) -> Unit {
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *mut _BinomialTree, __param_tree2: *mut _BinomialTree) -> *mut _BinomialTree {
     var __local_tree1 = __param_tree1
     var __local_tree2 = __param_tree2
@@ -227,7 +150,7 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
     var __local_i: i32
 
-    if ((if binomial_heap_cmp(__param_heap, (*__local_tree1).value, (*__local_tree2).value) > 0: 1 else: 0) != 0) {
+    if (binomial_heap_cmp(__param_heap, (*__local_tree1).value, (*__local_tree2).value) > 0) {
         (__local_tmp = __local_tree1)
 
         (__local_tree1 = __local_tree2)
@@ -238,7 +161,7 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
     (__local_new_tree = ((alloc_test_malloc((sizeof[_BinomialTree]() as u64)) as *mut _BinomialTree)))
 
-    if ((if __local_new_tree == null: 1 else: 0) != 0) {
+    if (__local_new_tree == null) {
         return ((null as *mut _BinomialTree))
 
     }
@@ -251,7 +174,7 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
     ((*__local_new_tree).subtrees = ((alloc_test_malloc((((sizeof[usize]() as u64) *% (((*__local_new_tree).order as i32) as u64)) as u64)) as *mut *mut _BinomialTree)))
 
-    if ((if (*__local_new_tree).subtrees == null: 1 else: 0) != 0) {
+    if ((*__local_new_tree).subtrees == null) {
         alloc_test_free((__local_new_tree as *mut c_void))
 
         return ((null as *mut _BinomialTree))
@@ -264,7 +187,7 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < (*__local_new_tree).order: 1 else: 0) != 0) {
+    while (__local_i < (*__local_new_tree).order) {
         binomial_tree_ref(((*__local_new_tree).subtrees[__local_i]))
 
 
@@ -277,12 +200,13 @@ unsafe fn binomial_tree_merge(__param_heap: *mut _BinomialHeap, __param_tree1: *
 
 }
 
+// contract: stored-unknown:0 — stores an argument; ownership not modeled
 unsafe fn binomial_heap_merge_undo(__param_new_roots: *mut *mut _BinomialTree, __param_count: u32) {
     var __local_i: u32
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i <= __param_count: 1 else: 0) != 0) {
+    while (__local_i <= __param_count) {
         binomial_tree_unref((__param_new_roots[__local_i]))
 
 
@@ -295,6 +219,7 @@ unsafe fn binomial_heap_merge_undo(__param_new_roots: *mut *mut _BinomialTree, _
 
 }
 
+// contract: receiver-mut:_BinomialHeap,unproved:1:read only
 unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *mut _BinomialHeap) -> i32 {
     var __local_new_roots: *mut *mut _BinomialTree
 
@@ -312,7 +237,7 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     var __local_i: u32
 
-    if ((if (*__param_heap).roots_length > (*__param_other).roots_length: 1 else: 0) != 0) {
+    if ((*__param_heap).roots_length > (*__param_other).roots_length) {
         (__local_max = (((((*__param_heap).roots_length as u32) +% (1 as u32)) as u32)))
 
     } else {
@@ -322,7 +247,7 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     (__local_new_roots = ((alloc_test_malloc((((sizeof[usize]() as u64) *% (__local_max as u64)) as u64)) as *mut *mut _BinomialTree)))
 
-    if ((if __local_new_roots == null: 1 else: 0) != 0) {
+    if (__local_new_roots == null) {
         return 0
 
     }
@@ -333,16 +258,16 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < __local_max: 1 else: 0) != 0) {
+    while (__local_i < __local_max) {
         (__local_num_vals = ((0 as i32)))
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if __local_i < (*__param_heap).roots_length: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if ((*__param_heap).roots[__local_i]) != null: 1 else: 0) != 0: 1 else: 0))
+        if (__local_i < (*__param_heap).roots_length) {
+            (__ci_expr_logic_0 = (if ((*__param_heap).roots[__local_i]) != null: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             (__local_vals[__local_num_vals] = ((*__param_heap).roots[__local_i]))
 
             (__local_num_vals = __local_num_vals + 1)
@@ -352,11 +277,11 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if __local_i < (*__param_other).roots_length: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if ((*__param_other).roots[__local_i]) != null: 1 else: 0) != 0: 1 else: 0))
+        if (__local_i < (*__param_other).roots_length) {
+            (__ci_expr_logic_1 = (if ((*__param_other).roots[__local_i]) != null: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             (__local_vals[__local_num_vals] = ((*__param_other).roots[__local_i]))
 
             (__local_num_vals = __local_num_vals + 1)
@@ -364,14 +289,14 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
         }
 
 
-        if ((if __local_carry != null: 1 else: 0) != 0) {
+        if (__local_carry != null) {
             (__local_vals[__local_num_vals] = __local_carry)
 
             (__local_num_vals = __local_num_vals + 1)
 
         }
 
-        if ((if ((__local_num_vals as i32) & (1 as i32)) != 0: 1 else: 0) != 0) {
+        if (((__local_num_vals as i32) & (1 as i32)) != 0) {
             ((__local_new_roots[__local_i]) = __local_vals[(__local_num_vals - 1)])
 
             binomial_tree_ref((__local_new_roots[__local_i]))
@@ -383,10 +308,10 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
         }
 
-        if ((if ((__local_num_vals as i32) & (2 as i32)) != 0: 1 else: 0) != 0) {
+        if (((__local_num_vals as i32) & (2 as i32)) != 0) {
             (__local_new_carry = binomial_tree_merge(__param_heap, __local_vals[0], __local_vals[1]))
 
-            if ((if __local_new_carry == null: 1 else: 0) != 0) {
+            if (__local_new_carry == null) {
                 binomial_heap_merge_undo(__local_new_roots, __local_i)
 
                 binomial_tree_unref(__local_carry)
@@ -414,8 +339,8 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
 
     (__local_i = ((0 as u32)))
 
-    while ((if __local_i < (*__param_heap).roots_length: 1 else: 0) != 0) {
-        if ((if ((*__param_heap).roots[__local_i]) != null: 1 else: 0) != 0) {
+    while (__local_i < (*__param_heap).roots_length) {
+        if (((*__param_heap).roots[__local_i]) != null) {
             binomial_tree_unref(((*__param_heap).roots[__local_i]))
 
         }
@@ -433,6 +358,94 @@ unsafe fn binomial_heap_merge(__param_heap: *mut _BinomialHeap, __param_other: *
     ((*__param_heap).roots_length = __local_new_roots_length)
 
     return 1
+
+}
+
+impl _BinomialHeap {
+    pub mut fn binomial_heap_pop() -> *mut c_void writes allocation_limit {
+        let __param_heap: *mut _BinomialHeap = self as *mut _BinomialHeap
+        var __local_least_tree: *mut _BinomialTree
+
+        var __local_fake_heap: _BinomialHeap
+
+        var __local_result: *mut c_void
+
+        var __local_i: u32
+
+        var __local_least_index: u32
+
+        if ((unsafe *__param_heap).num_values == 0) {
+            return binomial_heap_null_value
+
+        }
+
+        (__local_least_index = ((((((2147483647 as u32) *% (2 as u32)) as u32) +% (1 as u32)) as u32)))
+
+        (__local_i = ((0 as u32)))
+
+        while (__local_i < (unsafe *__param_heap).roots_length) {
+            if ((unsafe (*__param_heap).roots[__local_i]) == null) {
+                (__local_i = (__local_i +% 1))
+
+                continue
+
+
+            }
+
+            var __ci_expr_logic_0: i32
+
+            if (__local_least_index == ((((2147483647 as u32) *% (2 as u32)) as u32) +% (1 as u32))) {
+                (__ci_expr_logic_0 = (if true: 1 else: 0))
+            } else {
+                (__ci_expr_logic_0 = (if unsafe { binomial_heap_cmp(__param_heap, ((*__param_heap).roots[__local_i]).value, ((*__param_heap).roots[__local_least_index]).value) } < 0: 1 else: 0))
+            }
+
+            if __ci_expr_logic_0 {
+                (__local_least_index = __local_i)
+
+            }
+
+
+
+            (__local_i = (__local_i +% 1))
+
+        }
+
+
+        (__local_least_tree = (unsafe (*__param_heap).roots[__local_least_index]))
+
+        ((unsafe (*__param_heap).roots[__local_least_index]) = ((null as *mut _BinomialTree)))
+
+        (__local_fake_heap.heap_type = (unsafe *__param_heap).heap_type)
+
+        (__local_fake_heap.compare_func = (unsafe *__param_heap).compare_func)
+
+        (__local_fake_heap.roots = (unsafe *__local_least_tree).subtrees)
+
+        (__local_fake_heap.roots_length = (((unsafe *__local_least_tree).order as u32)))
+
+        if unsafe { binomial_heap_merge(__param_heap, (&raw mut __local_fake_heap as *mut _BinomialHeap)) } {
+            (__local_result = (unsafe *__local_least_tree).value)
+
+            unsafe { binomial_tree_unref(__local_least_tree) }
+
+            ((unsafe *__param_heap).num_values = ((unsafe *__param_heap).num_values -% 1))
+
+            return __local_result
+
+        }
+        ((unsafe (*__param_heap).roots[__local_least_index]) = __local_least_tree)
+
+        return binomial_heap_null_value
+
+
+    }
+
+    pub fn binomial_heap_num_entries() -> u32 {
+        let __param_heap: *mut _BinomialHeap = (self as *const _BinomialHeap) as *mut _BinomialHeap
+        return (unsafe *__param_heap).num_values
+
+    }
 
 }
 

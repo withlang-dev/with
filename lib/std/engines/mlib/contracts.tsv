@@ -1,0 +1,205 @@
+count	receiver:multimap_s
+fill_in	receiver-mut:multimap_s
+m_bptr33_add_transaction	receiver-mut:m_bptr33_transaction_t_anon,stored-unknown:2,stored-unknown:3
+m_c0re_ctype_mlib_slot_tree1	plain
+m_c0re_ctype_mlib_slot_tree2	plain
+m_core_backoff_clear	receiver:m_core_backoff_s
+m_core_backoff_init	receiver-mut:m_core_backoff_s
+m_core_backoff_reset	receiver-mut:m_core_backoff_s
+m_core_backoff_wait	receiver-mut:m_core_backoff_s
+m_core_clz32	plain
+m_core_clz64	plain
+m_core_cstr_hash	unproved:0:read only
+m_core_ctz32	plain
+m_core_ctz64	plain
+m_core_hash	stored-unknown:0
+m_core_in_serial_char	stored-unknown:0,out:1:c_char
+m_core_in_serial_double	stored-unknown:0,out:1:f64
+m_core_in_serial_enum	receiver-mut:m_serial_read_s
+m_core_in_serial_float	stored-unknown:0,out:1:f32
+m_core_in_serial_ldouble	stored-unknown:0,out:1:f64
+m_core_in_serial_schar	stored-unknown:0,out:1:i8
+m_core_in_serial_sint	stored-unknown:0,out:1:i32
+m_core_in_serial_sllong	stored-unknown:0,out:1:i64
+m_core_in_serial_slong	stored-unknown:0,out:1:i64
+m_core_in_serial_sshort	stored-unknown:0,out:1:i16
+m_core_in_serial_uchar	stored-unknown:0,out:1:u8
+m_core_in_serial_uint	stored-unknown:0,out:1:u32
+m_core_in_serial_ullong	stored-unknown:0,out:1:u64
+m_core_in_serial_ulong	stored-unknown:0,out:1:u64
+m_core_in_serial_ushort	stored-unknown:0,out:1:u16
+m_core_out_serial_strlen	unproved:0:read only
+m_core_parse1_enum	unproved:0:read only
+m_core_parse2_enum	unproved:0:read only,unproved:1:out-parameter read before the write
+m_core_parse_bool	unproved:0:mutated through a pointer to no corpus record,stored-unknown:1,unproved:2:out-parameter read before the write
+m_core_parse_char	unproved:0:mutated through a pointer to no corpus record,stored-unknown:1,unproved:2:out-parameter read before the write
+m_core_parse_double	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_float	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_ldouble	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_schar	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_sint	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_sllong	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_slong	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_sshort	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_uchar	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_uint	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_ullong	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_ulong	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_parse_ushort	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:out-parameter read before the write
+m_core_rotl32a	plain
+m_core_rotl64a	plain
+m_core_roundpow2	plain
+m_core_serial_fail	plain
+m_core_str_nospace	unproved:0:out-parameter read before the write
+main	plain
+mlib_slot_clone	stored-unknown:0
+mlib_slot_release	stored-unknown:0
+mlib_slot_tree_cget	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+mlib_slot_tree_clear	receiver-mut:mlib_slot_tree_s
+mlib_slot_tree_cmax	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_cmin	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_copy_node	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:read only
+mlib_slot_tree_cref	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_empty_p	receiver:mlib_slot_tree_s
+mlib_slot_tree_end_p	receiver:mlib_slot_tree_it_s
+mlib_slot_tree_equal_p	receiver:mlib_slot_tree_s,unproved:1:read only
+mlib_slot_tree_erase	receiver-mut:mlib_slot_tree_s,stored-unknown:1
+mlib_slot_tree_get	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+mlib_slot_tree_get_num	receiver:mlib_slot_tree_node_s
+mlib_slot_tree_i_left_shift	receiver-mut:mlib_slot_tree_node_s
+mlib_slot_tree_i_merge_node	receiver-mut:mlib_slot_tree_node_s
+mlib_slot_tree_i_right_shift	receiver-mut:mlib_slot_tree_node_s
+mlib_slot_tree_i_search_and_insert_in_leaf	receiver-mut:mlib_slot_tree_node_s,stored-unknown:1
+mlib_slot_tree_i_search_and_insert_in_node	receiver-mut:mlib_slot_tree_node_s,unproved:1:read only,unproved:2:read only
+mlib_slot_tree_i_search_and_remove_in_leaf	receiver-mut:mlib_slot_tree_node_s,stored-unknown:1
+mlib_slot_tree_i_search_for_leaf	receiver-mut:mlib_slot_tree_parent_it_s,unproved:1:read only,stored-unknown:2
+mlib_slot_tree_i_search_for_node	receiver:mlib_slot_tree_node_s,unproved:1:read only
+mlib_slot_tree_init	receiver-mut:mlib_slot_tree_s
+mlib_slot_tree_init_move	receiver-mut:mlib_slot_tree_s,unproved:1:out-parameter read before the write
+mlib_slot_tree_init_set	receiver-mut:mlib_slot_tree_s,unproved:1:read only
+mlib_slot_tree_is_leaf	receiver:mlib_slot_tree_node_s
+mlib_slot_tree_it	receiver-mut:mlib_slot_tree_it_s,unproved:1:read only
+mlib_slot_tree_it_end	receiver-mut:mlib_slot_tree_it_s,unproved:1:read only
+mlib_slot_tree_it_equal_p	receiver:mlib_slot_tree_it_s,unproved:1:read only
+mlib_slot_tree_it_from	receiver-mut:mlib_slot_tree_it_s,unproved:1:read only,stored-unknown:2
+mlib_slot_tree_it_last	receiver-mut:mlib_slot_tree_it_s,unproved:1:read only
+mlib_slot_tree_it_set	receiver-mut:mlib_slot_tree_it_s,unproved:1:read only
+mlib_slot_tree_it_until_p	receiver:mlib_slot_tree_it_s,stored-unknown:1
+mlib_slot_tree_it_while_p	receiver:mlib_slot_tree_it_s,stored-unknown:1
+mlib_slot_tree_max	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_min	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_move	receiver-mut:mlib_slot_tree_s,unproved:1:out-parameter read before the write
+mlib_slot_tree_new_node	plain
+mlib_slot_tree_next	receiver-mut:mlib_slot_tree_it_s
+mlib_slot_tree_pop_at	unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally,stored-unknown:2
+mlib_slot_tree_previous	receiver-mut:mlib_slot_tree_it_s
+mlib_slot_tree_push	receiver-mut:mlib_slot_tree_s,stored-unknown:1
+mlib_slot_tree_ref	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_slot_tree_remove	receiver-mut:mlib_slot_tree_s,unproved:1:out-parameter read before the write
+mlib_slot_tree_reset	receiver-mut:mlib_slot_tree_s
+mlib_slot_tree_rewind_transaction	receiver-mut:m_bptr33_transaction_t_anon
+mlib_slot_tree_safe_get	receiver-mut:mlib_slot_tree_s,stored-unknown:1
+mlib_slot_tree_set	receiver-mut:mlib_slot_tree_s,unproved:1:read only
+mlib_slot_tree_size	receiver:mlib_slot_tree_s
+mlib_slot_tree_swap	receiver-mut:mlib_slot_tree_s,unproved:1:out-parameter read before the write
+mlib_word_tree_cget	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_clear	receiver-mut:mlib_word_tree_s
+mlib_word_tree_cmax	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_cmin	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_copy_node	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:read only
+mlib_word_tree_cref	receiver-mut:mlib_word_tree_it_s
+mlib_word_tree_empty_p	receiver:mlib_word_tree_s
+mlib_word_tree_end_p	receiver:mlib_word_tree_it_s
+mlib_word_tree_equal_p	receiver:mlib_word_tree_s,unproved:1:read only
+mlib_word_tree_erase	receiver-mut:mlib_word_tree_s
+mlib_word_tree_get	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_get_num	receiver:mlib_word_tree_node_s
+mlib_word_tree_i_left_shift	receiver-mut:mlib_word_tree_node_s
+mlib_word_tree_i_merge_node	receiver-mut:mlib_word_tree_node_s
+mlib_word_tree_i_right_shift	receiver-mut:mlib_word_tree_node_s
+mlib_word_tree_i_search_and_insert_in_leaf	receiver-mut:mlib_word_tree_node_s,stored-unknown:2
+mlib_word_tree_i_search_and_insert_in_node	receiver-mut:mlib_word_tree_node_s,unproved:1:read only,unproved:2:read only
+mlib_word_tree_i_search_and_remove_in_leaf	receiver-mut:mlib_word_tree_node_s
+mlib_word_tree_i_search_for_leaf	receiver-mut:mlib_word_tree_parent_it_s,unproved:1:read only
+mlib_word_tree_i_search_for_node	receiver:mlib_word_tree_node_s,unproved:1:read only
+mlib_word_tree_init	receiver-mut:mlib_word_tree_s
+mlib_word_tree_init_move	receiver-mut:mlib_word_tree_s,unproved:1:out-parameter read before the write
+mlib_word_tree_init_set	receiver-mut:mlib_word_tree_s,unproved:1:read only
+mlib_word_tree_is_leaf	receiver:mlib_word_tree_node_s
+mlib_word_tree_it	receiver-mut:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_end	receiver-mut:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_equal_p	receiver:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_from	receiver-mut:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_last	receiver-mut:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_set	receiver-mut:mlib_word_tree_it_s,unproved:1:read only
+mlib_word_tree_it_until_p	receiver:mlib_word_tree_it_s
+mlib_word_tree_it_while_p	receiver:mlib_word_tree_it_s
+mlib_word_tree_max	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_min	unproved:0:returns a pointer the receiver's view cannot carry
+mlib_word_tree_move	receiver-mut:mlib_word_tree_s,unproved:1:out-parameter read before the write
+mlib_word_tree_new_node	plain
+mlib_word_tree_next	receiver-mut:mlib_word_tree_it_s
+mlib_word_tree_pop_at	unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally
+mlib_word_tree_previous	receiver-mut:mlib_word_tree_it_s
+mlib_word_tree_ref	receiver-mut:mlib_word_tree_it_s,ret-from:0
+mlib_word_tree_remove	receiver-mut:mlib_word_tree_s,unproved:1:out-parameter read before the write
+mlib_word_tree_reset	receiver-mut:mlib_word_tree_s
+mlib_word_tree_rewind_transaction	receiver-mut:m_bptr33_transaction_t_anon
+mlib_word_tree_safe_get	receiver-mut:mlib_word_tree_s
+mlib_word_tree_set	receiver-mut:mlib_word_tree_s,unproved:1:read only
+mlib_word_tree_set_at	receiver-mut:mlib_word_tree_s,stored-unknown:2
+mlib_word_tree_size	receiver:mlib_word_tree_s
+mlib_word_tree_swap	receiver-mut:mlib_word_tree_s,unproved:1:out-parameter read before the write
+multimap_cget	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_clear	receiver-mut:multimap_s
+multimap_cmax	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_cmin	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_copy_node	unproved:0:mutated through a pointer to no corpus record,unproved:1:read only,unproved:2:read only
+multimap_cref	receiver-mut:multimap_it_s
+multimap_empty_p	receiver:multimap_s
+multimap_end_p	receiver:multimap_it_s
+multimap_equal_p	receiver:multimap_s,unproved:1:read only
+multimap_erase	receiver-mut:multimap_s
+multimap_get	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_get_num	receiver:multimap_node_s
+multimap_hash	receiver:multimap_s
+multimap_i_left_shift	receiver-mut:multimap_node_s
+multimap_i_merge_node	receiver-mut:multimap_node_s
+multimap_i_right_shift	receiver-mut:multimap_node_s
+multimap_i_search_and_insert_in_leaf	receiver-mut:multimap_node_s
+multimap_i_search_and_insert_in_node	receiver-mut:multimap_node_s,unproved:1:read only,unproved:2:read only
+multimap_i_search_and_remove_in_leaf	receiver-mut:multimap_node_s
+multimap_i_search_for_leaf	receiver-mut:multimap_parent_it_s,unproved:1:read only
+multimap_i_search_for_node	receiver:multimap_node_s,unproved:1:read only
+multimap_in_serial	receiver-mut:multimap_s,stored-unknown:1
+multimap_init	receiver-mut:multimap_s
+multimap_init_move	receiver-mut:multimap_s,unproved:1:out-parameter read before the write
+multimap_init_set	receiver-mut:multimap_s,unproved:1:read only
+multimap_is_leaf	receiver:multimap_node_s
+multimap_it	receiver-mut:multimap_it_s,unproved:1:read only
+multimap_it_end	receiver-mut:multimap_it_s,unproved:1:read only
+multimap_it_equal_p	receiver:multimap_it_s,unproved:1:read only
+multimap_it_from	receiver-mut:multimap_it_s,unproved:1:read only
+multimap_it_last	receiver-mut:multimap_it_s,unproved:1:read only
+multimap_it_set	receiver-mut:multimap_it_s,unproved:1:read only
+multimap_it_until_p	receiver:multimap_it_s
+multimap_it_while_p	receiver:multimap_it_s
+multimap_max	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_min	unproved:0:returns a pointer the receiver's view cannot carry
+multimap_move	receiver-mut:multimap_s,unproved:1:out-parameter read before the write
+multimap_new_node	plain
+multimap_next	receiver-mut:multimap_it_s
+multimap_out_serial	stored-unknown:0,unproved:1:read only
+multimap_parse_str	receiver-mut:multimap_s,stored-unknown:1,unproved:2:out-parameter read before the write
+multimap_pop_at	unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally
+multimap_previous	receiver-mut:multimap_it_s
+multimap_ref	receiver-mut:multimap_it_s,ret-from:0
+multimap_remove	receiver-mut:multimap_s,unproved:1:out-parameter read before the write
+multimap_reset	receiver-mut:multimap_s
+multimap_rewind_transaction	receiver-mut:m_bptr33_transaction_t_anon
+multimap_safe_get	receiver-mut:multimap_s
+multimap_set	receiver-mut:multimap_s,unproved:1:read only
+multimap_set_at	receiver-mut:multimap_s
+multimap_size	receiver:multimap_s
+multimap_swap	receiver-mut:multimap_s,unproved:1:out-parameter read before the write
+print	receiver:multimap_s

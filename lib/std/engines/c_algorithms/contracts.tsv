@@ -1,0 +1,227 @@
+alloc_test_calloc	plain
+alloc_test_free	stored-unknown:0
+alloc_test_get_allocated	plain
+alloc_test_get_header	unproved:0:returns a pointer loaded from the parameter
+alloc_test_malloc	plain
+alloc_test_overwrite	stored-unknown:0
+alloc_test_realloc	stored-unknown:0
+alloc_test_set_limit	plain
+alloc_test_strdup	unproved:0:read only
+arraylist_append	receiver-mut:_ArrayList,stored-unknown:1
+arraylist_clear	receiver-mut:_ArrayList
+arraylist_enlarge	receiver-mut:_ArrayList
+arraylist_free	unproved:0:frees a part of it
+arraylist_index_of	receiver:_ArrayList,stored-unknown:2
+arraylist_insert	receiver-mut:_ArrayList,stored-unknown:2
+arraylist_new	plain
+arraylist_prepend	receiver-mut:_ArrayList,stored-unknown:1
+arraylist_remove	receiver-mut:_ArrayList
+arraylist_remove_range	receiver-mut:_ArrayList
+arraylist_sort	unproved:0:arraylist_sort_internal may write through it
+arraylist_sort_internal	unproved:0:out-parameter a return before the write
+avl_tree_balance_to_root	receiver-mut:_AVLTree,stored-unknown:1
+avl_tree_free	unproved:0:free is outside the corpus and not a known pure reader
+avl_tree_free_subtree	receiver:_AVLTree,unproved:1:read only
+avl_tree_insert	receiver-mut:_AVLTree,stored-unknown:1,stored-unknown:2
+avl_tree_lookup	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+avl_tree_lookup_node	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+avl_tree_new	plain
+avl_tree_node_balance	receiver-mut:_AVLTree,stored-unknown:1
+avl_tree_node_child	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_node_get_replacement	receiver-mut:_AVLTree,unproved:1:returns a pointer loaded from the parameter
+avl_tree_node_key	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_node_parent	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_node_parent_side	receiver:_AVLTreeNode
+avl_tree_node_replace	receiver-mut:_AVLTree,unproved:1:out-parameter read before the write,owned:2
+avl_tree_node_value	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_num_entries	receiver:_AVLTree
+avl_tree_remove	receiver-mut:_AVLTree,stored-unknown:1
+avl_tree_remove_node	receiver-mut:_AVLTree,unproved:1:out-parameter read before the write
+avl_tree_root_node	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_rotate	receiver-mut:_AVLTree,stored-unknown:1
+avl_tree_subtree_height	unproved:0:NULL is an accepted argument
+avl_tree_to_array	unproved:0:returns a pointer the receiver's view cannot carry
+avl_tree_to_array_add_subtree	unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
+avl_tree_update_height	receiver-mut:_AVLTreeNode
+binary_heap_cmp	receiver:_BinaryHeap,stored-unknown:1,stored-unknown:2
+binary_heap_free	unproved:0:frees a part of it
+binary_heap_insert	receiver-mut:_BinaryHeap,stored-unknown:1
+binary_heap_new	plain
+binary_heap_num_entries	receiver:_BinaryHeap
+binary_heap_pop	receiver-mut:_BinaryHeap
+binomial_heap_cmp	receiver:_BinomialHeap,stored-unknown:1,stored-unknown:2
+binomial_heap_free	unproved:0:frees a part of it
+binomial_heap_insert	receiver-mut:_BinomialHeap,stored-unknown:1
+binomial_heap_merge	receiver-mut:_BinomialHeap,unproved:1:read only
+binomial_heap_merge_undo	unproved:0:read only
+binomial_heap_new	plain
+binomial_heap_num_entries	receiver:_BinomialHeap
+binomial_heap_pop	receiver-mut:_BinomialHeap
+binomial_tree_merge	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1,stored-unknown:2
+binomial_tree_ref	unproved:0:NULL is an accepted argument
+binomial_tree_unref	unproved:0:NULL is an accepted argument
+bloom_filter_free	unproved:0:frees a part of it
+bloom_filter_insert	receiver-mut:_BloomFilter,stored-unknown:1
+bloom_filter_intersection	unproved:0:bloom_filter_new may write through it,unproved:1:read only
+bloom_filter_load	unproved:0:memcpy is outside the corpus and not a known pure reader,unproved:1:read only
+bloom_filter_new	plain
+bloom_filter_query	receiver:_BloomFilter,stored-unknown:1
+bloom_filter_read	unproved:0:memcpy is outside the corpus and not a known pure reader,unproved:1:read only
+bloom_filter_union	unproved:0:bloom_filter_new may write through it,unproved:1:read only
+free_node_recursive	unproved:0:free is outside the corpus and not a known pure reader
+hash_table_allocate_table	receiver-mut:_HashTable
+hash_table_enlarge	receiver-mut:_HashTable
+hash_table_free	unproved:0:frees a part of it
+hash_table_free_entry	receiver:_HashTable,unproved:1:read only
+hash_table_insert	receiver-mut:_HashTable,stored-unknown:1,stored-unknown:2
+hash_table_iter_has_more	receiver:_HashTableIterator
+hash_table_iter_next	receiver-mut:_HashTableIterator
+hash_table_iterate	stored-unknown:0,unproved:1:out-parameter read before the write
+hash_table_lookup	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+hash_table_new	plain
+hash_table_num_entries	receiver:_HashTable
+hash_table_register_free_functions	receiver-mut:_HashTable
+hash_table_remove	receiver-mut:_HashTable,stored-unknown:1
+int_compare	unproved:0:read only,unproved:1:read only
+int_equal	unproved:0:read only,unproved:1:read only
+int_hash	unproved:0:read only
+list_append	unproved:0:out-parameter written conditionally,stored-unknown:1
+list_data	unproved:0:NULL is an accepted argument
+list_find_data	stored-unknown:0,stored-unknown:2
+list_free	stored-unknown:0
+list_iter_has_more	receiver:_ListIterator
+list_iter_next	receiver-mut:_ListIterator
+list_iter_remove	receiver-mut:_ListIterator
+list_iterate	stored-unknown:0,unproved:1:out-parameter read before the write
+list_length	stored-unknown:0
+list_next	unproved:0:NULL is an accepted argument
+list_nth_data	stored-unknown:0
+list_nth_entry	stored-unknown:0
+list_prepend	unproved:0:out-parameter written conditionally,stored-unknown:1
+list_prev	unproved:0:NULL is an accepted argument
+list_remove_data	unproved:0:out-parameter written conditionally,stored-unknown:2
+list_remove_entry	unproved:0:out-parameter written conditionally,unproved:1:out-parameter written conditionally
+list_set_data	unproved:0:NULL is an accepted argument,stored-unknown:1
+list_sort	unproved:0:out-parameter read before the write
+list_sort_internal	unproved:0:out-parameter written conditionally
+list_to_array	stored-unknown:0
+main	unproved:1:read only
+pointer_compare	unproved:0:read only,unproved:1:read only
+pointer_equal	unproved:0:read only,unproved:1:read only
+pointer_hash	unproved:0:read only
+queue_free	receiver-mut:_Queue
+queue_is_empty	receiver:_Queue
+queue_new	plain
+queue_peek_head	unproved:0:returns a pointer the receiver's view cannot carry
+queue_peek_tail	unproved:0:returns a pointer the receiver's view cannot carry
+queue_pop_head	receiver-mut:_Queue
+queue_pop_tail	receiver-mut:_Queue
+queue_push_head	receiver-mut:_Queue,stored-unknown:1
+queue_push_tail	receiver-mut:_Queue,stored-unknown:1
+rb_tree_free	unproved:0:free is outside the corpus and not a known pure reader
+rb_tree_free_subtree	unproved:0:free is outside the corpus and not a known pure reader
+rb_tree_insert	receiver-mut:_RBTree,stored-unknown:1,stored-unknown:2
+rb_tree_insert_case1	receiver-mut:_RBTree,stored-unknown:1
+rb_tree_insert_case2	receiver-mut:_RBTree,stored-unknown:1
+rb_tree_insert_case3	receiver-mut:_RBTree,stored-unknown:1
+rb_tree_insert_case4	receiver-mut:_RBTree,stored-unknown:1
+rb_tree_insert_case5	receiver-mut:_RBTree,unproved:1:read only
+rb_tree_lookup	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+rb_tree_lookup_node	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+rb_tree_new	plain
+rb_tree_node_child	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_node_key	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_node_parent	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_node_replace	receiver-mut:_RBTree,unproved:1:out-parameter read before the write,owned:2
+rb_tree_node_sibling	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_node_side	receiver:_RBTreeNode
+rb_tree_node_uncle	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_node_value	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_num_entries	receiver:_RBTree
+rb_tree_remove	receiver:_RBTree,stored-unknown:1
+rb_tree_remove_node	receiver:_RBTree,unproved:1:read only
+rb_tree_root_node	unproved:0:returns a pointer the receiver's view cannot carry
+rb_tree_rotate	receiver-mut:_RBTree,stored-unknown:1
+rb_tree_to_array	unproved:0:returns a pointer the receiver's view cannot carry
+run_test	plain
+run_tests	unproved:0:indexed as an array
+set_allocate_table	receiver-mut:_Set
+set_enlarge	receiver-mut:_Set
+set_free	unproved:0:frees a part of it
+set_free_entry	receiver:_Set,unproved:1:read only
+set_insert	receiver-mut:_Set,stored-unknown:1
+set_intersection	stored-unknown:0,unproved:1:read only
+set_iter_has_more	receiver:_SetIterator
+set_iter_next	receiver-mut:_SetIterator
+set_iterate	stored-unknown:0,unproved:1:out-parameter read before the write
+set_new	plain
+set_num_entries	receiver:_Set
+set_query	receiver:_Set,stored-unknown:1
+set_register_free_function	receiver-mut:_Set
+set_remove	receiver-mut:_Set,stored-unknown:1
+set_to_array	unproved:0:returns a pointer the receiver's view cannot carry
+set_union	stored-unknown:0,stored-unknown:1
+slist_append	unproved:0:out-parameter a return before the write,stored-unknown:1
+slist_data	unproved:0:returns a pointer the receiver's view cannot carry
+slist_find_data	stored-unknown:0,stored-unknown:2
+slist_free	stored-unknown:0
+slist_iter_has_more	receiver:_SListIterator
+slist_iter_next	receiver-mut:_SListIterator
+slist_iter_remove	receiver-mut:_SListIterator
+slist_iterate	stored-unknown:0,unproved:1:out-parameter read before the write
+slist_length	stored-unknown:0
+slist_next	unproved:0:returns a pointer the receiver's view cannot carry
+slist_nth_data	stored-unknown:0
+slist_nth_entry	stored-unknown:0
+slist_prepend	unproved:0:out-parameter a return before the write,stored-unknown:1
+slist_remove_data	stored-unknown:0,stored-unknown:2
+slist_remove_entry	unproved:0:out-parameter written conditionally,unproved:1:read only
+slist_set_data	unproved:0:NULL is an accepted argument,stored-unknown:1
+slist_sort	unproved:0:out-parameter read before the write
+slist_sort_internal	unproved:0:out-parameter written conditionally
+slist_to_array	stored-unknown:0
+sortedarray_clear	receiver-mut:_SortedArray
+sortedarray_free	unproved:0:frees a part of it
+sortedarray_get	unproved:0:NULL is an accepted argument
+sortedarray_index_of	unproved:0:NULL is an accepted argument,stored-unknown:1
+sortedarray_insert	unproved:0:NULL is an accepted argument,owned:1
+sortedarray_length	receiver:_SortedArray
+sortedarray_new	plain
+sortedarray_remove	unproved:0:NULL is an accepted argument
+sortedarray_remove_range	unproved:0:NULL is an accepted argument
+string_compare	unproved:0:read only,unproved:1:read only
+string_equal	unproved:0:read only,unproved:1:read only
+string_hash	unproved:0:read only
+string_nocase_compare	unproved:0:read only,unproved:1:read only
+string_nocase_equal	unproved:0:read only,unproved:1:read only
+string_nocase_hash	unproved:0:read only
+test_arraylist	plain
+test_avl_tree	plain
+test_binary_heap	plain
+test_binomial_heap	plain
+test_bloom_filter	plain
+test_compare_int	plain
+test_compare_pointer	plain
+test_compare_string	plain
+test_hash_int	plain
+test_hash_pointer	plain
+test_hash_string	plain
+test_hash_table	plain
+test_list	plain
+test_queue	plain
+test_set	plain
+test_slist	plain
+test_trie	plain
+trie_find_end	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+trie_find_end_binary	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
+trie_free	unproved:0:free is outside the corpus and not a known pure reader
+trie_insert	receiver:_Trie,stored-unknown:1,stored-unknown:2
+trie_insert_binary	receiver:_Trie,stored-unknown:1,stored-unknown:3
+trie_insert_rollback	receiver:_Trie,stored-unknown:1
+trie_lookup	unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:1
+trie_lookup_binary	unproved:0:returns a pointer the receiver's view cannot carry,unproved:1:read only
+trie_new	plain
+trie_num_entries	receiver:_Trie
+trie_remove	receiver:_Trie,stored-unknown:1
+trie_remove_binary	receiver:_Trie,unproved:1:read only
+trie_value_is_null	unproved:0:read only

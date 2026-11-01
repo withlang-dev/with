@@ -29,6 +29,7 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
+// contract: receiver:pcre2_real_match_data_8,unproved:1:read only,unproved:2:out-parameter a return before the write,unproved:3:out-parameter a return before the write
 pub unsafe fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_buffer: *mut u8, __param_sizeptr: *mut u64) -> i32 {
     var __local_first: *const u8
 
@@ -42,13 +43,13 @@ pub unsafe fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_
     var __local_entrysize: i32
 
 
-    if ((if (*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0) {
+    if ((*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER) {
         return -41
     }
 
     (__local_entrysize = ((pcre2_substring_nametable_scan_8((*__param_match_data).code, __param_stringname, (&raw mut __local_first as *mut *const u8), (&raw mut __local_last as *mut *const u8)) as i32)))
 
-    if ((if __local_entrysize < 0: 1 else: 0) != 0) {
+    if (__local_entrysize < 0) {
         return __local_entrysize
     }
 
@@ -56,11 +57,11 @@ pub unsafe fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_
 
     (__local_entry = __local_first)
 
-    while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
+    while (__local_entry <= __local_last) {
         var __local_n: u32 = (((((((__local_entry[0]) as i32) << (8 as u32)) as i32) | ((__local_entry[(0 + 1)]) as i32)) as u32))
 
-        if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
-            if ((if (*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64)): 1 else: 0) != 0) {
+        if (__local_n < (*__param_match_data).oveccount) {
+            if ((*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64))) {
                 return pcre2_substring_copy_bynumber_8(__param_match_data, __local_n, __param_buffer, __param_sizeptr)
             }
 
@@ -78,6 +79,7 @@ pub unsafe fn pcre2_substring_copy_byname_8(__param_match_data: *mut pcre2_real_
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:2:out-parameter a return before the write,unproved:3:out-parameter a return before the write
 pub unsafe fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: u32, __param_buffer: *mut u8, __param_sizeptr: *mut u64) -> i32 {
     var __local_rc: i32
 
@@ -85,15 +87,15 @@ pub unsafe fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_rea
 
     (__local_rc = ((pcre2_substring_length_bynumber_8(__param_match_data, __param_stringnumber, (&raw mut __local_size as *mut u64)) as i32)))
 
-    if ((if __local_rc < 0: 1 else: 0) != 0) {
+    if (__local_rc < 0) {
         return __local_rc
     }
 
-    if ((if ((__local_size as u64) +% (1 as u64)) > (*__param_sizeptr): 1 else: 0) != 0) {
+    if (((__local_size as u64) +% (1 as u64)) > (*__param_sizeptr)) {
         return -48
     }
 
-    if ((if __local_size != 0: 1 else: 0) != 0) {
+    if (__local_size != 0) {
         with_memcpy(((__param_buffer as *mut c_void) as *mut u8), ((((*__param_match_data).subject + ((*__param_match_data).ovector[((__param_stringnumber as u32) *% (2 as u32))] as usize)) as *const c_void) as *const u8), ((((__local_size as u64) *% (1 as u64)) as u64) as i64))
     }
 
@@ -105,8 +107,9 @@ pub unsafe fn pcre2_substring_copy_bynumber_8(__param_match_data: *mut pcre2_rea
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn pcre2_substring_free_8(__param_string: *mut u8) {
-    if ((if __param_string != null: 1 else: 0) != 0) {
+    if (__param_string != null) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_string as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
         (*__local_memctl).free.unwrap()((__local_memctl as *mut c_void), (*__local_memctl).memory_data)
@@ -115,6 +118,7 @@ pub unsafe fn pcre2_substring_free_8(__param_string: *mut u8) {
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:1:read only,unproved:2:out-parameter a return before the write,unproved:3:out-parameter a return before the write
 pub unsafe fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_stringptr: *mut *mut u8, __param_sizeptr: *mut u64) -> i32 {
     var __local_first: *const u8
 
@@ -128,13 +132,13 @@ pub unsafe fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_m
     var __local_entrysize: i32
 
 
-    if ((if (*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0) {
+    if ((*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER) {
         return -41
     }
 
     (__local_entrysize = ((pcre2_substring_nametable_scan_8((*__param_match_data).code, __param_stringname, (&raw mut __local_first as *mut *const u8), (&raw mut __local_last as *mut *const u8)) as i32)))
 
-    if ((if __local_entrysize < 0: 1 else: 0) != 0) {
+    if (__local_entrysize < 0) {
         return __local_entrysize
     }
 
@@ -142,11 +146,11 @@ pub unsafe fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_m
 
     (__local_entry = __local_first)
 
-    while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
+    while (__local_entry <= __local_last) {
         var __local_n: u32 = (((((((__local_entry[0]) as i32) << (8 as u32)) as i32) | ((__local_entry[(0 + 1)]) as i32)) as u32))
 
-        if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
-            if ((if (*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64)): 1 else: 0) != 0) {
+        if (__local_n < (*__param_match_data).oveccount) {
+            if ((*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64))) {
                 return pcre2_substring_get_bynumber_8(__param_match_data, __local_n, __param_stringptr, __param_sizeptr)
             }
 
@@ -164,6 +168,7 @@ pub unsafe fn pcre2_substring_get_byname_8(__param_match_data: *mut pcre2_real_m
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:2:out-parameter a return before the write,unproved:3:out-parameter a return before the write
 pub unsafe fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: u32, __param_stringptr: *mut *mut u8, __param_sizeptr: *mut u64) -> i32 {
     var __local_rc: i32
 
@@ -173,19 +178,19 @@ pub unsafe fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real
 
     (__local_rc = ((pcre2_substring_length_bynumber_8(__param_match_data, __param_stringnumber, (&raw mut __local_size as *mut u64)) as i32)))
 
-    if ((if __local_rc < 0: 1 else: 0) != 0) {
+    if (__local_rc < 0) {
         return __local_rc
     }
 
     (__local_yield_ = ((_pcre2_memctl_malloc_8((((sizeof[pcre2_memctl]() as u64) +% (((((__local_size as u64) +% (1 as u64)) as u64) *% (8 as u64)) as u64)) as u64), (__param_match_data as *mut pcre2_memctl)) as *mut u8)))
 
-    if ((if __local_yield_ == null: 1 else: 0) != 0) {
+    if (__local_yield_ == null) {
         return -48
     }
 
     (__local_yield_ = ((((__local_yield_ as *mut c_char) + (sizeof[pcre2_memctl]() as usize)) as *mut u8)))
 
-    if ((if __local_size != 0: 1 else: 0) != 0) {
+    if (__local_size != 0) {
         with_memcpy(((__local_yield_ as *mut c_void) as *mut u8), ((((*__param_match_data).subject + ((*__param_match_data).ovector[((__param_stringnumber as u32) *% (2 as u32))] as usize)) as *const c_void) as *const u8), ((((__local_size as u64) *% (1 as u64)) as u64) as i64))
     }
 
@@ -199,6 +204,7 @@ pub unsafe fn pcre2_substring_get_bynumber_8(__param_match_data: *mut pcre2_real
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:1:read only,unproved:2:out-parameter a return before the write
 pub unsafe fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringname: *const u8, __param_sizeptr: *mut u64) -> i32 {
     var __local_first: *const u8
 
@@ -212,13 +218,13 @@ pub unsafe fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_rea
     var __local_entrysize: i32
 
 
-    if ((if (*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0) {
+    if ((*__param_match_data).matchedby == PCRE2_MATCHEDBY_DFA_INTERPRETER) {
         return -41
     }
 
     (__local_entrysize = ((pcre2_substring_nametable_scan_8((*__param_match_data).code, __param_stringname, (&raw mut __local_first as *mut *const u8), (&raw mut __local_last as *mut *const u8)) as i32)))
 
-    if ((if __local_entrysize < 0: 1 else: 0) != 0) {
+    if (__local_entrysize < 0) {
         return __local_entrysize
     }
 
@@ -226,11 +232,11 @@ pub unsafe fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_rea
 
     (__local_entry = __local_first)
 
-    while ((if __local_entry <= __local_last: 1 else: 0) != 0) {
+    while (__local_entry <= __local_last) {
         var __local_n: u32 = (((((((__local_entry[0]) as i32) << (8 as u32)) as i32) | ((__local_entry[(0 + 1)]) as i32)) as u32))
 
-        if ((if __local_n < (*__param_match_data).oveccount: 1 else: 0) != 0) {
-            if ((if (*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64)): 1 else: 0) != 0) {
+        if (__local_n < (*__param_match_data).oveccount) {
+            if ((*__param_match_data).ovector[((__local_n as u32) *% (2 as u32))] != (~(0 as u64))) {
                 return pcre2_substring_length_bynumber_8(__param_match_data, __local_n, __param_sizeptr)
             }
 
@@ -248,6 +254,7 @@ pub unsafe fn pcre2_substring_length_byname_8(__param_match_data: *mut pcre2_rea
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:2:out-parameter a return before the write
 pub unsafe fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_real_match_data_8, __param_stringnumber: u32, __param_sizeptr: *mut u64) -> i32 {
     var __local_left: u64
 
@@ -256,44 +263,44 @@ pub unsafe fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_r
 
     var __local_count: i32 = (*__param_match_data).rc
 
-    if ((if __local_count == -2: 1 else: 0) != 0) {
-        if ((if __param_stringnumber > 0: 1 else: 0) != 0) {
+    if (__local_count == -2) {
+        if (__param_stringnumber > 0) {
             return -2
         }
 
         (__local_count = ((0 as i32)))
 
     } else {
-        if ((if __local_count < 0: 1 else: 0) != 0) {
+        if (__local_count < 0) {
             return __local_count
         }
     }
 
-    if ((if (*__param_match_data).matchedby != PCRE2_MATCHEDBY_DFA_INTERPRETER: 1 else: 0) != 0) {
-        if ((if __param_stringnumber > (*(*__param_match_data).code).top_bracket: 1 else: 0) != 0) {
+    if ((*__param_match_data).matchedby != PCRE2_MATCHEDBY_DFA_INTERPRETER) {
+        if (__param_stringnumber > (*(*__param_match_data).code).top_bracket) {
             return -49
         }
 
-        if ((if __param_stringnumber >= (*__param_match_data).oveccount: 1 else: 0) != 0) {
+        if (__param_stringnumber >= (*__param_match_data).oveccount) {
             return -54
         }
 
-        if ((if (*__param_match_data).ovector[((__param_stringnumber as u32) *% (2 as u32))] == (~(0 as u64)): 1 else: 0) != 0) {
+        if ((*__param_match_data).ovector[((__param_stringnumber as u32) *% (2 as u32))] == (~(0 as u64))) {
             return -55
         }
 
     } else {
-        if ((if __param_stringnumber >= (*__param_match_data).oveccount: 1 else: 0) != 0) {
+        if (__param_stringnumber >= (*__param_match_data).oveccount) {
             return -54
         }
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if __local_count != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_stringnumber >= ((__local_count as u32)): 1 else: 0) != 0: 1 else: 0))
+        if (__local_count != 0) {
+            (__ci_expr_logic_0 = (if __param_stringnumber >= ((__local_count as u32)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             return -55
         }
 
@@ -306,16 +313,16 @@ pub unsafe fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_r
 
     var __ci_expr_logic_1: i32
 
-    if ((if __local_left > (*__param_match_data).subject_length: 1 else: 0) != 0) {
+    if (__local_left > (*__param_match_data).subject_length) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __local_right > (*__param_match_data).subject_length: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __local_right > (*__param_match_data).subject_length: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         loop {
             0
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -325,14 +332,15 @@ pub unsafe fn pcre2_substring_length_bynumber_8(__param_match_data: *mut pcre2_r
     }
 
 
-    if ((if __param_sizeptr != null: 1 else: 0) != 0) {
-        ((*__param_sizeptr) = (((if (if __local_left > __local_right: 1 else: 0) != 0: (0 as u64) else: (((__local_right as u64) -% (__local_left as u64)) as u64)) as u64)))
+    if (__param_sizeptr != null) {
+        ((*__param_sizeptr) = (((if __local_left > __local_right: (0 as u64) else: (((__local_right as u64) -% (__local_left as u64)) as u64)) as u64)))
     }
 
     return 0
 
 }
 
+// contract: receiver:pcre2_real_code_8,unproved:1:read only,unproved:2:out-parameter written conditionally,unproved:3:out-parameter written conditionally
 pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_code_8, __param_stringname: *const u8, __param_firstptr: *mut *const u8, __param_lastptr: *mut *const u8) -> i32 {
     var __local_bot: u16 = ((0 as u16))
 
@@ -342,14 +350,14 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
 
     var __local_nametable: *const u8 = ((((__param_code as *const c_char) + (sizeof[pcre2_real_code_8]() as usize)) as *const u8))
 
-    while ((if __local_top > __local_bot: 1 else: 0) != 0) {
+    while (__local_top > __local_bot) {
         var __local_mid: u16 = (((((__local_top as i32) + (__local_bot as i32)) / 2) as u16))
 
         var __local_entry: *const u8 = (__local_nametable + ((((__local_entrysize as i32) * (__local_mid as i32)) as isize) as usize))
 
         var __local_c: i32 = ((_pcre2_strcmp_8(__param_stringname, (__local_entry + ((2 as isize) as usize))) as i32))
 
-        if ((if __local_c == 0: 1 else: 0) != 0) {
+        if (__local_c == 0) {
             var __local_first: *const u8
 
             var __local_last: *const u8
@@ -363,8 +371,8 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
             (__local_first = __local_last)
 
 
-            while ((if __local_first > __local_nametable: 1 else: 0) != 0) {
-                if ((if _pcre2_strcmp_8(__param_stringname, ((__local_first - ((__local_entrysize as u32) as usize)) + ((2 as isize) as usize))) != 0: 1 else: 0) != 0) {
+            while (__local_first > __local_nametable) {
+                if (_pcre2_strcmp_8(__param_stringname, ((__local_first - ((__local_entrysize as u32) as usize)) + ((2 as isize) as usize))) != 0) {
                     break
                 }
 
@@ -372,8 +380,8 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
 
             }
 
-            while ((if __local_last < __local_lastentry: 1 else: 0) != 0) {
-                if ((if _pcre2_strcmp_8(__param_stringname, ((__local_last + ((__local_entrysize as u32) as usize)) + ((2 as isize) as usize))) != 0: 1 else: 0) != 0) {
+            while (__local_last < __local_lastentry) {
+                if (_pcre2_strcmp_8(__param_stringname, ((__local_last + ((__local_entrysize as u32) as usize)) + ((2 as isize) as usize))) != 0) {
                     break
                 }
 
@@ -381,8 +389,8 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
 
             }
 
-            if ((if __param_firstptr == null: 1 else: 0) != 0) {
-                return (if (if __local_first == __local_last: 1 else: 0) != 0: (((((((__local_entry[0]) as i32) << (8 as u32)) as i32) | ((__local_entry[(0 + 1)]) as i32)) as u32) as i32) else: (-50 as i32))
+            if (__param_firstptr == null) {
+                return (if __local_first == __local_last: (((((((__local_entry[0]) as i32) << (8 as u32)) as i32) | ((__local_entry[(0 + 1)]) as i32)) as u32) as i32) else: (-50 as i32))
             }
 
             ((*__param_firstptr) = __local_first)
@@ -393,7 +401,7 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
 
         }
 
-        if ((if __local_c > 0: 1 else: 0) != 0) {
+        if (__local_c > 0) {
             (__local_bot = ((((__local_mid as i32) + 1) as u16)))
         } else {
             (__local_top = __local_mid)
@@ -405,13 +413,15 @@ pub unsafe fn pcre2_substring_nametable_scan_8(__param_code: *const pcre2_real_c
 
 }
 
+// contract: receiver:pcre2_real_code_8,unproved:1:read only
 pub unsafe fn pcre2_substring_number_from_name_8(__param_code: *const pcre2_real_code_8, __param_stringname: *const u8) -> i32 {
     return pcre2_substring_nametable_scan_8(__param_code, __param_stringname, (null as *mut *const u8), (null as *mut *const u8))
 
 }
 
+// contract: unproved:0:read only
 pub unsafe fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) {
-    if ((if __param_list != null: 1 else: 0) != 0) {
+    if (__param_list != null) {
         var __local_memctl: *mut pcre2_memctl = ((((__param_list as *mut c_char) - (sizeof[pcre2_memctl]() as usize)) as *mut pcre2_memctl))
 
         (*__local_memctl).free.unwrap()((__local_memctl as *mut c_void), (*__local_memctl).memory_data)
@@ -420,6 +430,7 @@ pub unsafe fn pcre2_substring_list_free_8(__param_list: *mut *mut u8) {
 
 }
 
+// contract: receiver:pcre2_real_match_data_8,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
 pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_match_data_8, __param_listptr: *mut *mut *mut u8, __param_lengthsptr: *mut *mut u64) -> i32 {
     var __local_i: i32
 
@@ -442,12 +453,12 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
 
     (__local_count = (*__param_match_data).rc)
 
-    if ((if __local_count < 0: 1 else: 0) != 0) {
+    if (__local_count < 0) {
         return __local_count
     }
 
 
-    if ((if __local_count == 0: 1 else: 0) != 0) {
+    if (__local_count == 0) {
         (__local_count = (((*__param_match_data).oveccount as i32)))
     }
 
@@ -457,16 +468,16 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
 
     (__local_size = ((((sizeof[pcre2_memctl]() as u64) +% (sizeof[usize]() as u64)) as u64)))
 
-    if ((if __param_lengthsptr != null: 1 else: 0) != 0) {
+    if (__param_lengthsptr != null) {
         (__local_size = (__local_size +% ((sizeof[u64]() as u64) *% (__local_count as u64))))
     }
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __local_count2: 1 else: 0) != 0) {
+    while (__local_i < __local_count2) {
         (__local_size = (__local_size +% ((sizeof[usize]() as u64) +% (1 as u64))))
 
-        if ((if (__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i]): 1 else: 0) != 0) {
+        if ((__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i])) {
             (__local_size = (__local_size +% (((((__local_ovector[(__local_i + 1)]) as u64) -% ((__local_ovector[__local_i]) as u64)) as u64) *% (1 as u64))))
         }
 
@@ -478,7 +489,7 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
 
     (__local_memp = ((_pcre2_memctl_malloc_8(__local_size, (__param_match_data as *mut pcre2_memctl)) as *mut pcre2_memctl)))
 
-    if ((if __local_memp == null: 1 else: 0) != 0) {
+    if (__local_memp == null) {
         return -48
     }
 
@@ -489,7 +500,7 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
 
     (__local_lensp = ((((__local_listp as *mut c_char) + (((sizeof[usize]() as u64) *% ((__local_count + 1) as u64)) as usize)) as *mut u64)))
 
-    if ((if __param_lengthsptr == null: 1 else: 0) != 0) {
+    if (__param_lengthsptr == null) {
         (__local_sp = ((__local_lensp as *mut u8)))
 
         (__local_lensp = ((null as *mut u64)))
@@ -503,10 +514,10 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < __local_count2: 1 else: 0) != 0) {
-        (__local_size = (((if (if (__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i]): 1 else: 0) != 0: ((((__local_ovector[(__local_i + 1)]) as u64) -% ((__local_ovector[__local_i]) as u64)) as u64) else: (0 as u64)) as u64)))
+    while (__local_i < __local_count2) {
+        (__local_size = (((if (__local_ovector[(__local_i + 1)]) > (__local_ovector[__local_i]): ((((__local_ovector[(__local_i + 1)]) as u64) -% ((__local_ovector[__local_i]) as u64)) as u64) else: (0 as u64)) as u64)))
 
-        if ((if __local_size != 0: 1 else: 0) != 0) {
+        if (__local_size != 0) {
             with_memcpy(((__local_sp as *mut c_void) as *mut u8), ((((*__param_match_data).subject + ((__local_ovector[__local_i]) as usize)) as *const c_void) as *const u8), ((((__local_size as u64) *% (1 as u64)) as u64) as i64))
         }
 
@@ -517,7 +528,7 @@ pub unsafe fn pcre2_substring_list_get_8(__param_match_data: *mut pcre2_real_mat
         ((*__ci_expr_old_0) = __local_sp)
 
 
-        if ((if __local_lensp != null: 1 else: 0) != 0) {
+        if (__local_lensp != null) {
             var __ci_expr_old_1: *mut u64 = __local_lensp
 
             (__local_lensp = __local_lensp + 1)

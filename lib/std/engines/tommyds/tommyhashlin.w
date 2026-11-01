@@ -71,53 +71,7 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
-pub unsafe fn tommy_hashlin_init(__param_hashlin: *mut tommy_hashlin_struct) {
-    var __local_i: u32
-
-    ((*__param_hashlin).bucket_bit = ((6 as u32)))
-
-    ((*__param_hashlin).bucket_max = ((((1 as u64) << ((*__param_hashlin).bucket_bit as u32)) as u64)))
-
-    ((*__param_hashlin).bucket_mask = (((((*__param_hashlin).bucket_max as u64) -% (1 as u64)) as u64)))
-
-    ((*__param_hashlin).bucket[0] = (((with_alloc_zeroed(((*__param_hashlin).bucket_max as i64), ((sizeof[usize]() as u64) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
-
-    (__local_i = ((1 as u32)))
-
-    while ((if __local_i < 6: 1 else: 0) != 0) {
-        ((*__param_hashlin).bucket[__local_i] = (*__param_hashlin).bucket[0])
-
-        (__local_i = (__local_i +% 1))
-
-    }
-
-
-    tommy_hashlin_stable(__param_hashlin)
-
-    ((*__param_hashlin).count = ((0 as u64)))
-
-}
-
-pub unsafe fn tommy_hashlin_done(__param_hashlin: *mut tommy_hashlin_struct) {
-    var __local_i: u32
-
-    with_free((((*__param_hashlin).bucket[0] as *mut c_void) as *mut u8))
-
-    (__local_i = ((6 as u32)))
-
-    while ((if __local_i < (*__param_hashlin).bucket_bit: 1 else: 0) != 0) {
-        var __local_segment: *mut *mut tommy_node_struct = (*__param_hashlin).bucket[__local_i]
-
-        with_free(((((&raw const (__local_segment[((1 as i64) << (__local_i as u32))]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct) as *mut c_void) as *mut u8))
-
-
-        (__local_i = (__local_i +% 1))
-
-    }
-
-
-}
-
+// contract: receiver-mut:tommy_hashlin_struct,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashlin_insert(__param_hashlin: *mut tommy_hashlin_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: u64) {
     tommy_list_insert_tail(tommy_hashlin_bucket_ref(__param_hashlin, __param_hash), __param_node, __param_data)
 
@@ -129,6 +83,7 @@ pub unsafe fn tommy_hashlin_insert(__param_hashlin: *mut tommy_hashlin_struct, _
 
 }
 
+// contract: receiver-mut:tommy_hashlin_struct,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashlin_remove(__param_hashlin: *mut tommy_hashlin_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *const c_void, __param_hash: u64) -> *mut c_void {
     var __local_let_ptr: *mut *mut tommy_node_struct = tommy_hashlin_bucket_ref(__param_hashlin, __param_hash)
 
@@ -137,11 +92,11 @@ pub unsafe fn tommy_hashlin_remove(__param_hashlin: *mut tommy_hashlin_struct, _
     while (__local_node != null) {
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if (*__local_node).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_node).index == __param_hash) {
+            (__ci_expr_logic_0 = (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             tommy_list_remove_existing(__local_let_ptr, __local_node)
 
             ((*__param_hashlin).count = ((*__param_hashlin).count -% 1))
@@ -161,6 +116,7 @@ pub unsafe fn tommy_hashlin_remove(__param_hashlin: *mut tommy_hashlin_struct, _
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_hashlin_pos(__param_hashlin: *mut tommy_hashlin_struct, __param_pos: u64) -> *mut *mut tommy_node_struct {
     var __local_bsr: u32
 
@@ -170,6 +126,7 @@ pub unsafe fn tommy_hashlin_pos(__param_hashlin: *mut tommy_hashlin_struct, __pa
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_hashlin_bucket_ref(__param_hashlin: *mut tommy_hashlin_struct, __param_hash: u64) -> *mut *mut tommy_node_struct {
     var __local_pos: u64
 
@@ -179,7 +136,7 @@ pub unsafe fn tommy_hashlin_bucket_ref(__param_hashlin: *mut tommy_hashlin_struc
 
     (__local_high_pos = ((((__param_hash as u64) & ((*__param_hashlin).bucket_mask as u64)) as u64)))
 
-    if ((if __local_pos < (*__param_hashlin).split: 1 else: 0) != 0) {
+    if (__local_pos < (*__param_hashlin).split) {
         (__local_pos = __local_high_pos)
 
     }
@@ -188,22 +145,24 @@ pub unsafe fn tommy_hashlin_bucket_ref(__param_hashlin: *mut tommy_hashlin_struc
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_hashlin_bucket(__param_hashlin: *mut tommy_hashlin_struct, __param_hash: u64) -> *mut tommy_node_struct {
     return (*(tommy_hashlin_bucket_ref(__param_hashlin, __param_hash)))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashlin_search(__param_hashlin: *mut tommy_hashlin_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *const c_void, __param_hash: u64) -> *mut c_void {
     var __local_i: *mut tommy_node_struct = tommy_hashlin_bucket(__param_hashlin, __param_hash)
 
     while (__local_i != null) {
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if (*__local_i).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_i).index == __param_hash) {
+            (__ci_expr_logic_0 = (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             return (*__local_i).data
         }
 
@@ -216,6 +175,7 @@ pub unsafe fn tommy_hashlin_search(__param_hashlin: *mut tommy_hashlin_struct, _
 
 }
 
+// contract: receiver-mut:tommy_hashlin_struct,unproved:1:out-parameter read before the write
 pub unsafe fn tommy_hashlin_remove_existing(__param_hashlin: *mut tommy_hashlin_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     tommy_list_remove_existing(tommy_hashlin_bucket_ref(__param_hashlin, (*__param_node).index), __param_node)
 
@@ -227,35 +187,7 @@ pub unsafe fn tommy_hashlin_remove_existing(__param_hashlin: *mut tommy_hashlin_
 
 }
 
-pub unsafe fn tommy_hashlin_foreach(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
-    var __local_bucket_max: u64
-
-    var __local_pos: u64
-
-    (__local_bucket_max = (((((*__param_hashlin).low_max as u64) +% ((*__param_hashlin).split as u64)) as u64)))
-
-    (__local_pos = ((0 as u64)))
-
-    while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
-        var __local_node: *mut tommy_node_struct = (*(tommy_hashlin_pos(__param_hashlin, __local_pos)))
-
-        while (__local_node != null) {
-            var __local_data: *mut c_void = (*__local_node).data
-
-            (__local_node = (*__local_node).next)
-
-            __param_func(__local_data)
-
-        }
-
-
-        (__local_pos = (__local_pos +% 1))
-
-    }
-
-
-}
-
+// contract: receiver:tommy_hashlin_struct,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashlin_foreach_arg(__param_hashlin: *mut tommy_hashlin_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_bucket_max: u64
 
@@ -265,7 +197,7 @@ pub unsafe fn tommy_hashlin_foreach_arg(__param_hashlin: *mut tommy_hashlin_stru
 
     (__local_pos = ((0 as u64)))
 
-    while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
+    while (__local_pos < __local_bucket_max) {
         var __local_node: *mut tommy_node_struct = (*(tommy_hashlin_pos(__param_hashlin, __local_pos)))
 
         while (__local_node != null) {
@@ -285,16 +217,6 @@ pub unsafe fn tommy_hashlin_foreach_arg(__param_hashlin: *mut tommy_hashlin_stru
 
 }
 
-pub unsafe fn tommy_hashlin_count(__param_hashlin: *mut tommy_hashlin_struct) -> u64 {
-    return (*__param_hashlin).count
-
-}
-
-pub unsafe fn tommy_hashlin_memory_usage(__param_hashlin: *mut tommy_hashlin_struct) -> u64 {
-    return (((((*__param_hashlin).bucket_max as u64) *% (sizeof[usize]() as u64)) as u64) +% ((((*__param_hashlin).count as u64) *% (sizeof[tommy_node_struct]() as u64)) as u64))
-
-}
-
 unsafe fn tommy_hashlin_stable(__param_hashlin: *mut tommy_hashlin_struct) {
     ((*__param_hashlin).state = ((0 as u32)))
 
@@ -309,12 +231,12 @@ unsafe fn tommy_hashlin_stable(__param_hashlin: *mut tommy_hashlin_struct) {
 unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (*__param_hashlin).state != 1: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_hashlin).count > (((*__param_hashlin).bucket_max as u64) / (2 as u64)): 1 else: 0) != 0: 1 else: 0))
+    if ((*__param_hashlin).state != 1) {
+        (__ci_expr_logic_0 = (if (*__param_hashlin).count > (((*__param_hashlin).bucket_max as u64) / (2 as u64)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
-        if ((if (*__param_hashlin).state == 0: 1 else: 0) != 0) {
+    if __ci_expr_logic_0 {
+        if ((*__param_hashlin).state == 0) {
             var __local_segment: *mut *mut tommy_node_struct
 
             ((*__param_hashlin).low_max = (*__param_hashlin).bucket_max)
@@ -340,10 +262,10 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
     }
 
 
-    if ((if (*__param_hashlin).state == 1: 1 else: 0) != 0) {
+    if ((*__param_hashlin).state == 1) {
         var __local_split_target: u64 = ((((2 as u64) *% ((*__param_hashlin).count as u64)) as u64))
 
-        while ((if (((*__param_hashlin).split as u64) +% ((*__param_hashlin).low_max as u64)) < __local_split_target: 1 else: 0) != 0) {
+        while ((((*__param_hashlin).split as u64) +% ((*__param_hashlin).low_max as u64)) < __local_split_target) {
             var __local_split: List[*mut *mut tommy_node_struct] = [null; 2]
 
             var __local_j: *mut tommy_node_struct
@@ -379,7 +301,7 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
 
             ((*__param_hashlin).split = ((*__param_hashlin).split +% 1))
 
-            if ((if (*__param_hashlin).split == (*__param_hashlin).low_max: 1 else: 0) != 0) {
+            if ((*__param_hashlin).split == (*__param_hashlin).low_max) {
                 tommy_hashlin_stable(__param_hashlin)
 
                 break
@@ -395,13 +317,13 @@ unsafe fn hashlin_grow_step(__param_hashlin: *mut tommy_hashlin_struct) {
 unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if (*__param_hashlin).state != 2: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if (*__param_hashlin).count < (((*__param_hashlin).bucket_max as u64) / (8 as u64)): 1 else: 0) != 0: 1 else: 0))
+    if ((*__param_hashlin).state != 2) {
+        (__ci_expr_logic_0 = (if (*__param_hashlin).count < (((*__param_hashlin).bucket_max as u64) / (8 as u64)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
-        if ((if (*__param_hashlin).bucket_bit > 6: 1 else: 0) != 0) {
-            if ((if (*__param_hashlin).state == 0: 1 else: 0) != 0) {
+    if __ci_expr_logic_0 {
+        if ((*__param_hashlin).bucket_bit > 6) {
+            if ((*__param_hashlin).state == 0) {
                 ((*__param_hashlin).low_max = (((((*__param_hashlin).bucket_max as u64) / (2 as u64)) as u64)))
 
                 ((*__param_hashlin).low_mask = (((((*__param_hashlin).bucket_mask as u64) / (2 as u64)) as u64)))
@@ -417,10 +339,10 @@ unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
     }
 
 
-    if ((if (*__param_hashlin).state == 2: 1 else: 0) != 0) {
+    if ((*__param_hashlin).state == 2) {
         var __local_split_target: u64 = ((((8 as u64) *% ((*__param_hashlin).count as u64)) as u64))
 
-        while ((if (((*__param_hashlin).split as u64) +% ((*__param_hashlin).low_max as u64)) > __local_split_target: 1 else: 0) != 0) {
+        while ((((*__param_hashlin).split as u64) +% ((*__param_hashlin).low_max as u64)) > __local_split_target) {
             var __local_split: List[*mut *mut tommy_node_struct] = [null; 2]
 
             ((*__param_hashlin).split = ((*__param_hashlin).split -% 1))
@@ -431,7 +353,7 @@ unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
 
             tommy_list_concat(__local_split[0], __local_split[1])
 
-            if ((if (*__param_hashlin).split == 0: 1 else: 0) != 0) {
+            if ((*__param_hashlin).split == 0) {
                 var __local_segment: *mut *mut tommy_node_struct
 
                 ((*__param_hashlin).bucket_bit = ((*__param_hashlin).bucket_bit -% 1))
@@ -451,6 +373,100 @@ unsafe fn hashlin_shrink_step(__param_hashlin: *mut tommy_hashlin_struct) {
             }
 
         }
+
+    }
+
+}
+
+impl tommy_hashlin_struct {
+    pub mut fn tommy_hashlin_init() {
+        let __param_hashlin: *mut tommy_hashlin_struct = self as *mut tommy_hashlin_struct
+        var __local_i: u32
+
+        ((unsafe *__param_hashlin).bucket_bit = ((6 as u32)))
+
+        ((unsafe *__param_hashlin).bucket_max = ((((1 as u64) << ((unsafe *__param_hashlin).bucket_bit as u32)) as u64)))
+
+        ((unsafe *__param_hashlin).bucket_mask = (((((unsafe *__param_hashlin).bucket_max as u64) -% (1 as u64)) as u64)))
+
+        ((unsafe *__param_hashlin).bucket[0] = (((with_alloc_zeroed(((unsafe *__param_hashlin).bucket_max as i64), ((sizeof[usize]() as u64) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
+
+        (__local_i = ((1 as u32)))
+
+        while (__local_i < 6) {
+            ((unsafe *__param_hashlin).bucket[__local_i] = (unsafe *__param_hashlin).bucket[0])
+
+            (__local_i = (__local_i +% 1))
+
+        }
+
+
+        unsafe { tommy_hashlin_stable(__param_hashlin) }
+
+        ((unsafe *__param_hashlin).count = ((0 as u64)))
+
+    }
+
+    pub fn tommy_hashlin_done() {
+        let __param_hashlin: *mut tommy_hashlin_struct = (self as *const tommy_hashlin_struct) as *mut tommy_hashlin_struct
+        var __local_i: u32
+
+        with_free((((unsafe *__param_hashlin).bucket[0] as *mut c_void) as *mut u8))
+
+        (__local_i = ((6 as u32)))
+
+        while (__local_i < (unsafe *__param_hashlin).bucket_bit) {
+            var __local_segment: *mut *mut tommy_node_struct = (unsafe *__param_hashlin).bucket[__local_i]
+
+            with_free(((((&raw const (unsafe __local_segment[((1 as i64) << (__local_i as u32))]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct) as *mut c_void) as *mut u8))
+
+
+            (__local_i = (__local_i +% 1))
+
+        }
+
+
+    }
+
+    pub fn tommy_hashlin_foreach(__param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+        let __param_hashlin: *mut tommy_hashlin_struct = (self as *const tommy_hashlin_struct) as *mut tommy_hashlin_struct
+        var __local_bucket_max: u64
+
+        var __local_pos: u64
+
+        (__local_bucket_max = (((((unsafe *__param_hashlin).low_max as u64) +% ((unsafe *__param_hashlin).split as u64)) as u64)))
+
+        (__local_pos = ((0 as u64)))
+
+        while (__local_pos < __local_bucket_max) {
+            var __local_node: *mut tommy_node_struct = (unsafe *unsafe { tommy_hashlin_pos(__param_hashlin, __local_pos) })
+
+            while (__local_node != null) {
+                var __local_data: *mut c_void = (unsafe *__local_node).data
+
+                (__local_node = (unsafe *__local_node).next)
+
+                unsafe { __param_func(__local_data) }
+
+            }
+
+
+            (__local_pos = (__local_pos +% 1))
+
+        }
+
+
+    }
+
+    pub fn tommy_hashlin_count() -> u64 {
+        let __param_hashlin: *mut tommy_hashlin_struct = (self as *const tommy_hashlin_struct) as *mut tommy_hashlin_struct
+        return (unsafe *__param_hashlin).count
+
+    }
+
+    pub fn tommy_hashlin_memory_usage() -> u64 {
+        let __param_hashlin: *mut tommy_hashlin_struct = (self as *const tommy_hashlin_struct) as *mut tommy_hashlin_struct
+        return (((((unsafe *__param_hashlin).bucket_max as u64) *% (sizeof[usize]() as u64)) as u64) +% ((((unsafe *__param_hashlin).count as u64) *% (sizeof[tommy_node_struct]() as u64)) as u64))
 
     }
 

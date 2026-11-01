@@ -29,23 +29,24 @@ use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 
+// contract: unproved:0:read only,unproved:2:read only,unproved:3:out-parameter written conditionally
 pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __param_endptr: *const u8, __param_lenptr: *mut u32, __param_utf: i32) -> i32 {
     var __local_c: u32
 
-    if (__param_utf != 0) {
+    if __param_utf {
         (__local_c = (((*__param_ptr) as u32)))
 
-        if ((if __local_c >= 192: 1 else: 0) != 0) {
-            if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+        if (__local_c >= 192) {
+            if (((__local_c as u32) & (32 as u32)) == 0) {
                 (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((__param_ptr[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
             } else {
-                if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                if (((__local_c as u32) & (16 as u32)) == 0) {
                     (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((__param_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__param_ptr[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                 } else {
-                    if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                    if (((__local_c as u32) & (8 as u32)) == 0) {
                         (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((__param_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__param_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__param_ptr[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                     } else {
-                        if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_c as u32) & (4 as u32)) == 0) {
                             (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((__param_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__param_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__param_ptr[3]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__param_ptr[4]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                         } else {
                             (__local_c = ((((((((((((((((__local_c as u32) & (1 as u32)) as u32) << (30 as u32)) as u32) | (((((((__param_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (24 as u32)) as u32)) as u32) | (((((((__param_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__param_ptr[3]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__param_ptr[4]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__param_ptr[5]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
@@ -62,7 +63,7 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __
         (__local_c = (((*__param_ptr) as u32)))
     }
 
-    if ((if __param_type_ == 2: 1 else: 0) != 0) {
+    if (__param_type_ == 2) {
         match __local_c {
             10 => {
                 ((*__param_lenptr) = ((1 as u32)))
@@ -75,11 +76,11 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __
 
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if __param_ptr < (__param_endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if (__param_ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                if (__param_ptr < (__param_endptr - ((1 as isize) as usize))) {
+                    (__ci_expr_logic_0 = (if (__param_ptr[1]) == 10: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_0 != 0) {
+                if __ci_expr_logic_0 {
                     (__ci_expr_ternary_1 = ((2 as i32)))
                 } else {
                     (__ci_expr_ternary_1 = ((1 as i32)))
@@ -120,11 +121,11 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __
 
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if __param_ptr < (__param_endptr - ((1 as isize) as usize)): 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if (__param_ptr[1]) == 10: 1 else: 0) != 0: 1 else: 0))
+                if (__param_ptr < (__param_endptr - ((1 as isize) as usize))) {
+                    (__ci_expr_logic_2 = (if (__param_ptr[1]) == 10: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_2 != 0) {
+                if __ci_expr_logic_2 {
                     (__ci_expr_ternary_3 = ((2 as i32)))
                 } else {
                     (__ci_expr_ternary_3 = ((1 as i32)))
@@ -137,7 +138,7 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __
 
             },
             133 => {
-                ((*__param_lenptr) = (((if __param_utf != 0: (2 as i32) else: (1 as i32)) as u32)))
+                ((*__param_lenptr) = (((if __param_utf: (2 as i32) else: (1 as i32)) as u32)))
 
                 return 1
 
@@ -162,30 +163,31 @@ pub unsafe fn _pcre2_is_newline_8(__param_ptr: *const u8, __param_type_: u32, __
 
 }
 
+// contract: unproved:0:read only,unproved:2:read only,unproved:3:out-parameter written conditionally
 pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: u32, __param_startptr: *const u8, __param_lenptr: *mut u32, __param_utf: i32) -> i32 {
     var __local_ptr = __param_ptr
     var __local_c: u32
 
     (__local_ptr = __local_ptr - 1)
 
-    if (__param_utf != 0) {
-        while ((if ((((*__local_ptr) as i32) as u32) & (192 as u32)) == 128: 1 else: 0) != 0) {
+    if __param_utf {
+        while (((((*__local_ptr) as i32) as u32) & (192 as u32)) == 128) {
             (__local_ptr = __local_ptr - 1)
         }
 
         (__local_c = (((*__local_ptr) as u32)))
 
-        if ((if __local_c >= 192: 1 else: 0) != 0) {
-            if ((if ((__local_c as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+        if (__local_c >= 192) {
+            if (((__local_c as u32) & (32 as u32)) == 0) {
                 (__local_c = ((((((((__local_c as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((__local_ptr[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
             } else {
-                if ((if ((__local_c as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                if (((__local_c as u32) & (16 as u32)) == 0) {
                     (__local_c = ((((((((((__local_c as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((__local_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_ptr[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                 } else {
-                    if ((if ((__local_c as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                    if (((__local_c as u32) & (8 as u32)) == 0) {
                         (__local_c = ((((((((((((__local_c as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((__local_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_ptr[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                     } else {
-                        if ((if ((__local_c as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_c as u32) & (4 as u32)) == 0) {
                             (__local_c = ((((((((((((((__local_c as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((__local_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_ptr[3]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_ptr[4]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
                         } else {
                             (__local_c = ((((((((((((((((__local_c as u32) & (1 as u32)) as u32) << (30 as u32)) as u32) | (((((((__local_ptr[1]) as i32) as u32) & (63 as u32)) as u32) << (24 as u32)) as u32)) as u32) | (((((((__local_ptr[2]) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_ptr[3]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_ptr[4]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_ptr[5]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
@@ -202,18 +204,18 @@ pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: u32, _
         (__local_c = (((*__local_ptr) as u32)))
     }
 
-    if ((if __param_type_ == 2: 1 else: 0) != 0) {
+    if (__param_type_ == 2) {
         match __local_c {
             10 => {
                 var __ci_expr_ternary_1: i32 = 0
 
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if __local_ptr > __param_startptr: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if (__local_ptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
+                if (__local_ptr > __param_startptr) {
+                    (__ci_expr_logic_0 = (if (__local_ptr[-1]) == 13: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_0 != 0) {
+                if __ci_expr_logic_0 {
                     (__ci_expr_ternary_1 = ((2 as i32)))
                 } else {
                     (__ci_expr_ternary_1 = ((1 as i32)))
@@ -242,11 +244,11 @@ pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: u32, _
 
                 var __ci_expr_logic_2: i32 = 0
 
-                if ((if __local_ptr > __param_startptr: 1 else: 0) != 0) {
-                    (__ci_expr_logic_2 = (if (if (__local_ptr[-1]) == 13: 1 else: 0) != 0: 1 else: 0))
+                if (__local_ptr > __param_startptr) {
+                    (__ci_expr_logic_2 = (if (__local_ptr[-1]) == 13: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_2 != 0) {
+                if __ci_expr_logic_2 {
                     (__ci_expr_ternary_3 = ((2 as i32)))
                 } else {
                     (__ci_expr_ternary_3 = ((1 as i32)))
@@ -277,7 +279,7 @@ pub unsafe fn _pcre2_was_newline_8(__param_ptr: *const u8, __param_type_: u32, _
 
             },
             133 => {
-                ((*__param_lenptr) = (((if __param_utf != 0: (2 as i32) else: (1 as i32)) as u32)))
+                ((*__param_lenptr) = (((if __param_utf: (2 as i32) else: (1 as i32)) as u32)))
 
                 return 1
 

@@ -29,6 +29,7 @@ use std.engines.pcre2.pcre2_string_utils
 use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_valid_utf
 
+// contract: unproved:1:read only,unproved:2:read only
 pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_char_lists_end: *const u8, __param_utf: i32) -> i32 {
     var __local_c = __param_c
     var __local_data = __param_data
@@ -54,8 +55,8 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     (__local_data = __local_data + 1)
 
-    if ((if (((*__ci_expr_old_0) as i32) & (2 as i32)) != 0: 1 else: 0) != 0) {
-        if ((if __local_c < 256: 1 else: 0) != 0) {
+    if ((((*__ci_expr_old_0) as i32) & (2 as i32)) != 0) {
+        if (__local_c < 256) {
             return (if ((((__local_data[((__local_c as u32) / (8 as u32))]) as i32) as u32) & (((1 as u32) << (((__local_c as u32) & (7 as u32)) as u32)) as u32)) != 0: 1 else: 0)
         }
 
@@ -66,13 +67,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     var __ci_expr_logic_1: i32
 
-    if ((if (*__local_data) == 3: 1 else: 0) != 0) {
+    if ((*__local_data) == 3) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__local_data) == 4: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         var __local_prop: *const ucd_record = ((&_pcre2_ucd_records_8[0] as *const ucd_record) + ((_pcre2_ucd_stage2_8[(((_pcre2_ucd_stage1_8[((__local_c as i32) / 128)] as i32) * 128) + ((__local_c as i32) % 128))] as u32) as usize))
 
         loop {
@@ -95,52 +96,52 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_4: i32
 
-                        if ((if __local_chartype == ucp_Lu: 1 else: 0) != 0) {
+                        if (__local_chartype == ucp_Lu) {
                             (__ci_expr_logic_4 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_4 = (if (if __local_chartype == ucp_Ll: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_4 = (if __local_chartype == ucp_Ll: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_4 != 0) {
+                        if __ci_expr_logic_4 {
                             (__ci_expr_logic_5 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_5 = (if (if __local_chartype == ucp_Lt: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_5 = (if __local_chartype == ucp_Lt: 1 else: 0))
                         }
 
-                        if ((if __ci_expr_logic_5 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_5 == __local_isprop) {
                             return __local_not_negated
                         }
 
 
                     },
                     1 => {
-                        if ((if (if (__local_data[1]) == _pcre2_ucp_gentype_8[(*__local_prop).chartype]: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (__local_data[1]) == _pcre2_ucp_gentype_8[(*__local_prop).chartype]: 1 else: 0) == __local_isprop) {
                             return __local_not_negated
                         }
                     },
                     2 => {
-                        if ((if (if (__local_data[1]) == (*__local_prop).chartype: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (__local_data[1]) == (*__local_prop).chartype: 1 else: 0) == __local_isprop) {
                             return __local_not_negated
                         }
                     },
                     3 => {
-                        if ((if (if (__local_data[1]) == (*__local_prop).script: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (__local_data[1]) == (*__local_prop).script: 1 else: 0) == __local_isprop) {
                             return __local_not_negated
                         }
                     },
                     4 => {
                         var __ci_expr_logic_6: i32
 
-                        if ((if (__local_data[1]) == (*__local_prop).script: 1 else: 0) != 0) {
+                        if ((__local_data[1]) == (*__local_prop).script) {
                             (__ci_expr_logic_6 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_6 = (if (if (((((&_pcre2_ucd_script_sets_8[0] as *const u32) + (((((*__local_prop).scriptx_bidiclass as i32) & (1023 as i32)) as isize) as usize))[(((__local_data[1]) as i32) / 32)]) as u32) & (((1 as u32) << ((((__local_data[1]) as i32) % 32) as u32)) as u32)) != 0: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_6 = (if (((((&_pcre2_ucd_script_sets_8[0] as *const u32) + (((((*__local_prop).scriptx_bidiclass as i32) & (1023 as i32)) as isize) as usize))[(((__local_data[1]) as i32) / 32)]) as u32) & (((1 as u32) << ((((__local_data[1]) as i32) % 32) as u32)) as u32)) != 0: 1 else: 0))
                         }
 
                         (__local_ok = __ci_expr_logic_6)
 
 
-                        if ((if __local_ok == __local_isprop: 1 else: 0) != 0) {
+                        if (__local_ok == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -150,13 +151,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_7: i32
 
-                        if ((if _pcre2_ucp_gentype_8[__local_chartype] == 1: 1 else: 0) != 0) {
+                        if (_pcre2_ucp_gentype_8[__local_chartype] == 1) {
                             (__ci_expr_logic_7 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_7 = (if (if _pcre2_ucp_gentype_8[__local_chartype] == 3: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_7 = (if _pcre2_ucp_gentype_8[__local_chartype] == 3: 1 else: 0))
                         }
 
-                        if ((if __ci_expr_logic_7 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_7 == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -166,137 +167,137 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         while true {
                             match __local_c {
                                 9 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 32 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 160 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 5760 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 6158 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8192 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8193 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8194 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8195 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8196 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8197 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8198 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8199 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8200 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8201 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8202 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8239 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8287 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 12288 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 10 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 11 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 12 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 13 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 133 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8232 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8233 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 _ => {
-                                    if ((if (if _pcre2_ucp_gentype_8[(*__local_prop).chartype] == 6: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                                    if ((if _pcre2_ucp_gentype_8[(*__local_prop).chartype] == 6: 1 else: 0) == __local_isprop) {
                                         return __local_not_negated
                                     }
                                 },
@@ -310,137 +311,137 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         while true {
                             match __local_c {
                                 9 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 32 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 160 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 5760 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 6158 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8192 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8193 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8194 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8195 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8196 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8197 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8198 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8199 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8200 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8201 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8202 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8239 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8287 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 12288 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 10 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 11 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 12 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 13 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 133 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8232 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 8233 => {
-                                    if (__local_isprop != 0) {
+                                    if __local_isprop {
                                         return __local_not_negated
                                     }
                                 },
                                 _ => {
-                                    if ((if (if _pcre2_ucp_gentype_8[(*__local_prop).chartype] == 6: 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                                    if ((if _pcre2_ucp_gentype_8[(*__local_prop).chartype] == 6: 1 else: 0) == __local_isprop) {
                                         return __local_not_negated
                                     }
                                 },
@@ -459,49 +460,49 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_9: i32
 
-                        if ((if _pcre2_ucp_gentype_8[__local_chartype] == 1: 1 else: 0) != 0) {
+                        if (_pcre2_ucp_gentype_8[__local_chartype] == 1) {
                             (__ci_expr_logic_9 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_9 = (if (if _pcre2_ucp_gentype_8[__local_chartype] == 3: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_9 = (if _pcre2_ucp_gentype_8[__local_chartype] == 3: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_9 != 0) {
+                        if __ci_expr_logic_9 {
                             (__ci_expr_logic_10 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_10 = (if (if __local_chartype == ucp_Mn: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_10 = (if __local_chartype == ucp_Mn: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_10 != 0) {
+                        if __ci_expr_logic_10 {
                             (__ci_expr_logic_11 = (if true: 1 else: 0))
                         } else {
-                            (__ci_expr_logic_11 = (if (if __local_chartype == ucp_Pc: 1 else: 0) != 0: 1 else: 0))
+                            (__ci_expr_logic_11 = (if __local_chartype == ucp_Pc: 1 else: 0))
                         }
 
-                        if ((if __ci_expr_logic_11 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_11 == __local_isprop) {
                             return __local_not_negated
                         }
 
 
                     },
                     10 => {
-                        if ((if __local_c < 160: 1 else: 0) != 0) {
+                        if (__local_c < 160) {
                             var __ci_expr_logic_13: i32
 
                             var __ci_expr_logic_12: i32
 
-                            if ((if __local_c == 36: 1 else: 0) != 0) {
+                            if (__local_c == 36) {
                                 (__ci_expr_logic_12 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_12 = (if (if __local_c == 64: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_12 = (if __local_c == 64: 1 else: 0))
                             }
 
-                            if (__ci_expr_logic_12 != 0) {
+                            if __ci_expr_logic_12 {
                                 (__ci_expr_logic_13 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_13 = (if (if __local_c == 96: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_13 = (if __local_c == 96: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_13 == __local_isprop: 1 else: 0) != 0) {
+                            if (__ci_expr_logic_13 == __local_isprop) {
                                 return __local_not_negated
                             }
 
@@ -509,13 +510,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         } else {
                             var __ci_expr_logic_14: i32
 
-                            if ((if __local_c < 55296: 1 else: 0) != 0) {
+                            if (__local_c < 55296) {
                                 (__ci_expr_logic_14 = (if true: 1 else: 0))
                             } else {
-                                (__ci_expr_logic_14 = (if (if __local_c > 57343: 1 else: 0) != 0: 1 else: 0))
+                                (__ci_expr_logic_14 = (if __local_c > 57343: 1 else: 0))
                             }
 
-                            if ((if __ci_expr_logic_14 == __local_isprop: 1 else: 0) != 0) {
+                            if (__ci_expr_logic_14 == __local_isprop) {
                                 return __local_not_negated
                             }
 
@@ -523,14 +524,14 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         }
                     },
                     11 => {
-                        if ((if (if (((*__local_prop).scriptx_bidiclass as i32) >> (11 as u32)) == (__local_data[1]): 1 else: 0) == __local_isprop: 1 else: 0) != 0) {
+                        if ((if (((*__local_prop).scriptx_bidiclass as i32) >> (11 as u32)) == (__local_data[1]): 1 else: 0) == __local_isprop) {
                             return __local_not_negated
                         }
                     },
                     12 => {
                         (__local_ok = (((if (((((&_pcre2_ucd_boolprop_sets_8[0] as *const u32) + (((((*__local_prop).bprops as i32) & (4095 as i32)) as isize) as usize))[(((__local_data[1]) as i32) / 32)]) as u32) & (((1 as u32) << ((((__local_data[1]) as i32) % 32) as u32)) as u32)) != 0: 1 else: 0) as i32)))
 
-                        if ((if __local_ok == __local_isprop: 1 else: 0) != 0) {
+                        if (__local_ok == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -540,10 +541,10 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_20: i32 = 0
 
-                        if ((if _pcre2_ucp_gentype_8[__local_chartype] != 6: 1 else: 0) != 0) {
+                        if (_pcre2_ucp_gentype_8[__local_chartype] != 6) {
                             var __ci_expr_logic_19: i32
 
-                            if ((if _pcre2_ucp_gentype_8[__local_chartype] != 0: 1 else: 0) != 0) {
+                            if (_pcre2_ucp_gentype_8[__local_chartype] != 0) {
                                 (__ci_expr_logic_19 = (if true: 1 else: 0))
                             } else {
                                 var __ci_expr_logic_18: i32 = 0
@@ -552,36 +553,36 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                                 var __ci_expr_logic_15: i32 = 0
 
-                                if ((if __local_chartype == ucp_Cf: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_15 = (if (if __local_c != 1564: 1 else: 0) != 0: 1 else: 0))
+                                if (__local_chartype == ucp_Cf) {
+                                    (__ci_expr_logic_15 = (if __local_c != 1564: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_15 != 0) {
-                                    (__ci_expr_logic_16 = (if (if __local_c != 6158: 1 else: 0) != 0: 1 else: 0))
+                                if __ci_expr_logic_15 {
+                                    (__ci_expr_logic_16 = (if __local_c != 6158: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_16 != 0) {
+                                if __ci_expr_logic_16 {
                                     var __ci_expr_logic_17: i32
 
-                                    if ((if __local_c < 8294: 1 else: 0) != 0) {
+                                    if (__local_c < 8294) {
                                         (__ci_expr_logic_17 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_17 = (if (if __local_c > 8297: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_17 = (if __local_c > 8297: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_18 = (if __ci_expr_logic_17 != 0: 1 else: 0))
+                                    (__ci_expr_logic_18 = (if __ci_expr_logic_17: 1 else: 0))
 
                                 }
 
-                                (__ci_expr_logic_19 = (if __ci_expr_logic_18 != 0: 1 else: 0))
+                                (__ci_expr_logic_19 = (if __ci_expr_logic_18: 1 else: 0))
 
                             }
 
-                            (__ci_expr_logic_20 = (if __ci_expr_logic_19 != 0: 1 else: 0))
+                            (__ci_expr_logic_20 = (if __ci_expr_logic_19: 1 else: 0))
 
                         }
 
-                        if ((if __ci_expr_logic_20 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_20 == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -594,46 +595,46 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_21: i32 = 0
 
-                        if ((if __local_chartype != ucp_Zl: 1 else: 0) != 0) {
-                            (__ci_expr_logic_21 = (if (if __local_chartype != ucp_Zp: 1 else: 0) != 0: 1 else: 0))
+                        if (__local_chartype != ucp_Zl) {
+                            (__ci_expr_logic_21 = (if __local_chartype != ucp_Zp: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_21 != 0) {
+                        if __ci_expr_logic_21 {
                             var __ci_expr_logic_25: i32
 
-                            if ((if _pcre2_ucp_gentype_8[__local_chartype] != 0: 1 else: 0) != 0) {
+                            if (_pcre2_ucp_gentype_8[__local_chartype] != 0) {
                                 (__ci_expr_logic_25 = (if true: 1 else: 0))
                             } else {
                                 var __ci_expr_logic_24: i32 = 0
 
                                 var __ci_expr_logic_22: i32 = 0
 
-                                if ((if __local_chartype == ucp_Cf: 1 else: 0) != 0) {
-                                    (__ci_expr_logic_22 = (if (if __local_c != 1564: 1 else: 0) != 0: 1 else: 0))
+                                if (__local_chartype == ucp_Cf) {
+                                    (__ci_expr_logic_22 = (if __local_c != 1564: 1 else: 0))
                                 }
 
-                                if (__ci_expr_logic_22 != 0) {
+                                if __ci_expr_logic_22 {
                                     var __ci_expr_logic_23: i32
 
-                                    if ((if __local_c < 8294: 1 else: 0) != 0) {
+                                    if (__local_c < 8294) {
                                         (__ci_expr_logic_23 = (if true: 1 else: 0))
                                     } else {
-                                        (__ci_expr_logic_23 = (if (if __local_c > 8297: 1 else: 0) != 0: 1 else: 0))
+                                        (__ci_expr_logic_23 = (if __local_c > 8297: 1 else: 0))
                                     }
 
-                                    (__ci_expr_logic_24 = (if __ci_expr_logic_23 != 0: 1 else: 0))
+                                    (__ci_expr_logic_24 = (if __ci_expr_logic_23: 1 else: 0))
 
                                 }
 
-                                (__ci_expr_logic_25 = (if __ci_expr_logic_24 != 0: 1 else: 0))
+                                (__ci_expr_logic_25 = (if __ci_expr_logic_24: 1 else: 0))
 
                             }
 
-                            (__ci_expr_logic_26 = (if __ci_expr_logic_25 != 0: 1 else: 0))
+                            (__ci_expr_logic_26 = (if __ci_expr_logic_25: 1 else: 0))
 
                         }
 
-                        if ((if __ci_expr_logic_26 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_26 == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -644,20 +645,20 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_28: i32
 
-                        if ((if _pcre2_ucp_gentype_8[__local_chartype] == 4: 1 else: 0) != 0) {
+                        if (_pcre2_ucp_gentype_8[__local_chartype] == 4) {
                             (__ci_expr_logic_28 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_27: i32 = 0
 
-                            if ((if __local_c < 128: 1 else: 0) != 0) {
-                                (__ci_expr_logic_27 = (if (if _pcre2_ucp_gentype_8[__local_chartype] == 5: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c < 128) {
+                                (__ci_expr_logic_27 = (if _pcre2_ucp_gentype_8[__local_chartype] == 5: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_28 = (if __ci_expr_logic_27 != 0: 1 else: 0))
+                            (__ci_expr_logic_28 = (if __ci_expr_logic_27: 1 else: 0))
 
                         }
 
-                        if ((if __ci_expr_logic_28 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_28 == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -676,76 +677,76 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
                         var __ci_expr_logic_29: i32 = 0
 
-                        if ((if __local_c >= 48: 1 else: 0) != 0) {
-                            (__ci_expr_logic_29 = (if (if __local_c <= 57: 1 else: 0) != 0: 1 else: 0))
+                        if (__local_c >= 48) {
+                            (__ci_expr_logic_29 = (if __local_c <= 57: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_29 != 0) {
+                        if __ci_expr_logic_29 {
                             (__ci_expr_logic_31 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_30: i32 = 0
 
-                            if ((if __local_c >= 65: 1 else: 0) != 0) {
-                                (__ci_expr_logic_30 = (if (if __local_c <= 70: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c >= 65) {
+                                (__ci_expr_logic_30 = (if __local_c <= 70: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_31 = (if __ci_expr_logic_30 != 0: 1 else: 0))
+                            (__ci_expr_logic_31 = (if __ci_expr_logic_30: 1 else: 0))
 
                         }
 
-                        if (__ci_expr_logic_31 != 0) {
+                        if __ci_expr_logic_31 {
                             (__ci_expr_logic_33 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_32: i32 = 0
 
-                            if ((if __local_c >= 97: 1 else: 0) != 0) {
-                                (__ci_expr_logic_32 = (if (if __local_c <= 102: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c >= 97) {
+                                (__ci_expr_logic_32 = (if __local_c <= 102: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_33 = (if __ci_expr_logic_32 != 0: 1 else: 0))
+                            (__ci_expr_logic_33 = (if __ci_expr_logic_32: 1 else: 0))
 
                         }
 
-                        if (__ci_expr_logic_33 != 0) {
+                        if __ci_expr_logic_33 {
                             (__ci_expr_logic_35 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_34: i32 = 0
 
-                            if ((if __local_c >= 65296: 1 else: 0) != 0) {
-                                (__ci_expr_logic_34 = (if (if __local_c <= 65305: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c >= 65296) {
+                                (__ci_expr_logic_34 = (if __local_c <= 65305: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_35 = (if __ci_expr_logic_34 != 0: 1 else: 0))
+                            (__ci_expr_logic_35 = (if __ci_expr_logic_34: 1 else: 0))
 
                         }
 
-                        if (__ci_expr_logic_35 != 0) {
+                        if __ci_expr_logic_35 {
                             (__ci_expr_logic_37 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_36: i32 = 0
 
-                            if ((if __local_c >= 65313: 1 else: 0) != 0) {
-                                (__ci_expr_logic_36 = (if (if __local_c <= 65318: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c >= 65313) {
+                                (__ci_expr_logic_36 = (if __local_c <= 65318: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_37 = (if __ci_expr_logic_36 != 0: 1 else: 0))
+                            (__ci_expr_logic_37 = (if __ci_expr_logic_36: 1 else: 0))
 
                         }
 
-                        if (__ci_expr_logic_37 != 0) {
+                        if __ci_expr_logic_37 {
                             (__ci_expr_logic_39 = (if true: 1 else: 0))
                         } else {
                             var __ci_expr_logic_38: i32 = 0
 
-                            if ((if __local_c >= 65345: 1 else: 0) != 0) {
-                                (__ci_expr_logic_38 = (if (if __local_c <= 65350: 1 else: 0) != 0: 1 else: 0))
+                            if (__local_c >= 65345) {
+                                (__ci_expr_logic_38 = (if __local_c <= 65350: 1 else: 0))
                             }
 
-                            (__ci_expr_logic_39 = (if __ci_expr_logic_38 != 0: 1 else: 0))
+                            (__ci_expr_logic_39 = (if __ci_expr_logic_38: 1 else: 0))
 
                         }
 
-                        if ((if __ci_expr_logic_39 == __local_isprop: 1 else: 0) != 0) {
+                        if (__ci_expr_logic_39 == __local_isprop) {
                             return __local_not_negated
                         }
 
@@ -753,7 +754,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                     _ => {
                         loop {
                             0
-                            if not ((0 != 0)) {
+                            if not (false) {
                                 break
                             }
                         }
@@ -771,13 +772,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             var __ci_expr_logic_2: i32
 
-            if ((if (*__local_data) == 3: 1 else: 0) != 0) {
+            if ((*__local_data) == 3) {
                 (__ci_expr_logic_2 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_2 = (if (if (*__local_data) == 4: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_2 = (if (*__local_data) == 4: 1 else: 0))
             }
 
-            if not ((__ci_expr_logic_2 != 0)) {
+            if not (__ci_expr_logic_2) {
                 break
             }
         }
@@ -785,7 +786,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
     }
 
 
-    if ((if (*__local_data) < (if (if (sizeof[u8]() as usize) == 1: 1 else: 0) != 0: (16 as i32) else: (4096 as i32)): 1 else: 0) != 0) {
+    if ((*__local_data) < (if (sizeof[u8]() as usize) == 1: (16 as i32) else: (4096 as i32))) {
         while true {
             var __ci_expr_old_41: *const u8 = __local_data
 
@@ -793,7 +794,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             (__local_t = (*__ci_expr_old_41))
 
-            if (not ((if __local_t != 0: 1 else: 0) != 0)) {
+            if (not (__local_t != 0)) {
                 break
             }
 
@@ -801,7 +802,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             var __local_y: u32
 
-            if (__local_utf != 0) {
+            if __local_utf {
                 var __ci_expr_old_42: *const u8 = __local_data
 
                 (__local_data = __local_data + 1)
@@ -809,8 +810,8 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                 (__local_x = (((*__ci_expr_old_42) as u32)))
 
 
-                if ((if __local_x >= 192: 1 else: 0) != 0) {
-                    if ((if ((__local_x as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+                if (__local_x >= 192) {
+                    if (((__local_x as u32) & (32 as u32)) == 0) {
                         var __ci_expr_old_43: *const u8 = __local_data
 
                         (__local_data = __local_data + 1)
@@ -818,19 +819,19 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         (__local_x = ((((((((__local_x as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_43) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                     } else {
-                        if ((if ((__local_x as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_x as u32) & (16 as u32)) == 0) {
                             (__local_x = ((((((((((__local_x as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                             (__local_data = __local_data + ((2 as isize) as usize))
 
                         } else {
-                            if ((if ((__local_x as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                            if (((__local_x as u32) & (8 as u32)) == 0) {
                                 (__local_x = ((((((((((((__local_x as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                 (__local_data = __local_data + ((3 as isize) as usize))
 
                             } else {
-                                if ((if ((__local_x as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                                if (((__local_x as u32) & (4 as u32)) == 0) {
                                     (__local_x = ((((((((((((((__local_x as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_data[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                     (__local_data = __local_data + ((4 as isize) as usize))
@@ -858,9 +859,9 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             }
 
-            if ((if __local_t == 1: 1 else: 0) != 0) {
-                if ((if __local_c <= __local_x: 1 else: 0) != 0) {
-                    return (if (if __local_c == __local_x: 1 else: 0) != 0: __local_not_negated else: ((if not (__local_not_negated != 0): 1 else: 0) as i32))
+            if (__local_t == 1) {
+                if (__local_c <= __local_x) {
+                    return (if __local_c == __local_x: __local_not_negated else: ((if not __local_not_negated: 1 else: 0) as i32))
                 }
 
                 continue
@@ -869,12 +870,12 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             loop {
                 0
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
 
-            if (__local_utf != 0) {
+            if __local_utf {
                 var __ci_expr_old_45: *const u8 = __local_data
 
                 (__local_data = __local_data + 1)
@@ -882,8 +883,8 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                 (__local_y = (((*__ci_expr_old_45) as u32)))
 
 
-                if ((if __local_y >= 192: 1 else: 0) != 0) {
-                    if ((if ((__local_y as u32) & (32 as u32)) == 0: 1 else: 0) != 0) {
+                if (__local_y >= 192) {
+                    if (((__local_y as u32) & (32 as u32)) == 0) {
                         var __ci_expr_old_46: *const u8 = __local_data
 
                         (__local_data = __local_data + 1)
@@ -891,19 +892,19 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
                         (__local_y = ((((((((__local_y as u32) & (31 as u32)) as u32) << (6 as u32)) as u32) | (((((*__ci_expr_old_46) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                     } else {
-                        if ((if ((__local_y as u32) & (16 as u32)) == 0: 1 else: 0) != 0) {
+                        if (((__local_y as u32) & (16 as u32)) == 0) {
                             (__local_y = ((((((((((__local_y as u32) & (15 as u32)) as u32) << (12 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                             (__local_data = __local_data + ((2 as isize) as usize))
 
                         } else {
-                            if ((if ((__local_y as u32) & (8 as u32)) == 0: 1 else: 0) != 0) {
+                            if (((__local_y as u32) & (8 as u32)) == 0) {
                                 (__local_y = ((((((((((((__local_y as u32) & (7 as u32)) as u32) << (18 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[2]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                 (__local_data = __local_data + ((3 as isize) as usize))
 
                             } else {
-                                if ((if ((__local_y as u32) & (4 as u32)) == 0: 1 else: 0) != 0) {
+                                if (((__local_y as u32) & (4 as u32)) == 0) {
                                     (__local_y = ((((((((((((((__local_y as u32) & (3 as u32)) as u32) << (24 as u32)) as u32) | (((((((*__local_data) as i32) as u32) & (63 as u32)) as u32) << (18 as u32)) as u32)) as u32) | (((((((__local_data[1]) as i32) as u32) & (63 as u32)) as u32) << (12 as u32)) as u32)) as u32) | (((((((__local_data[2]) as i32) as u32) & (63 as u32)) as u32) << (6 as u32)) as u32)) as u32) | (((((__local_data[3]) as i32) as u32) & (63 as u32)) as u32)) as u32)))
 
                                     (__local_data = __local_data + ((4 as isize) as usize))
@@ -931,13 +932,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
             }
 
-            if ((if __local_c <= __local_y: 1 else: 0) != 0) {
-                return (if (if __local_c >= __local_x: 1 else: 0) != 0: __local_not_negated else: ((if not (__local_not_negated != 0): 1 else: 0) as i32))
+            if (__local_c <= __local_y) {
+                return (if __local_c >= __local_x: __local_not_negated else: ((if not __local_not_negated: 1 else: 0) as i32))
             }
 
         }
 
-        return (if not (__local_not_negated != 0): 1 else: 0)
+        return (if not __local_not_negated: 1 else: 0)
 
     }
 
@@ -951,20 +952,20 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if ((if __local_c >= 32768: 1 else: 0) != 0) {
+    if (__local_c >= 32768) {
         (__local_max_index = ((((__local_type_ as u32) & (3 as u32)) as u32)))
 
-        if ((if __local_max_index == 3: 1 else: 0) != 0) {
+        if (__local_max_index == 3) {
             (__local_max_index = (((*(__local_next_char as *const u16)) as u32)))
 
             loop {
                 0
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -979,17 +980,17 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     }
 
-    if ((if __local_c < 65536: 1 else: 0) != 0) {
+    if (__local_c < 65536) {
         (__local_max_index = ((((__local_type_ as u32) & (3 as u32)) as u32)))
 
         (__local_c = (((((((__local_c as u32) << (1 as u32)) as u32) | (1 as u32)) as u16) as u32)))
 
-        if ((if __local_max_index == 3: 1 else: 0) != 0) {
+        if (__local_max_index == 3) {
             (__local_max_index = (((*(__local_next_char as *const u16)) as u32)))
 
             loop {
                 0
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -1000,13 +1001,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
         var __ci_expr_logic_48: i32
 
-        if ((if __local_max_index == 0: 1 else: 0) != 0) {
+        if (__local_max_index == 0) {
             (__ci_expr_logic_48 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_48 = (if (if __local_c < (*(__local_next_char as *const u16)): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_48 = (if __local_c < (*(__local_next_char as *const u16)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_48 != 0) {
+        if __ci_expr_logic_48 {
             return (if (if ((__local_type_ as u32) & (4 as u32)) != 0: 1 else: 0) == __local_not_negated: 1 else: 0)
         }
 
@@ -1018,13 +1019,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
         (__local_value = ((((__local_next_char as *const u16)[__local_max_index]) as u32)))
 
 
-        if ((if __local_c >= __local_value: 1 else: 0) != 0) {
+        if (__local_c >= __local_value) {
             var __ci_expr_logic_49: i32
 
-            if ((if __local_value == __local_c: 1 else: 0) != 0) {
+            if (__local_value == __local_c) {
                 (__ci_expr_logic_49 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_49 = (if (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_49 = (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0))
             }
 
             return (if __ci_expr_logic_49 == __local_not_negated: 1 else: 0)
@@ -1033,23 +1034,23 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
         (__local_max_index = (__local_max_index -% 1))
 
-        while (1 != 0) {
+        while true {
             var __local_mid_index: u32 = ((((((__local_min_index as u32) +% (__local_max_index as u32)) as u32) >> (1 as u32)) as u32))
 
             (__local_value = ((((__local_next_char as *const u16)[__local_mid_index]) as u32)))
 
-            if ((if __local_c < __local_value: 1 else: 0) != 0) {
+            if (__local_c < __local_value) {
                 (__local_max_index = ((((__local_mid_index as u32) -% (1 as u32)) as u32)))
             } else {
-                if ((if ((__local_next_char as *const u16)[((__local_mid_index as u32) +% (1 as u32))]) <= __local_c: 1 else: 0) != 0) {
+                if (((__local_next_char as *const u16)[((__local_mid_index as u32) +% (1 as u32))]) <= __local_c) {
                     (__local_min_index = ((((__local_mid_index as u32) +% (1 as u32)) as u32)))
                 } else {
                     var __ci_expr_logic_50: i32
 
-                    if ((if __local_value == __local_c: 1 else: 0) != 0) {
+                    if (__local_value == __local_c) {
                         (__ci_expr_logic_50 = (if true: 1 else: 0))
                     } else {
-                        (__ci_expr_logic_50 = (if (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_50 = (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0))
                     }
 
                     return (if __ci_expr_logic_50 == __local_not_negated: 1 else: 0)
@@ -1063,12 +1064,12 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     (__local_max_index = ((((__local_type_ as u32) & (3 as u32)) as u32)))
 
-    if ((if __local_max_index == 3: 1 else: 0) != 0) {
+    if (__local_max_index == 3) {
         (__local_max_index = (((*(__local_next_char as *const u16)) as u32)))
 
         loop {
             0
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
@@ -1083,7 +1084,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1092,7 +1093,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     (__local_c = ((((((__local_c as u32) << (1 as u32)) as u32) | (1 as u32)) as u32)))
 
-    if ((if __local_max_index == 3: 1 else: 0) != 0) {
+    if (__local_max_index == 3) {
         (__local_max_index = (*(__local_next_char as *const u32)))
 
         (__local_next_char = __local_next_char + ((4 as isize) as usize))
@@ -1101,13 +1102,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     var __ci_expr_logic_51: i32
 
-    if ((if __local_max_index == 0: 1 else: 0) != 0) {
+    if (__local_max_index == 0) {
         (__ci_expr_logic_51 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_51 = (if (if __local_c < (*(__local_next_char as *const u32)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_51 = (if __local_c < (*(__local_next_char as *const u32)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_51 != 0) {
+    if __ci_expr_logic_51 {
         return (if (if ((__local_type_ as u32) & (4 as u32)) != 0: 1 else: 0) == __local_not_negated: 1 else: 0)
     }
 
@@ -1119,13 +1120,13 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
     (__local_value = ((((__local_next_char as *const u32)[__local_max_index]) as u32)))
 
 
-    if ((if __local_c >= __local_value: 1 else: 0) != 0) {
+    if (__local_c >= __local_value) {
         var __ci_expr_logic_52: i32
 
-        if ((if __local_value == __local_c: 1 else: 0) != 0) {
+        if (__local_value == __local_c) {
             (__ci_expr_logic_52 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_52 = (if (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_52 = (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0))
         }
 
         return (if __ci_expr_logic_52 == __local_not_negated: 1 else: 0)
@@ -1134,23 +1135,23 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
     (__local_max_index = (__local_max_index -% 1))
 
-    while (1 != 0) {
+    while true {
         var __local_mid_index_1: u32 = ((((((__local_min_index as u32) +% (__local_max_index as u32)) as u32) >> (1 as u32)) as u32))
 
         (__local_value = ((((__local_next_char as *const u32)[__local_mid_index_1]) as u32)))
 
-        if ((if __local_c < __local_value: 1 else: 0) != 0) {
+        if (__local_c < __local_value) {
             (__local_max_index = ((((__local_mid_index_1 as u32) -% (1 as u32)) as u32)))
         } else {
-            if ((if ((__local_next_char as *const u32)[((__local_mid_index_1 as u32) +% (1 as u32))]) <= __local_c: 1 else: 0) != 0) {
+            if (((__local_next_char as *const u32)[((__local_mid_index_1 as u32) +% (1 as u32))]) <= __local_c) {
                 (__local_min_index = ((((__local_mid_index_1 as u32) +% (1 as u32)) as u32)))
             } else {
                 var __ci_expr_logic_53: i32
 
-                if ((if __local_value == __local_c: 1 else: 0) != 0) {
+                if (__local_value == __local_c) {
                     (__ci_expr_logic_53 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_53 = (if (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_53 = (if ((__local_value as u32) & (1 as u32)) == 0: 1 else: 0))
                 }
 
                 return (if __ci_expr_logic_53 == __local_not_negated: 1 else: 0)
@@ -1162,6 +1163,7 @@ pub unsafe fn _pcre2_xclass_8(__param_c: u32, __param_data: *const u8, __param_c
 
 }
 
+// contract: unproved:1:read only,unproved:2:read only,unproved:3:read only
 pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __param_data_end: *const u8, __param_char_lists_end: *const u8, __param_utf: i32) -> i32 {
     var __local_ptr: *const u8 = __param_data_start
 
@@ -1173,7 +1175,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -1187,13 +1189,13 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
-    if ((if ((__local_flags as i32) & (1 as i32)) != 0: 1 else: 0) != 0) {
-        if ((if __param_c < 256: 1 else: 0) != 0) {
+    if (((__local_flags as i32) & (1 as i32)) != 0) {
+        if (__param_c < 256) {
             return (if ((((__local_ptr[((__param_c as u32) / (8 as u32))]) as i32) as u32) & (((1 as u32) << (((__param_c as u32) & (7 as u32)) as u32)) as u32)) != 0: 1 else: 0)
         }
 
@@ -1201,7 +1203,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
     }
 
-    while ((if __local_ptr < __param_data_end: 1 else: 0) != 0) {
+    while (__local_ptr < __param_data_end) {
         while true {
             match (*__local_ptr) {
                 1 => {
@@ -1211,7 +1213,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -1226,7 +1228,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -1241,7 +1243,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -1256,7 +1258,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -1275,7 +1277,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
                 _ => {
                     loop {
                         0
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
@@ -1293,7 +1295,7 @@ pub unsafe fn _pcre2_eclass_8(__param_c: u32, __param_data_start: *const u8, __p
 
     loop {
         0
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }

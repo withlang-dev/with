@@ -16,6 +16,7 @@ use std.engines.zlib.trees
 use std.option
 use std.collections
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 {
     var __local_old_flush: i32
 
@@ -25,19 +26,19 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     var __ci_expr_logic_0: i32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_flush > 5: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_flush > 5: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_flush < 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __param_flush < 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return -2
 
     }
@@ -49,44 +50,44 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     var __ci_expr_logic_3: i32
 
-    if ((if (*__param_strm).next_out == 0: 1 else: 0) != 0) {
+    if ((*__param_strm).next_out == 0) {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_2: i32 = 0
 
-        if ((if (*__param_strm).avail_in != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_2 = (if (if (*__param_strm).next_in == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__param_strm).avail_in != 0) {
+            (__ci_expr_logic_2 = (if (*__param_strm).next_in == 0: 1 else: 0))
         }
 
-        (__ci_expr_logic_3 = (if __ci_expr_logic_2 != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __ci_expr_logic_2: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         (__ci_expr_logic_5 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if (*__local_s).status == 666: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __param_flush != 4: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_s).status == 666) {
+            (__ci_expr_logic_4 = (if __param_flush != 4: 1 else: 0))
         }
 
-        (__ci_expr_logic_5 = (if __ci_expr_logic_4 != 0: 1 else: 0))
+        (__ci_expr_logic_5 = (if __ci_expr_logic_4: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_5 != 0) {
+    if __ci_expr_logic_5 {
         var __ci_expr_ternary_7: i32 = 0
 
         var __ci_expr_logic_6: i32
 
-        if ((if -2 < -6: 1 else: 0) != 0) {
+        if (-2 < -6) {
             (__ci_expr_logic_6 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_6 = (if (if -2 > 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_6 = (if -2 > 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if __ci_expr_logic_6 {
             (__ci_expr_ternary_7 = ((9 as i32)))
         } else {
             (__ci_expr_ternary_7 = (((2 - -2) as i32)))
@@ -100,18 +101,18 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
     }
 
 
-    if ((if (*__param_strm).avail_out == 0: 1 else: 0) != 0) {
+    if ((*__param_strm).avail_out == 0) {
         var __ci_expr_ternary_9: i32 = 0
 
         var __ci_expr_logic_8: i32
 
-        if ((if -5 < -6: 1 else: 0) != 0) {
+        if (-5 < -6) {
             (__ci_expr_logic_8 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_8 = (if (if -5 > 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_8 = (if -5 > 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_8 != 0) {
+        if __ci_expr_logic_8 {
             (__ci_expr_ternary_9 = ((9 as i32)))
         } else {
             (__ci_expr_ternary_9 = (((2 - -5) as i32)))
@@ -127,10 +128,10 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     ((*__local_s).last_flush = __param_flush)
 
-    if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+    if ((*__local_s).pending != 0) {
         flush_pending(__param_strm)
 
-        if ((if (*__param_strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*__param_strm).avail_out == 0) {
             ((*__local_s).last_flush = ((-1 as i32)))
 
             return 0
@@ -142,26 +143,26 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         var __ci_expr_logic_10: i32 = 0
 
-        if ((if (*__param_strm).avail_in == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if ((__param_flush * 2) - (if (if __param_flush > 4: 1 else: 0) != 0: (9 as i32) else: (0 as i32))) <= ((__local_old_flush * 2) - (if (if __local_old_flush > 4: 1 else: 0) != 0: (9 as i32) else: (0 as i32))): 1 else: 0) != 0: 1 else: 0))
+        if ((*__param_strm).avail_in == 0) {
+            (__ci_expr_logic_10 = (if ((__param_flush * 2) - (if __param_flush > 4: (9 as i32) else: (0 as i32))) <= ((__local_old_flush * 2) - (if __local_old_flush > 4: (9 as i32) else: (0 as i32))): 1 else: 0))
         }
 
-        if (__ci_expr_logic_10 != 0) {
-            (__ci_expr_logic_11 = (if (if __param_flush != 4: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_10 {
+            (__ci_expr_logic_11 = (if __param_flush != 4: 1 else: 0))
         }
 
-        if (__ci_expr_logic_11 != 0) {
+        if __ci_expr_logic_11 {
             var __ci_expr_ternary_13: i32 = 0
 
             var __ci_expr_logic_12: i32
 
-            if ((if -5 < -6: 1 else: 0) != 0) {
+            if (-5 < -6) {
                 (__ci_expr_logic_12 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_12 = (if (if -5 > 2: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_12 = (if -5 > 2: 1 else: 0))
             }
 
-            if (__ci_expr_logic_12 != 0) {
+            if __ci_expr_logic_12 {
                 (__ci_expr_ternary_13 = ((9 as i32)))
             } else {
                 (__ci_expr_ternary_13 = (((2 - -5) as i32)))
@@ -178,22 +179,22 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     var __ci_expr_logic_14: i32 = 0
 
-    if ((if (*__local_s).status == 666: 1 else: 0) != 0) {
-        (__ci_expr_logic_14 = (if (if (*__param_strm).avail_in != 0: 1 else: 0) != 0: 1 else: 0))
+    if ((*__local_s).status == 666) {
+        (__ci_expr_logic_14 = (if (*__param_strm).avail_in != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_14 != 0) {
+    if __ci_expr_logic_14 {
         var __ci_expr_ternary_16: i32 = 0
 
         var __ci_expr_logic_15: i32
 
-        if ((if -5 < -6: 1 else: 0) != 0) {
+        if (-5 < -6) {
             (__ci_expr_logic_15 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_15 = (if (if -5 > 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if -5 > 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_15 != 0) {
+        if __ci_expr_logic_15 {
             (__ci_expr_ternary_16 = ((9 as i32)))
         } else {
             (__ci_expr_ternary_16 = (((2 - -5) as i32)))
@@ -209,35 +210,35 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     var __ci_expr_logic_17: i32 = 0
 
-    if ((if (*__local_s).status == 42: 1 else: 0) != 0) {
-        (__ci_expr_logic_17 = (if (if (*__local_s).wrap == 0: 1 else: 0) != 0: 1 else: 0))
+    if ((*__local_s).status == 42) {
+        (__ci_expr_logic_17 = (if (*__local_s).wrap == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_17 != 0) {
+    if __ci_expr_logic_17 {
         ((*__local_s).status = ((113 as i32)))
     }
 
 
-    if ((if (*__local_s).status == 42: 1 else: 0) != 0) {
+    if ((*__local_s).status == 42) {
         var __local_header: u32 = ((((((8 as u32) +% ((((((*__local_s).w_bits as u32) -% (8 as u32)) as u32) << (4 as u32)) as u32)) as u32) << (8 as u32)) as u32))
 
         var __local_level_flags: u32
 
         var __ci_expr_logic_18: i32
 
-        if ((if (*__local_s).strategy >= 2: 1 else: 0) != 0) {
+        if ((*__local_s).strategy >= 2) {
             (__ci_expr_logic_18 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_18 = (if (if (*__local_s).level < 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_18 = (if (*__local_s).level < 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_18 != 0) {
+        if __ci_expr_logic_18 {
             (__local_level_flags = ((0 as u32)))
         } else {
-            if ((if (*__local_s).level < 6: 1 else: 0) != 0) {
+            if ((*__local_s).level < 6) {
                 (__local_level_flags = ((1 as u32)))
             } else {
-                if ((if (*__local_s).level == 6: 1 else: 0) != 0) {
+                if ((*__local_s).level == 6) {
                     (__local_level_flags = ((2 as u32)))
                 } else {
                     (__local_level_flags = ((3 as u32)))
@@ -248,7 +249,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         (__local_header = (__local_header as u32) | (((__local_level_flags as u32) << (6 as u32)) as u32))
 
-        if ((if (*__local_s).strstart != 0: 1 else: 0) != 0) {
+        if ((*__local_s).strstart != 0) {
             (__local_header = (__local_header as u32) | (32 as u32))
         }
 
@@ -256,7 +257,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         putShortMSB(__local_s, __local_header)
 
-        if ((if (*__local_s).strstart != 0: 1 else: 0) != 0) {
+        if ((*__local_s).strstart != 0) {
             putShortMSB(__local_s, ((((*__param_strm).adler as u64) >> (16 as u32)) as u32))
 
             putShortMSB(__local_s, ((((*__param_strm).adler as u64) & (65535 as u64)) as u32))
@@ -269,7 +270,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         flush_pending(__param_strm)
 
-        if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+        if ((*__local_s).pending != 0) {
             ((*__local_s).last_flush = ((-1 as i32)))
 
             return 0
@@ -278,7 +279,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     }
 
-    if ((if (*__local_s).status == 57: 1 else: 0) != 0) {
+    if ((*__local_s).status == 57) {
         ((*__param_strm).adler = ((crc32((0 as u64), null, (0 as u32)) as u64)))
 
         var __ci_expr_old_19: u64 = (*__local_s).pending
@@ -308,7 +309,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
 
 
-        if ((if (*__local_s).gzhead == 0: 1 else: 0) != 0) {
+        if ((*__local_s).gzhead == 0) {
             var __ci_expr_old_22: u64 = (*__local_s).pending
 
             ((*__local_s).pending = ((*__local_s).pending +% 1))
@@ -360,20 +361,20 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             var __ci_expr_ternary_30: i32 = 0
 
-            if ((if (*__local_s).level == 9: 1 else: 0) != 0) {
+            if ((*__local_s).level == 9) {
                 (__ci_expr_ternary_30 = ((2 as i32)))
             } else {
                 var __ci_expr_ternary_29: i32 = 0
 
                 var __ci_expr_logic_28: i32
 
-                if ((if (*__local_s).strategy >= 2: 1 else: 0) != 0) {
+                if ((*__local_s).strategy >= 2) {
                     (__ci_expr_logic_28 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_28 = (if (if (*__local_s).level < 2: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_28 = (if (*__local_s).level < 2: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_28 != 0) {
+                if __ci_expr_logic_28 {
                     (__ci_expr_ternary_29 = ((4 as i32)))
                 } else {
                     (__ci_expr_ternary_29 = ((0 as i32)))
@@ -401,7 +402,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             flush_pending(__param_strm)
 
-            if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+            if ((*__local_s).pending != 0) {
                 ((*__local_s).last_flush = ((-1 as i32)))
 
                 return 0
@@ -413,7 +414,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             ((*__local_s).pending = ((*__local_s).pending +% 1))
 
-            (((*__local_s).pending_buf[__ci_expr_old_32]) = (((((((if (*(*__local_s).gzhead).text != 0: (1 as i32) else: (0 as i32)) + (if (*(*__local_s).gzhead).hcrc != 0: (2 as i32) else: (0 as i32))) + (if (if (*(*__local_s).gzhead).extra == 0: 1 else: 0) != 0: (0 as i32) else: (4 as i32))) + (if (if (*(*__local_s).gzhead).name == 0: 1 else: 0) != 0: (0 as i32) else: (8 as i32))) + (if (if (*(*__local_s).gzhead).comment == 0: 1 else: 0) != 0: (0 as i32) else: (16 as i32))) as u8)))
+            (((*__local_s).pending_buf[__ci_expr_old_32]) = (((((((if (*(*__local_s).gzhead).text: (1 as i32) else: (0 as i32)) + (if (*(*__local_s).gzhead).hcrc: (2 as i32) else: (0 as i32))) + (if (*(*__local_s).gzhead).extra == 0: (0 as i32) else: (4 as i32))) + (if (*(*__local_s).gzhead).name == 0: (0 as i32) else: (8 as i32))) + (if (*(*__local_s).gzhead).comment == 0: (0 as i32) else: (16 as i32))) as u8)))
 
 
 
@@ -460,20 +461,20 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             var __ci_expr_ternary_40: i32 = 0
 
-            if ((if (*__local_s).level == 9: 1 else: 0) != 0) {
+            if ((*__local_s).level == 9) {
                 (__ci_expr_ternary_40 = ((2 as i32)))
             } else {
                 var __ci_expr_ternary_39: i32 = 0
 
                 var __ci_expr_logic_38: i32
 
-                if ((if (*__local_s).strategy >= 2: 1 else: 0) != 0) {
+                if ((*__local_s).strategy >= 2) {
                     (__ci_expr_logic_38 = (if true: 1 else: 0))
                 } else {
-                    (__ci_expr_logic_38 = (if (if (*__local_s).level < 2: 1 else: 0) != 0: 1 else: 0))
+                    (__ci_expr_logic_38 = (if (*__local_s).level < 2: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_38 != 0) {
+                if __ci_expr_logic_38 {
                     (__ci_expr_ternary_39 = ((4 as i32)))
                 } else {
                     (__ci_expr_ternary_39 = ((0 as i32)))
@@ -497,7 +498,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
 
 
-            if ((if (*(*__local_s).gzhead).extra != 0: 1 else: 0) != 0) {
+            if ((*(*__local_s).gzhead).extra != 0) {
                 var __ci_expr_old_42: u64 = (*__local_s).pending
 
                 ((*__local_s).pending = ((*__local_s).pending +% 1))
@@ -518,7 +519,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             }
 
-            if ((*(*__local_s).gzhead).hcrc != 0) {
+            if (*(*__local_s).gzhead).hcrc {
                 ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, ((*__local_s).pending_buf as *const u8), (*__local_s).pending) as u64)))
             }
 
@@ -530,13 +531,13 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     }
 
-    if ((if (*__local_s).status == 69: 1 else: 0) != 0) {
-        if ((if (*(*__local_s).gzhead).extra != 0: 1 else: 0) != 0) {
+    if ((*__local_s).status == 69) {
+        if ((*(*__local_s).gzhead).extra != 0) {
             var __local_beg: u64 = (*__local_s).pending
 
             var __local_left: u64 = (((((((*(*__local_s).gzhead).extra_len as u32) & (65535 as u32)) as u64) -% ((*__local_s).gzindex as u64)) as u64))
 
-            while ((if (((*__local_s).pending as u64) +% (__local_left as u64)) > (*__local_s).pending_buf_size: 1 else: 0) != 0) {
+            while ((((*__local_s).pending as u64) +% (__local_left as u64)) > (*__local_s).pending_buf_size) {
                 var __local_copy_: u64 = (((((*__local_s).pending_buf_size as u64) -% ((*__local_s).pending as u64)) as u64))
 
                 with_memcpy(((((*__local_s).pending_buf + ((*__local_s).pending as usize)) as *mut c_void) as *mut u8), ((((*(*__local_s).gzhead).extra + ((*__local_s).gzindex as usize)) as *const c_void) as *const u8), (__local_copy_ as i64))
@@ -546,16 +547,16 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
                 loop {
                     var __ci_expr_logic_44: i32 = 0
 
-                    if ((*(*__local_s).gzhead).hcrc != 0) {
-                        (__ci_expr_logic_44 = (if (if (*__local_s).pending > __local_beg: 1 else: 0) != 0: 1 else: 0))
+                    if (*(*__local_s).gzhead).hcrc {
+                        (__ci_expr_logic_44 = (if (*__local_s).pending > __local_beg: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_44 != 0) {
+                    if __ci_expr_logic_44 {
                         ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg as u64)) as u64)) as u64)))
                     }
 
 
-                    if not ((0 != 0)) {
+                    if not (false) {
                         break
                     }
                 }
@@ -564,7 +565,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
                 flush_pending(__param_strm)
 
-                if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+                if ((*__local_s).pending != 0) {
                     ((*__local_s).last_flush = ((-1 as i32)))
 
                     return 0
@@ -584,16 +585,16 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
             loop {
                 var __ci_expr_logic_45: i32 = 0
 
-                if ((*(*__local_s).gzhead).hcrc != 0) {
-                    (__ci_expr_logic_45 = (if (if (*__local_s).pending > __local_beg: 1 else: 0) != 0: 1 else: 0))
+                if (*(*__local_s).gzhead).hcrc {
+                    (__ci_expr_logic_45 = (if (*__local_s).pending > __local_beg: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_45 != 0) {
+                if __ci_expr_logic_45 {
                     ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg as u64)) as u64)) as u64)))
                 }
 
 
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -606,34 +607,34 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     }
 
-    if ((if (*__local_s).status == 73: 1 else: 0) != 0) {
-        if ((if (*(*__local_s).gzhead).name != 0: 1 else: 0) != 0) {
+    if ((*__local_s).status == 73) {
+        if ((*(*__local_s).gzhead).name != 0) {
             var __local_beg_1: u64 = (*__local_s).pending
 
             var __local_val: i32
 
             loop {
-                if ((if (*__local_s).pending == (*__local_s).pending_buf_size: 1 else: 0) != 0) {
+                if ((*__local_s).pending == (*__local_s).pending_buf_size) {
                     loop {
                         var __ci_expr_logic_46: i32 = 0
 
-                        if ((*(*__local_s).gzhead).hcrc != 0) {
-                            (__ci_expr_logic_46 = (if (if (*__local_s).pending > __local_beg_1: 1 else: 0) != 0: 1 else: 0))
+                        if (*(*__local_s).gzhead).hcrc {
+                            (__ci_expr_logic_46 = (if (*__local_s).pending > __local_beg_1: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_46 != 0) {
+                        if __ci_expr_logic_46 {
                             ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg_1 as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg_1 as u64)) as u64)) as u64)))
                         }
 
 
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
 
                     flush_pending(__param_strm)
 
-                    if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+                    if ((*__local_s).pending != 0) {
                         ((*__local_s).last_flush = ((-1 as i32)))
 
                         return 0
@@ -660,7 +661,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
 
 
-                if not (((if __local_val != 0: 1 else: 0) != 0)) {
+                if not ((__local_val != 0)) {
                     break
                 }
             }
@@ -668,16 +669,16 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
             loop {
                 var __ci_expr_logic_49: i32 = 0
 
-                if ((*(*__local_s).gzhead).hcrc != 0) {
-                    (__ci_expr_logic_49 = (if (if (*__local_s).pending > __local_beg_1: 1 else: 0) != 0: 1 else: 0))
+                if (*(*__local_s).gzhead).hcrc {
+                    (__ci_expr_logic_49 = (if (*__local_s).pending > __local_beg_1: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_49 != 0) {
+                if __ci_expr_logic_49 {
                     ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg_1 as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg_1 as u64)) as u64)) as u64)))
                 }
 
 
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -690,34 +691,34 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     }
 
-    if ((if (*__local_s).status == 91: 1 else: 0) != 0) {
-        if ((if (*(*__local_s).gzhead).comment != 0: 1 else: 0) != 0) {
+    if ((*__local_s).status == 91) {
+        if ((*(*__local_s).gzhead).comment != 0) {
             var __local_beg_2: u64 = (*__local_s).pending
 
             var __local_val_1: i32
 
             loop {
-                if ((if (*__local_s).pending == (*__local_s).pending_buf_size: 1 else: 0) != 0) {
+                if ((*__local_s).pending == (*__local_s).pending_buf_size) {
                     loop {
                         var __ci_expr_logic_50: i32 = 0
 
-                        if ((*(*__local_s).gzhead).hcrc != 0) {
-                            (__ci_expr_logic_50 = (if (if (*__local_s).pending > __local_beg_2: 1 else: 0) != 0: 1 else: 0))
+                        if (*(*__local_s).gzhead).hcrc {
+                            (__ci_expr_logic_50 = (if (*__local_s).pending > __local_beg_2: 1 else: 0))
                         }
 
-                        if (__ci_expr_logic_50 != 0) {
+                        if __ci_expr_logic_50 {
                             ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg_2 as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg_2 as u64)) as u64)) as u64)))
                         }
 
 
-                        if not ((0 != 0)) {
+                        if not (false) {
                             break
                         }
                     }
 
                     flush_pending(__param_strm)
 
-                    if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+                    if ((*__local_s).pending != 0) {
                         ((*__local_s).last_flush = ((-1 as i32)))
 
                         return 0
@@ -744,7 +745,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
 
 
-                if not (((if __local_val_1 != 0: 1 else: 0) != 0)) {
+                if not ((__local_val_1 != 0)) {
                     break
                 }
             }
@@ -752,16 +753,16 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
             loop {
                 var __ci_expr_logic_53: i32 = 0
 
-                if ((*(*__local_s).gzhead).hcrc != 0) {
-                    (__ci_expr_logic_53 = (if (if (*__local_s).pending > __local_beg_2: 1 else: 0) != 0: 1 else: 0))
+                if (*(*__local_s).gzhead).hcrc {
+                    (__ci_expr_logic_53 = (if (*__local_s).pending > __local_beg_2: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_53 != 0) {
+                if __ci_expr_logic_53 {
                     ((*__param_strm).adler = ((crc32_z((*__param_strm).adler, (((*__local_s).pending_buf + (__local_beg_2 as usize)) as *const u8), ((((*__local_s).pending as u64) -% (__local_beg_2 as u64)) as u64)) as u64)))
                 }
 
 
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -772,12 +773,12 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     }
 
-    if ((if (*__local_s).status == 103: 1 else: 0) != 0) {
-        if ((*(*__local_s).gzhead).hcrc != 0) {
-            if ((if (((*__local_s).pending as u64) +% (2 as u64)) > (*__local_s).pending_buf_size: 1 else: 0) != 0) {
+    if ((*__local_s).status == 103) {
+        if (*(*__local_s).gzhead).hcrc {
+            if ((((*__local_s).pending as u64) +% (2 as u64)) > (*__local_s).pending_buf_size) {
                 flush_pending(__param_strm)
 
-                if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+                if ((*__local_s).pending != 0) {
                     ((*__local_s).last_flush = ((-1 as i32)))
 
                     return 0
@@ -812,7 +813,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         flush_pending(__param_strm)
 
-        if ((if (*__local_s).pending != 0: 1 else: 0) != 0) {
+        if ((*__local_s).pending != 0) {
             ((*__local_s).last_flush = ((-1 as i32)))
 
             return 0
@@ -825,39 +826,39 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     var __ci_expr_logic_56: i32
 
-    if ((if (*__param_strm).avail_in != 0: 1 else: 0) != 0) {
+    if ((*__param_strm).avail_in != 0) {
         (__ci_expr_logic_56 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_56 = (if (if (*__local_s).lookahead != 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_56 = (if (*__local_s).lookahead != 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_56 != 0) {
+    if __ci_expr_logic_56 {
         (__ci_expr_logic_58 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_57: i32 = 0
 
-        if ((if __param_flush != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_57 = (if (if (*__local_s).status != 666: 1 else: 0) != 0: 1 else: 0))
+        if (__param_flush != 0) {
+            (__ci_expr_logic_57 = (if (*__local_s).status != 666: 1 else: 0))
         }
 
-        (__ci_expr_logic_58 = (if __ci_expr_logic_57 != 0: 1 else: 0))
+        (__ci_expr_logic_58 = (if __ci_expr_logic_57: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_58 != 0) {
+    if __ci_expr_logic_58 {
         var __local_bstate: i32
 
-        (__local_bstate = (((if (if (*__local_s).level == 0: 1 else: 0) != 0: (deflate_stored(__local_s, __param_flush) as u32) else: ((if (if (*__local_s).strategy == 2: 1 else: 0) != 0: (deflate_huff(__local_s, __param_flush) as u32) else: ((if (if (*__local_s).strategy == 3: 1 else: 0) != 0: (deflate_rle(__local_s, __param_flush) as u32) else: (configuration_table[(*__local_s).level].func.unwrap()(__local_s, __param_flush) as u32)) as u32)) as u32)) as i32)))
+        (__local_bstate = (((if (*__local_s).level == 0: (deflate_stored(__local_s, __param_flush) as u32) else: ((if (*__local_s).strategy == 2: (deflate_huff(__local_s, __param_flush) as u32) else: ((if (*__local_s).strategy == 3: (deflate_rle(__local_s, __param_flush) as u32) else: (configuration_table[(*__local_s).level].func.unwrap()(__local_s, __param_flush) as u32)) as u32)) as u32)) as i32)))
 
         var __ci_expr_logic_59: i32
 
-        if ((if __local_bstate == 2: 1 else: 0) != 0) {
+        if (__local_bstate == 2) {
             (__ci_expr_logic_59 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_59 = (if (if __local_bstate == 3: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_59 = (if __local_bstate == 3: 1 else: 0))
         }
 
-        if (__ci_expr_logic_59 != 0) {
+        if __ci_expr_logic_59 {
             ((*__local_s).status = ((666 as i32)))
 
         }
@@ -865,14 +866,14 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
         var __ci_expr_logic_60: i32
 
-        if ((if __local_bstate == 0: 1 else: 0) != 0) {
+        if (__local_bstate == 0) {
             (__ci_expr_logic_60 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_60 = (if (if __local_bstate == 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_60 = (if __local_bstate == 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_60 != 0) {
-            if ((if (*__param_strm).avail_out == 0: 1 else: 0) != 0) {
+        if __ci_expr_logic_60 {
+            if ((*__param_strm).avail_out == 0) {
                 ((*__local_s).last_flush = ((-1 as i32)))
 
             }
@@ -882,15 +883,15 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
         }
 
 
-        if ((if __local_bstate == 1: 1 else: 0) != 0) {
-            if ((if __param_flush == 1: 1 else: 0) != 0) {
-                _tr_align(__local_s)
+        if (__local_bstate == 1) {
+            if (__param_flush == 1) {
+                (*__local_s)._tr_align()
 
             } else {
-                if ((if __param_flush != 5: 1 else: 0) != 0) {
+                if (__param_flush != 5) {
                     _tr_stored_block(__local_s, null, (0 as u64), (0 as i32))
 
-                    if ((if __param_flush == 3: 1 else: 0) != 0) {
+                    if (__param_flush == 3) {
                         loop {
                             (((*__local_s).head[(((*__local_s).hash_size as u32) -% (1 as u32))]) = ((0 as u16)))
 
@@ -898,12 +899,12 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
                             ((*__local_s).slid = ((0 as i32)))
 
-                            if not ((0 != 0)) {
+                            if not (false) {
                                 break
                             }
                         }
 
-                        if ((if (*__local_s).lookahead == 0: 1 else: 0) != 0) {
+                        if ((*__local_s).lookahead == 0) {
                             ((*__local_s).strstart = ((0 as u32)))
 
                             ((*__local_s).block_start = ((0 as i64)))
@@ -919,7 +920,7 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
             flush_pending(__param_strm)
 
-            if ((if (*__param_strm).avail_out == 0: 1 else: 0) != 0) {
+            if ((*__param_strm).avail_out == 0) {
                 ((*__local_s).last_flush = ((-1 as i32)))
 
                 return 0
@@ -931,15 +932,15 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
     }
 
 
-    if ((if __param_flush != 4: 1 else: 0) != 0) {
+    if (__param_flush != 4) {
         return 0
     }
 
-    if ((if (*__local_s).wrap <= 0: 1 else: 0) != 0) {
+    if ((*__local_s).wrap <= 0) {
         return 1
     }
 
-    if ((if (*__local_s).wrap == 2: 1 else: 0) != 0) {
+    if ((*__local_s).wrap == 2) {
         var __ci_expr_old_61: u64 = (*__local_s).pending
 
         ((*__local_s).pending = ((*__local_s).pending +% 1))
@@ -1021,18 +1022,19 @@ pub unsafe fn deflate(__param_strm: *mut z_stream_s, __param_flush: i32) -> i32 
 
     flush_pending(__param_strm)
 
-    if ((if (*__local_s).wrap > 0: 1 else: 0) != 0) {
+    if ((*__local_s).wrap > 0) {
         ((*__local_s).wrap = (((0 - (*__local_s).wrap) as i32)))
     }
 
-    return (if (if (*__local_s).pending != 0: 1 else: 0) != 0: (0 as i32) else: (1 as i32))
+    return (if (*__local_s).pending != 0: (0 as i32) else: (1 as i32))
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateEnd(__param_strm: *mut z_stream_s) -> i32 {
     var __local_status: i32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
@@ -1066,10 +1068,11 @@ pub unsafe fn deflateEnd(__param_strm: *mut z_stream_s) -> i32 {
 
     ((*__param_strm).state = null)
 
-    return (if (if __local_status == 113: 1 else: 0) != 0: (-3 as i32) else: (0 as i32))
+    return (if __local_status == 113: (-3 as i32) else: (0 as i32))
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictionary: *const u8, __param_dictLength: u32) -> i32 {
     var __local_dictionary = __param_dictionary
     var __local_dictLength = __param_dictLength
@@ -1088,13 +1091,13 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
     var __ci_expr_logic_0: i32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __local_dictionary == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __local_dictionary == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return -2
     }
 
@@ -1107,38 +1110,38 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
     var __ci_expr_logic_2: i32
 
-    if ((if __local_wrap == 2: 1 else: 0) != 0) {
+    if (__local_wrap == 2) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if __local_wrap == 1: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (*__local_s).status != 42: 1 else: 0) != 0: 1 else: 0))
+        if (__local_wrap == 1) {
+            (__ci_expr_logic_1 = (if (*__local_s).status != 42: 1 else: 0))
         }
 
-        (__ci_expr_logic_2 = (if __ci_expr_logic_1 != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if __ci_expr_logic_1: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (*__local_s).lookahead != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if (*__local_s).lookahead: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         return -2
     }
 
 
-    if ((if __local_wrap == 1: 1 else: 0) != 0) {
+    if (__local_wrap == 1) {
         ((*__param_strm).adler = ((adler32((*__param_strm).adler, __local_dictionary, __local_dictLength) as u64)))
     }
 
     ((*__local_s).wrap = ((0 as i32)))
 
-    if ((if __local_dictLength >= (*__local_s).w_size: 1 else: 0) != 0) {
-        if ((if __local_wrap == 0: 1 else: 0) != 0) {
+    if (__local_dictLength >= (*__local_s).w_size) {
+        if (__local_wrap == 0) {
             loop {
                 (((*__local_s).head[(((*__local_s).hash_size as u32) -% (1 as u32))]) = ((0 as u16)))
 
@@ -1146,7 +1149,7 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
                 ((*__local_s).slid = ((0 as i32)))
 
-                if not ((0 != 0)) {
+                if not (false) {
                     break
                 }
             }
@@ -1175,7 +1178,7 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
     fill_window(__local_s)
 
-    while ((if (*__local_s).lookahead >= 3: 1 else: 0) != 0) {
+    while ((*__local_s).lookahead >= 3) {
         (__local_str = (*__local_s).strstart)
 
         (__local_n = (((((*__local_s).lookahead as u32) -% (2 as u32)) as u32)))
@@ -1190,7 +1193,7 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
             (__local_str = (__local_str +% 1))
 
             (__local_n = (__local_n -% 1))
-            if not ((__local_n != 0)) {
+            if not (__local_n) {
                 break
             }
         }
@@ -1228,12 +1231,13 @@ pub unsafe fn deflateSetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:read only,unproved:2:out-parameter a return before the write
 pub unsafe fn deflateGetDictionary(__param_strm: *mut z_stream_s, __param_dictionary: *mut u8, __param_dictLength: *mut u32) -> i32 {
     var __local_s: *mut internal_state
 
     var __local_len: u32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
@@ -1241,22 +1245,22 @@ pub unsafe fn deflateGetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
     (__local_len = (((((*__local_s).strstart as u32) +% ((*__local_s).lookahead as u32)) as u32)))
 
-    if ((if __local_len > (*__local_s).w_size: 1 else: 0) != 0) {
+    if (__local_len > (*__local_s).w_size) {
         (__local_len = (*__local_s).w_size)
     }
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __param_dictionary != 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if __local_len != 0: 1 else: 0))
+    if (__param_dictionary != 0) {
+        (__ci_expr_logic_0 = (if __local_len: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         with_memcpy(((__param_dictionary as *mut c_void) as *mut u8), ((((((*__local_s).window + ((*__local_s).strstart as usize)) + ((*__local_s).lookahead as usize)) - (__local_len as usize)) as *const c_void) as *const u8), ((__local_len as u64) as i64))
     }
 
 
-    if ((if __param_dictLength != 0: 1 else: 0) != 0) {
+    if (__param_dictLength != 0) {
         ((*__param_dictLength) = __local_len)
     }
 
@@ -1264,6 +1268,7 @@ pub unsafe fn deflateGetDictionary(__param_strm: *mut z_stream_s, __param_dictio
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:read only
 pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_stream_s) -> i32 {
     var __local_ds: *mut internal_state
 
@@ -1271,13 +1276,13 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     var __ci_expr_logic_0: i32
 
-    if (deflateStateCheck(__param_source) != 0) {
+    if deflateStateCheck(__param_source) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __param_dest == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __param_dest == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return -2
 
     }
@@ -1289,7 +1294,7 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     (__local_ds = (((*__param_dest).zalloc.unwrap()((*__param_dest).opaque_, (1 as u32), (5968 as u32)) as *mut internal_state)))
 
-    if ((if __local_ds == 0: 1 else: 0) != 0) {
+    if (__local_ds == 0) {
         return -4
     }
 
@@ -1315,25 +1320,25 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     var __ci_expr_logic_1: i32
 
-    if ((if (*__local_ds).window == 0: 1 else: 0) != 0) {
+    if ((*__local_ds).window == 0) {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__local_ds).prev == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__local_ds).prev == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (*__local_ds).head == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (*__local_ds).head == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if (*__local_ds).pending_buf == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if (*__local_ds).pending_buf == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         deflateEnd(__param_dest)
 
         return -4
@@ -1347,13 +1352,13 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
     var __ci_expr_logic_4: i32
 
-    if ((*__local_ss).slid != 0) {
+    if (*__local_ss).slid {
         (__ci_expr_logic_4 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_4 = (if (if (((*__local_ss).strstart as u32) -% ((*__local_ss).insert as u32)) > (*__local_ds).w_size: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_4 = (if (((*__local_ss).strstart as u32) -% ((*__local_ss).insert as u32)) > (*__local_ds).w_size: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         (__ci_expr_ternary_5 = (*__local_ds).w_size)
     } else {
         (__ci_expr_ternary_5 = (((((*__local_ss).strstart as u32) -% ((*__local_ss).insert as u32)) as u32)))
@@ -1382,12 +1387,13 @@ pub unsafe fn deflateCopy(__param_dest: *mut z_stream_s, __param_source: *mut z_
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateReset(__param_strm: *mut z_stream_s) -> i32 {
     var __local_ret: i32
 
     (__local_ret = ((deflateResetKeep(__param_strm) as i32)))
 
-    if ((if __local_ret == 0: 1 else: 0) != 0) {
+    if (__local_ret == 0) {
         lm_init((*__param_strm).state)
     }
 
@@ -1395,19 +1401,20 @@ pub unsafe fn deflateReset(__param_strm: *mut z_stream_s) -> i32 {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, __param_strategy: i32) -> i32 {
     var __local_level = __param_level
     var __local_s: *mut internal_state
 
     var __local_func: Option[unsafe extern "C" fn(*mut internal_state, i32) -> i32]
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
     (__local_s = (*__param_strm).state)
 
-    if ((if __local_level == -1: 1 else: 0) != 0) {
+    if (__local_level == -1) {
         (__local_level = ((6 as i32)))
     }
 
@@ -1417,25 +1424,25 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, _
 
     var __ci_expr_logic_0: i32
 
-    if ((if __local_level < 0: 1 else: 0) != 0) {
+    if (__local_level < 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __local_level > 9: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __local_level > 9: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if __param_strategy < 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if __param_strategy < 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if __param_strategy > 4: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if __param_strategy > 4: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         return -2
 
     }
@@ -1447,32 +1454,32 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, _
 
     var __ci_expr_logic_3: i32
 
-    if ((if __param_strategy != (*__local_s).strategy: 1 else: 0) != 0) {
+    if (__param_strategy != (*__local_s).strategy) {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if __local_func != configuration_table[__local_level].func: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __local_func != configuration_table[__local_level].func: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
-        (__ci_expr_logic_4 = (if (if (*__local_s).last_flush != -2: 1 else: 0) != 0: 1 else: 0))
+    if __ci_expr_logic_3 {
+        (__ci_expr_logic_4 = (if (*__local_s).last_flush != -2: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         var __local_err: i32 = ((deflate(__param_strm, (5 as i32)) as i32))
 
-        if ((if __local_err == -2: 1 else: 0) != 0) {
+        if (__local_err == -2) {
             return __local_err
         }
 
         var __ci_expr_logic_5: i32
 
-        if ((*__param_strm).avail_in != 0) {
+        if (*__param_strm).avail_in {
             (__ci_expr_logic_5 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_5 = (if (((*__local_s).strstart - (*__local_s).block_start) + (*__local_s).lookahead) != 0: 1 else: 0))
+            (__ci_expr_logic_5 = (if ((*__local_s).strstart - (*__local_s).block_start) + (*__local_s).lookahead: 1 else: 0))
         }
 
-        if (__ci_expr_logic_5 != 0) {
+        if __ci_expr_logic_5 {
             return -5
         }
 
@@ -1480,15 +1487,15 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, _
     }
 
 
-    if ((if (*__local_s).level != __local_level: 1 else: 0) != 0) {
+    if ((*__local_s).level != __local_level) {
         var __ci_expr_logic_6: i32 = 0
 
-        if ((if (*__local_s).level == 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if (*__local_s).matches != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_s).level == 0) {
+            (__ci_expr_logic_6 = (if (*__local_s).matches != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
-            if ((if (*__local_s).matches == 1: 1 else: 0) != 0) {
+        if __ci_expr_logic_6 {
+            if ((*__local_s).matches == 1) {
                 slide_hash(__local_s)
             } else {
                 loop {
@@ -1498,7 +1505,7 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, _
 
                     ((*__local_s).slid = ((0 as i32)))
 
-                    if not ((0 != 0)) {
+                    if not (false) {
                         break
                     }
                 }
@@ -1527,10 +1534,11 @@ pub unsafe fn deflateParams(__param_strm: *mut z_stream_s, __param_level: i32, _
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateTune(__param_strm: *mut z_stream_s, __param_good_length: i32, __param_max_lazy: i32, __param_nice_length: i32, __param_max_chain: i32) -> i32 {
     var __local_s: *mut internal_state
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
@@ -1548,13 +1556,15 @@ pub unsafe fn deflateTune(__param_strm: *mut z_stream_s, __param_good_length: i3
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateBound(__param_strm: *mut z_stream_s, __param_sourceLen: u64) -> u64 {
     var __local_bound: u64 = ((deflateBound_z(__param_strm, __param_sourceLen) as u64))
 
-    return (if (if __local_bound != __local_bound: 1 else: 0) != 0: (-1 as u64) else: __local_bound)
+    return (if __local_bound != __local_bound: (-1 as u64) else: __local_bound)
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u64) -> u64 {
     var __local_s: *mut internal_state
 
@@ -1569,46 +1579,46 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
 
     (__local_fixedlen = ((((((((((__param_sourceLen as u64) +% (((__param_sourceLen as u64) >> (3 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (8 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (9 as u32)) as u64)) as u64) +% (4 as u64)) as u64)))
 
-    if ((if __local_fixedlen < __param_sourceLen: 1 else: 0) != 0) {
+    if (__local_fixedlen < __param_sourceLen) {
         (__local_fixedlen = ((-1 as u64)))
     }
 
     (__local_storelen = ((((((((((__param_sourceLen as u64) +% (((__param_sourceLen as u64) >> (5 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (7 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (11 as u32)) as u64)) as u64) +% (7 as u64)) as u64)))
 
-    if ((if __local_storelen < __param_sourceLen: 1 else: 0) != 0) {
+    if (__local_storelen < __param_sourceLen) {
         (__local_storelen = ((-1 as u64)))
     }
 
-    if (deflateStateCheck(__param_strm) != 0) {
-        (__local_bound = (((if (if __local_fixedlen > __local_storelen: 1 else: 0) != 0: __local_fixedlen else: __local_storelen) as u64)))
+    if deflateStateCheck(__param_strm) {
+        (__local_bound = (((if __local_fixedlen > __local_storelen: __local_fixedlen else: __local_storelen) as u64)))
 
-        return (if (if ((__local_bound as u64) +% (18 as u64)) < __local_bound: 1 else: 0) != 0: (-1 as u64) else: (((__local_bound as u64) +% (18 as u64)) as u64))
+        return (if ((__local_bound as u64) +% (18 as u64)) < __local_bound: (-1 as u64) else: (((__local_bound as u64) +% (18 as u64)) as u64))
 
     }
 
     (__local_s = (*__param_strm).state)
 
     while true {
-        match (if (if (*__local_s).wrap < 0: 1 else: 0) != 0: ((0 - (*__local_s).wrap) as i32) else: (*__local_s).wrap) {
+        match (if (*__local_s).wrap < 0: ((0 - (*__local_s).wrap) as i32) else: (*__local_s).wrap) {
             0 => {
                 (__local_wraplen = ((0 as u64)))
             },
             1 => {
-                (__local_wraplen = (((6 + (if (*__local_s).strstart != 0: (4 as i32) else: (0 as i32))) as u64)))
+                (__local_wraplen = (((6 + (if (*__local_s).strstart: (4 as i32) else: (0 as i32))) as u64)))
             },
             2 => {
                 (__local_wraplen = ((18 as u64)))
 
-                if ((if (*__local_s).gzhead != 0: 1 else: 0) != 0) {
+                if ((*__local_s).gzhead != 0) {
                     var __local_str: *mut u8
 
-                    if ((if (*(*__local_s).gzhead).extra != 0: 1 else: 0) != 0) {
+                    if ((*(*__local_s).gzhead).extra != 0) {
                         (__local_wraplen = (__local_wraplen +% ((2 as u32) +% ((*(*__local_s).gzhead).extra_len as u32))))
                     }
 
                     (__local_str = (*(*__local_s).gzhead).name)
 
-                    if ((if __local_str != 0: 1 else: 0) != 0) {
+                    if (__local_str != 0) {
                         loop {
                             (__local_wraplen = (__local_wraplen +% 1))
 
@@ -1616,7 +1626,7 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
 
                             (__local_str = __local_str + 1)
 
-                            if not (((*__ci_expr_old_0) != 0)) {
+                            if not ((*__ci_expr_old_0)) {
                                 break
                             }
                         }
@@ -1624,7 +1634,7 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
 
                     (__local_str = (*(*__local_s).gzhead).comment)
 
-                    if ((if __local_str != 0: 1 else: 0) != 0) {
+                    if (__local_str != 0) {
                         loop {
                             (__local_wraplen = (__local_wraplen +% 1))
 
@@ -1632,13 +1642,13 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
 
                             (__local_str = __local_str + 1)
 
-                            if not (((*__ci_expr_old_1) != 0)) {
+                            if not ((*__ci_expr_old_1)) {
                                 break
                             }
                         }
                     }
 
-                    if ((*(*__local_s).gzhead).hcrc != 0) {
+                    if (*(*__local_s).gzhead).hcrc {
                         (__local_wraplen = (__local_wraplen +% 2))
                     }
 
@@ -1656,22 +1666,22 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
 
     var __ci_expr_logic_3: i32
 
-    if ((if (*__local_s).w_bits != 15: 1 else: 0) != 0) {
+    if ((*__local_s).w_bits != 15) {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if (*__local_s).hash_bits != 15: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if (*__local_s).hash_bits != 15: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         var __ci_expr_ternary_5: u64 = 0
 
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if (*__local_s).w_bits <= (*__local_s).hash_bits: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (*__local_s).level != 0: 1 else: 0))
+        if ((*__local_s).w_bits <= (*__local_s).hash_bits) {
+            (__ci_expr_logic_4 = (if (*__local_s).level: 1 else: 0))
         }
 
-        if (__ci_expr_logic_4 != 0) {
+        if __ci_expr_logic_4 {
             (__ci_expr_ternary_5 = __local_fixedlen)
         } else {
             (__ci_expr_ternary_5 = __local_storelen)
@@ -1680,30 +1690,31 @@ pub unsafe fn deflateBound_z(__param_strm: *mut z_stream_s, __param_sourceLen: u
         (__local_bound = __ci_expr_ternary_5)
 
 
-        return (if (if ((__local_bound as u64) +% (__local_wraplen as u64)) < __local_bound: 1 else: 0) != 0: (-1 as u64) else: (((__local_bound as u64) +% (__local_wraplen as u64)) as u64))
+        return (if ((__local_bound as u64) +% (__local_wraplen as u64)) < __local_bound: (-1 as u64) else: (((__local_bound as u64) +% (__local_wraplen as u64)) as u64))
 
     }
 
 
     (__local_bound = ((((((((((((((__param_sourceLen as u64) +% (((__param_sourceLen as u64) >> (12 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (14 as u32)) as u64)) as u64) +% (((__param_sourceLen as u64) >> (25 as u32)) as u64)) as u64) +% (13 as u64)) as u64) -% (6 as u64)) as u64) +% (__local_wraplen as u64)) as u64)))
 
-    return (if (if __local_bound < __param_sourceLen: 1 else: 0) != 0: (-1 as u64) else: __local_bound)
+    return (if __local_bound < __param_sourceLen: (-1 as u64) else: __local_bound)
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write,unproved:2:out-parameter a return before the write
 pub unsafe fn deflatePending(__param_strm: *mut z_stream_s, __param_pending: *mut u32, __param_bits: *mut i32) -> i32 {
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
-    if ((if __param_bits != 0: 1 else: 0) != 0) {
+    if (__param_bits != 0) {
         ((*__param_bits) = (*(*__param_strm).state).bi_valid)
     }
 
-    if ((if __param_pending != 0: 1 else: 0) != 0) {
+    if (__param_pending != 0) {
         ((*__param_pending) = (((*(*__param_strm).state).pending as u32)))
 
-        if ((if (*__param_pending) != (*(*__param_strm).state).pending: 1 else: 0) != 0) {
+        if ((*__param_pending) != (*(*__param_strm).state).pending) {
             ((*__param_pending) = ((-1 as u32)))
 
             return -5
@@ -1716,12 +1727,13 @@ pub unsafe fn deflatePending(__param_strm: *mut z_stream_s, __param_pending: *mu
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:1:out-parameter a return before the write
 pub unsafe fn deflateUsed(__param_strm: *mut z_stream_s, __param_bits: *mut i32) -> i32 {
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
-    if ((if __param_bits != 0: 1 else: 0) != 0) {
+    if (__param_bits != 0) {
         ((*__param_bits) = (*(*__param_strm).state).bi_used)
     }
 
@@ -1729,6 +1741,7 @@ pub unsafe fn deflateUsed(__param_strm: *mut z_stream_s, __param_bits: *mut i32)
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __param_value: i32) -> i32 {
     var __local_bits = __param_bits
     var __local_value = __param_value
@@ -1736,7 +1749,7 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __p
 
     var __local_put: i32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
     }
 
@@ -1746,19 +1759,19 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __p
 
     var __ci_expr_logic_0: i32
 
-    if ((if __local_bits < 0: 1 else: 0) != 0) {
+    if (__local_bits < 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if __local_bits > 16: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if __local_bits > 16: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__local_s).sym_buf < ((*__local_s).pending_out + (((((16 + 7) as i32) >> (3 as u32)) as isize) as usize)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__local_s).sym_buf < ((*__local_s).pending_out + (((((16 + 7) as i32) >> (3 as u32)) as isize) as usize)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return -5
     }
 
@@ -1766,7 +1779,7 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __p
     loop {
         (__local_put = (((16 - (*__local_s).bi_valid) as i32)))
 
-        if ((if __local_put > __local_bits: 1 else: 0) != 0) {
+        if (__local_put > __local_bits) {
             (__local_put = __local_bits)
         }
 
@@ -1774,13 +1787,13 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __p
 
         ((*__local_s).bi_valid = (*__local_s).bi_valid + __local_put)
 
-        _tr_flush_bits(__local_s)
+        (*__local_s)._tr_flush_bits()
 
         (__local_value = __local_value >> (__local_put as u32))
 
         (__local_bits = __local_bits - __local_put)
 
-        if not ((__local_bits != 0)) {
+        if not (__local_bits) {
             break
         }
     }
@@ -1789,16 +1802,17 @@ pub unsafe fn deflatePrime(__param_strm: *mut z_stream_s, __param_bits: i32, __p
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn deflateSetHeader(__param_strm: *mut z_stream_s, __param_head: *mut gz_header_s) -> i32 {
     var __ci_expr_logic_0: i32
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*(*__param_strm).state).wrap != 2: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*(*__param_strm).state).wrap != 2: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         return -2
     }
 
@@ -1809,11 +1823,13 @@ pub unsafe fn deflateSetHeader(__param_strm: *mut z_stream_s, __param_head: *mut
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:2:read only
 pub unsafe fn deflateInit_(__param_strm: *mut z_stream_s, __param_level: i32, __param_version: *const c_char, __param_stream_size: i32) -> i32 {
     return deflateInit2_(__param_strm, __param_level, (8 as i32), (15 as i32), (8 as i32), (0 as i32), __param_version, __param_stream_size)
 
 }
 
+// contract: unproved:0:NULL is an accepted argument,unproved:6:read only
 pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: i32, __param_method: i32, __param_windowBits: i32, __param_memLevel: i32, __param_strategy: i32, __param_version: *const c_char, __param_stream_size: i32) -> i32 {
     var __local_level = __param_level
     var __local_windowBits = __param_windowBits
@@ -1827,56 +1843,56 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: i32, _
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_version == 0: 1 else: 0) != 0) {
+    if (__param_version == 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (__param_version[0]) != 49: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (__param_version[0]) != 49: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if ((__param_stream_size as u64)) != (sizeof[z_stream_s]() as usize): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if ((__param_stream_size as u64)) != (sizeof[z_stream_s]() as usize): 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return -6
 
     }
 
 
-    if ((if __param_strm == 0: 1 else: 0) != 0) {
+    if (__param_strm == 0) {
         return -2
     }
 
     ((*__param_strm).msg = null)
 
-    if ((if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void)): 1 else: 0) != 0) {
+    if ((*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void))) {
         ((*__param_strm).zalloc = Some(zcalloc))
 
         ((*__param_strm).opaque_ = null)
 
     }
 
-    if ((if (*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)): 1 else: 0) != 0) {
+    if ((*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit))) {
         ((*__param_strm).zfree = Some(zcfree))
     }
 
-    if ((if __local_level == -1: 1 else: 0) != 0) {
+    if (__local_level == -1) {
         (__local_level = ((6 as i32)))
     }
 
-    if ((if __local_windowBits < 0: 1 else: 0) != 0) {
+    if (__local_windowBits < 0) {
         (__local_wrap = ((0 as i32)))
 
-        if ((if __local_windowBits < -15: 1 else: 0) != 0) {
+        if (__local_windowBits < -15) {
             return -2
         }
 
         (__local_windowBits = (((0 - __local_windowBits) as i32)))
 
     } else {
-        if ((if __local_windowBits > 15: 1 else: 0) != 0) {
+        if (__local_windowBits > 15) {
             (__local_wrap = ((2 as i32)))
 
             (__local_windowBits = __local_windowBits - 16)
@@ -1902,80 +1918,80 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: i32, _
 
     var __ci_expr_logic_2: i32
 
-    if ((if __param_memLevel < 1: 1 else: 0) != 0) {
+    if (__param_memLevel < 1) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if __param_memLevel > 9: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if __param_memLevel > 9: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_3 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_3 = (if (if __param_method != 8: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __param_method != 8: 1 else: 0))
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         (__ci_expr_logic_4 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_4 = (if (if __local_windowBits < 8: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_4 = (if __local_windowBits < 8: 1 else: 0))
     }
 
-    if (__ci_expr_logic_4 != 0) {
+    if __ci_expr_logic_4 {
         (__ci_expr_logic_5 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_5 = (if (if __local_windowBits > 15: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_5 = (if __local_windowBits > 15: 1 else: 0))
     }
 
-    if (__ci_expr_logic_5 != 0) {
+    if __ci_expr_logic_5 {
         (__ci_expr_logic_6 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_6 = (if (if __local_level < 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_6 = (if __local_level < 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_6 != 0) {
+    if __ci_expr_logic_6 {
         (__ci_expr_logic_7 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_7 = (if (if __local_level > 9: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_7 = (if __local_level > 9: 1 else: 0))
     }
 
-    if (__ci_expr_logic_7 != 0) {
+    if __ci_expr_logic_7 {
         (__ci_expr_logic_8 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_8 = (if (if __param_strategy < 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_8 = (if __param_strategy < 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_8 != 0) {
+    if __ci_expr_logic_8 {
         (__ci_expr_logic_9 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_9 = (if (if __param_strategy > 4: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_9 = (if __param_strategy > 4: 1 else: 0))
     }
 
-    if (__ci_expr_logic_9 != 0) {
+    if __ci_expr_logic_9 {
         (__ci_expr_logic_11 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_10: i32 = 0
 
-        if ((if __local_windowBits == 8: 1 else: 0) != 0) {
-            (__ci_expr_logic_10 = (if (if __local_wrap != 1: 1 else: 0) != 0: 1 else: 0))
+        if (__local_windowBits == 8) {
+            (__ci_expr_logic_10 = (if __local_wrap != 1: 1 else: 0))
         }
 
-        (__ci_expr_logic_11 = (if __ci_expr_logic_10 != 0: 1 else: 0))
+        (__ci_expr_logic_11 = (if __ci_expr_logic_10: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_11 != 0) {
+    if __ci_expr_logic_11 {
         return -2
 
     }
 
 
-    if ((if __local_windowBits == 8: 1 else: 0) != 0) {
+    if (__local_windowBits == 8) {
         (__local_windowBits = ((9 as i32)))
     }
 
     (__local_s = (((*__param_strm).zalloc.unwrap()((*__param_strm).opaque_, (1 as u32), (5968 as u32)) as *mut internal_state)))
 
-    if ((if __local_s == 0: 1 else: 0) != 0) {
+    if (__local_s == 0) {
         return -4
     }
 
@@ -2025,38 +2041,38 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: i32, _
 
     var __ci_expr_logic_12: i32
 
-    if ((if (*__local_s).window == 0: 1 else: 0) != 0) {
+    if ((*__local_s).window == 0) {
         (__ci_expr_logic_12 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_12 = (if (if (*__local_s).prev == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_12 = (if (*__local_s).prev == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_12 != 0) {
+    if __ci_expr_logic_12 {
         (__ci_expr_logic_13 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_13 = (if (if (*__local_s).head == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_13 = (if (*__local_s).head == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_13 != 0) {
+    if __ci_expr_logic_13 {
         (__ci_expr_logic_14 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_14 = (if (if (*__local_s).pending_buf == 0: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_14 = (if (*__local_s).pending_buf == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_14 != 0) {
+    if __ci_expr_logic_14 {
         ((*__local_s).status = ((666 as i32)))
 
         var __ci_expr_ternary_16: i32 = 0
 
         var __ci_expr_logic_15: i32
 
-        if ((if -4 < -6: 1 else: 0) != 0) {
+        if (-4 < -6) {
             (__ci_expr_logic_15 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_15 = (if (if -4 > 2: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_15 = (if -4 > 2: 1 else: 0))
         }
 
-        if (__ci_expr_logic_15 != 0) {
+        if __ci_expr_logic_15 {
             (__ci_expr_ternary_16 = ((9 as i32)))
         } else {
             (__ci_expr_ternary_16 = (((2 - -4) as i32)))
@@ -2086,10 +2102,11 @@ pub unsafe fn deflateInit2_(__param_strm: *mut z_stream_s, __param_level: i32, _
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn deflateResetKeep(__param_strm: *mut z_stream_s) -> i32 {
     var __local_s: *mut internal_state
 
-    if (deflateStateCheck(__param_strm) != 0) {
+    if deflateStateCheck(__param_strm) {
         return -2
 
     }
@@ -2109,25 +2126,25 @@ pub unsafe fn deflateResetKeep(__param_strm: *mut z_stream_s) -> i32 {
 
     ((*__local_s).pending_out = (*__local_s).pending_buf)
 
-    if ((if (*__local_s).wrap < 0: 1 else: 0) != 0) {
+    if ((*__local_s).wrap < 0) {
         ((*__local_s).wrap = (((0 - (*__local_s).wrap) as i32)))
 
     }
 
-    ((*__local_s).status = (((if (if (*__local_s).wrap == 2: 1 else: 0) != 0: (57 as i32) else: (42 as i32)) as i32)))
+    ((*__local_s).status = (((if (*__local_s).wrap == 2: (57 as i32) else: (42 as i32)) as i32)))
 
-    ((*__param_strm).adler = (((if (if (*__local_s).wrap == 2: 1 else: 0) != 0: (crc32((0 as u64), null, (0 as u32)) as u64) else: (adler32((0 as u64), null, (0 as u32)) as u64)) as u64)))
+    ((*__param_strm).adler = (((if (*__local_s).wrap == 2: (crc32((0 as u64), null, (0 as u32)) as u64) else: (adler32((0 as u64), null, (0 as u32)) as u64)) as u64)))
 
     ((*__local_s).last_flush = ((-2 as i32)))
 
-    _tr_init(__local_s)
+    (*__local_s)._tr_init()
 
     return 0
 
 }
 
 unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> i32 {
-    var __local_min_block: u32 = (((if (if (((*__param_s).pending_buf_size as u64) -% (5 as u64)) > (*__param_s).w_size: 1 else: 0) != 0: ((*__param_s).w_size as u64) else: ((((*__param_s).pending_buf_size as u64) -% (5 as u64)) as u64)) as u32))
+    var __local_min_block: u32 = (((if (((*__param_s).pending_buf_size as u64) -% (5 as u64)) > (*__param_s).w_size: ((*__param_s).w_size as u64) else: ((((*__param_s).pending_buf_size as u64) -% (5 as u64)) as u64)) as u32))
 
     var __local_last: i32 = ((0 as i32))
 
@@ -2145,7 +2162,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         (__local_have = (((((((*__param_s).bi_valid as u32) +% (42 as u32)) as u32) >> (3 as u32)) as u32)))
 
-        if ((if (*(*__param_s).strm).avail_out < __local_have: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out < __local_have) {
             break
         }
 
@@ -2153,44 +2170,44 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         (__local_left = ((((*__param_s).strstart - (*__param_s).block_start) as u32)))
 
-        if ((if __local_len > ((__local_left as u64) +% ((*(*__param_s).strm).avail_in as u64)): 1 else: 0) != 0) {
+        if (__local_len > ((__local_left as u64) +% ((*(*__param_s).strm).avail_in as u64))) {
             (__local_len = ((((__local_left as u32) +% ((*(*__param_s).strm).avail_in as u32)) as u32)))
         }
 
-        if ((if __local_len > __local_have: 1 else: 0) != 0) {
+        if (__local_len > __local_have) {
             (__local_len = __local_have)
         }
 
         var __ci_expr_logic_3: i32 = 0
 
-        if ((if __local_len < __local_min_block: 1 else: 0) != 0) {
+        if (__local_len < __local_min_block) {
             var __ci_expr_logic_2: i32
 
             var __ci_expr_logic_1: i32
 
             var __ci_expr_logic_0: i32 = 0
 
-            if ((if __local_len == 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if __param_flush != 4: 1 else: 0) != 0: 1 else: 0))
+            if (__local_len == 0) {
+                (__ci_expr_logic_0 = (if __param_flush != 4: 1 else: 0))
             }
 
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 (__ci_expr_logic_1 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_1 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_1 = (if __param_flush == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_1 != 0) {
+            if __ci_expr_logic_1 {
                 (__ci_expr_logic_2 = (if true: 1 else: 0))
             } else {
-                (__ci_expr_logic_2 = (if (if __local_len != ((__local_left as u32) +% ((*(*__param_s).strm).avail_in as u32)): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_2 = (if __local_len != ((__local_left as u32) +% ((*(*__param_s).strm).avail_in as u32)): 1 else: 0))
             }
 
-            (__ci_expr_logic_3 = (if __ci_expr_logic_2 != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if __ci_expr_logic_2: 1 else: 0))
 
         }
 
-        if (__ci_expr_logic_3 != 0) {
+        if __ci_expr_logic_3 {
             break
         }
 
@@ -2199,11 +2216,11 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         var __ci_expr_logic_4: i32 = 0
 
-        if ((if __param_flush == 4: 1 else: 0) != 0) {
-            (__ci_expr_logic_4 = (if (if __local_len == ((__local_left as u32) +% ((*(*__param_s).strm).avail_in as u32)): 1 else: 0) != 0: 1 else: 0))
+        if (__param_flush == 4) {
+            (__ci_expr_logic_4 = (if __local_len == ((__local_left as u32) +% ((*(*__param_s).strm).avail_in as u32)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_4 != 0) {
+        if __ci_expr_logic_4 {
             (__ci_expr_ternary_5 = ((1 as i32)))
         } else {
             (__ci_expr_ternary_5 = ((0 as i32)))
@@ -2224,8 +2241,8 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         flush_pending((*__param_s).strm)
 
-        if (__local_left != 0) {
-            if ((if __local_left > __local_len: 1 else: 0) != 0) {
+        if __local_left {
+            if (__local_left > __local_len) {
                 (__local_left = __local_len)
             }
 
@@ -2243,7 +2260,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         }
 
-        if (__local_len != 0) {
+        if __local_len {
             read_buf((*__param_s).strm, (*(*__param_s).strm).next_out, __local_len)
 
             ((*(*__param_s).strm).next_out = (*(*__param_s).strm).next_out + (__local_len as usize))
@@ -2254,15 +2271,15 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         }
 
-        if not (((if __local_last == 0: 1 else: 0) != 0)) {
+        if not ((__local_last == 0)) {
             break
         }
     }
 
     (__local_used = (__local_used -% (*(*__param_s).strm).avail_in))
 
-    if (__local_used != 0) {
-        if ((if __local_used >= (*__param_s).w_size: 1 else: 0) != 0) {
+    if __local_used {
+        if (__local_used >= (*__param_s).w_size) {
             ((*__param_s).matches = ((2 as u32)))
 
             with_memcpy((((*__param_s).window as *mut c_void) as *mut u8), ((((*(*__param_s).strm).next_in - ((*__param_s).w_size as usize)) as *const c_void) as *const u8), (((*__param_s).w_size as u64) as i64))
@@ -2272,16 +2289,16 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
             ((*__param_s).insert = (*__param_s).strstart)
 
         } else {
-            if ((if (((*__param_s).window_size as u64) -% ((*__param_s).strstart as u64)) <= __local_used: 1 else: 0) != 0) {
+            if ((((*__param_s).window_size as u64) -% ((*__param_s).strstart as u64)) <= __local_used) {
                 ((*__param_s).strstart = ((*__param_s).strstart -% (*__param_s).w_size))
 
                 with_memcpy((((*__param_s).window as *mut c_void) as *mut u8), ((((*__param_s).window + ((*__param_s).w_size as usize)) as *const c_void) as *const u8), (((*__param_s).strstart as u64) as i64))
 
-                if ((if (*__param_s).matches < 2: 1 else: 0) != 0) {
+                if ((*__param_s).matches < 2) {
                     ((*__param_s).matches = ((*__param_s).matches +% 1))
                 }
 
-                if ((if (*__param_s).insert > (*__param_s).strstart: 1 else: 0) != 0) {
+                if ((*__param_s).insert > (*__param_s).strstart) {
                     ((*__param_s).insert = (*__param_s).strstart)
                 }
 
@@ -2291,7 +2308,7 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
             ((*__param_s).strstart = ((*__param_s).strstart +% __local_used))
 
-            ((*__param_s).insert = ((*__param_s).insert +% (if (if __local_used > (((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)): 1 else: 0) != 0: ((((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)) as u32) else: __local_used)))
+            ((*__param_s).insert = ((*__param_s).insert +% (if __local_used > (((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)): ((((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)) as u32) else: __local_used)))
 
         }
 
@@ -2299,11 +2316,11 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
     }
 
-    if ((if (*__param_s).high_water < (*__param_s).strstart: 1 else: 0) != 0) {
+    if ((*__param_s).high_water < (*__param_s).strstart) {
         ((*__param_s).high_water = (((*__param_s).strstart as u64)))
     }
 
-    if (__local_last != 0) {
+    if __local_last {
         ((*__param_s).bi_used = ((8 as i32)))
 
         return 3
@@ -2316,19 +2333,19 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
     var __ci_expr_logic_6: i32 = 0
 
-    if ((if __param_flush != 0: 1 else: 0) != 0) {
-        (__ci_expr_logic_6 = (if (if __param_flush != 4: 1 else: 0) != 0: 1 else: 0))
+    if (__param_flush != 0) {
+        (__ci_expr_logic_6 = (if __param_flush != 4: 1 else: 0))
     }
 
-    if (__ci_expr_logic_6 != 0) {
-        (__ci_expr_logic_7 = (if (if (*(*__param_s).strm).avail_in == 0: 1 else: 0) != 0: 1 else: 0))
+    if __ci_expr_logic_6 {
+        (__ci_expr_logic_7 = (if (*(*__param_s).strm).avail_in == 0: 1 else: 0))
     }
 
-    if (__ci_expr_logic_7 != 0) {
-        (__ci_expr_logic_8 = (if (if (((*__param_s).strstart as i64)) == (*__param_s).block_start: 1 else: 0) != 0: 1 else: 0))
+    if __ci_expr_logic_7 {
+        (__ci_expr_logic_8 = (if (((*__param_s).strstart as i64)) == (*__param_s).block_start: 1 else: 0))
     }
 
-    if (__ci_expr_logic_8 != 0) {
+    if __ci_expr_logic_8 {
         return 1
     }
 
@@ -2337,58 +2354,58 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
     var __ci_expr_logic_9: i32 = 0
 
-    if ((if (*(*__param_s).strm).avail_in > __local_have: 1 else: 0) != 0) {
-        (__ci_expr_logic_9 = (if (if (*__param_s).block_start >= (((*__param_s).w_size as i64)): 1 else: 0) != 0: 1 else: 0))
+    if ((*(*__param_s).strm).avail_in > __local_have) {
+        (__ci_expr_logic_9 = (if (*__param_s).block_start >= (((*__param_s).w_size as i64)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_9 != 0) {
+    if __ci_expr_logic_9 {
         ((*__param_s).block_start = (*__param_s).block_start - (*__param_s).w_size)
 
         ((*__param_s).strstart = ((*__param_s).strstart -% (*__param_s).w_size))
 
         with_memcpy((((*__param_s).window as *mut c_void) as *mut u8), ((((*__param_s).window + ((*__param_s).w_size as usize)) as *const c_void) as *const u8), (((*__param_s).strstart as u64) as i64))
 
-        if ((if (*__param_s).matches < 2: 1 else: 0) != 0) {
+        if ((*__param_s).matches < 2) {
             ((*__param_s).matches = ((*__param_s).matches +% 1))
         }
 
         (__local_have = (__local_have +% (*__param_s).w_size))
 
-        if ((if (*__param_s).insert > (*__param_s).strstart: 1 else: 0) != 0) {
+        if ((*__param_s).insert > (*__param_s).strstart) {
             ((*__param_s).insert = (*__param_s).strstart)
         }
 
     }
 
 
-    if ((if __local_have > (*(*__param_s).strm).avail_in: 1 else: 0) != 0) {
+    if (__local_have > (*(*__param_s).strm).avail_in) {
         (__local_have = (*(*__param_s).strm).avail_in)
     }
 
-    if (__local_have != 0) {
+    if __local_have {
         read_buf((*__param_s).strm, ((*__param_s).window + ((*__param_s).strstart as usize)), __local_have)
 
         ((*__param_s).strstart = ((*__param_s).strstart +% __local_have))
 
-        ((*__param_s).insert = ((*__param_s).insert +% (if (if __local_have > (((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)): 1 else: 0) != 0: ((((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)) as u32) else: __local_have)))
+        ((*__param_s).insert = ((*__param_s).insert +% (if __local_have > (((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)): ((((*__param_s).w_size as u32) -% ((*__param_s).insert as u32)) as u32) else: __local_have)))
 
     }
 
-    if ((if (*__param_s).high_water < (*__param_s).strstart: 1 else: 0) != 0) {
+    if ((*__param_s).high_water < (*__param_s).strstart) {
         ((*__param_s).high_water = (((*__param_s).strstart as u64)))
     }
 
     (__local_have = (((((((*__param_s).bi_valid as u32) +% (42 as u32)) as u32) >> (3 as u32)) as u32)))
 
-    (__local_have = (((if (if (((*__param_s).pending_buf_size as u64) -% (__local_have as u64)) > 65535: 1 else: 0) != 0: (65535 as u64) else: ((((*__param_s).pending_buf_size as u64) -% (__local_have as u64)) as u64)) as u32)))
+    (__local_have = (((if (((*__param_s).pending_buf_size as u64) -% (__local_have as u64)) > 65535: (65535 as u64) else: ((((*__param_s).pending_buf_size as u64) -% (__local_have as u64)) as u64)) as u32)))
 
-    (__local_min_block = (((if (if __local_have > (*__param_s).w_size: 1 else: 0) != 0: (*__param_s).w_size else: __local_have) as u32)))
+    (__local_min_block = (((if __local_have > (*__param_s).w_size: (*__param_s).w_size else: __local_have) as u32)))
 
     (__local_left = ((((*__param_s).strstart - (*__param_s).block_start) as u32)))
 
     var __ci_expr_logic_14: i32
 
-    if ((if __local_left >= __local_min_block: 1 else: 0) != 0) {
+    if (__local_left >= __local_min_block) {
         (__ci_expr_logic_14 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_13: i32 = 0
@@ -2399,30 +2416,30 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         var __ci_expr_logic_10: i32
 
-        if (__local_left != 0) {
+        if __local_left {
             (__ci_expr_logic_10 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_10 = (if (if __param_flush == 4: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_10 = (if __param_flush == 4: 1 else: 0))
         }
 
-        if (__ci_expr_logic_10 != 0) {
-            (__ci_expr_logic_11 = (if (if __param_flush != 0: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_10 {
+            (__ci_expr_logic_11 = (if __param_flush != 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_11 != 0) {
-            (__ci_expr_logic_12 = (if (if (*(*__param_s).strm).avail_in == 0: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_11 {
+            (__ci_expr_logic_12 = (if (*(*__param_s).strm).avail_in == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_12 != 0) {
-            (__ci_expr_logic_13 = (if (if __local_left <= __local_have: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_12 {
+            (__ci_expr_logic_13 = (if __local_left <= __local_have: 1 else: 0))
         }
 
-        (__ci_expr_logic_14 = (if __ci_expr_logic_13 != 0: 1 else: 0))
+        (__ci_expr_logic_14 = (if __ci_expr_logic_13: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_14 != 0) {
-        (__local_len = (((if (if __local_left > __local_have: 1 else: 0) != 0: __local_have else: __local_left) as u32)))
+    if __ci_expr_logic_14 {
+        (__local_len = (((if __local_left > __local_have: __local_have else: __local_left) as u32)))
 
         var __ci_expr_ternary_17: i32 = 0
 
@@ -2430,15 +2447,15 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
 
         var __ci_expr_logic_15: i32 = 0
 
-        if ((if __param_flush == 4: 1 else: 0) != 0) {
-            (__ci_expr_logic_15 = (if (if (*(*__param_s).strm).avail_in == 0: 1 else: 0) != 0: 1 else: 0))
+        if (__param_flush == 4) {
+            (__ci_expr_logic_15 = (if (*(*__param_s).strm).avail_in == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_15 != 0) {
-            (__ci_expr_logic_16 = (if (if __local_len == __local_left: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_15 {
+            (__ci_expr_logic_16 = (if __local_len == __local_left: 1 else: 0))
         }
 
-        if (__ci_expr_logic_16 != 0) {
+        if __ci_expr_logic_16 {
             (__ci_expr_ternary_17 = ((1 as i32)))
         } else {
             (__ci_expr_ternary_17 = ((0 as i32)))
@@ -2456,11 +2473,11 @@ unsafe fn deflate_stored(__param_s: *mut internal_state, __param_flush: i32) -> 
     }
 
 
-    if (__local_last != 0) {
+    if __local_last {
         ((*__param_s).bi_used = ((8 as i32)))
     }
 
-    return (if __local_last != 0: finish_started else: need_more)
+    return (if __local_last: finish_started else: need_more)
 
 }
 
@@ -2470,22 +2487,22 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
     var __local_bflush: i32
 
     while true {
-        if ((if (*__param_s).lookahead < 262: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead < 262) {
             fill_window(__param_s)
 
             var __ci_expr_logic_0: i32 = 0
 
-            if ((if (*__param_s).lookahead < 262: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
+            if ((*__param_s).lookahead < 262) {
+                (__ci_expr_logic_0 = (if __param_flush == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 return 0
 
             }
 
 
-            if ((if (*__param_s).lookahead == 0: 1 else: 0) != 0) {
+            if ((*__param_s).lookahead == 0) {
                 break
             }
 
@@ -2493,7 +2510,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         (__local_hash_head = ((0 as u32)))
 
-        if ((if (*__param_s).lookahead >= 3: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead >= 3) {
             ((*__param_s).ins_h = (((((((((*__param_s).ins_h as u32) << ((*__param_s).hash_shift as u32)) as u32) ^ ((((*__param_s).window[(((*__param_s).strstart as u32) +% (2 as u32))]) as i32) as u32)) as u32) & ((*__param_s).hash_mask as u32)) as u32)))
 
             (((*__param_s).prev[(((*__param_s).strstart as u32) & ((*__param_s).w_mask as u32))]) = ((((*__param_s).head[(*__param_s).ins_h]) as u16)))
@@ -2507,17 +2524,17 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if __local_hash_head != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (((*__param_s).strstart as u32) -% (__local_hash_head as u32)) <= (((*__param_s).w_size as u32) -% (262 as u32)): 1 else: 0) != 0: 1 else: 0))
+        if (__local_hash_head != 0) {
+            (__ci_expr_logic_1 = (if (((*__param_s).strstart as u32) -% (__local_hash_head as u32)) <= (((*__param_s).w_size as u32) -% (262 as u32)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             ((*__param_s).match_length = ((longest_match(__param_s, __local_hash_head) as u32)))
 
         }
 
 
-        if ((if (*__param_s).match_length >= 3: 1 else: 0) != 0) {
+        if ((*__param_s).match_length >= 3) {
 
             var __local_len: u8 = (((((*__param_s).match_length as u32) -% (3 as u32)) as u8))
 
@@ -2548,7 +2565,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
             ((*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
 
-            ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
+            ((*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
 
             (__local_bflush = (((if (*__param_s).sym_next == (*__param_s).sym_end: 1 else: 0) as i32)))
 
@@ -2558,11 +2575,11 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
             var __ci_expr_logic_5: i32 = 0
 
-            if ((if (*__param_s).match_length <= (*__param_s).max_lazy_match: 1 else: 0) != 0) {
-                (__ci_expr_logic_5 = (if (if (*__param_s).lookahead >= 3: 1 else: 0) != 0: 1 else: 0))
+            if ((*__param_s).match_length <= (*__param_s).max_lazy_match) {
+                (__ci_expr_logic_5 = (if (*__param_s).lookahead >= 3: 1 else: 0))
             }
 
-            if (__ci_expr_logic_5 != 0) {
+            if __ci_expr_logic_5 {
                 ((*__param_s).match_length = ((*__param_s).match_length -% 1))
 
                 loop {
@@ -2578,7 +2595,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
                     ((*__param_s).match_length = ((*__param_s).match_length -% 1))
-                    if not (((if (*__param_s).match_length != 0: 1 else: 0) != 0)) {
+                    if not (((*__param_s).match_length != 0)) {
                         break
                     }
                 }
@@ -2634,8 +2651,8 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         }
 
-        if (__local_bflush != 0) {
-            _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+        if __local_bflush {
+            _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
             ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2644,7 +2661,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-            if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+            if ((*(*__param_s).strm).avail_out == 0) {
                 return 0
             }
 
@@ -2653,10 +2670,10 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     }
 
-    ((*__param_s).insert = (((if (if (*__param_s).strstart < 2: 1 else: 0) != 0: (*__param_s).strstart else: (2 as u32)) as u32)))
+    ((*__param_s).insert = (((if (*__param_s).strstart < 2: (*__param_s).strstart else: (2 as u32)) as u32)))
 
-    if ((if __param_flush == 4: 1 else: 0) != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
+    if (__param_flush == 4) {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2665,7 +2682,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 2
         }
 
@@ -2675,8 +2692,8 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     }
 
-    if ((*__param_s).sym_next != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+    if (*__param_s).sym_next {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2685,7 +2702,7 @@ unsafe fn deflate_fast(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 0
         }
 
@@ -2702,22 +2719,22 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
     var __local_bflush: i32
 
     while true {
-        if ((if (*__param_s).lookahead < 262: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead < 262) {
             fill_window(__param_s)
 
             var __ci_expr_logic_0: i32 = 0
 
-            if ((if (*__param_s).lookahead < 262: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
+            if ((*__param_s).lookahead < 262) {
+                (__ci_expr_logic_0 = (if __param_flush == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 return 0
 
             }
 
 
-            if ((if (*__param_s).lookahead == 0: 1 else: 0) != 0) {
+            if ((*__param_s).lookahead == 0) {
                 break
             }
 
@@ -2725,7 +2742,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         (__local_hash_head = ((0 as u32)))
 
-        if ((if (*__param_s).lookahead >= 3: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead >= 3) {
             ((*__param_s).ins_h = (((((((((*__param_s).ins_h as u32) << ((*__param_s).hash_shift as u32)) as u32) ^ ((((*__param_s).window[(((*__param_s).strstart as u32) +% (2 as u32))]) as i32) as u32)) as u32) & ((*__param_s).hash_mask as u32)) as u32)))
 
             (((*__param_s).prev[(((*__param_s).strstart as u32) & ((*__param_s).w_mask as u32))]) = ((((*__param_s).head[(*__param_s).ins_h]) as u16)))
@@ -2748,40 +2765,40 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if __local_hash_head != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (*__param_s).prev_length < (*__param_s).max_lazy_match: 1 else: 0) != 0: 1 else: 0))
+        if (__local_hash_head != 0) {
+            (__ci_expr_logic_1 = (if (*__param_s).prev_length < (*__param_s).max_lazy_match: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
-            (__ci_expr_logic_2 = (if (if (((*__param_s).strstart as u32) -% (__local_hash_head as u32)) <= (((*__param_s).w_size as u32) -% (262 as u32)): 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_1 {
+            (__ci_expr_logic_2 = (if (((*__param_s).strstart as u32) -% (__local_hash_head as u32)) <= (((*__param_s).w_size as u32) -% (262 as u32)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             ((*__param_s).match_length = ((longest_match(__param_s, __local_hash_head) as u32)))
 
             var __ci_expr_logic_5: i32 = 0
 
-            if ((if (*__param_s).match_length <= 5: 1 else: 0) != 0) {
+            if ((*__param_s).match_length <= 5) {
                 var __ci_expr_logic_4: i32
 
-                if ((if (*__param_s).strategy == 1: 1 else: 0) != 0) {
+                if ((*__param_s).strategy == 1) {
                     (__ci_expr_logic_4 = (if true: 1 else: 0))
                 } else {
                     var __ci_expr_logic_3: i32 = 0
 
-                    if ((if (*__param_s).match_length == 3: 1 else: 0) != 0) {
-                        (__ci_expr_logic_3 = (if (if (((*__param_s).strstart as u32) -% ((*__param_s).match_start as u32)) > 4096: 1 else: 0) != 0: 1 else: 0))
+                    if ((*__param_s).match_length == 3) {
+                        (__ci_expr_logic_3 = (if (((*__param_s).strstart as u32) -% ((*__param_s).match_start as u32)) > 4096: 1 else: 0))
                     }
 
-                    (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
+                    (__ci_expr_logic_4 = (if __ci_expr_logic_3: 1 else: 0))
 
                 }
 
-                (__ci_expr_logic_5 = (if __ci_expr_logic_4 != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if __ci_expr_logic_4: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_5 != 0) {
+            if __ci_expr_logic_5 {
                 ((*__param_s).match_length = ((2 as u32)))
 
             }
@@ -2792,11 +2809,11 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         var __ci_expr_logic_6: i32 = 0
 
-        if ((if (*__param_s).prev_length >= 3: 1 else: 0) != 0) {
-            (__ci_expr_logic_6 = (if (if (*__param_s).match_length <= (*__param_s).prev_length: 1 else: 0) != 0: 1 else: 0))
+        if ((*__param_s).prev_length >= 3) {
+            (__ci_expr_logic_6 = (if (*__param_s).match_length <= (*__param_s).prev_length: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
+        if __ci_expr_logic_6 {
             var __local_max_insert: u32 = (((((((*__param_s).strstart as u32) +% ((*__param_s).lookahead as u32)) as u32) -% (3 as u32)) as u32))
 
 
@@ -2829,7 +2846,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
             ((*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
 
-            ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
+            ((*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
 
             (__local_bflush = (((if (*__param_s).sym_next == (*__param_s).sym_end: 1 else: 0) as i32)))
 
@@ -2842,7 +2859,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
             loop {
                 ((*__param_s).strstart = ((*__param_s).strstart +% 1))
 
-                if ((if (*__param_s).strstart <= __local_max_insert: 1 else: 0) != 0) {
+                if ((*__param_s).strstart <= __local_max_insert) {
                     ((*__param_s).ins_h = (((((((((*__param_s).ins_h as u32) << ((*__param_s).hash_shift as u32)) as u32) ^ ((((*__param_s).window[(((*__param_s).strstart as u32) +% (2 as u32))]) as i32) as u32)) as u32) & ((*__param_s).hash_mask as u32)) as u32)))
 
                     (((*__param_s).prev[(((*__param_s).strstart as u32) & ((*__param_s).w_mask as u32))]) = ((((*__param_s).head[(*__param_s).ins_h]) as u16)))
@@ -2856,7 +2873,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
                 ((*__param_s).prev_length = ((*__param_s).prev_length -% 1))
-                if not (((if (*__param_s).prev_length != 0: 1 else: 0) != 0)) {
+                if not (((*__param_s).prev_length != 0)) {
                     break
                 }
             }
@@ -2867,8 +2884,8 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
             ((*__param_s).strstart = ((*__param_s).strstart +% 1))
 
-            if (__local_bflush != 0) {
-                _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+            if __local_bflush {
+                _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
                 ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2877,7 +2894,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-                if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+                if ((*(*__param_s).strm).avail_out == 0) {
                     return 0
                 }
 
@@ -2885,7 +2902,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
         } else {
-            if ((*__param_s).match_available != 0) {
+            if (*__param_s).match_available {
 
                 var __local_cc: u8 = ((((*__param_s).window[(((*__param_s).strstart as u32) -% (1 as u32))]) as u8))
 
@@ -2916,8 +2933,8 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-                if (__local_bflush != 0) {
-                    _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+                if __local_bflush {
+                    _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
                     ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2932,7 +2949,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
                 ((*__param_s).lookahead = ((*__param_s).lookahead -% 1))
 
-                if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+                if ((*(*__param_s).strm).avail_out == 0) {
                     return 0
                 }
 
@@ -2950,7 +2967,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
     }
 
 
-    if ((*__param_s).match_available != 0) {
+    if (*__param_s).match_available {
 
         var __local_cc_1: u8 = ((((*__param_s).window[(((*__param_s).strstart as u32) -% (1 as u32))]) as u8))
 
@@ -2985,10 +3002,10 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     }
 
-    ((*__param_s).insert = (((if (if (*__param_s).strstart < 2: 1 else: 0) != 0: (*__param_s).strstart else: (2 as u32)) as u32)))
+    ((*__param_s).insert = (((if (*__param_s).strstart < 2: (*__param_s).strstart else: (2 as u32)) as u32)))
 
-    if ((if __param_flush == 4: 1 else: 0) != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
+    if (__param_flush == 4) {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -2997,7 +3014,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 2
         }
 
@@ -3007,8 +3024,8 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     }
 
-    if ((*__param_s).sym_next != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+    if (*__param_s).sym_next {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3017,7 +3034,7 @@ unsafe fn deflate_slow(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 0
         }
 
@@ -3039,22 +3056,22 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
 
     while true {
-        if ((if (*__param_s).lookahead <= 258: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead <= 258) {
             fill_window(__param_s)
 
             var __ci_expr_logic_0: i32 = 0
 
-            if ((if (*__param_s).lookahead <= 258: 1 else: 0) != 0) {
-                (__ci_expr_logic_0 = (if (if __param_flush == 0: 1 else: 0) != 0: 1 else: 0))
+            if ((*__param_s).lookahead <= 258) {
+                (__ci_expr_logic_0 = (if __param_flush == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 return 0
 
             }
 
 
-            if ((if (*__param_s).lookahead == 0: 1 else: 0) != 0) {
+            if ((*__param_s).lookahead == 0) {
                 break
             }
 
@@ -3064,11 +3081,11 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__param_s).lookahead >= 3: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (*__param_s).strstart > 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__param_s).lookahead >= 3) {
+            (__ci_expr_logic_1 = (if (*__param_s).strstart > 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             (__local_scan = ((*__param_s).window + ((*__param_s).strstart as usize)) - ((1 as isize) as usize))
 
             (__local_prev = (((*__local_scan) as u32)))
@@ -3079,21 +3096,21 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
             (__local_scan = __local_scan + 1)
 
-            if ((if __local_prev == (*__local_scan): 1 else: 0) != 0) {
+            if (__local_prev == (*__local_scan)) {
                 (__local_scan = __local_scan + 1)
 
-                (__ci_expr_logic_2 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_2 = (if __local_prev == (*__local_scan): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_2 != 0) {
+            if __ci_expr_logic_2 {
                 (__local_scan = __local_scan + 1)
 
-                (__ci_expr_logic_3 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_3 = (if __local_prev == (*__local_scan): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_3 != 0) {
+            if __ci_expr_logic_3 {
                 (__local_strend = ((*__param_s).window + ((*__param_s).strstart as usize)) + ((258 as isize) as usize))
 
                 loop {
@@ -3116,67 +3133,67 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
                     (__local_scan = __local_scan + 1)
 
-                    if ((if __local_prev == (*__local_scan): 1 else: 0) != 0) {
+                    if (__local_prev == (*__local_scan)) {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_4 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_4 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_4 != 0) {
+                    if __ci_expr_logic_4 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_5 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_5 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_5 != 0) {
+                    if __ci_expr_logic_5 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_6 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_6 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_6 != 0) {
+                    if __ci_expr_logic_6 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_7 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_7 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_7 != 0) {
+                    if __ci_expr_logic_7 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_8 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_8 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_8 != 0) {
+                    if __ci_expr_logic_8 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_9 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_9 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_9 != 0) {
+                    if __ci_expr_logic_9 {
                         (__local_scan = __local_scan + 1)
 
-                        (__ci_expr_logic_10 = (if (if __local_prev == (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+                        (__ci_expr_logic_10 = (if __local_prev == (*__local_scan): 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_10 != 0) {
-                        (__ci_expr_logic_11 = (if (if __local_scan < __local_strend: 1 else: 0) != 0: 1 else: 0))
+                    if __ci_expr_logic_10 {
+                        (__ci_expr_logic_11 = (if __local_scan < __local_strend: 1 else: 0))
                     }
 
-                    if not ((__ci_expr_logic_11 != 0)) {
+                    if not (__ci_expr_logic_11) {
                         break
                     }
                 }
 
                 ((*__param_s).match_length = ((((258 as u32) -% (((((__local_strend as usize) -% (__local_scan as usize)) as i64) / (sizeof[u8]() as i64)) as u32)) as u32)))
 
-                if ((if (*__param_s).match_length > (*__param_s).lookahead: 1 else: 0) != 0) {
+                if ((*__param_s).match_length > (*__param_s).lookahead) {
                     ((*__param_s).match_length = (*__param_s).lookahead)
                 }
 
@@ -3187,7 +3204,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
         }
 
 
-        if ((if (*__param_s).match_length >= 3: 1 else: 0) != 0) {
+        if ((*__param_s).match_length >= 3) {
 
             var __local_len: u8 = (((((*__param_s).match_length as u32) -% (3 as u32)) as u8))
 
@@ -3218,7 +3235,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
             ((*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc.freq = ((*(&raw const (*__param_s).dyn_ltree[(((_length_code[__local_len] as i32) + 256) + 1)].fc as *const ct_data_s_fc)).freq +% 1))
 
-            ((*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if (if __local_dist < 256: 1 else: 0) != 0: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
+            ((*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc.freq = ((*(&raw const (*__param_s).dyn_dtree[(if __local_dist < 256: (_dist_code[__local_dist] as i32) else: (_dist_code[(256 + ((__local_dist as i32) >> (7 as u32)))] as i32))].fc as *const ct_data_s_fc)).freq +% 1))
 
             (__local_bflush = (((if (*__param_s).sym_next == (*__param_s).sym_end: 1 else: 0) as i32)))
 
@@ -3267,8 +3284,8 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
         }
 
-        if (__local_bflush != 0) {
-            _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+        if __local_bflush {
+            _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
             ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3277,7 +3294,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
 
 
-            if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+            if ((*(*__param_s).strm).avail_out == 0) {
                 return 0
             }
 
@@ -3288,8 +3305,8 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
     ((*__param_s).insert = ((0 as u32)))
 
-    if ((if __param_flush == 4: 1 else: 0) != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
+    if (__param_flush == 4) {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3298,7 +3315,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 2
         }
 
@@ -3308,8 +3325,8 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
     }
 
-    if ((*__param_s).sym_next != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+    if (*__param_s).sym_next {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3318,7 +3335,7 @@ unsafe fn deflate_rle(__param_s: *mut internal_state, __param_flush: i32) -> i32
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 0
         }
 
@@ -3333,11 +3350,11 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
     var __local_bflush: i32
 
     while true {
-        if ((if (*__param_s).lookahead == 0: 1 else: 0) != 0) {
+        if ((*__param_s).lookahead == 0) {
             fill_window(__param_s)
 
-            if ((if (*__param_s).lookahead == 0: 1 else: 0) != 0) {
-                if ((if __param_flush == 0: 1 else: 0) != 0) {
+            if ((*__param_s).lookahead == 0) {
+                if (__param_flush == 0) {
                     return 0
                 }
 
@@ -3383,8 +3400,8 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
         ((*__param_s).strstart = ((*__param_s).strstart +% 1))
 
-        if (__local_bflush != 0) {
-            _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+        if __local_bflush {
+            _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
             ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3393,7 +3410,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-            if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+            if ((*(*__param_s).strm).avail_out == 0) {
                 return 0
             }
 
@@ -3404,8 +3421,8 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     ((*__param_s).insert = ((0 as u32)))
 
-    if ((if __param_flush == 4: 1 else: 0) != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
+    if (__param_flush == 4) {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (1 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3414,7 +3431,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 2
         }
 
@@ -3424,8 +3441,8 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
     }
 
-    if ((*__param_s).sym_next != 0) {
-        _tr_flush_block(__param_s, (if (if (*__param_s).block_start >= 0: 1 else: 0) != 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
+    if (*__param_s).sym_next {
+        _tr_flush_block(__param_s, (if (*__param_s).block_start >= 0: (((&raw const ((*__param_s).window[((*__param_s).block_start as u32)]) as *const u8) as *mut u8) as *mut c_char) else: (null as *mut c_char)), ((((*__param_s).strstart as i64) - (*__param_s).block_start) as u64), (0 as i32))
 
         ((*__param_s).block_start = (((*__param_s).strstart as i64)))
 
@@ -3434,7 +3451,7 @@ unsafe fn deflate_huff(__param_s: *mut internal_state, __param_flush: i32) -> i3
 
 
 
-        if ((if (*(*__param_s).strm).avail_out == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_out == 0) {
             return 0
         }
 
@@ -3465,10 +3482,10 @@ unsafe fn slide_hash(__param_s: *mut internal_state) {
         (__local_m = (((*__local_p) as u32)))
 
 
-        ((*__local_p) = (((if (if __local_m >= __local_wsize: 1 else: 0) != 0: (((__local_m as u32) -% (__local_wsize as u32)) as u32) else: (0 as u32)) as u16)))
+        ((*__local_p) = (((if __local_m >= __local_wsize: (((__local_m as u32) -% (__local_wsize as u32)) as u32) else: (0 as u32)) as u16)))
 
         (__local_n = (__local_n -% 1))
-        if not ((__local_n != 0)) {
+        if not (__local_n) {
             break
         }
     }
@@ -3483,10 +3500,10 @@ unsafe fn slide_hash(__param_s: *mut internal_state) {
         (__local_m = (((*__local_p) as u32)))
 
 
-        ((*__local_p) = (((if (if __local_m >= __local_wsize: 1 else: 0) != 0: (((__local_m as u32) -% (__local_wsize as u32)) as u32) else: (0 as u32)) as u16)))
+        ((*__local_p) = (((if __local_m >= __local_wsize: (((__local_m as u32) -% (__local_wsize as u32)) as u32) else: (0 as u32)) as u16)))
 
         (__local_n = (__local_n -% 1))
-        if not ((__local_n != 0)) {
+        if not (__local_n) {
             break
         }
     }
@@ -3495,14 +3512,15 @@ unsafe fn slide_hash(__param_s: *mut internal_state) {
 
 }
 
+// contract: receiver-mut:z_stream_s,stored-unknown:1 — stores an argument; ownership not modeled
 unsafe fn read_buf(__param_strm: *mut z_stream_s, __param_buf: *mut u8, __param_size: u32) -> u32 {
     var __local_len: u32 = (*__param_strm).avail_in
 
-    if ((if __local_len > __param_size: 1 else: 0) != 0) {
+    if (__local_len > __param_size) {
         (__local_len = __param_size)
     }
 
-    if ((if __local_len == 0: 1 else: 0) != 0) {
+    if (__local_len == 0) {
         return ((0 as u32))
     }
 
@@ -3510,11 +3528,11 @@ unsafe fn read_buf(__param_strm: *mut z_stream_s, __param_buf: *mut u8, __param_
 
     with_memcpy(((__param_buf as *mut c_void) as *mut u8), (((*__param_strm).next_in as *const c_void) as *const u8), ((__local_len as u64) as i64))
 
-    if ((if (*(*__param_strm).state).wrap == 1: 1 else: 0) != 0) {
+    if ((*(*__param_strm).state).wrap == 1) {
         ((*__param_strm).adler = ((adler32((*__param_strm).adler, (__param_buf as *const u8), __local_len) as u64)))
 
     } else {
-        if ((if (*(*__param_strm).state).wrap == 2: 1 else: 0) != 0) {
+        if ((*(*__param_strm).state).wrap == 2) {
             ((*__param_strm).adler = ((crc32((*__param_strm).adler, (__param_buf as *const u8), __local_len) as u64)))
 
         }
@@ -3539,24 +3557,24 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
     loop {
         (__local_more = (((((((*__param_s).window_size as u64) -% ((*__param_s).lookahead as u64)) as u64) -% ((*__param_s).strstart as u64)) as u32)))
 
-        if ((if (sizeof[i32]() as usize) <= 2: 1 else: 0) != 0) {
+        if ((sizeof[i32]() as usize) <= 2) {
             var __ci_expr_logic_2: i32 = 0
 
             var __ci_expr_logic_1: i32 = 0
 
-            if ((if __local_more == 0: 1 else: 0) != 0) {
-                (__ci_expr_logic_1 = (if (if (*__param_s).strstart == 0: 1 else: 0) != 0: 1 else: 0))
+            if (__local_more == 0) {
+                (__ci_expr_logic_1 = (if (*__param_s).strstart == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_1 != 0) {
-                (__ci_expr_logic_2 = (if (if (*__param_s).lookahead == 0: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_1 {
+                (__ci_expr_logic_2 = (if (*__param_s).lookahead == 0: 1 else: 0))
             }
 
-            if (__ci_expr_logic_2 != 0) {
+            if __ci_expr_logic_2 {
                 (__local_more = __local_wsize)
 
             } else {
-                if ((if __local_more == ((-1 as u32)): 1 else: 0) != 0) {
+                if (__local_more == ((-1 as u32))) {
                     (__local_more = (__local_more -% 1))
 
                 }
@@ -3565,7 +3583,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
         }
 
-        if ((if (*__param_s).strstart >= ((__local_wsize as u32) +% ((((*__param_s).w_size as u32) -% (262 as u32)) as u32)): 1 else: 0) != 0) {
+        if ((*__param_s).strstart >= ((__local_wsize as u32) +% ((((*__param_s).w_size as u32) -% (262 as u32)) as u32))) {
             with_memcpy((((*__param_s).window as *mut c_void) as *mut u8), ((((*__param_s).window + (__local_wsize as usize)) as *const c_void) as *const u8), ((((__local_wsize as u32) -% (__local_more as u32)) as u64) as i64))
 
             ((*__param_s).match_start = ((*__param_s).match_start -% __local_wsize))
@@ -3574,7 +3592,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
             ((*__param_s).block_start = (*__param_s).block_start - (__local_wsize as i64))
 
-            if ((if (*__param_s).insert > (*__param_s).strstart: 1 else: 0) != 0) {
+            if ((*__param_s).insert > (*__param_s).strstart) {
                 ((*__param_s).insert = (*__param_s).strstart)
             }
 
@@ -3584,7 +3602,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
         }
 
-        if ((if (*(*__param_s).strm).avail_in == 0: 1 else: 0) != 0) {
+        if ((*(*__param_s).strm).avail_in == 0) {
             break
         }
 
@@ -3593,14 +3611,14 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
         ((*__param_s).lookahead = ((*__param_s).lookahead +% __local_n))
 
-        if ((if (((*__param_s).lookahead as u32) +% ((*__param_s).insert as u32)) >= 3: 1 else: 0) != 0) {
+        if ((((*__param_s).lookahead as u32) +% ((*__param_s).insert as u32)) >= 3) {
             var __local_str: u32 = (((((*__param_s).strstart as u32) -% ((*__param_s).insert as u32)) as u32))
 
             ((*__param_s).ins_h = ((((*__param_s).window[__local_str]) as u32)))
 
             ((*__param_s).ins_h = (((((((((*__param_s).ins_h as u32) << ((*__param_s).hash_shift as u32)) as u32) ^ ((((*__param_s).window[((__local_str as u32) +% (1 as u32))]) as i32) as u32)) as u32) & ((*__param_s).hash_mask as u32)) as u32)))
 
-            while ((*__param_s).insert != 0) {
+            while (*__param_s).insert {
                 ((*__param_s).ins_h = (((((((((*__param_s).ins_h as u32) << ((*__param_s).hash_shift as u32)) as u32) ^ ((((*__param_s).window[((((__local_str as u32) +% (3 as u32)) as u32) -% (1 as u32))]) as i32) as u32)) as u32) & ((*__param_s).hash_mask as u32)) as u32)))
 
                 (((*__param_s).prev[((__local_str as u32) & ((*__param_s).w_mask as u32))]) = ((((*__param_s).head[(*__param_s).ins_h]) as u16)))
@@ -3611,7 +3629,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
                 ((*__param_s).insert = ((*__param_s).insert -% 1))
 
-                if ((if (((*__param_s).lookahead as u32) +% ((*__param_s).insert as u32)) < 3: 1 else: 0) != 0) {
+                if ((((*__param_s).lookahead as u32) +% ((*__param_s).insert as u32)) < 3) {
                     break
                 }
 
@@ -3621,24 +3639,24 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if (*__param_s).lookahead < 262: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if (*(*__param_s).strm).avail_in != 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__param_s).lookahead < 262) {
+            (__ci_expr_logic_0 = (if (*(*__param_s).strm).avail_in != 0: 1 else: 0))
         }
 
-        if not ((__ci_expr_logic_0 != 0)) {
+        if not (__ci_expr_logic_0) {
             break
         }
     }
 
-    if ((if (*__param_s).high_water < (*__param_s).window_size: 1 else: 0) != 0) {
+    if ((*__param_s).high_water < (*__param_s).window_size) {
         var __local_curr: u64 = (((((*__param_s).strstart as u64) +% ((*__param_s).lookahead as u64)) as u64))
 
         var __local_init: u64
 
-        if ((if (*__param_s).high_water < __local_curr: 1 else: 0) != 0) {
+        if ((*__param_s).high_water < __local_curr) {
             (__local_init = (((((*__param_s).window_size as u64) -% (__local_curr as u64)) as u64)))
 
-            if ((if __local_init > 258: 1 else: 0) != 0) {
+            if (__local_init > 258) {
                 (__local_init = ((258 as u64)))
             }
 
@@ -3647,10 +3665,10 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
             ((*__param_s).high_water = ((((__local_curr as u64) +% (__local_init as u64)) as u64)))
 
         } else {
-            if ((if (*__param_s).high_water < ((__local_curr as u64) +% (258 as u64)): 1 else: 0) != 0) {
+            if ((*__param_s).high_water < ((__local_curr as u64) +% (258 as u64))) {
                 (__local_init = ((((((__local_curr as u64) +% (258 as u64)) as u64) -% ((*__param_s).high_water as u64)) as u64)))
 
-                if ((if __local_init > (((*__param_s).window_size as u64) -% ((*__param_s).high_water as u64)): 1 else: 0) != 0) {
+                if (__local_init > (((*__param_s).window_size as u64) -% ((*__param_s).high_water as u64))) {
                     (__local_init = (((((*__param_s).window_size as u64) -% ((*__param_s).high_water as u64)) as u64)))
                 }
 
@@ -3666,6 +3684,7 @@ unsafe fn fill_window(__param_s: *mut internal_state) {
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> i32 {
     var __local_s: *mut internal_state
 
@@ -3673,19 +3692,19 @@ unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> i32 {
 
     var __ci_expr_logic_0: i32
 
-    if ((if __param_strm == 0: 1 else: 0) != 0) {
+    if (__param_strm == 0) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if (*__param_strm).zalloc == ((0 as unsafe extern "C" fn(*mut c_void, u32, u32) -> *mut c_void)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if (if (*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)): 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if (*__param_strm).zfree == ((0 as unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit)): 1 else: 0))
     }
 
-    if (__ci_expr_logic_1 != 0) {
+    if __ci_expr_logic_1 {
         return 1
     }
 
@@ -3696,13 +3715,13 @@ unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> i32 {
 
     var __ci_expr_logic_2: i32
 
-    if ((if __local_s == 0: 1 else: 0) != 0) {
+    if (__local_s == 0) {
         (__ci_expr_logic_2 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_2 = (if (if (*__local_s).strm != __param_strm: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_2 = (if (*__local_s).strm != __param_strm: 1 else: 0))
     }
 
-    if (__ci_expr_logic_2 != 0) {
+    if __ci_expr_logic_2 {
         (__ci_expr_logic_10 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_9: i32 = 0
@@ -3719,39 +3738,39 @@ unsafe fn deflateStateCheck(__param_strm: *mut z_stream_s) -> i32 {
 
         var __ci_expr_logic_3: i32 = 0
 
-        if ((if (*__local_s).status != 42: 1 else: 0) != 0) {
-            (__ci_expr_logic_3 = (if (if (*__local_s).status != 57: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_s).status != 42) {
+            (__ci_expr_logic_3 = (if (*__local_s).status != 57: 1 else: 0))
         }
 
-        if (__ci_expr_logic_3 != 0) {
-            (__ci_expr_logic_4 = (if (if (*__local_s).status != 69: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_3 {
+            (__ci_expr_logic_4 = (if (*__local_s).status != 69: 1 else: 0))
         }
 
-        if (__ci_expr_logic_4 != 0) {
-            (__ci_expr_logic_5 = (if (if (*__local_s).status != 73: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_4 {
+            (__ci_expr_logic_5 = (if (*__local_s).status != 73: 1 else: 0))
         }
 
-        if (__ci_expr_logic_5 != 0) {
-            (__ci_expr_logic_6 = (if (if (*__local_s).status != 91: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_5 {
+            (__ci_expr_logic_6 = (if (*__local_s).status != 91: 1 else: 0))
         }
 
-        if (__ci_expr_logic_6 != 0) {
-            (__ci_expr_logic_7 = (if (if (*__local_s).status != 103: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_6 {
+            (__ci_expr_logic_7 = (if (*__local_s).status != 103: 1 else: 0))
         }
 
-        if (__ci_expr_logic_7 != 0) {
-            (__ci_expr_logic_8 = (if (if (*__local_s).status != 113: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_7 {
+            (__ci_expr_logic_8 = (if (*__local_s).status != 113: 1 else: 0))
         }
 
-        if (__ci_expr_logic_8 != 0) {
-            (__ci_expr_logic_9 = (if (if (*__local_s).status != 666: 1 else: 0) != 0: 1 else: 0))
+        if __ci_expr_logic_8 {
+            (__ci_expr_logic_9 = (if (*__local_s).status != 666: 1 else: 0))
         }
 
-        (__ci_expr_logic_10 = (if __ci_expr_logic_9 != 0: 1 else: 0))
+        (__ci_expr_logic_10 = (if __ci_expr_logic_9: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_10 != 0) {
+    if __ci_expr_logic_10 {
         return 1
     }
 
@@ -3770,7 +3789,7 @@ unsafe fn lm_init(__param_s: *mut internal_state) {
 
         ((*__param_s).slid = ((0 as i32)))
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
@@ -3828,11 +3847,11 @@ unsafe fn flush_pending(__param_strm: *mut z_stream_s) {
 
     var __local_s: *mut internal_state = (*__param_strm).state
 
-    _tr_flush_bits(__local_s)
+    (*__local_s)._tr_flush_bits()
 
-    (__local_len = (((if (if (*__local_s).pending > (*__param_strm).avail_out: 1 else: 0) != 0: (*__param_strm).avail_out else: ((*__local_s).pending as u32)) as u32)))
+    (__local_len = (((if (*__local_s).pending > (*__param_strm).avail_out: (*__param_strm).avail_out else: ((*__local_s).pending as u32)) as u32)))
 
-    if ((if __local_len == 0: 1 else: 0) != 0) {
+    if (__local_len == 0) {
         return
     }
 
@@ -3848,7 +3867,7 @@ unsafe fn flush_pending(__param_strm: *mut z_stream_s) {
 
     ((*__local_s).pending = ((*__local_s).pending -% __local_len))
 
-    if ((if (*__local_s).pending == 0: 1 else: 0) != 0) {
+    if ((*__local_s).pending == 0) {
         ((*__local_s).pending_out = (*__local_s).pending_buf)
 
     }
@@ -3869,7 +3888,7 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
 
     var __local_nice_match: i32 = (*__param_s).nice_match
 
-    var __local_limit: u32 = (((if (if (*__param_s).strstart > (((*__param_s).w_size as u32) -% (262 as u32)): 1 else: 0) != 0: ((((*__param_s).strstart as u32) -% ((((*__param_s).w_size as u32) -% (262 as u32)) as u32)) as u32) else: (0 as u32)) as u32))
+    var __local_limit: u32 = (((if (*__param_s).strstart > (((*__param_s).w_size as u32) -% (262 as u32)): ((((*__param_s).strstart as u32) -% ((((*__param_s).w_size as u32) -% (262 as u32)) as u32)) as u32) else: (0 as u32)) as u32))
 
     var __local_prev: *mut u16 = (*__param_s).prev
 
@@ -3882,12 +3901,12 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
     var __local_scan_end: u8 = (((__local_scan[__local_best_len]) as u8))
 
 
-    if ((if (*__param_s).prev_length >= (*__param_s).good_match: 1 else: 0) != 0) {
+    if ((*__param_s).prev_length >= (*__param_s).good_match) {
         (__local_chain_length = __local_chain_length >> (2 as u32))
 
     }
 
-    if ((if ((__local_nice_match as u32)) > (*__param_s).lookahead: 1 else: 0) != 0) {
+    if (((__local_nice_match as u32)) > (*__param_s).lookahead) {
         (__local_nice_match = (((*__param_s).lookahead as i32)))
     }
 
@@ -3902,40 +3921,40 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
 
         var __ci_expr_logic_1: i32
 
-        if ((if (__local_match_[__local_best_len]) != __local_scan_end: 1 else: 0) != 0) {
+        if ((__local_match_[__local_best_len]) != __local_scan_end) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if (__local_match_[(__local_best_len - 1)]) != __local_scan_end1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if (__local_match_[(__local_best_len - 1)]) != __local_scan_end1: 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if (*__local_match_) != (*__local_scan): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if (*__local_match_) != (*__local_scan): 1 else: 0))
         }
 
-        if (__ci_expr_logic_2 != 0) {
+        if __ci_expr_logic_2 {
             (__ci_expr_logic_3 = (if true: 1 else: 0))
         } else {
             (__local_match_ = __local_match_ + 1)
 
-            (__ci_expr_logic_3 = (if (if (*__local_match_) != (__local_scan[1]): 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_3 = (if (*__local_match_) != (__local_scan[1]): 1 else: 0))
 
         }
 
-        if (__ci_expr_logic_3 != 0) {
+        if __ci_expr_logic_3 {
             var __ci_expr_logic_0: i32 = 0
 
             (__local_cur_match = (((__local_prev[((__local_cur_match as u32) & (__local_wmask as u32))]) as u32)))
 
-            if ((if __local_cur_match > __local_limit: 1 else: 0) != 0) {
+            if (__local_cur_match > __local_limit) {
                 (__local_chain_length = (__local_chain_length -% 1))
 
-                (__ci_expr_logic_0 = (if (if __local_chain_length != 0: 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_0 = (if __local_chain_length != 0: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_0 != 0) {
+            if __ci_expr_logic_0 {
                 continue
             }
             break
@@ -3971,74 +3990,74 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
 
             (__local_match_ = __local_match_ + 1)
 
-            if ((if (*__local_scan) == (*__local_match_): 1 else: 0) != 0) {
+            if ((*__local_scan) == (*__local_match_)) {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_4 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_4 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_4 != 0) {
+            if __ci_expr_logic_4 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_5 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_5 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_5 != 0) {
+            if __ci_expr_logic_5 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_6 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_6 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_6 != 0) {
+            if __ci_expr_logic_6 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_7 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_7 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_7 != 0) {
+            if __ci_expr_logic_7 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_8 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_8 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_8 != 0) {
+            if __ci_expr_logic_8 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_9 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_9 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_9 != 0) {
+            if __ci_expr_logic_9 {
                 (__local_scan = __local_scan + 1)
 
                 (__local_match_ = __local_match_ + 1)
 
-                (__ci_expr_logic_10 = (if (if (*__local_scan) == (*__local_match_): 1 else: 0) != 0: 1 else: 0))
+                (__ci_expr_logic_10 = (if (*__local_scan) == (*__local_match_): 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_10 != 0) {
-                (__ci_expr_logic_11 = (if (if __local_scan < __local_strend: 1 else: 0) != 0: 1 else: 0))
+            if __ci_expr_logic_10 {
+                (__ci_expr_logic_11 = (if __local_scan < __local_strend: 1 else: 0))
             }
 
-            if not ((__ci_expr_logic_11 != 0)) {
+            if not (__ci_expr_logic_11) {
                 break
             }
         }
@@ -4048,12 +4067,12 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
 
         (__local_scan = __local_strend - ((258 as isize) as usize))
 
-        if ((if __local_len > __local_best_len: 1 else: 0) != 0) {
+        if (__local_len > __local_best_len) {
             ((*__param_s).match_start = __local_cur_match)
 
             (__local_best_len = __local_len)
 
-            if ((if __local_len >= __local_nice_match: 1 else: 0) != 0) {
+            if (__local_len >= __local_nice_match) {
                 break
             }
 
@@ -4067,19 +4086,19 @@ unsafe fn longest_match(__param_s: *mut internal_state, __param_cur_match: u32) 
 
         (__local_cur_match = (((__local_prev[((__local_cur_match as u32) & (__local_wmask as u32))]) as u32)))
 
-        if ((if __local_cur_match > __local_limit: 1 else: 0) != 0) {
+        if (__local_cur_match > __local_limit) {
             (__local_chain_length = (__local_chain_length -% 1))
 
-            (__ci_expr_logic_0 = (if (if __local_chain_length != 0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_0 = (if __local_chain_length != 0: 1 else: 0))
 
         }
 
-        if not ((__ci_expr_logic_0 != 0)) {
+        if not (__ci_expr_logic_0) {
             break
         }
     }
 
-    if ((if ((__local_best_len as u32)) <= (*__param_s).lookahead: 1 else: 0) != 0) {
+    if (((__local_best_len as u32)) <= (*__param_s).lookahead) {
         return ((__local_best_len as u32))
     }
 

@@ -29,6 +29,7 @@ use std.engines.pcre2.pcre2_string_utils
 use std.engines.pcre2.pcre2_study
 use std.engines.pcre2.pcre2_xclass
 
+// contract: stored-unknown:0,unproved:2:out-parameter written conditionally — stores an argument; ownership not modeled
 pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64, __param_erroroffset: *mut u64) -> i32 {
     var __local_length = __param_length
     var __local_p: *const u8
@@ -37,7 +38,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
     (__local_p = __param_string)
 
-    while ((if __local_length > 0: 1 else: 0) != 0) {
+    while (__local_length > 0) {
         var __local_ab: u32
 
         var __local_d: u32
@@ -47,21 +48,21 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
         (__local_length = (__local_length -% 1))
 
-        if ((if __local_c < 128: 1 else: 0) != 0) {
+        if (__local_c < 128) {
             (__local_p = __local_p + 1)
 
             continue
 
         }
 
-        if ((if __local_c < 192: 1 else: 0) != 0) {
+        if (__local_c < 192) {
             ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64)))
 
             return -22
 
         }
 
-        if ((if __local_c >= 254: 1 else: 0) != 0) {
+        if (__local_c >= 254) {
             ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64)))
 
             return -23
@@ -70,7 +71,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
         (__local_ab = ((_pcre2_utf8_table4[((__local_c as u32) & (63 as u32))] as u32)))
 
-        if ((if __local_length < __local_ab: 1 else: 0) != 0) {
+        if (__local_length < __local_ab) {
             ((*__param_erroroffset) = ((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64)))
 
             match ((__local_ab as u64) -% (__local_length as u64)) {
@@ -99,7 +100,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
         (__local_d = (((*__local_p) as u32)))
 
-        if ((if ((__local_d as u32) & (192 as u32)) != 128: 1 else: 0) != 0) {
+        if (((__local_d as u32) & (192 as u32)) != 128) {
             ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (1 as u64)) as u64)))
 
             return -8
@@ -110,7 +111,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
         while true {
             match __local_ab {
                 1 => {
-                    if ((if ((__local_c as u32) & (62 as u32)) == 0: 1 else: 0) != 0) {
+                    if (((__local_c as u32) & (62 as u32)) == 0) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (1 as u64)) as u64)))
 
                         return -17
@@ -120,7 +121,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
                 2 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -9
@@ -130,11 +131,11 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_0: i32 = 0
 
-                    if ((if __local_c == 224: 1 else: 0) != 0) {
-                        (__ci_expr_logic_0 = (if (if ((__local_d as u32) & (32 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 224) {
+                        (__ci_expr_logic_0 = (if ((__local_d as u32) & (32 as u32)) == 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_0 != 0) {
+                    if __ci_expr_logic_0 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -18
@@ -144,11 +145,11 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_1: i32 = 0
 
-                    if ((if __local_c == 237: 1 else: 0) != 0) {
-                        (__ci_expr_logic_1 = (if (if __local_d >= 160: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 237) {
+                        (__ci_expr_logic_1 = (if __local_d >= 160: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_1 != 0) {
+                    if __ci_expr_logic_1 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -16
@@ -160,7 +161,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
                 3 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -9
@@ -170,7 +171,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (3 as u64)) as u64)))
 
                         return -10
@@ -180,11 +181,11 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_2: i32 = 0
 
-                    if ((if __local_c == 240: 1 else: 0) != 0) {
-                        (__ci_expr_logic_2 = (if (if ((__local_d as u32) & (48 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 240) {
+                        (__ci_expr_logic_2 = (if ((__local_d as u32) & (48 as u32)) == 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_2 != 0) {
+                    if __ci_expr_logic_2 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (3 as u64)) as u64)))
 
                         return -19
@@ -194,20 +195,20 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_4: i32
 
-                    if ((if __local_c > 244: 1 else: 0) != 0) {
+                    if (__local_c > 244) {
                         (__ci_expr_logic_4 = (if true: 1 else: 0))
                     } else {
                         var __ci_expr_logic_3: i32 = 0
 
-                        if ((if __local_c == 244: 1 else: 0) != 0) {
-                            (__ci_expr_logic_3 = (if (if __local_d > 143: 1 else: 0) != 0: 1 else: 0))
+                        if (__local_c == 244) {
+                            (__ci_expr_logic_3 = (if __local_d > 143: 1 else: 0))
                         }
 
-                        (__ci_expr_logic_4 = (if __ci_expr_logic_3 != 0: 1 else: 0))
+                        (__ci_expr_logic_4 = (if __ci_expr_logic_3: 1 else: 0))
 
                     }
 
-                    if (__ci_expr_logic_4 != 0) {
+                    if __ci_expr_logic_4 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (3 as u64)) as u64)))
 
                         return -15
@@ -219,7 +220,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
                 4 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -9
@@ -229,7 +230,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (3 as u64)) as u64)))
 
                         return -10
@@ -239,7 +240,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (4 as u64)) as u64)))
 
                         return -11
@@ -249,11 +250,11 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_5: i32 = 0
 
-                    if ((if __local_c == 248: 1 else: 0) != 0) {
-                        (__ci_expr_logic_5 = (if (if ((__local_d as u32) & (56 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 248) {
+                        (__ci_expr_logic_5 = (if ((__local_d as u32) & (56 as u32)) == 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_5 != 0) {
+                    if __ci_expr_logic_5 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (4 as u64)) as u64)))
 
                         return -20
@@ -265,7 +266,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
                 5 => {
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (2 as u64)) as u64)))
 
                         return -9
@@ -275,7 +276,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (3 as u64)) as u64)))
 
                         return -10
@@ -285,7 +286,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (4 as u64)) as u64)))
 
                         return -11
@@ -295,7 +296,7 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     (__local_p = __local_p + 1)
 
-                    if ((if (((*__local_p) as i32) & (192 as i32)) != 128: 1 else: 0) != 0) {
+                    if ((((*__local_p) as i32) & (192 as i32)) != 128) {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (5 as u64)) as u64)))
 
                         return -12
@@ -305,11 +306,11 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
                     var __ci_expr_logic_6: i32 = 0
 
-                    if ((if __local_c == 252: 1 else: 0) != 0) {
-                        (__ci_expr_logic_6 = (if (if ((__local_d as u32) & (60 as u32)) == 0: 1 else: 0) != 0: 1 else: 0))
+                    if (__local_c == 252) {
+                        (__ci_expr_logic_6 = (if ((__local_d as u32) & (60 as u32)) == 0: 1 else: 0))
                     }
 
-                    if (__ci_expr_logic_6 != 0) {
+                    if __ci_expr_logic_6 {
                         ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (5 as u64)) as u64)))
 
                         return -21
@@ -324,10 +325,10 @@ pub unsafe fn _pcre2_valid_utf_8(__param_string: *const u8, __param_length: u64,
 
         }
 
-        if ((if __local_ab > 3: 1 else: 0) != 0) {
+        if (__local_ab > 3) {
             ((*__param_erroroffset) = ((((((((__local_p as usize) -% (__param_string as usize)) as i64) / (sizeof[u8]() as i64)) as u64) -% (__local_ab as u64)) as u64)))
 
-            return (if (if __local_ab == 4: 1 else: 0) != 0: (-13 as i32) else: (-14 as i32))
+            return (if __local_ab == 4: (-13 as i32) else: (-14 as i32))
 
         }
 

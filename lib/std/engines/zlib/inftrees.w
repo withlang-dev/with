@@ -14,6 +14,7 @@ use std.engines.zlib.adler32
 use std.engines.zlib.crc32
 use std.collections
 
+// contract: unproved:1:read only,unproved:3:out-parameter written conditionally,unproved:4:out-parameter read before the write,unproved:5:out-parameter a return before the write
 pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_codes: u32, __param_table: *mut *mut code, __param_bits: *mut u32, __param_work: *mut u16) -> i32 {
     var __local_len: u32
 
@@ -68,7 +69,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_len = ((0 as u32)))
 
-    while ((if __local_len <= 15: 1 else: 0) != 0) {
+    while (__local_len <= 15) {
         (__local_count[__local_len] = ((0 as u16)))
 
         (__local_len = (__local_len +% 1))
@@ -78,7 +79,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_sym = ((0 as u32)))
 
-    while ((if __local_sym < __param_codes: 1 else: 0) != 0) {
+    while (__local_sym < __param_codes) {
         (__local_count[(__param_lens[__local_sym])] = (__local_count[(__param_lens[__local_sym])] +% 1))
 
         (__local_sym = (__local_sym +% 1))
@@ -90,8 +91,8 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_max = ((15 as u32)))
 
-    while ((if __local_max >= 1: 1 else: 0) != 0) {
-        if ((if __local_count[__local_max] != 0: 1 else: 0) != 0) {
+    while (__local_max >= 1) {
+        if (__local_count[__local_max] != 0) {
             break
         }
 
@@ -100,11 +101,11 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
     }
 
 
-    if ((if __local_root > __local_max: 1 else: 0) != 0) {
+    if (__local_root > __local_max) {
         (__local_root = __local_max)
     }
 
-    if ((if __local_max == 0: 1 else: 0) != 0) {
+    if (__local_max == 0) {
         (__local_here.op = ((64 as u8)))
 
         (__local_here.bits = ((1 as u8)))
@@ -133,8 +134,8 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_min = ((1 as u32)))
 
-    while ((if __local_min < __local_max: 1 else: 0) != 0) {
-        if ((if __local_count[__local_min] != 0: 1 else: 0) != 0) {
+    while (__local_min < __local_max) {
+        if (__local_count[__local_min] != 0) {
             break
         }
 
@@ -143,7 +144,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
     }
 
 
-    if ((if __local_root < __local_min: 1 else: 0) != 0) {
+    if (__local_root < __local_min) {
         (__local_root = __local_min)
     }
 
@@ -151,12 +152,12 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_len = ((1 as u32)))
 
-    while ((if __local_len <= 15: 1 else: 0) != 0) {
+    while (__local_len <= 15) {
         (__local_left = __local_left << (1 as u32))
 
         (__local_left = __local_left - (__local_count[__local_len] as i32))
 
-        if ((if __local_left < 0: 1 else: 0) != 0) {
+        if (__local_left < 0) {
             return -1
         }
 
@@ -168,20 +169,20 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     var __ci_expr_logic_3: i32 = 0
 
-    if ((if __local_left > 0: 1 else: 0) != 0) {
+    if (__local_left > 0) {
         var __ci_expr_logic_2: i32
 
-        if ((if __param_type_ == 0: 1 else: 0) != 0) {
+        if (__param_type_ == 0) {
             (__ci_expr_logic_2 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_2 = (if (if __local_max != 1: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_2 = (if __local_max != 1: 1 else: 0))
         }
 
-        (__ci_expr_logic_3 = (if __ci_expr_logic_2 != 0: 1 else: 0))
+        (__ci_expr_logic_3 = (if __ci_expr_logic_2: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_3 != 0) {
+    if __ci_expr_logic_3 {
         return -1
     }
 
@@ -190,7 +191,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_len = ((1 as u32)))
 
-    while ((if __local_len < 15: 1 else: 0) != 0) {
+    while (__local_len < 15) {
         (__local_offs[((__local_len as u32) +% (1 as u32))] = ((((__local_offs[__local_len] as i32) + (__local_count[__local_len] as i32)) as u16)))
 
         (__local_len = (__local_len +% 1))
@@ -200,8 +201,8 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     (__local_sym = ((0 as u32)))
 
-    while ((if __local_sym < __param_codes: 1 else: 0) != 0) {
-        if ((if (__param_lens[__local_sym]) != 0: 1 else: 0) != 0) {
+    while (__local_sym < __param_codes) {
+        if ((__param_lens[__local_sym]) != 0) {
             var __ci_expr_old_4: u16 = __local_offs[(__param_lens[__local_sym])]
 
             (__local_offs[(__param_lens[__local_sym])] = (__local_offs[(__param_lens[__local_sym])] +% 1))
@@ -262,24 +263,24 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     var __ci_expr_logic_6: i32 = 0
 
-    if ((if __param_type_ == 1: 1 else: 0) != 0) {
-        (__ci_expr_logic_6 = (if (if __local_used > 852: 1 else: 0) != 0: 1 else: 0))
+    if (__param_type_ == 1) {
+        (__ci_expr_logic_6 = (if __local_used > 852: 1 else: 0))
     }
 
-    if (__ci_expr_logic_6 != 0) {
+    if __ci_expr_logic_6 {
         (__ci_expr_logic_8 = (if true: 1 else: 0))
     } else {
         var __ci_expr_logic_7: i32 = 0
 
-        if ((if __param_type_ == 2: 1 else: 0) != 0) {
-            (__ci_expr_logic_7 = (if (if __local_used > 592: 1 else: 0) != 0: 1 else: 0))
+        if (__param_type_ == 2) {
+            (__ci_expr_logic_7 = (if __local_used > 592: 1 else: 0))
         }
 
-        (__ci_expr_logic_8 = (if __ci_expr_logic_7 != 0: 1 else: 0))
+        (__ci_expr_logic_8 = (if __ci_expr_logic_7: 1 else: 0))
 
     }
 
-    if (__ci_expr_logic_8 != 0) {
+    if __ci_expr_logic_8 {
         return 1
     }
 
@@ -287,13 +288,13 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
     while true {
         (__local_here.bits = ((((__local_len as u32) -% (__local_drop as u32)) as u8)))
 
-        if ((if ((((__param_work[__local_sym]) as i32) as u32) +% (1 as u32)) < __local_match_: 1 else: 0) != 0) {
+        if (((((__param_work[__local_sym]) as i32) as u32) +% (1 as u32)) < __local_match_) {
             (__local_here.op = ((0 as u8)))
 
             (__local_here.val = (((__param_work[__local_sym]) as u16)))
 
         } else {
-            if ((if (__param_work[__local_sym]) >= __local_match_: 1 else: 0) != 0) {
+            if ((__param_work[__local_sym]) >= __local_match_) {
                 (__local_here.op = (((__local_extra[((((__param_work[__local_sym]) as i32) as u32) -% (__local_match_ as u32))]) as u8)))
 
                 (__local_here.val = (((__local_base[((((__param_work[__local_sym]) as i32) as u32) -% (__local_match_ as u32))]) as u16)))
@@ -317,18 +318,18 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
             ((__local_next[((((__local_huff as u32) >> (__local_drop as u32)) as u32) +% (__local_fill as u32))]) = __local_here)
 
-            if not (((if __local_fill != 0: 1 else: 0) != 0)) {
+            if not ((__local_fill != 0)) {
                 break
             }
         }
 
         (__local_incr = ((((1 as u32) << (((__local_len as u32) -% (1 as u32)) as u32)) as u32)))
 
-        while (((__local_huff as u32) & (__local_incr as u32)) != 0) {
+        while ((__local_huff as u32) & (__local_incr as u32)) {
             (__local_incr = __local_incr >> (1 as u32))
         }
 
-        if ((if __local_incr != 0: 1 else: 0) != 0) {
+        if (__local_incr != 0) {
             (__local_huff = (__local_huff as u32) & (((__local_incr as u32) -% (1 as u32)) as u32))
 
             (__local_huff = (__local_huff +% __local_incr))
@@ -341,8 +342,8 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
         (__local_count[__local_len] = (__local_count[__local_len] -% 1))
 
-        if ((if __local_count[__local_len] == 0: 1 else: 0) != 0) {
-            if ((if __local_len == __local_max: 1 else: 0) != 0) {
+        if (__local_count[__local_len] == 0) {
+            if (__local_len == __local_max) {
                 break
             }
 
@@ -353,12 +354,12 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
         var __ci_expr_logic_9: i32 = 0
 
-        if ((if __local_len > __local_root: 1 else: 0) != 0) {
-            (__ci_expr_logic_9 = (if (if ((__local_huff as u32) & (__local_mask as u32)) != __local_low: 1 else: 0) != 0: 1 else: 0))
+        if (__local_len > __local_root) {
+            (__ci_expr_logic_9 = (if ((__local_huff as u32) & (__local_mask as u32)) != __local_low: 1 else: 0))
         }
 
-        if (__ci_expr_logic_9 != 0) {
-            if ((if __local_drop == 0: 1 else: 0) != 0) {
+        if __ci_expr_logic_9 {
+            if (__local_drop == 0) {
                 (__local_drop = __local_root)
             }
 
@@ -368,10 +369,10 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
             (__local_left = ((((1 as i32) << (__local_curr as u32)) as i32)))
 
-            while ((if ((__local_curr as u32) +% (__local_drop as u32)) < __local_max: 1 else: 0) != 0) {
+            while (((__local_curr as u32) +% (__local_drop as u32)) < __local_max) {
                 (__local_left = __local_left - (__local_count[((__local_curr as u32) +% (__local_drop as u32))] as i32))
 
-                if ((if __local_left <= 0: 1 else: 0) != 0) {
+                if (__local_left <= 0) {
                     break
                 }
 
@@ -387,24 +388,24 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
             var __ci_expr_logic_10: i32 = 0
 
-            if ((if __param_type_ == 1: 1 else: 0) != 0) {
-                (__ci_expr_logic_10 = (if (if __local_used > 852: 1 else: 0) != 0: 1 else: 0))
+            if (__param_type_ == 1) {
+                (__ci_expr_logic_10 = (if __local_used > 852: 1 else: 0))
             }
 
-            if (__ci_expr_logic_10 != 0) {
+            if __ci_expr_logic_10 {
                 (__ci_expr_logic_12 = (if true: 1 else: 0))
             } else {
                 var __ci_expr_logic_11: i32 = 0
 
-                if ((if __param_type_ == 2: 1 else: 0) != 0) {
-                    (__ci_expr_logic_11 = (if (if __local_used > 592: 1 else: 0) != 0: 1 else: 0))
+                if (__param_type_ == 2) {
+                    (__ci_expr_logic_11 = (if __local_used > 592: 1 else: 0))
                 }
 
-                (__ci_expr_logic_12 = (if __ci_expr_logic_11 != 0: 1 else: 0))
+                (__ci_expr_logic_12 = (if __ci_expr_logic_11: 1 else: 0))
 
             }
 
-            if (__ci_expr_logic_12 != 0) {
+            if __ci_expr_logic_12 {
                 return 1
             }
 
@@ -422,7 +423,7 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
     }
 
-    if ((if __local_huff != 0: 1 else: 0) != 0) {
+    if (__local_huff != 0) {
         (__local_here.op = ((64 as u8)))
 
         (__local_here.bits = ((((__local_len as u32) -% (__local_drop as u32)) as u8)))
@@ -441,14 +442,18 @@ pub unsafe fn inflate_table(__param_type_: i32, __param_lens: *mut u16, __param_
 
 }
 
-pub unsafe fn inflate_fixed(__param_state: *mut inflate_state) {
-    ((*__param_state).lencode = (&lenfix[0] as *const code))
+impl inflate_state {
+    pub mut fn inflate_fixed() {
+        let __param_state: *mut inflate_state = self as *mut inflate_state
+        ((unsafe *__param_state).lencode = (&lenfix[0] as *const code))
 
-    ((*__param_state).lenbits = ((9 as u32)))
+        ((unsafe *__param_state).lenbits = ((9 as u32)))
 
-    ((*__param_state).distcode = (&distfix[0] as *const code))
+        ((unsafe *__param_state).distcode = (&distfix[0] as *const code))
 
-    ((*__param_state).distbits = ((5 as u32)))
+        ((unsafe *__param_state).distbits = ((5 as u32)))
+
+    }
 
 }
 

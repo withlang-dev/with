@@ -30,10 +30,11 @@ use std.engines.pcre2.pcre2_valid_utf
 use std.engines.pcre2.pcre2_xclass
 use std.option
 
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader
 pub unsafe fn pcre2_general_context_copy_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_general_context_8 {
     var __local_newcontext: *mut pcre2_real_general_context_8 = (((*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((sizeof[pcre2_real_general_context_8]() as u64), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_general_context_8))
 
-    if ((if __local_newcontext == null: 1 else: 0) != 0) {
+    if (__local_newcontext == null) {
         return ((null as *mut pcre2_real_general_context_8))
     }
 
@@ -43,22 +44,23 @@ pub unsafe fn pcre2_general_context_copy_8(__param_gcontext: *mut pcre2_real_gen
 
 }
 
+// contract: stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_general_context_create_8(__param_private_malloc: Option[unsafe extern "C" fn(u64, *mut c_void) -> *mut c_void], __param_private_free: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_memory_data: *mut c_void) -> *mut pcre2_real_general_context_8 {
     var __local_private_malloc = __param_private_malloc
     var __local_private_free = __param_private_free
     var __local_gcontext: *mut pcre2_real_general_context_8
 
-    if ((if __local_private_malloc == null: 1 else: 0) != 0) {
+    if (__local_private_malloc == null) {
         (__local_private_malloc = Some(default_malloc))
     }
 
-    if ((if __local_private_free == null: 1 else: 0) != 0) {
+    if (__local_private_free == null) {
         (__local_private_free = Some(default_free))
     }
 
     (__local_gcontext = ((__local_private_malloc.unwrap()((sizeof[pcre2_real_general_context_8]() as u64), __param_memory_data) as *mut pcre2_real_general_context_8)))
 
-    if ((if __local_gcontext == null: 1 else: 0) != 0) {
+    if (__local_gcontext == null) {
         return ((null as *mut pcre2_real_general_context_8))
     }
 
@@ -72,17 +74,19 @@ pub unsafe fn pcre2_general_context_create_8(__param_private_malloc: Option[unsa
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn pcre2_general_context_free_8(__param_gcontext: *mut pcre2_real_general_context_8) {
-    if ((if __param_gcontext != null: 1 else: 0) != 0) {
+    if (__param_gcontext != null) {
         (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).free.unwrap()((__param_gcontext as *mut c_void), (*(&raw const (*__param_gcontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader
 pub unsafe fn pcre2_compile_context_copy_8(__param_ccontext: *mut pcre2_real_compile_context_8) -> *mut pcre2_real_compile_context_8 {
     var __local_newcontext: *mut pcre2_real_compile_context_8 = (((*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).malloc.unwrap()((sizeof[pcre2_real_compile_context_8]() as u64), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_compile_context_8))
 
-    if ((if __local_newcontext == null: 1 else: 0) != 0) {
+    if (__local_newcontext == null) {
         return ((null as *mut pcre2_real_compile_context_8))
     }
 
@@ -92,16 +96,17 @@ pub unsafe fn pcre2_compile_context_copy_8(__param_ccontext: *mut pcre2_real_com
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn pcre2_compile_context_create_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_compile_context_8 {
     var __local_ccontext: *mut pcre2_real_compile_context_8 = ((_pcre2_memctl_malloc_8((sizeof[pcre2_real_compile_context_8]() as u64), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_compile_context_8))
 
-    if ((if __local_ccontext == null: 1 else: 0) != 0) {
+    if (__local_ccontext == null) {
         return ((null as *mut pcre2_real_compile_context_8))
     }
 
     with_memcpy((&raw mut (*__local_ccontext) as *mut u8), (&raw const _pcre2_default_compile_context_8 as *const u8), sizeof[pcre2_real_compile_context_8]())
 
-    if ((if __param_gcontext != null: 1 else: 0) != 0) {
+    if (__param_gcontext != null) {
         with_memcpy((&raw mut (*(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
@@ -109,34 +114,15 @@ pub unsafe fn pcre2_compile_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn pcre2_compile_context_free_8(__param_ccontext: *mut pcre2_real_compile_context_8) {
-    if ((if __param_ccontext != null: 1 else: 0) != 0) {
+    if (__param_ccontext != null) {
         (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free.unwrap()((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
-pub unsafe fn pcre2_set_bsr_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_value: u32) -> i32 {
-    match __param_value {
-        2 => {
-            ((*__param_ccontext).bsr_convention = ((__param_value as u16)))
-
-            return 0
-
-        },
-        1 => {
-            ((*__param_ccontext).bsr_convention = ((__param_value as u16)))
-
-            return 0
-
-        },
-        _ => {
-            return -29
-        },
-    }
-
-}
-
+// contract: receiver-mut:pcre2_real_compile_context_8,stored-unknown:1 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_set_character_tables_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_tables: *const u8) -> i32 {
     ((*__param_ccontext).tables = __param_tables)
 
@@ -144,86 +130,7 @@ pub unsafe fn pcre2_set_character_tables_8(__param_ccontext: *mut pcre2_real_com
 
 }
 
-pub unsafe fn pcre2_set_compile_extra_options_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_options: u32) -> i32 {
-    ((*__param_ccontext).extra_options = __param_options)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_max_pattern_length_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_length: u64) -> i32 {
-    ((*__param_ccontext).max_pattern_length = __param_length)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_max_pattern_compiled_length_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_length: u64) -> i32 {
-    ((*__param_ccontext).max_pattern_compiled_length = __param_length)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_max_varlookbehind_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_limit: u32) -> i32 {
-    ((*__param_ccontext).max_varlookbehind = __param_limit)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_newline_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_newline: u32) -> i32 {
-    match __param_newline {
-        1 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        2 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        3 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        4 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        5 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        6 => {
-            ((*__param_ccontext).newline_convention = ((__param_newline as u16)))
-
-            return 0
-
-        },
-        _ => {
-            return -29
-        },
-    }
-
-}
-
-pub unsafe fn pcre2_set_parens_nest_limit_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_limit: u32) -> i32 {
-    ((*__param_ccontext).parens_nest_limit = __param_limit)
-
-    return 0
-
-}
-
+// contract: receiver-mut:pcre2_real_compile_context_8,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_set_compile_recursion_guard_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_guard: Option[unsafe extern "C" fn(u32, *mut c_void) -> i32], __param_user_data: *mut c_void) -> i32 {
     ((*__param_ccontext).stack_guard = __param_guard)
 
@@ -233,8 +140,9 @@ pub unsafe fn pcre2_set_compile_recursion_guard_8(__param_ccontext: *mut pcre2_r
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_context_8, __param_directive: u32) -> i32 {
-    if ((if __param_ccontext == null: 1 else: 0) != 0) {
+    if (__param_ccontext == null) {
         return -51
     }
 
@@ -249,12 +157,12 @@ pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_con
             _ => {
                 var __ci_expr_logic_0: i32 = 0
 
-                if ((if __param_directive >= 64: 1 else: 0) != 0) {
-                    (__ci_expr_logic_0 = (if (if __param_directive <= 69: 1 else: 0) != 0: 1 else: 0))
+                if (__param_directive >= 64) {
+                    (__ci_expr_logic_0 = (if __param_directive <= 69: 1 else: 0))
                 }
 
-                if (__ci_expr_logic_0 != 0) {
-                    if ((if ((__param_directive as u32) & (1 as u32)) != 0: 1 else: 0) != 0) {
+                if __ci_expr_logic_0 {
+                    if (((__param_directive as u32) & (1 as u32)) != 0) {
                         ((*__param_ccontext).optimization_flags = ((*__param_ccontext).optimization_flags as u32) & ((~((1 as u32) << (((((__param_directive as u32) >> (1 as u32)) as u32) -% (32 as u32)) as u32))) as u32))
                     } else {
                         ((*__param_ccontext).optimization_flags = ((*__param_ccontext).optimization_flags as u32) | (((1 as u32) << (((((__param_directive as u32) >> (1 as u32)) as u32) -% (32 as u32)) as u32)) as u32))
@@ -278,10 +186,11 @@ pub unsafe fn pcre2_set_optimize_8(__param_ccontext: *mut pcre2_real_compile_con
 
 }
 
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader
 pub unsafe fn pcre2_convert_context_copy_8(__param_ccontext: *mut pcre2_real_convert_context_8) -> *mut pcre2_real_convert_context_8 {
     var __local_newcontext: *mut pcre2_real_convert_context_8 = (((*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).malloc.unwrap()((sizeof[pcre2_real_convert_context_8]() as u64), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_convert_context_8))
 
-    if ((if __local_newcontext == null: 1 else: 0) != 0) {
+    if (__local_newcontext == null) {
         return ((null as *mut pcre2_real_convert_context_8))
     }
 
@@ -291,16 +200,17 @@ pub unsafe fn pcre2_convert_context_copy_8(__param_ccontext: *mut pcre2_real_con
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn pcre2_convert_context_create_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_convert_context_8 {
     var __local_ccontext: *mut pcre2_real_convert_context_8 = ((_pcre2_memctl_malloc_8((sizeof[pcre2_real_convert_context_8]() as u64), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_convert_context_8))
 
-    if ((if __local_ccontext == null: 1 else: 0) != 0) {
+    if (__local_ccontext == null) {
         return ((null as *mut pcre2_real_convert_context_8))
     }
 
     with_memcpy((&raw mut (*__local_ccontext) as *mut u8), (&raw const _pcre2_default_convert_context_8 as *const u8), sizeof[pcre2_real_convert_context_8]())
 
-    if ((if __param_gcontext != null: 1 else: 0) != 0) {
+    if (__param_gcontext != null) {
         with_memcpy((&raw mut (*(__local_ccontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
@@ -308,68 +218,19 @@ pub unsafe fn pcre2_convert_context_create_8(__param_gcontext: *mut pcre2_real_g
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn pcre2_convert_context_free_8(__param_ccontext: *mut pcre2_real_convert_context_8) {
-    if ((if __param_ccontext != null: 1 else: 0) != 0) {
+    if (__param_ccontext != null) {
         (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).free.unwrap()((__param_ccontext as *mut c_void), (*(&raw const (*__param_ccontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
-pub unsafe fn pcre2_set_glob_escape_8(__param_ccontext: *mut pcre2_real_convert_context_8, __param_escape: u32) -> i32 {
-    var __ci_expr_logic_1: i32
-
-    if ((if __param_escape > 255: 1 else: 0) != 0) {
-        (__ci_expr_logic_1 = (if true: 1 else: 0))
-    } else {
-        var __ci_expr_logic_0: i32 = 0
-
-        if ((if __param_escape != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if strchr(globpunct, (__param_escape as i32)) == null: 1 else: 0) != 0: 1 else: 0))
-        }
-
-        (__ci_expr_logic_1 = (if __ci_expr_logic_0 != 0: 1 else: 0))
-
-    }
-
-    if (__ci_expr_logic_1 != 0) {
-        return -29
-    }
-
-
-    ((*__param_ccontext).glob_escape = __param_escape)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_glob_separator_8(__param_ccontext: *mut pcre2_real_convert_context_8, __param_separator: u32) -> i32 {
-    var __ci_expr_logic_1: i32 = 0
-
-    var __ci_expr_logic_0: i32 = 0
-
-    if ((if __param_separator != 47: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __param_separator != 92: 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_0 != 0) {
-        (__ci_expr_logic_1 = (if (if __param_separator != 46: 1 else: 0) != 0: 1 else: 0))
-    }
-
-    if (__ci_expr_logic_1 != 0) {
-        return -29
-    }
-
-
-    ((*__param_ccontext).glob_separator = __param_separator)
-
-    return 0
-
-}
-
+// contract: unproved:0:memcpy is outside the corpus and not a known pure reader
 pub unsafe fn pcre2_match_context_copy_8(__param_mcontext: *mut pcre2_real_match_context_8) -> *mut pcre2_real_match_context_8 {
     var __local_newcontext: *mut pcre2_real_match_context_8 = (((*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).malloc.unwrap()((sizeof[pcre2_real_match_context_8]() as u64), (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).memory_data) as *mut pcre2_real_match_context_8))
 
-    if ((if __local_newcontext == null: 1 else: 0) != 0) {
+    if (__local_newcontext == null) {
         return ((null as *mut pcre2_real_match_context_8))
     }
 
@@ -379,16 +240,17 @@ pub unsafe fn pcre2_match_context_copy_8(__param_mcontext: *mut pcre2_real_match
 
 }
 
+// contract: unproved:0:NULL is an accepted argument
 pub unsafe fn pcre2_match_context_create_8(__param_gcontext: *mut pcre2_real_general_context_8) -> *mut pcre2_real_match_context_8 {
     var __local_mcontext: *mut pcre2_real_match_context_8 = ((_pcre2_memctl_malloc_8((sizeof[pcre2_real_match_context_8]() as u64), (__param_gcontext as *mut pcre2_memctl)) as *mut pcre2_real_match_context_8))
 
-    if ((if __local_mcontext == null: 1 else: 0) != 0) {
+    if (__local_mcontext == null) {
         return ((null as *mut pcre2_real_match_context_8))
     }
 
     with_memcpy((&raw mut (*__local_mcontext) as *mut u8), (&raw const _pcre2_default_match_context_8 as *const u8), sizeof[pcre2_real_match_context_8]())
 
-    if ((if __param_gcontext != null: 1 else: 0) != 0) {
+    if (__param_gcontext != null) {
         with_memcpy((&raw mut (*(__local_mcontext as *mut pcre2_memctl)) as *mut u8), (&raw const (*(__param_gcontext as *mut pcre2_memctl)) as *const u8), sizeof[pcre2_memctl]())
     }
 
@@ -396,13 +258,15 @@ pub unsafe fn pcre2_match_context_create_8(__param_gcontext: *mut pcre2_real_gen
 
 }
 
+// contract: unproved:0:frees a part of it
 pub unsafe fn pcre2_match_context_free_8(__param_mcontext: *mut pcre2_real_match_context_8) {
-    if ((if __param_mcontext != null: 1 else: 0) != 0) {
+    if (__param_mcontext != null) {
         (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).free.unwrap()((__param_mcontext as *mut c_void), (*(&raw const (*__param_mcontext).memctl as *const pcre2_memctl)).memory_data)
     }
 
 }
 
+// contract: receiver-mut:pcre2_real_match_context_8,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_set_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_callout: Option[unsafe extern "C" fn(*mut pcre2_callout_block_8, *mut c_void) -> i32], __param_callout_data: *mut c_void) -> i32 {
     ((*__param_mcontext).callout = __param_callout)
 
@@ -412,6 +276,7 @@ pub unsafe fn pcre2_set_callout_8(__param_mcontext: *mut pcre2_real_match_contex
 
 }
 
+// contract: receiver-mut:pcre2_real_match_context_8,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_set_substitute_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_substitute_callout: Option[unsafe extern "C" fn(*mut pcre2_substitute_callout_block_8, *mut c_void) -> i32], __param_substitute_callout_data: *mut c_void) -> i32 {
     ((*__param_mcontext).substitute_callout = __param_substitute_callout)
 
@@ -421,6 +286,7 @@ pub unsafe fn pcre2_set_substitute_callout_8(__param_mcontext: *mut pcre2_real_m
 
 }
 
+// contract: receiver-mut:pcre2_real_match_context_8,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn pcre2_set_substitute_case_callout_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_substitute_case_callout: Option[unsafe extern "C" fn(*const u8, u64, *mut u8, u64, i32, *mut c_void) -> u64], __param_substitute_case_callout_data: *mut c_void) -> i32 {
     ((*__param_mcontext).substitute_case_callout = __param_substitute_case_callout)
 
@@ -430,39 +296,7 @@ pub unsafe fn pcre2_set_substitute_case_callout_8(__param_mcontext: *mut pcre2_r
 
 }
 
-pub unsafe fn pcre2_set_depth_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: u32) -> i32 {
-    ((*__param_mcontext).depth_limit = __param_limit)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_heap_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: u32) -> i32 {
-    ((*__param_mcontext).heap_limit = __param_limit)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_match_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: u32) -> i32 {
-    ((*__param_mcontext).match_limit = __param_limit)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_offset_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: u64) -> i32 {
-    ((*__param_mcontext).offset_limit = __param_limit)
-
-    return 0
-
-}
-
-pub unsafe fn pcre2_set_recursion_limit_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_limit: u32) -> i32 {
-    return pcre2_set_depth_limit_8(__param_mcontext, __param_limit)
-
-}
-
+// contract: receiver:pcre2_real_match_context_8,unproved:3:read only
 pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcre2_real_match_context_8, __param_mymalloc: Option[unsafe extern "C" fn(u64, *mut c_void) -> *mut c_void], __param_myfree: Option[unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit], __param_mydata: *mut c_void) -> i32 {
 
 
@@ -472,18 +306,19 @@ pub unsafe fn pcre2_set_recursion_memory_management_8(__param_mcontext: *mut pcr
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn _pcre2_memctl_malloc_8(__param_size: u64, __param_memctl: *mut pcre2_memctl) -> *mut c_void {
     var __local_newmemctl: *mut pcre2_memctl
 
-    var __local_yield_: *mut c_void = (if (if __param_memctl == null: 1 else: 0) != 0: (with_alloc((__param_size as i64)) as *mut c_void) else: (*__param_memctl).malloc.unwrap()(__param_size, (*__param_memctl).memory_data))
+    var __local_yield_: *mut c_void = (if __param_memctl == null: (with_alloc((__param_size as i64)) as *mut c_void) else: (*__param_memctl).malloc.unwrap()(__param_size, (*__param_memctl).memory_data))
 
-    if ((if __local_yield_ == null: 1 else: 0) != 0) {
+    if (__local_yield_ == null) {
         return null
     }
 
     (__local_newmemctl = ((__local_yield_ as *mut pcre2_memctl)))
 
-    if ((if __param_memctl == null: 1 else: 0) != 0) {
+    if (__param_memctl == null) {
         ((*__local_newmemctl).malloc = Some(default_malloc))
 
         ((*__local_newmemctl).free = Some(default_free))
@@ -498,15 +333,225 @@ pub unsafe fn _pcre2_memctl_malloc_8(__param_size: u64, __param_memctl: *mut pcr
 
 }
 
+// contract: unproved:1:read only
 unsafe fn default_malloc(__param_size: u64, __param_data: *mut c_void) -> *mut c_void {
 
     return ((with_alloc((__param_size as i64)) as *mut c_void))
 
 }
 
+// contract: unproved:0:read only,unproved:1:read only
 unsafe fn default_free(__param_block: *mut c_void, __param_data: *mut c_void) {
 
     with_free((__param_block as *mut u8))
+
+}
+
+impl pcre2_real_compile_context_8 {
+    pub mut fn pcre2_set_bsr_8(__param_value: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        match __param_value {
+            2 => {
+                ((unsafe *__param_ccontext).bsr_convention = ((__param_value as u16)))
+
+                return 0
+
+            },
+            1 => {
+                ((unsafe *__param_ccontext).bsr_convention = ((__param_value as u16)))
+
+                return 0
+
+            },
+            _ => {
+                return -29
+            },
+        }
+
+    }
+
+    pub mut fn pcre2_set_compile_extra_options_8(__param_options: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        ((unsafe *__param_ccontext).extra_options = __param_options)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_max_pattern_length_8(__param_length: u64) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        ((unsafe *__param_ccontext).max_pattern_length = __param_length)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_max_pattern_compiled_length_8(__param_length: u64) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        ((unsafe *__param_ccontext).max_pattern_compiled_length = __param_length)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_max_varlookbehind_8(__param_limit: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        ((unsafe *__param_ccontext).max_varlookbehind = __param_limit)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_newline_8(__param_newline: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        match __param_newline {
+            1 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            2 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            3 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            4 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            5 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            6 => {
+                ((unsafe *__param_ccontext).newline_convention = ((__param_newline as u16)))
+
+                return 0
+
+            },
+            _ => {
+                return -29
+            },
+        }
+
+    }
+
+    pub mut fn pcre2_set_parens_nest_limit_8(__param_limit: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_compile_context_8 = self as *mut pcre2_real_compile_context_8
+        ((unsafe *__param_ccontext).parens_nest_limit = __param_limit)
+
+        return 0
+
+    }
+
+}
+
+impl pcre2_real_convert_context_8 {
+    pub mut fn pcre2_set_glob_escape_8(__param_escape: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_convert_context_8 = self as *mut pcre2_real_convert_context_8
+        var __ci_expr_logic_1: i32
+
+        if (__param_escape > 255) {
+            (__ci_expr_logic_1 = (if true: 1 else: 0))
+        } else {
+            var __ci_expr_logic_0: i32 = 0
+
+            if (__param_escape != 0) {
+                (__ci_expr_logic_0 = (if strchr(globpunct, (__param_escape as i32)) == null: 1 else: 0))
+            }
+
+            (__ci_expr_logic_1 = (if __ci_expr_logic_0: 1 else: 0))
+
+        }
+
+        if __ci_expr_logic_1 {
+            return -29
+        }
+
+
+        ((unsafe *__param_ccontext).glob_escape = __param_escape)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_glob_separator_8(__param_separator: u32) -> i32 {
+        let __param_ccontext: *mut pcre2_real_convert_context_8 = self as *mut pcre2_real_convert_context_8
+        var __ci_expr_logic_1: i32 = 0
+
+        var __ci_expr_logic_0: i32 = 0
+
+        if (__param_separator != 47) {
+            (__ci_expr_logic_0 = (if __param_separator != 92: 1 else: 0))
+        }
+
+        if __ci_expr_logic_0 {
+            (__ci_expr_logic_1 = (if __param_separator != 46: 1 else: 0))
+        }
+
+        if __ci_expr_logic_1 {
+            return -29
+        }
+
+
+        ((unsafe *__param_ccontext).glob_separator = __param_separator)
+
+        return 0
+
+    }
+
+}
+
+impl pcre2_real_match_context_8 {
+    pub mut fn pcre2_set_depth_limit_8(__param_limit: u32) -> i32 {
+        let __param_mcontext: *mut pcre2_real_match_context_8 = self as *mut pcre2_real_match_context_8
+        ((unsafe *__param_mcontext).depth_limit = __param_limit)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_heap_limit_8(__param_limit: u32) -> i32 {
+        let __param_mcontext: *mut pcre2_real_match_context_8 = self as *mut pcre2_real_match_context_8
+        ((unsafe *__param_mcontext).heap_limit = __param_limit)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_match_limit_8(__param_limit: u32) -> i32 {
+        let __param_mcontext: *mut pcre2_real_match_context_8 = self as *mut pcre2_real_match_context_8
+        ((unsafe *__param_mcontext).match_limit = __param_limit)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_offset_limit_8(__param_limit: u64) -> i32 {
+        let __param_mcontext: *mut pcre2_real_match_context_8 = self as *mut pcre2_real_match_context_8
+        ((unsafe *__param_mcontext).offset_limit = __param_limit)
+
+        return 0
+
+    }
+
+    pub mut fn pcre2_set_recursion_limit_8(__param_limit: u32) -> i32 {
+        let __param_mcontext: *mut pcre2_real_match_context_8 = self as *mut pcre2_real_match_context_8
+        return unsafe { (*__param_mcontext).pcre2_set_depth_limit_8(__param_limit) }
+
+    }
 
 }
 

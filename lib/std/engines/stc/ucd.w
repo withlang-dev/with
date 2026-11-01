@@ -21,7 +21,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+    while (__local_len >= ((sizeof[u64]() as i64))) {
         with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         (__local_h = (__local_h as u64) ^ (__local_block as u64))
@@ -39,7 +39,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
         (__local_len = __local_len - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -89,7 +89,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
     var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    while ((*__local_msg) != 0) {
+    while (*__local_msg) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
@@ -109,7 +109,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
         ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
@@ -147,11 +147,11 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
-    if ((if __param_nlen == 0: 1 else: 0) != 0) {
+    if (__param_nlen == 0) {
         return ((__local_str as *mut c_char))
     }
 
-    if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
+    if (__param_nlen > __local_slen) {
         return ((null as *mut c_char))
     }
 
@@ -160,11 +160,11 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
     loop {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_str) == (*__param_needle)) {
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return ((__local_str as *mut c_char))
         }
 
@@ -175,7 +175,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
         (__local_slen = __local_slen - 1)
 
-        if not ((__ci_expr_old_0 != 0)) {
+        if not (__ci_expr_old_0) {
             break
         }
     }
@@ -195,7 +195,7 @@ unsafe fn cutf8_count(__param_s: *const c_char) -> i64 {
     var __local_s = __param_s
     var __local_size: i64 = ((0 as i64))
 
-    while ((*__local_s) != 0) {
+    while (*__local_s) {
         (__local_s = __local_s + 1)
 
         (__local_size = __local_size + (if (((*__local_s) as i32) & (192 as i32)) != 128: 1 else: 0))
@@ -219,11 +219,11 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 
         (__local_nbytes = __local_nbytes - 1)
 
-        if ((if __ci_expr_old_0 != 0: 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if (*__local_s) != 0: 1 else: 0) != 0: 1 else: 0))
+        if (__ci_expr_old_0 != 0) {
+            (__ci_expr_logic_1 = (if (*__local_s) != 0: 1 else: 0))
         }
 
-        if (not (__ci_expr_logic_1 != 0)) {
+        if (not __ci_expr_logic_1) {
             break
         }
 
@@ -240,14 +240,14 @@ unsafe fn cutf8_count_n(__param_s: *const c_char, __param_nbytes: i64) -> i64 {
 unsafe fn cutf8_at(__param_s: *const c_char, __param_u8pos: i64) -> *const c_char {
     var __local_s = __param_s
     var __local_u8pos = __param_u8pos
-    while ((((if __local_u8pos > 0: 1 else: 0) as i32) & ((if (*__local_s) != 0: 1 else: 0) as i32)) != 0) {
+    while (((if __local_u8pos > 0: 1 else: 0) as i32) & ((if (*__local_s) != 0: 1 else: 0) as i32)) {
         (__local_s = __local_s + 1)
 
         (__local_u8pos = __local_u8pos - (if (((*__local_s) as i32) & (192 as i32)) != 128: 1 else: 0))
 
     }
 
-    if (((if not ((if __local_u8pos == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_u8pos == 0): 1 else: 0) as i64) {
         __assert_rtn(c"cutf8_at".ptr, c"utf8_prv.h".ptr, (57 as i32), c"u8pos == 0".ptr)
     } else {
         0
@@ -262,7 +262,7 @@ unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c
     var __local_u8pos = __param_u8pos
     var __local_inc: i32 = ((1 as i32))
 
-    if ((if __local_u8pos < 0: 1 else: 0) != 0) {
+    if (__local_u8pos < 0) {
         (__local_u8pos = (((0 - __local_u8pos) as i64)))
 
         (__local_inc = ((-1 as i32)))
@@ -272,11 +272,11 @@ unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c
     while true {
         var __ci_expr_logic_0: i32 = 0
 
-        if (__local_u8pos != 0) {
-            (__ci_expr_logic_0 = (if (*__local_s) != 0: 1 else: 0))
+        if __local_u8pos {
+            (__ci_expr_logic_0 = (if (*__local_s): 1 else: 0))
         }
 
-        if (not (__ci_expr_logic_0 != 0)) {
+        if (not __ci_expr_logic_0) {
             break
         }
 
@@ -286,7 +286,7 @@ unsafe fn cutf8_offset(__param_s: *const c_char, __param_u8pos: i64) -> *const c
 
     }
 
-    if (((if not ((if __local_u8pos == 0: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_u8pos == 0): 1 else: 0) as i64) {
         __assert_rtn(c"cutf8_offset".ptr, c"utf8_prv.h".ptr, (66 as i32), c"u8pos == 0".ptr)
     } else {
         0
@@ -319,7 +319,7 @@ unsafe fn cutf8_decode(__param_d: *mut cutf8_decode_t, __param_byte: u32) -> u32
 
     var __local_type_: u32 = ((__local_cutf8_dtab[__param_byte] as u32))
 
-    ((*__param_d).codep = (((if (*__param_d).state != 0: (((((__param_byte as u32) & (63 as u32)) as u32) | ((((*__param_d).codep as u32) << (6 as u32)) as u32)) as u32) else: (((((255 as u32) >> (__local_type_ as u32)) as u32) & (__param_byte as u32)) as u32)) as u32)))
+    ((*__param_d).codep = (((if (*__param_d).state: (((((__param_byte as u32) & (63 as u32)) as u32) | ((((*__param_d).codep as u32) << (6 as u32)) as u32)) as u32) else: (((((255 as u32) >> (__local_type_ as u32)) as u32) & (__param_byte as u32)) as u32)) as u32)))
 
     ((*__param_d).state = ((__local_cutf8_dtab[((((256 as u32) +% ((*__param_d).state as u32)) as u32) +% (__local_type_ as u32))] as u32)))
 
@@ -344,8 +344,8 @@ pub fn cutf8_isgroup(__param_group: i32, __param_c: u32) -> bool {
 
         var __local__c: u32 = __param_c
 
-        while ((if __local__n > 0: 1 else: 0) != 0) {
-            if ((if (unsafe *(&raw const (_utf8_unicode_groups[__param_group].r16[(__local__i + __local__mid)]).hi as *const u16)) < (unsafe *(&raw mut __local__c as *mut u32)): 1 else: 0) != 0) {
+        while (__local__n > 0) {
+            if ((unsafe *(&raw const (_utf8_unicode_groups[__param_group].r16[(__local__i + __local__mid)]).hi as *const u16)) < (unsafe *(&raw mut __local__c as *mut u32))) {
                 (__local__i = __local__i + (__local__mid + 1))
 
                 (__local__n = __local__n - (__local__mid + 1))
@@ -363,15 +363,15 @@ pub fn cutf8_isgroup(__param_group: i32, __param_c: u32) -> bool {
 
         ((unsafe *(&raw mut __local_i as *mut i32)) = __local__i)
 
-        if not ((0 != 0)) {
+        if not (false) {
             break
         }
     }
 
     var __ci_expr_logic_0: i32 = 0
 
-    if ((if __local_i < __local_n: 1 else: 0) != 0) {
-        (__ci_expr_logic_0 = (if (if __param_c >= (unsafe _utf8_unicode_groups[__param_group].r16[__local_i]).lo: 1 else: 0) != 0: 1 else: 0))
+    if (__local_i < __local_n) {
+        (__ci_expr_logic_0 = (if __param_c >= (unsafe _utf8_unicode_groups[__param_group].r16[__local_i]).lo: 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -386,12 +386,12 @@ unsafe fn cutf8_peek_at(__param_s: *const c_char, __param_offset: i64) -> u32 {
 }
 
 fn cutf8_isupper(__param_c: u32) -> bool {
-    return ((((if (if __param_c < 128: 1 else: 0) != 0: ((((if __param_c >= 65: 1 else: 0) as i32) & ((if __param_c <= 90: 1 else: 0) as i32)) as i32) else: ((if cutf8_tolower(__param_c) != __param_c: 1 else: 0) as i32)) != 0) as bool))
+    return ((((if __param_c < 128: ((((if __param_c >= 65: 1 else: 0) as i32) & ((if __param_c <= 90: 1 else: 0) as i32)) as i32) else: ((if cutf8_tolower(__param_c) != __param_c: 1 else: 0) as i32)) != 0) as bool))
 
 }
 
 fn cutf8_islower(__param_c: u32) -> bool {
-    return ((((if (if __param_c < 128: 1 else: 0) != 0: ((((if __param_c >= 97: 1 else: 0) as i32) & ((if __param_c <= 122: 1 else: 0) as i32)) as i32) else: ((if cutf8_toupper(__param_c) != __param_c: 1 else: 0) as i32)) != 0) as bool))
+    return ((((if __param_c < 128: ((((if __param_c >= 97: 1 else: 0) as i32) & ((if __param_c <= 122: 1 else: 0) as i32)) as i32) else: ((if cutf8_toupper(__param_c) != __param_c: 1 else: 0) as i32)) != 0) as bool))
 
 }
 
@@ -402,17 +402,17 @@ unsafe fn cutf8_icmp(__param_s1: *const c_char, __param_s2: *const c_char) -> i3
 }
 
 fn cutf8_isdigit(__param_c: u32) -> bool {
-    return ((((if (if __param_c < 128: 1 else: 0) != 0: ((((if __param_c >= 48: 1 else: 0) as i32) & ((if __param_c <= 57: 1 else: 0) as i32)) as i32) else: (cutf8_isgroup(U8G_Nd, __param_c) as i32)) != 0) as bool))
+    return ((((if __param_c < 128: ((((if __param_c >= 48: 1 else: 0) as i32) & ((if __param_c <= 57: 1 else: 0) as i32)) as i32) else: (cutf8_isgroup(U8G_Nd, __param_c) as i32)) != 0) as bool))
 
 }
 
 fn cutf8_isalpha(__param_c: u32) -> bool {
-    return ((((if (if __param_c < 128: 1 else: 0) != 0: ((if isalpha((__param_c as i32)) != 0: 1 else: 0) as i32) else: (cutf8_isgroup(U8G_L, __param_c) as i32)) != 0) as bool))
+    return ((((if __param_c < 128: ((if isalpha((__param_c as i32)) != 0: 1 else: 0) as i32) else: (cutf8_isgroup(U8G_L, __param_c) as i32)) != 0) as bool))
 
 }
 
 fn cutf8_iscased(__param_c: u32) -> bool {
-    if ((if __param_c < 128: 1 else: 0) != 0) {
+    if (__param_c < 128) {
         return ((((isalpha((__param_c as i32)) != 0)) as bool))
     }
 
@@ -420,16 +420,16 @@ fn cutf8_iscased(__param_c: u32) -> bool {
 
     var __ci_expr_logic_0: i32
 
-    if ((if cutf8_toupper(__param_c) != __param_c: 1 else: 0) != 0) {
+    if (cutf8_toupper(__param_c) != __param_c) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if (if cutf8_tolower(__param_c) != __param_c: 1 else: 0) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if cutf8_tolower(__param_c) != __param_c: 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if cutf8_isgroup(U8G_Lt, __param_c) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if cutf8_isgroup(U8G_Lt, __param_c): 1 else: 0))
     }
 
     return (((__ci_expr_logic_1 != 0) as bool))
@@ -438,16 +438,16 @@ fn cutf8_iscased(__param_c: u32) -> bool {
 }
 
 fn cutf8_isalnum(__param_c: u32) -> bool {
-    if ((if __param_c < 128: 1 else: 0) != 0) {
+    if (__param_c < 128) {
         return ((((isalnum((__param_c as i32)) != 0)) as bool))
     }
 
     var __ci_expr_logic_0: i32
 
-    if (cutf8_isgroup(U8G_L, __param_c) != 0) {
+    if cutf8_isgroup(U8G_L, __param_c) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Nd, __param_c) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Nd, __param_c): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -456,7 +456,7 @@ fn cutf8_isalnum(__param_c: u32) -> bool {
 }
 
 fn cutf8_isword(__param_c: u32) -> bool {
-    if ((if __param_c < 128: 1 else: 0) != 0) {
+    if (__param_c < 128) {
         return ((((((if isalnum((__param_c as i32)) != 0: 1 else: 0) as i32) | ((if __param_c == 95: 1 else: 0) as i32)) != 0) as bool))
     }
 
@@ -464,16 +464,16 @@ fn cutf8_isword(__param_c: u32) -> bool {
 
     var __ci_expr_logic_0: i32
 
-    if (cutf8_isgroup(U8G_L, __param_c) != 0) {
+    if cutf8_isgroup(U8G_L, __param_c) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Nd, __param_c) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Nd, __param_c): 1 else: 0))
     }
 
-    if (__ci_expr_logic_0 != 0) {
+    if __ci_expr_logic_0 {
         (__ci_expr_logic_1 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_1 = (if cutf8_isgroup(U8G_Pc, __param_c) != 0: 1 else: 0))
+        (__ci_expr_logic_1 = (if cutf8_isgroup(U8G_Pc, __param_c): 1 else: 0))
     }
 
     return (((__ci_expr_logic_1 != 0) as bool))
@@ -482,7 +482,7 @@ fn cutf8_isword(__param_c: u32) -> bool {
 }
 
 fn cutf8_isblank(__param_c: u32) -> bool {
-    if ((if __param_c < 128: 1 else: 0) != 0) {
+    if (__param_c < 128) {
         return ((((((if __param_c == 32: 1 else: 0) as i32) | ((if __param_c == 9: 1 else: 0) as i32)) != 0) as bool))
     }
 
@@ -491,16 +491,16 @@ fn cutf8_isblank(__param_c: u32) -> bool {
 }
 
 fn cutf8_isspace(__param_c: u32) -> bool {
-    if ((if __param_c < 128: 1 else: 0) != 0) {
+    if (__param_c < 128) {
         return ((((isspace((__param_c as i32)) != 0)) as bool))
     }
 
     var __ci_expr_logic_0: i32
 
-    if ((((if __param_c == 8232: 1 else: 0) as i32) | ((if __param_c == 8233: 1 else: 0) as i32)) != 0) {
+    if (((if __param_c == 8232: 1 else: 0) as i32) | ((if __param_c == 8233: 1 else: 0) as i32)) {
         (__ci_expr_logic_0 = (if true: 1 else: 0))
     } else {
-        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Zs, __param_c) != 0: 1 else: 0))
+        (__ci_expr_logic_0 = (if cutf8_isgroup(U8G_Zs, __param_c): 1 else: 0))
     }
 
     return (((__ci_expr_logic_0 != 0) as bool))
@@ -539,4 +539,4 @@ let Hiragana_range16: List[URange16] = [URange16 { lo: 12353, hi: 12438 }, URang
 let Katakana_range16: List[URange16] = [URange16 { lo: 12449, hi: 12538 }, URange16 { lo: 12541, hi: 12543 }, URange16 { lo: 12784, hi: 12799 }, URange16 { lo: 13008, hi: 13054 }, URange16 { lo: 13056, hi: 13143 }, URange16 { lo: 65382, hi: 65391 }, URange16 { lo: 65393, hi: 65437 }]
 let Latin_range16: List[URange16] = [URange16 { lo: 65, hi: 90 }, URange16 { lo: 97, hi: 122 }, URange16 { lo: 170, hi: 170 }, URange16 { lo: 186, hi: 186 }, URange16 { lo: 192, hi: 214 }, URange16 { lo: 216, hi: 246 }, URange16 { lo: 248, hi: 696 }, URange16 { lo: 736, hi: 740 }, URange16 { lo: 7424, hi: 7461 }, URange16 { lo: 7468, hi: 7516 }, URange16 { lo: 7522, hi: 7525 }, URange16 { lo: 7531, hi: 7543 }, URange16 { lo: 7545, hi: 7614 }, URange16 { lo: 7680, hi: 7935 }, URange16 { lo: 8305, hi: 8305 }, URange16 { lo: 8319, hi: 8319 }, URange16 { lo: 8336, hi: 8348 }, URange16 { lo: 8490, hi: 8491 }, URange16 { lo: 8498, hi: 8498 }, URange16 { lo: 8526, hi: 8526 }, URange16 { lo: 8544, hi: 8584 }, URange16 { lo: 11360, hi: 11391 }, URange16 { lo: 42786, hi: 42887 }, URange16 { lo: 42891, hi: 42954 }, URange16 { lo: 42960, hi: 42961 }, URange16 { lo: 42963, hi: 42963 }, URange16 { lo: 42965, hi: 42969 }, URange16 { lo: 42994, hi: 43007 }, URange16 { lo: 43824, hi: 43866 }, URange16 { lo: 43868, hi: 43876 }, URange16 { lo: 43878, hi: 43881 }, URange16 { lo: 64256, hi: 64262 }, URange16 { lo: 65313, hi: 65338 }, URange16 { lo: 65345, hi: 65370 }]
 let Thai_range16: List[URange16] = [URange16 { lo: 3585, hi: 3642 }, URange16 { lo: 3648, hi: 3675 }]
-let _utf8_unicode_groups: List[UGroup] = [UGroup { r16: (&raw const Cc_range16[0] as *const URange16), nr16: 2 }, UGroup { r16: (&raw const L_range16[0] as *const URange16), nr16: 380 }, UGroup { r16: (&raw const Lm_range16[0] as *const URange16), nr16: 57 }, UGroup { r16: (&raw const Lt_range16[0] as *const URange16), nr16: 10 }, UGroup { r16: (&raw const Nd_range16[0] as *const URange16), nr16: 37 }, UGroup { r16: (&raw const Nl_range16[0] as *const URange16), nr16: 7 }, UGroup { r16: (&raw const No_range16[0] as *const URange16), nr16: 29 }, UGroup { r16: (&raw const P_range16[0] as *const URange16), nr16: 133 }, UGroup { r16: (&raw const Pc_range16[0] as *const URange16), nr16: 6 }, UGroup { r16: (&raw const Pd_range16[0] as *const URange16), nr16: 18 }, UGroup { r16: (&raw const Pe_range16[0] as *const URange16), nr16: 76 }, UGroup { r16: (&raw const Pf_range16[0] as *const URange16), nr16: 10 }, UGroup { r16: (&raw const Pi_range16[0] as *const URange16), nr16: 11 }, UGroup { r16: (&raw const Ps_range16[0] as *const URange16), nr16: 79 }, UGroup { r16: (&raw const Sc_range16[0] as *const URange16), nr16: 18 }, UGroup { r16: (&raw const Sk_range16[0] as *const URange16), nr16: 30 }, UGroup { r16: (&raw const Sm_range16[0] as *const URange16), nr16: 53 }, UGroup { r16: (&raw const Zl_range16[0] as *const URange16), nr16: 1 }, UGroup { r16: (&raw const Zp_range16[0] as *const URange16), nr16: 1 }, UGroup { r16: (&raw const Zs_range16[0] as *const URange16), nr16: 7 }, UGroup { r16: (&raw const Arabic_range16[0] as *const URange16), nr16: 22 }, UGroup { r16: (&raw const Bengali_range16[0] as *const URange16), nr16: 14 }, UGroup { r16: (&raw const Cyrillic_range16[0] as *const URange16), nr16: 8 }, UGroup { r16: (&raw const Devanagari_range16[0] as *const URange16), nr16: 4 }, UGroup { r16: (&raw const Georgian_range16[0] as *const URange16), nr16: 10 }, UGroup { r16: (&raw const Greek_range16[0] as *const URange16), nr16: 33 }, UGroup { r16: (&raw const Han_range16[0] as *const URange16), nr16: 11 }, UGroup { r16: (&raw const Hiragana_range16[0] as *const URange16), nr16: 2 }, UGroup { r16: (&raw const Katakana_range16[0] as *const URange16), nr16: 7 }, UGroup { r16: (&raw const Latin_range16[0] as *const URange16), nr16: 34 }, UGroup { r16: (&raw const Thai_range16[0] as *const URange16), nr16: 2 }]
+let _utf8_unicode_groups: List[UGroup] = [UGroup { r16: (&raw const Cc_range16[0] as *const URange16), nr16: ((Cc_range16.len() as u64) as i32) }, UGroup { r16: (&raw const L_range16[0] as *const URange16), nr16: ((L_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Lm_range16[0] as *const URange16), nr16: ((Lm_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Lt_range16[0] as *const URange16), nr16: ((Lt_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Nd_range16[0] as *const URange16), nr16: ((Nd_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Nl_range16[0] as *const URange16), nr16: ((Nl_range16.len() as u64) as i32) }, UGroup { r16: (&raw const No_range16[0] as *const URange16), nr16: ((No_range16.len() as u64) as i32) }, UGroup { r16: (&raw const P_range16[0] as *const URange16), nr16: ((P_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Pc_range16[0] as *const URange16), nr16: ((Pc_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Pd_range16[0] as *const URange16), nr16: ((Pd_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Pe_range16[0] as *const URange16), nr16: ((Pe_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Pf_range16[0] as *const URange16), nr16: ((Pf_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Pi_range16[0] as *const URange16), nr16: ((Pi_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Ps_range16[0] as *const URange16), nr16: ((Ps_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Sc_range16[0] as *const URange16), nr16: ((Sc_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Sk_range16[0] as *const URange16), nr16: ((Sk_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Sm_range16[0] as *const URange16), nr16: ((Sm_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Zl_range16[0] as *const URange16), nr16: ((Zl_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Zp_range16[0] as *const URange16), nr16: ((Zp_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Zs_range16[0] as *const URange16), nr16: ((Zs_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Arabic_range16[0] as *const URange16), nr16: ((Arabic_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Bengali_range16[0] as *const URange16), nr16: ((Bengali_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Cyrillic_range16[0] as *const URange16), nr16: ((Cyrillic_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Devanagari_range16[0] as *const URange16), nr16: ((Devanagari_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Georgian_range16[0] as *const URange16), nr16: ((Georgian_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Greek_range16[0] as *const URange16), nr16: ((Greek_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Han_range16[0] as *const URange16), nr16: ((Han_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Hiragana_range16[0] as *const URange16), nr16: ((Hiragana_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Katakana_range16[0] as *const URange16), nr16: ((Katakana_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Latin_range16[0] as *const URange16), nr16: ((Latin_range16.len() as u64) as i32) }, UGroup { r16: (&raw const Thai_range16[0] as *const URange16), nr16: ((Thai_range16.len() as u64) as i32) }]

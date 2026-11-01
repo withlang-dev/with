@@ -102,6 +102,34 @@ impl Sema:
             if not self.type_identity_syms.contains(key):
                 let identity = self.pool_intern(self.pool_resolve(name) ++ "$m$" ++ f"{sema_extension_path_hash(path)}")
                 self.type_identity_syms.insert(key, identity)
+        // An impl in a file other than the one declaring the colliding name
+        // keys its methods to that name's declaration in the impl's own
+        // package (mlib's facade_shapes.w impls defs.w's `m_serial_read_s`
+        // beside a program's), so the symbol compute_method_origins mints
+        // before any type is registered is the one collect_fn_decl looks up
+        // after: without the entry the lookup fell to visibility, found a
+        // different key once the type was registered, and registered the
+        // method's signature without a name.
+        var package_identity: HashMap[i64, i32] = HashMap.new()
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_TYPE_DECL: continue
+            let name = self.ast.get_data0(decl)
+            if not self.colliding_type_names.contains(name): continue
+            let path: str = self.decl_source_path_for_index(di)
+            let by_package = sema_pair_key(name, self.pool_intern(self.package_of(path)))
+            if not package_identity.contains(by_package):
+                package_identity.insert(by_package, self.type_identity_syms.get(sema_pair_key(name, self.pool_intern(path))).unwrap())
+        for di in 0..dc:
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_IMPL_DECL: continue
+            let name = self.ast.get_data0(decl)
+            if not self.colliding_type_names.contains(name): continue
+            let path: str = self.decl_source_path_for_index(di)
+            let key = sema_pair_key(name, self.pool_intern(path))
+            if self.type_identity_syms.contains(key): continue
+            let identity = package_identity.get(sema_pair_key(name, self.pool_intern(self.package_of(path))))
+            if identity.is_some(): self.type_identity_syms.insert(key, identity.unwrap())
 
     // #2520: the trait-name mirror — trait identity is (module, name), so
     // a trait name declared in more than one file mints its impl methods

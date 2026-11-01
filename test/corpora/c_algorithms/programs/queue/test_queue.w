@@ -16,7 +16,7 @@ pub fn generate_queue() -> *mut _Queue writes allocation_limit, variable1, varia
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 1000: 1 else: 0) != 0) {
+    while (__local_i < 1000) {
         unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
         unsafe { queue_push_head(__local_queue, ((&raw mut variable2 as *mut i32) as *mut c_void)) }
@@ -48,7 +48,7 @@ pub fn test_queue_new_free() -> Unit writes allocation_limit, variable1 {
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 1000: 1 else: 0) != 0) {
+    while (__local_i < 1000) {
         unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
 
@@ -63,7 +63,7 @@ pub fn test_queue_new_free() -> Unit writes allocation_limit, variable1 {
 
     (__local_queue = queue_new())
 
-    if (((if not ((if __local_queue == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (__local_queue == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_new_free".ptr, c"test-queue.c".ptr, (73 as i32), c"queue == NULL".ptr)
     } else {
         0
@@ -80,7 +80,7 @@ pub fn test_queue_push_head() writes allocation_limit, variable1, variable2, var
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 1000: 1 else: 0) != 0) {
+    while (__local_i < 1000) {
         unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
         unsafe { queue_push_head(__local_queue, ((&raw mut variable2 as *mut i32) as *mut c_void)) }
@@ -95,55 +95,55 @@ pub fn test_queue_push_head() writes allocation_limit, variable1, variable2, var
     }
 
 
-    if (((if not ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { (*__local_queue).queue_is_empty() }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (91 as i32), c"!queue_is_empty(queue)".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (94 as i32), c"queue_pop_tail(queue) == &variable1".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (95 as i32), c"queue_pop_tail(queue) == &variable2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (96 as i32), c"queue_pop_tail(queue) == &variable3".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (97 as i32), c"queue_pop_tail(queue) == &variable4".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (100 as i32), c"queue_pop_head(queue) == &variable4".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (101 as i32), c"queue_pop_head(queue) == &variable3".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (102 as i32), c"queue_pop_head(queue) == &variable2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (103 as i32), c"queue_pop_head(queue) == &variable1".ptr)
     } else {
         0
@@ -155,7 +155,7 @@ pub fn test_queue_push_head() writes allocation_limit, variable1, variable2, var
 
     alloc_test_set_limit((0 as i32))
 
-    if (((if not ((if not (unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_head".ptr, c"test-queue.c".ptr, (111 as i32), c"!queue_push_head(queue, &variable1)".ptr)
     } else {
         0
@@ -170,7 +170,7 @@ pub fn test_queue_pop_head() writes allocation_limit, variable1, variable2, vari
 
     (__local_queue = queue_new())
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (123 as i32), c"queue_pop_head(queue) == NULL".ptr)
     } else {
         0
@@ -180,26 +180,26 @@ pub fn test_queue_pop_head() writes allocation_limit, variable1, variable2, vari
 
     (__local_queue = generate_queue())
 
-    while ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0) {
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (not unsafe { (*__local_queue).queue_is_empty() }) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (131 as i32), c"queue_pop_head(queue) == &variable4".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (132 as i32), c"queue_pop_head(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (133 as i32), c"queue_pop_head(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (134 as i32), c"queue_pop_head(queue) == &variable1".ptr)
         } else {
             0
@@ -207,7 +207,7 @@ pub fn test_queue_pop_head() writes allocation_limit, variable1, variable2, vari
 
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_pop_head".ptr, c"test-queue.c".ptr, (137 as i32), c"queue_pop_head(queue) == NULL".ptr)
     } else {
         0
@@ -222,7 +222,7 @@ pub fn test_queue_peek_head() writes allocation_limit, variable1, variable2, var
 
     (__local_queue = queue_new())
 
-    if (((if not ((if unsafe { queue_peek_head(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { queue_peek_head(__local_queue) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (149 as i32), c"queue_peek_head(queue) == NULL".ptr)
     } else {
         0
@@ -232,50 +232,50 @@ pub fn test_queue_peek_head() writes allocation_limit, variable1, variable2, var
 
     (__local_queue = generate_queue())
 
-    while ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0) {
-        if (((if not ((if unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (not unsafe { (*__local_queue).queue_is_empty() }) {
+        if ((if not (unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (158 as i32), c"queue_peek_head(queue) == &variable4".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (159 as i32), c"queue_pop_head(queue) == &variable4".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (160 as i32), c"queue_peek_head(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (161 as i32), c"queue_pop_head(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (162 as i32), c"queue_peek_head(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (163 as i32), c"queue_pop_head(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_head(__local_queue) } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (164 as i32), c"queue_peek_head(queue) == &variable1".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (165 as i32), c"queue_pop_head(queue) == &variable1".ptr)
         } else {
             0
@@ -283,7 +283,7 @@ pub fn test_queue_peek_head() writes allocation_limit, variable1, variable2, var
 
     }
 
-    if (((if not ((if unsafe { queue_peek_head(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { queue_peek_head(__local_queue) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_peek_head".ptr, c"test-queue.c".ptr, (168 as i32), c"queue_peek_head(queue) == NULL".ptr)
     } else {
         0
@@ -302,7 +302,7 @@ pub fn test_queue_push_tail() writes allocation_limit, variable1, variable2, var
 
     (__local_i = ((0 as i32)))
 
-    while ((if __local_i < 1000: 1 else: 0) != 0) {
+    while (__local_i < 1000) {
         unsafe { queue_push_tail(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
         unsafe { queue_push_tail(__local_queue, ((&raw mut variable2 as *mut i32) as *mut c_void)) }
@@ -317,55 +317,55 @@ pub fn test_queue_push_tail() writes allocation_limit, variable1, variable2, var
     }
 
 
-    if (((if not ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { (*__local_queue).queue_is_empty() }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (188 as i32), c"!queue_is_empty(queue)".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (191 as i32), c"queue_pop_head(queue) == &variable1".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (192 as i32), c"queue_pop_head(queue) == &variable2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (193 as i32), c"queue_pop_head(queue) == &variable3".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_head(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_head() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (194 as i32), c"queue_pop_head(queue) == &variable4".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (197 as i32), c"queue_pop_tail(queue) == &variable4".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (198 as i32), c"queue_pop_tail(queue) == &variable3".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (199 as i32), c"queue_pop_tail(queue) == &variable2".ptr)
     } else {
         0
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (200 as i32), c"queue_pop_tail(queue) == &variable1".ptr)
     } else {
         0
@@ -377,7 +377,7 @@ pub fn test_queue_push_tail() writes allocation_limit, variable1, variable2, var
 
     alloc_test_set_limit((0 as i32))
 
-    if (((if not ((if not (unsafe { queue_push_tail(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { queue_push_tail(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_push_tail".ptr, c"test-queue.c".ptr, (208 as i32), c"!queue_push_tail(queue, &variable1)".ptr)
     } else {
         0
@@ -392,7 +392,7 @@ pub fn test_queue_pop_tail() writes allocation_limit, variable1, variable2, vari
 
     (__local_queue = queue_new())
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (220 as i32), c"queue_pop_tail(queue) == NULL".ptr)
     } else {
         0
@@ -402,26 +402,26 @@ pub fn test_queue_pop_tail() writes allocation_limit, variable1, variable2, vari
 
     (__local_queue = generate_queue())
 
-    while ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0) {
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (not unsafe { (*__local_queue).queue_is_empty() }) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (228 as i32), c"queue_pop_tail(queue) == &variable1".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (229 as i32), c"queue_pop_tail(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (230 as i32), c"queue_pop_tail(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (231 as i32), c"queue_pop_tail(queue) == &variable4".ptr)
         } else {
             0
@@ -429,7 +429,7 @@ pub fn test_queue_pop_tail() writes allocation_limit, variable1, variable2, vari
 
     }
 
-    if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_pop_tail".ptr, c"test-queue.c".ptr, (234 as i32), c"queue_pop_tail(queue) == NULL".ptr)
     } else {
         0
@@ -444,7 +444,7 @@ pub fn test_queue_peek_tail() writes allocation_limit, variable1, variable2, var
 
     (__local_queue = queue_new())
 
-    if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { queue_peek_tail(__local_queue) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (246 as i32), c"queue_peek_tail(queue) == NULL".ptr)
     } else {
         0
@@ -454,50 +454,50 @@ pub fn test_queue_peek_tail() writes allocation_limit, variable1, variable2, var
 
     (__local_queue = generate_queue())
 
-    while ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0) {
-        if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    while (not unsafe { (*__local_queue).queue_is_empty() }) {
+        if ((if not (unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (255 as i32), c"queue_peek_tail(queue) == &variable1".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable1 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable1 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (256 as i32), c"queue_pop_tail(queue) == &variable1".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (257 as i32), c"queue_peek_tail(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable2 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable2 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (258 as i32), c"queue_pop_tail(queue) == &variable2".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (259 as i32), c"queue_peek_tail(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable3 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable3 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (260 as i32), c"queue_pop_tail(queue) == &variable3".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { queue_peek_tail(__local_queue) } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (261 as i32), c"queue_peek_tail(queue) == &variable4".ptr)
         } else {
             0
         }
 
-        if (((if not ((if unsafe { queue_pop_tail(__local_queue) } == ((&raw mut variable4 as *mut i32)): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+        if ((if not (unsafe { (*__local_queue).queue_pop_tail() } == ((&raw mut variable4 as *mut i32))): 1 else: 0) as i64) {
             __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (262 as i32), c"queue_pop_tail(queue) == &variable4".ptr)
         } else {
             0
@@ -505,7 +505,7 @@ pub fn test_queue_peek_tail() writes allocation_limit, variable1, variable2, var
 
     }
 
-    if (((if not ((if unsafe { queue_peek_tail(__local_queue) } == null: 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (unsafe { queue_peek_tail(__local_queue) } == null): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_peek_tail".ptr, c"test-queue.c".ptr, (265 as i32), c"queue_peek_tail(queue) == NULL".ptr)
     } else {
         0
@@ -520,7 +520,7 @@ pub fn test_queue_is_empty() writes allocation_limit, variable1 {
 
     (__local_queue = queue_new())
 
-    if (((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) as i64) != 0) {
+    if ((if not unsafe { (*__local_queue).queue_is_empty() }: 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_is_empty".ptr, c"test-queue.c".ptr, (275 as i32), c"queue_is_empty(queue)".ptr)
     } else {
         0
@@ -528,15 +528,15 @@ pub fn test_queue_is_empty() writes allocation_limit, variable1 {
 
     unsafe { queue_push_head(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
-    if (((if not ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { (*__local_queue).queue_is_empty() }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_is_empty".ptr, c"test-queue.c".ptr, (278 as i32), c"!queue_is_empty(queue)".ptr)
     } else {
         0
     }
 
-    unsafe { queue_pop_head(__local_queue) }
+    unsafe { (*__local_queue).queue_pop_head() }
 
-    if (((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) as i64) != 0) {
+    if ((if not unsafe { (*__local_queue).queue_is_empty() }: 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_is_empty".ptr, c"test-queue.c".ptr, (281 as i32), c"queue_is_empty(queue)".ptr)
     } else {
         0
@@ -544,15 +544,15 @@ pub fn test_queue_is_empty() writes allocation_limit, variable1 {
 
     unsafe { queue_push_tail(__local_queue, ((&raw mut variable1 as *mut i32) as *mut c_void)) }
 
-    if (((if not ((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) != 0): 1 else: 0) as i64) != 0) {
+    if ((if not (not unsafe { (*__local_queue).queue_is_empty() }): 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_is_empty".ptr, c"test-queue.c".ptr, (284 as i32), c"!queue_is_empty(queue)".ptr)
     } else {
         0
     }
 
-    unsafe { queue_pop_tail(__local_queue) }
+    unsafe { (*__local_queue).queue_pop_tail() }
 
-    if (((if not (unsafe { queue_is_empty(__local_queue) } != 0): 1 else: 0) as i64) != 0) {
+    if ((if not unsafe { (*__local_queue).queue_is_empty() }: 1 else: 0) as i64) {
         __assert_rtn(c"test_queue_is_empty".ptr, c"test-queue.c".ptr, (287 as i32), c"queue_is_empty(queue)".ptr)
     } else {
         0
@@ -562,6 +562,7 @@ pub fn test_queue_is_empty() writes allocation_limit, variable1 {
 
 }
 
+// contract: unproved:1:read only
 pub unsafe fn main(__param_argc: i32, __param_argv: *mut *mut c_char) -> i32 writes allocation_limit {
     run_tests((&tests[0] as *mut extern "C" fn() -> Unit))
 

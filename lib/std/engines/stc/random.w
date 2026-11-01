@@ -17,7 +17,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
     var __local_block: u64 = ((0 as u64))
 
 
-    while ((if __local_len >= ((sizeof[u64]() as i64)): 1 else: 0) != 0) {
+    while (__local_len >= ((sizeof[u64]() as i64))) {
         with_memcpy((((&raw mut __local_block as *mut u64) as *mut c_void) as *mut u8), ((__local_msg as *const c_void) as *const u8), ((sizeof[u64]() as u64) as i64))
 
         (__local_h = (__local_h as u64) ^ (__local_block as u64))
@@ -35,7 +35,7 @@ unsafe fn c_basehash_n(__param_key: *const c_void, __param_len: i64) -> u64 {
 
         (__local_len = __local_len - 1)
 
-        if (not (__ci_expr_old_0 != 0)) {
+        if (not __ci_expr_old_0) {
             break
         }
 
@@ -85,7 +85,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 
     var __local_h: u64 = ((((0 as u64) -% 3750763034362895579) as u64))
 
-    while ((*__local_msg) != 0) {
+    while (*__local_msg) {
         var __ci_expr_old_0: *const u8 = __local_msg
 
         (__local_msg = __local_msg + 1)
@@ -105,7 +105,7 @@ unsafe fn c_hash_str(__param_str: *const c_char) -> u64 {
 unsafe fn c_hash_mix_n(__param_h: *mut u64, __param_n: i64) -> u64 {
     var __local_i: i64 = ((1 as i64))
 
-    while ((if __local_i < __param_n: 1 else: 0) != 0) {
+    while (__local_i < __param_n) {
         ((__param_h[0]) = ((__param_h[0]) +% (((__param_h[0]) as u64) ^ ((__param_h[__local_i]) as u64))))
 
         (__local_i = __local_i + 1)
@@ -143,11 +143,11 @@ fn c_next_pow2(__param_n: i64) -> i64 {
 unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_needle: *const c_char, __param_nlen: i64) -> *mut c_char {
     var __local_str = __param_str
     var __local_slen = __param_slen
-    if ((if __param_nlen == 0: 1 else: 0) != 0) {
+    if (__param_nlen == 0) {
         return ((__local_str as *mut c_char))
     }
 
-    if ((if __param_nlen > __local_slen: 1 else: 0) != 0) {
+    if (__param_nlen > __local_slen) {
         return ((null as *mut c_char))
     }
 
@@ -156,11 +156,11 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
     loop {
         var __ci_expr_logic_1: i32 = 0
 
-        if ((if (*__local_str) == (*__param_needle): 1 else: 0) != 0) {
-            (__ci_expr_logic_1 = (if (if not (with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if 1 != 0: __param_nlen else: (-1 as i64)) as u64) as i64)) != 0): 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_str) == (*__param_needle)) {
+            (__ci_expr_logic_1 = (if not with_memcmp(((__local_str as *const c_void) as *const u8), ((__param_needle as *const c_void) as *const u8), (((if true: __param_nlen else: (-1 as i64)) as u64) as i64)): 1 else: 0))
         }
 
-        if (__ci_expr_logic_1 != 0) {
+        if __ci_expr_logic_1 {
             return ((__local_str as *mut c_char))
         }
 
@@ -171,7 +171,7 @@ unsafe fn c_strnstrn(__param_str: *const c_char, __param_slen: i64, __param_need
 
         (__local_slen = __local_slen - 1)
 
-        if not ((__ci_expr_old_0 != 0)) {
+        if not (__ci_expr_old_0) {
             break
         }
     }
@@ -195,7 +195,7 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
     ((*__param_d)._has_next = (*__param_d)._has_next + 1)
 
-    if (((__ci_expr_old_0 as i32) & (1 as i32)) != 0) {
+    if ((__ci_expr_old_0 as i32) & (1 as i32)) {
         return (((*__param_d)._next * (*__param_d).stddev) + (*__param_d).mean)
     }
 
@@ -209,13 +209,13 @@ pub unsafe fn crand64_normal_r(__param_rng: *mut crand64, __param_stream: u64, _
 
         var __ci_expr_logic_1: i32
 
-        if ((if __local_sq >= 1.0: 1 else: 0) != 0) {
+        if (__local_sq >= 1.0) {
             (__ci_expr_logic_1 = (if true: 1 else: 0))
         } else {
-            (__ci_expr_logic_1 = (if (if __local_sq == 0.0: 1 else: 0) != 0: 1 else: 0))
+            (__ci_expr_logic_1 = (if __local_sq == 0.0: 1 else: 0))
         }
 
-        if not ((__ci_expr_logic_1 != 0)) {
+        if not (__ci_expr_logic_1) {
             break
         }
     }
@@ -284,12 +284,12 @@ pub unsafe fn crand64_uniform_r(__param_rng: *mut crand64, __param_stream: u64, 
             ((*(&raw mut __local_hi as *mut u64)) = ((((__local__z as u128) >> (64 as u32)) as u64)))
 
 
-            if not ((0 != 0)) {
+            if not (false) {
                 break
             }
         }
 
-        if not (((if __local_lo < (*__param_d).threshold: 1 else: 0) != 0)) {
+        if not ((__local_lo < (*__param_d).threshold)) {
             break
         }
     }
@@ -345,7 +345,7 @@ pub unsafe fn crand32_uniform_r(__param_rng: *mut crand32, __param_stream: u32, 
     loop {
         (__local_r = (((((*__param_rng).uint_r(__param_stream) as u64) *% ((*__param_d).range as u64)) as u64)))
 
-        if not (((if ((__local_r as u32)) < (*__param_d).threshold: 1 else: 0) != 0)) {
+        if not ((((__local_r as u32)) < (*__param_d).threshold)) {
             break
         }
     }

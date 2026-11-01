@@ -70,31 +70,13 @@ fn tommy_haszero_u32(__param_value: u32) -> i32 {
 
 }
 
-pub unsafe fn tommy_hashtable_init(__param_hashtable: *mut tommy_hashtable_struct, __param_bucket_max: u64) {
-    var __local_bucket_max = __param_bucket_max
-    if ((if __local_bucket_max < 16: 1 else: 0) != 0) {
-        (__local_bucket_max = ((16 as u64)))
-    } else {
-        (__local_bucket_max = ((tommy_roundup_pow2_u64(__local_bucket_max) as u64)))
-    }
-
-    ((*__param_hashtable).bucket_max = __local_bucket_max)
-
-    ((*__param_hashtable).bucket_mask = (((((*__param_hashtable).bucket_max as u64) -% (1 as u64)) as u64)))
-
-    ((*__param_hashtable).bucket = (((with_alloc((((((*__param_hashtable).bucket_max as u64) *% (8 as u64)) as u64) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
-
-    with_memset((((*__param_hashtable).bucket as *mut c_void) as *mut u8), (0 as i32), (((((*__param_hashtable).bucket_max as u64) *% (8 as u64)) as u64) as i64))
-
-    ((*__param_hashtable).count = ((0 as u64)))
-
-}
-
+// contract: unproved:0:frees a part of it
 pub unsafe fn tommy_hashtable_done(__param_hashtable: *mut tommy_hashtable_struct) {
     with_free((((*__param_hashtable).bucket as *mut c_void) as *mut u8))
 
 }
 
+// contract: receiver-mut:tommy_hashtable_struct,stored-unknown:1,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashtable_insert(__param_hashtable: *mut tommy_hashtable_struct, __param_node: *mut tommy_node_struct, __param_data: *mut c_void, __param_hash: u64) {
     var __local_pos: u64 = ((((__param_hash as u64) & ((*__param_hashtable).bucket_mask as u64)) as u64))
 
@@ -106,6 +88,7 @@ pub unsafe fn tommy_hashtable_insert(__param_hashtable: *mut tommy_hashtable_str
 
 }
 
+// contract: receiver-mut:tommy_hashtable_struct,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *const c_void, __param_hash: u64) -> *mut c_void {
     var __local_pos: u64 = ((((__param_hash as u64) & ((*__param_hashtable).bucket_mask as u64)) as u64))
 
@@ -114,11 +97,11 @@ pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_str
     while (__local_node != null) {
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if (*__local_node).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_node).index == __param_hash) {
+            (__ci_expr_logic_0 = (if __param_cmp(__param_cmp_arg, ((*__local_node).data as *const c_void)) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             tommy_list_remove_existing(((&raw const ((*__param_hashtable).bucket[__local_pos]) as *const *mut tommy_node_struct) as *mut *mut tommy_node_struct), __local_node)
 
             ((*__param_hashtable).count = ((*__param_hashtable).count -% 1))
@@ -136,22 +119,24 @@ pub unsafe fn tommy_hashtable_remove(__param_hashtable: *mut tommy_hashtable_str
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry
 pub unsafe fn tommy_hashtable_bucket(__param_hashtable: *mut tommy_hashtable_struct, __param_hash: u64) -> *mut tommy_node_struct {
     return ((((*__param_hashtable).bucket[((__param_hash as u64) & ((*__param_hashtable).bucket_mask as u64))]) as *mut tommy_node_struct))
 
 }
 
+// contract: unproved:0:returns a pointer the receiver's view cannot carry,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_struct, __param_cmp: unsafe extern "C" fn(*const c_void, *const c_void) -> i32, __param_cmp_arg: *const c_void, __param_hash: u64) -> *mut c_void {
     var __local_i: *mut tommy_node_struct = tommy_hashtable_bucket(__param_hashtable, __param_hash)
 
     while (__local_i != null) {
         var __ci_expr_logic_0: i32 = 0
 
-        if ((if (*__local_i).index == __param_hash: 1 else: 0) != 0) {
-            (__ci_expr_logic_0 = (if (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0) != 0: 1 else: 0))
+        if ((*__local_i).index == __param_hash) {
+            (__ci_expr_logic_0 = (if __param_cmp(__param_cmp_arg, ((*__local_i).data as *const c_void)) == 0: 1 else: 0))
         }
 
-        if (__ci_expr_logic_0 != 0) {
+        if __ci_expr_logic_0 {
             return (*__local_i).data
         }
 
@@ -164,6 +149,7 @@ pub unsafe fn tommy_hashtable_search(__param_hashtable: *mut tommy_hashtable_str
 
 }
 
+// contract: receiver-mut:tommy_hashtable_struct,unproved:1:out-parameter read before the write
 pub unsafe fn tommy_hashtable_remove_existing(__param_hashtable: *mut tommy_hashtable_struct, __param_node: *mut tommy_node_struct) -> *mut c_void {
     var __local_pos: u64 = (((((*__param_node).index as u64) & ((*__param_hashtable).bucket_mask as u64)) as u64))
 
@@ -175,35 +161,7 @@ pub unsafe fn tommy_hashtable_remove_existing(__param_hashtable: *mut tommy_hash
 
 }
 
-pub unsafe fn tommy_hashtable_foreach(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
-    var __local_bucket_max: u64 = (*__param_hashtable).bucket_max
-
-    var __local_bucket: *mut *mut tommy_node_struct = (*__param_hashtable).bucket
-
-    var __local_pos: u64
-
-    (__local_pos = ((0 as u64)))
-
-    while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
-        var __local_node: *mut tommy_node_struct = (__local_bucket[__local_pos])
-
-        while (__local_node != null) {
-            var __local_data: *mut c_void = (*__local_node).data
-
-            (__local_node = (*__local_node).next)
-
-            __param_func(__local_data)
-
-        }
-
-
-        (__local_pos = (__local_pos +% 1))
-
-    }
-
-
-}
-
+// contract: receiver:tommy_hashtable_struct,stored-unknown:2 — stores an argument; ownership not modeled
 pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtable_struct, __param_func: unsafe extern "C" fn(*mut c_void, *mut c_void) -> Unit, __param_arg: *mut c_void) {
     var __local_bucket_max: u64 = (*__param_hashtable).bucket_max
 
@@ -213,7 +171,7 @@ pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtabl
 
     (__local_pos = ((0 as u64)))
 
-    while ((if __local_pos < __local_bucket_max: 1 else: 0) != 0) {
+    while (__local_pos < __local_bucket_max) {
         var __local_node: *mut tommy_node_struct = (__local_bucket[__local_pos])
 
         while (__local_node != null) {
@@ -233,12 +191,68 @@ pub unsafe fn tommy_hashtable_foreach_arg(__param_hashtable: *mut tommy_hashtabl
 
 }
 
-pub unsafe fn tommy_hashtable_count(__param_hashtable: *mut tommy_hashtable_struct) -> u64 {
-    return (*__param_hashtable).count
+impl tommy_hashtable_struct {
+    pub mut fn tommy_hashtable_init(__param_bucket_max: u64) {
+        let __param_hashtable: *mut tommy_hashtable_struct = self as *mut tommy_hashtable_struct
+        var __local_bucket_max = __param_bucket_max
+        if (__local_bucket_max < 16) {
+            (__local_bucket_max = ((16 as u64)))
+        } else {
+            (__local_bucket_max = ((tommy_roundup_pow2_u64(__local_bucket_max) as u64)))
+        }
 
-}
+        ((unsafe *__param_hashtable).bucket_max = __local_bucket_max)
 
-pub unsafe fn tommy_hashtable_memory_usage(__param_hashtable: *mut tommy_hashtable_struct) -> u64 {
-    return (((((*__param_hashtable).bucket_max as u64) *% (sizeof[usize]() as u64)) as u64) +% (((tommy_hashtable_count(__param_hashtable) as u64) *% (sizeof[tommy_node_struct]() as u64)) as u64))
+        ((unsafe *__param_hashtable).bucket_mask = (((((unsafe *__param_hashtable).bucket_max as u64) -% (1 as u64)) as u64)))
+
+        ((unsafe *__param_hashtable).bucket = (((with_alloc((((((unsafe *__param_hashtable).bucket_max as u64) *% (8 as u64)) as u64) as i64)) as *mut c_void) as *mut *mut tommy_node_struct)))
+
+        with_memset((((unsafe *__param_hashtable).bucket as *mut c_void) as *mut u8), (0 as i32), (((((unsafe *__param_hashtable).bucket_max as u64) *% (8 as u64)) as u64) as i64))
+
+        ((unsafe *__param_hashtable).count = ((0 as u64)))
+
+    }
+
+    pub fn tommy_hashtable_foreach(__param_func: unsafe extern "C" fn(*mut c_void) -> Unit) {
+        let __param_hashtable: *mut tommy_hashtable_struct = (self as *const tommy_hashtable_struct) as *mut tommy_hashtable_struct
+        var __local_bucket_max: u64 = (unsafe *__param_hashtable).bucket_max
+
+        var __local_bucket: *mut *mut tommy_node_struct = (unsafe *__param_hashtable).bucket
+
+        var __local_pos: u64
+
+        (__local_pos = ((0 as u64)))
+
+        while (__local_pos < __local_bucket_max) {
+            var __local_node: *mut tommy_node_struct = (unsafe __local_bucket[__local_pos])
+
+            while (__local_node != null) {
+                var __local_data: *mut c_void = (unsafe *__local_node).data
+
+                (__local_node = (unsafe *__local_node).next)
+
+                unsafe { __param_func(__local_data) }
+
+            }
+
+
+            (__local_pos = (__local_pos +% 1))
+
+        }
+
+
+    }
+
+    pub fn tommy_hashtable_count() -> u64 {
+        let __param_hashtable: *mut tommy_hashtable_struct = (self as *const tommy_hashtable_struct) as *mut tommy_hashtable_struct
+        return (unsafe *__param_hashtable).count
+
+    }
+
+    pub fn tommy_hashtable_memory_usage() -> u64 {
+        let __param_hashtable: *mut tommy_hashtable_struct = (self as *const tommy_hashtable_struct) as *mut tommy_hashtable_struct
+        return (((((unsafe *__param_hashtable).bucket_max as u64) *% (sizeof[usize]() as u64)) as u64) +% (((unsafe { (*__param_hashtable).tommy_hashtable_count() } as u64) *% (sizeof[tommy_node_struct]() as u64)) as u64))
+
+    }
 
 }
