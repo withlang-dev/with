@@ -1302,6 +1302,8 @@ fn release_package_asset_for_platform(platform: &str) -> str:
         return "with-darwin-aarch64"
     if platform == "linux_x86_64" or platform == "linux-x86_64":
         return "with-linux-x86_64"
+    if platform == "linux_aarch64" or platform == "linux-aarch64":
+        return "with-linux-aarch64"
     if platform == "windows_x86_64" or platform == "windows-x86_64":
         return "with-windows-x86_64.exe"
     if platform == "windows_aarch64" or platform == "windows-aarch64":
@@ -1341,16 +1343,13 @@ fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target
 
 fn package_current_host_target() -> Target:
     var target = target_new(.Group, "package-current-host", "")
+    // One package target per release platform, named for the host's tag; a
+    // host no platform names depends on a target the graph does not have
+    // and fails there by name. The old spelling fell through to the darwin
+    // target, which refused the linux-aarch64 container at the end of a green
+    // release leg ("unsupported release packaging host: Linux/aarch64").
     let platform = supported_release_platform_tag()
-    if platform == "darwin-aarch64":
-        return target.dep("package-darwin-aarch64")
-    if platform == "linux-x86_64":
-        return target.dep("package-linux-x86_64")
-    if platform == "windows-x86_64":
-        return target.dep("package-windows-x86_64")
-    if platform == "windows-aarch64":
-        return target.dep("package-windows-aarch64")
-    target.dep("package-darwin-aarch64")
+    target.dep("package-" ++ (if platform.len() > 0: platform else: "unsupported-host"))
 
 // The SDK archive of `prefix`, with its digest and manifest, in `dir`. An
 // SDK fetched into .deps is repackaged into out/release (the release
@@ -3156,6 +3155,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     out = out.add_target(package_platform_target("package-darwin-aarch64", "darwin-aarch64", ctx))
     out = out.add_target(package_platform_target("package-linux-x86_64", "linux-x86_64", ctx))
+    out = out.add_target(package_platform_target("package-linux-aarch64", "linux-aarch64", ctx))
     out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
     out = out.add_target(package_platform_target("package-windows-aarch64", "windows-aarch64", ctx))
     out = out.add_target(package_current_host_target())
