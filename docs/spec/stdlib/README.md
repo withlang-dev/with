@@ -22,6 +22,7 @@ language change.
 
 - [lib/std — Standard Library Plan](libstd-spec.md)
 - [std.math — Design Specification](std-math-spec.md)
+- [std.frame — Dataframe Plan](std-frame-plan.md)
 - [std.regex — Design Specification](regex-spec.md)
 - [Perl-Compatible Regular Expression Conformance Specification](perl-compatible-re.md)
 - [RFC 4648 Encodings](std-encoding-rfc4648.md)
