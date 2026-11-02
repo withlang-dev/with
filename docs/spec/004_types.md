@@ -510,7 +510,12 @@ ensures resources are properly released.
 Implicit widening is only allowed for these numeric conversions:
 - Signed integers: `i8 -> i16 -> i32 -> i64`
 - Unsigned integers: `u8 -> u16 -> u32 -> u64`
-- Floats: `f32 -> f64`
+- Floats, in either direction (D182): a float beside a wider float in
+  arithmetic or a comparison is the wider float, and a float where a
+  narrower float is demanded (a binding, an argument, a return, an element)
+  converts to it as `as` does, rounding to nearest, ties to even. Dropping
+  mantissa bits is representation, not meaning: there is one float the
+  value can become, and the compiler knows it.
 - Unsigned to signed only when destination is strictly wider
   (`u8 -> i16`, `u16 -> i32`, `u32 -> i64`)
 - Any integer to `f32` or `f64` (D181). An integer beside a float in
@@ -522,7 +527,7 @@ Implicit widening is only allowed for these numeric conversions:
   meaning, and the compiler knows the only float this can be.
 
 No other implicit numeric conversion is allowed: a float never becomes an
-integer without `as`.
+integer without `as` (truncate or round is a choice, so it is spelled).
 
 **Implicit narrowing is a compile error:**
 
@@ -536,8 +541,8 @@ let y: u8 = x                 // ERROR: possible truncation
 let y: u8 = x as u8           // OK: explicit intent
 
 let f: f64 = 3.14
-let g: f32 = f                // ERROR: possible precision loss
-let g: f32 = f as f32         // OK: explicit intent
+let g: f32 = f                // OK: rounds to nearest (D182); one meaning
+let n: i32 = f                // ERROR: truncate or round? write `f as i32` or `f.round() as i32`
 ```
 
 This catches a class of silent data corruption bugs inherited from

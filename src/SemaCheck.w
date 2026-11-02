@@ -30084,9 +30084,11 @@ impl Sema:
         // as `as` would; codegen rounds to nearest at the store.
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:
             return false
-        if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_FLOAT and self.get_type_d0(er) < self.get_type_d0(vr):
-            self.emit_error(f"implicit float narrowing from `{got}` to `{want}`; use an explicit `as` cast (§4.2.6)", node)
-            return true
+        // D182 (§4.2.6): a float where a narrower float is demanded converts
+        // to it, as `as` would (round to nearest, ties to even): one meaning,
+        // so no spelling; codegen's fp_cast at the store does it.
+        if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_FLOAT:
+            return false
         false
 
     // #781: an EXPLICIT owned demand (annotated let, assignment into an owned
