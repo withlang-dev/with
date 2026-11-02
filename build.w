@@ -1363,6 +1363,24 @@ fn package_platform_target(name: &str, platform: &str, ctx: &BuildCtx) -> Target
         target = target.dep("release-uat")
     target
 
+// A platform's asset cross-built on this host (windows-aarch64 on the release
+// host): the finalization package_platform_target gives a native asset, from
+// the stamped cross compiler, with the target SDK's notice. The host cannot
+// run the asset, so the version is read from the stamp the patch wrote.
+fn package_cross_platform_target(name: &str, platform: &str, compiler_path: &str, llvm_prefix: &str, compiler_target: &str, ctx: &BuildCtx) -> Target:
+    let asset = release_package_asset_for_platform(platform)
+    var target = target_new(.Action, build_owned_text(name), "").output("out/release/" ++ name ++ ".passed")
+    target.action = run_package_platform_release_action
+    // Arguments 4 and 6: the host SDK, whose llvm-readobj and llvm-strip run
+    // here, and the target SDK, whose mingw-w64 notice ships with the asset.
+    target = target.arg(build_owned_text(asset)).arg(build_owned_text(platform)).arg(build_owned_text(compiler_path)).arg(compiler_default_llvm_prefix()).arg("cross").arg(build_owned_text(llvm_prefix))
+    target = target.input("src/version").input(build_owned_text(compiler_path)).input("build/package.w")
+    target = target.extra_output("out/release/" ++ asset ++ ".sha256")
+    target = target.write_scope("out/release").write_scope("out/command/" ++ name)
+    target = target.timeout(600000)
+    target = target_with_version_inputs(target, ctx)
+    target.dep(build_owned_text(compiler_target))
+
 fn package_current_host_target() -> Target:
     var target = target_new(.Group, "package-current-host", "")
     // One package target per release platform, named for the host's tag; a
@@ -3183,7 +3201,13 @@ pub fn build(ctx: BuildCtx) -> Build:
     out = out.add_target(package_platform_target("package-linux-x86_64", "linux-x86_64", ctx))
     out = out.add_target(package_platform_target("package-linux-aarch64", "linux-aarch64", ctx))
     out = out.add_target(package_platform_target("package-windows-x86_64", "windows-x86_64", ctx))
-    out = out.add_target(package_platform_target("package-windows-aarch64", "windows-aarch64", ctx))
+    // windows-aarch64 is packaged natively on that host and cross-built
+    // everywhere else (the release host's leg; see cross-winarm-compiler).
+    // One name, one digest file: the host decides which action produces it.
+    if supported_release_platform_tag() == "windows-aarch64":
+        out = out.add_target(package_platform_target("package-windows-aarch64", "windows-aarch64", ctx))
+    else:
+        out = out.add_target(package_cross_platform_target("package-windows-aarch64", "windows-aarch64", "out/cross/windows_aarch64/bin/with.exe", cross_windows_aarch64_llvm_prefix(), "cross-winarm-compiler", ctx))
     out = out.add_target(package_current_host_target())
     var sdk_contract = target_new(.Action, "sdk-contract-tests", "").output("out/test-graph/sdk-contract-tests/passed")
     sdk_contract.action = run_sdk_contract_tests_action
@@ -4083,6 +4107,10 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     var cross_winarm_ld_rsp = target_new(.Action, "cross-winarm-llvm-link-metadata", "").output(cross_windows_aarch64_dir() ++ "/llvm_ld.rsp")
     cross_winarm_ld_rsp.action = run_cross_windows_aarch64_llvm_link_metadata_action
+    // The response file names the SDK's archives: a replaced SDK (the stale
+    // MSVC-style extraction next to the pinned mingw-style one listed .lib
+    // files that did not exist, 2026-11-02) regenerates it.
+    cross_winarm_ld_rsp = cross_winarm_ld_rsp.input(cross_windows_aarch64_llvm_prefix() ++ "/lib/libclang.a")
     cross_winarm_ld_rsp = cross_winarm_ld_rsp.write_scope(cross_windows_aarch64_dir())
     cross_winarm_ld_rsp = cross_winarm_ld_rsp.write_scope("out/command/cross-winarm-llvm-link-metadata")
     out = out.add_target(cross_winarm_ld_rsp)
@@ -4093,6 +4121,52 @@ pub fn build(ctx: BuildCtx) -> Build:
     cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-clang-bridge-object")
     cross_rt_windows_aarch64 = cross_rt_windows_aarch64.dep("cross-winarm-llvm-link-metadata")
     out = out.add_target(cross_rt_windows_aarch64)
+
+    // The windows-aarch64 release asset is cross-built here, the way
+    // seed-windows-aarch64.yml cross-builds its seed: the rebuilt native
+    // compiler emits every unit for aarch64-pc-windows-msvc, links against the
+    // pinned windows-aarch64 SDK (its libc carries the import libraries and
+    // the UCRT startup objects) and is stamped with its version and runtime
+    // generation as the native stages are. D137: the arm lane is non-gating,
+    // and it runs the battery on the platform itself post hoc; D180: the asset
+    // and its SDK ship with every release, from the release host.
+    var cross_winarm_objects: List[str] = List.new()
+    for suffix in "cimport-stubs-object fiber-asm-object llvm-bridge-object clang-bridge-object embedded-objects-object llvm-link-metadata".split(" "):
+        cross_winarm_objects.push("cross-winarm-" ++ suffix)
+    cross_winarm_objects.push("rt-bundle-windows_aarch64")
+    out = out.add_target(runtime_producer_target("cross-winarm-runtime-producer", release_compiler_bin("with"), cross_windows_aarch64_dir(), &cross_winarm_objects))
+    let cross_winarm_bin_dir = "out/cross/windows_aarch64/bin"
+    let cross_winarm_bin = cross_winarm_bin_dir ++ "/with.exe"
+    var cross_winarm_link = target_new(.Action, "cross-winarm-link-compiler", "").output(cross_winarm_bin ++ ".unstamped")
+    cross_winarm_link.action = run_with_compiler_build_action
+    cross_winarm_link = cross_winarm_link.compiler(release_compiler_bin("with"))
+    cross_winarm_link = cross_winarm_link.input("out/gen/main.w")
+    cross_winarm_link = target_with_compiler_source_inputs(cross_winarm_link, ctx)
+    cross_winarm_link = cross_winarm_link.arg("-O1").arg("--target=" ++ cross_windows_aarch64_triple())
+    cross_winarm_link = cross_winarm_link.arg("embedded-object=" ++ cross_windows_aarch64_dir() ++ "/embedded_objects.o")
+    // Link selects cross/<target> beneath the producer's native root
+    // (link_stage_runtime_variant_dir); the target directory is for embedding.
+    cross_winarm_link = cross_winarm_link.arg("runtime-root=out/lib")
+    cross_winarm_link = cross_winarm_link.input(cross_windows_aarch64_dir() ++ "/.producer")
+    cross_winarm_link = cross_winarm_link.dep("cross-rt-windows-aarch64").dep("cross-winarm-runtime-producer")
+    cross_winarm_link = cross_winarm_link.write_scope(build_owned_text(cross_winarm_bin_dir))
+    cross_winarm_link = cross_winarm_link.extra_output("out/command/cross-winarm-link-compiler")
+    cross_winarm_link = cross_winarm_link.timeout(1800000)
+    for pi in 0..corpus_plans_windows_aarch64.len():
+        cross_winarm_link = target_with_link_bundle(cross_winarm_link, ctx, corpus_plans_windows_aarch64[pi])
+    out = out.add_target(cross_winarm_link)
+
+    var cross_winarm_stamp = target_new(.Action, "cross-winarm-compiler", "").output(build_owned_text(cross_winarm_bin))
+    cross_winarm_stamp.action = run_patch_version_action
+    cross_winarm_stamp = cross_winarm_stamp.input(cross_winarm_bin ++ ".unstamped").input("docs/with-abi.sha256")
+    cross_winarm_stamp = cross_winarm_stamp.arg("runtime-producer=" ++ cross_windows_aarch64_dir() ++ "/.producer")
+    cross_winarm_stamp = cross_winarm_stamp.input(cross_windows_aarch64_dir() ++ "/.producer")
+    cross_winarm_stamp = cross_winarm_stamp.dep("cross-winarm-link-compiler").dep("abi-hash-check")
+    cross_winarm_stamp = target_with_generation_inputs(cross_winarm_stamp, ctx)
+    cross_winarm_stamp = target_with_version_inputs(cross_winarm_stamp, ctx)
+    cross_winarm_stamp = cross_winarm_stamp.write_scope(build_owned_text(cross_winarm_bin_dir))
+    cross_winarm_stamp = cross_winarm_stamp.extra_output("out/command/cross-winarm-compiler")
+    out = out.add_target(cross_winarm_stamp)
 
     // stage3: stage2 compiles the compiler once more, for fixpoint-compare only
     // (its units against stage2's). Nothing else depends on it, so it builds

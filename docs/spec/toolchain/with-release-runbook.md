@@ -542,16 +542,18 @@ move every workflow seed pin with it (`with run tools/bump_seed_pins.w`;
 `with build :seed` refetches `src/main`. Land the first change that needs the
 new seed after that bump, never in the same PR.
 
-### Local-first: the Mac publishes darwin and linux-aarch64; CI appends the rest
+### Local-first: the Mac publishes darwin, linux-aarch64 and windows-aarch64; CI appends the rest
 
-The two platforms an Apple Silicon Mac can build are built, verified and
+The three platforms an Apple Silicon Mac can produce are built, verified and
 published from the release host, minutes after the tag; the tag push makes
-CI build and append only what a Mac cannot — linux-x86_64, windows-x86_64
-and windows-aarch64 (`.github/workflows/nightly-release.yml` gates the
+CI build and append only what a Mac cannot — linux-x86_64 and
+windows-x86_64 (`.github/workflows/nightly-release.yml` gates the
 darwin-aarch64 and linux-aarch64 jobs on `github.event_name != 'push'`, so
-the nightly and test channels still exercise all five). The whole local half
-is one command, run from the release checkout after `src/version` is bumped
-and the tag is pushed:
+the nightly and test channels still exercise all five; its windows-aarch64
+job is add-only, so the cross-built asset published here stands, and the
+job's battery on the platform itself is the post-hoc evidence D137 asks
+for). The whole local half is one command, run from the release checkout
+after `src/version` is bumped and the tag is pushed:
 
 ```sh
 export GH_TOKEN=$(gh auth token)
@@ -562,14 +564,23 @@ with run tools/release_local.w v0.14.3            # --channel test to rehearse
 It runs, in order: the darwin gates (`build`, `:fixpoint`, `:test`,
 `:test-green`, `:last-green`, seed-driven), the rebuilt compiler's
 `:release-uat`, `:package-current-host`, `:package-llvm-sdk` and
-`:publish-release-asset` (compiler, SDK and the installer scripts); then it
-builds the `tools/docker/linux-aarch64` image, checks the tagged commit out
-in the `with-aarch64` volume, bootstraps exactly as the linux-aarch64 lane
-does (the seed from `seed.lock`, the SDK via
+`:publish-release-asset` (compiler, SDK and the installer scripts); then the
+windows-aarch64 cross leg: the pinned windows-aarch64 SDK is extracted into
+`.deps` when missing (its libc carries the import libraries and UCRT startup
+objects the compiler links against), the rebuilt darwin compiler cross-builds
+and stamps the arm compiler (`:cross-winarm-compiler`, the recipe of
+`seed-windows-aarch64.yml`), `:package-windows-aarch64` (in cross mode on a
+non-arm host) audits, strips
+and digests it (the version read from its stamp, since the host cannot run
+it), and the compiler, the pinned SDK with its sidecars and the mingw-w64
+notice are published; then it builds the `tools/docker/linux-aarch64` image,
+checks the tagged commit out in the `with-aarch64` volume, bootstraps exactly
+as the linux-aarch64 lane does (the seed from `seed.lock`, the SDK via
 `build :deps`), runs the same gates inside the container and publishes the
-linux-aarch64 compiler and SDK. `--skip-darwin` / `--skip-linux-aarch64`
-rerun one half. Every step prints its command and stops at the first
-failure; a failed platform simply has no asset until it is rerun.
+linux-aarch64 compiler and SDK. `--skip-darwin` / `--skip-windows-aarch64` /
+`--skip-linux-aarch64` rerun one leg. Every step prints its command and
+stops at the first failure; a failed platform simply has no asset until it
+is rerun.
 
 ### Publish-first: the release exists as soon as one platform is done
 
