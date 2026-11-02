@@ -30261,10 +30261,12 @@ impl Sema:
                 let name: str = self.pool_resolve(self.ast.get_data0(node))
                 self.emit_error_with_label(f"`{name}` is `{got}` from its use here, and `{want}` is demanded at this use; a local's uses must agree on its type (§4.2.1)", node, first_use, f"`{name}` is `{got}` from this use")
                 return true
-            if literal_let == 0: self.emit_error(msg, node)
-            else if literal_let < 0: self.emit_error_with_help(msg, node, f"`{self.pool_resolve(self.ast.get_data0(node))}` is a closure parameter nothing types, so it is `{got}`; annotate it (`({self.pool_resolve(self.ast.get_data0(node))}: T) => …`)")
-            else: self.emit_error_with_label(msg, node, literal_let, f"`{self.pool_resolve(self.ast.get_data0(node))}` is `{got}` from its literal here (§4.1)")
-            return true
+            // D183 (§4.2.6): the value converts with a range check, as an
+            // out-of-range index panics (D71); MIR emits the check. The lint
+            // names the declaration whose width is wrong, never the use.
+            self.checked_narrowings.insert(node, expected)
+            self.emit_warning(f"`{got}` narrows to `{want}` with a range check{self.narrowing_target_note}{seam_note}: widen the `{want}` declaration it flows into, or write `as {want}` for the wrap (§4.2.6, D183)", node)
+            return false
         // D181 (§4.2.6): an integer where a float is demanded converts to it,
         // as `as` would; codegen rounds to nearest at the store.
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:

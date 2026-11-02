@@ -1710,6 +1710,9 @@ type Sema {
     try_from_break_fns: HashMap[i32, i32],
     // §10.2 (D190): the `?` nodes in main whose Err ends the program.
     main_question_nodes: HashMap[i32, i32],
+    // §4.2.6 (D183): an expression Sema admitted at a narrower or other-signed
+    // integer demand, keyed to the demanded type; MIR converts it with a range check.
+    checked_narrowings: HashMap[i32, i32],
     try_branch_sigs: HashMap[i32, i32],
     try_branch_mono_syms: HashMap[i32, i32],
     try_from_break_sigs: HashMap[i32, i32],
@@ -3960,6 +3963,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         try_branch_fns: sema_new_map_i32_i32(),
         try_from_break_fns: sema_new_map_i32_i32(),
         main_question_nodes: sema_new_map_i32_i32(),
+        checked_narrowings: sema_new_map_i32_i32(),
         try_branch_sigs: sema_new_map_i32_i32(),
         try_branch_mono_syms: sema_new_map_i32_i32(),
         try_from_break_sigs: sema_new_map_i32_i32(),
