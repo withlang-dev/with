@@ -1904,8 +1904,8 @@ fn comp_doc_path_allowed(path: &str, file: &str) -> bool:
     // Corpus output: the promoted bundle roots carry this line; it changes
     // only with every corpus's re-promotion (D112).
     if file == "build/corpus.w" and path == "docs/spec/toolchain/wo_bundles.md": return true
-    // This list names them.
-    file == "build/compiler.w" and path == "docs/spec/toolchain/wo_bundles.md"
+    // This list names them; the conformance inventory reads the decision log.
+    file == "build/compiler.w" and (path == "docs/spec/toolchain/wo_bundles.md" or path == "docs/meetings/README.md")
 
 fn comp_doc_path_file_exempt(file: &str) -> bool:
     // Generated, never edited by hand (D112): the corpora and their tests.
@@ -1990,10 +1990,64 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
     errors = comp_inventory_add_errors(move errors, "cli flags", comp_spec_cli_flags(), comp_impl_flags(fs), "flag", "flag")
     // The spec does not catalogue lib/std (Eric, 2026-09-20): a library is
     // documented by its source, and adding one is not a language change.
+    for e in comp_conformance_errors(fs): errors.push(e)
 
     if errors.len() > 0:
         ctx.diagnostics().error(comp_inventory_error_text(errors))
     comp_write_ok_output(ctx)
+
+// The conformance inventory (bridge-the-impl-gap.md): one row per ruling
+// or section with a testable claim. A row says what the compiler does; the
+// gate keeps the file honest: an `implemented` row names a fixture that
+// exists, an `open` or `regressed` row names an issue, every ruling a row
+// names is in the decision log, and every ruling from D181 on has a row (the
+// older ones join as they are audited).
+fn comp_conformance_errors(fs: &ToolFs) -> List[str]:
+    var errors: List[str] = List.new()
+    let path = "docs/spec/conformance.tsv"
+    if not fs.exists(path):
+        errors.push("conformance: missing " ++ path)
+        return errors
+    let log = fs.read_text("docs/meetings/README.md")
+    var rows: HashMap[str, i32] = HashMap.new()
+    var line_no = 0
+    for line in fs.read_text(path).split("\n"):
+        line_no = line_no + 1
+        if line_no == 1 or line.trim().len() == 0: continue
+        let f = line.split("\t")
+        if f.len() < 5:
+            errors.push(f"conformance: {path}:{line_no}: a row has {f.len()} fields, not 5 (ruling, claim, state, fixture, issue)")
+            continue
+        let ruling = f[0]
+        let state = f[2]
+        let fixture = f[3]
+        let issue = f[4]
+        rows.insert(ruling, 1)
+        if state == "implemented":
+            if fixture.len() == 0 or not fs.exists(fixture):
+                errors.push(f"conformance: {path}:{line_no}: {ruling} says implemented but names no fixture that exists (Law 10: every ruling has its adversarial program)")
+        else if state == "open" or state == "regressed":
+            if issue.len() == 0:
+                errors.push(f"conformance: {path}:{line_no}: {ruling} is {state} and names no issue (the spec-gap queue)")
+        else:
+            errors.push(f"conformance: {path}:{line_no}: {ruling} has state '{state}'; implemented, open or regressed")
+        if ruling.starts_with("D") and not log.contains("[" ++ ruling ++ " "):
+            errors.push(f"conformance: {path}:{line_no}: {ruling} is not in the decision log")
+    // Every ruling from D181 on has a row.
+    for line in log.split("\n"):
+        if not line.starts_with("- [D"): continue
+        let close = line.find(" ")
+        if close < 3: continue
+        let name = line.slice(3, close)
+        var digits = ""
+        for i in 1..name.len():
+            let c = name[i]
+            if c < '0' or c > '9': break
+            digits = digits ++ name.slice(i, i + 1)
+        if digits.len() == 0: continue
+        if parse(digits) >= 181 and not rows.contains(name):
+            errors.push("conformance: " ++ name ++ " has no row in " ++ path ++ " (a ruling lands with its row and fixture)")
+    errors
 
 pub fn run_stack_budget_check_action(ctx: ActionCtx) -> i32:
     let inputs = ctx.inputs()

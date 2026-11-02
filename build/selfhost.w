@@ -377,6 +377,51 @@ pub fn run_wasm_link_regression_action(ctx: ActionCtx) -> i32:
     if not fs.exists(bin_path):
         return bs_fail(ctx, "wasm32 link produced no " ++ bin_path)
     0
+// bridge-the-impl-gap.md: every fixture in test/conformance/open.txt spells
+// a ruling the compiler does not implement yet, so each must FAIL under
+// the release compiler; one that passes says the ruling landed: flip its
+// row in docs/spec/conformance.tsv, delete the changelog's NON-COMPLIANT
+// sentence, and move the fixture to test/behavior. One that is missing is
+// an error too: the list is the queue.
+pub fn run_conformance_open_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() == 0:
+        return bs_fail(ctx, "missing compiler input")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let root = ctx.project_info().project_root()
+    let list_path = "test/conformance/open.txt"
+    if not fs.exists(list_path):
+        return bs_fail(ctx, "missing " ++ list_path)
+    var passed: List[str] = List.new()
+    var ran = 0
+    for raw in fs.read_text(list_path).split("\n"):
+        let line = raw.trim()
+        if line.len() == 0 or line.starts_with("#"): continue
+        if not fs.exists(line):
+            return bs_fail(ctx, "conformance-open: " ++ line ++ " is listed but does not exist")
+        ran = ran + 1
+        let label = bs_basename(line)
+        var args: List[str] = List.new()
+        args |> push(bs_abs(root, inputs[0]))
+        args |> push("test")
+        args |> push(bs_abs(root, line))
+        let result = ctx.process_runner().run_capture(args, bs_abs(root, bs_join(output_dir, label ++ ".stdout")), bs_abs(root, bs_join(output_dir, label ++ ".stderr")), BS_HANG_GUARD_MS)
+        if result.rc == 124:
+            return bs_fail(ctx, "conformance-open: " ++ line ++ " timed out")
+        if result.rc == 0:
+            passed.push(line)
+    if passed.len() > 0:
+        var names = ""
+        for p in passed: names = names ++ "\n  " ++ p
+        return bs_fail(ctx, "conformance-open: a fixture of an unimplemented ruling now PASSES; flip its row in docs/spec/conformance.tsv, delete the spec changelog's NON-COMPLIANT sentence, and move it to test/behavior:" ++ names)
+    print(f"conformance-open: {ran} open fixture(s) still fail, as recorded")
+    0
+
 // #1815 (D30): a link takes runtime objects of the linking compiler's
 // generation only, and says so when it cannot. The release compiler is one
 // generation with the out/lib it links through (its .producer) and with its

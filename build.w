@@ -2521,6 +2521,30 @@ fn run_ceremony_census_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("ceremony-census: a count rose above main's bar\n" ++ fs.read_text(stderr_rel))
     0
 
+// bridge-the-impl-gap.md: every fenced With example in docs/spec compiles
+// (tools/spec_examples.w); an example that cannot is a spec defect, or a
+// ruling not implemented yet and listed in test/conformance/spec-examples-open.txt.
+fn run_spec_examples_action(ctx: ActionCtx) -> i32:
+    let fs = ctx.fs()
+    let out_dir = ctx.output()
+    if fs.mkdir_all(out_dir) != 0: return 1
+    let root = ctx.project_info().project_root()
+    let compiler = build_project_abs(root, ctx.inputs()[0])
+    var args: List[str] = List.new()
+    args.push(compiler)
+    args.push("run")
+    args.push("tools/spec_examples.w")
+    args.push("--compiler")
+    args.push(compiler)
+    let stdout_rel = build_project_join(out_dir, "examples.stdout")
+    let stderr_rel = build_project_join(out_dir, "examples.stderr")
+    let result = ctx.process_runner().run_capture_cwd(args, build_project_abs(root, stdout_rel), build_project_abs(root, stderr_rel), 1200000, root)
+    print(fs.read_text(stdout_rel))
+    if result.rc != 0:
+        ctx.diagnostics().error("spec-examples: a spec example does not compile, or a listed open one now does\n" ++ fs.read_text(stderr_rel))
+    0
+
+
 fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let out_dir = ctx.output()
@@ -4349,6 +4373,17 @@ pub fn build(ctx: BuildCtx) -> Build:
     ceremony_census = ceremony_census.dep("build")
     ceremony_census = ceremony_census.write_scope("out/ceremony-census")
     out = out.add_target(ceremony_census)
+    var spec_examples = test_lane(.Action, "spec-examples", "").output("out/spec-examples")
+    spec_examples.action = run_spec_examples_action
+    spec_examples = spec_examples.allow_parallel()
+    spec_examples = spec_examples.input(release_compiler_bin("with"))
+    spec_examples = spec_examples.input("tools/spec_examples.w")
+    spec_examples = spec_examples.input("docs/spec")
+    spec_examples = spec_examples.input("test/conformance/spec-examples-open.txt")
+    spec_examples = spec_examples.dep("build")
+    spec_examples = spec_examples.write_scope("out/spec-examples")
+    out = out.add_target(spec_examples)
+
     var rt_decl_audit = test_lane(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
@@ -4733,6 +4768,16 @@ pub fn build(ctx: BuildCtx) -> Build:
         invariance_check = invariance_check.dep("invariance-" ++ inv_label)
     out = out.add_target(invariance_check)
 
+    // bridge-the-impl-gap.md: the fixtures of rulings not yet implemented
+    // must keep failing; one that passes is a ruling that landed unrecorded.
+    var conformance_open = test_lane(.Action, "conformance-open", "").output("out/test-graph/conformance-open")
+    conformance_open = conformance_open.allow_parallel()
+    conformance_open.action = run_conformance_open_action
+    conformance_open = conformance_open.input(release_compiler_bin("with"))
+    conformance_open = conformance_open.input("test/conformance/open.txt")
+    conformance_open = conformance_open.dep("build")
+    out = out.add_target(conformance_open)
+
     var embedded_runtime_regression = test_lane(.Action, "embedded-runtime-regression", "").output("out/test-graph/embedded-runtime-regression")
     embedded_runtime_regression = embedded_runtime_regression.allow_parallel()
     embedded_runtime_regression.action = run_embedded_runtime_regression_action
@@ -4826,6 +4871,8 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("embedded-runtime-regression")
+    tests = tests.dep("conformance-open")
+    tests = tests.dep("spec-examples")
     tests = tests.dep("wasm-link-regression")
     tests = tests.dep("runtime-generation-regression")
     tests = tests.dep("emit-c-smoke")
