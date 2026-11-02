@@ -526,29 +526,38 @@ Implicit widening is only allowed for these numeric conversions:
   low bits of a value beyond the float's mantissa are representation, not
   meaning, and the compiler knows the only float this can be.
 
+- An integer where a narrower integer, or an integer of the other
+  signedness, is demanded converts with a range check (D183): a value the
+  destination cannot hold panics, as an out-of-range index panics (D71).
+  In a comptime initializer the check runs at compile time and an
+  out-of-range value is an error. `as` is the wrap: it keeps the low bits.
+  Positions are `isize` (D108, D114): a loop index from `0..xs.len()` is
+  `isize` by inference and indexes with no conversion, so a conversion
+  that remains marks the declaration whose width is wrong (an `i32` field
+  or parameter), and the lint names that declaration, not the use.
+
 No other implicit numeric conversion is allowed: a float never becomes an
 integer without `as` (truncate or round is a choice, so it is spelled).
 
-**Implicit narrowing is a compile error:**
-
 ```
 let big: i64 = 100000
-let small: i32 = big          // ERROR: possible truncation
-let small: i32 = big as i32   // OK: explicit intent
+let small: i32 = big          // OK: checked; panics if big does not fit (D183)
+let small: i32 = big as i32   // OK: wraps, keeps the low 32 bits
 
 let x: u32 = 300
-let y: u8 = x                 // ERROR: possible truncation
-let y: u8 = x as u8           // OK: explicit intent
+let y: u8 = x                 // panics at run time: 300 does not fit a u8
+let y: u8 = x as u8           // OK: wraps to 44
+const Z: u8 = 300             // ERROR: a comptime value out of range
 
 let f: f64 = 3.14
 let g: f32 = f                // OK: rounds to nearest (D182); one meaning
 let n: i32 = f                // ERROR: truncate or round? write `f as i32` or `f.round() as i32`
 ```
 
-This catches a class of silent data corruption bugs inherited from
-C. The `as` keyword signals that the programmer understands the
-conversion may lose data. Signed-to-unsigned and unsigned-to-signed
-conversions also require `as`, even at the same width.
+`as` is written where two meanings remain: a float into an integer
+(truncate or round) and the wrap of a narrowing or sign change (wrap or
+trap). Where one meaning is forced the conversion is implicit, whatever
+bits it drops: representation is never the reason for a spelling (Law 1).
 
 **What a cast does.** `v as T` between integer types takes `v`'s
 mathematical value and keeps its low bits in two's complement, so widening

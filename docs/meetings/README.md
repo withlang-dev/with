@@ -12,6 +12,13 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D189 — Tuple `.await` has no arity limit (delegated, D98)](2026-11-02-D189-tuple-await-has-no-arity-limit.md)
+- [D188 — `Duration` is a value type over `i64` nanoseconds, with `millis`/`secs` constructors, `Instant` and `timeout` (delegated, D98)](2026-11-02-D188-duration-is-a-value-type-over-i64-nanoseconds.md)
+- [D187 — A facade operation may return a borrow from two parameters: `returns borrow T from params N, M`, invalidated when either is (ruled)](2026-11-02-D187-a-facade-operation-may-borrow-from-two-parameters-returns-borrow-t-from-params.md)
+- [D186 — The iterator adapter is `skip(n)`; `drop(value)` stays the prelude's; `zip`, `chain` and `zip_with` take any iterable (ruled; the iterables delegated)](2026-11-02-D186-the-iterator-adapter-is-skip-n-drop-stays-the-preludes.md)
+- [D185 — One comprehension family: the bracket form over `Option` and `Result`; the `yield` expression form is retired; the statement form stays (ruled)](2026-11-02-D185-one-comprehension-family-the-bracket-form-over-option-and-result.md)
+- [D184 — A script's top-level bindings are module globals assigned in statement order; a read before its statement is D175's compile-time error (ruled)](2026-11-02-D184-a-scripts-top-level-bindings-are-module-globals-assigned-in-statement-order.md)
+- [D183 — An integer where a narrower integer or a different sign is demanded converts with a range check; `as` is the wrap spelling; positions are `isize`; a comptime value out of range is an error (ruled)](2026-11-02-D183-an-integer-where-a-narrower-integer-is-demanded-converts-with-a-range-check.md)
 - [D182 — A float beside a wider float is the wider float; a float where a narrower float is demanded converts to it, as `as` would; float-to-integer stays explicit (delegated, D98)](2026-11-02-D182-a-float-beside-a-wider-float-is-the-wider-float.md)
 - [D181 — An integer beside a float is the float: integer-to-float conversion is implicit in arithmetic, comparison and where a float is demanded; float-to-integer never is (ruled)](2026-11-01-D181-an-integer-beside-a-float-is-the-float.md)
 - [D180 — Every platform a release ships a compiler for ships that platform's SDK in the same release; a release without one is not done (ruled)](2026-11-01-D180-every-platform-ships-its-sdk-with-every-release.md)

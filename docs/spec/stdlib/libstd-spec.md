@@ -73,7 +73,7 @@ document does not redefine them; each module's header comment does.
 | `sys`, `sysinfo`, `os` | cpu_count, total_memory, page_size; os, arch, hostname; Layer-1 wrapper (os_kind, arch_kind, env, set_env, has_env, path_exists, posix_*) |
 | `signal` | sigint, sigterm, sigkill, raise_signal |
 | `random` | xorshift64 PRNG — seed, seed_now, `next()` and `range(lo, hi)` drawing the demanded type through the `Random` trait (D162), chance |
-| `time` | Duration, now, now_ns, sleep_secs, async sleep |
+| `time` | `Duration`: a value over `i64` nanoseconds on every target (D188), `nanos/micros/millis/secs/minutes/hours`, integer extensions (`50.millis()`), arithmetic and comparison; `Instant.now().elapsed()`; `now`, `now_ns`, async `sleep(Duration)`, `timeout(Duration) -> Task[Unit]` |
 | `thread` | JoinHandle, spawn_os, join |
 | `sync` | Mutex, RwLock, AtomicI64 |
 | `task` | Task[T], await_all, await_first, await_any, await_settled, with_concurrency (`lib/std/async/*.md`) |
