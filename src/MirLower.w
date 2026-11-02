@@ -13649,7 +13649,39 @@ impl MirBuilder:
         self.lower_cleanup_await(await_op, node)
         self.unit_operand()
 
+    // §11.8 (D95): a tuple's clone, element by element (clone_or_copy_place
+    // under the anchor Sema recorded), into a fresh aggregate; a view of a
+    // tuple clones the tuple it views.
+    mut fn lower_tuple_clone(self_expr: i32, node: i32) -> i32:
+        let tuple_ty = self.concrete_type(self.sema.tuple_clone_nodes.get(node).unwrap())
+        var place = self.lower_expr_place(self_expr)
+        let recv_ty = self.expr_type(self_expr)
+        if recv_ty != 0 and self.sema.get_type_kind(self.sema.resolve_alias(recv_ty as TypeId)) == TypeKind.TY_REF:
+            place = self.new_deref_place(place)
+        let elem_count = self.sema.get_type_d1(self.sema.resolve_alias(tuple_ty as TypeId))
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
+        for ti in 0..elem_count:
+            let elem_ty = self.tuple_elem_type(tuple_ty, ti)
+
+            let field_place = self.body.new_tuple_index_place(place, ti, elem_ty)
+            // A Copy element with drop glue (a CoW List, a str) is a counted copy:
+            // its hold retains, as a copied field's does (D111, D120).
+            let elem_op = self.clone_or_copy_place(field_place, elem_ty, self.sema.tuple_clone_elem_anchor(node, ti))
+            self.retain_consumed_copy(elem_op)
+            fields.push(elem_op)
+            names.push(0)
+        let fid = self.body.new_agg_fields(fields, names)
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, fid, 0)
+        let tmp = self.new_temp(tuple_ty)
+        let tmp_place = self.place_for_local(tmp)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, tmp_place, rv, self.ast.get_start(node))
+        self.body.new_operand(if self.sema.is_copy_frozen(tuple_ty) != 0: OperandKind.OK_COPY else: OperandKind.OK_MOVE, tmp_place)
+
+
     mut fn lower_method_call(self_expr: i32, method_sym0: i32, arg_start: i32, arg_count: i32, node: i32) -> i32:
+        // §11.8 (D95): the tuple clone Sema synthesized.
+        if self.sema.tuple_clone_nodes.contains(node): return self.lower_tuple_clone(self_expr, node)
         // §16.2b.3: Sema decided this `T.zeroed()` is the all-zero C record.
         if self.sema.zeroed_call_nodes.contains(node): return self.body.gen_zero_operand(self.expr_type(node))
         // D65 phase 5 (#2043): the method Sema resolved the call to when it

@@ -8287,6 +8287,12 @@ impl Sema:
     // lookup_generic_method_fn + concrete_owner_method_sig is the canonical
     // resolution/specialization path. Record that Sema decision for MIR rather
     // than re-resolving a frozen trait call during lowering.
+    // §11.8 (D95): the anchor under which element `i` of the tuple cloned at
+    // `node` records its clone contract (record_clone_contract); MIR reads the
+    // same key (clone_or_copy_place). Negative, so it never meets a node id.
+    fn tuple_clone_elem_anchor(node: i32, i: i32) -> i32: -(node * 64 + i + 1)
+
+
     mut fn record_clone_contract(payload_ty: i32, anchor_node: i32) -> bool:
         let owner_ty = self.resolve_alias(payload_ty as TypeId) as i32
         let owner_sym = self.method_owner_symbol_for_type(owner_ty)
@@ -31965,6 +31971,13 @@ impl Sema:
         // applicable to Vecs of primitive/other Copy elements.
         if trait_sym == self.syms.clone_trait and self.is_copy(resolved) != 0:
             return true
+        // §11.8 (D95): a tuple implements Clone when every element does.
+        if trait_sym == self.syms.clone_trait and self.get_type_kind(resolved) == TypeKind.TY_TUPLE:
+            let elem_start = self.get_type_d0(resolved)
+            for ti in 0..self.get_type_d1(resolved):
+                if not self.type_implements_trait(self.type_extra[elem_start + ti], trait_sym): return false
+            return true
+
         if trait_sym == self.syms.drop:
             if self.get_type_kind(resolved) == TypeKind.TY_GENERIC_INST:
                 return self.select_trait_impl_for_generic_inst(resolved as i32, trait_sym) != 0
@@ -37635,6 +37648,26 @@ impl Sema:
                     return self.resolve_contextual_default_join(result_join_expected, expr, result_payload, result_default_node, result_default_node, result_default_ty, D22_JOIN_ROLE_EXPR, node, "Result.unwrap_or")
                 if field == self.syms.is_ok or field == self.syms.is_err:
                     return self.ty_bool as i32
+
+        // §11.8 (D95): a tuple's `clone()` is synthesized — every element is
+        // cloned (a Copy element copied) into a new tuple; std cannot write
+        // the impl for every arity. A view of a tuple clones the tuple.
+        let tuple_recv = self.auto_deref_ref_ptr_type(self.resolve_alias(recv_type as TypeId))
+        if self.get_type_kind(tuple_recv) == TypeKind.TY_TUPLE and field == self.pool_intern("clone") and mc_resolved_arg_count == 0:
+            let elem_start = self.get_type_d0(tuple_recv)
+            let elem_count = self.get_type_d1(tuple_recv)
+            var all_clone = true
+            for ti in 0..elem_count:
+                let elem_ty = self.type_extra[elem_start + ti]
+                if self.is_copy(elem_ty as TypeId) != 0: continue
+                if not self.type_implements_trait(elem_ty, self.syms.clone_trait) or not self.record_clone_contract(elem_ty, self.tuple_clone_elem_anchor(node, ti)):
+                    all_clone = false
+            if all_clone:
+                self.tuple_clone_nodes.insert(node, tuple_recv as i32)
+                return tuple_recv as i32
+            self.emit_error(f"a tuple clones when every element does: `{self.type_name(tuple_recv as i32)}` has an element with no Clone (§11.8)", node)
+            return 0
+
 
         // Return types for primitive type methods
         let resolved_tk = self.get_type_kind(recv_type)
