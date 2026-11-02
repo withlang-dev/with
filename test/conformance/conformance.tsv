@@ -34,3 +34,4 @@ D190	`?` in fn main: and in a script: an Err ends the program (stderr, exit 1)	i
 §18.5	REPL persistent declarations	open		#2950
 §17	comptime enum payload shorthand; comptime f-string format specs	open		#2950
 D147	bitfields in member records under c_import	open		#2950
+D191	a line beginning with |> (or <|, ??) continues the expression whose line is indented no more than its own; at a match's column it pipes the whole match (§9.6)	implemented	test/behavior/behav_d191_pipe_line_indent.w	

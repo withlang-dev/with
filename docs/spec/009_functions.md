@@ -626,6 +626,28 @@ can fail. Both are idiomatic — they solve different problems.
 data |> parse |> validate? |> transform |> summarize
 ```
 
+A pipeline may continue on the next line with a leading `|>` (as may
+`<|` and `??`): the line's indentation decides what the operator's
+left-hand side includes (D191). The operator continues the expression
+whose line is indented no more than its own: at the column of a `match`
+it pipes the whole match; indented under an operand it continues that
+operand.
+
+```
+for i in 1..=100:
+    match (i % 3, i % 5):
+        (0, 0) => "FizzBuzz"
+        (0, _) => "Fizz"
+        (_, 0) => "Buzz"
+        _      => f"{i}"
+    |> print                 // the match is piped, not the last arm
+
+let total = xs
+    |> map(it * 2)
+    |> sum()                 // continues `xs`
+```
+
+
 Pipelines are left-associative. Ordinarily, `x |> f(a)` desugars to
 `f(x, a)`, and the next stage receives that call's result. There is one
 place-preserving case for in-place mutation (D21):

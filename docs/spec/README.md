@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.36
+# The With Programming Language — Specification v7.37
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,7 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.37:** §9.6: a line that begins with `|>` (or `<|`, `??`) continues the expression whose line is indented no more than its own; at a `match`'s column it pipes the whole match (D191, Eric 2026-11-02). Implemented in the same change.
 **Changelog v7.36:** §10.2: in `main` (`fn main:` or a script's implicit main) `?` on a `Result` needs no `Result` return; an `Err` it meets is written to stderr in its `Debug` form after `error: ` and the process exits with status 1 (D190, delegated). Implemented in the same change (#2935).
 **Changelog v7.35:** seven rulings of 2026-11-02 (D183–D189). §4.2.6: an
 integer where a narrower integer or the other signedness is demanded
