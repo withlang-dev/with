@@ -1189,13 +1189,20 @@ fn stage_compiler_obj(name: &str) -> str:
 fn release_compiler_bin(name: &str) -> str:
     host_bin("out/release/bin/" ++ name)
 
-// A test lane's ceiling is a hang guard, not a speed budget (#2902). Each
-// test in a lane has its own thirty-minute guard (TEST_HANG_GUARD_MS); the
-// lane as a whole is hung, not slow, only after an hour. The driver's own
-// default is twenty minutes, which behavior-tests, native-phase-tests and
-// tools-tests crossed on a 4-core Windows runner (v0.16.0.4) while every
-// test in them passed.
+// A lane's ceiling is a hang guard, not a speed budget (#2902). Each test
+// in a lane has its own thirty-minute guard (TEST_HANG_GUARD_MS); the lane
+// as a whole (a test lane, an audit, the migrator tests) is hung, not slow,
+// only after an hour. The driver's own default for a pooled lane is twenty
+// minutes, which behavior-tests, native-phase-tests and tools-tests crossed
+// on a 4-core Windows runner (v0.16.0.4) while every test in them passed.
 fn test_lane(kind: BuildKind, name: str, entry: str) -> Target: target_new(kind, name, entry).timeout(3600000)
+
+// A single spawned check (selfcheck, reseed-check-build-w, every-target-
+// check) gets the test hang guard. The driver's default for one is five
+// minutes, which `check src/main.w` by stage2 crossed on every 4-core
+// release runner once `:test` ran it beside the test lanes (v0.16.0.6:
+// 303 s on linux-x86_64, 305 s on windows-aarch64, 90 s alone on a host).
+fn guarded_check(name: str, entry: str) -> Target: target_new(.RunCorpusTest, name, entry).timeout(1800000)
 
 fn release_platform_asset_bin() -> str:
     let host_os = os()
@@ -3430,7 +3437,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // compiles them; checking needs no linker for the target.
     var every_target_check = target_new(.Group, "every-target-check", "")
     for target_name in "linux_x86_64 linux_aarch64 darwin_aarch64 windows_x86_64 windows_aarch64 wasm32".split(" "):
-        var target_check = target_new(.RunCorpusTest, "every-target-check-" ++ target_name, release_compiler_bin("with"))
+        var target_check = guarded_check("every-target-check-" ++ target_name, release_compiler_bin("with"))
         target_check = target_check.output("out/corpus/every-target-check-" ++ target_name)
         target_check = target_check.arg("check")
         target_check = target_check.arg("--target")
@@ -3782,7 +3789,7 @@ pub fn build(ctx: BuildCtx) -> Build:
         stage3_fixpoint = target_with_link_bundle(move stage3_fixpoint, ctx, corpus_plans[pi])
     out = out.add_target(stage3_fixpoint)
 
-    var selfcheck = target_new(.RunCorpusTest, "selfcheck", stage_compiler_bin("with-stage2"))
+    var selfcheck = guarded_check("selfcheck", stage_compiler_bin("with-stage2"))
     selfcheck = selfcheck.output("out/corpus/selfcheck")
     selfcheck = selfcheck.arg("check")
     selfcheck = selfcheck.arg("src/main.w")
@@ -4209,7 +4216,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     validate_all_async = validate_all_async.dep("build")
     validate_all_async = validate_all_async.write_scope("out/validate-all-async")
     out = out.add_target(validate_all_async)
-    var drop_audit = target_new(.Action, "drop-audit", "").output("out/drop-audit")
+    var drop_audit = test_lane(.Action, "drop-audit", "").output("out/drop-audit")
     drop_audit = drop_audit.allow_parallel()
     drop_audit.action = run_drop_audit_action
     drop_audit = drop_audit.input(release_compiler_bin("with"))
@@ -4261,7 +4268,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     ceremony_census = ceremony_census.dep("build")
     ceremony_census = ceremony_census.write_scope("out/ceremony-census")
     out = out.add_target(ceremony_census)
-    var rt_decl_audit = target_new(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
+    var rt_decl_audit = test_lane(.Action, "rt-decl-audit", "").output("out/rt-decl-audit")
     rt_decl_audit.action = run_rt_decl_audit_action
     rt_decl_audit = rt_decl_audit.allow_parallel()
     rt_decl_audit = rt_decl_audit.input(release_compiler_bin("with"))
@@ -4280,7 +4287,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     stdlib_complexity = stdlib_complexity.dep("build")
     stdlib_complexity = stdlib_complexity.write_scope("out/stdlib-complexity")
     out = out.add_target(stdlib_complexity)
-    var move_audit = target_new(.Action, "move-audit", "").output("out/move-audit")
+    var move_audit = test_lane(.Action, "move-audit", "").output("out/move-audit")
     move_audit = move_audit.allow_parallel()
     move_audit.action = run_move_audit_action
     move_audit = move_audit.input(release_compiler_bin("with"))
@@ -4354,7 +4361,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // D38: the ABI-defining sources' recorded hash must match — an ABI change
     // without a WITH_ABI_VERSION bump fails the battery (with-abi.md §7).
-    var abi_hash_check = target_new(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
+    var abi_hash_check = test_lane(.Action, "abi-hash-check", "").output("out/abi-hash-check/stamp")
     abi_hash_check = abi_hash_check.allow_parallel()
     abi_hash_check.action = run_abi_hash_check_action
     abi_hash_check = abi_hash_check.input("src/FnAbi.w")
@@ -4515,7 +4522,7 @@ pub fn build(ctx: BuildCtx) -> Build:
 
     // Type checking does not depend on declaration order except where the
     // spec orders it (#1941; build/sema_order.w).
-    var sema_order_check = target_new(.Action, "sema-order-check", "").output("out/test-graph/sema-order-check")
+    var sema_order_check = test_lane(.Action, "sema-order-check", "").output("out/test-graph/sema-order-check")
     sema_order_check = sema_order_check.allow_parallel()
     sema_order_check.action = run_sema_order_check_action
     sema_order_check = sema_order_check.input(release_compiler_bin("with"))
@@ -4538,7 +4545,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // The benchmarks lane: every benchmarks/workloads/*/*.w and the runner,
     // benchmarks/run.w, are checked (never built or run) with the release
     // compiler, so a benchmark that stops compiling fails the gate.
-    var benchmarks_check = target_new(.Action, "benchmarks-check", "").output("out/test-graph/benchmarks-check")
+    var benchmarks_check = test_lane(.Action, "benchmarks-check", "").output("out/test-graph/benchmarks-check")
     benchmarks_check = benchmarks_check.allow_parallel()
     benchmarks_check.action = run_benchmarks_check_action
     benchmarks_check = benchmarks_check.input(release_compiler_bin("with"))
@@ -4598,14 +4605,14 @@ pub fn build(ctx: BuildCtx) -> Build:
     c_migrator_pcre2_prep_tests = c_migrator_pcre2_prep_tests.dep("build")
     out = out.add_target(c_migrator_pcre2_prep_tests)
 
-    var c_migrator_basic_tests = target_new(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
+    var c_migrator_basic_tests = test_lane(.Action, "c-migrator-basic-tests", "").output("out/test-graph/c-migrator-basic-tests")
     c_migrator_basic_tests = c_migrator_basic_tests.allow_parallel()
     c_migrator_basic_tests.action = run_cli_selfhost_migrate_basic_action
     c_migrator_basic_tests = c_migrator_basic_tests.input(release_compiler_bin("with"))
     c_migrator_basic_tests = c_migrator_basic_tests.dep("build")
     out = out.add_target(c_migrator_basic_tests)
 
-    var c_migrator_core_tests = target_new(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
+    var c_migrator_core_tests = test_lane(.Action, "c-migrator-core-tests", "").output("out/test-graph/c-migrator-core-tests")
     c_migrator_core_tests = c_migrator_core_tests.allow_parallel()
     c_migrator_core_tests.action = run_cli_selfhost_migrate_core_action
     c_migrator_core_tests = c_migrator_core_tests.input(release_compiler_bin("with"))
@@ -4634,7 +4641,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     var invariance_check = target_new(.Group, "invariance-check", "")
     for ii in 0..invariance_labels.len():
         let inv_label = invariance_labels[ii]
-        var inv = target_new(.Action, "invariance-" ++ inv_label, "").output("out/test-graph/invariance-" ++ inv_label)
+        var inv = test_lane(.Action, "invariance-" ++ inv_label, "").output("out/test-graph/invariance-" ++ inv_label)
         inv.action = invariance_variant_action
         inv = inv.input(release_compiler_bin("with"))
         inv = inv.input("seed.lock")
@@ -4679,7 +4686,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     // so a battery went green on sources whose compiler could not become the
     // seed (2026-09-22: build/sdk.w pushed a `&str` into a List[str]). A green
     // must be reseedable.
-    var reseed_check = target_new(.RunCorpusTest, "reseed-check-build-w", release_compiler_bin("with"))
+    var reseed_check = guarded_check("reseed-check-build-w", release_compiler_bin("with"))
     reseed_check = reseed_check.output("out/corpus/reseed-check-build-w")
     reseed_check = reseed_check.arg("check")
     reseed_check = reseed_check.arg("build.w")
