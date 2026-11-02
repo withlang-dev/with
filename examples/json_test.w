@@ -1,83 +1,58 @@
 // std.json — the safe document surface: JsonDocument.parse, field views,
 // Deserialize for primitives and derived types, and JsonWriter round trips.
-
 use std.json
 
-fn expect(label: str, ok: bool):
-    if ok:
-        print(f"PASS: {label}")
-    else:
-        print(f"FAIL: {label}")
+fn expect(label: str, ok: bool): print(if ok: f"PASS: {label}" else: f"FAIL: {label}")
 
 @[derive(Serialize, Deserialize)]
-type InitParams {
-    rootUri: str,
-}
+type InitParams { rootUri: str }
 
 @[derive(Serialize, Deserialize)]
-type InitRequest {
-    method: str,
-    id: i32,
-    params: InitParams,
-}
+type InitRequest { method: str, id: i32, params: InitParams }
 
-fn main:
-    // ── Test 1: Object with nested structure ──
-    let js = "{\"method\":\"initialize\",\"id\":1,\"params\":{\"rootUri\":\"/tmp\"}}"
-    // The document keeps its source (parse takes an owned str), so the
-    // copy the round-trip test compares against is spelled.
-    let doc = JsonDocument.parse(js)
-    let root = doc.root()
-    expect("method val", root.field("method").raw() == "initialize")
-    expect("id val", i32.deserialize(root.field("id")) == 1)
-    expect("rootUri val", root.field("params").field("rootUri").raw() == "/tmp")
+// An object with nested structure
+let js = "{\"method\":\"initialize\",\"id\":1,\"params\":{\"rootUri\":\"/tmp\"}}"
+let doc = JsonDocument.parse(js)
+let root = doc.root()
+expect("method val", root.field("method").raw() == "initialize")
+expect("id val", i32.deserialize(root.field("id")) == 1)
+expect("rootUri val", root.field("params").field("rootUri").raw() == "/tmp")
 
-    // ── Test 2: Deserialize into a derived type ──
-    let req = InitRequest.deserialize(root)
-    expect("derived method", req.method == "initialize")
-    expect("derived id", req.id == 1)
-    expect("derived nested", req.params.rootUri == "/tmp")
+// Deserialize into a derived type
+let req = InitRequest.deserialize(root)
+expect("derived method", req.method == "initialize")
+expect("derived id", req.id == 1)
+expect("derived nested", req.params.rootUri == "/tmp")
 
-    // ── Test 3: Array and primitives ──
-    let arr_doc = JsonDocument.parse("{\"items\":[1, 2, 3, \"hello\", true, null],\"n\":3}")
-    let arr_root = arr_doc.root()
-    expect("array raw", arr_root.field("items").raw() == "[1, 2, 3, \"hello\", true, null]")
-    expect("array sibling", i32.deserialize(arr_root.field("n")) == 3)
+// Arrays and primitives
+let arr = JsonDocument.parse("{\"items\":[1, 2, 3, \"hello\", true, null],\"n\":3}")
+let arr_root = arr.root()
+expect("array raw", arr_root.field("items").raw() == "[1, 2, 3, \"hello\", true, null]")
+expect("array sibling", i32.deserialize(arr_root.field("n")) == 3)
 
-    // ── Test 4: Nested objects ──
-    let nested = JsonDocument.parse("{\"a\":{\"b\":{\"c\":\"deep\"}}}")
-    expect("nested field chain", nested.root().field("a").field("b").field("c").raw() == "deep")
+// Nested objects, empty containers, escapes, negatives, booleans and null
+expect("nested field chain", JsonDocument.parse("{\"a\":{\"b\":{\"c\":\"deep\"}}}").root().field("a").field("b").field("c").raw() == "deep")
+let empty_doc = JsonDocument.parse("{\"o\":{},\"a\":[]}")
+let empty = empty_doc.root()
+expect("empty obj", empty.field("o").raw() == "{}")
+expect("empty arr", empty.field("a").raw() == "[]")
+let esc_doc = JsonDocument.parse("{\"s\":\"hello\\nworld\",\"t\":\"tab\\there\"}")
+let esc = esc_doc.root()
+expect("escape n", str.deserialize(esc.field("s")) == "hello\nworld")
+expect("escape t", str.deserialize(esc.field("t")) == "tab\there")
+expect("neg int val", i32.deserialize(JsonDocument.parse("{\"x\":-42}").root().field("x")) == -42)
+let bools_doc = JsonDocument.parse("{\"a\":true,\"b\":false,\"c\":null}")
+let bools = bools_doc.root()
+expect("true", bool.deserialize(bools.field("a")))
+expect("false", not bool.deserialize(bools.field("b")))
+expect("null raw", bools.field("c").raw() == "null")
 
-    // ── Test 5: Empty object ──
-    let empty = JsonDocument.parse("{\"o\":{},\"a\":[]}")
-    expect("empty obj", empty.root().field("o").raw() == "{}")
-    expect("empty arr", empty.root().field("a").raw() == "[]")
+// Serialize round trip
+expect("serialize round trip", req.serialize(JsonWriter.new()).finish() == js)
 
-    // ── Test 6: Escape sequences ──
-    let esc = JsonDocument.parse("{\"s\":\"hello\\nworld\",\"t\":\"tab\\there\"}")
-    expect("escape n", str.deserialize(esc.root().field("s")) == "hello\nworld")
-    expect("escape t", str.deserialize(esc.root().field("t")) == "tab\there")
+// Curly braces in ordinary strings (once a lexer bug)
+expect("curly in str len", "{abc}".len() == 5)
+expect("unmatched curly len", "{unmatched".len() == 10)
+expect("no braces len", "no braces".len() == 9)
 
-    // ── Test 7: Negative integer ──
-    let neg = JsonDocument.parse("{\"x\":-42}")
-    expect("neg int val", i32.deserialize(neg.root().field("x")) == -42)
-
-    // ── Test 8: Boolean and null ──
-    let bools = JsonDocument.parse("{\"a\":true,\"b\":false,\"c\":null}")
-    expect("true", bool.deserialize(bools.root().field("a")))
-    expect("false", not bool.deserialize(bools.root().field("b")))
-    expect("null raw", bools.root().field("c").raw() == "null")
-
-    // ── Test 9: Serialize round trip ──
-    let written = req.serialize(JsonWriter.new()).finish()
-    expect("serialize round trip", written == js)
-
-    // ── Test 10: Curly braces in regular strings (was lexer bug) ──
-    let s1 = "{abc}"
-    expect("curly in str len", s1.len() == 5)
-    let s2 = "{unmatched"
-    expect("unmatched curly len", s2.len() == 10)
-    let s3 = "no braces"
-    expect("no braces len", s3.len() == 9)
-
-    print("all tests done")
+print("all tests done")
