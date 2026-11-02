@@ -902,6 +902,13 @@ unsafe fn tls_recv_server_finish(conn: *mut TlsConn) -> i32:
 
 // ── Peer verification (#1061) ──────────────────────────────────────
 
+// The trust store this verifier can hold: 4096 roots in 8 MiB of DER (a
+// root is ~1.5 KB; a Windows release runner's store passed 512), from a
+// PEM bundle of up to 16 MiB.
+const TLS_ROOTS_MAX = 4096
+const TLS_ROOTS_BYTES = 8388608
+const TLS_ROOTS_PEM_BYTES = 16777216
+
 // The OS trust store as PEM text, read in With from the platform's
 // bundle file; on Windows the runtime enumerates the ROOT store to
 // DER directly (tls_load_windows_roots). Empty means no store found.
@@ -935,9 +942,14 @@ unsafe fn tls_verify_peer(
 ) -> i32:
     if evidence.chain_count <= 0 or evidence.ske_params_len <= 0 or evidence.ske_sig_len <= 0:
         return -1
-    let roots_buf = with_alloc(1048576)
-    var roots_starts: [i32; 512] = [0; 512]
-    var roots_lens: [i32; 512] = [0; 512]
+    // Room for the whole store. Windows's ROOT view (its own roots, the
+    // machine's and the auto-updated AuthRoot) exceeded 512 certificates on
+    // a release runner; the loader stopped there and the root of every
+    // chain past the cut was "untrusted" (#2922: zlib.net and GitHub's
+    // asset host refused, github.com verified). A DER root is ~1.5 KB.
+    let roots_buf = with_alloc(TLS_ROOTS_BYTES)
+    var roots_starts: [i32; TLS_ROOTS_MAX] = [0; TLS_ROOTS_MAX]
+    var roots_lens: [i32; TLS_ROOTS_MAX] = [0; TLS_ROOTS_MAX]
     let override_path = tls_roots_override_path()
     let windows_store = override_path.len() == 0 and with_sysinfo_os() == "Windows"
     var ok = 0
@@ -950,14 +962,18 @@ unsafe fn tls_verify_peer(
     while ok == 0 and attempt < 2:
         var roots_count = -1
         if windows_store:
-            roots_count = with_tls_load_windows_roots(roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+            roots_count = with_tls_load_windows_roots(roots_buf, TLS_ROOTS_BYTES, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, TLS_ROOTS_MAX)
         else:
             let pem = if override_path.len() > 0: (read_file(override_path) ?? "") else: tls_system_roots_pem()
-            if pem.len() > 0 and pem.len() <= 4194304:
+            if pem.len() > 0 and pem.len() <= TLS_ROOTS_PEM_BYTES:
                 let pem_bytes = str_copy_bytes(pem)
-                roots_count = x509_pem_parse_certs(pem_bytes, pem.len(), roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+                roots_count = x509_pem_parse_certs(pem_bytes, pem.len(), roots_buf, TLS_ROOTS_BYTES, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, TLS_ROOTS_MAX)
                 str_free_bytes(pem_bytes)
         tls_trace(f"{roots_count} trust roots loaded; the server sent a chain of {evidence.chain_count}")
+        if roots_count >= TLS_ROOTS_MAX:
+            // Loud, not silent: a store this loader cannot hold whole is the
+            // defect behind every "untrusted" verdict that follows.
+            eprint(f"tls: the trust store holds more than {TLS_ROOTS_MAX} roots; only the first were loaded (raise TLS_ROOTS_MAX in std.tls)")
         if roots_count > 0:
             if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()):
                 let leaf_buf = cert_buf + evidence.leaf_start as u64
