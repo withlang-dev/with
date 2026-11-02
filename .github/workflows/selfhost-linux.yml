@@ -78,10 +78,13 @@ jobs:
           ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld.lld
           ln -sf "$LLVM_PREFIX/bin/ld.lld" .link-shim/ld64.lld
           ln -sf "$LLVM_PREFIX/bin/lld"    .link-shim/lld
-          xml2="$(ldconfig -p | awk '/libxml2\.so\.2 /{print $NF; exit}')"
-          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1)"
-          [ -n "$xml2" ] || { echo "no system libxml2.so.2"; exit 1; }
-          ln -sf "$xml2" .link-shim/libxml2.so.16
+          # ldconfig exits 2 on an image with a stale cache entry and pipefail
+          # made that the step's exit (the nightly of 2026-11-01); the alias
+          # is a convenience the SDK's lld runs without.
+          xml2="$(ldconfig -p 2>/dev/null | awk '/libxml2\.so\.2 /{print $NF; exit}' || true)"
+          [ -n "$xml2" ] || xml2="$(ls /lib/x86_64-linux-gnu/libxml2.so.2* /usr/lib/x86_64-linux-gnu/libxml2.so.2* 2>/dev/null | head -1 || true)"
+          [ -n "$xml2" ] || echo "no system libxml2.so.2; the SDK lld runs without the alias"
+          [ -z "$xml2" ] || ln -sf "$xml2" .link-shim/libxml2.so.16
           # Verify lld runs — it needs the aliased libxml2.so.16 on the search
           # path, so point LD_LIBRARY_PATH at the shim (as the build steps do).
           LD_LIBRARY_PATH="$PWD/.link-shim:${LD_LIBRARY_PATH:-}" "$LLVM_PREFIX/bin/ld.lld" --version
