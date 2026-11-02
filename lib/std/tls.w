@@ -75,6 +75,18 @@ unsafe fn tls_send_record(fd: i32, content_type: u8, data: *const u8, data_len: 
 
 // Receive a TLS record into buf. Returns content length or -1 on error.
 // Sets *content_type to the record's content type.
+// WITH_TLS_TRACE=1 narrates the handshake and every record on stderr: which
+// stage a connection reaches before it stalls (#2922: the windows-aarch64
+// release runner connected and read no response; no other platform did).
+var tls_trace_state: i32 = 0
+
+fn tls_trace_on() -> bool:
+    if tls_trace_state == 0: tls_trace_state = if env("WITH_TLS_TRACE").len() > 0: 1 else: 2
+    tls_trace_state == 1
+
+fn tls_trace(message: &str):
+    if tls_trace_on(): eprint("tls: " ++ message)
+
 unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap: i32) -> i32:
 
     // Read 5-byte header
@@ -95,7 +107,9 @@ unsafe fn tls_recv_record(fd: i32, content_type: *mut u8, buf: *mut u8, buf_cap:
     let h3 = hdr[3] as u32
     let h4 = hdr[4] as u32
     let rec_len = ((h3 << 8u32) | h4) as i32
+    tls_trace(f"record type {hdr[0]} version {hdr[1]}.{hdr[2]} length {rec_len}")
     if rec_len > buf_cap or rec_len < 0:
+        tls_trace(f"record length {rec_len} exceeds the buffer ({buf_cap})")
         return -1
 
     // Read record body
@@ -997,7 +1011,9 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
         str_free_bytes(host_bytes)
         n
     if r1 < 0:
+        tls_trace("ClientHello could not be sent")
         return -1
+    tls_trace("ClientHello sent; awaiting the server's handshake")
 
     // Receive server handshake messages
     var server_pub_x: [u8; 32] = [0u8; 32]
@@ -1016,7 +1032,9 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
         &raw mut evidence as *mut TlsPeerEvidence,
     )
     if r2 < 0:
+        tls_trace("the server's handshake did not complete")
         return -1
+    tls_trace(f"server handshake received: certificate {cert_len} bytes, curve {evidence.ske_curve}")
 
     // Authenticate the peer before sending anything under the new keys:
     // chain to the OS trust store, hostname, SKE signature (#1061).
@@ -1024,17 +1042,23 @@ unsafe fn tls_handshake(conn: *mut TlsConn, hostname: &str) -> i32:
     let rv = tls_verify_peer(conn, host_bytes2 as *const u8, hl, &cert_buf[0] as *const u8, &raw mut evidence as *mut TlsPeerEvidence)
     str_free_bytes(host_bytes2)
     if rv < 0:
+        tls_trace("peer verification failed")
         return -1
+    tls_trace("peer verified")
 
     // Send ClientKeyExchange + ChangeCipherSpec + Finished
     let r3 = tls_send_client_finish(conn, &server_ecdh_pub[0] as *const u8, evidence.ske_curve)
     if r3 < 0:
+        tls_trace("ClientKeyExchange, ChangeCipherSpec and Finished could not be sent")
         return -1
+    tls_trace("ClientKeyExchange, ChangeCipherSpec and Finished sent; awaiting the server's Finished")
 
     // Receive server's ChangeCipherSpec + Finished
     let r4 = tls_recv_server_finish(conn)
     if r4 < 0:
+        tls_trace("the server's Finished did not verify")
         return -1
+    tls_trace("handshake complete")
 
     0
 
@@ -1047,7 +1071,9 @@ fn tls_connect(hostname: &str, port: i32) -> TlsConn: tls_connect_timeout(hostna
 fn tls_connect_timeout(hostname: &str, port: i32, connect_ms: i32, idle_ms: i32) -> TlsConn:
     let fd = if connect_ms > 0: tcp_connect_timeout(hostname, port, connect_ms) else: tcp_connect(hostname, port)
     if fd < 0:
+        tls_trace(f"no TCP connection to {hostname}:{port} (fd {fd})")
         return TlsConn.new(-1)
+    tls_trace(f"TCP connected to {hostname}:{port}; idle bound {idle_ms} ms")
     if connect_ms > 0 or idle_ms > 0:
         let _ = set_timeout(fd, idle_ms)
     var conn = TlsConn.new(fd)

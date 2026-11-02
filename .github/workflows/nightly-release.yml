@@ -811,6 +811,40 @@ jobs:
       - name: Build seed to release compiler
         run: ./src/main.exe build
 
+      # #2922: on the windows-aarch64 runner the HTTPS fetch helper connected
+      # to zlib.net and read no response, under the seed, while every other
+      # platform fetched in seconds. The seed-built helper is the lane's; the
+      # release-built one carries this tree's std.tls trace. Evidence only.
+      - name: Diagnose HTTPS fetch (test channel)
+        if: inputs.channel == 'test'
+        continue-on-error: true
+        env:
+          WITH_TLS_TRACE: "1"
+        run: |
+          mkdir -p out/fetch-diag
+          for who in seed release; do
+            if [ "$who" = seed ]; then c=./src/main.exe; else c=./out/release/bin/with.exe; fi
+            "$c" build build/https_fetch.w -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
+            for url in https://zlib.net/fossils/zlib-1.3.2.tar.gz https://github.com/withlang-dev/with/releases/download/seed-windows-aarch64/with-windows-aarch64.exe.sha256; do
+              name=$(basename "$url")
+              timeout 120 "out/fetch-diag/https_fetch_$who.exe" --probe "$url" > "out/fetch-diag/probe_${who}_$name.log" 2>&1 || echo "probe rc=$?" >> "out/fetch-diag/probe_${who}_$name.log"
+              timeout 240 "out/fetch-diag/https_fetch_$who.exe" "$url" "out/fetch-diag/$name.$who" > "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || echo "fetch rc=$?" >> "out/fetch-diag/fetch_${who}_$name.log"
+              ls -l "out/fetch-diag/$name.$who" >> "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || true
+            done
+          done
+          ./src/main.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
+          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
+          rm -f out/fetch-diag/*.seed out/fetch-diag/*.release
+
+      - name: Preserve HTTPS fetch diagnostics (test channel)
+        if: inputs.channel == 'test'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetch-diagnostics-${{ github.job }}
+          path: out/fetch-diag/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Verify fixpoint
         run: ./src/main.exe build :fixpoint
 
@@ -1266,6 +1300,40 @@ jobs:
 
       - name: Build seed to release compiler
         run: ./src/main.exe build
+
+      # #2922: on the windows-aarch64 runner the HTTPS fetch helper connected
+      # to zlib.net and read no response, under the seed, while every other
+      # platform fetched in seconds. The seed-built helper is the lane's; the
+      # release-built one carries this tree's std.tls trace. Evidence only.
+      - name: Diagnose HTTPS fetch (test channel)
+        if: inputs.channel == 'test'
+        continue-on-error: true
+        env:
+          WITH_TLS_TRACE: "1"
+        run: |
+          mkdir -p out/fetch-diag
+          for who in seed release; do
+            if [ "$who" = seed ]; then c=./src/main.exe; else c=./out/release/bin/with.exe; fi
+            "$c" build build/https_fetch.w -o "out/fetch-diag/https_fetch_$who.exe" > "out/fetch-diag/compile_$who.log" 2>&1 || true
+            for url in https://zlib.net/fossils/zlib-1.3.2.tar.gz https://github.com/withlang-dev/with/releases/download/seed-windows-aarch64/with-windows-aarch64.exe.sha256; do
+              name=$(basename "$url")
+              timeout 120 "out/fetch-diag/https_fetch_$who.exe" --probe "$url" > "out/fetch-diag/probe_${who}_$name.log" 2>&1 || echo "probe rc=$?" >> "out/fetch-diag/probe_${who}_$name.log"
+              timeout 240 "out/fetch-diag/https_fetch_$who.exe" "$url" "out/fetch-diag/$name.$who" > "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || echo "fetch rc=$?" >> "out/fetch-diag/fetch_${who}_$name.log"
+              ls -l "out/fetch-diag/$name.$who" >> "out/fetch-diag/fetch_${who}_$name.log" 2>&1 || true
+            done
+          done
+          ./src/main.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_seed.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_seed.log
+          ./out/release/bin/with.exe run test/behavior/behav_crypto_kats.w > out/fetch-diag/crypto_kats_release.log 2>&1 || echo "rc=$?" >> out/fetch-diag/crypto_kats_release.log
+          rm -f out/fetch-diag/*.seed out/fetch-diag/*.release
+
+      - name: Preserve HTTPS fetch diagnostics (test channel)
+        if: inputs.channel == 'test'
+        uses: actions/upload-artifact@v4
+        with:
+          name: fetch-diagnostics-${{ github.job }}
+          path: out/fetch-diag/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Verify fixpoint
         run: ./src/main.exe build :fixpoint
