@@ -208,7 +208,7 @@ fn pkg_forbidden_dependency(text: &str, platform: &str) -> str:
         needles.push("libgcc_s")
         needles.push("libc++")
         needles.push("libc++abi")
-    if platform == "windows-x86_64":
+    if pkg_is_windows(platform):
         needles.push("msvcp")
         needles.push("vcruntime")
         needles.push("zlib")
@@ -225,6 +225,21 @@ fn pkg_run_capture(ctx: &ActionCtx, label: &str, argv: List[str], timeout_ms: i3
     let stdout_path = pkg_abs(root, pkg_join(command_dir, label ++ ".stdout"))
     let stderr_path = pkg_abs(root, pkg_join(command_dir, label ++ ".stderr"))
     ctx.process_runner().run_capture(argv, stdout_path, stderr_path, timeout_ms)
+
+fn pkg_is_windows(platform: &str): platform.starts_with("windows-")
+
+// A cross-built asset cannot run on this host: its version is the stamp the
+// post-link patch wrote (build/compiler.w): the sentinel gone, the version
+// present.
+fn pkg_check_asset_version_stamp(ctx: &ActionCtx, asset_path: &str, version: &str) -> i32:
+    let image = ctx.fs().read_text(asset_path)
+    if image.len() == 0:
+        return pkg_fail(ctx, "could not read the release asset: " ++ asset_path)
+    if image.contains("WITHVERSIONSTAMPv1XXXX"):
+        return pkg_fail(ctx, "release binary is unstamped: its version slot still holds the sentinel")
+    if not image.contains(version):
+        return pkg_fail(ctx, "release binary does not carry its version '" ++ version ++ "'")
+    0
 
 fn pkg_run_asset_version(ctx: &ActionCtx, asset_path: &str, version: &str) -> i32:
     let root = ctx.project_info().project_root()
@@ -246,7 +261,7 @@ fn pkg_check_dynamic_dependencies(ctx: &ActionCtx, asset_path: &str, platform: &
         return pkg_fail(ctx, "missing With-owned llvm-readobj: " ++ readobj)
     let args: List[str] = List.new()
     args.push(pkg_process_path(root, readobj))
-    if platform == "windows-x86_64":
+    if pkg_is_windows(platform):
         args.push("--coff-imports")
     else:
         args.push("--needed-libs")
@@ -260,7 +275,7 @@ fn pkg_check_dynamic_dependencies(ctx: &ActionCtx, asset_path: &str, platform: &
     0
 
 fn pkg_check_static_libclang_symbol(ctx: &ActionCtx, asset_path: &str, platform: &str) -> i32:
-    if platform == "windows-x86_64":
+    if pkg_is_windows(platform):
         return 0
     let root = ctx.project_info().project_root()
     let nm = pkg_llvm_tool(ctx, "WITH_LLVM_NM", "LLVM_NM", "llvm-nm")
@@ -582,10 +597,14 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     let asset = args[0]
     let platform = args[1]
     let compiler_path = args[2]
+    // A fifth argument `cross` names an asset cross-built on this host
+    // (windows-aarch64 on the release host): the same finalization, except
+    // that the version is read from the binary's stamp, since it cannot run.
+    let cross = args.len() >= 5 and args[4] == "cross"
     let current = pkg_current_platform()
     if current.len() == 0:
         return pkg_fail(ctx, "unsupported release packaging host: " ++ os() ++ "/" ++ arch())
-    if current != platform:
+    if current != platform and not cross:
         return pkg_fail(ctx, "target packages must be built on their native host; requested " ++ platform ++ " on " ++ current)
     let version = pkg_version(ctx)
     if version.len() == 0:
@@ -598,9 +617,9 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
         return pkg_fail(ctx, "could not create release directory")
     if fs.copy_file(compiler_path, asset_path) != 0:
         return pkg_fail(ctx, "could not copy release compiler to " ++ asset_path)
-    if platform != "windows-x86_64" and fs.chmod(asset_path, 0o755) != 0:
+    if not pkg_is_windows(platform) and fs.chmod(asset_path, 0o755) != 0:
         return pkg_fail(ctx, "could not chmod release asset: " ++ asset_path)
-    var rc = pkg_run_asset_version(ctx, asset_path, version)
+    var rc = if cross: pkg_check_asset_version_stamp(ctx, asset_path, version) else: pkg_run_asset_version(ctx, asset_path, version)
     if rc != 0: return rc
     rc = pkg_check_dynamic_dependencies(ctx, asset_path, platform, "before-strip")
     if rc != 0: return rc
@@ -612,7 +631,9 @@ pub fn run_package_platform_release_action(ctx: ActionCtx) -> i32:
     if rc != 0: return rc
     rc = pkg_write_release_checksum(ctx, asset_path)
     if rc != 0: return rc
-    rc = pkg_write_windows_notice(ctx, asset, platform, args[3])
+    // A cross-built asset's notice comes from the target SDK (argument 6);
+    // the host SDK (argument 4) only ran the tools above.
+    rc = pkg_write_windows_notice(ctx, asset, platform, if cross and args.len() >= 6: args[5] else: args[3])
     if rc != 0: return rc
     let output = ctx.output()
     if output.len() > 0:

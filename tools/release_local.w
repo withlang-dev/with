@@ -1,11 +1,11 @@
 // tools/release_local.w — the local-first half of cutting a release.
 //
-//   with run tools/release_local.w vX.Y.Z [--channel release|test] [--skip-darwin] [--skip-linux-aarch64]
+//   with run tools/release_local.w vX.Y.Z [--channel release|test] [--skip-darwin] [--skip-linux-aarch64] [--skip-windows-aarch64]
 //
 // Run from the release checkout on the maintainer's Mac after `src/version`
 // says vX.Y.Z and the `vX.Y.Z` tag is pushed (publish-first refuses a commit
 // the repository does not have). It builds, verifies, packages and publishes
-// the two platforms a Mac can produce:
+// the three platforms a Mac can produce:
 //
 //   darwin-aarch64   natively: the seed-driven gates (build, :fixpoint,
 //                    :test, :test-green, :last-green), then the rebuilt
@@ -15,11 +15,18 @@
 //                    tools/docker/linux-aarch64 (see the release runbook,
 //                    "Linux aarch64 Release Host"): the same gates and
 //                    publish, driven inside the container.
+//   windows-aarch64  cross-built by the rebuilt darwin compiler against the
+//                    pinned windows-aarch64 SDK (:cross-winarm-compiler, the
+//                    recipe of seed-windows-aarch64.yml), finalized by
+//                    :package-windows-aarch64 (cross mode) and published with the
+//                    pinned SDK. D137: the arm CI lane runs the battery on
+//                    the platform itself, post hoc; D180: the asset and its
+//                    SDK ship with every release, from here.
 //
 // The `v*` tag push then makes CI build and append only the platforms a Mac
-// cannot: linux-x86_64, windows-x86_64 and windows-aarch64
-// (.github/workflows/nightly-release.yml gates the local-first jobs on
-// `github.event_name != 'push'`).
+// cannot: linux-x86_64 and windows-x86_64 (.github/workflows/nightly-release.yml
+// gates the local-first jobs on `github.event_name != 'push'`; its
+// windows-aarch64 job is add-only, so the asset published here stands).
 //
 // Pins come from where they already live: seed.lock (the linux-aarch64 seed
 // version and digest) and sdk.lock (the SDK, which `build :deps` installs).
@@ -180,13 +187,74 @@ fn linux_aarch64_leg(version: &str, channel: &str) -> i32:
     run_args.push(linux_aarch64_script(version, channel, sha, seed_version, seed_sha))
     step("linux-aarch64 (container)", &run_args)
 
+/// Fetch `url` to `path` and refuse it unless its sha256 is `digest`: the
+/// pinned SDK archive and its sidecars, as the CI lanes fetch them.
+fn fetch_verified(label: &str, url: &str, path: &str, digest: &str) -> i32:
+    var curl: List[str] = List.new()
+    for a in ["curl", "-fsSL", "--retry", "5", "-o"]: curl.push(a ++ "")
+    curl.push(path ++ "")
+    curl.push(url ++ "")
+    if step(label, &curl) != 0: return 1
+    let check = path ++ ".check"
+    if write_file(check, digest ++ "  " ++ path ++ "\n") != 0: return fail("could not write " ++ check)
+    var shasum: List[str] = List.new()
+    for a in ["shasum", "-a", "256", "-c"]: shasum.push(a ++ "")
+    shasum.push(check ++ "")
+    let rc = step(label ++ " digest", &shasum)
+    remove_file(check)
+    rc
+
+/// windows-aarch64, cross-built on the release host. The pinned arm SDK is
+/// extracted into .deps when it is missing (its libc is what the compiler
+/// links against); the rebuilt darwin compiler cross-builds and stamps the
+/// arm compiler; the cross packaging finalizes it; the pinned SDK is
+/// republished beside it, as every lane republishes its SDK (D180).
+fn windows_aarch64_leg(version: &str, channel: &str) -> i32:
+    let root = env("PWD")
+    let release = root ++ "/out/release/bin/with"
+    let sdk_lock = text_of("sdk.lock")
+    let archive = "with-llvm-sdk-22.1.6-windows-aarch64.tar.gz"
+    let tag = lock_value(sdk_lock, archive ++ ".version")
+    let digest = lock_value(sdk_lock, archive)
+    if tag.len() == 0 or digest.len() != 64: return fail("sdk.lock has no windows-aarch64 SDK pin")
+    let base = "https://github.com/withlang-dev/with/releases/download/" ++ tag ++ "/" ++ archive
+    let staged = "out/release/" ++ archive
+    let prefix = ".deps/llvm-22.1.6-windows-aarch64-msvc"
+    if not file_exists(prefix ++ "/libc/windows/aarch64-w64-mingw32/lib/crt2.o"):
+        if fetch_verified("windows-aarch64 SDK", base, staged, digest) != 0: return 1
+        remove_tree(prefix)
+        var tar: List[str] = List.new()
+        for a in ["tar", "-xzf"]: tar.push(a ++ "")
+        tar.push(staged ++ "")
+        tar.push("-C")
+        tar.push(".deps")
+        if step("windows-aarch64 SDK extract", &tar) != 0: return 1
+    set_env("WITH", release)
+    set_env("WITH_VERSION", version)
+    for target in [":cross-winarm-compiler", ":package-windows-aarch64"]:
+        let argv = argv3(release, "build", target)
+        if step("windows-aarch64 " ++ target, &argv) != 0: return 1
+    // The SDK asset and its sidecars, republished verbatim from the pinned
+    // SDK release; the digests of all three come from sdk.lock.
+    if not file_exists(staged) and fetch_verified("windows-aarch64 SDK", base, staged, digest) != 0: return 1
+    for suffix in [".sha256", ".manifest"]:
+        let side_digest = lock_value(sdk_lock, archive ++ suffix)
+        if side_digest.len() != 64: return fail("sdk.lock has no digest for " ++ archive ++ suffix)
+        if fetch_verified("windows-aarch64 SDK" ++ suffix, base ++ suffix, staged ++ suffix, side_digest) != 0: return 1
+    publish_env(version, channel, "out/release/with-windows-aarch64.exe",
+        staged ++ "," ++ staged ++ ".sha256," ++ staged ++ ".manifest,out/release/with-windows-aarch64-NOTICE.txt",
+        "local windows-aarch64 (cross-built on the release host)")
+    let publish_argv = argv3(release, "build", ":publish-release-asset")
+    step("windows-aarch64 :publish-release-asset", &publish_argv)
+
 fn main -> i32:
     let argv = args()
-    if argv.len() < 2: return fail("usage: with run tools/release_local.w vX.Y.Z [--channel release|test] [--skip-darwin] [--skip-linux-aarch64]")
+    if argv.len() < 2: return fail("usage: with run tools/release_local.w vX.Y.Z [--channel release|test] [--skip-darwin] [--skip-linux-aarch64] [--skip-windows-aarch64]")
     let version = argv[1].clone()
     var channel = "release"
     var do_darwin = true
     var do_aarch64 = true
+    var do_winarm = true
     var i = 2
     while i < argv.len():
         let a = argv[i].clone()
@@ -195,12 +263,14 @@ fn main -> i32:
             i += 1
         else if a == "--skip-darwin": do_darwin = false
         else if a == "--skip-linux-aarch64": do_aarch64 = false
+        else if a == "--skip-windows-aarch64": do_winarm = false
         else: return fail("unknown argument " ++ a)
         i += 1
     if not version.starts_with("v"): return fail("version must look like vX.Y.Z, got " ++ version)
     if text_of("src/version").trim() != version: return fail("src/version does not say " ++ version ++ "; bump and commit it first")
     if env("GH_TOKEN").len() == 0: return fail("GH_TOKEN is not set")
     if do_darwin and darwin_leg(version, channel) != 0: return 1
+    if do_winarm and windows_aarch64_leg(version, channel) != 0: return 1
     if do_aarch64 and linux_aarch64_leg(version, channel) != 0: return 1
-    print("release_local: done — CI appends linux-x86_64, windows-x86_64 and windows-aarch64 on the tag push")
+    print("release_local: done — CI appends linux-x86_64 and windows-x86_64 on the tag push")
     0
