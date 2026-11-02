@@ -7731,9 +7731,17 @@ fn bs_check_build_w_comptime_evaluator(ctx: &ActionCtx, compiler_path: &str, bas
     if fs.copy_tree(".github/workflows", bs_join(seed_dir, ".github/workflows")) != 0:
         return bs_fail(ctx, "could not copy .github/workflows into " ++ seed_dir)
     // The seed target's output is src/main with the host's executable
-    // suffix (src/main.exe on Windows, #2759).
+    // suffix (src/main.exe on Windows, #2759). The pinned seed is the tree's
+    // src/main when the tree has one; a lane has none (its driver is the
+    // fetched `with-seed`, named by WITH), and linking a path that does not
+    // exist made `:seed` download the seed over the network inside a test
+    // (the linux nightly of 2026-11-02 hung 300 s on that fetch).
     let seed_bin = "src/main" ++ bs_exe_suffix()
-    if fs.symlink(seed_bin, bs_join(seed_dir, seed_bin)) != 0:
+    let root = ctx.project_info().project_root()
+    let seed_source = if fs.exists(seed_bin): bs_abs(root, seed_bin) else: env("WITH") ++ ""
+    if seed_source.len() == 0 or not fs.exists(seed_source):
+        return bs_fail(ctx, "no pinned seed to link into " ++ seed_dir ++ ": neither " ++ seed_bin ++ " nor $WITH names a file")
+    if fs.symlink(seed_source, bs_join(seed_dir, seed_bin)) != 0:
         return bs_fail(ctx, "could not link the pinned seed into " ++ seed_dir)
     rc = bs_force_comptime_evaluator(ctx, seed_dir)
     if rc != 0: return rc
