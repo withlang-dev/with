@@ -7702,6 +7702,10 @@ impl Parser:
         if self.peek() == TokenKind.TK_KW_YIELD:
             has_yield = 1
             self.advance()
+            // D185 (§13.6a, Law 9): the `yield` expression form was a second
+            // spelling of the bracket comprehension.
+            self.emit_error_span("the `for x in a; y in b: yield e` expression form is retired; write the bracket comprehension `[e for x in a for y in b]` (§13.6a, D185)", start, self.prev_end())
+
             self.skip_newlines()
 
         var body_expr: NodeId = 0 as NodeId
@@ -8786,7 +8790,7 @@ impl Parser:
             if self.peek() == TokenKind.TK_KW_FOR:
                 let patterns: List[i32] = List.new()
                 let iterables: List[i32] = List.new()
-                var filter: NodeId = 0 as NodeId
+                let filters: List[i32] = List.new()
 
                 while self.peek() == TokenKind.TK_KW_FOR:
                     self.advance()
@@ -8802,12 +8806,14 @@ impl Parser:
                     patterns.push(binding as i32)
                     iterables.push(iterable as i32)
                     self.skip_newlines()
-
-                if self.peek() == TokenKind.TK_KW_IF:
-                    self.advance()
-                    self.skip_newlines()
-                    filter = self.parse_expr()
-                    self.skip_newlines()
+                    // D185 (§13.6a): a guard may follow any clause.
+                    var clause_filter: NodeId = 0 as NodeId
+                    if self.peek() == TokenKind.TK_KW_IF:
+                        self.advance()
+                        self.skip_newlines()
+                        clause_filter = self.parse_expr()
+                        self.skip_newlines()
+                    filters.push(clause_filter as i32)
 
                 self.expect(TokenKind.TK_R_BRACKET)
                 let clause_count = patterns.len() as i32
@@ -8815,10 +8821,29 @@ impl Parser:
                 for ci in 0..clause_count:
                     self.pool.add_extra(patterns[ci])
                     self.pool.add_extra(iterables[ci])
-                    self.pool.add_extra(if ci == clause_count - 1: filter as i32 else: 0)
+                    self.pool.add_extra(filters[ci])
                 let arr_comp_node = self.pool.add_node(NodeKind.NK_ARRAY_COMPREHENSION, start, self.prev_end(), first, extra_start, clause_count)
                 for pci in 0..clause_count:
                     self.pool.mark_pattern_binding(arr_comp_node, patterns[pci])
+                // D185 (§13.6a): over an Option or Result first clause the
+                // bracket form is the short-circuiting chain; Sema, which knows
+                // the type, chooses this alternative (as a `for` does).
+                let alt_pats: List[i32] = List.new()
+                let alt_exprs: List[i32] = List.new()
+                let alt_kinds: List[i32] = List.new()
+                let alt_fails: List[i32] = List.new()
+                for ci in 0..clause_count:
+                    alt_pats.push(patterns[ci])
+                    alt_exprs.push(iterables[ci])
+                    alt_kinds.push(0)
+                    alt_fails.push(self.intern.intern(f"___fail_{ci}"))
+                    if filters[ci] != 0:
+                        alt_pats.push(0)
+                        alt_exprs.push(filters[ci])
+                        alt_kinds.push(1)
+                        alt_fails.push(0)
+                let alt = self.pool.build_comprehension_match(start, self.prev_end(), self.intern.intern("_Payload"), self.intern.intern("_Empty"), alt_fails, alt_pats, alt_exprs, alt_kinds, first as i32, true)
+                self.pool.add_for_carrier_alt(arr_comp_node, alt)
                 return arr_comp_node
 
             elems.push(first as i32)

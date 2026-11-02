@@ -12711,6 +12711,40 @@ impl Sema:
             let expr = self.ast.get_data0(node)
             let comp_start = self.ast.get_data1(node)
             let clause_count = self.ast.get_data2(node)
+            // D185 (§13.6a): over an Option or Result first clause the bracket
+            // form is the short-circuiting chain the parser built beside it,
+            // and the result is the carrier of the element, never a List of
+            // one. The first iterable is checked once, here; the collection
+            // path below takes its type.
+            var first_ty: i32 = 0
+            let carrier_alt = self.ast.for_carrier_alt(node)
+
+            // A bare variant construction (`[a + b for a in Ok(2) …]` under a
+            // `Result[i32, str]` demand) is typed against the demanded carrier
+            // by the match checker (#722): the chain takes it unchecked.
+            if carrier_alt != 0 and clause_count > 0 and self.has_expected_type != 0 and self.expected_expr_type != 0 and self.option_result_carrier_family(self.expected_expr_type as i32) != 0:
+                let first_clause = self.ast.get_extra(comp_start + 1)
+                if self.ast.kind(first_clause) == NodeKind.NK_VARIANT_SHORTHAND or self.comparison_operand_is_variant_call(first_clause):
+                    self.for_carrier_matches.insert(node, carrier_alt)
+                    let chain_ty = self.check_match_expr(carrier_alt)
+                    if chain_ty != 0:
+                        self.typed_expr_types.insert(node, chain_ty)
+                    return chain_ty
+            if carrier_alt != 0 and clause_count > 0 and not self.untyped_list_literal_iterable(self.ast.get_extra(comp_start + 1)):
+                let first_iterable = self.ast.get_extra(comp_start + 1)
+                let saved_loop_iterable = self.loop_iterable_node
+                self.loop_iterable_node = first_iterable
+                first_ty = self.check_expr_value_context(first_iterable) as i32
+                self.loop_iterable_node = saved_loop_iterable
+                if first_ty != 0 and self.option_result_carrier_family(first_ty) != 0:
+                    self.for_carrier_matches.insert(node, carrier_alt)
+                    self.prechecked_match_subject = first_iterable
+                    self.prechecked_match_subject_type = first_ty
+                    let comprehension_ty = self.check_match_expr(carrier_alt)
+                    if comprehension_ty != 0:
+                        self.typed_expr_types.insert(node, comprehension_ty)
+                    return comprehension_ty
+
             var target_ty: i32 = 0
             var result_expected: i32 = 0
             if self.has_expected_type != 0 and self.expected_expr_type != 0:
@@ -12735,7 +12769,7 @@ impl Sema:
                 let binding = self.ast.get_extra(base)
                 let iterable = self.ast.get_extra(base + 1)
                 let filter = self.ast.get_extra(base + 2)
-                let elem_ty = self.check_comprehension_clause_iterable(iterable)
+                let elem_ty = self.check_comprehension_clause_iterable(iterable, if ci == 0: first_ty else: 0)
                 gen_outer_counts.push(if self.gen_for_elem_types.contains(iterable): self.bind_names.len() as i32 else: -1)
                 self.push_scope()
                 if self.gen_for_elem_types.contains(iterable):
@@ -20098,6 +20132,13 @@ impl Sema:
         // all on None/Err, and a body that is `yield E` makes it a value.
         let carrier_match = self.ast.for_carrier_alt(node)
         if carrier_match != 0 and self.option_result_carrier_family(iter_type) != 0:
+            // D185 (§13.6a, Law 9): the one-clause `yield` body was the expression
+            // form; the bracket comprehension is the spelling (a generator's
+            // `yield` in a statement-form body is the generator's).
+            let carrier_body = self.ast.get_data2(node)
+            let body_tail = if carrier_body != 0 and self.ast.kind(carrier_body) == NodeKind.NK_BLOCK and self.ast.get_data1(carrier_body) == 0: self.ast.get_data2(carrier_body) else: carrier_body
+            if body_tail != 0 and self.ast.kind(body_tail) == NodeKind.NK_YIELD and self.has_gen_yield_type == 0:
+                self.emit_error("the `for x in opt: yield e` expression form is retired; write `[e for x in opt]` (§13.6a, D185)", node)
             self.for_carrier_matches.insert(node, carrier_match)
             self.prechecked_match_subject = iterable
             self.prechecked_match_subject_type = iter_type
@@ -20311,14 +20352,15 @@ impl Sema:
         let sym = if is_pattern: self.ast.get_data0(binding) else: binding
         self.int_local_for_decls.remove(sym)
 
-    mut fn check_comprehension_clause_iterable(iterable: i32) -> i32:
+    mut fn check_comprehension_clause_iterable(iterable: i32, prechecked: i32 = 0) -> i32:
         let outer_loop_iterable: i32 = self.loop_iterable_node
         self.loop_iterable_node = iterable
         // The collection demand is the comprehension's, never its iterable's
         // (#2569: a `BTreeMap` demand reached `[4, 2, 3]` in `for k in`). A
         // list literal of untyped numbers is typed by the binding's uses
         // (D128), as a `for` loop's is, at the body's second check.
-        let iter_ty = if self.untyped_list_literal_iterable(iterable) and self.int_local_decisions.contains(iterable):
+        let iter_ty = if prechecked != 0: prechecked as TypeId
+        else if self.untyped_list_literal_iterable(iterable) and self.int_local_decisions.contains(iterable):
             let decided_elem = (self.int_local_decisions.get(iterable).unwrap() / 4294967296) as i32
             let elem_args: List[i32] = List.new()
             elem_args.push(decided_elem)
