@@ -4237,6 +4237,15 @@ impl MirBuilder:
             self.body.mark_global_local(local_id)
             self.bind_local(sym, local_id)
             return local_id
+        // D184 (§29.15): a helper's capture of a script binding: the storage
+        // main's let bound.
+        if self.sema.script_slot_types.contains(sym):
+            let slot_ty: i32 = self.sema.script_slot_types.get(sym) ?? 0
+            let slot_mut: i32 = self.sema.script_slot_muts.get(sym) ?? 0
+            let slot_local = self.body.new_local(slot_ty, slot_mut, sym, 1)
+            self.body.mark_global_local(slot_local)
+            self.bind_local(sym, slot_local)
+            return slot_local
         -1
 
     // D88 (§4.2.1): a use of a constant with no numeric type of its own is
@@ -7493,6 +7502,9 @@ impl MirBuilder:
                     return
         self.body.note_let_binding(node, -1)
         let local_id = self.body.new_local(bind_ty, mutable, name_sym, 1)
+        // D184 (§29.15): a script binding a helper captures is main's local in
+        // storage the helper can reach; codegen binds the proxy to it.
+        if self.sema.script_slot_types.contains(name_sym): self.body.mark_global_local(local_id)
 
         // d1 = 0 for normal storage, bind_ty for zero-init (no initializer)
         let storage_d1 = if rhs_expr == 0: bind_ty else: 0

@@ -7973,6 +7973,16 @@ impl Codegen:
             let decl = self.pool.get_decl(i)
             if self.pool.kind(decl) == NodeKind.NK_LET_DECL:
                 self.gen_module_constant(decl)
+        // D184 (§29.15): a script binding a helper captures has storage of its
+        // own; main's let stores into it and the helper reads it. Zeroed
+        // here, assigned where the statement stands, dropped by main's scope.
+        for si in 0..self.sema.script_slot_syms.len():
+            let slot_sym = self.sema.script_slot_syms[si]
+            let slot_tid: i32 = self.sema.script_slot_types.get(slot_sym) ?? 0
+            if slot_tid == 0: continue
+            let slot_llvm = self.sema_type_to_llvm(self.sema.resolve_alias(slot_tid as TypeId))
+            if slot_llvm == 0: continue
+            self.record_module_binding_global(slot_sym, slot_llvm, self.build_default_value(slot_llvm), 1)
 
         // Pass 1.5: detect drop functions
         self.detect_drop_functions()

@@ -155,6 +155,11 @@ fn astpool_clone_deep(src: &AstPool) -> AstPool:
         out.mark_const_decl((src.state.const_decl_nodes[ki]) as NodeId)
     for gi in 0..src.state.global_allocator_decl_nodes.len():
         out.mark_global_allocator_decl((src.state.global_allocator_decl_nodes[gi]) as NodeId)
+    // D184: a script's bindings and helpers travel with the nodes they name.
+    for si in 0..src.state.script_binding_syms.len():
+        out.mark_script_binding(src.state.script_binding_syms[si], (src.state.script_binding_nodes[si]) as NodeId)
+    for hi in 0..src.state.script_helper_decls.len():
+        out.mark_script_helper((src.state.script_helper_decls[hi]) as NodeId)
     for hi in 0..src.compiler_hook_count():
         out.mark_compiler_hook_fn(src.compiler_hook_node(hi), src.compiler_hook_phase_at(hi))
     for mi in 0..src.state.move_closure_nodes.len():

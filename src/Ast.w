@@ -769,6 +769,13 @@ type AstPoolState {
     compiler_hook_fn_set: HashMap[i32, i32],
     compiler_hook_phase_map: HashMap[i32, i32],
     global_allocator_decl_set: HashMap[i32, i32],
+    // D184 (§29.15): a script's top-level bindings (sym -> NK_LET_BINDING) and
+    // the file's top-level fns, which capture them.
+    script_binding_syms: List[i32],
+    script_binding_nodes: List[i32],
+    script_binding_by_sym: HashMap[i32, i32],
+    script_helper_decls: List[i32],
+    script_helper_set: HashMap[i32, i32],
     call_named_args: HashMap[i32, i32],
     // §9.3.1 (#2326): a call argument that is or holds an implicit `it`
     // closure → its extra slot, and → the enclosing call argument holding
@@ -944,6 +951,11 @@ fn AstPool.new -> AstPool:
             compiler_hook_fn_set: HashMap.new(),
             compiler_hook_phase_map: HashMap.new(),
             global_allocator_decl_set: HashMap.new(),
+            script_binding_syms: List.new(),
+            script_binding_nodes: List.new(),
+            script_binding_by_sym: HashMap.new(),
+            script_helper_decls: List.new(),
+            script_helper_set: HashMap.new(),
             call_named_args: HashMap.new(),
             implicit_it_slots: [:],
             implicit_it_parents: [:],
@@ -1535,6 +1547,25 @@ impl AstPool:
 
     fn compiler_hook_phase_at(idx: isize) -> i32:
         self.state.compiler_hook_phase_syms[idx]
+
+    // D184 (§29.15): a script's top-level `let`/`var` is a local of the
+    // implicit main that the file's helper fns may capture.
+    mut fn mark_script_binding(sym: i32, node: NodeId):
+        self.state.script_binding_syms.push(sym)
+        self.state.script_binding_nodes.push(node as i32)
+        self.state.script_binding_by_sym.insert(sym, node as i32)
+
+    fn script_binding_node(sym: i32) -> i32:
+        self.state.script_binding_by_sym.get(sym) ?? 0
+
+    fn script_binding_count() -> isize: self.state.script_binding_syms.len()
+
+    mut fn mark_script_helper(decl: NodeId):
+        self.state.script_helper_decls.push(decl as i32)
+        self.state.script_helper_set.insert(decl as i32, 1)
+
+    fn is_script_helper(decl: NodeId) -> bool:
+        self.state.script_helper_set.contains(decl as i32)
 
     mut fn mark_global_allocator_decl(node: NodeId):
         self.state.global_allocator_decl_nodes.push(node as i32)

@@ -1259,6 +1259,8 @@ impl CCodegen:
         let sym = body.local_names[local_id]
         if sym == 0 or body.local_is_global[local_id] == 0:
             return 0
+        // D184: a captured script binding has storage with no declaration.
+        if self.sema.script_slot_types.contains(sym): return sym
         let decl = self.global_decl_node(sym)
         if decl == 0 as NodeId:
             return 0
@@ -10342,6 +10344,13 @@ impl CCodegen:
                 if ci_libc_symbol_allowed_as(cc_intern_resolve(self.intern, sym), CI_LIBC_KIND_VAR):
                     continue
                 out.push(CGlobalDef { sym, name: "", text: "extern " ++ self.c_decl(tid, self.global_c_name(sym)) ++ ";\n" })
+        // D184 (§29.15): a script binding a helper captures has storage of its
+        // own, zeroed here and assigned where its statement stands in main.
+        for si in 0..self.sema.script_slot_syms.len():
+            let slot_sym = self.sema.script_slot_syms[si]
+            let slot_tid: i32 = self.sema.script_slot_types.get(slot_sym) ?? 0
+            if slot_tid == 0: continue
+            out.push(CGlobalDef { sym: slot_sym, name: self.global_c_name(slot_sym), text: "static " ++ self.c_decl(slot_tid, self.global_c_name(slot_sym)) ++ " = " ++ self.global_zero_text(slot_tid) ++ ";\n" })
         out
 
     mut fn emit_extern_fn_decl(decl: NodeId) -> str:

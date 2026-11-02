@@ -46,6 +46,9 @@ type Parser {
     diags: DiagnosticList,
     source: str,
     file_id: i32,
+    // D184: the first node this parse created; the pool is shared with the
+    // modules parsed before, whose fns are not this script's helpers.
+    first_node_id: i32,
     suppress_as: i32,
     suppress_brace: i32,
     pending_tailrec: i32,
@@ -159,6 +162,7 @@ fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPoo
 // (#2449): the caller keeps its own handle, nothing is handed back.
 fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList, pool: AstPool) -> Parser:
     pool.set_current_file_id(AstFileId(file_id))
+    let first_node_id = pool.node_count()
     Parser {
         tokens,
         pos: 0,
@@ -167,6 +171,7 @@ fn Parser.init_with_pool(tokens: TokenList, source: &str, file_id: i32, intern: 
         diags,
         source: with_str_clone_ref(source),
         file_id,
+        first_node_id,
         suppress_as: 0,
         suppress_brace: 0,
         pending_tailrec: 0,
@@ -407,6 +412,10 @@ impl Parser:
             self.emit_explicit_main_conflict(self.top_level_stmts[0] as NodeId)
             return
         let main_sym = self.intern.intern("main")
+        // D184: the file's top-level fns are the script's helpers.
+        for di in 0..self.pool.decl_count():
+            let helper = self.pool.get_decl(di)
+            if self.pool.kind(helper) == NodeKind.NK_FN_DECL and (helper as i32) >= self.first_node_id: self.pool.mark_script_helper(helper)
         let stmt_count = self.top_level_stmts.len()
         let first_stmt = self.top_level_stmts[0] as NodeId
         let last_stmt = self.top_level_stmts[(stmt_count - 1)] as NodeId
@@ -1081,6 +1090,10 @@ impl Parser:
         if self.implicit_main_mode != 0 and self.top_level_starts_decl() == false:
             let stmt = self.parse_expr()
             if stmt != 0:
+                // D184 (§29.15): a script's named `let`/`var` is a local of the
+                // implicit main that a helper fn may capture.
+                if self.pool.kind(stmt) == NodeKind.NK_LET_BINDING and self.pool.get_data0(stmt) != 0:
+                    self.pool.mark_script_binding(self.pool.get_data0(stmt), stmt)
                 self.record_top_level_stmt(stmt)
             else:
                 self.recover_to_top_level()
