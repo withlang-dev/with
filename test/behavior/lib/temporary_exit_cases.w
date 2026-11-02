@@ -24,7 +24,7 @@ fn loop_user_try(text: &str) -> Validation:
     Valid(0)
 
 var started: Atomic[i32]
-async fn tick(): sleep(1).await
+async fn tick(): sleep(1.millis()).await
 async fn cancellable(text: str) -> i32:
     for part in text.split(","):
         defer: observe_part(part)
