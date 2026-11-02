@@ -15148,12 +15148,9 @@ impl Sema:
         self.note_inferred_field_demand(rhs as i32, lhs as i32, node)
         let l = self.type_name(lhs as i32)
         let r = self.type_name(rhs as i32)
-        let lk = self.get_type_kind(self.resolve_alias(self.numeric_operand_type(lhs as i32) as TypeId))
-        let rk = self.get_type_kind(self.resolve_alias(self.numeric_operand_type(rhs as i32) as TypeId))
-        if lk != rk:
-            self.emit_error(f"arithmetic on `{l}` and `{r}` needs an explicit `as` on one operand (§4.2.6: no implicit integer-to-float conversion)", node)
-        else:
-            self.emit_error(f"arithmetic on `{l}` and `{r}` needs an explicit `as` on one operand (§4.2.6: no implicit sign change)", node)
+        // Two integers that neither widens into (D181: an integer beside a
+        // float converts to the float, so only a sign change reaches here).
+        self.emit_error(f"arithmetic on `{l}` and `{r}` needs an explicit `as` on one operand (§4.2.6: no implicit sign change)", node)
 
     // A wrapping or saturating operator computes at its left operand's type
     // (§4.2.3); the right operand converts to it implicitly or not at all.
@@ -16554,6 +16551,10 @@ impl Sema:
         let rk = self.get_type_kind(rr)
         if lk == TypeKind.TY_FLOAT and rk == TypeKind.TY_FLOAT:
             return if self.get_type_d0(lr) >= self.get_type_d0(rr): lr else: rr
+        // D181 (§4.2.6): an integer beside a float is the float; the result
+        // of `i / 140.0` is f64, and the integer converts as `as f64` would.
+        if lk == TypeKind.TY_FLOAT and rk == TypeKind.TY_INT: return lr
+        if lk == TypeKind.TY_INT and rk == TypeKind.TY_FLOAT: return rr
         if lk != TypeKind.TY_INT or rk != TypeKind.TY_INT:
             return 0 as TypeId
         if self.int_narrowing_requires_cast(lr, rr) == false:
@@ -30079,9 +30080,10 @@ impl Sema:
             else if literal_let < 0: self.emit_error_with_help(msg, node, f"`{self.pool_resolve(self.ast.get_data0(node))}` is a closure parameter nothing types, so it is `{got}`; annotate it (`({self.pool_resolve(self.ast.get_data0(node))}: T) => …`)")
             else: self.emit_error_with_label(msg, node, literal_let, f"`{self.pool_resolve(self.ast.get_data0(node))}` is `{got}` from its literal here (§4.1)")
             return true
+        // D181 (§4.2.6): an integer where a float is demanded converts to it,
+        // as `as` would; codegen rounds to nearest at the store.
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_INT:
-            self.emit_error(f"an integer where a float is demanded needs an explicit `as {want}` (§4.2.6: no implicit integer-to-float conversion)", node)
-            return true
+            return false
         if ek == TypeKind.TY_FLOAT and vk == TypeKind.TY_FLOAT and self.get_type_d0(er) < self.get_type_d0(vr):
             self.emit_error(f"implicit float narrowing from `{got}` to `{want}`; use an explicit `as` cast (§4.2.6)", node)
             return true
