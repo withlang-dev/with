@@ -581,7 +581,12 @@ else:
     measure("trie", trie_work, 2000, 0)
     measure("stdin-lines", stdin_lines_work, 10000, 0)
     measure("stdin-read-all", read_all_work, 100000, 0)
-    measure("hash-index", hash_index_work, 4000, 0)
+    // n=1000: at 4000 → 16000 the index's slots cross a 4-core release
+    // runner's 512 KiB L2 and the row read 7.3x–9.2x in five of five rounds
+    // (linux-x86_64, run 41372423302) while the same binary reads 4.4x on a
+    // host with a 16 MiB L2; the row measures the index's growth, not the
+    // cache's cliff, so both sizes sit on one side of it.
+    measure("hash-index", hash_index_work, 1000, 0)
     measure("priority-queue", priority_queue_work, 4000, 0)
     measure("ordered-set-ascending", ordered_set_ascending, 4000, 0)
     measure("ordered-set-descending", ordered_set_descending, 4000, 0)
