@@ -16206,6 +16206,14 @@ impl Sema:
             if source_err_ty != 0:
                 let target_err_ty = self.result_error_type(self.current_return_type as i32)
                 if target_err_ty == 0:
+                    // §10.2 (D190): in main, outside any closure, an Err that `?`
+                    // meets is the program's outcome (stderr, exit 1): MIR emits
+                    // the exit on the fail path.
+                    if self.closure_body_depth == 0 and self.current_fn_decl_node > 0 and self.pool_resolve(self.ast.get_data0(self.current_fn_decl_node)) == "main":
+                        self.main_question_nodes.insert(node, 1)
+                        self.typed_expr_types.insert(node, unwrapped)
+                        self.record_transparent_view_origins(node, operand_node)
+                        return unwrapped
                     self.emit_error("? on Result requires the enclosing function to return Result", node)
                     return 0
                 let conversion_chain = self.error_conversion_chain(target_err_ty, source_err_ty)

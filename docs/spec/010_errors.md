@@ -47,6 +47,20 @@ for example, parser result types or validation types. `Try.branch`
 decides whether evaluation continues, and `Try.from_break` rebuilds
 the enclosing return carrier for the early-return path.
 
+In `main` — `fn main:` with no declared return type, or the implicit main
+of a script (§29.15) — `?` on a `Result` needs no `Result` return: an
+`Err` it meets is the program's outcome. The error is written to stderr in
+its `Debug` form after `error: `, and the process exits with status 1;
+nothing after the `?` runs, and no backtrace is printed (D190). A `?`
+inside a closure in main is the closure's. `?` on an `Option` in main
+follows the ordinary rule.
+
+```
+use std.fs
+let text = read_file("README.md")?     // Err: `error: ...` on stderr, exit 1
+print(text.len())
+```
+
 ### 10.3 Optional Chaining (`?.`)
 
 The `?.` operator accesses a field or method on an `Option` or
