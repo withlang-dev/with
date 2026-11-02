@@ -18,12 +18,12 @@ vocabulary, not exotica — and everything funnels through the same
 | `flat_map(fn(T) -> Iter[U])` | Map then flatten |
 | `flatten()` | Flatten nested iterators |
 | `take(n)` | First n elements |
-| `drop(n)` | Skip first n |
+| `skip(n)` | Skip first n (D186; `drop` is the prelude's release form) |
 | `take_while(fn(&T) -> bool)` | Take while predicate holds |
-| `drop_while(fn(&T) -> bool)` | Skip while predicate holds |
-| `zip(Iter[U])` | Pair from two iterators |
+| `skip_while(fn(&T) -> bool)` | Skip while predicate holds |
+| `zip(impl IntoIter[U])` | Pair with another iterable; a `List` needs no `.iter()` (D186) |
 | `enumerate()` | Attach index |
-| `chain(Iter[T])` | Concatenate |
+| `chain(impl IntoIter[T])` | Concatenate with another iterable |
 | `peekable()` | Allow lookahead |
 | `chunks(n)` | Fixed-size groups |
 | `windows(n)` | Sliding window |
@@ -32,7 +32,7 @@ vocabulary, not exotica — and everything funnels through the same
 | `intersperse(sep)` | Insert separator |
 | `scan(init, fn(S, T) -> (S, U))` | Stateful map |
 | `step_by(n)` | Every nth element |
-| `zip_with(Iter[U], fn(T, U) -> V)` | Zip and transform in one step |
+| `zip_with(impl IntoIter[U], fn(T, U) -> V)` | Zip and transform in one step |
 
 **Consumers** (eager, produce final value):
 

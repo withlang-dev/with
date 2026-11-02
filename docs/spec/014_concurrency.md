@@ -213,14 +213,14 @@ machines.
 ### 14.4 `async fn` Semantics
 
 ```
-async fn fetch(url: str) -> Result[String, IoError]: ...
+async fn fetch(url: str) -> Result[str, IoError]: ...
 ```
 
 Calling `fetch(url)` does the following:
 
 1. Allocates a lightweight thread (fiber) with its own stack.
 2. Begins executing the function body on that fiber.
-3. Returns a `Task[Result[String, IoError]]` handle immediately
+3. Returns a `Task[Result[str, IoError]]` handle immediately
    to the caller.
 
 The fiber runs concurrently. It suspends at compiler-known
@@ -274,8 +274,8 @@ returning a `Task[T]`:
 let task = async:
     let a = fetch("http://a.com").await?
     let b = fetch("http://b.com").await?
-    Ok(a + b)
-// task: Task[Result[String, IoError]]
+    a + b
+// task: Task[Result[str, IoError]]
 ```
 
 **Semantics:** `async: body` allocates a fiber, begins execution
@@ -290,7 +290,7 @@ async scope s =>
     s.track(async:
         for i in 0..5:
             sleep(50.millis()).await
-            tx.send("msg-{i}").await
+            tx.send(f"msg-{i}").await
     )
     s.track(async:
         for msg in rx:
@@ -754,8 +754,8 @@ async scope s =>
     (user?, posts?)
 ```
 
-Tuple `.await` supports tuple sizes 2..12. For dynamic or larger
-sets, use collection combinators.
+Tuple `.await` has no arity limit (D189); for a set whose size is
+known only at run time, use the collection combinators.
 
 Desugaring (2-tuple):
 

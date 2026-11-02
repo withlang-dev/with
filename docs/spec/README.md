@@ -1,4 +1,4 @@
-# The With Programming Language — Specification v7.33
+# The With Programming Language — Specification v7.35
 
 **Author:** Eric Hartford
 **Status:** Reference specification for prototype implementation
@@ -11,6 +11,20 @@ implementation is still in progress.** The D22 rules are normative now. The
 compiler, comptime evaluator, backends, standard library, diagnostics, and
 tests are NON-COMPLIANT wherever they do not yet implement them. Existing
 implementation behavior must not be treated as precedent against D22.
+**Changelog v7.35:** seven rulings of 2026-11-02 (D183–D189). §4.2.6: an
+integer where a narrower integer or the other signedness is demanded
+converts with a range check, `as` is the wrap, a comptime value out of range
+is an error, positions are `isize`, and the lint names the narrow
+declaration (D183); the section's rationale is "`as` where two meanings
+remain". §29.15: a script's top-level bindings are module globals assigned
+in statement order (D184). §13.6/§13.6a: one comprehension family, the
+bracket form over `Option`/`Result` yields an `Option`/`Result` of the
+element, the `yield` expression form is retired, the statement form stays
+(D185). §13.3: `skip(n)`/`skip_while`, and `zip`/`chain`/`zip_with` take
+any iterable (D186). §16.2b.6: `returns borrow T from params N, M` (D187).
+std.time: `Duration` is `i64` nanoseconds (D188). §14.11: no tuple-await
+arity limit (D189). §14.6's example no longer writes `Ok(...)` or `String`.
+The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.34:** three modeled-C rulings for the facade proof engine,
 2026-10-15 (D134). §16.2b.6: a borrowed value's origin is the argument's
 origin, bound per call, one borrowed type for every origin; `detaches param

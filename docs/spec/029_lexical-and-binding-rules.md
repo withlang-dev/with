@@ -436,3 +436,22 @@ type-position operator `@TypeOf(expr)` (compile-time type of an
 expression) is likewise implementation-internal and unstable.
 
 ---
+
+### 29.15 Scripts: top-level statements
+
+A file with top-level statements and no `fn main` is a script: its
+statements are the program and run top to bottom, beside the file's
+`fn`s. A script's top-level `let` and `var` are globals of the module
+(D184): a helper `fn` in the file names one as it names any global. Each
+is assigned where its statement stands, so the script keeps its order; a
+call that reaches a binding before its statement has run is the
+uninitialized-access error of D175, reported at compile time from the
+static dependency graph. A file with `fn main` has no top-level
+statements, and nothing here applies to it.
+
+```
+var count = 0
+fn bump(): count = count + 1
+bump()
+print(count)            // 1
+```

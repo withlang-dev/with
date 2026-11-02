@@ -801,12 +801,15 @@ not produce values (§13.5a, §13.5c).
 ### 13.6 Collection Comprehensions
 
 Comprehensions build collections from iteration with filtering.
-There is **one comprehension family, polymorphic over its target
-collection** (the Scala lesson: don't invent a syntax per container).
-The element form builds sequences and sets; the `key: value` form
-builds maps. The target is selected by expected type — the same
-inference rule as enum variant shorthand (§4.4) and numeric literals
-(§4.2.1) — with `List` and `HashMap` as the defaults:
+There is **one comprehension family, polymorphic over its target**
+(the Scala lesson: don't invent a syntax per container). The first
+clause fixes the carrier (D185): over a collection or a range the
+element form builds sequences and sets and the `key: value` form builds
+maps, the target selected by expected type — the same inference rule as
+enum variant shorthand (§4.4) and numeric literals (§4.2.1) — with `List`
+and `HashMap` as the defaults; over an `Option` or a `Result` the
+comprehension produces an **`Option` or `Result` of the element, never a
+`List` of one element** (§13.6a).
 
 ```
 let squares = [x * x for x in 0..10]
@@ -870,23 +873,20 @@ operator (§9.9) may appear in the `if` filter clause:
 The parser resolves this structurally — `for PATTERN in EXPR` is
 always iteration, `EXPR in EXPR` in the filter is always membership.
 
-### 13.6a Option and Result For-Comprehensions
+### 13.6a Option and Result Comprehensions
 
-`for` can also express short-circuiting chains over `Option` and
-`Result`. Clauses are separated by `;`. Each binding clause unwraps
-one successful value and binds it for the following clauses.
+A bracket comprehension whose first clause iterates an `Option` or a
+`Result` is a short-circuiting chain over that carrier (D185). Each
+clause unwraps one successful value and binds it for the following
+clauses, and the result is an `Option` or `Result` of the element, never
+a `List` of one element:
 
 ```
-let name: Option[str] =
-    for user in get_user(id);
-        profile in get_profile(user):
-    yield profile.display_name
+let name = [profile.display_name for user in get_user(id) for profile in get_profile(user)]
+// Option[str]
 
-let data: Result[Response, Error] =
-    for conn in connect(host);
-        auth in conn.authenticate(token);
-        resp in auth.fetch(path):
-    yield resp
+let data = [resp for conn in connect(host) for auth in conn.authenticate(token) for resp in auth.fetch(path)]
+// Result[Response, Error]
 ```
 
 The first clause determines the carrier family:
@@ -896,26 +896,25 @@ The first clause determines the carrier family:
 - `Result[T, E]` comprehensions unwrap `Ok(...)` and short-circuit on
   `Err(...)`.
 
-The expression form ends with `yield expr`, which re-wraps the final
-value in `Some(...)` or `Ok(...)`. The statement form omits `yield`
-and runs its body only when every clause succeeds:
+The element expression is re-wrapped in `Some(...)` or `Ok(...)`. The
+**statement form** is a `for` whose clauses are separated by `;` and
+whose body runs only when every clause succeeds; it builds nothing, and
+no bracket form says this:
 
 ```
 for user in get_user(id); profile in get_profile(user):
     update_profile(profile)
 ```
 
-This is equivalent to nested `match` expressions over the relevant
-success and failure constructors.
+Both are equivalent to nested `match` expressions over the relevant
+success and failure constructors. The former `for … ; … : yield expr`
+expression form is retired (D185, Law 9): it was a second spelling of the
+bracket form.
 
-Option comprehensions also support boolean guard clauses:
+Option comprehensions also support guard clauses:
 
 ```
-let active_name =
-    for user in get_user(id);
-        if user.is_active();
-        profile in get_profile(user):
-    yield profile.name
+let active_name = [profile.name for user in get_user(id) if user.is_active() for profile in get_profile(user)]
 ```
 
 If the guard is false, the comprehension produces `None`. `Result`
