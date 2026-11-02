@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D190 — `?` in main: an `Err` that reaches main ends the program (delegated, D98)](2026-11-02-D190-question-mark-in-main-ends-the-program.md)
 - [D189 — Tuple `.await` has no arity limit (delegated, D98)](2026-11-02-D189-tuple-await-has-no-arity-limit.md)
 - [D188 — `Duration` is a value type over `i64` nanoseconds, with `millis`/`secs` constructors, `Instant` and `timeout` (delegated, D98)](2026-11-02-D188-duration-is-a-value-type-over-i64-nanoseconds.md)
 - [D187 — A facade operation may return a borrow from two parameters: `returns borrow T from params N, M`, invalidated when either is (ruled)](2026-11-02-D187-a-facade-operation-may-borrow-from-two-parameters-returns-borrow-t-from-params.md)

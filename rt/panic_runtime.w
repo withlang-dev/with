@@ -35,6 +35,16 @@ pub fn with_panic_ref(msg: &str, file: &str, line: i32) -> Never:
     rt_backtrace_print()
     rt_libc_exit(134)
 
+// §10.2 (D190): `?` in main meets an `Err`. The error is the program's
+// outcome: its Debug form after `error: ` on stderr, exit status 1. Not a
+// panic: no backtrace, no 134.
+pub fn with_main_error_exit(msg: str) -> Never:
+    with_ewrite("error: ")
+    with_ewrite(msg)
+    with_ewrite("\n")
+    rt_libc_exit(1)
+
+
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
 // The runtime is not exempt from the foreign-state model: every foreign
 // call above is described here, and the `runtime-domain-audit` lane

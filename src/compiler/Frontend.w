@@ -2396,6 +2396,10 @@ impl Zcu:
         let t_start = runtime_clock_nanos()
         self.iface_mentioned = HashMap.new()
         self.note_interface_mentions(&out, 0, out.node_count())
+        // A call the compiler emits on its own, which no source mentions:
+        // main's `?` exit (§10.2, D190). Seeded here so its interface line
+        // is merged and Sema resolves the callee it names (D65).
+        self.iface_mentioned.insert(self.pool.intern("with_main_error_exit"), 1)
         let line_section: List[i32] = List.new()
         let line_texts = frontend_new_list_str()
         let line_names = frontend_new_list_str()

@@ -14468,6 +14468,29 @@ impl MirBuilder:
             self.lower_cleanup_await(task_op, node)
             ci = ci + 1
 
+    // §10.2 (D190): `?` in main meets an Err: the error's Debug form on
+    // stderr, exit status 1. The process ends here, so no cleanup or return
+    // follows on this path.
+    mut fn emit_main_error_exit(value_place: i32, value_ty: i32, err_ty: i32, span_node: i32):
+        let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
+        if err_idx < 0:
+            self.mark_unsupported()
+            return
+        let err_downcast = self.body.new_downcast_place(value_place, err_idx)
+        let err_payload_place = self.body.new_field_place(err_downcast, 0, err_ty)
+        let err_op = self.body.new_operand(self.carrier_read_kind(err_ty, self.local_type(self.place_base_local(err_payload_place))), err_payload_place)
+        let msg = self.lower_fmt_debug(err_op, err_ty, span_node)
+        let exit_op = self.const_operand(ConstKind.CK_FN, self.pool.intern("with_main_error_exit"), self.sema.ty_void)
+        let args: List[i32] = List.new()
+        args.push(msg)
+        let args_id = self.body.new_call_args(args)
+        let tmp_place = self.place_for_local(self.new_temp(self.sema.ty_void))
+        let unreachable_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, exit_op, args_id, tmp_place, unreachable_bb)
+        self.switch_to(unreachable_bb)
+        self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+
+
     mut fn lower_question_mark_value(value_op: i32, value_ty: i32, result_ty_hint: i32, node: i32, span_node: i32, cleanup_task_ops: &List[i32], cleanup_start_idx: i32) -> i32:
         let value_place = self.materialize_operand(value_op, value_ty, self.ast.get_start(span_node))
 
@@ -14496,9 +14519,14 @@ impl MirBuilder:
         let target_err_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.result, 1)
         let source_option_ty = self.generic_inst_arg_type(value_ty, self.sema.syms.option, 0)
         let target_option_ty = self.generic_inst_arg_type(ret_ty, self.sema.syms.option, 0)
+        var main_exit = false
         if source_err_ty != 0:
             if target_err_ty == 0:
-                self.mark_unsupported()
+                if self.sema.main_question_nodes.contains(node):
+                    main_exit = true
+                    self.emit_main_error_exit(value_place, value_ty, source_err_ty, span_node)
+                else:
+                    self.mark_unsupported()
             else:
                 let err_idx = self.enum_variant_index_for_type(value_ty, self.sema.syms.err)
                 if err_idx < 0:
@@ -14536,15 +14564,16 @@ impl MirBuilder:
         else:
             let fail_op = self.body.new_operand(OperandKind.OK_MOVE, value_place)
             self.assign_operand_to_place(ret_place, fail_op, self.ast.get_start(span_node))
-        self.emit_cleanup_awaits_from(cleanup_task_ops, cleanup_start_idx, node)
-        // D17: moves already executed in this statement (field blanks, move-arg
-        // temps) must land before the early error return — the enclosing
-        // statement's flush is never reached on this path.
-        self.emit_pending_resets_since(0, 0, 0)
-        self.emit_errdefers_for_return()
-        self.emit_defers_for_return()
-        self.emit_drops_for_return()
-        self.terminate_fn_return(GEN_LOOP_ERR_RETURN)
+        if not main_exit:
+            self.emit_cleanup_awaits_from(cleanup_task_ops, cleanup_start_idx, node)
+            // D17: moves already executed in this statement (field blanks, move-arg
+            // temps) must land before the early error return — the enclosing
+            // statement's flush is never reached on this path.
+            self.emit_pending_resets_since(0, 0, 0)
+            self.emit_errdefers_for_return()
+            self.emit_defers_for_return()
+            self.emit_drops_for_return()
+            self.terminate_fn_return(GEN_LOOP_ERR_RETURN)
 
         // Extract Ok payload via ProjKind.PK_DOWNCAST + field access
         var result_ty = result_ty_hint

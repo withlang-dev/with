@@ -488,6 +488,10 @@ impl Sema:
                     iface_files.insert(self.decl_source_file_ids[di], 1)
         if iface_count == 0 or eager:
             return
+        // A call the compiler emits on its own, which no source mentions:
+        // main's `?` exit (§10.2, D190). Sema owns the callee (D65), so the
+        // demand is seeded here rather than found by MIR.
+        self.iface_mentioned.insert(self.pool_intern("with_main_error_exit"), 1)
         // S, and each interface file's contiguous node run (a file's nodes
         // are appended in one parse; anything after that run is generated).
         let file_first = sema_new_map_i32_i32()

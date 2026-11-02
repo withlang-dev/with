@@ -10,5 +10,4 @@ test/conformance/open_s13_5a_label_alone.w
 test/conformance/open_s18_1_root_grouped_import.w
 test/conformance/open_s14_10_channel_select_arm.w
 test/conformance/open_s14_11_1_await_all_pipeline.w
-test/conformance/open_s10_question_in_main.w
 test/conformance/open_d91_target_os.w
