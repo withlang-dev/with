@@ -384,7 +384,12 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: src/main build :last-green
 
-      - name: Select rebuilt compiler (the release UAT runs the rebuilt binary as the orchestrator)
+      # Packaging and publish run the rebuilt binary. The release UAT below
+      # stays seed-driven, as every gate is and as the Windows lanes and the
+      # local legs run it: seed-driver refuses any other driver, and the
+      # linux-aarch64 rehearsal of 2026-11-01 died there under the rebuilt
+      # binary ("is not the pinned seed").
+      - name: Select rebuilt compiler for packaging and publish
         run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
 
       - name: Provide a display and software OpenGL (Linux)
@@ -402,7 +407,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x800x24" ./out/release/bin/with build :release-uat
+        run: xvfb-run -a -s "-screen 0 1280x800x24" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
 
       - name: Release UAT (macOS)
         # The runner's session has a WindowServer but no GPU: NSGL finds no
@@ -417,7 +422,7 @@ jobs:
         # CoreAudio) that only Apple's SDK carries, and the compiler reads no
         # host SDK unless one is named (§16.1, D81). The runner has Xcode: name
         # its SDK, as a user building raylib from source does.
-        run: SDKROOT="$(xcrun --show-sdk-path)" ./out/release/bin/with build :release-uat
+        run: SDKROOT="$(xcrun --show-sdk-path)" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -631,7 +636,12 @@ jobs:
           WITH: ${{ github.workspace }}/src/main
         run: src/main build :last-green
 
-      - name: Select rebuilt compiler (the release UAT runs the rebuilt binary as the orchestrator)
+      # Packaging and publish run the rebuilt binary. The release UAT below
+      # stays seed-driven, as every gate is and as the Windows lanes and the
+      # local legs run it: seed-driver refuses any other driver, and the
+      # linux-aarch64 rehearsal of 2026-11-01 died there under the rebuilt
+      # binary ("is not the pinned seed").
+      - name: Select rebuilt compiler for packaging and publish
         run: echo "WITH=$GITHUB_WORKSPACE/out/release/bin/with" >> "$GITHUB_ENV"
 
       - name: Release UAT (macOS)
@@ -646,7 +656,7 @@ jobs:
         # CoreAudio) that only Apple's SDK carries, and the compiler reads no
         # host SDK unless one is named (§16.1, D81). The runner has Xcode: name
         # its SDK, as a user building raylib from source does.
-        run: SDKROOT="$(xcrun --show-sdk-path)" ./out/release/bin/with build :release-uat
+        run: SDKROOT="$(xcrun --show-sdk-path)" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -1100,7 +1110,7 @@ jobs:
       - name: Release UAT (under Xvfb)
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x800x24" ./out/release/bin/with build :release-uat
+        run: xvfb-run -a -s "-screen 0 1280x800x24" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
