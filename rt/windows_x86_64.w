@@ -1395,7 +1395,7 @@ extern fn CertFreeCertificateContext(pCertContext: *mut u8) -> i32
 extern fn CertOpenStore(lpszStoreProvider: *const u8, dwEncodingType: u32, hCryptProv: i64, dwFlags: u32, pvPara: *const u8) -> *mut u8
 extern fn CertAddEncodedCertificateToStore(hCertStore: *mut u8, dwCertEncodingType: u32, pbCertEncoded: *const u8, cbCertEncoded: u32, dwAddDisposition: u32, ppCertContext: *mut *mut u8) -> i32
 extern fn CertGetCertificateChain(hChainEngine: *mut u8, pCertContext: *mut u8, pTime: *const u8, hAdditionalStore: *mut u8, pChainPara: *const CertChainPara, dwFlags: u32, pvReserved: *mut u8, ppChainContext: *mut *mut u8) -> i32
-extern fn CertFreeCertificateChain(pChainContext: *mut u8) -> Unit
+extern fn CertFreeCertificateChain(pChainContext: *mut u8)
 
 // CERT_CHAIN_PARA with an empty usage match: cbSize, then CERT_USAGE_MATCH
 // (dwType, then CERT_ENHKEY_USAGE's count and identifier pointer).
