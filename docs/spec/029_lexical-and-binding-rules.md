@@ -441,13 +441,19 @@ expression) is likewise implementation-internal and unstable.
 
 A file with top-level statements and no `fn main` is a script: its
 statements are the program and run top to bottom, beside the file's
-`fn`s. A script's top-level `let` and `var` are globals of the module
-(D184): a helper `fn` in the file names one as it names any global. Each
-is assigned where its statement stands, so the script keeps its order; a
-call that reaches a binding before its statement has run is the
-uninitialized-access error of D175, reported at compile time from the
-static dependency graph. A file with `fn main` has no top-level
-statements, and nothing here applies to it.
+`fn`s. A script's top-level `let` and `var` are locals of the implicit
+main (D184): each is assigned where its statement stands, may hold a view,
+and is typed by its uses in main up to its last top-level use (§4.3c). A
+`fn` in the file that names one captures it, as a closure captures a
+binding of its enclosing function: it observes or mutates the binding and
+never consumes it; a helper that captures an ephemeral binding is
+non-escaping, so it cannot be spawned, stored or returned. A helper's
+parameters and locals shadow script bindings, the local winning for every
+use (D173). A helper is checked against the settled type; a use in a helper
+that would widen it is an error naming both sites. A read in a helper that
+runs before the binding's statement has run is the uninitialized-access
+error, reported at compile time where the call graph shows it. A file with
+`fn main` has no top-level statements, and nothing here applies to it.
 
 ```
 var count = 0
