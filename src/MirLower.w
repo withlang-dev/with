@@ -16901,8 +16901,65 @@ impl MirBuilder:
     // Every expression's operand, recorded with Sema's type for its node
     // (D65: audit:resolution judges they agree). A contextual copy is
     // Sema's own adjustment: its operand has the adjusted type.
+    // D183 (§4.2.6): Sema admitted this value at a narrower or other-signed
+    // integer demand; it converts here with a range check, and a value the
+    // destination cannot hold panics (the D71 shape). The bounds are the
+    // destination's, compared in the source's type; a check the source's
+    // own range makes redundant is not emitted.
+    mut fn lower_checked_narrowing(op_in: i32, node: i32, target_ty: i32) -> i32:
+        var src_ty = self.operand_type(op_in)
+        if src_ty == 0 or src_ty == self.sema.ty_void as i32: src_ty = self.expr_type(node)
+        let span = self.ast.get_start(node)
+        let tr = self.sema.resolve_alias(target_ty as TypeId)
+        let sr = self.sema.resolve_alias(src_ty as TypeId)
+        if self.sema.get_type_kind(tr) != TypeKind.TY_INT or self.sema.get_type_kind(sr) != TypeKind.TY_INT:
+            return op_in
+        let width = self.sema.get_type_d0(tr)
+        let src_width = self.sema.get_type_d0(sr)
+        let signed = self.sema.get_type_d1(tr) != 0
+        let src_signed = self.sema.get_type_d1(sr) != 0
+        let need_lo = src_signed and (not signed or width < src_width)
+        // A 128-bit destination's maximum is not an i64 constant; only its
+        // sign bound is checked (a wider unsigned source cannot exceed it).
+        let need_hi = (width < src_width or (signed and not src_signed)) and width <= 64
+        if not need_lo and not need_hi:
+            return self.lower_value_cast(op_in, src_ty, target_ty, span)
+        let value_place = self.materialize_operand(op_in, src_ty, span)
+        let fail_bb = self.new_block()
+        if need_lo:
+            let lo: i64 = if signed: -((1 as i64) << ((width - 1) as u32)) else: 0
+            let lo_place = self.materialize_operand(self.int_const_operand(lo, src_ty), src_ty, span)
+            let next_bb = self.new_block()
+            self.lower_debug_counter_test(value_place, lo_place, BinaryOp.OP_LT, fail_bb, next_bb)
+            self.switch_to(next_bb)
+        if need_hi:
+            let hi: i64 = if width >= 64: 9223372036854775807 else if signed: ((1 as i64) << ((width - 1) as u32)) - 1 else: ((1 as i64) << (width as u32)) - 1
+            let hi_place = self.materialize_operand(self.int_const_operand(hi, src_ty), src_ty, span)
+            let next_bb = self.new_block()
+            self.lower_debug_counter_test(value_place, hi_place, BinaryOp.OP_GT, fail_bb, next_bb)
+            self.switch_to(next_bb)
+        let pass_bb = self.cur_bb
+        self.switch_to(fail_bb)
+        let panic_op = self.const_operand(ConstKind.CK_FN, self.sema.pool_lookup_symbol("with_panic"), self.sema.ty_void)
+        let panic_args: List[i32] = List.new()
+        panic_args.push(self.lower_str_lit(self.pool.intern("integer does not fit `" ++ self.sema.type_name(target_ty) ++ "` (§4.2.6)")))
+        panic_args.push(self.lower_str_lit(self.pool.intern("")))
+        panic_args.push(self.int_const_operand(0, self.sema.ty_i32))
+        let panic_args_id = self.body.new_call_args(panic_args)
+        let panic_place = self.place_for_local(self.new_temp(self.sema.ty_void))
+        let unreachable_bb = self.new_block()
+        self.terminate(TermKind.TK_CALL, panic_op, panic_args_id, panic_place, unreachable_bb)
+        self.switch_to(unreachable_bb)
+        self.terminate(TermKind.TK_UNREACHABLE, 0, 0, 0, 0)
+        self.switch_to(pass_bb)
+        self.lower_value_cast(self.body.new_operand(OperandKind.OK_COPY, value_place), src_ty, target_ty, span)
+
+
     mut fn lower_expr(node: i32) -> i32:
         var op = self.lower_expr_node(node)
+        // D183 (§4.2.6): a checked narrowing Sema recorded on this node.
+        if node > 0 and op >= 0 and self.sema.checked_narrowings.contains(node):
+            op = self.lower_checked_narrowing(op, node, self.concrete_type(self.sema.checked_narrowings.get(node).unwrap()))
         // §4.9a (D103): Sema decided this value is `Some(value)` at its
         // demand; the Option is built here around the lowered value.
         if node > 0 and op >= 0 and self.sema.value_to_option_nodes.contains(node):

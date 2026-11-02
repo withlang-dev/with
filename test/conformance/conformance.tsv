@@ -15,8 +15,8 @@ D127	a view of a constant is a view of an immutable static (§3.1)	implemented	t
 D128	a binding whose untyped integer literal typed it takes the type its uses agree on (§4.2.1)	implemented	test/behavior/behav_d128_int_local_shapes.w	
 D181	an integer beside a float is the float (§4.2.6)	implemented	test/behavior/behav_d181_int_beside_float_is_float.w	
 D182	a float where a narrower float is demanded converts (§4.2.6)	implemented	test/behavior/behav_d182_float_widths.w	
-D183	an integer where a narrower integer is demanded converts with a range check; as is the wrap; positions are isize (§4.2.6)	open		#2522
-D184	a script's top-level binding is a local of the implicit main; a helper that names it captures it (§29.15)	open	test/behavior/behav_d184_script_captures.w	#2951
+D183	an integer where a narrower integer is demanded converts with a range check; as is the wrap; a comptime value out of range is an error; the lint names the narrow declaration (§4.2.6)	implemented	test/behavior/behav_d183_narrowing_out_of_range_panics.w	#2522
+D184	a script's top-level binding is a local of the implicit main; a helper that names it captures it (§29.15)	implemented	test/behavior/behav_d184_script_captures.w	#2951
 D185	one comprehension family: the bracket form over Option and Result yields the carrier of the element (§13.6, §13.6a)	open		#2960
 D186	the iterator adapter is skip(n); drop(value) stays the prelude's (§13.3)	implemented	test/behavior/behav_d186_skip_adapter.w	
 D186	zip, chain and zip_with take any iterable (§13.3)	open		#2962
