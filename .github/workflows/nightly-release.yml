@@ -424,6 +424,22 @@ jobs:
         # its SDK, as a user building raylib from source does.
         run: SDKROOT="$(xcrun --show-sdk-path)" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
 
+      # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
+      # and out/release-uat/; the log carries one line per scenario (the
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # failed: tmp" stderr that way).
+      - name: Upload release UAT captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/uat/**/step-*.stdout
+            out/uat/**/step-*.stderr
+            out/release-uat/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -661,6 +677,22 @@ jobs:
         # host SDK unless one is named (§16.1, D81). The runner has Xcode: name
         # its SDK, as a user building raylib from source does.
         run: SDKROOT="$(xcrun --show-sdk-path)" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
+
+      # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
+      # and out/release-uat/; the log carries one line per scenario (the
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # failed: tmp" stderr that way).
+      - name: Upload release UAT captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/uat/**/step-*.stdout
+            out/uat/**/step-*.stderr
+            out/release-uat/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -959,6 +991,22 @@ jobs:
             out/release/bin/*.pdb
             out/uat/raylib_spiral_windows/tmp/out/bin/opengl32.dll
 
+      # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
+      # and out/release-uat/; the log carries one line per scenario (the
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # failed: tmp" stderr that way).
+      - name: Upload release UAT captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/uat/**/step-*.stdout
+            out/uat/**/step-*.stderr
+            out/release-uat/
+          if-no-files-found: ignore
+          retention-days: 7
+
       - name: Package fixpoint-verified release asset
         run: |
           set -euo pipefail
@@ -1153,6 +1201,22 @@ jobs:
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
         run: WITH="$GITHUB_WORKSPACE/src/main" xvfb-run -a -s "-screen 0 1280x800x24" ./src/main build :release-uat
+
+      # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
+      # and out/release-uat/; the log carries one line per scenario (the
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # failed: tmp" stderr that way).
+      - name: Upload release UAT captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/uat/**/step-*.stdout
+            out/uat/**/step-*.stderr
+            out/release-uat/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Package fixpoint-verified release asset
         run: |
@@ -1439,6 +1503,22 @@ jobs:
             out/release/bin/with.exe
             out/release/bin/*.pdb
             out/uat/raylib_spiral_windows/tmp/out/bin/opengl32.dll
+
+      # A red release UAT leaves its evidence in out/uat/<scenario>/step-N.*
+      # and out/release-uat/; the log carries one line per scenario (the
+      # linux-x86_64 rehearsal 41395933232 lost sdl's "build.w target
+      # failed: tmp" stderr that way).
+      - name: Upload release UAT captures
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uat-captures-${{ github.job }}-${{ strategy.job-index }}
+          path: |
+            out/uat/**/step-*.stdout
+            out/uat/**/step-*.stderr
+            out/release-uat/
+          if-no-files-found: ignore
+          retention-days: 7
 
       - name: Package fixpoint-verified release asset
         run: |
