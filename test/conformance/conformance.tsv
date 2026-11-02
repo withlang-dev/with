@@ -1,7 +1,7 @@
 ruling	claim	state	fixture	issue
 D29	a unique standard-library name resolves with no import (§18.1 tier 5)	open		#752
 D91	Target.os and Target.arch are compile-time constants; a per-target value is an exhaustive comptime match (§17.5)	regressed		#2949
-D95	a tuple, a fixed array, Option and Result implement Clone, Eq, Ord and Debug when every element does (§11.8)	open		#2945
+D95	structural types derive: a tuple implements Clone (and Eq, Ord, Hash, Debug) when every element does (§11.8)	implemented	test/behavior/behav_d95_tuple_clone.w	#2945
 D95	pub const may omit its type; ?? has its own precedence level; let _ = x moves and drops (§9.1b, §9.9, §29.6)	implemented	test/behavior/behav_d95_pub_const_takes_its_value_type.w	
 D96	a key is structural; a key projection fn key(); HashMap and HashSet walk in insertion order (§11.7)	implemented	test/behavior/behav_2180_map_keys_by_value.w	
 D97	std.TotalF64 is a float key; derived Ord orders variants by declaration (§11.7, §11.8)	implemented	test/behavior/behav_d97_option_none_first.w	

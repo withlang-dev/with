@@ -4,7 +4,6 @@
 # row in test/conformance/conformance.tsv to implemented, delete the spec
 # changelog's NON-COMPLIANT sentence, and move the fixture out of here.
 test/conformance/open_d29_fallback_tier.w
-test/conformance/open_d95_tuple_clone.w
 test/conformance/open_s13_5a_label_alone.w
 test/conformance/open_s18_1_root_grouped_import.w
 test/conformance/open_s14_10_channel_select_arm.w
