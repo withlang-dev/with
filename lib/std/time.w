@@ -88,7 +88,7 @@ pub async fn sleep(d: Duration): with_fiber_sleep_until(with_clock_nanos() + d.n
 
 /// A task that completes after `d`: the `_ = timeout(1.secs())` arm of a
 /// `select await` (§14.10).
-pub async fn timeout(d: Duration): sleep(d).await
+pub async fn timeout(d: Duration): with_fiber_sleep_until(with_clock_nanos() + d.ns)
 
 /// Get monotonic time in nanoseconds (for benchmarking).
 pub fn now_ns() -> i64:
