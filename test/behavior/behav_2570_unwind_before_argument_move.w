@@ -11,7 +11,7 @@ fn program_text -> str:
     "use std.time\n" ++
         "use std.builtins.print_i32\n" ++
         "fn sleeper() -> i32:\n" ++
-        "    sleep(1).await\n" ++
+        "    sleep(1.millis()).await\n" ++
         "    1\n" ++
         "fn a(f: fn() -> i32) -> fn() -> i32:\n" ++
         "    let _ = f()\n" ++

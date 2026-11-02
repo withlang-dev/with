@@ -257,8 +257,8 @@ type SemaBuiltinSymbols {
     reduce: i32,
     take: i32,
     take_while: i32,
-    drop_items: i32,
-    drop_while: i32,
+    skip_items: i32,
+    skip_while: i32,
     zip: i32,
     zip_with: i32,
     enumerate: i32,
@@ -3273,8 +3273,8 @@ fn sema_builtin_symbols_zero -> SemaBuiltinSymbols:
         reduce: 0,
         take: 0,
         take_while: 0,
-        drop_items: 0,
-        drop_while: 0,
+        skip_items: 0,
+        skip_while: 0,
         zip: 0,
         zip_with: 0,
         enumerate: 0,
@@ -6024,8 +6024,8 @@ impl Sema:
         self.syms.reduce = self.pool_intern("reduce")
         self.syms.take = self.pool_intern("take")
         self.syms.take_while = self.pool_intern("take_while")
-        self.syms.drop_items = self.pool_intern("drop")
-        self.syms.drop_while = self.pool_intern("drop_while")
+        self.syms.skip_items = self.pool_intern("skip")
+        self.syms.skip_while = self.pool_intern("skip_while")
         self.syms.zip = self.pool_intern("zip")
         self.syms.zip_with = self.pool_intern("zip_with")
         self.syms.enumerate = self.pool_intern("enumerate")

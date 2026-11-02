@@ -65,7 +65,7 @@ let config = with Config.default() as mut c:
 let request = with HttpRequest.new("GET", "/api/users") as mut r:
     r.header("Authorization", token)
     r.header("Accept", "application/json")
-    r.timeout(Duration.seconds(30))
+    r.timeout(Duration.secs(30))
 
 let sprite = with Sprite.new() as mut s:
     s.position = Vec2.new(100.0, 200.0)

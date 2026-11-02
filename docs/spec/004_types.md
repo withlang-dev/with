@@ -736,7 +736,7 @@ type ServerConfig {
     host: str = "127.0.0.1",
     port: u16 = 8080,
     max_conns: usize = 1000,
-    timeout: Duration = Duration.seconds(30),
+    timeout: Duration = Duration.secs(30),
 }
 
 // Omitted fields use their defaults
@@ -746,7 +746,7 @@ let config = ServerConfig {
     host: "127.0.0.1",
     port: 9090,
     max_conns: 1000,
-    timeout: Duration.seconds(30),
+    timeout: Duration.secs(30),
 }
 
 // All defaults (every field has a default)
@@ -760,7 +760,7 @@ type ServerConfig:
     host: str = "127.0.0.1"
     port: u16 = 8080
     max_conns: usize = 1000
-    timeout: Duration = Duration.seconds(30)
+    timeout: Duration = Duration.secs(30)
 ```
 
 Default expressions are evaluated at the construction site, not at
@@ -803,7 +803,7 @@ type Ship { pos = Vector2 { x: 480.0, y: 300.0 }, radius = 10.0, ticks = 0, aliv
 type PoolConfig {
     min_conns: usize = 5,
     max_conns: usize = 20,
-    idle_timeout: Duration = Duration.seconds(300),
+    idle_timeout: Duration = Duration.secs(300),
     allocator: Allocator = std.heap.page_allocator(),
 }
 

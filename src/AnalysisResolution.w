@@ -324,7 +324,7 @@ fn resolution_is_drop_impl_call(sema: &Sema, node: i32) -> bool:
     if sema.ast.get_data2(node) != 0: return false
     let callee = sema.ast.get_data0(node)
     if callee <= 0 or callee >= sema.ast.node_count() or sema.ast.kind(callee) != NodeKind.NK_FIELD_ACCESS: return false
-    if sema.ast.get_data1(callee) != sema.syms.drop_items: return false
+    if sema.ast.get_data1(callee) != sema.syms.skip_items: return false
     let recv_ty = sema.typed_expr_types.get(sema.ast.get_data0(callee))
     recv_ty.is_some() and sema.type_has_drop_impl(recv_ty.unwrap())
 

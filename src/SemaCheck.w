@@ -7672,7 +7672,7 @@ impl Sema:
             return false
         let extra_start = self.ast.get_data0(node)
         let elem_count = self.ast.get_data1(node)
-        if elem_count < 2 or elem_count > 12:
+        if elem_count < 2:
             return false
         for ei in 0..elem_count:
             if self.expr_is_awaitable_task_value(self.ast.get_extra(extra_start + ei)) == false:
@@ -9050,7 +9050,7 @@ impl Sema:
         self.builtin_sig_modes.push("tttt")
         self.builtin_sig_required.push(-1)
         let iter = self.pool_intern("Iter")
-        for name in "MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter DropWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
+        for name in "MappedIter FilterIter FilterMapIter TakeIter DropIter TakeWhileIter SkipWhileIter ZipIter EnumerateIter ChainIter ZipWithIter StepByIter FlatMapIter".split(" "):
             self.builtin_sig_owner_alias.insert(self.pool_intern(name), iter)
         self.builtin_sig_owner_alias.insert(self.pool_intern("ScopedTask"), self.pool_intern("Task"))
         self.builtin_sig_owner_alias.insert(-(TypeKind.TY_STR as i32), self.pool_intern("str"))
@@ -12274,8 +12274,9 @@ impl Sema:
             let inner_ty = self.check_expr(inner)
             if self.ast.kind(inner) == NodeKind.NK_TUPLE:
                 let elem_count = self.ast.get_data1(inner)
-                if elem_count < 2 or elem_count > 12:
-                    self.emit_error("await tuple requires between 2 and 12 tasks", node)
+                // D189: no arity limit; the desugar is generic over the tuple's size.
+                if elem_count < 2:
+                    self.emit_error("await tuple requires at least two tasks", node)
                     return inner_ty
                 if self.expr_is_tuple_of_tasks(inner) == 0:
                     self.emit_error("await tuple requires Task values", node)
@@ -26277,7 +26278,7 @@ impl Sema:
         // A predicate adapter over an iterator of views hands the predicate
         // the view itself (`&T`, as the element access does), never a view
         // of the view: std's `_views` twins over `Iter[&T]`.
-        let predicate_over_views = name_text == "filter" or name_text == "take_while" or name_text == "drop_while" or name_text == "any" or name_text == "all" or name_text == "none" or name_text == "find" or name_text == "position"
+        let predicate_over_views = name_text == "filter" or name_text == "take_while" or name_text == "skip_while" or name_text == "any" or name_text == "all" or name_text == "none" or name_text == "find" or name_text == "position"
         if predicate_over_views:
             var pv_elem = self.iterator_element_type(recv_type)
             if pv_elem == 0:
@@ -34342,7 +34343,7 @@ impl Sema:
                 return self.ensure_option_type_for(iter_elem_ty)
             if field == self.syms.map:
                 return recv_type
-            if field == self.syms.filter or field == self.syms.filter_map or field == self.syms.take or field == self.syms.drop_items or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.zip or field == self.syms.enumerate or field == self.syms.chain or field == self.syms.zip_with or field == self.syms.step_by or field == self.syms.flat_map:
+            if field == self.syms.filter or field == self.syms.filter_map or field == self.syms.take or field == self.syms.skip_items or field == self.syms.take_while or field == self.syms.skip_while or field == self.syms.zip or field == self.syms.enumerate or field == self.syms.chain or field == self.syms.zip_with or field == self.syms.step_by or field == self.syms.flat_map:
                 return recv_type
             if field == self.syms.sum or field == self.syms.product:
                 return self.summed_type(iter_elem_ty)
@@ -34646,7 +34647,7 @@ impl Sema:
                 let params: List[i32] = List.new()
                 params.push(iter_elem)
                 return self.ensure_fn_type(params, 1, 0 as TypeId) as i32
-            if (field == self.syms.filter or field == self.syms.take_while or field == self.syms.drop_while or field == self.syms.partition or field == self.syms.find or field == self.syms.position or field == self.syms.any or field == self.syms.all or field == self.syms.none_pred) and arg_index == 0:
+            if (field == self.syms.filter or field == self.syms.take_while or field == self.syms.skip_while or field == self.syms.partition or field == self.syms.find or field == self.syms.position or field == self.syms.any or field == self.syms.all or field == self.syms.none_pred) and arg_index == 0:
                 let params2: List[i32] = List.new()
                 params2.push(iter_elem)
                 return self.ensure_fn_type(params2, 1, self.ty_bool) as i32
@@ -34660,7 +34661,7 @@ impl Sema:
                 let params4: List[i32] = List.new()
                 params4.push(iter_elem)
                 return self.ensure_fn_type(params4, 1, self.ty_void) as i32
-            if (field == self.syms.take or field == self.syms.drop_items or field == self.syms.step_by) and arg_index == 0:
+            if (field == self.syms.take or field == self.syms.skip_items or field == self.syms.step_by) and arg_index == 0:
                 return self.ty_i64 as i32
             if (field == self.syms.zip or field == self.syms.chain) and arg_index == 0:
                 return recv_type
@@ -41943,7 +41944,7 @@ impl Sema:
 // §13.3 (#1746): the operations std.traits defines over any Iter[T], by
 // their method names.
 fn sema_iter_adapter_name(name: &str) -> bool:
-    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "drop" or name == "take_while" or name == "drop_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with"
+    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "skip" or name == "take_while" or name == "skip_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with"
 
 impl Sema:
     // D93's second check exists to retype a literal's binding at the type

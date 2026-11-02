@@ -9,7 +9,7 @@ use std.task.await_all
 use std.time
 
 async fn mark(i: i32) -> i32:
-    sleep(200).await
+    sleep(200.millis()).await
     i + 1
 
 fn main:
