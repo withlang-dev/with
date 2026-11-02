@@ -1266,6 +1266,9 @@ pub fn rt_sysinfo_arch() -> str:
 pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
     -1
 
+pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
+    -1
+
 // ── networking (no sockets in WASI preview1) ──────────────────────────
 
 fn rt_net_empty_str() -> str: rt_empty_str()

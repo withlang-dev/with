@@ -5140,6 +5140,13 @@ extern fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32
 pub fn with_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
     rt_tls_load_windows_roots(buf, buf_cap, starts, lens, max_roots)
 
+// Ask Windows to build `chain` once, so a root its store lacks is fetched
+// into it (#2922); -1 on every other backend, where the PEM bundle is whole.
+extern fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32
+
+pub fn with_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
+    rt_tls_windows_complete_chain(chain, starts, lens, count)
+
 pub fn with_sysinfo_hostname() -> str:
     var buf: [256]u8 = [0 as u8; 256]
     let buf_ptr = (&raw mut buf) as *mut [256]u8 as *mut u8

@@ -1051,6 +1051,9 @@ pub fn rt_sysinfo_arch() -> str:
 pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
     -1
 
+pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
+    -1
+
 pub fn rt_gethostname(name: *mut u8, len: u64) -> i32: rt_libc_gethostname(name, len)
 
 pub fn rt_getenv(name: *const c_char) -> *const c_char:

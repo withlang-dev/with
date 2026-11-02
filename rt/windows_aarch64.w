@@ -1233,6 +1233,27 @@ pub fn rt_sysinfo_arch() -> str:
 extern fn CertOpenSystemStoreA(hProv: i64, szSubsystemProtocol: *const u8) -> *mut u8
 extern fn CertEnumCertificatesInStore(hCertStore: *mut u8, pPrevCertContext: *mut u8) -> *mut u8
 extern fn CertCloseStore(hCertStore: *mut u8, dwFlags: u32) -> i32
+// CryptoAPI chain building (#2922): Windows seeds its trust store lazily and
+// fetches a chain's root from Windows Update the first time CryptoAPI builds
+// that chain. Our verifier reads the store itself and never asked, so a
+// fresh machine (a release runner) lacked every root it had not met; one
+// chain build fills the store, and the verifier then judges the chain on
+// its own terms.
+extern fn CertCreateCertificateContext(dwCertEncodingType: u32, pbCertEncoded: *const u8, cbCertEncoded: u32) -> *mut u8
+extern fn CertFreeCertificateContext(pCertContext: *mut u8) -> i32
+extern fn CertOpenStore(lpszStoreProvider: *const u8, dwEncodingType: u32, hCryptProv: i64, dwFlags: u32, pvPara: *const u8) -> *mut u8
+extern fn CertAddEncodedCertificateToStore(hCertStore: *mut u8, dwCertEncodingType: u32, pbCertEncoded: *const u8, cbCertEncoded: u32, dwAddDisposition: u32, ppCertContext: *mut *mut u8) -> i32
+extern fn CertGetCertificateChain(hChainEngine: *mut u8, pCertContext: *mut u8, pTime: *const u8, hAdditionalStore: *mut u8, pChainPara: *const CertChainPara, dwFlags: u32, pvReserved: *mut u8, ppChainContext: *mut *mut u8) -> i32
+extern fn CertFreeCertificateChain(pChainContext: *mut u8) -> Unit
+
+// CERT_CHAIN_PARA with an empty usage match: cbSize, then CERT_USAGE_MATCH
+// (dwType, then CERT_ENHKEY_USAGE's count and identifier pointer).
+type CertChainPara:
+    cb_size: u32
+    usage_type: u32
+    usage_count: u32
+    usage_pad: u32
+    usage_ids: *mut u8
 
 pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, lens: *mut i32, max_roots: i32) -> i32:
     unsafe:
@@ -1262,6 +1283,34 @@ pub fn rt_tls_load_windows_roots(buf: *mut u8, buf_cap: i32, starts: *mut i32, l
             count = count + 1
         let _closed = CertCloseStore(store, 0 as u32)
         if count > 0: count else: -1
+
+// Ask CryptoAPI to build `chain` (the leaf first, then the intermediates the
+// server sent): the build pulls a root the store lacks into it. 0 when a
+// chain was built, -1 otherwise; the caller reloads the roots and verifies
+// the chain itself either way (#2922).
+pub fn rt_tls_windows_complete_chain(chain: *const u8, starts: *const i32, lens: *const i32, count: i32) -> i32:
+    if count <= 0:
+        return -1
+    unsafe:
+        let leaf = CertCreateCertificateContext(1u32, chain + (*starts) as u64, (*lens) as u32)
+        if leaf == null:
+            return -1
+        // CERT_STORE_PROV_MEMORY is the provider "name" 2.
+        let extra = CertOpenStore(2 as *const u8, 1u32, 0, 0u32, null)
+        if extra != null:
+            var i = 1
+            while i < count:
+                let _added = CertAddEncodedCertificateToStore(extra, 1u32, chain + (*(starts + i as u64)) as u64, (*(lens + i as u64)) as u32, 4u32, null)
+                i = i + 1
+        var para = CertChainPara { cb_size: 24u32, usage_type: 0u32, usage_count: 0u32, usage_pad: 0u32, usage_ids: null }
+        var built: *mut u8 = null
+        let ok = CertGetCertificateChain(null, leaf, null, extra, &raw mut para as *const CertChainPara, 0u32, null, &raw mut built)
+        if built != null:
+            CertFreeCertificateChain(built)
+        if extra != null:
+            let _closed = CertCloseStore(extra, 0u32)
+        let _freed = CertFreeCertificateContext(leaf)
+        if ok != 0 and built != null: 0 else: -1
 
 pub fn rt_getenv(name: *const c_char) -> *const c_char:
     var wname: [1024]u16 = [0; 1024]
@@ -2118,6 +2167,12 @@ c facade win32:
     fn CertOpenSystemStoreA
     fn CertEnumCertificatesInStore
     fn CertCloseStore
+    fn CertCreateCertificateContext
+    fn CertFreeCertificateContext
+    fn CertOpenStore
+    fn CertAddEncodedCertificateToStore
+    fn CertGetCertificateChain
+    fn CertFreeCertificateChain
     fn __acrt_iob_func
         preserves domain environ
         preserves domain locale
