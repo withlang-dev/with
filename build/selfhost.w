@@ -339,6 +339,44 @@ pub fn run_embedded_runtime_regression_action(ctx: ActionCtx) -> i32:
         return bs_fail(ctx, "could not remove copied compiler after embedded runtime regression")
     0
 
+
+// A wasm32 link of a program against the release compiler's wasm32 runtime
+// bundle, without running it: the standing battery has no node, so
+// :wasm-tests is the nightly's alone, and the bundle linked with `malloc`
+// undefined for ten days (rt/wasm.w's libc stand-in came out as `malloc.1`,
+// 2026-10-24..11-02). The link alone catches that class.
+pub fn run_wasm_link_regression_action(ctx: ActionCtx) -> i32:
+    let inputs = ctx.inputs()
+    if inputs.len() < 2:
+        return bs_fail(ctx, "missing compiler and source inputs")
+    let fs = ctx.fs()
+    let output_dir = ctx.output()
+    if output_dir.len() == 0:
+        return bs_fail(ctx, "missing output directory")
+    if fs.exists(output_dir) and fs.remove_tree(output_dir) != 0:
+        return bs_fail(ctx, "could not remove previous output directory: " ++ output_dir)
+    if fs.mkdir_all(output_dir) != 0:
+        return bs_fail(ctx, "could not create output directory: " ++ output_dir)
+    let root = ctx.project_info().project_root()
+    let bin_path = bs_join(output_dir, "hello.wasm")
+    let build_stdout = bs_join(output_dir, "build.stdout")
+    let build_stderr = bs_join(output_dir, "build.stderr")
+    var build_args: List[str] = List.new()
+    build_args |> push(bs_abs(root, inputs[0]))
+    build_args |> push("build")
+    build_args |> push("--target")
+    build_args |> push("wasm32")
+    build_args |> push(bs_abs(root, inputs[1]))
+    build_args |> push("-o")
+    build_args |> push(bs_abs(root, bin_path))
+    let result = ctx.process_runner().run_capture(build_args, bs_abs(root, build_stdout), bs_abs(root, build_stderr), BS_HANG_GUARD_MS)
+    if result.rc == 124:
+        return bs_fail(ctx, "wasm32 link timed out; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+    if result.rc != 0:
+        return bs_fail(ctx, f"wasm32 link failed with exit code {result.rc}: " ++ bs_trim_trailing_line_endings(result.stderr) ++ "; stdout=" ++ build_stdout ++ " stderr=" ++ build_stderr)
+    if not fs.exists(bin_path):
+        return bs_fail(ctx, "wasm32 link produced no " ++ bin_path)
+    0
 // #1815 (D30): a link takes runtime objects of the linking compiler's
 // generation only, and says so when it cannot. The release compiler is one
 // generation with the out/lib it links through (its .producer) and with its

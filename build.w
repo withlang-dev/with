@@ -4740,6 +4740,15 @@ pub fn build(ctx: BuildCtx) -> Build:
     embedded_runtime_regression = embedded_runtime_regression.dep("build")
     out = out.add_target(embedded_runtime_regression)
 
+    var wasm_link_regression = test_lane(.Action, "wasm-link-regression", "").output("out/test-graph/wasm-link-regression")
+    wasm_link_regression = wasm_link_regression.allow_parallel()
+    wasm_link_regression.action = run_wasm_link_regression_action
+    wasm_link_regression = wasm_link_regression.input(release_compiler_bin("with"))
+    wasm_link_regression = wasm_link_regression.input("test/wasm/wasm_hello.w")
+    wasm_link_regression = wasm_link_regression.dep("build")
+    wasm_link_regression = wasm_link_regression.dep("cross-rt-wasm")
+    out = out.add_target(wasm_link_regression)
+
     var runtime_generation_regression = test_lane(.Action, "runtime-generation-regression", "").output("out/test-graph/runtime-generation-regression")
     runtime_generation_regression = runtime_generation_regression.allow_parallel()
     runtime_generation_regression.action = run_runtime_generation_regression_action
@@ -4817,6 +4826,7 @@ pub fn build(ctx: BuildCtx) -> Build:
     tests = tests.dep("cli-selfhost-lsp-tests")
     tests = tests.dep("cli-selfhost-edge-tests")
     tests = tests.dep("embedded-runtime-regression")
+    tests = tests.dep("wasm-link-regression")
     tests = tests.dep("runtime-generation-regression")
     tests = tests.dep("emit-c-smoke")
     // Serial lanes run together after the pooled wave, so none of them
