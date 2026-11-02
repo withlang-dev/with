@@ -1,5 +1,4 @@
-async fn fetch_user(id: i32) -> i32:
-    id * 10
+async fn fetch_user(id: i32): id * 10
 
 async fn run:
     async scope s =>
@@ -8,5 +7,4 @@ async fn run:
         s.track(fetch_user(3))
     print("all tasks completed")
 
-fn main:
-    run()
+fn main: run()
