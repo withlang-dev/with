@@ -1,1 +1,1 @@
-{"schemaVersion":1,"label":"linux-aarch64","message":"v0.16.0.8 · missing: compiler compiler.sha256 SDK SDK.sha256","color":"red"}
+{"schemaVersion":1,"label":"linux-aarch64","message":"v0.16.0.8 · compiler + SDK","color":"brightgreen"}
