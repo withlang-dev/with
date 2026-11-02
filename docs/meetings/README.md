@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D191 — The indentation of a `|>` line decides what its left-hand side includes](2026-11-02-D191-the-indentation-of-a-pipe-line-decides-its-left-hand-side.md)
 - [D190 — `?` in main: an `Err` that reaches main ends the program (delegated, D98)](2026-11-02-D190-question-mark-in-main-ends-the-program.md)
 - [D189 — Tuple `.await` has no arity limit (delegated, D98)](2026-11-02-D189-tuple-await-has-no-arity-limit.md)
 - [D188 — `Duration` is a value type over `i64` nanoseconds, with `millis`/`secs` constructors, `Instant` and `timeout` (delegated, D98)](2026-11-02-D188-duration-is-a-value-type-over-i64-nanoseconds.md)

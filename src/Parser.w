@@ -548,6 +548,16 @@ impl Parser:
             return self.tokens.get_tag(p)
         TokenKind.TK_EOF
 
+    // The start offset of the first token past the newlines at `pos`.
+    fn start_past_newlines() -> i32:
+        var p = self.pos
+        while p < self.tokens.len() and self.tokens.get_tag(p) == TokenKind.TK_NEWLINE:
+            p = p + 1
+        if p < self.tokens.len():
+            return self.tokens.get_start(p)
+        0
+
+
     fn peek_past_separators() -> i32:
         var p = self.pos
         while p < self.tokens.len() and (self.tokens.get_tag(p) == TokenKind.TK_NEWLINE or self.tokens.get_tag(p) == TokenKind.TK_SEMICOLON):
@@ -4098,7 +4108,12 @@ impl Parser:
         while true:
             if self.peek() == TokenKind.TK_NEWLINE:
                 let next = self.peek_past_newlines()
-                if next == TokenKind.TK_PIPE_GT or next == TokenKind.TK_LT_PIPE or next == TokenKind.TK_QUESTION_QUESTION:
+                // D191 (§9.6, Eric 2026-11-02): the indentation of the operator's line
+                // decides what its left-hand side includes. A line indented less
+                // than the line its left operand starts on continues an enclosing
+                // expression (`match …:` with its arms, then `|> print` at the
+                // match's column pipes the whole match), not the operand.
+                if (next == TokenKind.TK_PIPE_GT or next == TokenKind.TK_LT_PIPE or next == TokenKind.TK_QUESTION_QUESTION) and line_indent_of(self.source, self.start_past_newlines()) >= line_indent_of(self.source, self.pool.get_start(lhs)):
                     self.skip_newlines()
 
             let info = self.infix_op()
