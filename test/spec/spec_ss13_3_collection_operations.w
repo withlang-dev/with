@@ -163,9 +163,9 @@ fn test_filter_map_and_skip_adapters:
     assert(mapped[1] == 8)
 
     let window = list_1_to_10().iter()
-        |> drop(2)
+        |> skip(2)
         |> take_while(x => x < 7)
-        |> drop_while(x => x < 5)
+        |> skip_while(x => x < 5)
         |> collect[List]()
     assert(window.len() == 2)
     assert(window[0] == 5)

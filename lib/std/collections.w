@@ -993,14 +993,14 @@ pub type FilterMapIter[I, T, U] ephemeral { iter: I, f: fn(T) -> Option[U] }
 /// Lazy iterator adapter produced by `.take(n)`.
 pub type TakeIter[I, T] ephemeral { iter: I, remaining: i64 }
 
-/// Lazy iterator adapter produced by `.drop(n)`.
+/// Lazy iterator adapter produced by `.skip(n)`.
 pub type DropIter[I, T] ephemeral { iter: I, remaining: i64 }
 
 /// Lazy iterator adapter produced by `.take_while(pred)`.
 pub type TakeWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, done: bool }
 
-/// Lazy iterator adapter produced by `.drop_while(pred)`.
-pub type DropWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping: bool }
+/// Lazy iterator adapter produced by `.skip_while(pred)`.
+pub type SkipWhileIter[I, T] ephemeral { iter: I, pred: fn(T) -> bool, dropping: bool }
 
 /// Lazy iterator adapter produced by `.zip(other)`.
 pub type ZipIter[A, B, T, U] ephemeral { left: A, right: B }
@@ -1054,7 +1054,7 @@ impl[I, T] Iter[T] for DropIter[I, T]:
 impl[I, T] Iter[T] for TakeWhileIter[I, T]:
     mut fn next() -> Option[T]: self.next()
 
-impl[I, T] Iter[T] for DropWhileIter[I, T]:
+impl[I, T] Iter[T] for SkipWhileIter[I, T]:
     mut fn next() -> Option[T]: self.next()
 
 impl[A, B, T, U] Iter[(T, U)] for ZipIter[A, B, T, U]:

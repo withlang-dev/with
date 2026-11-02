@@ -36,7 +36,7 @@ fn main:
     let d = Counter { n: 0, limit: 3 }
     let total = d.fold(0, (acc, x) => acc + x)
     let e = Counter { n: 0, limit: 6 }
-    let dropped = e.drop(2).take(2).count()
+    let dropped = e.skip(2).take(2).count()
     let f = Counter { n: 0, limit: 3 }
     let any3 = f.any(*it == 3)
     let g = Counter { n: 0, limit: 10 }

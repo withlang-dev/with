@@ -486,10 +486,10 @@ impl[T, I: Iter[T]] Iter[T] for Taken[T, I]:
 
 pub fn iter_take[T, I: Iter[T]](iter: I, n: i64) -> Taken[T, I]: Taken { inner: iter, left: n }
 
-/// `it.drop(n)`: everything after the first `n`.
-pub type Dropped[T, I] { inner: I, pending: i64 }
+/// `it.skip(n)`: everything after the first `n`.
+pub type Skipped[T, I] { inner: I, pending: i64 }
 
-impl[T, I: Iter[T]] Iter[T] for Dropped[T, I]:
+impl[T, I: Iter[T]] Iter[T] for Skipped[T, I]:
     mut fn next() -> Option[T]:
         while self.pending > 0:
             self.pending -= 1
@@ -497,7 +497,7 @@ impl[T, I: Iter[T]] Iter[T] for Dropped[T, I]:
                 return None
         self.inner.next()
 
-pub fn iter_drop[T, I: Iter[T]](iter: I, n: i64) -> Dropped[T, I]: Dropped { inner: iter, pending: n }
+pub fn iter_skip[T, I: Iter[T]](iter: I, n: i64) -> Skipped[T, I]: Skipped { inner: iter, pending: n }
 
 /// `it.take_while(p)`: elements while `p` holds.
 pub type TakenWhile[T, I] { inner: I, pred: fn(&T) -> bool, done: bool }
@@ -517,10 +517,10 @@ impl[T, I: Iter[T]] Iter[T] for TakenWhile[T, I]:
 
 pub fn iter_take_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> TakenWhile[T, I]: TakenWhile { inner: iter, pred, done: false }
 
-/// `it.drop_while(p)`: elements from the first for which `p` fails.
-pub type DroppedWhile[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
+/// `it.skip_while(p)`: elements from the first for which `p` fails.
+pub type SkippedWhile[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
 
-impl[T, I: Iter[T]] Iter[T] for DroppedWhile[T, I]:
+impl[T, I: Iter[T]] Iter[T] for SkippedWhile[T, I]:
     mut fn next() -> Option[T]:
         if not self.dropping:
             return self.inner.next()
@@ -532,12 +532,12 @@ impl[T, I: Iter[T]] Iter[T] for DroppedWhile[T, I]:
                         self.dropping = false
                         return Some(x)
 
-pub fn iter_drop_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> DroppedWhile[T, I]: DroppedWhile { inner: iter, pred, dropping: true }
+pub fn iter_skip_while[T, I: Iter[T]](iter: I, pred: fn(&T) -> bool) -> SkippedWhile[T, I]: SkippedWhile { inner: iter, pred, dropping: true }
 
 // The predicate adapters over an iterator of views (`ListIter` yields
 // `&T`): the predicate reads the view itself, as element access hands it,
 // never a view of the view. The compiler dispatches `filter`, `take_while`,
-// `drop_while`, `any`, `all`, `none`, `find` and `position` over `Iter[&T]`
+// `skip_while`, `any`, `all`, `none`, `find` and `position` over `Iter[&T]`
 // here (check_user_iter_method).
 pub type FilteredViews[T, I] { inner: I, pred: fn(&T) -> bool }
 
@@ -569,9 +569,9 @@ impl[T, I: Iter[&T]] Iter[&T] for TakenWhileViews[T, I]:
 
 pub fn iter_take_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> TakenWhileViews[T, I]: TakenWhileViews { inner: iter, pred, done: false }
 
-pub type DroppedWhileViews[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
+pub type SkippedWhileViews[T, I] { inner: I, pred: fn(&T) -> bool, dropping: bool }
 
-impl[T, I: Iter[&T]] Iter[&T] for DroppedWhileViews[T, I]:
+impl[T, I: Iter[&T]] Iter[&T] for SkippedWhileViews[T, I]:
     mut fn next() -> Option[&T]:
         if not self.dropping:
             return self.inner.next()
@@ -583,7 +583,7 @@ impl[T, I: Iter[&T]] Iter[&T] for DroppedWhileViews[T, I]:
                         self.dropping = false
                         return x
 
-pub fn iter_drop_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> DroppedWhileViews[T, I]: DroppedWhileViews { inner: iter, pred, dropping: true }
+pub fn iter_skip_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> SkippedWhileViews[T, I]: SkippedWhileViews { inner: iter, pred, dropping: true }
 
 pub fn iter_any_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> bool:
     var i = iter

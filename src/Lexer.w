@@ -516,9 +516,10 @@ impl Lexer:
             while self.pos < slen and (lex_is_digit(src[(self.pos)]) or src[(self.pos)] == CharCode.Underscore):
                 self.pos = self.pos + 1
 
-            // Check for decimal point (but not .. range)
+            // A decimal point only when a digit follows (§30 FLOAT_LIT): `1.5` is a
+            // float, `1..n` a range, and `50.millis()` a member access (D188).
             if self.pos < slen and src[(self.pos)] == CharCode.Dot:
-                if self.pos + 1 < slen and src[(self.pos + 1)] != CharCode.Dot:
+                if self.pos + 1 < slen and lex_is_digit(src[(self.pos + 1)]):
                     is_float = true
                     self.pos = self.pos + 1
                     while self.pos < slen and (lex_is_digit(src[(self.pos)]) or src[(self.pos)] == CharCode.Underscore):

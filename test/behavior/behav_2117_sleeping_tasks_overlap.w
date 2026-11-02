@@ -7,11 +7,11 @@
 use std.time
 
 async fn fetch(name: str, ms: i32) -> str:
-    sleep(ms).await
+    sleep(ms.millis()).await
     name
 
 async fn woke_at(ms: i32) -> i64:
-    sleep(ms).await
+    sleep(ms.millis()).await
     now_ns()
 
 fn main:
