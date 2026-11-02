@@ -2004,7 +2004,7 @@ pub fn run_check_spec_inventory_action(ctx: ActionCtx) -> i32:
 // older ones join as they are audited).
 fn comp_conformance_errors(fs: &ToolFs) -> List[str]:
     var errors: List[str] = List.new()
-    let path = "docs/spec/conformance.tsv"
+    let path = "test/conformance/conformance.tsv"
     if not fs.exists(path):
         errors.push("conformance: missing " ++ path)
         return errors

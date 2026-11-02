@@ -1,7 +1,7 @@
 # bridge-the-impl-gap.md: fixtures that spell a ruling the compiler does
 # not implement yet, one path per line. The conformance-open lane runs
 # each and expects it to FAIL; one that passes is the signal to flip its
-# row in docs/spec/conformance.tsv to implemented, delete the spec
+# row in test/conformance/conformance.tsv to implemented, delete the spec
 # changelog's NON-COMPLIANT sentence, and move the fixture out of here.
 test/conformance/open_d29_fallback_tier.w
 test/conformance/open_d126_slice_demand_literal.w

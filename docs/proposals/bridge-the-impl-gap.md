@@ -95,7 +95,7 @@ reads: 1757 explicit `&x` at `&T` parameters, 1158 call-site `move x`, 1345
 
 ### 1. The conformance inventory is a file the build checks
 
-`docs/spec/conformance.tsv`: one row per ruling and per normative section
+`test/conformance/conformance.tsv`: one row per ruling and per normative section
 with a testable claim: `D-number or §`, `claim` (one sentence), `state`
 (`implemented` / `open` / `regressed`), `fixture` (the test file that pins
 it, or empty), `issue`. The gate (`:spec-inventory-check`, which already
@@ -122,10 +122,10 @@ delete the changelog sentence; a fixture that stops failing *the way it
 did* is a regression caught the night it happens. D91's regression would
 have been one red line instead of a reader's surprise.
 
-Spec examples are fixtures too: a `with check` over every fenced `with`
-block in `docs/spec/*.md` whose first line is not `// not With` (the
-grammar, the desugars, the C). Today §14.6, §14.10, §13.6 and §4.3c examples
-do not compile, and nothing noticed.
+Spec examples are not fixtures (Eric, 2026-11-02): the spec is human-facing
+and has no build or test connection, so a spec edit never forces a build;
+its examples are maintained by hand. The examples that did not compile on
+2026-11-02 (§14.6, §14.10, §13.6, §4.3c) are #2955's children, fixed by hand.
 
 ### 3. A ruling is not done until the compiler conforms, and the queue is visible
 
@@ -147,8 +147,8 @@ Each item is a PR with its battery; the order pays users first and keeps the
 compiler-internal work last.
 
 1. **Mechanism first** (one PR, docs and build): `conformance.tsv` seeded
-   from this document, the gate rules, `test/conformance/open.txt`, the spec
-   example lane. Nothing else lands without a row after this.
+   from this document, the gate rules, `test/conformance/open.txt`.
+   Nothing else lands without a row after this.
 2. **The user-facing refusals**: #752 fallback tier; #2935 `?` in main;
    D184 (in flight); D183 checked narrowing with `isize` positions (#2522),
    which also retires the largest ceremony pattern; D185 comprehensions
@@ -180,8 +180,7 @@ asks for are the words of the gate rules in item 1, which land under D98.
   the `spec-gap` queue;
 - the spec changelog carries no `NON-COMPLIANT until it catches up` sentence
   that is false, and the gate refuses a new one without a row;
-- every fenced With example in the spec compiles under the installed
-  compiler, in a lane;
+- the spec's examples are correct by hand (#2955 and its children closed);
 - the `spec-gap` queue is empty of everything in the tables above, and a new
   ruling cannot join it without its fixture;
 - the conformance audit of 2026-11-02, re-run as a lane, finds nothing.
