@@ -2068,6 +2068,13 @@ impl Codegen:
         if (vk == wl_float_type_kind() or vk == wl_double_type_kind()) and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
             return wl_build_fp_cast(self.builder, val, target_ty)
 
+        // D181 (§4.2.6): an integer meeting a float destination converts to
+        // it. A site that knows the source's signedness goes through
+        // mir_coerce_value_to_sema_type; this is the signed default, as
+        // coerce_int's is.
+        if vk == wl_integer_type_kind() and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
+            return wl_build_si_to_fp(self.builder, val, target_ty)
+
         // D65: a pointer meeting a `{ptr, ptr}` pair is not evidence of a
         // function becoming a callable value. That fact is Sema's (a function
         // typed `fn(...)`, CK_FN d1), and the adapter is built where the

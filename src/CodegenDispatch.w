@@ -2274,6 +2274,10 @@ impl Codegen:
         let tk = wl_get_type_kind(target_ty)
         if vk == wl_integer_type_kind() and tk == wl_integer_type_kind():
             return self.coerce_int_ext(val, target_ty, src_unsigned or self.mir_sema_type_is_unsigned(target_sema_ty))
+        // D181 (§4.2.6): an integer where a float is demanded converts to it
+        // with its own signedness, as `as` does (round to nearest).
+        if vk == wl_integer_type_kind() and (tk == wl_float_type_kind() or tk == wl_double_type_kind()):
+            return if src_unsigned: wl_build_ui_to_fp(self.builder, val, target_ty) else: wl_build_si_to_fp(self.builder, val, target_ty)
         self.coerce_value_to_type(val, target_ty)
 
     // A `Box[C]` operand as a `Box[dyn T]`: the box's pointer is the data
@@ -5067,7 +5071,9 @@ impl Codegen:
                         indices.push(wl_const_int(wl_i32_type(self.context), 0, 0))
                         indices.push(wl_const_int(wl_i32_type(self.context), i as i64, 0))
                         let gep = wl_build_gep(self.builder, struct_ty, alloca, list_data_i64(&indices), 2)
-                        wl_build_store(self.builder, self.coerce_value_to_type(val, elem_ty), gep)
+                        // D181: an integer element of a float array converts with its signedness.
+                        let elem_unsigned = self.mir_sema_type_is_unsigned(self.mir_operand_sema_type(body, op_id))
+                        wl_build_store(self.builder, self.mir_coerce_value_to_sema_type(val, elem_ty, 0, elem_unsigned), gep)
                     return wl_build_load(self.builder, struct_ty, alloca)
                 if d0 == 1 and struct_ty != 0 and wl_get_type_kind(struct_ty) == wl_pointer_type_kind():
                     if agg_count > 0:
@@ -5212,7 +5218,7 @@ impl Codegen:
                         if field_ty == 0:
                             continue
                         let val = self.mir_eval_operand(body, op_id, field_ty)
-                        let coerced_val = self.coerce_value_to_type(val, field_ty)
+                        let coerced_val = self.mir_coerce_value_to_sema_type(val, field_ty, 0, self.mir_sema_type_is_unsigned(self.mir_operand_sema_type(body, op_id)))
                         wl_build_store(self.builder, coerced_val, alloca)
                     else:
                         let llvm_fi = self.get_llvm_field_index(struct_ty, fi)
