@@ -938,22 +938,42 @@ unsafe fn tls_verify_peer(
     let roots_buf = with_alloc(1048576)
     var roots_starts: [i32; 512] = [0; 512]
     var roots_lens: [i32; 512] = [0; 512]
-    var roots_count = -1
     let override_path = tls_roots_override_path()
-    if override_path.len() == 0 and with_sysinfo_os() == "Windows":
-        roots_count = with_tls_load_windows_roots(roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
-    else:
-        let pem = if override_path.len() > 0: (read_file(override_path) ?? "") else: tls_system_roots_pem()
-        if pem.len() > 0 and pem.len() <= 4194304:
-            let pem_bytes = str_copy_bytes(pem)
-            roots_count = x509_pem_parse_certs(pem_bytes, pem.len(), roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
-            str_free_bytes(pem_bytes)
+    let windows_store = override_path.len() == 0 and with_sysinfo_os() == "Windows"
     var ok = 0
-    if roots_count > 0:
-        if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()):
-            let leaf_buf = cert_buf + evidence.leaf_start as u64
-            if x509_verify_hostname(leaf_buf, &evidence.leaf as *const X509Cert, hostname, hostname_len):
-                ok = 1
+    // Windows fills its trust store lazily: a root it has not met is fetched
+    // the first time CryptoAPI builds a chain through it. A chain the store
+    // cannot complete is built once by CryptoAPI, the roots reloaded, and
+    // the verdict is this verifier's again (#2922: a fresh release runner
+    // refused zlib.net and GitHub's asset host while github.com verified).
+    var attempt = 0
+    while ok == 0 and attempt < 2:
+        var roots_count = -1
+        if windows_store:
+            roots_count = with_tls_load_windows_roots(roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+        else:
+            let pem = if override_path.len() > 0: (read_file(override_path) ?? "") else: tls_system_roots_pem()
+            if pem.len() > 0 and pem.len() <= 4194304:
+                let pem_bytes = str_copy_bytes(pem)
+                roots_count = x509_pem_parse_certs(pem_bytes, pem.len(), roots_buf, 1048576, &raw mut roots_starts[0] as *mut i32, &raw mut roots_lens[0] as *mut i32, 512)
+                str_free_bytes(pem_bytes)
+        tls_trace(f"{roots_count} trust roots loaded; the server sent a chain of {evidence.chain_count}")
+        if roots_count > 0:
+            if x509_verify_chain_at(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count, roots_buf, &roots_starts[0] as *const i32, &roots_lens[0] as *const i32, roots_count, with_time_now()):
+                let leaf_buf = cert_buf + evidence.leaf_start as u64
+                if x509_verify_hostname(leaf_buf, &evidence.leaf as *const X509Cert, hostname, hostname_len):
+                    ok = 1
+                else:
+                    tls_trace("the leaf certificate does not name the host")
+                    attempt = 2
+            else:
+                tls_trace("the chain does not end in a trusted root")
+        if ok == 0 and attempt == 0 and windows_store:
+            tls_trace("asking Windows to complete the chain, so a root it has not met enters its store")
+            let _built = with_tls_windows_complete_chain(cert_buf, &evidence.chain_starts[0] as *const i32, &evidence.chain_lens[0] as *const i32, evidence.chain_count)
+            attempt = 1
+        else:
+            attempt = 2
     with_free(roots_buf)
     if ok == 0:
         return -1
