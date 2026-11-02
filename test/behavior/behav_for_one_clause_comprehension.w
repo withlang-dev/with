@@ -30,18 +30,18 @@ fn main:
         print(f"ok {x}")
     for x in res(false):
         print("never err")
-    let a = for x in get(true): yield x ++ "!"
+    let a = [x ++ "!" for x in get(true)]
     print(f"{a:?}")
-    let b = for x in get(false): yield x ++ "!"
+    let b = [x ++ "!" for x in get(false)]
     print(f"{b:?}")
-    let c = for x in get(true): yield x.len()
+    let c = [x.len() for x in get(true)]
     print(f"{c:?}")
-    let d: Result[i64, str] = for x in res(true): yield x.len() + 1
+    let d: Result[i64, str] = [x.len() + 1 for x in res(true)]
     print(f"{d:?}")
-    let e: Result[i64, str] = for x in res(false): yield x.len()
+    let e: Result[i64, str] = [x.len() for x in res(false)]
     print(f"{e:?}")
     let owned = res(true)
-    let f = for x in owned: yield x ++ "?"
+    let f = [x ++ "?" for x in owned]
     print(f"{f:?}")
     var m: HashMap[str, str] = HashMap.new()
     m.insert("k", "v" ++ "w")

@@ -6,5 +6,5 @@ fn a() -> Result[i32, str]: Ok(1)
 fn b() -> Result[i32, i64]: Ok(2)
 
 fn main:
-    let r = for x in a(); y in b(): yield x + y
+    let r = [x + y for x in a() for y in b()]
     print(f"{r:?}")

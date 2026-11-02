@@ -17,7 +17,7 @@ D181	an integer beside a float is the float (§4.2.6)	implemented	test/behavior/
 D182	a float where a narrower float is demanded converts (§4.2.6)	implemented	test/behavior/behav_d182_float_widths.w	
 D183	an integer where a narrower integer is demanded converts with a range check; as is the wrap; a comptime value out of range is an error; the lint names the narrow declaration (§4.2.6)	implemented	test/behavior/behav_d183_narrowing_out_of_range_panics.w	#2522
 D184	a script's top-level binding is a local of the implicit main; a helper that names it captures it (§29.15)	implemented	test/behavior/behav_d184_script_captures.w	#2951
-D185	one comprehension family: the bracket form over Option and Result yields the carrier of the element (§13.6, §13.6a)	open		#2960
+D185	one comprehension family: the bracket form over Option/Result yields the carrier of the element; the yield expression form is retired; the statement form stays (§13.6, §13.6a)	implemented	test/behavior/behav_for_comprehension_yield_types.w	#2960
 D186	the iterator adapter is skip(n); drop(value) stays the prelude's (§13.3)	implemented	test/behavior/behav_d186_skip_adapter.w	
 D186	zip, chain and zip_with take any iterable (§13.3)	open		#2962
 D187	returns borrow T from params N, M: a view borrowed from two parameters (§16.2b.6)	open		#2965

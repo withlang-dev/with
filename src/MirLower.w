@@ -17408,6 +17408,10 @@ impl MirBuilder:
             return self.lower_for(node)
 
         if kind == NodeKind.NK_ARRAY_COMPREHENSION:
+            // D185 (§13.6a): over an Option or Result first clause Sema chose
+            // the carrier chain; it lowers as the match Sema checked.
+            if self.sema.for_carrier_matches.contains(node):
+                return self.lower_for_carrier(node, 1)
             return self.lower_array_comprehension(node)
         if kind == NodeKind.NK_MAP_COMPREHENSION:
             return self.lower_array_comprehension(node)

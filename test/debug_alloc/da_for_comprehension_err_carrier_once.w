@@ -8,8 +8,7 @@ fn get_result(x: i32) -> Result[i32, str]:
     if x > 0: Ok(x) else: Err(f"negative {x} with a tail long enough to live on the heap for sure")
 
 fn main:
-    let r: Result[i32, str] = for x in get_result(5); y in get_result(-1):
-        yield x + y
+    let r: Result[i32, str] = [x + y for x in get_result(5) for y in get_result(-1)]
     match r:
         Ok(_) => assert(false)
         Err(e) => print(e)

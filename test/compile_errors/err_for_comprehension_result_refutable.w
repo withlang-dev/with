@@ -5,5 +5,5 @@
 fn pair() -> Result[(i32, i32), str]: Ok((1, 2))
 
 fn main:
-    let r = for (a, 1) in pair(): yield a
+    let r = [a for (a, 1) in pair()]
     print(f"{r:?}")
