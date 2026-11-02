@@ -33,6 +33,7 @@ module build.release_publish
 //   GH_TOKEN           a token gh can publish with
 use std.build
 use std.process
+use std.time
 
 fn rp_join(left: &str, right: &str) -> str:
     if left.len() == 0: return right ++ ""
@@ -207,10 +208,22 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
         if channel != "release": create_rest.push("--prerelease")
         let create = rp_release_args("create", tag, repo, &create_rest)
         print("publish: creating release " ++ tag ++ " (" ++ channel ++ ") at " ++ source_sha)
-        let created = rp_gh(&ctx, scratch, "create", &create)
+        // GitHub refused a create once with a transient 403 (the darwin job of
+        // run 41402357934, after a green battery, UAT and package) where the
+        // same job created its release minutes earlier in another run; a
+        // racing platform's create is also seen here as "already exists".
+        // Three tries, each followed by a view, before the platform is lost.
+        var created = rp_gh(&ctx, scratch, "create", &create)
         view = rp_gh(&ctx, scratch, "view", &view_args)
+        var tries = 1
+        while view.rc != 0 and tries < 3:
+            sleep_secs(5)
+            print("publish: release " ++ tag ++ " not visible yet; creating again (try " ++ f"{tries + 1}" ++ " of 3)")
+            created = rp_gh(&ctx, scratch, "create", &create)
+            view = rp_gh(&ctx, scratch, "view", &view_args)
+            tries = tries + 1
         if view.rc != 0:
-            return rp_fail(&ctx, "could not create or find release " ++ tag ++ ": " ++ created.stderr)
+            return rp_fail(&ctx, "could not create or find release " ++ tag ++ " after 3 tries: " ++ created.stderr)
     let is_prerelease = view.stdout.contains("\"isPrerelease\":true")
     if channel == "release" and is_prerelease:
         return rp_fail(&ctx, tag ++ " is a prerelease but the channel is release")
