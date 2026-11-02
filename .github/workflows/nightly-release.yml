@@ -480,7 +480,14 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
 
+      # A rehearsal (channel test) verifies and packages; it publishes
+      # nothing. Its release would be a tag at the dispatched commit, and
+      # GitHub refuses the RELEASE_TOKEN a tag at a commit whose workflow
+      # files differ from main's head without the `workflow` scope: run
+      # 41402357934 lost darwin and linux-aarch64 at this step after green
+      # batteries, UATs and packages, hours after main moved.
       - name: Publish this platform's assets (add-only)
+        if: steps.release.outputs.channel != 'test'
         env:
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -730,7 +737,14 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md "${{ matrix.platform }}"
 
+      # A rehearsal (channel test) verifies and packages; it publishes
+      # nothing. Its release would be a tag at the dispatched commit, and
+      # GitHub refuses the RELEASE_TOKEN a tag at a commit whose workflow
+      # files differ from main's head without the `workflow` scope: run
+      # 41402357934 lost darwin and linux-aarch64 at this step after green
+      # batteries, UATs and packages, hours after main moved.
       - name: Publish this platform's assets (add-only)
+        if: steps.release.outputs.channel != 'test'
         env:
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -1049,7 +1063,14 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-x86_64
 
+      # A rehearsal (channel test) verifies and packages; it publishes
+      # nothing. Its release would be a tag at the dispatched commit, and
+      # GitHub refuses the RELEASE_TOKEN a tag at a commit whose workflow
+      # files differ from main's head without the `workflow` scope: run
+      # 41402357934 lost darwin and linux-aarch64 at this step after green
+      # batteries, UATs and packages, hours after main moved.
       - name: Publish this platform's assets (add-only)
+        if: steps.release.outputs.channel != 'test'
         env:
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -1252,7 +1273,14 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md linux-aarch64
 
+      # A rehearsal (channel test) verifies and packages; it publishes
+      # nothing. Its release would be a tag at the dispatched commit, and
+      # GitHub refuses the RELEASE_TOKEN a tag at a commit whose workflow
+      # files differ from main's head without the `workflow` scope: run
+      # 41402357934 lost darwin and linux-aarch64 at this step after green
+      # batteries, UATs and packages, hours after main moved.
       - name: Publish this platform's assets (add-only)
+        if: steps.release.outputs.channel != 'test'
         env:
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -1553,7 +1581,14 @@ jobs:
             "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" "$GITHUB_SHA" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" \
             "$WITH_VERSION" "$GITHUB_OUTPUT" out/release/nightly-release-notes.md windows-aarch64
 
+      # A rehearsal (channel test) verifies and packages; it publishes
+      # nothing. Its release would be a tag at the dispatched commit, and
+      # GitHub refuses the RELEASE_TOKEN a tag at a commit whose workflow
+      # files differ from main's head without the `workflow` scope: run
+      # 41402357934 lost darwin and linux-aarch64 at this step after green
+      # batteries, UATs and packages, hours after main moved.
       - name: Publish this platform's assets (add-only)
+        if: steps.release.outputs.channel != 'test'
         env:
           GH_TOKEN: ${{ github.event_name == 'schedule' && github.token || secrets.RELEASE_TOKEN }}
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
