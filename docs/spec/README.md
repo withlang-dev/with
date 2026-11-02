@@ -16,8 +16,9 @@ integer where a narrower integer or the other signedness is demanded
 converts with a range check, `as` is the wrap, a comptime value out of range
 is an error, positions are `isize`, and the lint names the narrow
 declaration (D183); the section's rationale is "`as` where two meanings
-remain". §29.15: a script's top-level bindings are module globals assigned
-in statement order (D184). §13.6/§13.6a: one comprehension family, the
+remain". §29.15: a script's top-level bindings are locals of the implicit main,
+typed by their uses in main; a helper that names one captures it (D184,
+amended the same day). §13.6/§13.6a: one comprehension family, the
 bracket form over `Option`/`Result` yields an `Option`/`Result` of the
 element, the `yield` expression form is retired, the statement form stays
 (D185). §13.3: `skip(n)`/`skip_while`, and `zip`/`chain`/`zip_with` take
