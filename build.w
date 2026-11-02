@@ -1195,7 +1195,14 @@ fn release_compiler_bin(name: &str) -> str:
 // only after an hour. The driver's own default for a pooled lane is twenty
 // minutes, which behavior-tests, native-phase-tests and tools-tests crossed
 // on a 4-core Windows runner (v0.16.0.4) while every test in them passed.
-fn test_lane(kind: BuildKind, name: str, entry: str) -> Target: target_new(kind, name, entry).timeout(3600000)
+//
+// A lane starts after selfcheck. The lanes and selfcheck share the pool, and
+// `check src/main.w` by stage2 beside four lanes that each fill the cores
+// took 1065 s (linux-x86_64), 1161 s (darwin) and over 1800 s
+// (windows-x86_64) on the 4-core release runners (run 41372423302), against
+// 90 s alone; the local legs ran `:selfcheck` before `:test` by hand and
+// never saw it. The dependency is the graph's spelling of that order.
+fn test_lane(kind: BuildKind, name: str, entry: str) -> Target: target_new(kind, name, entry).timeout(3600000).dep("selfcheck")
 
 // A single spawned check (selfcheck, reseed-check-build-w, every-target-
 // check) gets the test hang guard. The driver's default for one is five
