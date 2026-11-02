@@ -1,0 +1,77 @@
+name: release badges
+
+# The README's platform badges say what a user gets: for the latest
+# release, does this platform have its compiler and its SDK, each with a
+# digest? They are written here, from the release's assets, whenever a
+# release is published or edited (and on request), as shields.io endpoint
+# files on the `badges` branch. The nightly self-host lanes are post-hoc
+# evidence (D56) and keep their own badges further down the README.
+on:
+  release:
+    types: [published, edited]
+  workflow_dispatch:
+
+concurrency:
+  group: release-badges
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  badges:
+    name: release badges
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Checkout the badges branch
+        run: |
+          set -euo pipefail
+          git init -q badges
+          cd badges
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q origin badges 2>/dev/null; then
+            git checkout -q -B badges FETCH_HEAD
+          else
+            git checkout -q --orphan badges
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Write one endpoint file per platform
+        run: |
+          set -euo pipefail
+          tag="$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-pre-releases --exclude-drafts --limit 1 --json tagName --jq '.[0].tagName')"
+          [ -n "$tag" ] || { echo "no release"; exit 1; }
+          assets="$(gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          has() { printf '%s\n' "$assets" | grep -qx -- "$1"; }
+          sdk_name="$(printf '%s\n' "$assets" | grep '^with-llvm-sdk-.*\.tar\.gz$' | head -1)"
+          sdk_ver="${sdk_name#with-llvm-sdk-}"; sdk_ver="${sdk_ver%%-*}"
+          for platform in darwin-aarch64 linux-x86_64 linux-aarch64 windows-x86_64 windows-aarch64; do
+            exe="with-$platform"
+            case "$platform" in windows-*) exe="$exe.exe" ;; esac
+            sdk="with-llvm-sdk-$sdk_ver-$platform.tar.gz"
+            missing=""
+            has "$exe" || missing="$missing compiler"
+            has "$exe.sha256" || missing="$missing compiler.sha256"
+            has "$sdk" || missing="$missing SDK"
+            has "$sdk.sha256" || missing="$missing SDK.sha256"
+            if [ -z "$missing" ]; then
+              message="$tag · compiler + SDK"; color="brightgreen"
+            else
+              message="$tag · missing:$missing"; color="red"
+            fi
+            printf '{"schemaVersion":1,"label":"%s","message":"%s","color":"%s"}\n' "$platform" "$message" "$color" > "badges/release-$platform.json"
+            echo "$platform: $message"
+          done
+
+      - name: Publish
+        run: |
+          set -euo pipefail
+          cd badges
+          git add -A
+          if git diff --cached --quiet; then echo "badges unchanged"; exit 0; fi
+          git commit -q -m "release badges: $(date -u +%Y-%m-%dT%H:%MZ)"
+          git push -q origin badges

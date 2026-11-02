@@ -23,6 +23,9 @@ jobs:
   selfhost-windows:
     name: windows x86_64
     runs-on: windows-latest
+    permissions:
+      contents: read
+      issues: write
     timeout-minutes: 360
     defaults:
       run:
@@ -184,3 +187,24 @@ jobs:
             out/release/bin/with.exe
           if-no-files-found: ignore
           retention-days: 7
+
+      # A red nightly is work, not a badge: it is filed (one open issue per
+      # lane; a repeat comments) and fixed like any other bug.
+      - name: File the red nightly as an issue
+        if: failure()
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          LANE: "windows x86_64"
+        run: |
+          set -euo pipefail
+          title="nightly red: $LANE"
+          run_url="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          body="Run $run_url on ${{ github.sha }} (${{ github.event_name }}). The failing step and its captures are on the run. A red nightly is fixed like any other bug (AGENTS.md)."
+          gh label create nightly-red --repo "$GITHUB_REPOSITORY" --color B60205 --description "a nightly self-host lane is red" --force >/dev/null
+          n="$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --label nightly-red --search "\"$title\" in:title" --json number,title --jq ".[] | select(.title == \"$title\") | .number" | head -1)"
+          if [ -n "$n" ]; then
+            gh issue comment "$n" --repo "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$title" --label nightly-red --body "$body"
+          fi
