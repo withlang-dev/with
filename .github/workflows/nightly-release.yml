@@ -438,7 +438,11 @@ jobs:
       - name: Verify packaged checksums
         run: |
           shasum -a 256 -c "out/release/${{ matrix.release_asset }}.sha256"
-          shasum -a 256 -c "out/release/$WITH_SDK_ASSET.sha256"
+          # The pinned SDK's sidecar names the path the SDK release wrote it
+          # at (out/sdk-release/…), not out/release/, so `-c` on it cannot
+          # find the file; the archive is verified against the pinned digest
+          # instead, the same bytes the fetch step verified.
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "out/release/$WITH_SDK_ASSET" | shasum -a 256 -c -
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
@@ -672,7 +676,11 @@ jobs:
       - name: Verify packaged checksums
         run: |
           shasum -a 256 -c "out/release/${{ matrix.release_asset }}.sha256"
-          shasum -a 256 -c "out/release/$WITH_SDK_ASSET.sha256"
+          # The pinned SDK's sidecar names the path the SDK release wrote it
+          # at (out/sdk-release/…), not out/release/, so `-c` on it cannot
+          # find the file; the archive is verified against the pinned digest
+          # instead, the same bytes the fetch step verified.
+          printf '%s  %s\n' "$WITH_SDK_SHA256" "out/release/$WITH_SDK_ASSET" | shasum -a 256 -c -
 
       - name: Attest build provenance
         uses: actions/attest-build-provenance@96b4a1ef7235a096b17240c259729fdd70c83d45 # v2
