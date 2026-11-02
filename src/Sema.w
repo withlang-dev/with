@@ -705,6 +705,18 @@ type Sema {
     // Reverse index for the AST declaration table. The first declaration for
     // a node wins, matching find_decl_index's original forward scan.
     decl_index_by_node: HashMap[i32, i32],
+    // D184 (§29.15): a script's bindings a helper captures — their settled
+    // type and mutability (storage a helper can reach), every capture read
+    // as [body, sym, node, file] (the statement-order check), and the
+    // helpers an ephemeral capture made non-escaping.
+    script_slot_types: HashMap[i32, i32],
+    script_slot_muts: HashMap[i32, i32],
+    script_slot_syms: List[i32],
+    script_capture_records: List[i32],
+    script_nonescaping_helpers: HashMap[i32, i32],
+    // The scope indices of the captures injected for the helper being checked:
+    // a helper's parameter or local shadows one (D173).
+    script_capture_indices: HashMap[i32, i32],
 
     // Type table (SoA parallel arrays)
     type_kinds: List[i32],
@@ -3464,6 +3476,12 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         diags: diags,
         ast: ast.clone(),
         decl_index_by_node: sema_new_map_i32_i32(),
+        script_slot_types: sema_new_map_i32_i32(),
+        script_slot_muts: sema_new_map_i32_i32(),
+        script_slot_syms: List.new(),
+        script_capture_records: List.new(),
+        script_nonescaping_helpers: sema_new_map_i32_i32(),
+        script_capture_indices: sema_new_map_i32_i32(),
         type_kinds: List.new(),
         type_d0: List.new(),
         type_d1: List.new(),
@@ -7968,7 +7986,7 @@ impl Sema:
             return true
         false
 
-    mut fn scope_insert_at(sym: i32, tid: i32, is_mut: i32):
+    mut fn scope_insert_at(sym: i32, tid: i32, is_mut: i32) -> i32:
         let idx = self.bind_names.len() as i32
         self.bind_names.push(sym)
         self.bind_types.push(tid)
@@ -7980,6 +7998,7 @@ impl Sema:
         self.bind_is_view_bound.push(0)
         self.bind_provenance.push(binding_provenance_empty())
         self.scope_name_map.insert(sym, idx)
+        idx
 
     // §9.5 (#1930), §29.8: in its type's own module's instance method a
     // receiver field is in scope by its bare name, so a parameter or local
@@ -8023,6 +8042,10 @@ impl Sema:
     // pass reports a true same-module shadowing. Every other collision — a
     // local, or a global the module imports — is shadowing.
     fn binding_is_unseen_global(idx: i32, sym: i32) -> bool:
+        // D184 (§29.15): a script binding injected for a helper is shadowed
+        // by the helper's own parameter or local, the local winning (D173).
+        if self.script_capture_indices.contains(idx):
+            return true
         // A bundle interface's global (a corpus' `pub let`, std.engines.pcre2's PACKAGE)
         // is another module's declaration by construction.
         if self.interface_global_index.contains(sym) and self.interface_global_index.get(sym).unwrap() == idx:
@@ -8490,6 +8513,12 @@ impl Sema:
             with_eprint(f"[state] sym=" ++ dbg_name ++ f" -> {state}")
         let opt = self.scope_name_map.get(sym).copied()
         if opt.is_some():
+            // D184 (§29.15, Law 5): a helper observes or mutates a script
+            // binding it captures, never consumes it.
+            if state == VarState.MOVED and self.script_capture_indices.contains(opt.unwrap()):
+                let site = if self.move_site_node > 0: self.move_site_node else: self.current_fn_decl_node
+                self.emit_error("a helper does not own the script binding `" ++ self.pool_resolve(sym) ++ "`: it observes or mutates it, never consumes it; clone it, or move it inside main (§29.15, D184)", site)
+                return
             if state == VarState.MOVED:
                 self.check_live_views_for_origin(sym, self.move_site_node)
                 self.clear_moved_fields_for_binding(sym)

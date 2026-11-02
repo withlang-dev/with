@@ -87,6 +87,7 @@ impl Sema:
 // checked in the middle of it (a concrete generic instance, or a body
 // checked on demand for its inferred return type).
 type SemaLexicalEnv {
+    script_capture_indices: HashMap[i32, i32],
     bind_names: List[i32],
     bind_types: List[i32],
     bind_muts: List[i32],
@@ -2953,6 +2954,15 @@ impl Sema:
         // (the callee-first dependencies still apply): a program whose facts
         // or diagnostics change under it depends on declaration order.
         let reverse = with_getenv_str("WITH_SEMA_BODY_ORDER") == "reverse"
+        // D184 (§29.15): in a script, main's body first, so a helper reached
+        // from it (callee-first) sees the bindings' types main settled so far
+        // and one reached later sees them settled.
+        if self.ast.script_binding_count() > 0:
+            let main_sym = self.pool_lookup_symbol("main")
+            for di in 0..count:
+                let decl = self.ast.get_decl(di)
+                if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.get_data0(decl) == main_sym and not self.decl_is_lazy_skipped(di):
+                    self.check_decl_body_in_order(di)
         for di in 0..count:
             self.check_decl_body_in_order(if reverse: count - 1 - di else: di)
         self.resolve_allocating_callees()
@@ -2986,6 +2996,7 @@ impl Sema:
         if sema_profile_enabled(): sema_profile_report("footprints.judge", judge_t0)
         self.check_calls_against_live_global_views()
         self.order_global_initializers()
+        self.check_script_capture_order()
 
     // #1473 (§21.1 Rule 6): a function whose declared return is a view — a
     // reference, or a value carrying one (`Option[&T]`, an ephemeral value) —
@@ -3127,8 +3138,12 @@ impl Sema:
                 let named = if callee_kind == NodeKind.NK_IDENT: self.ast.get_data0(callee) else: if callee_kind == NodeKind.NK_FIELD_ACCESS: self.ast.get_data1(callee) else: 0
                 var target: i32 = if named != 0: (self.body_typed_decls.get(named) ?? -1) else: -1
                 while target >= 0:
+                    // D184 (§29.15): a script helper is checked where main calls
+                    // it, after the statements before the call settled the
+                    // bindings it captures; never ahead of main's body.
+                    let ahead_of_main = self.ast.is_script_helper(self.ast.get_decl(target) as NodeId) and self.ast.get_data0(decl) == self.pool_lookup_symbol("main")
                     // In progress means a cycle: that call is reported, not chased.
-                    if target != di: self.check_decl_body_in_order(target)
+                    if target != di and not ahead_of_main: self.check_decl_body_in_order(target)
                     target = self.body_typed_next[target]
             n = n + 1
 
@@ -3891,6 +3906,78 @@ impl Sema:
             if seen.contains(self.global_write_records[wi * GLOBAL_WRITE_STRIDE]):
                 out = self.push_unique_i32(move out, self.global_write_records[wi * GLOBAL_WRITE_STRIDE + 1])
         out
+
+    // D184 (§29.15): a script's bindings are assigned where their statements
+    // stand, so a helper that reads one and is reached from an earlier
+    // statement of main reads it before it exists: an error, found from the
+    // same static call graph D175 orders initializers by.
+    mut fn check_script_capture_order():
+        if self.script_capture_records.len() == 0: return
+        let main_sym = self.pool_lookup_symbol("main")
+        var main_decl: i32 = 0
+        var main_di: i32 = -1
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.ast.get_data0(decl) == main_sym and not self.decl_is_lazy_skipped(di):
+                main_decl = decl
+                main_di = di
+        if main_decl == 0: return
+        let body = self.ast.get_data1(main_decl)
+        if body == 0 or self.ast.kind(body) != NodeKind.NK_BLOCK: return
+        var stmts: List[i32] = List.new()
+        let extra_start = self.ast.get_data0(body)
+        for si in 0..self.ast.get_data1(body): stmts.push(self.ast.get_extra(extra_start + si))
+        if self.ast.get_data2(body) != 0: stmts.push(self.ast.get_data2(body))
+        var init_index: HashMap[i32, i32] = sema_new_map_i32_i32()
+        for si in 0..stmts.len():
+            let s = stmts[si]
+            if self.ast.kind(s) == NodeKind.NK_LET_BINDING and self.script_slot_types.contains(self.ast.get_data0(s)):
+                init_index.insert(self.ast.get_data0(s), si as i32)
+        if init_index.len() == 0: return
+        let main_sig = self.get_sig(self.fn_decl_semantic_symbol_at(main_decl, main_sym, main_di))
+        let index = self.global_call_index()
+        for si in 0..stmts.len():
+            let s = stmts[si]
+            let s_start = self.ast.get_start(s)
+            let s_end = self.ast.get_end(s)
+            var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+            var work: List[i32] = List.new()
+            for ci in 0..self.global_calls.len() / GLOBAL_CALL_STRIDE:
+                if self.global_calls[ci * GLOBAL_CALL_STRIDE] != main_sig: continue
+                let call_node: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 1]
+                if self.ast.get_start(call_node) < s_start or self.ast.get_end(call_node) > s_end: continue
+                let target_start: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 3]
+                let target_count: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 4]
+                for ti in target_start..target_start + target_count:
+                    let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                    if not seen.contains(target):
+                        seen.insert(target, 1)
+                        work.push(target)
+            var w = 0
+            while w < work.len():
+                var ci2: i32 = index.head.get(work[w]) ?? -1
+                w = w + 1
+                while ci2 >= 0:
+                    let ts: i32 = self.global_calls[ci2 * GLOBAL_CALL_STRIDE + 3]
+                    let tc: i32 = self.global_calls[ci2 * GLOBAL_CALL_STRIDE + 4]
+                    for ti in ts..ts + tc:
+                        let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                        if not seen.contains(target):
+                            seen.insert(target, 1)
+                            work.push(target)
+                    ci2 = index.next[ci2]
+            for ri in 0..self.script_capture_records.len() / 4:
+                let rbody: i32 = self.script_capture_records[ri * 4]
+                let rsym: i32 = self.script_capture_records[ri * 4 + 1]
+                let rnode: i32 = self.script_capture_records[ri * 4 + 2]
+                let k: i32 = init_index.get(rsym) ?? -1
+                if k < 0 or k <= si as i32 or not seen.contains(rbody): continue
+                let gname: str = with_str_clone_ref(self.pool_resolve(rsym))
+                let file: i32 = self.script_capture_records[ri * 4 + 3]
+                var diag = Diagnostic.err("`" ++ gname ++ "` is read before its statement has run: a script's top-level binding is assigned where it stands (§29.15, D184)", Span { file, start: self.ast.get_start(rnode), end: self.ast.get_end(rnode) })
+                diag.add_note("the statement that assigns it comes later in the file: move the read after it, or the binding before the statement that reaches this read")
+                self.diags.emit(diag)
+                return
 
     // D175 (§9.1c): runtime globals initialize in dependency order. An
     // initializer may read every global its body reads and every global a
@@ -5201,6 +5288,62 @@ impl Sema:
             return
         self.check_fn_body_with_sig_at_settled(node, sig_idx, decl_index, demands_start, diags_start)
 
+    // D184 (§29.15): the script's bindings, as main settled them, enter
+    // the scope at level 0 for a helper's body; returns how many. Main is
+    // checked first so the types are the ones its uses settled; a helper
+    // reached from main mid-check sees the types settled so far.
+    mut fn inject_script_captures(helper_decl: i32) -> i32:
+        if helper_decl <= 0 or not self.ast.is_script_helper(helper_decl as NodeId) or self.ast.script_binding_count() == 0:
+            return 0
+        var count: i32 = 0
+        for bi in 0..self.ast.script_binding_count():
+            let sym = self.ast.state.script_binding_syms[bi]
+            let binding = self.ast.state.script_binding_nodes[bi]
+            if self.scope_name_map.contains(sym): continue
+            var tid: i32 = self.typed_binding_types.get(binding) ?? 0
+            var literal = self.ast.get_data1(binding)
+            while literal != 0 and self.ast.kind(literal) == NodeKind.NK_GROUPED: literal = self.ast.get_data0(literal)
+            let int_literal = literal != 0 and self.ast.kind(literal) == NodeKind.NK_INT_LIT and self.ast.get_data2(binding) / 2 == 0
+            // D128 meets D184: an integer-literal binding main has not settled
+            // yet (a helper reached mid-main) is settled here, from the uses so
+            // far or the literal's default; a later use in main that disagrees
+            // names both sites, as a local's uses must agree.
+            if tid == 0:
+                let decided: i64 = self.int_local_decisions.get(binding) ?? 0
+                let ann_packed = self.ast.get_data2(binding) / 2
+                if ann_packed > 0:
+                    tid = self.resolve_type_expr(self.ast.get_extra(ann_packed - 1)) as i32
+                else if decided != 0:
+                    tid = (decided / 4294967296) as i32
+                else if int_literal:
+                    tid = self.ty_isize as i32
+            if tid == 0: continue
+            let is_mut = self.ast.get_data2(binding) % 2
+            if with_getenv_str("WITH_TRACE_D184").len() > 0: with_eprint(f"[d184] inject `{self.pool_resolve(sym)}` ty={tid} into helper `{self.pool_resolve(self.ast.get_data0(helper_decl))}` ({helper_decl}) scope_starts={self.scope_starts.len()} binds={self.bind_names.len()}\n")
+            self.script_capture_indices.insert(self.scope_insert_at(sym, tid, is_mut), 1)
+            count = count + 1
+        count
+
+    fn script_binding_is_int_literal(binding: i32) -> bool:
+        var literal = self.ast.get_data1(binding)
+        while literal != 0 and self.ast.kind(literal) == NodeKind.NK_GROUPED: literal = self.ast.get_data0(literal)
+        literal != 0 and self.ast.kind(literal) == NodeKind.NK_INT_LIT and self.ast.get_data2(binding) / 2 == 0
+
+    mut fn remove_script_captures(count: i32):
+        for _ in 0..count:
+            let removed_sym = self.bind_names[self.bind_names.len() - 1]
+            self.script_capture_indices.remove(self.scope_name_map.get(removed_sym) ?? -1)
+            self.scope_name_map.remove(removed_sym)
+            self.bind_names.pop()
+            self.bind_types.pop()
+            self.bind_muts.pop()
+            self.bind_states.pop()
+            self.bind_is_task.pop()
+            self.bind_task_used.pop()
+            self.bind_is_scoped_task.pop()
+            self.bind_is_view_bound.pop()
+            self.bind_provenance.pop()
+
     mut fn check_fn_body_with_sig_at_settled(node: i32, sig_idx: i32, decl_index: i32, demands_start: isize, diags_start: isize):
         // A decision can make a new demand (`sum: i32` then `sum = sum + i`
         // demands of `i`), so the body is checked until no undecided local is
@@ -5342,6 +5485,12 @@ impl Sema:
         self.for_view_binding_depths = List.new()
         self.for_view_binding_gen_loops = List.new()
 
+        // D184 (§29.15): a script helper sees the script's bindings as
+        // captures: level-0 entries (never a local of the helper, so a
+        // parameter or local of the same name shadows them, D173, and the
+        // move rules of a non-local apply, Law 5), typed as main settled
+        // them. Removed when the body is done.
+        let injected_captures = self.inject_script_captures(node)
         // Push function scope
         self.push_scope()
         // #1827: a `return` drops every binding from here (§2.4).
@@ -5915,6 +6064,8 @@ impl Sema:
             self.implicit_binding_types.pop()
             self.implicit_binding_syms.pop()
         self.pop_scope()
+        // D184: the captures sit below the function scope; they leave after it.
+        self.remove_script_captures(injected_captures)
         self.in_unsafe = saved_body_unsafe
         self.unsafe_scope_used = move saved_unsafe_scope_used
         self.unsafe_scope_nodes = move saved_unsafe_scope_nodes
@@ -7399,6 +7550,7 @@ impl Sema:
             bind_provenance: move self.bind_provenance,
             scope_starts: move self.scope_starts,
             scope_name_map: move self.scope_name_map,
+            script_capture_indices: move self.script_capture_indices,
             pending_generic_binding_base: move self.pending_generic_binding_base,
             pending_generic_binding_call: move self.pending_generic_binding_call,
             pending_generic_binding_decl: move self.pending_generic_binding_decl,
@@ -7407,6 +7559,7 @@ impl Sema:
             pending_soft_debug_nodes: move self.pending_soft_debug_nodes,
         }
         self.bind_names = List.new()
+        self.script_capture_indices = sema_new_map_i32_i32()
         self.bind_types = List.new()
         self.bind_muts = List.new()
         self.bind_states = List.new()
@@ -7467,6 +7620,7 @@ impl Sema:
         self.bind_provenance = move env.bind_provenance
         self.scope_starts = move env.scope_starts
         self.scope_name_map = move env.scope_name_map
+        self.script_capture_indices = move env.script_capture_indices
         self.pending_generic_binding_base = move env.pending_generic_binding_base
         self.pending_generic_binding_call = move env.pending_generic_binding_call
         self.pending_generic_binding_decl = move env.pending_generic_binding_decl
@@ -12881,6 +13035,28 @@ impl Sema:
         // a top-level `let ptr` broke every imported function with a `ptr`
         // parameter.
         let is_local = self.scope_binding_is_local(sym)
+        // D184 (§29.15): a helper's read of a script binding is a capture: it
+        // observes (never a second owner, Law 5), and a view captured makes
+        // the helper non-escaping.
+        let capture_idx: i32 = self.scope_name_map.get(sym) ?? -1
+        if tid >= 0 and not is_local and capture_idx >= 0 and self.script_capture_indices.contains(capture_idx):
+            if not self.script_slot_types.contains(sym):
+                self.script_slot_types.insert(sym, tid)
+                self.script_slot_muts.insert(sym, self.bind_muts[capture_idx])
+                self.script_slot_syms.push(sym)
+            self.global_value_ident_nodes.insert(node, sym)
+            self.script_capture_records.push(self.global_effect_body())
+            self.script_capture_records.push(sym)
+            self.script_capture_records.push(node)
+            self.script_capture_records.push(self.local_file_id)
+            if self.type_is_ephemeral_value(tid): self.script_nonescaping_helpers.insert(self.current_fn_decl_node, 1)
+            // D128 meets D184: the helper's read is a use of an integer-literal
+            // binding and settles its width when main has not; a later use in
+            // main that disagrees names both sites. A helper that only shadows
+            // the name settles nothing.
+            let binding = self.ast.script_binding_node(sym)
+            if binding != 0 and not self.int_local_decisions.contains(binding) and self.script_binding_is_int_literal(binding):
+                self.int_local_decisions.insert(binding, (tid as i64) * 4294967296 + self.current_fn_decl_node as i64)
         // A global read by another's initializer is checked first, so it is
         // typed whatever the declaration order; its own initializer is refused.
         if tid >= 0 and not is_local and self.top_level_let_current >= 0 and not self.const_global_syms.contains(sym):
