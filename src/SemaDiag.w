@@ -162,8 +162,15 @@ impl Sema:
             diag.add_note("expected type: " ++ expected_name)
         diag.add_note("actual type: " ++ actual_name)
 
+        // §4.3c: `&[]T` is a reference to a slice, which no argument can
+        // satisfy (a slice is already a view); the person wrote Rust's `&[T]`.
+        let expected_resolved = self.resolve_alias(expected_ty as TypeId)
+        let ref_to_slice = self.get_type_kind(expected_resolved) == TypeKind.TY_REF and self.get_type_kind(self.resolve_alias(self.get_type_d0(expected_resolved) as TypeId)) == TypeKind.TY_SLICE
+
         let help = self.argument_literal_default_help(arg_node, expr_text, expected_ty, actual_ty)
         let pointer_help = self.integer_pointer_cast_help(expected_ty, actual_ty, expr_text)
+        if ref_to_slice:
+            diag.add_help("a slice parameter is spelled `[]T`, not `&[]T`: a slice is already a view, and `&[]T` is a reference to one that no argument satisfies (§4.3c)")
         if help.len() > 0:
             diag.add_help(help)
         else if pointer_help.len() > 0:

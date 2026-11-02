@@ -10,7 +10,7 @@ D100	a declaration without pub is visible throughout its package; internal segme
 D109	offsetof[T](field) (§16.12)	implemented	test/behavior/behav_2131_offsetof.w	
 D124	a cast converts an untyped constant exactly (§4.2.1 rule 7)	implemented	test/behavior/behav_d124_cast_constant_exact.w	
 D125	literal join arms take the typed arms' type; what a cast does (§4.2.1 rule 8, §4.2.6)	implemented	test/behavior/behav_d125_carrier_literal_default.w	
-D126	a slice demand supplies the element type to a literal in argument position (§4.3c)	open		#2944
+D126	a slice demand supplies the element type to a literal in argument position (§4.3c)	implemented	test/behavior/behav_d126_slice_demand_literal.w	#2944
 D127	a view of a constant is a view of an immutable static (§3.1)	implemented	test/behavior/behav_d127_view_of_constant_is_static.w	
 D128	a binding whose untyped integer literal typed it takes the type its uses agree on (§4.2.1)	implemented	test/behavior/behav_d128_int_local_shapes.w	
 D181	an integer beside a float is the float (§4.2.6)	implemented	test/behavior/behav_d181_int_beside_float_is_float.w	
