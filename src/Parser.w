@@ -549,6 +549,16 @@ impl Parser:
         TokenKind.TK_EOF
 
     // The start offset of the first token past the newlines at `pos`.
+    // The start offset of the first token past the newlines at `p0`.
+    fn start_past_newlines_at(p0: i32) -> i32:
+        var p = p0
+        while p < self.tokens.len() and self.tokens.get_tag(p) == TokenKind.TK_NEWLINE:
+            p = p + 1
+        if p < self.tokens.len():
+            return self.tokens.get_start(p)
+        0
+
+
     fn start_past_newlines() -> i32:
         var p = self.pos
         while p < self.tokens.len() and self.tokens.get_tag(p) == TokenKind.TK_NEWLINE:
@@ -7757,7 +7767,13 @@ impl Parser:
         self.advance()
         self.skip_separators()
 
-        let t = self.peek()
+        var t = self.peek()
+        // §13.5a: a label alone on its line (`'again:` then a newline, the
+        // next line no deeper) labels the next statement.
+        if t == TokenKind.TK_COLON and self.pos + 1 < self.tokens.len() and self.tokens.get_tag(self.pos + 1) == TokenKind.TK_NEWLINE and line_indent_of(self.source, self.start_past_newlines_at(self.pos + 1)) <= line_indent_of(self.source, start):
+            self.advance()
+            self.skip_newlines()
+            t = self.peek()
         var stmt: NodeId = 0 as NodeId
         if t == TokenKind.TK_KW_FOR:
             stmt = self.parse_for(label_sym)

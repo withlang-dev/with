@@ -196,6 +196,38 @@ impl Zcu:
             let span = Span { file: self.decl_source_file_id_frontend(di), start: pool.get_start(decl), end: pool.get_end(decl) }
             self.diagnostics.emit(Diagnostic.err(refusal, span))
 
+    // §18.1 (#2948): a group whose base names no module (`use std.{fs,
+    // process}`) names a module per member. The member files, or none
+    // when a member is missing (then the base's not-found error stands).
+    mut fn group_member_files_frontend(pool: &AstPool, decl: i32, dir: &str) -> List[str]:
+        let out: List[str] = List.new()
+        let ps = pool.get_data0(decl)
+        let pc = pool.get_data1(decl)
+        let sc = pool.get_data2(decl)
+        if sc <= 0 or pool.use_alias(decl as NodeId) != 0: return out
+        let base = self.use_path_name_frontend(pool, ps, pc)
+        for si in 0..sc:
+            let member = self.pool.resolve(pool.get_extra(ps + pc + si))
+            let path = self.resolve_module_path_frontend(base ++ "/" ++ member, dir)
+            if path.len() == 0: return List.new()
+            out.push(path)
+        out
+
+    // A `use` whose path names no module: a root group's members are
+    // parsed in, anything else is reported.
+    mut fn import_group_or_report_frontend(pool: AstPool, decl: i32, di: i32) -> AstPool:
+        var merged = pool
+        let members = self.group_member_files_frontend(merged, decl, self.decl_source_dir_frontend(di))
+        if members.len() == 0:
+            self.emit_missing_import_frontend(merged, decl)
+            return merged
+        for m in members:
+            if self.has_imported_path(m) == false:
+                self.add_imported_path(m)
+                merged = self.parse_imported_file_frontend(m, merged)
+        merged
+
+
     mut fn emit_missing_import_frontend(pool: &AstPool, decl: i32):
         // #932: name the module — an unnamed miss cost a debugger session
         // to bisect (a fresh clone lacks the build-generated modules).
@@ -1862,7 +1894,7 @@ impl Zcu:
                         self.add_imported_path(ppfpath)
                         merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
                     else if ppfpath.len() == 0:
-                        self.emit_missing_import_frontend(merged_pool, decl)
+                        merged_pool = self.import_group_or_report_frontend(merged_pool, decl, pi)
             pi = pi + 1
         merged_pool
 
@@ -2854,7 +2886,7 @@ impl Zcu:
                             self.add_imported_path(ppfpath)
                             merged_pool = self.parse_imported_file_frontend(ppfpath, merged_pool)
                         else if ppfpath.len() == 0:
-                            self.emit_missing_import_frontend(merged_pool, decl)
+                            merged_pool = self.import_group_or_report_frontend(merged_pool, decl, pi)
                 pi = pi + 1
         let after_prelude = merged_pool.decl_count()
 
@@ -2885,7 +2917,7 @@ impl Zcu:
                         self.add_imported_path(upfpath)
                         merged_pool = self.parse_imported_file_frontend(upfpath, merged_pool)
                     else if upfpath.len() == 0:
-                        self.emit_missing_import_frontend(merged_pool, decl)
+                        merged_pool = self.import_group_or_report_frontend(merged_pool, decl, ui)
 
         // Scan decls added by user-import expansion (from after_prelude onward).
         var ui2 = after_prelude
