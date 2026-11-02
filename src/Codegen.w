@@ -5850,8 +5850,14 @@ impl Codegen:
         // synthesized wrapper called → undefined at link) and a
         // with_runtime_init.1 carrying the real body. An existing
         // DEFINITION keeps the add (auto-uniquified; flat-name duplicates).
-        // Only runtime-ABI names (with_/rt_/wl_) get the unification: their
-        // pre-existing declarations are the compiler's own ensure_* probes.
+        // Only names a runtime source keeps bare get the unification: the
+        // with_/rt_/wl_ ABI names, whose pre-existing declarations are the
+        // compiler's own ensure_* probes, and rt/wasm.w's libc stand-ins
+        // (codegen_is_wasm_libc_provider_symbol): in the wasm32 runtime
+        // bundle rt_core's @[link_name("malloc")] extern and wasm.w's
+        // `pub fn malloc` share one LLVM module, and adding a second
+        // `malloc` left the body as `malloc.1` and the symbol undefined at
+        // every wasm32 link (the linux nightly, 2026-10-24..11-02).
         // A foreign declaration (libc send/recv via @[link_name]) keeps its
         // C symbol — stealing it re-pointed rt-internal libc calls at a
         // renamed undefined decl; the With fn takes the auto-uniquified
@@ -5865,7 +5871,7 @@ impl Codegen:
         let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol.clone() else: effective_name.clone()
         if c_export_symbol.len() > 0: self.c_export_owner_syms.insert(c_export_symbol, name_sym)
         var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
-        if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_is_runtime_abi_symbol(effective_name):
+        if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
             ast_existing = 0
         var displaced_declaration: i64 = 0
         if ast_existing != 0 and wl_fn_is_declaration(ast_existing) != 0 and wl_global_get_value_type(ast_existing) != fn_type:
@@ -5881,7 +5887,7 @@ impl Codegen:
         // compatible with) keeps every reference it had, emitted or to come:
         // each becomes a reference to the definition, never to a renamed
         // declaration nothing defines.
-        if displaced_declaration != 0 and c_export_symbol.len() > 0:
+        if displaced_declaration != 0 and (c_export_symbol.len() > 0 or codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name)):
             wl_replace_all_uses_with(displaced_declaration, function)
             self.redirect_fn_value(displaced_declaration, function)
         self.with_fn_link_names.insert(self.intern.intern(effective_name), 1)
