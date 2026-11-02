@@ -12,6 +12,7 @@ decision supersedes an earlier one, say so in both.
 
 ## Decisions
 
+- [D181 — An integer beside a float is the float: integer-to-float conversion is implicit in arithmetic, comparison and where a float is demanded; float-to-integer never is (ruled)](2026-11-01-D181-an-integer-beside-a-float-is-the-float.md)
 - [D180 — Every platform a release ships a compiler for ships that platform's SDK in the same release; a release without one is not done (ruled)](2026-11-01-D180-every-platform-ships-its-sdk-with-every-release.md)
 - [D179 — An unannotated binding of a view of `str` takes the `str`; `List` keeps observing (ruled; amends D144)](2026-10-31-D179-an-unannotated-binding-of-a-view-of-str-takes-the-str.md)
 - [D178 — A `mut fn` call mutates the field paths its body writes, at full depth, within a package; the whole receiver across packages (ruled; rules D172 point 6)](2026-10-31-D178-per-field-mutation-footprints-at-full-depth.md)

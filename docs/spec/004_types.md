@@ -507,14 +507,22 @@ ensures resources are properly released.
 
 #### 4.2.6 Implicit Widening
 
-Implicit widening is only allowed for lossless numeric conversions:
+Implicit widening is only allowed for these numeric conversions:
 - Signed integers: `i8 -> i16 -> i32 -> i64`
 - Unsigned integers: `u8 -> u16 -> u32 -> u64`
 - Floats: `f32 -> f64`
 - Unsigned to signed only when destination is strictly wider
   (`u8 -> i16`, `u16 -> i32`, `u32 -> i64`)
+- Any integer to `f32` or `f64` (D181). An integer beside a float in
+  arithmetic or a comparison converts to the float's type, and the result
+  is that float: `i / 140.0` is `f64`. An integer where a float is demanded
+  (a binding, an argument, a return, an element) converts the same way. The
+  conversion is the one `as` performs: round to nearest, ties to even; the
+  low bits of a value beyond the float's mantissa are representation, not
+  meaning, and the compiler knows the only float this can be.
 
-No other implicit numeric conversion is allowed.
+No other implicit numeric conversion is allowed: a float never becomes an
+integer without `as`.
 
 **Implicit narrowing is a compile error:**
 
