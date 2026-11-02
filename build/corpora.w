@@ -378,9 +378,13 @@ pub fn run_corpus_stamp_action(ctx: ActionCtx) -> i32:
 
 // ── the pipeline ────────────────────────────────────────────────
 
+// A corpus lane's ceiling is a hang guard, not a speed budget (#2902): an
+// hour for the lane, as every test lane has; a corpus is migrated, built and
+// tested on a 4-core release runner too, where the driver's twenty-minute
+// default for a pooled lane is a budget.
 fn corpus_target(kind: BuildKind, corpus: &Corpus, suffix: &str, output: &str) -> Target:
     let name = corpus.stem ++ "-" ++ suffix
-    var target = target_new(kind, name.clone(), "").output(output.clone())
+    var target = target_new(kind, name.clone(), "").output(output.clone()).timeout(3600000)
     target = target.arg(corpus.name.clone())
     target.write_scope("out/tmp/action-scratch/" ++ name)
 

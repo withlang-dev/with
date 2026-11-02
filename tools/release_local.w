@@ -81,12 +81,13 @@ fn darwin_leg(version: &str, channel: &str) -> i32:
     // The pinned seed drives everything but the publish: seed-driver refuses
     // any other driver, and :release-uat and the package targets depend on
     // release-checks, which depends on it (#2888). The UAT exercises the
-    // packaged asset whoever drives it. :selfcheck runs before :test because
-    // test-green demands its state and the test group does not run it (#2887).
+    // packaged asset whoever drives it. The steps are the release workflow's
+    // own: `:test` runs selfcheck itself (#2915), so a leg here exercises the
+    // same graph the CI lanes do; the #2887 hand-run `:selfcheck` hid that
+    // the test group never ran it, through two tags.
     set_env("WITH", seed)
     var gates: List[str] = List.new()
     gates.push(":fixpoint")
-    gates.push(":selfcheck")
     gates.push(":test")
     gates.push(":test-green")
     gates.push(":last-green")
