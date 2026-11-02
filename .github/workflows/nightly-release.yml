@@ -407,7 +407,7 @@ jobs:
         if: runner.os == 'Linux'
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x800x24" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
+        run: WITH="$GITHUB_WORKSPACE/src/main" xvfb-run -a -s "-screen 0 1280x800x24" ./src/main build :release-uat
 
       - name: Release UAT (macOS)
         # The runner's session has a WindowServer but no GPU: NSGL finds no
@@ -1144,7 +1144,7 @@ jobs:
       - name: Release UAT (under Xvfb)
         env:
           LIBGL_ALWAYS_SOFTWARE: "1"
-        run: xvfb-run -a -s "-screen 0 1280x800x24" WITH="$GITHUB_WORKSPACE/src/main" ./src/main build :release-uat
+        run: WITH="$GITHUB_WORKSPACE/src/main" xvfb-run -a -s "-screen 0 1280x800x24" ./src/main build :release-uat
 
       - name: Package fixpoint-verified release asset
         run: |
