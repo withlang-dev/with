@@ -380,7 +380,7 @@ pub fn run_wasm_link_regression_action(ctx: ActionCtx) -> i32:
 // bridge-the-impl-gap.md: every fixture in test/conformance/open.txt spells
 // a ruling the compiler does not implement yet, so each must FAIL under
 // the release compiler; one that passes says the ruling landed: flip its
-// row in docs/spec/conformance.tsv, delete the changelog's NON-COMPLIANT
+// row in test/conformance/conformance.tsv, delete the changelog's NON-COMPLIANT
 // sentence, and move the fixture to test/behavior. One that is missing is
 // an error too: the list is the queue.
 pub fn run_conformance_open_action(ctx: ActionCtx) -> i32:
@@ -418,7 +418,7 @@ pub fn run_conformance_open_action(ctx: ActionCtx) -> i32:
     if passed.len() > 0:
         var names = ""
         for p in passed: names = names ++ "\n  " ++ p
-        return bs_fail(ctx, "conformance-open: a fixture of an unimplemented ruling now PASSES; flip its row in docs/spec/conformance.tsv, delete the spec changelog's NON-COMPLIANT sentence, and move it to test/behavior:" ++ names)
+        return bs_fail(ctx, "conformance-open: a fixture of an unimplemented ruling now PASSES; flip its row in test/conformance/conformance.tsv, delete the spec changelog's NON-COMPLIANT sentence, and move it to test/behavior:" ++ names)
     print(f"conformance-open: {ran} open fixture(s) still fail, as recorded")
     0
 
