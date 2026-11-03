@@ -400,7 +400,7 @@ fn xz_decompress(data: &str) -> List[str]:
             at = dec.lzma2(at)
             if at < 0:
                 result.push("")
-                result.push(dec.problem.clone())
+                result.push(dec.problem)
                 return result
             while (at - block_start) % 4 != 0: at = at + 1
             let check_size = xz_check_size(check)
@@ -408,12 +408,12 @@ fn xz_decompress(data: &str) -> List[str]:
             for i in block_out_start..dec.out.len(): block_data.push(dec.out[i])
             var ok = true
             if check == 1:
-                ok = xz_crc32(xz_bytes_to_str(&block_data), 0, block_data.len()) == xz_u32_le(data, at)
+                ok = xz_crc32(xz_bytes_to_str(block_data), 0, block_data.len()) == xz_u32_le(data, at)
             else if check == 4:
-                ok = xz_crc64(&block_data) == xz_u64_le(data, at)
+                ok = xz_crc64(block_data) == xz_u64_le(data, at)
             else if check == 10:
                 var digest: [32]u8 = [0 as u8; 32]
-                sha256_hash_str(xz_bytes_to_str(&block_data), &raw mut digest[0] as *mut u8)
+                sha256_hash_str(xz_bytes_to_str(block_data), &raw mut digest[0] as *mut u8)
                 for i in 0..32:
                     if digest[i] != data[at + i as i64]: ok = false
             else if check != 0:
@@ -434,6 +434,6 @@ fn xz_decompress(data: &str) -> List[str]:
         while (q - index_start) % 4 != 0: q = q + 1
         at = q + 4 + 12
         streams = streams + 1
-    result.push(xz_bytes_to_str(&dec.out))
+    result.push(xz_bytes_to_str(dec.out))
     result.push("")
     result

@@ -31,7 +31,7 @@ fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
 fn green_first_line(text: &str) -> str:
     for i in 0..text.len():
         if text[i] == '\n': return text.slice(0, i as i64)
-    text.clone()
+    text
 
 /// The battery's inputs, as the text `git hash-object` identifies (D50: key
 /// on what the output is made from). `top_level` is `git ls-tree HEAD`. The
@@ -50,7 +50,7 @@ fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
     for line in top_level.split("\n"):
         if line.len() == 0: continue
         let tab = line.find("\t")
-        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
+        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line
         if path == "docs" or path.ends_with(".md"): continue
         if path == "benchmarks":
             for bench_line in bench_level.split("\n"):
@@ -68,7 +68,7 @@ fn green_inputs_identity(root: &str) -> str:
     let top_args: List[str] = List.new()
     top_args.push("ls-tree")
     top_args.push("HEAD")
-    let top_level = green_git_output(root, &top_args, "ls-tree")
+    let top_level = green_git_output(root, top_args, "ls-tree")
     if top_level.len() == 0: return ""
     let bench_args: List[str] = List.new()
     bench_args.push("ls-tree")
@@ -80,7 +80,7 @@ fn green_inputs_identity(root: &str) -> str:
     let hash_args: List[str] = List.new()
     hash_args.push("hash-object")
     hash_args.push(listing)
-    green_first_line(green_git_output(root, &hash_args, "hash-object"))
+    green_first_line(green_git_output(root, hash_args, "hash-object"))
 
 /// A `git status --porcelain` line that names no build input: a document —
 /// `docs/`, `benchmarks/goose/` and top-level `*.md` are outside the
@@ -100,7 +100,7 @@ fn green_worktree_is_clean(root: &str) -> bool:
     let args: List[str] = List.new()
     args.push("status")
     args.push("--porcelain")
-    let status_lines = green_git_output(root, &args, "status").split("\n")
+    let status_lines = green_git_output(root, args, "status").split("\n")
     for i in 0..status_lines.len():
         let line = status_lines[i]
         if line.len() > 0 and not green_status_is_not_input(line): return false
@@ -125,7 +125,7 @@ fn green_by_source_identity(root: &str) -> str:
         let line = store_lines[i]
         if line.starts_with(identity ++ "\t"):
             let fields = line.split("\t")
-            return if fields.len() > 1: fields[1].clone() else: "recorded"
+            return if fields.len() > 1: fields[1] else: "recorded"
     ""
 
 // The ceremony census bar (tools/ceremony_census.w): the installed tree's

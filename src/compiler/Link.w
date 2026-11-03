@@ -161,7 +161,7 @@ fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_l
     for extra in extras: inputs.push(extra)
     let dirs = link_stage_explicit_search_dirs(extras, link_args, "")
     for lib in link_libs:
-        let archive = link_stage_darwin_lib_archive(&dirs, lib)
+        let archive = link_stage_darwin_lib_archive(dirs, lib)
         if archive.len() > 0: inputs.push(archive)
     for input in inputs:
         let minos = link_stage_macho_macos_minos(input)
@@ -316,7 +316,7 @@ impl LinkStageCommand:
             shown = shown ++ " " ++ self.args[i]
         if link_stage_verbose():
             with_eprint("link: " ++ shown)
-        let saved = link_stage_apply_env(&self.env)
+        let saved = link_stage_apply_env(self.env)
         let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
         // #1915, #1914: a failed macOS or Windows link says why (lld's own
         // diagnostics, or the linker and its exit status), never a bare
@@ -531,7 +531,7 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
         for j in 0..dw_la.len():
             args.push(with_str_clone_ref(dw_la[j]))
     for arg in link_stage_driver_args_for_ld(link_args):
-        args.push(arg.clone())
+        args.push(arg)
     args.push("-lSystem")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
@@ -571,7 +571,7 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     args.push("-m")
     args.push(link_stage_linux_emulation())
     for a in ["--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker"]:
-        args.push(a.clone())
+        args.push(a)
     args.push(link_stage_linux_own_dynamic_linker())
     // The sysroot's libc is link stubs: they define what a program may name,
     // not glibc's private interfaces (GLIBC_PRIVATE). A shared library from
@@ -635,7 +635,7 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
         with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
         return link_stage_plan_fail()
     let ld_link_args = link_stage_linux_driver_args_for_ld(link_args)
-    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, &ld_link_args, false)
+    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, ld_link_args, false)
     let args: List[str] = List.new()
     args.push("__ld")
     for i in 0..command.args.len():
@@ -725,7 +725,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
         if not input.starts_with("-l"): inputs.push(input)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for arg in link_stage_driver_args_for_ld(link_args):
-        args.push(arg.clone())
+        args.push(arg)
     args.push("-lc")
     args.push("-lgcc")
 
@@ -1086,7 +1086,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     let map_root = link_stage_file_prefix_map_root().replace("\\", "/")
     if map_root.len() == 0:
         return LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
-    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(&args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
 
 // Under WITH_FILE_PREFIX_MAP a PDB names nothing under the mapped root:
 // lld-link records its working directory, its command line and each
@@ -1430,10 +1430,10 @@ fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
         let arg = link_args[i]
         if arg == "-Xlinker" and i + 1 < link_args.len():
             i += 1
-            out.push(link_args[i].clone())
+            out.push(link_args[i])
         else if arg.starts_with("-Wl,"):
             for part in arg.slice(4, arg.len()).split(","):
-                if part.len() > 0: out.push(part.clone())
+                if part.len() > 0: out.push(part)
         else:
             out.push(with_str_clone_ref(arg))
         i += 1

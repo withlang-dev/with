@@ -353,7 +353,7 @@ fn ct_enclosing_impl(pool: &AstPool, impls: &List[i32], decl: i32) -> i32:
     0
 
 fn ct_raw_literal_text(decoded: &str) -> str:
-    if decoded.starts_with("\x01raw\x01"): return decoded.clone()
+    if decoded.starts_with("\x01raw\x01"): return decoded
     "\x01raw\x01" ++ decoded
 
 fn ct_fresh_sym(intern: &InternPool, prefix: &str, seed: i32) -> i32:
@@ -1791,7 +1791,7 @@ impl Sema:
             return generated
 
         let type_name_sym = out.get_data0(decl)
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let soa_name = type_name ++ "SoA"
         let soa_sym = intern.intern(soa_name)
         if self.lookup_named_type_visible(soa_sym) != 0:
@@ -2077,7 +2077,7 @@ impl Sema:
         false
 
 fn ct_supported_derive_target(intern: &InternPool, derive_sym: i32) -> bool:
-    let name = intern.resolve(derive_sym).clone()
+    let name = intern.resolve(derive_sym)
     if name == "all": return true
     if name == "Copy": return true
     if name == "Clone": return true
@@ -2113,7 +2113,7 @@ fn ct_build_type_decl_type_arg(mut out: AstPool, decl: i32, type_name_sym: i32) 
 
 impl Sema:
     mut fn ct_eval_user_derive_source(mut out: AstPool, intern: &InternPool, decl: i32, derive_sym: i32) -> str:
-        let target_name = intern.resolve(derive_sym).clone()
+        let target_name = intern.resolve(derive_sym)
         let derive_fn_name = ct_derive_target_fn_name(target_name)
         let derive_fn_sym = intern.intern(derive_fn_name)
         if not self.generic_fn_nodes.contains(derive_fn_sym):
@@ -2220,7 +2220,7 @@ impl Sema:
     mut fn ct_check_struct_derive_fields(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
         if self.type_decl_has_derive(decl, trait_sym) == false:
             return true
-        let trait_name = intern.resolve(trait_sym).clone()
+        let trait_name = intern.resolve(trait_sym)
         if type_decl_sub_kind(out.get_data2(decl)) != TypeDeclKind.Struct:
             self.ct_emit_error(out, decl, "cannot derive " ++ trait_name ++ " for a non-struct type")
             return false
@@ -2263,7 +2263,7 @@ impl Sema:
     mut fn ct_check_enum_derive_payloads(out: &AstPool, intern: &InternPool, decl: i32, trait_sym: i32, all_sym: i32) -> bool:
         if self.type_decl_has_derive(decl, trait_sym) == false:
             return true
-        let trait_name = intern.resolve(trait_sym).clone()
+        let trait_name = intern.resolve(trait_sym)
         let type_name_sym = out.get_data0(decl)
         let tid = self.lookup_named_type_visible(type_name_sym)
         if tid == 0:
@@ -2408,7 +2408,7 @@ impl Sema:
 
         let start = out.get_start(decl)
         let end = out.get_end(decl)
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let fn_sym = intern.intern(type_name ++ ".default")
         let tp_count = ct_type_decl_tp_count(out, decl)
         let tp_start = ct_type_decl_tp_start(out, decl)
@@ -2475,7 +2475,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2548,7 +2548,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2626,7 +2626,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2702,7 +2702,7 @@ impl Sema:
         if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2761,7 +2761,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_ENUM:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2869,7 +2869,7 @@ impl Sema:
         if self.get_type_kind(resolved) != (if is_enum: TypeKind.TY_ENUM else: TypeKind.TY_STRUCT):
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -2938,7 +2938,7 @@ impl Sema:
             return generated
 
         let type_name_sym = out.get_data0(decl)
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let builder_name = type_name ++ "Builder"
         let builder_sym = intern.intern(builder_name)
         if self.lookup_named_type_visible(builder_sym) != 0:
@@ -3117,7 +3117,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, serialize_trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let self_sym = intern.intern("self")
@@ -3199,7 +3199,7 @@ impl Sema:
         if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let input_sym = intern.intern("input")
@@ -3276,7 +3276,7 @@ impl Sema:
         if self.select_trait_impl(type_name_sym, component_trait_sym) != 0:
             return generated
 
-        let type_name = intern.resolve(type_name_sym).clone()
+        let type_name = intern.resolve(type_name_sym)
         let start = out.get_start(decl)
         let end = out.get_end(decl)
         let i64_sym = intern.intern("i64")
@@ -3343,13 +3343,13 @@ impl Sema:
 
     mut fn comptime_transform_module(source_ast: &AstPool, intern: &InternPool) -> AstPool:
         var out = astpool_clone_deep(source_ast)
-        let saved_module_paths = sema_clone_str_list(&self.module_paths)
-        let saved_module_import_starts = sema_clone_i32_list(&self.module_import_starts)
-        let saved_module_import_counts = sema_clone_i32_list(&self.module_import_counts)
-        let saved_module_import_targets = sema_clone_i32_list(&self.module_import_targets)
-        let saved_module_import_paths = sema_clone_str_list(&self.module_import_paths)
-        let saved_module_import_selected = sema_clone_str_list(&self.module_import_selected)
-        let saved_module_import_offsets = sema_clone_i32_list(&self.module_import_offsets)
+        let saved_module_paths = sema_clone_str_list(self.module_paths)
+        let saved_module_import_starts = sema_clone_i32_list(self.module_import_starts)
+        let saved_module_import_counts = sema_clone_i32_list(self.module_import_counts)
+        let saved_module_import_targets = sema_clone_i32_list(self.module_import_targets)
+        let saved_module_import_paths = sema_clone_str_list(self.module_import_paths)
+        let saved_module_import_selected = sema_clone_str_list(self.module_import_selected)
+        let saved_module_import_offsets = sema_clone_i32_list(self.module_import_offsets)
         let saved_global_module_paths = ct_new_list_str()
         for smi in 0..saved_module_paths.len():
             let module_path = saved_module_paths[smi]
@@ -3542,12 +3542,12 @@ impl Sema:
         let transform_pool = intern
         var transform_sema = Sema.init(transform_pool, move self.diags, out)
         transform_sema.source_text = move self.source_text
-        transform_sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
-        transform_sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
-        transform_sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
-        transform_sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
-        transform_sema.source_text_names = sema_clone_str_list(&self.source_text_names)
-        transform_sema.source_texts = sema_clone_str_list(&self.source_texts)
+        transform_sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
+        transform_sema.decl_source_file_ids = sema_clone_i32_list(self.decl_source_file_ids)
+        transform_sema.decl_is_c_import = sema_clone_i32_list(self.decl_is_c_import)
+        transform_sema.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
+        transform_sema.source_text_names = sema_clone_str_list(self.source_text_names)
+        transform_sema.source_texts = sema_clone_str_list(self.source_texts)
         transform_sema.overflow_mode = self.overflow_mode
         // The transform Sema checks what a `comptime if` condition in a
         // generic body (the prelude's `print[T]`) reaches; its diagnostics
@@ -3559,13 +3559,13 @@ impl Sema:
         transform_sema.lint_partial_statement_match = self.lint_partial_statement_match
         transform_sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         transform_sema.interface_eager = self.interface_eager
-        transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_module_import_selected, &saved_module_import_offsets, &saved_global_module_paths)
+        transform_sema.copy_module_graph_parts(saved_module_paths, saved_module_import_starts, saved_module_import_counts, saved_module_import_targets, saved_module_import_paths, saved_module_import_selected, saved_module_import_offsets, saved_global_module_paths)
         transform_sema.copy_import_namespaces(self)
         transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
         transform_sema.prepare_for_comptime_transform()
         if transform_sema.diags.has_errors():
             self.diags = move transform_sema.diags
-            self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
+            self.merge_tracked_inputs(transform_sema.tracked_input_paths)
             return out
 
         // A method's type parameters (its impl's, then its own) are unbound
@@ -3580,10 +3580,10 @@ impl Sema:
             let decl = out.get_decl(di)
             // Nodes a comptime expansion adds belong to the declaring file.
             out.set_current_file_id(out.file(decl))
-            let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, &impl_decls, decl as i32)
+            let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, impl_decls, decl as i32)
             transform_sema.ct_type_param_syms = ct_type_params_in_scope(out, owner, decl as i32)
             transform_sema.ct_transform_decl(out, intern, decl as i32)
             transform_sema.ct_type_param_syms = List.new()
         self.diags = move transform_sema.diags
-        self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
+        self.merge_tracked_inputs(transform_sema.tracked_input_paths)
         out

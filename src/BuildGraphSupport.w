@@ -247,8 +247,8 @@ fn build_graph_path_under_root(root: &str, path: &str) -> str:
         norm_root = norm_root.slice(0, norm_root.len() - 1)
     let norm_path = resolve_normalize_path(path)
     let fold = runtime_sysinfo_os() == "Windows"
-    let cmp_root = if fold: norm_root.to_lower() else: norm_root.clone()
-    let cmp_path = if fold: norm_path.to_lower() else: norm_path.clone()
+    let cmp_root = if fold: norm_root.to_lower() else: norm_root
+    let cmp_path = if fold: norm_path.to_lower() else: norm_path
     if cmp_path == cmp_root:
         return "."
     if cmp_path.starts_with(cmp_root ++ "/"):
@@ -460,7 +460,7 @@ fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], 
     while picked.len() < 5 and picked.len() < names.len():
         var best: i64 = -1
         for i in 0..names.len():
-            if not build_graph_time_picked(&picked, i as i64):
+            if not build_graph_time_picked(picked, i as i64):
                 if best < 0 or ns_list[i] > ns_list[best]:
                     best = i as i64
         picked.push(best)

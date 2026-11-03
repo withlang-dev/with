@@ -397,7 +397,7 @@ fn ci_migrate_shared_module_prefix() -> str:
 // Physical output paths and imports must use the same identifier spelling.
 // A C filename may contain punctuation that is not valid in a With module.
 fn ci_migrate_module_relative_path(input_dir: &str, path: &str) -> str:
-    var rel = path.clone()
+    var rel = path
     if input_dir.len() > 0 and ci_starts_with(path, input_dir):
         rel = path.slice(input_dir.len(), path.len())
     while rel.len() > 0 and rel[0] == 47:
@@ -929,7 +929,7 @@ fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_m
 // a header puts after it; "" for a name that is no object-like macro.
 fn ci_migrate_object_macro_body(name: &str) -> str:
     if not g_migrate_macro_last_values.contains(name): return ""
-    var text = g_migrate_macro_last_values.get(name).unwrap().clone()
+    var text = g_migrate_macro_last_values.get(name).unwrap()
     let block_comment = text.find("/*")
     if block_comment >= 0: text = text.slice(0, block_comment)
     let line_comment = text.find("//")
@@ -1536,8 +1536,8 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     // D107: a lone unit is its own corpus — its definitions' body evidence
     // and NULL callers decide their function-pointer parameters.
     var one: List[str] = List.new()
-    one.push(input_path.clone())
-    project.register_modules(&one)
+    one.push(input_path)
+    project.register_modules(one)
     if project.migrate_scan_file(input_path) != 0: return 1
     project.resolve_header_definers()
     project.resolve_fn_ptr_nullability()
@@ -1567,7 +1567,7 @@ fn ci_migrate_path_stem(basename: &str) -> str:
     var end = basename.len()
     while end > 0 and basename[(end - 1)] != '.':
         end = end - 1
-    if end == 0: basename.clone() else: basename.slice(0, (end - 1) as i64)
+    if end == 0: basename else: basename.slice(0, (end - 1) as i64)
 
 // The file of a cursor location (`path:line:col`), "" when absent.
 // A definition's identity across units: the real path of its file and its
@@ -1678,7 +1678,7 @@ fn ci_migrate_validate_module_paths(input_dir: &str, files: &List[str]):
         if owners.contains(module_path):
             eprint("migrate: module path collision: " ++ owners.get(module_path).unwrap() ++ " and " ++ path ++ " both map to " ++ module_path)
             return false
-        owners.insert(module_path, path.clone())
+        owners.insert(module_path, path)
     true
 
 fn ci_migrate_print_progress(file_path: &str, current: isize, total: isize):
@@ -1811,7 +1811,7 @@ impl CiProject:
             if test == 1: self.symbols[symbol_id].param_tested[pi] = 1
             else if test == -1: self.symbols[symbol_id].param_aborting[pi] = 1
         let fname = with_str_clone_ref(self.symbols[symbol_id].name)
-        for line in ci_body_call_evidence(session, cursor, &names).split("\n"):
+        for line in ci_body_call_evidence(session, cursor, names).split("\n"):
             if line.len() == 0: continue
             let parts = line.split(":")
             if parts[0] == "null" and parts.len() == 3:
@@ -1819,12 +1819,12 @@ impl CiProject:
                 let index = parse(parts[2])
                 self.symbols[callee].grow_params(index + 1)
                 if self.symbols[callee].param_null_caller[index].len() == 0:
-                    self.symbols[callee].param_null_caller[index] = fname.clone()
+                    self.symbols[callee].param_null_caller[index] = fname
             else if parts[0] == "sink" and parts.len() == 4:
-                let pi = ci_index_of_name(&names, parts[3])
+                let pi = ci_index_of_name(names, parts[3])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[1] ++ ":" ++ parts[2] ++ ";"
             else if (parts[0] == "field" or parts[0] == "global") and parts.len() == 2:
-                let pi = ci_index_of_name(&names, parts[1])
+                let pi = ci_index_of_name(names, parts[1])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[0] ++ ";"
 
     // A static definition is not a project symbol, but its calls are corpus
@@ -1832,7 +1832,7 @@ impl CiProject:
     // (pcre2test's `pcre2_jit_stack_assign(ctx, NULL, NULL)`).
     mut fn record_call_evidence(session: i64, cursor: i32, fname: &str):
         let none: List[str] = List.new()
-        for line in ci_body_call_evidence(session, cursor, &none).split("\n"):
+        for line in ci_body_call_evidence(session, cursor, none).split("\n"):
             let parts = line.split(":")
             if parts.len() != 3 or parts[0] != "null": continue
             let callee = self.ensure_symbol(CiProjectSymbolKind.CIPS_FN, parts[1])
@@ -1953,7 +1953,7 @@ impl CiProject:
                 bits = bits ++ (if self.symbols[si].param_nullable[pi] != 0: "1" else: "0")
                 reasons = reasons ++ self.symbols[si].param_reason[pi]
                 if verbose: eprint("migrate: " ++ self.symbols[si].name ++ f" param {pi}: " ++ self.symbols[si].param_reason[pi])
-            g_migrate_fn_nullable_names.push(self.symbols[si].name.clone())
+            g_migrate_fn_nullable_names.push(self.symbols[si].name)
             g_migrate_fn_nullable_bits.push(bits)
             g_migrate_fn_nullable_reasons.push(reasons)
 
@@ -1994,7 +1994,7 @@ fn ci_migrate_directory_filewise(input_dir: &str, output_dir: &str, files: &List
         // drawn each time and the artifact written once.
         project.resolve_ownership()
         project.resolve_contracts()
-        if i == 0 and ci_migrate_write_contracts(&project) != 0: return 1
+        if i == 0 and ci_migrate_write_contracts(project) != 0: return 1
         let rc = ci_migrate_file_inner(file_path, out_path, true, project)
         if rc != 0:
             eprint(f"migrate: failed while migrating {base}")
@@ -2207,7 +2207,7 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
         return ci_migrate_directory_filewise(input_dir, output_dir, sorted_files)
 
     var project = CiProject.new()
-    project.register_modules(&sorted_files)
+    project.register_modules(sorted_files)
     var scan_i = 0
     while scan_i < sorted_files.len():
         if project.migrate_scan_file(sorted_files[scan_i]) != 0:
@@ -2220,7 +2220,7 @@ fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basena
     // D159: the contracts the bodies prove, drawn once; the artifact if asked.
     project.resolve_ownership()
     project.resolve_contracts()
-    if ci_migrate_write_contracts(&project) != 0: return 1
+    if ci_migrate_write_contracts(project) != 0: return 1
 
     var fi = 0
     let total_files = sorted_files.len()
@@ -2472,7 +2472,7 @@ fn ci_migrate_apply_writes_clauses() -> i32:
         let tokens = lexer.tokenize()
         for i in 0..tokens.len() - 2:
             if tokens.get_tag(i) == TokenKind.TK_KW_PUB and tokens.get_tag(i + 1) == TokenKind.TK_KW_VAR and tokens.get_tag(i + 2) == TokenKind.TK_IDENT:
-                globals.insert(ci_migrate_token_text(text, &tokens, i + 2), 1)
+                globals.insert(ci_migrate_token_text(text, tokens, i + 2), 1)
     var fn_index: HashMap[str, i32] = HashMap.new()
     for fi in 0..g_migrate_writes_fn_names.len():
         fn_index.insert(with_str_clone_ref(g_migrate_writes_fn_names[fi]), fi as i32)
@@ -2488,11 +2488,11 @@ fn ci_migrate_apply_writes_clauses() -> i32:
         for i in 0..tokens.len():
             if tokens.get_tag(i) != TokenKind.TK_IDENT or (i > 0 and tokens.get_tag(i - 1) == TokenKind.TK_DOT):
                 continue
-            let name = ci_migrate_token_text(body, &tokens, i)
+            let name = ci_migrate_token_text(body, tokens, i)
             if globals.contains(name):
-                let after = ci_migrate_skip_place_projections(&tokens, i + 1)
+                let after = ci_migrate_skip_place_projections(tokens, i + 1)
                 let assigned = after < tokens.len() and (tokens.get_tag(after) == TokenKind.TK_EQ or parser_compound_assign_op(tokens.get_tag(after)) >= 0)
-                if (assigned or ci_migrate_taken_raw_mut(body, &tokens, i)) and ci_find_str(w, "|" ++ name ++ "|") < 0:
+                if (assigned or ci_migrate_taken_raw_mut(body, tokens, i)) and ci_find_str(w, "|" ++ name ++ "|") < 0:
                     w = w ++ name ++ "|"
             else if fn_index.contains(name) and i + 1 < tokens.len() and tokens.get_tag(i + 1) == TokenKind.TK_L_PAREN and ci_find_str(c, "|" ++ name ++ "|") < 0:
                 c = c ++ name ++ "|"
@@ -2785,7 +2785,7 @@ fn ci_migrate_translate_function(session: i64, idx: i32, known_structs: &str, pr
         g_migrate_writes_fn_bodies.push(with_str_clone_ref(body_for_emit))
         let writes_mark = if visibility.len() > 0: ci_migrate_writes_mark(safe_name) else: ""
         if as_method:
-            return hoisted_decls ++ ci_migrate_push_method(&method, method_params, method_self_name, method_self_type, method_out_name, method_out_type, ret_render, ret_suffix, body, body_terminates, writes_mark)
+            return hoisted_decls ++ ci_migrate_push_method(method, method_params, method_self_name, method_self_type, method_out_name, method_out_type, ret_render, ret_suffix, body, body_terminates, writes_mark)
         let contract_note = ci_migrate_contract_note(project_active, project, name)
         if migrate_prefer_brace():
             return hoisted_decls ++ contract_note ++ export_prefix ++ fn_keyword ++ safe_name ++ "(" ++ params ++ ")" ++ ret_suffix ++ writes_mark ++ " {\n" ++ body_for_emit ++ "}\n\n"
@@ -2852,7 +2852,7 @@ fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProjec
         return ""
     let symbol = project.symbols[symbol_id]
     if symbol.resolved_ty_text.len() > 0:
-        return symbol.resolved_ty_text.clone()
+        return symbol.resolved_ty_text
     if (symbol.resolved_ty as i32) != 0:
         return ci_print_type(project.types, symbol.resolved_ty)
     ""

@@ -72,7 +72,7 @@ fn te_dirname(path: &str) -> str:
 // components of every name. "" on success, else why not.
 fn tar_extract_text(data: &str, dest: &str, strip: i32) -> str:
     let all: List[str] = List.new()
-    tar_extract_text_keep(data, dest, strip, &all)
+    tar_extract_text_keep(data, dest, strip, all)
 
 // Whether the stripped name `rel` is under one of `keep`; every name is when
 // `keep` is empty.
@@ -157,12 +157,12 @@ fn te_bytes(text: &str) -> List[u8]:
 // Unpacks the gzip-compressed tar `archive` into `dest`. "" or why not.
 fn tar_gz_extract(archive: &str, dest: &str, strip: i32) -> str:
     let all: List[str] = List.new()
-    tar_gz_extract_keep(archive, dest, strip, &all)
+    tar_gz_extract_keep(archive, dest, strip, all)
 
 // Unpacks the gzip-compressed tar image `packed` (bytes in memory, an
 // embedded blob) into `dest`. "" or why not.
 fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
-    match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
+    match decompress_gzip_with_limit(te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty embedded archive"
             let text = with_str_from_bytes(&tar[0] as *const u8, tar.len())
@@ -173,7 +173,7 @@ fn tar_gz_extract_data(packed: &str, dest: &str, strip: i32) -> str:
 fn tar_gz_extract_keep(archive: &str, dest: &str, strip: i32, keep: &List[str]) -> str:
     let packed = runtime_read_file(archive)
     if packed.len() == 0: return "could not read " ++ archive
-    match decompress_gzip_with_limit(&te_bytes(packed), 8589934592):
+    match decompress_gzip_with_limit(te_bytes(packed), 8589934592):
         .Ok(tar) =>
             if tar.len() == 0: return "an empty archive: " ++ archive
             let text = with_str_from_bytes(&tar[0] as *const u8, tar.len())

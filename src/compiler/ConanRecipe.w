@@ -64,14 +64,14 @@ fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) 
             if url[i] == '/': slash = i as i32
         let name = url.slice(slash + 1, url.len())
         let candidate = dir ++ "/" ++ name
-        if download(url, &candidate) != 0:
+        if download(url, candidate) != 0:
             tried = tried ++ "\n  " ++ url ++ ": did not download"
             continue
-        let digest = digest_of(&candidate)
+        let digest = digest_of(candidate)
         if digest != source.sha256:
             tried = tried ++ "\n  " ++ url ++ ": sha256 " ++ digest ++ ", the recipe expects " ++ source.sha256
             continue
-        return ConanArchivePick { path: candidate, tried: tried.clone() }
+        return ConanArchivePick { path: candidate, tried: tried }
     ConanArchivePick { path: "", tried }
 
 // A patch entry can say where in the tree it applies (`base_path`) or how many

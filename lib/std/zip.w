@@ -61,7 +61,7 @@ unsafe fn zip_current_entry(handle: *mut c_void) -> Result[ZipEntry, ZipError]:
     with_free(name_buf as *mut u8)
     let unix_host = ((info.version as i64) >> 8) == ZIP_HOST_UNIX
     let mode = if unix_host: (((info.external_fa as i64) >> 16) & 0o7777) as i32 else: 0
-    Ok(ZipEntry { name: name.clone(), size: info.uncompressed_size as i64, mode: mode, is_dir: name.ends_with("/") })
+    Ok(ZipEntry { name: name, size: info.uncompressed_size as i64, mode: mode, is_dir: name.ends_with("/") })
 
 impl ZipArchive:
     /// Every member, in archive order.

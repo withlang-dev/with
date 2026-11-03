@@ -486,8 +486,8 @@ fn run_receiver_migration -> i32:
         print("error: no semantic entry file supplied")
         exit_code(1)
     var facts = compiler_relocation_facts(entry)
-    let paths = unique_relocation_paths(&facts, &excludes)
-    let selected = count_selected(&facts, &excludes)
+    let paths = unique_relocation_paths(facts, excludes)
+    let selected = count_selected(facts, excludes)
     // Always complete a no-write structural preflight over the whole semantic
     // selection before the first file can be changed.
     var preflight: isize = 0
@@ -495,7 +495,7 @@ fn run_receiver_migration -> i32:
         let changed = facts.relocate_file(paths[i], false, list_methods)
         if changed < 0: exit_code(1)
         preflight = preflight + changed
-    if not verify_all_matched(&facts, &excludes): exit_code(1)
+    if not verify_all_matched(facts, excludes): exit_code(1)
     if preflight != selected:
         print(f"error: compiler selected {selected} methods but the rewriter matched {preflight}")
         exit_code(1)
@@ -508,7 +508,7 @@ fn run_receiver_migration -> i32:
         let changed = facts.relocate_file(paths[i], true, false)
         if changed < 0: exit_code(1)
         changed_total = changed_total + changed
-    if not verify_all_matched(&facts, &excludes) or changed_total != selected:
+    if not verify_all_matched(facts, excludes) or changed_total != selected:
         print(f"error: apply phase changed {changed_total} of {selected} selected methods")
         exit_code(1)
     print(f"receiver-relocation: selected={selected} matched={preflight} changed={changed_total} files={paths.len()} mode=apply")

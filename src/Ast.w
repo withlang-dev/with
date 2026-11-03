@@ -1998,9 +1998,9 @@ impl AstPool:
             let fn_node = self.get_decl(di)
             if (di < decl_is_c_import.len() and decl_is_c_import[di] != 0) or generated.contains(self.file(fn_node) as i32):
                 continue
-            let owner = self.own_module_receiver_type(fn_node, self_sym, intern, &struct_decls)
+            let owner = self.own_module_receiver_type(fn_node, self_sym, intern, struct_decls)
             if owner != 0:
-                self.resolve_method_receiver_field_names(fn_node, owner, self_sym, &decl_nodes)
+                self.resolve_method_receiver_field_names(fn_node, owner, self_sym, decl_nodes)
 
     // The struct or union `fn_node` is an instance method of when the file
     // declaring the method declares the type, else 0. A derive the compiler
@@ -2011,7 +2011,7 @@ impl AstPool:
         let meta = self.find_fn_meta(fn_node)
         if meta < 0 or self.fn_meta_param_count(meta) == 0 or self.fn_param_name(self.fn_meta_param_start(meta), 0) != self_sym:
             return 0
-        let name = intern.resolve(self.get_data0(fn_node)).clone()
+        let name = intern.resolve(self.get_data0(fn_node))
         var dot = -1
         for ci in 0..name.len():
             if name[ci] == '.':
@@ -2497,7 +2497,7 @@ impl AstPool:
         fail_syms.push(fail_sym)
         let body = self.get_data2(for_node)
         let yielded = ast_for_body_yield_value(self, body)
-        self.build_comprehension_match(start, self.get_end(for_node), payload_sym, 0, &fail_syms, &pats, &exprs, &kinds, if yielded != 0: yielded else: body, yielded != 0)
+        self.build_comprehension_match(start, self.get_end(for_node), payload_sym, 0, fail_syms, pats, exprs, kinds, if yielded != 0: yielded else: body, yielded != 0)
 
     // The placeholder symbols of an alternative build_for_carrier_alt made:
     // its payload pattern's variant and its failure arm's binding.

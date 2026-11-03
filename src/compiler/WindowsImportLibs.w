@@ -72,7 +72,7 @@ fn wil_crt_dir(libc_root: &str) -> str:
     keep.push("mingw-w64-crt/lib64/")
     keep.push("mingw-w64-crt/libarm64/")
     keep.push("mingw-w64-crt/def-include/")
-    let problem = tar_gz_extract_keep(archive, cache, 1, &keep)
+    let problem = tar_gz_extract_keep(archive, cache, 1, keep)
     if problem.len() > 0: return "error: could not unpack " ++ problem
     let _rm = runtime_remove_file(archive)
     if runtime_write_file(stamp, sha ++ "\n") != 0: return "error: could not write " ++ stamp
@@ -129,7 +129,7 @@ fn wil_def(self_exe: &str, crt: &str, arch: &str, name: &str, work: &str) -> str
     argv.push(input)
     argv.push("-o")
     argv.push(pre)
-    let problem = wil_run(&argv, work, "def-" ++ name)
+    let problem = wil_run(argv, work, "def-" ++ name)
     if problem.len() > 0: return "error: preprocessing " ++ input ++ ": " ++ problem
     if not common: return pre
     var out = ""
@@ -187,7 +187,7 @@ fn windows_import_libs_write(dir: &str, names: &List[str]) -> WindowsImportLibs:
         argv.push(def)
         argv.push("-l")
         argv.push(dir ++ "/lib" ++ name ++ ".a")
-        let problem = wil_run(&argv, work, "dlltool-" ++ name)
+        let problem = wil_run(argv, work, "dlltool-" ++ name)
         if problem.len() > 0:
             let _rm = runtime_remove_tree(work)
             return WindowsImportLibs { written, problem: "writing lib" ++ name ++ ".a: " ++ problem }
@@ -206,7 +206,7 @@ fn with_windows_import_libs_main(args: &List[str]) -> i32:
     if runtime_mkdir_p(args[0]) != 0:
         runtime_eprint("error: could not create " ++ args[0])
         return 1
-    let made = windows_import_libs_write(args[0], &names)
+    let made = windows_import_libs_write(args[0], names)
     if made.problem.len() > 0:
         runtime_eprint("error: Windows import libraries: " ++ made.problem)
         return 1

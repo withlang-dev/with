@@ -30,8 +30,8 @@ fn host_lib_sorted(xs: List[str]) -> List[str]:
         var i = out.len()
         out.push(x)
         while i > 0 and out[i - 1] > out[i]:
-            let prev = out[i - 1].clone()
-            out[i - 1] = out[i].clone()
+            let prev = out[i - 1]
+            out[i - 1] = out[i]
             out[i] = prev
             i -= 1
     out

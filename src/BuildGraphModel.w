@@ -415,24 +415,24 @@ fn build_graph_target_deep_copy(t: &BuildGraphTarget) -> BuildGraphTarget:
         output: with_str_clone_ref(t.output),
         target_kind: t.target_kind,
         optimize_mode: t.optimize_mode,
-        system_libs: bg_clone_str_list(&t.system_libs),
-        library_paths: bg_clone_str_list(&t.library_paths),
-        rpaths: bg_clone_str_list(&t.rpaths),
-        include_paths: bg_clone_str_list(&t.include_paths),
-        defines: bg_clone_str_list(&t.defines),
-        inputs: bg_clone_str_list(&t.inputs),
-        extra_outputs: bg_clone_str_list(&t.extra_outputs),
-        write_scopes: bg_clone_str_list(&t.write_scopes),
-        deps: bg_clone_str_list(&t.deps),
-        args: bg_clone_str_list(&t.args),
+        system_libs: bg_clone_str_list(t.system_libs),
+        library_paths: bg_clone_str_list(t.library_paths),
+        rpaths: bg_clone_str_list(t.rpaths),
+        include_paths: bg_clone_str_list(t.include_paths),
+        defines: bg_clone_str_list(t.defines),
+        inputs: bg_clone_str_list(t.inputs),
+        extra_outputs: bg_clone_str_list(t.extra_outputs),
+        write_scopes: bg_clone_str_list(t.write_scopes),
+        deps: bg_clone_str_list(t.deps),
+        args: bg_clone_str_list(t.args),
         action_fn: t.action_fn,
         timeout_ms: t.timeout_ms,
         rss_limit_bytes: t.rss_limit_bytes,
         cwd: with_str_clone_ref(t.cwd),
-        env: bg_clone_str_list(&t.env),
+        env: bg_clone_str_list(t.env),
         network: t.network,
         parallel: t.parallel,
-        action_source_paths: bg_clone_str_list(&t.action_source_paths),
+        action_source_paths: bg_clone_str_list(t.action_source_paths),
     }
 
 fn build_graph_output_index(paths: &List[str], path: &str) -> i64:
@@ -473,7 +473,7 @@ fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
         for ii in 0..t.inputs.len():
             consumed.push(with_str_clone_ref(t.inputs[ii]))
         for ci in 0..consumed.len():
-            let producer_idx = build_graph_output_index(&out_paths, consumed[ci])
+            let producer_idx = build_graph_output_index(out_paths, consumed[ci])
             if producer_idx < 0:
                 continue
             let producer = out_owners[producer_idx]
@@ -489,7 +489,7 @@ fn build_graph_complete_edges(graph: BuildGraph) -> BuildGraph:
 fn build_graph_filter_target(graph: &BuildGraph, target_name: &str) -> BuildGraph:
     var names: List[str] = List.new()
     if target_name.len() > 0: names.push(with_str_clone_ref(target_name))
-    build_graph_filter_targets(graph, &names)
+    build_graph_filter_targets(graph, names)
 
 // The graph restricted to the closures of every named root (`build :a
 // :b`); no roots means the whole graph, as one empty name did before.
@@ -506,7 +506,7 @@ fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> B
         out.generated_sources.push(BuildGraphGeneratedSource { path: with_str_clone_ref(bgm_gen.path), contents: with_str_clone_ref(bgm_gen.contents) })
     if target_names.len() == 0:
         for ti_all in 0..graph.targets.len():
-            out.targets.push(build_graph_target_deep_copy(&graph.targets[ti_all]))
+            out.targets.push(build_graph_target_deep_copy(graph.targets[ti_all]))
         out.raw_text = build_graph_emit(out)
         return out
     var selected = build_graph_select_targets_closure(graph, target_names)
@@ -515,7 +515,7 @@ fn build_graph_filter_targets(graph: &BuildGraph, target_names: &List[str]) -> B
         out.error_msg = move selected.error_msg
     else:
         for ti in 0..selected.targets.len():
-            out.targets.push(build_graph_target_deep_copy(&selected.targets[ti]))
+            out.targets.push(build_graph_target_deep_copy(selected.targets[ti]))
         if with_getenv_str("WITH_TRACE_GRAPH").len() > 0:
             with_eprint("[filt] pre-emit dt=" ++ out.default_target)
         out.raw_text = build_graph_emit(out)
@@ -567,7 +567,7 @@ fn build_graph_filter_single_targets(graph: &BuildGraph, target_names: &List[str
             out.ok = false
             out.error_msg = "build.w did not declare target '" ++ target_names[ni] ++ "'"
             return out
-        out.targets.push(build_graph_target_deep_copy(&graph.targets[index]))
+        out.targets.push(build_graph_target_deep_copy(graph.targets[index]))
     out.raw_text = build_graph_emit(out)
     out
 

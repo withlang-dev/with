@@ -423,7 +423,7 @@ pub fn Regex.__capture_count(code: *const i8) -> i32:
 
 impl Regex:
     pub fn pattern() -> str:
-        self.pattern_text.clone()
+        self.pattern_text
 
     pub fn num_captures() -> i32:
         self.capture_count
@@ -627,7 +627,7 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ regex_expand_replacement(&captures, repl)
+                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ regex_expand_replacement(captures, repl)
                             if not replace_all:
                                 out = out ++ with_str_slice_ref(text, found.end as i64, text.len())
                                 break
@@ -665,7 +665,7 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(&captures)
+                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(captures)
                             out = out ++ with_str_slice_ref(text, found.end as i64, text.len())
                             return out
                         }
@@ -682,7 +682,7 @@ impl Regex:
                 Some(captures) => {
                     match captures.get(0):
                         Some(found) => {
-                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(&captures)
+                            out = out ++ with_str_slice_ref(text, cursor as i64, found.start as i64) ++ replacement_callback(captures)
                             if found.end == found.start:
                                 if found.end >= text.len():
                                     cursor = (text.len() + 1) as i32

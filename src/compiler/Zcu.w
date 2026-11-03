@@ -288,7 +288,7 @@ impl Zcu:
     fn package_key_map() -> HashMap[str, str]:
         var out = HashMap[str, str].new()
         for path in self.decl_source_paths:
-            if not out.contains(path): out.insert(path.clone(), zcu_package_key(path))
+            if not out.contains(path): out.insert(path, zcu_package_key(path))
         out
 
     mut fn append_decl_source_paths(count: i32, path: &str, file_id: i32) -> Unit:
@@ -314,7 +314,7 @@ impl Zcu:
     fn decl_source_path_frontend(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[decl_index])
-        self.current_source_path.clone()
+        self.current_source_path
 
     fn decl_source_file_id_frontend(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len():
@@ -324,7 +324,7 @@ impl Zcu:
     fn decl_source_dir_frontend(decl_index: i32) -> str:
         let path = self.decl_source_path_frontend(decl_index)
         if path.len() == 0:
-            return self.source_dir.clone()
+            return self.source_dir
         resolve_dirname(path)
 
     fn c_import_cache_lookup(key: &str) -> str:
@@ -366,7 +366,7 @@ impl Zcu:
     // reproduced as a DOUBLE FREE under --debug-alloc).
     fn render_diag_frontend(diag: &Diagnostic):
         let source = self.source_for_file_id_frontend(diag.primary.file)
-        self.render_diag_frontend_with(diag, &source)
+        self.render_diag_frontend_with(diag, source)
 
     // Renders against a caller-supplied primary Source so diagnostic loops
     // can reuse one Source per file. Building a fresh Source per diagnostic
@@ -396,7 +396,7 @@ impl Zcu:
             else:
                 label_paths.push("")
                 label_texts.push("")
-        diag.render_with_label_sources(source, &label_paths, &label_texts)
+        diag.render_with_label_sources(source, label_paths, label_texts)
 
     fn source_for_file_id_frontend(file_id: i32) -> Source:
         if file_id == 0:
@@ -430,7 +430,7 @@ impl Zcu:
             if self.cli_diag_mapping_index(diag.primary.start) < 0 and diag.primary.file != cached_file:
                 cached_source = self.source_for_file_id_frontend(diag.primary.file)
                 cached_file = diag.primary.file
-            self.render_diag_frontend_with(diag, &cached_source)
+            self.render_diag_frontend_with(diag, cached_source)
             if i + 1 < self.diagnostics.items.len():
                 runtime_eprint("")
 
@@ -469,11 +469,11 @@ impl Zcu:
 
     fn tracked_input_root() -> str:
         if self.project_config.root_dir.len() > 0:
-            return self.project_config.root_dir.clone()
-        self.source_dir.clone()
+            return self.project_config.root_dir
+        self.source_dir
 
     fn configure_tracked_input_sema(sema: Sema) -> Sema:
-        sema.set_tracked_input_context(self.tracked_input_root(), &self.tracked_input_paths)
+        sema.set_tracked_input_context(self.tracked_input_root(), self.tracked_input_paths)
         sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         sema.interface_eager = (self.interface_eager or self.bundle_corpus.len() > 0) as i32
         sema
@@ -535,7 +535,7 @@ impl Zcu:
             runtime_eprint(f"[zcu] sync_from_sema:before zcu.pool={self.pool.symbol_count()} sema.pool={sema.pool.symbol_count()} sema.ast.decls={sema.ast.decl_count()}")
         self.pool = sema.pool.clone()
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &sema.tracked_input_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, sema.tracked_input_paths)
         // Callers move sema.diags into Zcu.diagnostics before syncing. The moved
         // field is an all-zero reset sentinel, not a reusable List: pushing a
         // later comptime/action diagnostic would allocate zero bytes and leave
@@ -649,7 +649,7 @@ fn zcu_package_key(path: &str) -> str:
     var dir = zcu_parent_dir(path)
     while true:
         let manifest = if dir.len() == 0: "with.toml" else: dir ++ "/with.toml"
-        if resolve_file_exists(manifest): return if dir.len() == 0: "." else: dir.clone()
+        if resolve_file_exists(manifest): return if dir.len() == 0: "." else: dir
         if dir.len() == 0 or dir == "/": break
         dir = zcu_parent_dir(dir)
     "<program>"

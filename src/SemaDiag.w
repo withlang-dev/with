@@ -258,7 +258,7 @@ impl Sema:
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
-                paths.insert(file_id, self.decl_source_paths[di].clone())
+                paths.insert(file_id, self.decl_source_paths[di])
         var out = ""
         for (node, pattern) in self.ceremony_sites:
             let name = if pattern == 1: "str-clone" else: if pattern == 2: "ref-at-ref-param" else: if pattern == 4: "plain-bits-field-copy-annotation" else: if pattern == 5: "str-view-copy-annotation" else: "some-at-option-demand"
@@ -527,7 +527,7 @@ impl Sema:
         for di in 0..self.decl_source_file_ids.len():
             let file_id = self.decl_source_file_ids[di]
             if not paths.contains(file_id) and di < self.decl_source_paths.len():
-                paths.insert(file_id, self.decl_source_paths[di].clone())
+                paths.insert(file_id, self.decl_source_paths[di])
         var n = 0
         for ai in 0..self.contextual_copy_adjustments.len():
             let file_id = self.ast.file(self.contextual_copy_adjustments[ai].source_node as NodeId) as i32

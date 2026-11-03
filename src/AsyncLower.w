@@ -106,7 +106,7 @@ impl AsyncLower:
     mut fn record_suspend(node: i32, suspend_kind: i32):
         let span_start = async_ast_get_start(self.ast, node)
         let span_end = async_ast_get_end(self.ast, node)
-        let snap = async_snapshot_for_span(&self.mir_mod.bodies[self.cur_mir_body_index], span_start)
+        let snap = async_snapshot_for_span(self.mir_mod.bodies[self.cur_mir_body_index], span_start)
         self.cur_body.add_suspend(suspend_kind, span_start, span_end, snap.resume_bb, snap.live_locals, snap.storage_dead, snap.drop_count)
 
     mut fn walk_expr(node: i32):

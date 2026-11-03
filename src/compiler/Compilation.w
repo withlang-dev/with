@@ -446,9 +446,9 @@ impl Compilation:
         self.set_compiler_hooks_enabled(options.compiler_hooks_enabled)
         self.set_target_kind(options.target_kind)
         self.emit_all = options.emit_all
-        self.link_objects = driver_clone_str_list(&options.link_objects)
-        self.set_link_paths(&options.link_search_paths, &options.link_rpaths)
-        self.set_link_bundles(&options.link_bundles)
+        self.link_objects = driver_clone_str_list(options.link_objects)
+        self.set_link_paths(options.link_search_paths, options.link_rpaths)
+        self.set_link_bundles(options.link_bundles)
         self.bundle_manifest_path = with_str_clone_ref(options.bundle_manifest_path)
         self.bundle_interface_path = with_str_clone_ref(options.bundle_interface_path)
         self.set_bundle_fingerprint(options.bundle_corpus, options.bundle_fingerprint_path)
@@ -474,7 +474,7 @@ impl Compilation:
     // Sema out of the Zcu (the root-15 class).
     fn bundle_model(what: &str) -> BundleInterfaceModel:
         let sema = &self.zcu.last_sema
-        let model = bundle_interface_build(sema, self.bundle_corpus, &self.zcu.last_bundle_unlowered_globals)
+        let model = bundle_interface_build(sema, self.bundle_corpus, self.zcu.last_bundle_unlowered_globals)
         for wi in 0..model.warnings.len():
             runtime_eprint("warning: bundle interface: " ++ model.warnings[wi])
         var omitted_fns = 0
@@ -516,7 +516,7 @@ impl Compilation:
         let model = self.bundle_model("--bundle-fingerprint")
         if not model.ok:
             return ""
-        self.write_bundle_fingerprint(&model)
+        self.write_bundle_fingerprint(model)
 
     mut fn compile_bundle_interface_root(wi_path: &str) -> AstPool:
         let wi_text = runtime_read_file(wi_path)
@@ -611,9 +611,9 @@ impl Compilation:
                 self.link_objects.push(with_str_clone_ref(obj_path))
             // The object joins the link explicitly, so on-demand selection
             // must not extract an embedded copy of the same modules.
-            link_stage_add_explicit_bundle_prefixes(&prefixes)
+            link_stage_add_explicit_bundle_prefixes(prefixes)
             var taken_zcu = move self.zcu
-            taken_zcu.add_link_bundle_prefixes(&prefixes)
+            taken_zcu.add_link_bundle_prefixes(prefixes)
             self.zcu = taken_zcu
         true
 
@@ -718,9 +718,9 @@ impl Compilation:
     fn project_config_for_source(source_path: &str) -> ProjectConfig:
         var cfg = self.apply_runtime_config(project_config_load_for_source(source_path))
         for path in self.link_search_paths:
-            cfg.link_search_paths.push(path.clone())
+            cfg.link_search_paths.push(path)
         for path in self.link_rpaths:
-            cfg.link_rpaths.push(path.clone())
+            cfg.link_rpaths.push(path)
         cfg
 
     mut fn set_link_paths(search_paths: &List[str], rpaths: &List[str]):
@@ -855,17 +855,17 @@ impl Compilation:
         let cfg = &taken_zcu.project_config
         out = out ++ "config root=" ++ cfg.root_dir ++ "\n"
         out = out ++ "config package=" ++ cfg.package_name ++ " version=" ++ cfg.package_version ++ "\n"
-        out = out ++ "config c_import_include_paths=" ++ compilation_join_strings(&cfg.c_import_include_paths, ",") ++ "\n"
-        out = out ++ "config c_import_defines=" ++ compilation_join_strings(&cfg.c_import_defines, ",") ++ "\n"
-        out = out ++ "config link_libs=" ++ compilation_join_strings(&cfg.link_libs, ",") ++ "\n"
-        out = out ++ "config link_search_paths=" ++ compilation_join_strings(&cfg.link_search_paths, ",") ++ "\n"
-        out = out ++ "config link_rpaths=" ++ compilation_join_strings(&cfg.link_rpaths, ",") ++ "\n"
-        out = out ++ "config dep_link_libs=" ++ compilation_join_strings(&cfg.dep_link_libs, ",") ++ "\n"
-        out = out ++ "config dep_names=" ++ compilation_join_strings(&cfg.dep_names, ",") ++ "\n"
-        out = out ++ "config dep_constraints=" ++ compilation_join_strings(&cfg.dep_constraints, ",") ++ "\n"
-        out = out ++ "config feature_default=" ++ compilation_join_strings(&cfg.feature_default, ",") ++ "\n"
-        out = out ++ "config feature_names=" ++ compilation_join_strings(&cfg.feature_names, ",") ++ "\n"
-        out = out ++ "config feature_values=" ++ compilation_join_strings(&cfg.feature_values, ",") ++ "\n"
+        out = out ++ "config c_import_include_paths=" ++ compilation_join_strings(cfg.c_import_include_paths, ",") ++ "\n"
+        out = out ++ "config c_import_defines=" ++ compilation_join_strings(cfg.c_import_defines, ",") ++ "\n"
+        out = out ++ "config link_libs=" ++ compilation_join_strings(cfg.link_libs, ",") ++ "\n"
+        out = out ++ "config link_search_paths=" ++ compilation_join_strings(cfg.link_search_paths, ",") ++ "\n"
+        out = out ++ "config link_rpaths=" ++ compilation_join_strings(cfg.link_rpaths, ",") ++ "\n"
+        out = out ++ "config dep_link_libs=" ++ compilation_join_strings(cfg.dep_link_libs, ",") ++ "\n"
+        out = out ++ "config dep_names=" ++ compilation_join_strings(cfg.dep_names, ",") ++ "\n"
+        out = out ++ "config dep_constraints=" ++ compilation_join_strings(cfg.dep_constraints, ",") ++ "\n"
+        out = out ++ "config feature_default=" ++ compilation_join_strings(cfg.feature_default, ",") ++ "\n"
+        out = out ++ "config feature_names=" ++ compilation_join_strings(cfg.feature_names, ",") ++ "\n"
+        out = out ++ "config feature_values=" ++ compilation_join_strings(cfg.feature_values, ",") ++ "\n"
         out = out ++ "config target_default=" ++ cfg.target_default ++ "\n"
         out = out ++ f"config runtime_fiber_stack_size={cfg.runtime_fiber_stack_size}\n"
         out = out ++ f"config runtime_fiber_pool_size={cfg.runtime_fiber_pool_size}\n"
@@ -969,7 +969,7 @@ fn compilation_compiler_hook_call_args(pool: &AstPool, intern: &InternPool, hook
 impl Compilation:
     fn compiler_hook_runner_source(pool: &AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
         let taken_zcu = &self.zcu
-        let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
+        let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
         var out = "use std.compiler\n"
         let imported: HashMap[str, i32] = HashMap.new()
@@ -1038,7 +1038,7 @@ impl Compilation:
             return true
         if not self.config.compiler_hooks_enabled:
             return true
-        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
+        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir else: frontend_dirname(source_path)
         // Hook scratch lives in the system temp dir, never beside the source:
         // rooting it at frontend_dirname scattered pid-stamped runners and
         // dSYM bundles into source test directories (#741). The stamped dir
@@ -1109,7 +1109,7 @@ impl Compilation:
             return AstPool.new()
         if self.compiler_hook_emitted_source.len() == 0:
             return pool.clone()
-        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text.clone() else: runtime_read_file(source_path)
+        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: runtime_read_file(source_path)
         let cfg = move self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
         self.compiler_hook_emitted_source = ""
@@ -1295,7 +1295,7 @@ impl Compilation:
         // holds only declarations — a top-level `let`/`var` alone is a module
         // global (§18.5b, D74) — has none, and the link used to fail with the
         // linker's raw "undefined symbol: _main".
-        if not compilation_defines_main(&self.zcu):
+        if not compilation_defines_main(self.zcu):
             runtime_eprint("error: " ++ source_path ++ " has no `fn main` and no top-level statement to run: a top-level `let`/`var` alone is a module global (§18.5b). Add `fn main`, or a statement for the program to run.")
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
@@ -1319,7 +1319,7 @@ impl Compilation:
         var _sp_dla = move self.zcu.project_config.dep_link_args
         let rpath_args = link_stage_rpath_driver_args(self.zcu.project_config.link_rpaths, target_spec_os())
         for arg in rpath_args:
-            _sp_dla.push(arg.clone())
+            _sp_dla.push(arg)
         var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for
@@ -1340,7 +1340,7 @@ impl Compilation:
     mut fn execute_binary_link_plan(plan: CompilationBinaryLinkPlan) -> str:
         if not plan.ok:
             return ""
-        let bin_path = plan.bin_path.clone()
+        let bin_path = plan.bin_path
         var link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
         self.last_link_command_available = 1
         self.last_link_command = move link_result.command
@@ -1448,12 +1448,12 @@ impl Compilation:
                 compilation_remove_file_best_effort(obj_path)
                 return ""
             if self.bundle_interface_path.len() > 0:
-                interface_sha = self.write_bundle_interface(&model)
+                interface_sha = self.write_bundle_interface(model)
                 if interface_sha.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
             if self.bundle_fingerprint_path.len() > 0:
-                fingerprint = self.write_bundle_fingerprint(&model)
+                fingerprint = self.write_bundle_fingerprint(model)
                 if fingerprint.len() == 0:
                     compilation_remove_file_best_effort(obj_path)
                     return ""
@@ -1466,7 +1466,7 @@ impl Compilation:
     // --emit-bundle-interface; returns the sha256 of its bytes (the
     // manifest's `interface-sha`), "" on refusal.
     fn write_bundle_interface(model: &BundleInterfaceModel) -> str:
-        let rendered = bundle_interface_render(&self.zcu.last_sema, model)
+        let rendered = bundle_interface_render(self.zcu.last_sema, model)
         for ei in 0..rendered.errors.len():
             runtime_eprint("error: " ++ rendered.errors[ei])
         if rendered.errors.len() > 0:
@@ -1807,13 +1807,13 @@ impl Compilation:
         sema.source_text = with_str_clone_ref(taken_zcu.current_source_text)
         // Clone: see run_mir_lower — bare assignments would move these tables
         // out of the Zcu and blank them for later consumers.
-        sema.decl_source_paths = sema_clone_str_list(&taken_zcu.decl_source_paths)
+        sema.decl_source_paths = sema_clone_str_list(taken_zcu.decl_source_paths)
         sema.package_keys = taken_zcu.package_key_map()
-        sema.decl_source_file_ids = sema_clone_i32_list(&taken_zcu.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_list(&taken_zcu.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_list(&taken_zcu.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_list(&taken_zcu.source_text_names)
-        sema.source_texts = sema_clone_str_list(&taken_zcu.source_texts)
+        sema.decl_source_file_ids = sema_clone_i32_list(taken_zcu.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_list(taken_zcu.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_list(taken_zcu.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_list(taken_zcu.source_text_names)
+        sema.source_texts = sema_clone_str_list(taken_zcu.source_texts)
         sema.tool_mode_entry_path = with_str_clone_ref(taken_zcu.tool_mode_entry_path)
         sema.runtime_available = (taken_zcu.project_config.runtime_available) as i32
         sema.runtime_fiber_stack_size = taken_zcu.project_config.runtime_fiber_stack_size
@@ -2020,8 +2020,8 @@ impl Compilation:
         var result = compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
         if result.needs_codegen:
             let backend = self.zcu.analyze_codegen_backend(self.active_pool(active), self.config.opt_level, result.codegen_query)
-            result.report.merge(&backend.report)
-            result.text = compiler_analysis_render(&result.report, inner_request)
+            result.report.merge(backend.report)
+            result.text = compiler_analysis_render(result.report, inner_request)
             if backend.status != 0:
                 result.status = 1
         result
@@ -2057,7 +2057,7 @@ impl Compilation:
             return "MIR lowering produced no bodies"
         let err = validate_ownership_mir_module(self.zcu.last_mir_module)
         if err.len() > 0:
-            return mir_name_fn_syms(err, &self.zcu.pool)
+            return mir_name_fn_syms(err, self.zcu.pool)
         "ok"
 
     mut fn validate_all_file(source_path: &str) -> str:
@@ -2071,7 +2071,7 @@ impl Compilation:
             return "MIR lowering produced no bodies"
         let mir_err = validate_all_mir_module(self.zcu.last_mir_module)
         if mir_err.len() > 0:
-            return mir_name_fn_syms(mir_err, &self.zcu.pool)
+            return mir_name_fn_syms(mir_err, self.zcu.pool)
         "ok"
 
     mut fn dump_async_mir(pool: &AstPool) -> str:
@@ -2128,7 +2128,7 @@ impl Compilation:
             // wants the field valid on this path before any read.
             self.zcu.last_sema = Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new())
             sema.diags = move self.zcu.diagnostics
-            sema.set_tracked_input_context(self.zcu.tracked_input_root(), &self.zcu.tracked_input_paths)
+            sema.set_tracked_input_context(self.zcu.tracked_input_root(), self.zcu.tracked_input_paths)
             // The frontend sema already emitted config warnings; the MIR-phase
             // sema never re-emits them (the fresh path's default is 0 too).
             sema.emit_config_warnings = 0
@@ -2141,13 +2141,13 @@ impl Compilation:
             // Clone like Frontend's seam: a bare assignment moves the table out of
             // the Zcu (single-owner List), and the backend's module-object pruning
             // then sees empty decl paths and emits every imported module's bodies.
-            sema.decl_source_paths = sema_clone_str_list(&self.zcu.decl_source_paths)
+            sema.decl_source_paths = sema_clone_str_list(self.zcu.decl_source_paths)
             sema.package_keys = self.zcu.package_key_map()
-            sema.decl_source_file_ids = sema_clone_i32_list(&self.zcu.decl_source_file_ids)
-            sema.decl_is_c_import = sema_clone_i32_list(&self.zcu.decl_is_c_import)
-            sema.source_text_file_ids = sema_clone_i32_list(&self.zcu.source_text_file_ids)
-            sema.source_text_names = sema_clone_str_list(&self.zcu.source_text_names)
-            sema.source_texts = sema_clone_str_list(&self.zcu.source_texts)
+            sema.decl_source_file_ids = sema_clone_i32_list(self.zcu.decl_source_file_ids)
+            sema.decl_is_c_import = sema_clone_i32_list(self.zcu.decl_is_c_import)
+            sema.source_text_file_ids = sema_clone_i32_list(self.zcu.source_text_file_ids)
+            sema.source_text_names = sema_clone_str_list(self.zcu.source_text_names)
+            sema.source_texts = sema_clone_str_list(self.zcu.source_texts)
             sema.tool_mode_entry_path = with_str_clone_ref(self.zcu.tool_mode_entry_path)
             sema.runtime_available = (self.zcu.project_config.runtime_available) as i32
             sema.runtime_fiber_stack_size = self.zcu.project_config.runtime_fiber_stack_size
@@ -2156,7 +2156,7 @@ impl Compilation:
             sema.copy_warn_threshold = self.zcu.project_config.copy_warn_threshold
             sema.lint_partial_statement_match = (self.zcu.project_config.lint_partial_statement_match) as i32
             sema.overflow_mode = self.zcu.project_config.overflow_mode
-            sema.init_module_graph(&self.zcu.last_resolved)
+            sema.init_module_graph(self.zcu.last_resolved)
             if self.zcu.project_config.no_std or self.config.no_std:
                 sema.no_std = 1
             if self.zcu.project_config.alloc_mode or self.config.alloc_mode:
@@ -2193,9 +2193,9 @@ impl Compilation:
         let mir_mod = move lowered.mir_module
         sema.freeze_symbols()
         sema.freeze_types()
-        let tailrec_syms = collect_tailrec_fn_syms(&sema, active_pool, self.zcu.pool)
+        let tailrec_syms = collect_tailrec_fn_syms(sema, active_pool, self.zcu.pool)
         if tailrec_syms.len() > 0:
-            let tailrec_violations = mir_mod.verify_tailrec_contracts(&sema, active_pool, tailrec_syms)
+            let tailrec_violations = mir_mod.verify_tailrec_contracts(sema, active_pool, tailrec_syms)
             if tailrec_violations.len() > 0:
                 for vi in 0..tailrec_violations.len():
                     let violation = tailrec_violations[vi]
@@ -2224,17 +2224,17 @@ impl Compilation:
         // #782: the callee borrows &sema while diags is moved out — hand it a
         // whole sema (fresh empty slot; it returns the merged list).
         sema.diags = DiagnosticList.init()
-        sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, &sema, move _sp_diags)
+        sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, sema, move _sp_diags)
         if do_profile:
             profile_emit("mir.suspend_check", t_suspend_check, "")
         // D66 (#1652, §16.2b.9): a resource's callback pair is proven
         // compatible along every path here, on the lowered CFG.
-        let pair_report = check_foreign_pairs(mir_mod, active_pool, &sema)
+        let pair_report = check_foreign_pairs(mir_mod, active_pool, sema)
         for fi in 0..pair_report.findings.len():
             let finding = &pair_report.findings[fi]
-            var pair_diag = Diagnostic.err(finding.message.clone(), compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
-            if finding.note.len() > 0: pair_diag.add_note(finding.note.clone())
-            if finding.help.len() > 0: pair_diag.add_help(finding.help.clone())
+            var pair_diag = Diagnostic.err(finding.message, compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
+            if finding.note.len() > 0: pair_diag.add_note(finding.note)
+            if finding.help.len() > 0: pair_diag.add_help(finding.help)
             sema.diags.emit(move pair_diag)
         if pair_report.findings.len() > 0 and pairs_dump_enabled():
             runtime_eprint(f"pair-flow findings={pair_report.findings.len()} diagnostics={sema.diags.count()}")
@@ -2271,7 +2271,7 @@ impl Compilation:
         // #782: same shape as the suspend check above — whole sema borrowed
         // while diags is taken; reinit before the borrow.
         sema.diags = DiagnosticList.init()
-        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, &sema, move _async_diags)
+        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, sema, move _async_diags)
         if do_profile:
             profile_emit("async.lower", t_async, "")
         sema.diags = move async_artifacts.diags

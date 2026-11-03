@@ -653,5 +653,5 @@ fn check_foreign_pairs(mir_mod: &MirModule, ast: &AstPool, sema: &Sema) -> Pairs
     if sema.facade_pair_ops.len() == 0:
         return report
     for bi in 0..mir_mod.bodies.len():
-        report.check_body(ast, sema, &mir_mod.bodies[bi])
+        report.check_body(ast, sema, mir_mod.bodies[bi])
     report

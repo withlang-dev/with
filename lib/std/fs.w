@@ -68,7 +68,7 @@ pub fn read_file(path: &str) -> Result[str, IoError]:
     var status: i32 = 0
     let text = with_fs_read_file_status(path, &raw mut status as *mut i32)
     if status != 0:
-        return Err(.Os(0 - status, path.clone()))
+        return Err(.Os(0 - status, path))
     text
 
 /// Set a file's permission bits (a no-op where the platform has none).

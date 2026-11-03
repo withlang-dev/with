@@ -629,7 +629,7 @@ fn conan_json_array(values: &List[str]) -> str:
 
 fn conan_write_metadata(dest_dir: &str, name: &str, version: &str, recipe_rev: &str, package_id: &str, package_rev: &str, include_paths: &List[str], lib_paths: &List[str], libs: &List[str], defines: &List[str], link_args: &List[str], requires: &List[str]) -> i32:
     let none: List[ConanComponentLink] = List.new()
-    conan_write_metadata_components(dest_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requires, &none)
+    conan_write_metadata_components(dest_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requires, none)
 
 // `components`, when the package has them, are written beside the package's
 // own lists as `libs:<name>`, `lib_paths:<name>`, `link_args:<name>` and
@@ -653,12 +653,12 @@ fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, re
     if runtime_sysinfo_os() == "Windows":
         let wanted = conan_windows_libs_without_import_lib(dest_dir, lib_paths, libs)
         if wanted.len() > 0:
-            let made = windows_import_libs_write(dest_dir ++ "/windows-libs", &wanted)
+            let made = windows_import_libs_write(dest_dir ++ "/windows-libs", wanted)
             if made.problem.len() > 0:
                 runtime_eprint("error: " ++ name ++ "/" ++ version ++ " links Windows DLLs whose import libraries could not be written: " ++ made.problem)
                 return 1
             if made.written.len() > 0: all_lib_paths.push("windows-libs")
-    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(&all_lib_paths) ++ "," ++ nl
+    meta = meta ++ "  " ++ q ++ "lib_paths" ++ q ++ ": " ++ conan_json_array(all_lib_paths) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "libs" ++ q ++ ": " ++ conan_json_array(libs) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "defines" ++ q ++ ": " ++ conan_json_array(defines) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "link_args" ++ q ++ ": " ++ conan_json_array(link_args) ++ "," ++ nl
@@ -667,22 +667,22 @@ fn conan_write_metadata_components(dest_dir: &str, name: &str, version: &str, re
     // Apple SDK, so the stubs are the package's (compiler.FrameworkStubs).
     let frameworks = framework_names_in_link_args(link_args)
     if runtime_sysinfo_os() == "Macos" and frameworks.len() > 0:
-        let problem = framework_stubs_write(dest_dir ++ "/Frameworks", &frameworks)
+        let problem = framework_stubs_write(dest_dir ++ "/Frameworks", frameworks)
         if problem.len() > 0:
             runtime_eprint("error: " ++ name ++ "/" ++ version ++ " links Apple frameworks, and their link stubs could not be written: " ++ problem)
             return 1
         meta = meta ++ "  " ++ q ++ "framework_paths" ++ q ++ ": [" ++ q ++ "Frameworks" ++ q ++ "]," ++ nl
     if components.len() > 0:
         var names: List[str] = List.new()
-        for c in components: names.push(c.name.clone())
-        meta = meta ++ "  " ++ q ++ "components" ++ q ++ ": " ++ conan_json_array(&names) ++ "," ++ nl
+        for c in components: names.push(c.name)
+        meta = meta ++ "  " ++ q ++ "components" ++ q ++ ": " ++ conan_json_array(names) ++ "," ++ nl
         for c in components:
             var paths = c.lib_paths.clone()
             if conan_list_contains(all_lib_paths, "windows-libs"): paths.push("windows-libs")
-            meta = meta ++ "  " ++ q ++ "libs:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.libs) ++ "," ++ nl
-            meta = meta ++ "  " ++ q ++ "lib_paths:" ++ c.name ++ q ++ ": " ++ conan_json_array(&paths) ++ "," ++ nl
-            meta = meta ++ "  " ++ q ++ "link_args:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.link_args) ++ "," ++ nl
-            meta = meta ++ "  " ++ q ++ "requires:" ++ c.name ++ q ++ ": " ++ conan_json_array(&c.requires) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "libs:" ++ c.name ++ q ++ ": " ++ conan_json_array(c.libs) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "lib_paths:" ++ c.name ++ q ++ ": " ++ conan_json_array(paths) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "link_args:" ++ c.name ++ q ++ ": " ++ conan_json_array(c.link_args) ++ "," ++ nl
+            meta = meta ++ "  " ++ q ++ "requires:" ++ c.name ++ q ++ ": " ++ conan_json_array(c.requires) ++ "," ++ nl
     meta = meta ++ "  " ++ q ++ "requires" ++ q ++ ": " ++ conan_json_array(requires) ++ nl
     meta = meta ++ "}" ++ nl
     runtime_write_file(dest_dir ++ "/metadata.json", meta)
@@ -697,7 +697,7 @@ fn conan_windows_libs_without_import_lib(dest_dir: &str, lib_paths: &List[str], 
     if libc_root.len() > 0: dirs.push(libc_root ++ "/" ++ link_stage_windows_arch() ++ "-w64-mingw32/lib")
     let out: List[str] = List.new()
     for lib in libs:
-        if not windows_lib_in_dirs(lib, &dirs): out.push(lib.clone())
+        if not windows_lib_in_dirs(lib, dirs): out.push(lib)
     out
 
 fn conan_library_name_from_path(path: &str) -> str:
@@ -795,7 +795,7 @@ fn conan_binary_recipe_env(info: &str, version: &str, dep_dir: &str) -> RecipeEn
 // and the recipe's own default options.
 fn conan_built_recipe_env(version: &str, dep_dir: &str) -> RecipeEnv:
     let os = conan_detect_os()
-    RecipeEnv { os: os.clone(), arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: List.new(), options_known: false }
+    RecipeEnv { os: os, arch: conan_detect_arch(), compiler: if os == "Macos": "apple-clang" else: "clang", compiler_version: "", build_type: "Release", version: version.to_owned(), package_folder: dep_dir.to_owned(), source_folder: "", options: List.new(), options_known: false }
 
 // One component of a package, as the build links it: `requires` names a
 // sibling component, or `name/version:component` of another package.
@@ -839,21 +839,21 @@ fn conan_component_link(dep_dir: &str, requirements: &List[str], c: &RecipeCompo
     var warnings = warnings0
     var out = ConanComponentLink { name: name.to_owned(), libs: List.new(), lib_paths: List.new(), link_args: List.new(), defines: c.defines.clone(), include_paths: List.new(), requires: List.new() }
     for d in c.libdirs:
-        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.lib_paths.push(d.clone())
+        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.lib_paths.push(d)
     for d in c.includedirs:
-        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.include_paths.push(d.clone())
+        if runtime_is_dir(dep_dir ++ "/" ++ d) != 0: out.include_paths.push(d)
     for lib in c.libs:
-        if not conan_package_has_lib(dep_dir, &c.libdirs, lib):
-            return (out, warnings, "its recipe names the library '" ++ lib ++ "'" ++ (if whole: "" else: " (component '" ++ name ++ "')") ++ ", which the package does not hold in " ++ conan_json_array(&c.libdirs))
-        out.libs.push(lib.clone())
-    for lib in c.system_libs: out.libs.push(lib.clone())
+        if not conan_package_has_lib(dep_dir, c.libdirs, lib):
+            return (out, warnings, "its recipe names the library '" ++ lib ++ "'" ++ (if whole: "" else: " (component '" ++ name ++ "')") ++ ", which the package does not hold in " ++ conan_json_array(c.libdirs))
+        out.libs.push(lib)
+    for lib in c.system_libs: out.libs.push(lib)
     for fw in c.frameworks:
         out.link_args.push("-framework")
-        out.link_args.push(fw.clone())
+        out.link_args.push(fw)
     for flag in c.exelinkflags:
         let args = conan_framework_flag_args(flag)
         if args.len() == 0: warnings.push("link flag '" ++ flag ++ "' is not passed on")
-        for a in args: out.link_args.push(a.clone())
+        for a in args: out.link_args.push(a)
     for r in c.requires:
         let resolved = conan_component_requirement(r, requirements)
         if resolved.len() == 0: warnings.push("'" ++ r ++ "' names a package this one was not resolved against; it is not linked")
@@ -868,13 +868,13 @@ fn conan_package_link(dep_dir: &str, requirements: &List[str], info: &RecipePack
     var out = ConanPackageLink { problem: "", warnings: List.new(), components: List.new() }
     for n in info.notes: out.warnings.push("recipe " ++ n)
     if info.components.len() == 0:
-        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, &info.root, CONAN_WHOLE_COMPONENT(), true, move out.warnings)
+        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, info.root, CONAN_WHOLE_COMPONENT(), true, move out.warnings)
         out.warnings = warnings
         out.problem = problem
         out.components.push(link)
         return out
     for i in 0..info.components.len():
-        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, &info.components[i], info.components[i].name, false, move out.warnings)
+        let (link, warnings, problem) = conan_component_link(dep_dir, requirements, info.components[i], info.components[i].name, false, move out.warnings)
         out.warnings = warnings
         if problem.len() > 0:
             out.problem = problem
@@ -932,7 +932,7 @@ fn conan_pc_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str]) 
                 let args = conan_framework_flag_args(token)
                 if args.len() == 0: out.warnings.push("link flag '" ++ token ++ "' of its pkg-config file is not passed on")
                 else if not conan_list_contains(link.link_args, args[1]):
-                    for a in args: link.link_args.push(a.clone())
+                    for a in args: link.link_args.push(a)
     for req in requirements: link.requires.push(conan_ref_name(req) ++ "/" ++ conan_ref_version(req))
     out.components.push(link)
     out
@@ -1036,7 +1036,7 @@ fn conan_resolve_and_install_requirements(requirements: &List[str], project_root
 fn conan_component_add_links(into0: ConanComponentLink, libs: &List[str], link_args: &List[str]) -> ConanComponentLink:
     var into = into0
     for lib in libs:
-        if not conan_list_contains(into.libs, lib): into.libs.push(lib.clone())
+        if not conan_list_contains(into.libs, lib): into.libs.push(lib)
     var i = 0
     while i + 1 < link_args.len():
         var seen = false
@@ -1045,8 +1045,8 @@ fn conan_component_add_links(into0: ConanComponentLink, libs: &List[str], link_a
             if into.link_args[j + 1] == link_args[i + 1]: seen = true
             j = j + 2
         if not seen:
-            into.link_args.push(link_args[i].clone())
-            into.link_args.push(link_args[i + 1].clone())
+            into.link_args.push(link_args[i])
+            into.link_args.push(link_args[i + 1])
         i = i + 2
     into
 
@@ -1061,40 +1061,40 @@ fn conan_component_add_links(into0: ConanComponentLink, libs: &List[str], link_a
 // its components are the recipe's when the build produced the libraries it
 // names, and the build's otherwise.
 fn conan_built_package_link(dep_dir: &str, requirements: &List[str], pc_texts: &List[str], info: &RecipePackageInfo) -> ConanPackageLink:
-    let recipe_link = if info.ok: conan_package_link(dep_dir, requirements, info) else: ConanPackageLink { problem: info.problem.clone(), warnings: List.new(), components: List.new() }
+    let recipe_link = if info.ok: conan_package_link(dep_dir, requirements, info) else: ConanPackageLink { problem: info.problem, warnings: List.new(), components: List.new() }
     if pc_texts.len() == 0: return recipe_link
     let pc_link = conan_pc_link(dep_dir, requirements, pc_texts)
     if recipe_link.problem.len() == 0:
         // What the pkg-config files add, to every component that links a library.
         var extra_libs: List[str] = List.new()
         for lib in pc_link.components[0].libs:
-            if not conan_package_has_lib(dep_dir, &pc_link.components[0].lib_paths, lib): extra_libs.push(lib.clone())
+            if not conan_package_has_lib(dep_dir, pc_link.components[0].lib_paths, lib): extra_libs.push(lib)
         var out = ConanPackageLink { problem: "", warnings: List.new(), components: List.new() }
-        for w in recipe_link.warnings: out.warnings.push(w.clone())
-        for w in pc_link.warnings: out.warnings.push(w.clone())
+        for w in recipe_link.warnings: out.warnings.push(w)
+        for w in pc_link.warnings: out.warnings.push(w)
         for c in recipe_link.components:
-            var merged = ConanComponentLink { name: c.name.clone(), libs: c.libs.clone(), lib_paths: c.lib_paths.clone(), link_args: c.link_args.clone(), defines: c.defines.clone(), include_paths: c.include_paths.clone(), requires: c.requires.clone() }
-            if c.libs.len() > 0: merged = conan_component_add_links(move merged, &extra_libs, &pc_link.components[0].link_args)
+            var merged = ConanComponentLink { name: c.name, libs: c.libs.clone(), lib_paths: c.lib_paths.clone(), link_args: c.link_args.clone(), defines: c.defines.clone(), include_paths: c.include_paths.clone(), requires: c.requires.clone() }
+            if c.libs.len() > 0: merged = conan_component_add_links(move merged, extra_libs, pc_link.components[0].link_args)
             out.components.push(merged)
         return out
     // The build did not produce the libraries the recipe names: the build's
     // own files say what it produced, and the recipe's system libraries and
     // frameworks are added to them.
     var out = ConanPackageLink { problem: "", warnings: List.new(), components: List.new() }
-    for w in pc_link.warnings: out.warnings.push(w.clone())
-    var whole = ConanComponentLink { name: pc_link.components[0].name.clone(), libs: pc_link.components[0].libs.clone(), lib_paths: pc_link.components[0].lib_paths.clone(), link_args: pc_link.components[0].link_args.clone(), defines: pc_link.components[0].defines.clone(), include_paths: pc_link.components[0].include_paths.clone(), requires: pc_link.components[0].requires.clone() }
+    for w in pc_link.warnings: out.warnings.push(w)
+    var whole = ConanComponentLink { name: pc_link.components[0].name, libs: pc_link.components[0].libs.clone(), lib_paths: pc_link.components[0].lib_paths.clone(), link_args: pc_link.components[0].link_args.clone(), defines: pc_link.components[0].defines.clone(), include_paths: pc_link.components[0].include_paths.clone(), requires: pc_link.components[0].requires.clone() }
     if info.ok:
         var frameworks: List[str] = List.new()
         for fw in info.root.frameworks:
             frameworks.push("-framework")
-            frameworks.push(fw.clone())
-        whole = conan_component_add_links(move whole, &info.root.system_libs, &frameworks)
+            frameworks.push(fw)
+        whole = conan_component_add_links(move whole, info.root.system_libs, frameworks)
         for c in info.components:
             var component_frameworks: List[str] = List.new()
             for fw in c.frameworks:
                 component_frameworks.push("-framework")
-                component_frameworks.push(fw.clone())
-            whole = conan_component_add_links(move whole, &c.system_libs, &component_frameworks)
+                component_frameworks.push(fw)
+            whole = conan_component_add_links(move whole, c.system_libs, component_frameworks)
         for n in info.notes: out.warnings.push("recipe " ++ n)
     out.components.push(whole)
     out
@@ -1113,7 +1113,7 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
     if not info.ok and pc.len() == 0:
         runtime_eprint("error: " ++ name ++ "/" ++ version ++ ": " ++ info.problem)
         return 1
-    let link = if built: conan_built_package_link(dep_dir, requirements, &pc, &info) else: conan_package_link(dep_dir, requirements, &info)
+    let link = if built: conan_built_package_link(dep_dir, requirements, pc, info) else: conan_package_link(dep_dir, requirements, info)
     if link.problem.len() > 0:
         runtime_eprint("error: " ++ name ++ "/" ++ version ++ " cannot be linked: " ++ link.problem)
         return 1
@@ -1126,13 +1126,13 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
     var link_args: List[str] = List.new()
     for c in link.components:
         for p in c.include_paths:
-            if not conan_list_contains(include_paths, p): include_paths.push(p.clone())
+            if not conan_list_contains(include_paths, p): include_paths.push(p)
         for p in c.lib_paths:
-            if not conan_list_contains(lib_paths, p): lib_paths.push(p.clone())
+            if not conan_list_contains(lib_paths, p): lib_paths.push(p)
         for l in c.libs:
-            if not conan_list_contains(libs, l): libs.push(l.clone())
+            if not conan_list_contains(libs, l): libs.push(l)
         for d in c.defines:
-            if not conan_list_contains(defines, d): defines.push(d.clone())
+            if not conan_list_contains(defines, d): defines.push(d)
         var i = 0
         while i + 1 < c.link_args.len():
             // Flag and name travel together: `-framework X`.
@@ -1142,10 +1142,10 @@ fn conan_write_binary_metadata(name: &str, version: &str, recipe_rev: &str, pack
                 if link_args[j + 1] == c.link_args[i + 1]: seen = true
                 j = j + 2
             if not seen:
-                link_args.push(c.link_args[i].clone())
-                link_args.push(c.link_args[i + 1].clone())
+                link_args.push(c.link_args[i])
+                link_args.push(c.link_args[i + 1])
             i = i + 2
-    conan_write_metadata_components(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requirements, &link.components)
+    conan_write_metadata_components(dep_dir, name, version, recipe_rev, package_id, package_rev, include_paths, lib_paths, libs, defines, link_args, requirements, link.components)
 
 // On Windows every C package is built from source with the SDK's toolchain
 // (#1915; Eric, 2026-09-30: "with get builds packages from source in
@@ -1189,7 +1189,7 @@ fn conan_restore_locked_binary_package(name: &str, version: &str, recipe_rev: &s
         return false
     let requirements = conan_parse_requires_from_info(info)
     let restored_env = conan_binary_recipe_env(info, version, dep_dir)
-    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements, &restored_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
+    if conan_write_binary_metadata(name, version, recipe_rev, package_id, package_rev, dep_dir, requirements, restored_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return false
@@ -1233,7 +1233,7 @@ fn conan_install_binary(name: &str, version: &str, recipe_rev: &str, project_roo
         let _remove = runtime_remove_tree(dep_dir)
         return ""
     let binary_env = conan_binary_recipe_env(info, version, dep_dir)
-    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements, &binary_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
+    if conan_write_binary_metadata(name, version, recipe_rev, pick.package_id, package_rev, dep_dir, resolved_requirements, binary_env, conan_fetch_recipe_revision_text(name, version, recipe_rev), false) != 0:
         runtime_eprint("error: failed to write metadata for " ++ name ++ "/" ++ version)
         let _remove = runtime_remove_tree(dep_dir)
         return ""
@@ -1495,7 +1495,7 @@ fn conan_cmake_collect(project_root: &str, reference: &str, set: ConanCMakeLinkS
     var lib_dirs: List[str] = List.new()
     for lib_path in project_config_json_str_array(meta, "lib_paths"): lib_dirs.push(dep_dir ++ "/" ++ lib_path)
     for lib in project_config_json_str_array(meta, "libs"):
-        let file = conan_cmake_library_file(&lib_dirs, lib)
+        let file = conan_cmake_library_file(lib_dirs, lib)
         if file.len() > 0:
             out.libraries = conan_cmake_push_unique(move out.libraries, file)
         else:
@@ -1559,23 +1559,23 @@ fn conan_write_cmake_package_config(project_root: &str, reference: &str, cmake_d
     if target_name.len() == 0: target_name = name ++ "::" ++ name
     let empty = ConanCMakeLinkSet { visited: List.new(), includes: List.new(), defines: List.new(), libraries: List.new(), options: List.new(), problem: "" }
     let set = conan_cmake_collect(project_root, reference, empty, 0)
-    if set.problem.len() > 0: return ConanCMakeConfig { define: "", problem: set.problem.clone() }
+    if set.problem.len() > 0: return ConanCMakeConfig { define: "", problem: set.problem }
     for list in [&set.includes, &set.defines, &set.libraries, &set.options]:
         let problem = conan_cmake_list_problem(list)
         if problem.len() > 0: return ConanCMakeConfig { define: "", problem: reference ++ ": " ++ problem }
     let dir = cmake_deps_dir ++ "/" ++ file_name
     if runtime_mkdir_p(dir) != 0: return ConanCMakeConfig { define: "", problem: "could not create " ++ dir }
-    let target = conan_cmake_element(&target_name)
+    let target = conan_cmake_element(target_name)
     var config = "# Written by `with get` from " ++ reference ++ "'s package metadata: what Conan's CMakeDeps writes at install time (#1900).\n"
     config = config ++ "if(NOT TARGET " ++ target ++ ")\n"
     config = config ++ "  add_library(" ++ target ++ " INTERFACE IMPORTED)\n"
     config = config ++ "  set_target_properties(" ++ target ++ " PROPERTIES\n"
-    config = config ++ "    INTERFACE_INCLUDE_DIRECTORIES \"" ++ conan_cmake_list(&set.includes) ++ "\"\n"
-    config = config ++ "    INTERFACE_COMPILE_DEFINITIONS \"" ++ conan_cmake_list(&set.defines) ++ "\"\n"
-    config = config ++ "    INTERFACE_LINK_LIBRARIES \"" ++ conan_cmake_list(&set.libraries) ++ "\"\n"
-    config = config ++ "    INTERFACE_LINK_OPTIONS \"" ++ conan_cmake_list(&set.options) ++ "\")\n"
+    config = config ++ "    INTERFACE_INCLUDE_DIRECTORIES \"" ++ conan_cmake_list(set.includes) ++ "\"\n"
+    config = config ++ "    INTERFACE_COMPILE_DEFINITIONS \"" ++ conan_cmake_list(set.defines) ++ "\"\n"
+    config = config ++ "    INTERFACE_LINK_LIBRARIES \"" ++ conan_cmake_list(set.libraries) ++ "\"\n"
+    config = config ++ "    INTERFACE_LINK_OPTIONS \"" ++ conan_cmake_list(set.options) ++ "\")\n"
     config = config ++ "endif()\n"
-    config = config ++ "set(" ++ file_name ++ "_INCLUDE_DIRS \"" ++ conan_cmake_list(&set.includes) ++ "\")\n"
+    config = config ++ "set(" ++ file_name ++ "_INCLUDE_DIRS \"" ++ conan_cmake_list(set.includes) ++ "\")\n"
     config = config ++ "set(" ++ file_name ++ "_LIBRARIES " ++ target ++ ")\n"
     if runtime_write_file(dir ++ "/" ++ file_name ++ "Config.cmake", config) != 0:
         return ConanCMakeConfig { define: "", problem: "could not write " ++ dir ++ "/" ++ file_name ++ "Config.cmake" }
@@ -1586,7 +1586,7 @@ fn conan_write_cmake_package_config(project_root: &str, reference: &str, cmake_d
         if dot > 0: major = version.slice(0, dot)
         var check = "set(PACKAGE_VERSION \"" ++ conan_cmake_element(version) ++ "\")\n"
         check = check ++ "if(PACKAGE_FIND_VERSION VERSION_GREATER PACKAGE_VERSION)\n  set(PACKAGE_VERSION_COMPATIBLE FALSE)\n"
-        check = check ++ "elseif(PACKAGE_FIND_VERSION_MAJOR STREQUAL \"" ++ conan_cmake_element(&major) ++ "\")\n  set(PACKAGE_VERSION_COMPATIBLE TRUE)\n"
+        check = check ++ "elseif(PACKAGE_FIND_VERSION_MAJOR STREQUAL \"" ++ conan_cmake_element(major) ++ "\")\n  set(PACKAGE_VERSION_COMPATIBLE TRUE)\n"
         check = check ++ "  if(PACKAGE_FIND_VERSION STREQUAL PACKAGE_VERSION)\n    set(PACKAGE_VERSION_EXACT TRUE)\n  endif()\n"
         check = check ++ "else()\n  set(PACKAGE_VERSION_COMPATIBLE FALSE)\nendif()\n"
         if runtime_write_file(dir ++ "/" ++ file_name ++ "ConfigVersion.cmake", check) != 0:
@@ -1651,7 +1651,7 @@ fn conan_fetch_source_tree(name: &str, version: &str, fetched: &ConanFetchedReci
         return ConanSourceTree { source_dir: "", problem: "could not create " ++ work }
     runtime_eprint("  downloading " ++ fetched.source.urls[0])
     let picked = conan_pick_archive(fetched.source, work, conan_archive_download, conan_archive_digest)
-    let archive = picked.path.clone()
+    let archive = picked.path
     if archive.len() == 0: return ConanSourceTree { source_dir: "", problem: "no source archive of " ++ name ++ "/" ++ version ++ " could be used:" ++ picked.tried }
     if conan_extract_any(archive, raw_dir):
         return ConanSourceTree { source_dir: "", problem: "could not extract " ++ conan_path_basename(archive) ++ " (it needs `tar`" ++ (if archive.ends_with(".zip"): " with zip support, or `unzip`" else: if archive.ends_with(".xz"): " and `xz`" else: "") ++ ")" }
@@ -2063,7 +2063,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     if conan_run_tool(install, 300000) != 0:
         return conan_source_fail(dep_dir, name ++ "/" ++ version ++ " did not build (the compiler's output is above" ++ (if build_rc != 0: "; the build step failed" else: "") ++ ")")
     let package_env = conan_built_recipe_env(version, dep_dir)
-    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, &package_env, recipe, true) != 0:
+    if conan_write_binary_metadata(name, version, "built", "built", source.sha256, dep_dir, resolved, package_env, recipe, true) != 0:
         return conan_source_fail(dep_dir, "could not write metadata for " ++ name ++ "/" ++ version)
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     // D121 step 5: the facade, from the build that just ran.
@@ -2078,7 +2078,7 @@ fn conan_restore_locked_source(name: &str, version: &str, sha256: &str, project_
     let folder = conan_recipe_folder(name, version)
     let data = if folder.len() > 0: conan_http_get(conan_recipe_file_url(name, folder, "conandata.yml")) else: ""
     let pinned = conan_data_source(data, version)
-    let now = pinned.sha256.clone()
+    let now = pinned.sha256
     if now != sha256:
         runtime_eprint("error: the lock pins c." ++ name ++ "@" ++ version ++ " to source sha256 " ++ sha256 ++ "; the recipe now says " ++ (if now.len() == 0: "nothing for that version" else: now))
         return false

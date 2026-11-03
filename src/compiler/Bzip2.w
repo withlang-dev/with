@@ -195,7 +195,7 @@ fn bzip2_decompress(data: &str) -> List[str]:
                         if bits.bit() == 0: break
                         len = if bits.bit() == 0: len + 1 else: len - 1
                     lengths.push(len)
-                tables.push(bz_huffman(&lengths))
+                tables.push(bz_huffman(lengths))
             // The MTF/RLE2 symbols into the BWT vector `tt`.
             let mtf: List[i32] = List.new()
             for i in 0i32..256: mtf.push(i)
@@ -216,7 +216,7 @@ fn bzip2_decompress(data: &str) -> List[str]:
                     group_left = 50
                     group_index = group_index + 1
                 group_left = group_left - 1
-                let symbol = bits.symbol(&tables[selectors[group_index - 1]])
+                let symbol = bits.symbol(tables[selectors[group_index - 1]])
                 if bits.problem.len() > 0:
                     result.push("")
                     result.push(bits.problem)
@@ -294,6 +294,6 @@ fn bzip2_decompress(data: &str) -> List[str]:
                 return result
             combined = (((combined << 1) | (combined >> 31)) & BZ_MASK32) ^ crc
         streams = streams + 1
-    result.push(bz_bytes_to_str(&out))
+    result.push(bz_bytes_to_str(out))
     result.push("")
     result

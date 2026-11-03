@@ -289,7 +289,7 @@ fn build_graph_run_test_files_pool(root: &str, target: &BuildGraphTarget, compil
     // Persist the passing set even when the target is red (compaction:
     // the file is rewritten with exactly the keys proven this run plus
     // the still-valid cached ones).
-    build_cache_write_test_verdicts(root, compiler_fp, target.name, &pass_keys, &pass_paths)
+    build_cache_write_test_verdicts(root, compiler_fp, target.name, pass_keys, pass_paths)
 
     if failed_paths.len() > 0:
         build_graph_rt_eprint(f"error: test target '{target.name}': {failed_paths.len()} of {test_files.len()} files failed ({cached_count} cached, {run_files.len()} ran):")
