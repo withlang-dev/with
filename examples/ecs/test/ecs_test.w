@@ -6,17 +6,16 @@ type Vec2 {
     y: f64,
 }
 
-fn Vec2.new(x: f64, y: f64) -> Vec2: Vec2 { x, y }
+fn Vec2.new(x: f64, y: f64): Vec2 { x, y }
 
-fn Vec2.zero -> Vec2: Vec2 { x: 0.0, y: 0.0 }
+fn Vec2.zero: Vec2 { x: 0.0, y: 0.0 }
 
 extend Vec2:
-    fn add(self: &Self, other: Vec2) -> Vec2:
-        Vec2 { x: self.x + other.x, y: self.y + other.y }
+    fn add(other: Vec2): Vec2 { x: self.x + other.x, y: self.y + other.y }
 
-    fn scale(self: &Self, s: f64) -> Vec2: Vec2 { x: self.x * s, y: self.y * s }
+    fn scale(s: f64): Vec2 { x: self.x * s, y: self.y * s }
 
-    fn length_sq(self: &Self) -> f64: self.x * self.x + self.y * self.y
+    fn length_sq(): self.x * self.x + self.y * self.y
 
 type Transform {
     x: f64,
@@ -42,14 +41,13 @@ type Entity {
     generation: i32,
 }
 
-fn make_entity(id: i32) -> Entity: Entity { id, generation: 1 }
+fn make_entity(id: i32): Entity { id, generation: 1 }
 
-fn make_transform(x: f64, y: f64) -> Transform:
-    Transform { x, y, rotation: 0.0, scale_val: 1.0 }
+fn make_transform(x: f64, y: f64): Transform { x, y, rotation: 0.0, scale_val: 1.0 }
 
-fn make_velocity(vx: f64, vy: f64) -> Velocity: Velocity { vx, vy, angular: 0.0 }
+fn make_velocity(vx: f64, vy: f64): Velocity { vx, vy, angular: 0.0 }
 
-fn apply_velocity(t: &Transform, v: &Velocity, dt: f64) -> Transform:
+fn apply_velocity(t: &Transform, v: &Velocity, dt: f64):
     Transform {
         x: t.x + v.vx * dt,
         y: t.y + v.vy * dt,
@@ -57,7 +55,7 @@ fn apply_velocity(t: &Transform, v: &Velocity, dt: f64) -> Transform:
         scale_val: t.scale_val,
     }
 
-fn check_collision(t1: &Transform, c1: &Collider, t2: &Transform, c2: &Collider) -> bool:
+fn check_collision(t1: &Transform, c1: &Collider, t2: &Transform, c2: &Collider):
     let dx = t1.x - t2.x
     let dy = t1.y - t2.y
     let dist_sq = dx * dx + dy * dy
@@ -72,12 +70,12 @@ fn clamp[T](val: T, lo: T, hi: T) -> T: min(max(val, lo), hi)
 
 enum InputDir { Idle | Up | Down | Left | Right }
 
-fn dir_to_velocity(dir: InputDir, speed: f64) -> Velocity:
+fn dir_to_velocity(dir: InputDir, speed: f64):
     match dir:
         Idle => make_velocity(0.0, 0.0)
-        Up => make_velocity(0.0, 0.0 - speed)
+        Up => make_velocity(0.0, -speed)
         Down => make_velocity(0.0, speed)
-        Left => make_velocity(0.0 - speed, 0.0)
+        Left => make_velocity(-speed, 0.0)
         Right => make_velocity(speed, 0.0)
 
 @[test]

@@ -102,10 +102,7 @@ fn run_collision(
     var events = List.new()
 
     // Gather entities that have both Transform and Collider.
-    var candidates = List.new()
-    for eid in colliders.dense_entities:
-        if transforms.contains(Entity.new(eid)):
-            candidates.push(eid)
+    let candidates = [eid for eid in colliders.dense_entities if transforms.contains(Entity.new(eid))]
 
     // O(n^2) broad phase -- sufficient for small entity counts.
     for i in 0..candidates.len():
@@ -128,7 +125,7 @@ fn run_collision(
             let half_b = Vec2.new(col_b.radius, col_b.radius)
             let bounds_b = AABB.from_center(tf_b.position, half_b)
 
-            if bounds_a.overlaps(&bounds_b):
+            if bounds_a.overlaps(bounds_b):
                 let dist = Vec2.distance(tf_a.position, tf_b.position)
                 let min_dist = col_a.radius + col_b.radius
                 if dist < min_dist:
@@ -191,12 +188,8 @@ fn run_render(
 
 fn run_collision_response(world: &World):
     for event in world.collision_events:
-        let name_a = match world.entity_name(event.entity_a):
-            Some(name) => f"{name}"
-            None => "?"
-        let name_b = match world.entity_name(event.entity_b):
-            Some(name) => f"{name}"
-            None => "?"
+        let name_a = world.entity_name(event.entity_a) ?? "?"
+        let name_b = world.entity_name(event.entity_b) ?? "?"
         print(f"  Collision: {name_a} <-> {name_b} (overlap: {event.overlap})")
 
 // ===================================================================
@@ -216,10 +209,10 @@ extend World:
         self.run_movement()
 
         // Phase 3: Collision detection (reads transforms, colliders)
-        self.collision_events = run_collision(&self.transforms, &self.colliders)
+        self.collision_events = run_collision(self.transforms, self.colliders)
 
         // Phase 4: Render
-        run_render(&self.transforms, &self.sprites)
+        run_render(self.transforms, self.sprites)
 
         // Phase 5: Collision response + cleanup
         run_collision_response(self)

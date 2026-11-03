@@ -19,12 +19,7 @@ pub type DenseStorage[T] {
     sparse: HashMap[i32, i64],
 }
 
-pub fn DenseStorage.new[T]() -> DenseStorage[T]:
-    DenseStorage {
-        dense_entities: List.new(),
-        dense_data: List.new(),
-        sparse: HashMap.new(),
-    }
+pub fn DenseStorage.new[T]() -> DenseStorage[T]: DenseStorage { dense_entities: [], dense_data: [], sparse: HashMap.new() }
 
 extend[T] DenseStorage[T]:
     // `-> Unit` is the answer D43 asks for: the tail `if`'s arms are an
@@ -55,9 +50,9 @@ extend[T] DenseStorage[T]:
             self.sparse.insert(eid, i)
         Some(self.dense_data.remove(idx))
 
-    pub fn contains(entity: Entity) -> bool: entity.id in self.sparse
+    pub fn contains(entity: Entity): entity.id in self.sparse
 
-    pub fn len() -> i64: self.dense_data.len()
+    pub fn len(): self.dense_data.len()
 
     pub mut fn clear():
         self.dense_entities.clear()
