@@ -659,7 +659,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         fact.body_sym = if fact.owner >= 0 and fact.owner < sema.sig_names.len(): sema.sig_names[fact.owner] else: 0
         fact.symbol = sema.global_write_records[(at + 1)]
         fact.flags = sema.global_write_records[(at + 4)]
-        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.name = sema.pool_resolve(fact.symbol)
         fact.detail = f"write body={sema.global_effect_body_name(fact.owner)} body-id={fact.owner} kind={fact.flags}"
         report.add(analysis_global_location(move fact, sema, sema.global_write_records[(at + 2)], source_path, source_text))
     for ci in 0..sema.global_calls.len() / 8:
@@ -689,7 +689,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         fact.symbol = sema.global_view_call_checks[(at + 1)]
         fact.owner = sema.global_view_call_checks[(at + 2)]
         fact.flags = sema.global_view_call_checks[(at + 5)]
-        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.name = sema.pool_resolve(fact.symbol)
         fact.detail = f"live-view call={fact.parent} view={sema.pool_resolve(fact.owner)} last-use={sema.global_view_call_checks[(at + 4)]}"
         report.add(analysis_global_location(move fact, sema, sema.global_view_call_checks[(at + 3)], source_path, source_text))
     for di in 0..sema.global_drop_impl_targets.len() / 3:
@@ -701,7 +701,7 @@ fn analysis_collect_global_effects(mut report: AnalysisReport, sema: &Sema, sour
         fact.parent = sema.global_drop_impl_targets[at]
         fact.type_id = sema.global_drop_impl_targets[(at + 2)]
         fact.symbol = sema.ast.get_data0(decl)
-        fact.name = sema.pool_resolve(fact.symbol).clone()
+        fact.name = sema.pool_resolve(fact.symbol)
         fact.detail = f"drop-target dyn={sema.type_name(fact.parent)} target-type={sema.type_name(fact.type_id)} lookup-context={sema.global_drop_impl_contexts[di]} branch=" ++ (if fact.type_id > 0: "enqueue-target" else: "skip-target")
         report.add(analysis_global_location(move fact, sema, decl, source_path, source_text))
     for tid in 1..sema.type_kinds.len() as i32:
@@ -842,7 +842,7 @@ fn analysis_collect_diagnostics(mut report: AnalysisReport, sema: &Sema, diagnos
         fact.source_file = diag.primary.file
         fact.start = diag.primary.start
         fact.end = diag.primary.end
-        fact.name = if diag.code.len() > 0: diag.code.clone() else: diag.message.clone()
+        fact.name = if diag.code.len() > 0: diag.code else: diag.message
         var subject = ""
         for si in 0..sema.source_text_file_ids.len():
             if sema.source_text_file_ids[si] == diag.primary.file:
@@ -857,7 +857,7 @@ fn analysis_collect_diagnostics(mut report: AnalysisReport, sema: &Sema, diagnos
         if subject_source.len() > 0:
             fact.line = analysis_line_for_offset(subject_source, diag.primary.start)
             fact.column = analysis_column_for_offset(subject_source, diag.primary.start)
-        fact.path = if subject.len() > 0: subject else: diag.origin_file.clone()
+        fact.path = if subject.len() > 0: subject else: diag.origin_file
         let node_file = sema.ast.file(diag.origin_node as NodeId) as i32
         fact.detail = diag.origin_fn ++ ": " ++ diag.message ++ f" subject-file={diag.primary.file} origin-node-file={node_file} emitter={diag.origin_file}:{diag.origin_line}"
         for li in 0..diag.labels.len():
@@ -2485,7 +2485,7 @@ fn analysis_symbol_name(report: &AnalysisReport, sym: i32) -> str:
     for i in 0..report.facts.len():
         let fact = report.facts[i]
         if fact.symbol == sym and (fact.kind == AnalysisFactKind.Signature or fact.kind == AnalysisFactKind.Body or fact.kind == AnalysisFactKind.Declaration):
-            return fact.name.clone()
+            return fact.name
     f"sym{sym}"
 
 fn analysis_find_symbol(report: &AnalysisReport, name: &str) -> i32:

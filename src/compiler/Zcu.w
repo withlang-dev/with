@@ -288,7 +288,7 @@ impl Zcu:
     fn package_key_map() -> HashMap[str, str]:
         var out = HashMap[str, str].new()
         for path in self.decl_source_paths:
-            if not out.contains(path): out.insert(path.clone(), zcu_package_key(path))
+            if not out.contains(path): out.insert(path, zcu_package_key(path))
         out
 
     mut fn append_decl_source_paths(count: i32, path: &str, file_id: i32) -> Unit:
@@ -314,7 +314,7 @@ impl Zcu:
     fn decl_source_path_frontend(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[decl_index])
-        self.current_source_path.clone()
+        self.current_source_path
 
     fn decl_source_file_id_frontend(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len():
@@ -324,7 +324,7 @@ impl Zcu:
     fn decl_source_dir_frontend(decl_index: i32) -> str:
         let path = self.decl_source_path_frontend(decl_index)
         if path.len() == 0:
-            return self.source_dir.clone()
+            return self.source_dir
         resolve_dirname(path)
 
     fn c_import_cache_lookup(key: &str) -> str:
@@ -469,8 +469,8 @@ impl Zcu:
 
     fn tracked_input_root() -> str:
         if self.project_config.root_dir.len() > 0:
-            return self.project_config.root_dir.clone()
-        self.source_dir.clone()
+            return self.project_config.root_dir
+        self.source_dir
 
     fn configure_tracked_input_sema(sema: Sema) -> Sema:
         sema.set_tracked_input_context(self.tracked_input_root(), &self.tracked_input_paths)
@@ -649,7 +649,7 @@ fn zcu_package_key(path: &str) -> str:
     var dir = zcu_parent_dir(path)
     while true:
         let manifest = if dir.len() == 0: "with.toml" else: dir ++ "/with.toml"
-        if resolve_file_exists(manifest): return if dir.len() == 0: "." else: dir.clone()
+        if resolve_file_exists(manifest): return if dir.len() == 0: "." else: dir
         if dir.len() == 0 or dir == "/": break
         dir = zcu_parent_dir(dir)
     "<program>"

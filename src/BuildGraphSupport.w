@@ -247,8 +247,8 @@ fn build_graph_path_under_root(root: &str, path: &str) -> str:
         norm_root = norm_root.slice(0, norm_root.len() - 1)
     let norm_path = resolve_normalize_path(path)
     let fold = runtime_sysinfo_os() == "Windows"
-    let cmp_root = if fold: norm_root.to_lower() else: norm_root.clone()
-    let cmp_path = if fold: norm_path.to_lower() else: norm_path.clone()
+    let cmp_root = if fold: norm_root.to_lower() else: norm_root
+    let cmp_path = if fold: norm_path.to_lower() else: norm_path
     if cmp_path == cmp_root:
         return "."
     if cmp_path.starts_with(cmp_root ++ "/"):

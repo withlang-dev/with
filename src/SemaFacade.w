@@ -320,7 +320,7 @@ impl Sema:
         let rname: str = self.pool_resolve(self.facade_resources[ri].name)
         var names: List[str] = List.new()
         var roles: List[str] = List.new()
-        names.push(rname.clone())
+        names.push(rname)
         roles.push(if self.facade_resources[ri].handle != 0: "the handle type" else: "the resource type")
         if self.facade_projects_status(ri):
             let cn = self.facade_ok_text(ri)
@@ -2331,7 +2331,7 @@ impl Sema:
             if recv0.len() > 1:
                 continue
             let presented = self.facade_presented_free_name(ci)
-            let base = if self.foreign_contracts[ci].rename != 0: presented.clone() else: facade_render_bridge_name(fname)
+            let base = if self.foreign_contracts[ci].rename != 0: presented else: facade_render_bridge_name(fname)
             let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
             let rendered_file = "<facade " ++ facade_name ++ ">"
             for k in 0..case_count:
@@ -2471,7 +2471,7 @@ impl Sema:
         let p = self.foreign_contracts[ci].variadic_selector
         if arg_count <= p or self.ast.has_call_named_args(node):
             return fn_sym
-        let base = if self.foreign_contracts[ci].rename != 0: name.clone() else: facade_render_bridge_name(name)
+        let base = if self.foreign_contracts[ci].rename != 0: name else: facade_render_bridge_name(name)
         let target = self.facade_variadic_pick(ci, base, self.ast.get_extra(extra_start + p), node)
         if target == 0:
             return 0
@@ -2897,7 +2897,7 @@ impl Sema:
                     if noted[k] == short: seen = true
                 if seen:
                     continue
-                noted.push(short.clone())
+                noted.push(short)
                 let ci = self.facade_contract_named(cname)
                 let node = if ci >= 0: self.foreign_contracts[ci].node else: rnode
                 let decl: i32 = if ci >= 0: self.foreign_contracts[ci].decl else: self.facade_resources[ri].decl
@@ -3180,7 +3180,7 @@ impl Sema:
             return
         // A free operation passed every check: its rendering must exist, or
         // the presented call would silently be the raw one.
-        let rendered_name = if self.foreign_contracts[ci].rename != 0: presented_name.clone() else: facade_render_bridge_name(fname)
+        let rendered_name = if self.foreign_contracts[ci].rename != 0: presented_name else: facade_render_bridge_name(fname)
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) == NodeKind.NK_FN_DECL and self.safe_symbol_text(self.ast.get_data0(decl)) == rendered_name and self.facade_decl_file_name(di) == rendered_file:
@@ -3752,8 +3752,8 @@ impl Sema:
                 if (self.foreign_contracts[cj].returns_borrow_parent != 0) != (parent != 0):
                     let ofn: str = self.pool_resolve(self.foreign_contracts[cj].fn_sym)
                     let bn = facade_render_borrowed_name(rn)
-                    let pf = if parent != 0: fname.clone() else: ofn.clone()
-                    let cf = if parent != 0: ofn.clone() else: fname.clone()
+                    let pf = if parent != 0: fname else: ofn
+                    let cf = if parent != 0: ofn else: fname
                     self.emit_error(f"fn '{pf}' borrows '{rn}' as the parent of its argument and fn '{cf}' from its argument ('from param'); '{bn}' is one type with one origin rule, and a borrowed value under both is not ruled (§16.2b.6)", node)
                     clash = true
                     break
@@ -3882,7 +3882,7 @@ impl Sema:
             if recv0.len() > 1:
                 return
             let presented = self.facade_presented_free_name(ci)
-            let rendered_name = if self.foreign_contracts[ci].rename != 0: presented.clone() else: facade_render_bridge_name(fname)
+            let rendered_name = if self.foreign_contracts[ci].rename != 0: presented else: facade_render_bridge_name(fname)
             let facade_name: str = self.pool_resolve(self.foreign_contracts[ci].facade)
             let rendered_file = "<facade " ++ facade_name ++ ">"
             let missing = f"fn '{fname}': 'returns borrow {rn}' passed every facade check but no '{rendered_name}' was rendered — a compiler defect (§16.2b.6)"
@@ -3906,7 +3906,7 @@ impl Sema:
         let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
         let mname = self.facade_presented(recv0[0], fname)
         let hosts: List[str] = List.new()
-        hosts.push(host.clone())
+        hosts.push(host)
         hosts.push(facade_render_borrowed_name(host))
         if self.foreign_contracts[ci].valid_on_failed != 0:
             hosts.push(facade_render_failed_name(host))
@@ -3981,7 +3981,7 @@ impl Sema:
         let host: str = self.pool_resolve(self.facade_resources[recv0[0]].name)
         let mname = self.facade_presented(recv0[0], fname)
         let hosts: List[str] = List.new()
-        hosts.push(host.clone())
+        hosts.push(host)
         hosts.push(facade_render_borrowed_name(host))
         // `valid on failed`: the same view on the failed state (#1612).
         if self.foreign_contracts[ci].valid_on_failed != 0:
@@ -4160,7 +4160,7 @@ impl Sema:
             for k in 0..self.foreign_contracts[ci].variadic_case_syms.len():
                 hosts.push(host ++ "." ++ self.facade_variadic_case_name(mname, ci, k as i32))
             for hi in 0..hosts.len():
-                let htext = hosts[hi].clone()
+                let htext = hosts[hi]
                 if self.sig_text_index.contains(htext):
                     self.facade_add_call_effect(self.sig_text_index.get(htext).unwrap(), fn_sym, ci, self.facade_presented_touch_mask(fn_sym, ci), &domains, borrow, -1)
                 else if hi == 1:
@@ -4182,9 +4182,9 @@ impl Sema:
             let bridge: str = self.facade_bridge_of.get(fname).unwrap()
             names.push(bridge)
         else if rename != 0 and (self.foreign_contracts[ci].returns_borrow_record != 0 or self.foreign_contracts[ci].bridged != 0):
-            names.push(rename_text.clone())
+            names.push(rename_text)
         if self.foreign_contracts[ci].variadic_node != 0:
-            let base = if rename != 0: rename_text.clone() else: facade_render_bridge_name(fname)
+            let base = if rename != 0: rename_text else: facade_render_bridge_name(fname)
             for k in 0..self.foreign_contracts[ci].variadic_case_syms.len():
                 names.push(self.facade_variadic_case_name(base, ci, k as i32))
         for ni in 0..names.len():
@@ -4664,7 +4664,7 @@ impl Sema:
             self.update_decl_source_context(self.facade_resources[ri].decl)
             let rname: str = self.pool_resolve(self.facade_resources[ri].name)
             let hosts: List[str] = List.new()
-            hosts.push(rname.clone())
+            hosts.push(rname)
             hosts.push(facade_render_borrowed_name(rname))
             for hi in 0..hosts.len():
                 let mtext = hosts[hi] ++ "." ++ facade_render_text_view_name()
@@ -5010,9 +5010,9 @@ impl Sema:
                 continue
             // The net: the method was rendered (a generic template when the
             // userdata is typed, a signature otherwise).
-            let host: str = if hosted: self.pool_resolve(self.facade_resources[recv0[0]].name).clone() else: ""
+            let host: str = if hosted: self.pool_resolve(self.facade_resources[recv0[0]].name) else: ""
             let mname = if hosted: self.facade_presented(recv0[0], fname) else: if self.foreign_contracts[ci].rename != 0: self.facade_presented_free_name(ci) else: facade_render_bridge_name(fname)
-            let mtext = if hosted: host ++ "." ++ mname else: mname.clone()
+            let mtext = if hosted: host ++ "." ++ mname else: mname
             let msym = self.pool_lookup_symbol(mtext)
             let rendered = self.sig_text_index.contains(mtext) or (msym != 0 and self.generic_fn_node_for_symbol(msym) != 0)
             if not rendered:

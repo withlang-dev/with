@@ -1089,18 +1089,18 @@ impl CCodegen:
             let path = self.sema.decl_source_paths[di]
             if path.len() > 0:
                 return with_str_clone_ref(path)
-        self.source_path.clone()
+        self.source_path
 
     fn source_text_for_path(path: &str) -> str:
         if path.len() == 0 or path == self.source_path:
-            return self.source_text.clone()
+            return self.source_text
         let embedded_rel = embedded_std_rel_path(path)
         if embedded_rel.len() > 0:
             return embedded_std_source(embedded_rel)
         let text = with_fs_read_file(path)
         if text.len() > 0:
             return text
-        self.source_text.clone()
+        self.source_text
 
     fn decl_source_text(decl: NodeId) -> str:
         self.source_text_for_path(self.decl_source_path(decl))
@@ -7970,7 +7970,7 @@ impl CCodegen:
                 slot_guard = "    if (!with_hashmap_slot_occupied(" ++ map_ptr ++ ", " ++ slot ++ ")) with_panic(WITH_STR_LIT(\"map slot holds no entry: slot_key/slot_value read a removed or out-of-range slot\"), WITH_STR_LIT(\"\"), 0);\n"
         // The guard leads the read (it was overwritten here, so a dead
         // slot was read with no panic).
-        var out = slot_guard.clone()
+        var out = slot_guard
         if has_ret != 0:
             let dst = self.place_text(body, dest_place)
             out = out ++ "    " ++ dst ++ " = " ++ value ++ ";\n"
@@ -9242,10 +9242,10 @@ impl CCodegen:
             self.line_file_path = ""
             return
         self.line_file_id = self.sema.ast.file(fn_node) as i32
-        self.line_file_path = self.source_path.clone()
+        self.line_file_path = self.source_path
         for si in 0..self.sema.source_text_file_ids.len():
             if self.sema.source_text_file_ids[si] == self.line_file_id:
-                self.line_file_path = self.sema.source_text_names[si].clone()
+                self.line_file_path = self.sema.source_text_names[si]
 
     mut fn emit_stmt_line(body: &MirBody, stmt_id: i32) -> str:
         if stmt_id < 0 or stmt_id >= body.stmt_kinds.len():
@@ -9831,7 +9831,7 @@ impl CCodegen:
             let c_name = self.fn_type_c_name(tid as i32)
             if seen_names.contains(c_name):
                 continue
-            seen_names.insert(c_name.clone(), 1)
+            seen_names.insert(c_name, 1)
             let ret_tid = self.sema.get_type_d2(tid)
             let start = self.sema.get_type_d0(tid)
             let count = self.sema.get_type_d1(tid)
@@ -10947,10 +10947,10 @@ impl CCodegen:
     // "path:line" of an AST node, for a diagnostic that names a construct.
     fn node_site_text(node: i32) -> str:
         let file_id = self.sema.ast.file(node as NodeId) as i32
-        var path = self.source_path.clone()
+        var path = self.source_path
         for si in 0..self.sema.source_text_file_ids.len():
             if self.sema.source_text_file_ids[si] == file_id:
-                path = self.sema.source_text_names[si].clone()
+                path = self.sema.source_text_names[si]
         let line = self.sema.source_location_for_file_id(file_id, self.ast.get_start(node)).line + 1
         f"{path}:{line}"
 

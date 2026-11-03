@@ -102,7 +102,7 @@ fn libc_facade_has(names: &List[str], name: &str) -> bool:
 // The second word of a facade line (`from fopen` → `fopen`).
 fn libc_facade_operand(line: &str) -> str:
     let words = line.trim().split(" ")
-    if words.len() < 2: "" else: words[1].clone()
+    if words.len() < 2: "" else: words[1]
 
 // The facade text restricted to what this compilation's c_import
 // declarations support (`ci` flags them) and `claimed` (names the program's
@@ -124,20 +124,20 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
     var body = ""
     var i = 1
     while i < lines.len():
-        let header = lines[i].clone()
+        let header = lines[i]
         i = i + 1
         if header.trim().len() == 0:
             continue
         var clauses: List[str] = List.new()
         while i < lines.len() and lines[i].starts_with("        "):
-            clauses.push(lines[i].clone())
+            clauses.push(lines[i])
             i = i + 1
         let name = libc_facade_operand(header)
         if libc_facade_has(claimed, name):
             continue
         if header.trim().starts_with("domain "):
-            domain_lines.push(header.clone())
-            domain_names.push(name.clone())
+            domain_lines.push(header)
+            domain_names.push(name)
             continue
         if header.trim().starts_with("resource "):
             let words = header.trim().split(" wraps ")
@@ -148,7 +148,7 @@ fn libc_facade_select(pool: &AstPool, intern: &InternPool, ci: &List[i32], claim
             var producers = 0
             var has_drop = false
             for ci_ in 0..clauses.len():
-                let clause = clauses[ci_].clone()
+                let clause = clauses[ci_]
                 let op = libc_facade_operand(clause)
                 let (found, ret, p0) = facade_render_import_shape(pool, intern, ci, op)
                 if clause.trim().starts_with("from "):

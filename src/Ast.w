@@ -2011,7 +2011,7 @@ impl AstPool:
         let meta = self.find_fn_meta(fn_node)
         if meta < 0 or self.fn_meta_param_count(meta) == 0 or self.fn_param_name(self.fn_meta_param_start(meta), 0) != self_sym:
             return 0
-        let name = intern.resolve(self.get_data0(fn_node)).clone()
+        let name = intern.resolve(self.get_data0(fn_node))
         var dot = -1
         for ci in 0..name.len():
             if name[ci] == '.':

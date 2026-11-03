@@ -1025,13 +1025,13 @@ fn ci_print_expr(exprs: CiExprPool, types: CiTypePool, id: CiExprId, parent_prec
 var g_ci_print_unknowns: List[str] = List.new()
 
 fn ci_print_note_unknown(detail: &str):
-    g_ci_print_unknowns.push(detail.clone())
+    g_ci_print_unknowns.push(detail)
 
 /// The printer's unrenderable-node records since the last take; taking clears.
 fn ci_print_take_unknowns() -> List[str]:
     var taken: List[str] = List.new()
     for i in 0..g_ci_print_unknowns.len():
-        taken.push(g_ci_print_unknowns[i].clone())
+        taken.push(g_ci_print_unknowns[i])
     g_ci_print_unknowns.clear()
     taken
 
@@ -1422,7 +1422,7 @@ fn ci_roundtrip_exprs -> i32:
     let bogus = exprs.add(9999 as CiExprKind, 0, 0, 0, i32_ty)
     fails = fails + ci_expect_eq("expr_unknown_placeholder", ci_print_expr(exprs, types, bogus, 0, 0), "<ci:expr:unknown>")
     let recorded = ci_print_take_unknowns()
-    let recorded_text = if recorded.len() == 1: recorded[0].clone() else: f"{recorded.len()} records"
+    let recorded_text = if recorded.len() == 1: recorded[0] else: f"{recorded.len()} records"
     fails = fails + ci_expect_eq("expr_unknown_recorded", recorded_text, "expression kind 9999")
     fails = fails + ci_expect_eq("expr_unknown_taken", f"{ci_print_take_unknowns().len()}", "0")
     fails = fails + ci_expect_eq("expr_array_pointer_deref", ci_print_expr(exprs, types, slot_deref, 0, 0), "(unsafe *(slots[0] as *const i32))")

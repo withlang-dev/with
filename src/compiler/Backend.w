@@ -302,4 +302,4 @@ const _backend_eof_guard = 0
 
 // The failure line with codegen's reason, when it gave one (#2199: the
 // detail was recorded and never printed).
-fn codegen_failure_message(head: &str, detail: &str): if detail.len() > 0: f"{head}: {detail}" else: head.clone()
+fn codegen_failure_message(head: &str, detail: &str): if detail.len() > 0: f"{head}: {detail}" else: head

@@ -313,7 +313,7 @@ type PyParser { toks: List[PyTok], at: i32, nodes: List[PyNode], err: str }
 
 impl PyParser:
     fn kind() -> i32: self.toks[self.at].kind
-    fn text() -> str: self.toks[self.at].text.clone()
+    fn text() -> str: self.toks[self.at].text
     fn line() -> i32: self.toks[self.at].line
     fn is_op(op: &str) -> bool: self.toks[self.at].kind == PT_OP and self.toks[self.at].text == op
     fn is_word(word: &str) -> bool: self.toks[self.at].kind == PT_NAME and self.toks[self.at].text == word
@@ -738,7 +738,7 @@ impl PyParser:
                 self.skip_block()
             else: self.skip_line()
         let plist = self.mk(N_LIST, -1, -1, -1, "", params, line)
-        let why = if unreadable == 1: self.err.clone() else: ""
+        let why = if unreadable == 1: self.err else: ""
         if unreadable == 1: self.err = ""
         let node = self.mk(N_DEF, plist, (is_property) as i32, unreadable, name, if unreadable == 1: List.new() else: body, line)
         if unreadable == 1: self.nodes[node].s = name ++ "\n" ++ why
@@ -883,7 +883,7 @@ const V_NAMED = 13      // s: a name from outside the recipe (`os.path.join`)
 type PyVal { k: i32, n: i64, s: str }
 
 fn pv(k: i32, n: i64, s: &str): PyVal { k, n, s: s.to_owned() }
-fn pv_copy(v: &PyVal): PyVal { k: v.k, n: v.n, s: v.s.clone() }
+fn pv_copy(v: &PyVal): PyVal { k: v.k, n: v.n, s: v.s }
 fn pv_unknown(): pv(V_UNKNOWN, 0, "")
 fn pv_none(): pv(V_NONE, 0, "")
 fn pv_bool(b: bool): pv(V_BOOL, (b) as i32, "")
@@ -961,7 +961,7 @@ fn py_option_text(v: &PyVal) -> str:
     if v.k == V_BOOL: return if v.n != 0: "True" else: "False"
     if v.k == V_NONE: return "None"
     if v.k == V_INT: return f"{v.n}"
-    v.s.clone()
+    v.s
 
 impl PyInterp:
     // ── Arenas ──
@@ -1004,7 +1004,7 @@ impl PyInterp:
         var vals: List[PyVal] = List.new()
         for i in 0..self.objs[obj].names.len():
             if i == at: continue
-            names.push(self.objs[obj].names[i].clone())
+            names.push(self.objs[obj].names[i])
             vals.push(pv_copy(&self.objs[obj].vals[i]))
         self.objs[obj].names = names
         self.objs[obj].vals = vals
@@ -1179,7 +1179,7 @@ impl PyInterp:
         if target.k == V_STR or target.k == V_LIST or target.k == V_DICT or target.k == V_OPT: return self.bound(target, name)
         if target.k != V_OBJ: return pv_unknown()
         let obj = target.n as i32
-        let cls = self.objs[obj].cls.clone()
+        let cls = self.objs[obj].cls
         if cls == "self": return self.self_attr(name, line)
         if cls == "cppinfo": return self.cppinfo_attr(obj, name)
         if cls == "options":
@@ -1272,7 +1272,7 @@ impl PyInterp:
                 return self.new_list(move items)
             return pv_unknown()
         if receiver.k == V_STR or receiver.k == V_OPT:
-            let s = receiver.s.clone()
+            let s = receiver.s
             if name == "startswith" and arg0.k == V_STR: return pv_bool(s.starts_with(arg0.s))
             if name == "endswith" and arg0.k == V_STR: return pv_bool(s.ends_with(arg0.s))
             if name == "lower": return pv_str(s.to_lower())
@@ -1320,7 +1320,7 @@ impl PyInterp:
                 for i in 0..self.lists[arg0.n as i32].items.len():
                     let part = self.to_text(&self.lists[arg0.n as i32].items[i])
                     if part.k != V_STR: return pv_unknown()
-                    out = out ++ (if i > 0: s.clone() else: "") ++ part.s
+                    out = out ++ (if i > 0: s else: "") ++ part.s
                 return pv_str(out)
             return pv_unknown()
         if receiver.k == V_DICT:
@@ -1343,7 +1343,7 @@ impl PyInterp:
             return pv_unknown()
         if receiver.k != V_OBJ: return pv_unknown()
         let obj = receiver.n as i32
-        let cls = self.objs[obj].cls.clone()
+        let cls = self.objs[obj].cls
         if cls == "cppinfo": return if name == "set_property": pv_none() else: pv_unknown()
         if cls == "self":
             if name == "test_requires": return pv_none()
@@ -1352,8 +1352,8 @@ impl PyInterp:
                 if reference.k != V_STR:
                     self.note(line, "a requirement could not be evaluated")
                     return pv_none()
-                if name == "requires": self.reqs.push(reference.s.clone())
-                else: self.tool_reqs.push(reference.s.clone())
+                if name == "requires": self.reqs.push(reference.s)
+                else: self.tool_reqs.push(reference.s)
                 return pv_none()
             return pv_unknown()
         if cls == "options":
@@ -1375,7 +1375,7 @@ impl PyInterp:
     // A function the recipe imports, by the name it calls it under.
     mut fn call_named(name: &str, args: &List[PyVal], line: i32) -> PyVal:
         let arg0 = if args.len() > 0: self.plain(&args[0]) else: pv_unknown()
-        let os = self.env.os.clone()
+        let os = self.env.os
         if name == "is_apple_os": return pv_bool(os == "Macos" or os == "iOS" or os == "watchOS" or os == "tvOS" or os == "visionOS")
         if name == "is_msvc": return pv_bool(self.env.compiler == "msvc" or self.env.compiler == "Visual Studio")
         if name == "is_msvc_static_runtime": return if self.env.compiler == "msvc" or self.env.compiler == "Visual Studio": pv_unknown() else: pv_bool(false)
@@ -1417,7 +1417,7 @@ impl PyInterp:
                 let part = self.to_text(&args[i])
                 if part.k != V_STR: return pv_unknown()
                 if part.s.len() == 0: continue
-                out = if out.len() == 0 or runtime_path_is_absolute(part.s): part.s.clone() else: out ++ "/" ++ part.s
+                out = if out.len() == 0 or runtime_path_is_absolute(part.s): part.s else: out ++ "/" ++ part.s
             return pv_str(out)
         if name == "os.path.basename" and arg0.k == V_STR:
             let parts = arg0.s.split("/")
@@ -1428,7 +1428,7 @@ impl PyInterp:
         if name == "collect_libs":
             // Conan's helper: the libraries the package holds in its library
             // directories, by the names a linker is given.
-            let folder = self.env.package_folder.clone()
+            let folder = self.env.package_folder
             if folder.len() == 0: return pv_unknown()
             var names: List[str] = List.new()
             for dir in ["lib"]:
@@ -1474,7 +1474,7 @@ impl PyInterp:
         var next = 0
         for pi in 0..self.nodes[params].kids.len():
             let p: i32 = self.nodes[params].kids[pi]
-            let pname = self.nodes[p].s.clone()
+            let pname = self.nodes[p].s
             if pi == 0 and pname == "self":
                 names.push(pname)
                 vals.push(pv(V_OBJ, self.self_obj as i64, ""))
@@ -1530,7 +1530,7 @@ impl PyInterp:
             let (ok, n) = py_parse_int(self.nodes[node].s)
             return if ok: pv(V_INT, n, "") else: pv_str(self.nodes[node].s)
         if kind == N_CONST:
-            let s = self.nodes[node].s.clone()
+            let s = self.nodes[node].s
             return if s == "None": pv_none() else: pv_bool(s == "True")
         if kind == N_FSTR:
             var out = ""
@@ -1583,7 +1583,7 @@ impl PyInterp:
             return dict
         if kind == N_ATTR:
             let target = self.eval(self.nodes[node].a)
-            let name = self.nodes[node].s.clone()
+            let name = self.nodes[node].s
             return self.attribute(&target, name, line)
         if kind == N_CALL: return self.call(node)
         if kind == N_SUB:
@@ -1610,7 +1610,7 @@ impl PyInterp:
         if kind == N_CMP:
             let left = self.eval(self.nodes[node].a)
             let right = self.eval(self.nodes[node].b)
-            let op = self.nodes[node].s.clone()
+            let op = self.nodes[node].s
             if op == "==" or op == "!=":
                 let e = self.equal(&left, &right)
                 return if e < 0: pv_unknown() else: pv_bool((e == 1) == (op == "=="))
@@ -1631,7 +1631,7 @@ impl PyInterp:
         if kind == N_BIN:
             let left = self.plain(&self.eval(self.nodes[node].a))
             let right = self.plain(&self.eval(self.nodes[node].b))
-            let op = self.nodes[node].s.clone()
+            let op = self.nodes[node].s
             if op == "+":
                 if left.k == V_LIST and right.k == V_LIST:
                     var items: List[PyVal] = List.new()
@@ -1665,18 +1665,18 @@ impl PyInterp:
     mut fn bind_targets(targets: i32, item: &PyVal):
         let count = self.nodes[targets].kids.len()
         if count == 1:
-            let name = self.nodes[self.nodes[targets].kids[0]].s.clone()
+            let name = self.nodes[self.nodes[targets].kids[0]].s
             self.bind(name, pv_copy(item))
             return
         for i in 0..count:
-            let name = self.nodes[self.nodes[targets].kids[i]].s.clone()
+            let name = self.nodes[self.nodes[targets].kids[i]].s
             if item.k == V_LIST and i < self.lists[item.n as i32].items.len(): self.bind(name, pv_copy(&self.lists[item.n as i32].items[i]))
             else: self.bind(name, pv_unknown())
 
     mut fn assign(target: i32, value: PyVal, line: i32):
         let kind = self.nodes[target].kind
         if kind == N_NAME:
-            let name = self.nodes[target].s.clone()
+            let name = self.nodes[target].s
             self.bind(name, value)
             return
         if kind == N_LIST:
@@ -1688,7 +1688,7 @@ impl PyInterp:
             let owner = self.eval(self.nodes[target].a)
             if owner.k != V_OBJ: return
             let obj = owner.n as i32
-            let name = self.nodes[target].s.clone()
+            let name = self.nodes[target].s
             if self.objs[obj].cls == "options":
                 self.obj_set(obj, name, pv(V_OPT, 0, py_option_text(&self.plain(&value))))
                 return
@@ -1777,7 +1777,7 @@ impl PyInterp:
             let target = self.nodes[node].a
             if self.nodes[target].kind == N_ATTR:
                 let owner = self.eval(self.nodes[target].a)
-                let name = self.nodes[target].s.clone()
+                let name = self.nodes[target].s
                 if owner.k == V_OBJ: self.obj_remove(owner.n as i32, name)
             return PY_NORMAL
         PY_NORMAL
@@ -1806,7 +1806,7 @@ impl PyInterp:
         if list.k != V_LIST: return out
         for i in 0..self.lists[list.n as i32].items.len():
             let text = self.to_text(&self.lists[list.n as i32].items[i])
-            if text.k == V_STR: out.push(text.s.clone())
+            if text.k == V_STR: out.push(text.s)
             else: self.note(0, "an entry of " ++ (if component.len() > 0: "component '" ++ component ++ "' " else: "") ++ "cpp_info." ++ name ++ " could not be evaluated")
         out
 
@@ -1834,7 +1834,7 @@ fn recipe_class(tree: &PyModule) -> i32:
 
 fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     var tree = py_parse(recipe)
-    var ip = PyInterp { nodes: List.new(), lists: List.new(), dkeys: List.new(), dvals: List.new(), objs: List.new(), recv: List.new(), frame_names: List.new(), frame_vals: List.new(), method_names: List.new(), method_nodes: List.new(), attr_names: List.new(), attr_vals: List.new(), func_names: List.new(), func_nodes: List.new(), self_obj: 0, env: RecipeEnv { os: env.os.clone(), arch: env.arch.clone(), compiler: env.compiler.clone(), compiler_version: env.compiler_version.clone(), build_type: env.build_type.clone(), version: env.version.clone(), package_folder: env.package_folder.clone(), source_folder: env.source_folder.clone(), options: List.new(), options_known: env.options_known }, notes: List.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: List.new(), tool_reqs: List.new(), toolchains: List.new() }
+    var ip = PyInterp { nodes: List.new(), lists: List.new(), dkeys: List.new(), dvals: List.new(), objs: List.new(), recv: List.new(), frame_names: List.new(), frame_vals: List.new(), method_names: List.new(), method_nodes: List.new(), attr_names: List.new(), attr_vals: List.new(), func_names: List.new(), func_nodes: List.new(), self_obj: 0, env: RecipeEnv { os: env.os, arch: env.arch, compiler: env.compiler, compiler_version: env.compiler_version, build_type: env.build_type, version: env.version, package_folder: env.package_folder, source_folder: env.source_folder, options: List.new(), options_known: env.options_known }, notes: List.new(), ret: pv_none(), steps: 0, depth: 0, problem: "", reqs: List.new(), tool_reqs: List.new(), toolchains: List.new() }
     if tree.problem.len() > 0: return (ip, "the recipe could not be read: " ++ tree.problem)
     let cls_node = recipe_class(&tree)
     if cls_node < 0: return (ip, "the recipe defines no class")
@@ -1865,7 +1865,7 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
         let _ = ip.exec(k)
     let class_frame: i32 = (ip.frame_names.len() - 1) as i32
     for i in 0..ip.frame_names[class_frame].items.len():
-        let name = ip.frame_names[class_frame].items[i].clone()
+        let name = ip.frame_names[class_frame].items[i]
         let value = pv_copy(&ip.frame_vals[class_frame].items[i])
         ip.attr_names.push(name)
         ip.attr_vals.push(value)
@@ -1946,7 +1946,7 @@ fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
         var names: List[str] = List.new()
         var ids: List[i32] = List.new()
         for i in 0..ip.objs[comps].names.len():
-            names.push(ip.objs[comps].names[i].clone())
+            names.push(ip.objs[comps].names[i])
             ids.push(ip.objs[comps].vals[i].n as i32)
         for i in 0..names.len(): components.push(ip.component(ids[i], names[i]))
     RecipePackageInfo { ok: true, problem: "", notes: move ip.notes, root, components }
@@ -1963,11 +1963,11 @@ fn recipe_requirements(recipe: &str, env: &RecipeEnv) -> RecipeRequirements:
     ip.notes = List.new()
     // The class may state its requirements as an attribute instead.
     let stated = ip.self_attr("requires", 0)
-    if stated.k == V_STR: ip.reqs.push(stated.s.clone())
+    if stated.k == V_STR: ip.reqs.push(stated.s)
     if stated.k == V_LIST:
         for i in 0..ip.lists[stated.n as i32].items.len():
             let reference = pv_copy(&ip.lists[stated.n as i32].items[i])
-            if reference.k == V_STR: ip.reqs.push(reference.s.clone())
+            if reference.k == V_STR: ip.reqs.push(reference.s)
     let _r = ip.run_method("requirements")
     let _b = ip.run_method("build_requirements")
     if ip.problem.len() > 0: return RecipeRequirements { ok: false, problem: move ip.problem, notes: List.new(), requires: List.new(), tool_requires: List.new() }
@@ -2008,14 +2008,14 @@ fn recipe_cmake_variables(recipe: &str, env: &RecipeEnv) -> RecipeCMake:
                 else if value.k == V_OPT and (value.s == "True" or value.s == "False"): text = if value.s == "True": "ON" else: "OFF"
                 else if value.k == V_STR or value.k == V_OPT or value.k == V_VER or value.k == V_INT: text = py_option_text(&value)
                 else:
-                    out.unknown.push(key.s.clone())
+                    out.unknown.push(key.s)
                     continue
                 var slot = -1
                 for k in 0..out.names.len():
                     if out.names[k] == key.s: slot = k as i32
                 if slot >= 0: out.values[slot] = text
                 else:
-                    out.names.push(key.s.clone())
+                    out.names.push(key.s)
                     out.values.push(text)
     out.ok = true
     out.notes = move ip.notes

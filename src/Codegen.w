@@ -715,7 +715,7 @@ impl Codegen:
     fn analysis_fact_selected(fact: &AnalysisFact) -> bool:
         if self.analysis_query == "audit":
             return true
-        let query = if self.analysis_query.starts_with("matrix:"): self.analysis_query.slice(7, self.analysis_query.len()) else: self.analysis_query.clone()
+        let query = if self.analysis_query.starts_with("matrix:"): self.analysis_query.slice(7, self.analysis_query.len()) else: self.analysis_query
         analysis_fact_matches(fact, query)
 
     fn analysis_text() -> str:
@@ -1486,7 +1486,7 @@ impl Codegen:
     mut fn debug_enter_function(fn_node: i32, fn_sym: i32, function: i64) -> i64:
         if self.di_builder == 0:
             return 0
-        let fn_name = self.intern.resolve(fn_sym).clone()
+        let fn_name = self.intern.resolve(fn_sym)
         if fn_name.len() == 0:
             return 0
         self.debug_enter_named(fn_node, fn_sym, fn_name, function)
@@ -5736,15 +5736,15 @@ impl Codegen:
         let name_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         let raw_name_str = self.intern.resolve(name_sym)
         let sema_name_str = self.sema_symbol_text(name_sym)
-        let name_str = if sema_name_str.len() > 0: sema_name_str.clone() else: with_str_clone_ref(raw_name_str)
+        let name_str = if sema_name_str.len() > 0: sema_name_str else: with_str_clone_ref(raw_name_str)
         if name_sym == 0:
             return
         let parsed_name = if sema_name_str.len() == 0 and name_str.len() == 0: self.fn_decl_name_from_node(fn_node) else: ""
         let alias_text =
             if sema_name_str.len() > 0:
-                sema_name_str.clone()
+                sema_name_str
             else:
-                parsed_name.clone()
+                parsed_name
         let alias_sym = if alias_text.len() > 0: self.intern.intern(alias_text) else: 0
         let flags = self.pool.get_data2(fn_node)
         let meta = self.pool.find_fn_meta(fn_node)
@@ -5875,7 +5875,7 @@ impl Codegen:
         // `name` let LLVM rename the body `name.1` and left the prototype the
         // C code calls undefined at link.
         let c_export_symbol = if cc_name.len() > 9 and cc_name.slice(0, 9) == "c_export:": cc_name.slice(9, cc_name.len()) else: ""
-        let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol.clone() else: effective_name.clone()
+        let defined_symbol = if c_export_symbol.len() > 0: c_export_symbol else: effective_name
         if c_export_symbol.len() > 0: self.c_export_owner_syms.insert(c_export_symbol, name_sym)
         var ast_existing = wl_get_named_function(self.llmod, defined_symbol)
         if ast_existing != 0 and c_export_symbol.len() == 0 and not codegen_preserve_runtime_link_name(self.current_decl_source_file, effective_name):
@@ -6932,7 +6932,7 @@ impl Codegen:
         // The public name may now select a curated With wrapper with a
         // different arity. FnAbi must read this raw declaration's signature.
         let sema_sig_idx = self.sema.extern_decl_sigs.get(ext_node) ?? -1
-        let name_str = self.intern.resolve(name_sym).clone()
+        let name_str = self.intern.resolve(name_sym)
         // #2043 (D65): the return and parameter types are Sema's signature's.
         if sema_sig_idx < 0 or self.sema.sig_get_param_count(sema_sig_idx) != param_count:
             with_eprint(f"error: extern declaration {name_str} has no finalized FnAbi signature")

@@ -397,7 +397,7 @@ fn ci_migrate_shared_module_prefix() -> str:
 // Physical output paths and imports must use the same identifier spelling.
 // A C filename may contain punctuation that is not valid in a With module.
 fn ci_migrate_module_relative_path(input_dir: &str, path: &str) -> str:
-    var rel = path.clone()
+    var rel = path
     if input_dir.len() > 0 and ci_starts_with(path, input_dir):
         rel = path.slice(input_dir.len(), path.len())
     while rel.len() > 0 and rel[0] == 47:
@@ -929,7 +929,7 @@ fn ci_migrate_system_object_macro(name: &str) -> bool: g_migrate_system_object_m
 // a header puts after it; "" for a name that is no object-like macro.
 fn ci_migrate_object_macro_body(name: &str) -> str:
     if not g_migrate_macro_last_values.contains(name): return ""
-    var text = g_migrate_macro_last_values.get(name).unwrap().clone()
+    var text = g_migrate_macro_last_values.get(name).unwrap()
     let block_comment = text.find("/*")
     if block_comment >= 0: text = text.slice(0, block_comment)
     let line_comment = text.find("//")
@@ -1536,7 +1536,7 @@ fn migrate_c_file(input_path_arg: &str, output_path_arg: &str) -> i32:
     // D107: a lone unit is its own corpus — its definitions' body evidence
     // and NULL callers decide their function-pointer parameters.
     var one: List[str] = List.new()
-    one.push(input_path.clone())
+    one.push(input_path)
     project.register_modules(&one)
     if project.migrate_scan_file(input_path) != 0: return 1
     project.resolve_header_definers()
@@ -1567,7 +1567,7 @@ fn ci_migrate_path_stem(basename: &str) -> str:
     var end = basename.len()
     while end > 0 and basename[(end - 1)] != '.':
         end = end - 1
-    if end == 0: basename.clone() else: basename.slice(0, (end - 1) as i64)
+    if end == 0: basename else: basename.slice(0, (end - 1) as i64)
 
 // The file of a cursor location (`path:line:col`), "" when absent.
 // A definition's identity across units: the real path of its file and its
@@ -1678,7 +1678,7 @@ fn ci_migrate_validate_module_paths(input_dir: &str, files: &List[str]):
         if owners.contains(module_path):
             eprint("migrate: module path collision: " ++ owners.get(module_path).unwrap() ++ " and " ++ path ++ " both map to " ++ module_path)
             return false
-        owners.insert(module_path, path.clone())
+        owners.insert(module_path, path)
     true
 
 fn ci_migrate_print_progress(file_path: &str, current: isize, total: isize):
@@ -1819,7 +1819,7 @@ impl CiProject:
                 let index = parse(parts[2])
                 self.symbols[callee].grow_params(index + 1)
                 if self.symbols[callee].param_null_caller[index].len() == 0:
-                    self.symbols[callee].param_null_caller[index] = fname.clone()
+                    self.symbols[callee].param_null_caller[index] = fname
             else if parts[0] == "sink" and parts.len() == 4:
                 let pi = ci_index_of_name(&names, parts[3])
                 if pi >= 0: self.symbols[symbol_id].param_sinks[pi] = self.symbols[symbol_id].param_sinks[pi] ++ parts[1] ++ ":" ++ parts[2] ++ ";"
@@ -1953,7 +1953,7 @@ impl CiProject:
                 bits = bits ++ (if self.symbols[si].param_nullable[pi] != 0: "1" else: "0")
                 reasons = reasons ++ self.symbols[si].param_reason[pi]
                 if verbose: eprint("migrate: " ++ self.symbols[si].name ++ f" param {pi}: " ++ self.symbols[si].param_reason[pi])
-            g_migrate_fn_nullable_names.push(self.symbols[si].name.clone())
+            g_migrate_fn_nullable_names.push(self.symbols[si].name)
             g_migrate_fn_nullable_bits.push(bits)
             g_migrate_fn_nullable_reasons.push(reasons)
 
@@ -2852,7 +2852,7 @@ fn ci_migrate_project_var_resolved_type(project_active: bool, project: &CiProjec
         return ""
     let symbol = project.symbols[symbol_id]
     if symbol.resolved_ty_text.len() > 0:
-        return symbol.resolved_ty_text.clone()
+        return symbol.resolved_ty_text
     if (symbol.resolved_ty as i32) != 0:
         return ci_print_type(project.types, symbol.resolved_ty)
     ""

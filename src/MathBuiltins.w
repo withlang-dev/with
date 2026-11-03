@@ -83,14 +83,14 @@ fn math_fn_arity(id: i32) -> i32:
 
 fn math_fn_name(id: i32) -> str:
     let t = math_fn_table()
-    t[id].name.clone()
+    t[id].name
 
 /// LLVM intrinsic base name (`llvm.cos`), or "" when the function is libm-only.
 fn math_fn_llvm(id: i32) -> str:
     let t = math_fn_table()
-    t[id].llvm.clone()
+    t[id].llvm
 
 /// libm base symbol; the f32 spelling appends `f` (`cos` -> `cosf`).
 fn math_fn_libm(id: i32) -> str:
     let t = math_fn_table()
-    t[id].libm.clone()
+    t[id].libm

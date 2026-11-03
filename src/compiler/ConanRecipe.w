@@ -71,7 +71,7 @@ fn conan_pick_archive(source: &ConanSource, dir: &str, download: fn(&str, &str) 
         if digest != source.sha256:
             tried = tried ++ "\n  " ++ url ++ ": sha256 " ++ digest ++ ", the recipe expects " ++ source.sha256
             continue
-        return ConanArchivePick { path: candidate, tried: tried.clone() }
+        return ConanArchivePick { path: candidate, tried: tried }
     ConanArchivePick { path: "", tried }
 
 // A patch entry can say where in the tree it applies (`base_path`) or how many

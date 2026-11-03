@@ -283,7 +283,7 @@ impl Parser:
 
     mut fn enable_interface_mode(): self.interface_mode = 1
 
-    mut fn enable_module_mode(label: &str): self.module_label = label.clone()
+    mut fn enable_module_mode(label: &str): self.module_label = label
 
     // §18.5b (D74): a token that opens an executable statement, never a
     // declaration, at a module's top level. `let`/`var` are declarations
@@ -1284,7 +1284,7 @@ impl Parser:
                     let variant = self.parse_target_variant(field)
                     if variant.len() > 0:
                         if named.contains(&variant): self.emit_error(f"`.{variant}` has an arm already")
-                        named.push(variant.clone())
+                        named.push(variant)
                     if variant == active: matches = true
                     if self.peek() != TokenKind.TK_PIPE: break
                     self.advance()
@@ -4704,7 +4704,7 @@ impl Parser:
         var name = ""
         let first = self.expect_ident()
         if first == 0: return self.poisoned_expr()
-        name = self.intern.resolve(first).clone()
+        name = self.intern.resolve(first)
         while self.peek() == TokenKind.TK_DOT:
             self.advance()
             let seg = self.expect_ident()

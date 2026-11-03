@@ -440,7 +440,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
         return out
     let package_key = name ++ "/" ++ version
     if not project_config_list_contains(&out.dep_loaded, package_key):
-        out.dep_loaded.push(package_key.clone())
+        out.dep_loaded.push(package_key)
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
         let includes = project_config_json_str_array(meta, "include_paths")
@@ -721,7 +721,7 @@ fn project_config_resolve_header_path(cfg: &ProjectConfig, decl_dir: &str, heade
     let base_dir = if decl_dir.len() > 0:
         project_config_absolutize_path(decl_dir)
     else:
-        if cfg.root_dir.len() > 0: cfg.root_dir.clone() else: project_config_absolutize_path(".")
+        if cfg.root_dir.len() > 0: cfg.root_dir else: project_config_absolutize_path(".")
     let local_candidate = resolve_join(base_dir, header_name)
     if project_config_file_exists(local_candidate):
         return local_candidate

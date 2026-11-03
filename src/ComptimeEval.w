@@ -2176,7 +2176,7 @@ impl ComptimeEvaluator:
             return ""
         let exe = parts[0]
         let resolved = comptime_effect_resolve_executable(exe)
-        let key = if resolved.len() > 0: resolved.clone() else: with_str_clone_ref(exe)
+        let key = if resolved.len() > 0: resolved else: with_str_clone_ref(exe)
         for i in 0..self.tool_identity_paths.len():
             if self.tool_identity_paths[i] == key:
                 return with_str_clone_ref(self.tool_identity_values[i])
@@ -2238,7 +2238,7 @@ impl ComptimeEvaluator:
         if self.strict_effects != 0 and record.inputs.len() == 0 and record.outputs.len() == 0:
             let _ = self.fail(0, "ProcessRunner." ++ method ++ " affects build output but has no declared action inputs or outputs in strict mode")
             return
-        let target = if record.target_name.len() > 0: record.target_name.clone() else: "<build>"
+        let target = if record.target_name.len() > 0: record.target_name else: "<build>"
         var line = "process"
         line = line ++ "\ttarget=" ++ comptime_effect_escape(target)
         line = line ++ "\tmethod=" ++ comptime_effect_escape(method)
@@ -2261,7 +2261,7 @@ impl ComptimeEvaluator:
         if record.network != 0:
             return false
         let tool = comptime_process_basename(exe)
-        let target = if record.target_name.len() > 0: record.target_name.clone() else: "<build>"
+        let target = if record.target_name.len() > 0: record.target_name else: "<build>"
         let _ = self.fail(node, "ProcessRunner." ++ method ++ " uses network tool '" ++ tool ++ "' for target '" ++ target ++ "' without target.allow_network()")
         true
 
@@ -2422,7 +2422,7 @@ impl ComptimeEvaluator:
             if path.len() > 0:
                 return with_str_clone_ref(path)
         if self.sema.current_module_path.len() > 0:
-            return self.sema.current_module_path.clone()
+            return self.sema.current_module_path
         ""
 
     fn current_source_path() -> str:
@@ -3511,7 +3511,7 @@ fn comptime_str_find(haystack: &str, needle: &str) -> i32:
 
 impl ComptimeEvaluator:
     mut fn eval_str_method_call(recv_value: &ComptimeValue, field: i32, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
-        let method = self.pool.resolve(field).clone()
+        let method = self.pool.resolve(field)
         let text = recv_value.text
         if method == "len":
             if arg_count != 0:
@@ -3990,7 +3990,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "capability method " ++ method ++ " expects a string argument")
             return ""
         // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-        value.text.clone()
+        value.text
 
     mut fn capability_arg_i32(args: &ComptimeValue, index: i32, method: &str, node: i32) -> i32:
         let value = self.extra_value_at((args.extra_start + index) as i64)
@@ -4208,7 +4208,7 @@ impl ComptimeEvaluator:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_STR:
             // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-            return value.text.clone()
+            return value.text
         ""
 
     fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
@@ -4360,7 +4360,7 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl)).clone()
+        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl))
         let flags = ast_pool.get_data2(decl)
         let is_pub = (flags / FnFlags.PUB) % 2 == 1
         let meta = ast_pool.find_fn_meta(decl)
@@ -4405,7 +4405,7 @@ impl ComptimeEvaluator:
         let file_id = comp.zcu.decl_source_file_id_frontend(decl_index)
         let source = comp.zcu.source_for_file_id_frontend(file_id)
         let module_name = comptime_module_name_for_path(comp.zcu.project_config.root_dir, path)
-        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl)).clone()
+        let name = comp.zcu.pool.resolve(ast_pool.get_data0(decl))
         let packed = ast_pool.get_data2(decl)
         let sub_kind = type_decl_sub_kind(packed)
         let is_pub = type_decl_is_pub(ast_pool, ast_pool.get_data1(decl), sub_kind)
@@ -4592,7 +4592,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a string")
             return ""
         // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-        field.text.clone()
+        field.text
 
     mut fn link_command_str_list_field(value: &ComptimeValue, name: &str, node: i32) -> List[str]:
         let out: List[str] = List.new()
@@ -4626,7 +4626,7 @@ impl ComptimeEvaluator:
                 return out
             // D32: take intended; clone until the D32 compiler is the seed
             // (old §2.4 Drop-owner gate on ComptimeValue).
-            out.push(LinkStageEnvVar { name: name.text.clone(), value: env_value.text.clone() })
+            out.push(LinkStageEnvVar { name: name.text, value: env_value.text })
         out
 
     mut fn link_command_from_value(value: &ComptimeValue, node: i32) -> LinkStageCommand:
@@ -5029,7 +5029,7 @@ impl ComptimeEvaluator:
         if plan.valid == 0:
             return comptime_workspace_compile_invalid()
         let artifact_kind = if plan.is_migrate != 0: 7 else: self.workspace_artifact_kind_for_output(plan.output_kind)
-        let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output.clone()
+        let result_artifact_path = if plan.output_kind == 5 and plan.is_migrate == 0: "" else: plan.final_output
         let plan_name = plan.name
         let native = comptime_execute_workspace_compile_plan(plan)
         let result = self.workspace_build_result_value(plan_name, native.rc, artifact_kind, result_artifact_path, node)
@@ -5356,8 +5356,8 @@ impl ComptimeEvaluator:
             kind,
             // D32: take intended; clone until the D32 compiler is the seed
             // (old §2.4 Drop-owner gate on ComptimeValue).
-            source_path: source_value.text.clone(),
-            archive_path: archive_value.text.clone(),
+            source_path: source_value.text,
+            archive_path: archive_value.text,
             mode: mode_value.data0 as i32,
         }
 
@@ -5757,7 +5757,7 @@ impl ComptimeEvaluator:
             if not has_glob:
                 return self.fail(node, "glob pattern contains no wildcards: " ++ pattern)
             let glob_base = if last_clean_slash < 0: "." else: pattern.slice(0, last_clean_slash as i64)
-            let glob_suffix = if last_clean_slash < 0: pattern.clone() else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
+            let glob_suffix = if last_clean_slash < 0: pattern else: pattern.slice((last_clean_slash + 1) as i64, pattern.len())
             let resolved_base = self.capability_resolve_project_path(record, glob_base, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
@@ -5770,7 +5770,7 @@ impl ComptimeEvaluator:
                 let abs_file = raw_files[gi]
                 let rel_file = self.capability_project_relative_path(record, abs_file)
                 let base_prefix = if glob_base == ".": "" else: glob_base ++ "/"
-                let rel_to_base = if base_prefix.len() > 0 and rel_file.starts_with(base_prefix): rel_file.slice(base_prefix.len(), rel_file.len()) else: rel_file.clone()
+                let rel_to_base = if base_prefix.len() > 0 and rel_file.starts_with(base_prefix): rel_file.slice(base_prefix.len(), rel_file.len()) else: rel_file
                 let file_segs = comptime_glob_split_by_slash(rel_to_base)
                 if comptime_glob_segments_match(pat_segs, 0, file_segs, 0):
                     results.push(rel_file)
@@ -8155,7 +8155,7 @@ impl ComptimeEvaluator:
                 if line_value > 0:
                     location.text ++ f":{line_value}"
                 else:
-                    location.text.clone()
+                    location.text
             self.runtime_exit_code = 134
             self.runtime_stderr = "panic at " ++ rendered_location ++ ": " ++ message.text ++ "\n"
             self.had_error = 1

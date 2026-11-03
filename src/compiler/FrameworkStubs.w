@@ -121,7 +121,7 @@ fn fs_open_cache() -> DscCache:
         return fs_cache_error("no dyld shared cache on this machine (looked in /System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld and /System/Library/dyld)")
     let base = fs_basename(main_path)
     let files: List[str] = List.new()
-    files.push(main_path.clone())
+    files.push(main_path)
     for line in runtime_list_files(fs_dirname(main_path)).split("\n"):
         let name = fs_basename(line)
         // dyld_shared_cache_arm64e.01, .02.dylddata, ...; not the .map or
@@ -181,7 +181,7 @@ fn fs_framework_install_name(cache: &DscCache, name: &str) -> str:
     for i in 0..cache.images.len():
         let path = cache.images[i].path
         if path.starts_with(prefix) and path.ends_with("/" ++ name):
-            return path.clone()
+            return path
     ""
 
 fn fs_version(v: i64) -> str:
@@ -277,11 +277,11 @@ fn fs_read_library(cache: &DscCache, install_name: &str) -> DscLibrary:
             let kind = flags % 4
             let weak = (flags / 4) % 2 == 1
             if kind == 1:
-                library.tls_symbols.push(prefix.clone())
+                library.tls_symbols.push(prefix)
             else if weak:
-                library.weak_symbols.push(prefix.clone())
+                library.weak_symbols.push(prefix)
             else:
-                library.symbols.push(prefix.clone())
+                library.symbols.push(prefix)
         var child_at = terminal.next + terminal.value
         if child_at >= trie.len(): continue
         let children = trie[child_at] as i64
@@ -306,13 +306,13 @@ fn fs_str_less(a: &str, b: &str) -> bool:
 fn fs_sorted(items: &List[str]) -> List[str]:
     if items.len() <= 1:
         let one: List[str] = List.new()
-        for i in 0..items.len(): one.push(items[i].clone())
+        for i in 0..items.len(): one.push(items[i])
         return one
     let mid = items.len() / 2
     let left: List[str] = List.new()
     let right: List[str] = List.new()
     for i in 0..items.len():
-        if i < mid: left.push(items[i].clone()) else: right.push(items[i].clone())
+        if i < mid: left.push(items[i]) else: right.push(items[i])
     let a = fs_sorted(&left)
     let b = fs_sorted(&right)
     let out: List[str] = List.new()
@@ -320,10 +320,10 @@ fn fs_sorted(items: &List[str]) -> List[str]:
     var j = 0
     while i < a.len() or j < b.len():
         if j >= b.len() or (i < a.len() and not fs_str_less(b[j], a[i])):
-            out.push(a[i].clone())
+            out.push(a[i])
             i = i + 1
         else:
-            out.push(b[j].clone())
+            out.push(b[j])
             j = j + 1
     out
 
@@ -375,7 +375,7 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
     var text = StringBuilder.new()
     var next = 0
     while next < queue.len():
-        let current = queue[next].clone()
+        let current = queue[next]
         next = next + 1
         let library = fs_read_library(cache, current)
         if library.problem.len() > 0:
@@ -385,7 +385,7 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
             var known = false
             for s in 0..queue.len():
                 if queue[s] == library.reexports[r]: known = true
-            if not known: queue.push(library.reexports[r].clone())
+            if not known: queue.push(library.reexports[r])
     text.push_str("...\n")
     text.to_str()
 
@@ -398,7 +398,7 @@ fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
     let cache = fs_open_cache()
     if cache.problem.len() > 0:
         fs_close_cache(&cache)
-        return cache.problem.clone()
+        return cache.problem
     for i in 0..names.len():
         let tbd = fs_framework_tbd(&cache, names[i])
         if tbd.starts_with("error: "):
@@ -418,7 +418,7 @@ fn framework_names_in_link_args(link_args: &List[str]) -> List[str]:
     let out: List[str] = List.new()
     for i in 0..link_args.len():
         if (link_args[i] == "-framework" or link_args[i] == "-weak_framework") and i + 1 < link_args.len():
-            out.push(link_args[i + 1].clone())
+            out.push(link_args[i + 1])
     out
 
 // `with __framework-stubs <dir> <Name>...`: the step `with get` runs, on its
@@ -428,7 +428,7 @@ fn with_framework_stubs_main(args: &List[str]) -> i32:
         runtime_eprint("usage: with __framework-stubs <dir> <Framework>...")
         return 2
     let names: List[str] = List.new()
-    for i in 1..args.len(): names.push(args[i].clone())
+    for i in 1..args.len(): names.push(args[i])
     let problem = framework_stubs_write(args[0], &names)
     if problem.len() > 0:
         runtime_eprint("error: framework stubs: " ++ problem)

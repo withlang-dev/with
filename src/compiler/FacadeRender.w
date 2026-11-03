@@ -150,9 +150,9 @@ fn facade_render_presentation_prefix() -> str: "__with_presented_"
 fn facade_render_shown_names(text: &str) -> str:
     let prefix = facade_render_presentation_prefix()
     if not text.contains(prefix):
-        return text.clone()
+        return text
     let parts = text.split(prefix)
-    var out = parts[0].clone()
+    var out = parts[0]
     for i in 1..parts.len():
         let at = parts[i].find("__of__")
         out = out ++ (if at >= 0: parts[i].slice(at + 6, parts[i].len()) else: prefix ++ parts[i])
@@ -205,7 +205,7 @@ fn facade_render_item_rename_of(pool: &AstPool, intern: &InternPool, item: i32) 
     let cstart = pool.get_data1(item as NodeId)
     for k in 0..pool.get_data2(item as NodeId):
         let clause = pool.get_extra(cstart + k)
-        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_RENAME: return intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId))).clone()
+        if pool.get_data0(clause as NodeId) == FACADE_CLAUSE_RENAME: return intern.resolve(pool.get_extra(pool.get_data1(clause as NodeId)))
     ""
 
 // `message <fn>` (ruling Amendment 3, §16.2b.4): how one of `resource`'s
@@ -301,7 +301,7 @@ fn facade_render_public(text: &str) -> str:
         // impl too.
         if line.starts_with("impl Drop for ") or line.starts_with("impl[Origin] Drop for "): in_drop = true
         else if line.starts_with("impl ") or line.starts_with("impl["): in_drop = false
-        var shown = line.clone()
+        var shown = line
         if line.starts_with("type ") or line.starts_with("error ") or line.starts_with("fn "):
             shown = "pub " ++ line
         else if not in_drop and (line.starts_with("    fn ") or line.starts_with("    mut fn ") or line.starts_with("    move fn ")):
@@ -373,7 +373,7 @@ fn facade_render_handle_for(pool: &AstPool, intern: &InternPool, repr: &str) -> 
         let r = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.get_extra(pool.get_data1(item as NodeId)) as NodeId))
         if r == repr:
             let hname: str = intern.resolve(pool.get_data0(item as NodeId))
-            found = hname.clone()
+            found = hname
             n = n + 1
     if n == 1: found else: ""
 
@@ -395,18 +395,18 @@ fn facade_render_handle_callback_type(pool: &AstPool, intern: &InternPool, text:
     // declares an unsafe one, as for the typed callback).
     let raw = facade_render_callback_raw_type(facade_render_unalias(pool, intern, text))
     if not facade_render_is_callable_type(raw):
-        return text.clone()
+        return text
     let (head, parts, tail) = facade_render_callable_parts(raw)
     if head.len() == 0:
-        return text.clone()
+        return text
     var out = ""
     var changed = false
     for j in 0..parts.len():
         let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
         if handle.len() > 0: changed = true
-        out = out ++ (if j > 0: ", " else: "") ++ (if handle.len() > 0: handle.clone() else: parts[j].clone())
+        out = out ++ (if j > 0: ", " else: "") ++ (if handle.len() > 0: handle else: parts[j])
     if not changed:
-        return text.clone()
+        return text
     head ++ out ++ tail
 
 // A NUL-terminated C string's pointer type as c_import spells it, aliases
@@ -478,10 +478,10 @@ fn facade_render_lend_methods(pool: &AstPool, intern: &InternPool, ci: &List[i32
         let bridge = facade_render_bridge(pool, intern, decl, 1, -1, "")
         if not bridge.ok:
             continue
-        let params = bridge.params.clone()
-        let args = bridge.args.clone()
+        let params = bridge.params
+        let args = bridge.args
         let pro = facade_render_indent(bridge.prologue, "        ")
-        let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg.clone()
+        let call_args = if args.len() > 0: repr_arg ++ ", " ++ args else: repr_arg
         if li.text_view:
             // `returns borrow CStr from …` / `returns static CStr` (ruling
             // §32, §40, §41; spec §16.2b.8): the nullable foreign string is
@@ -729,12 +729,12 @@ fn facade_render_present(pool: &AstPool, intern: &InternPool, ci: &List[i32], re
             continue
         let explicit: bool = s.explicit[i]
         if explicit:
-            return s.names[i].clone()
+            return s.names[i]
         for j in 0..s.cnames.len():
             if j != i and s.names[j] == s.names[i]:
-                return cname.clone()
-        return s.names[i].clone()
-    cname.clone()
+                return cname
+        return s.names[i]
+    cname
 
 // Why `cname` keeps its imported name on `resource` — the other operations
 // its shortened name would also spell, as "'db_get' (a lend method), the
@@ -751,7 +751,7 @@ fn facade_render_presentation_clash(pool: &AstPool, intern: &InternPool, ci: &Li
                 continue
             let cn = s.cnames[j]
             let role = s.roles[j]
-            let shown = if cn.len() == 0: role.clone() else: f"'{cn}' ({role})"
+            let shown = if cn.len() == 0: role else: f"'{cn}' ({role})"
             others = others ++ (if others.len() > 0: ", " else: "") ++ shown
         return others
     ""
@@ -768,7 +768,7 @@ fn facade_render_presented_ops(pool: &AstPool, intern: &InternPool, ci: &List[i3
         for k in 0..out.len():
             if out[k] == cn: seen = true
         if not seen:
-            out.push(cn.clone())
+            out.push(cn)
     out
 
 // Those of them an fn item renames.
@@ -777,7 +777,7 @@ fn facade_render_renamed_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32]
     let out: List[str] = List.new()
     for i in 0..ops.len():
         if facade_render_item_rename(pool, intern, ops[i]).len() > 0:
-            out.push(ops[i].clone())
+            out.push(ops[i])
     out
 
 // The shortened name of `cname` on `resource`, ambiguity aside ("" when no
@@ -810,7 +810,7 @@ fn facade_render_surface(pool: &AstPool, intern: &InternPool, ci: &List[i32], re
             if parent > 0:
                 let more = facade_render_prefix_names(pool, intern, parent)
                 for mi in 0..more.len():
-                    names.push(more[mi].clone())
+                    names.push(more[mi])
         let role = if kind == FACADE_CLAUSE_DESTROYS: "a destroying method" else: "a constructor"
         s = facade_render_surface_add(s, cname, &names, facade_render_item_rename(pool, intern, cname), role)
     s = facade_render_surface_push(s, "", "drop", true, "the resource's Drop")
@@ -862,10 +862,10 @@ fn facade_render_surface_add(s0: FacadeSurface, cname: &str, prefixes: &List[str
 
 fn facade_render_surface_push(s0: FacadeSurface, cname: &str, name: &str, explicit: bool, role: &str) -> FacadeSurface:
     var s = s0
-    s.cnames.push(cname.clone())
-    s.names.push(name.clone())
+    s.cnames.push(cname)
+    s.names.push(name)
     s.explicit.push(explicit)
-    s.roles.push(role.clone())
+    s.roles.push(role)
     s
 
 // The struct names a resource's operations may be shortened by: the
@@ -893,7 +893,7 @@ fn facade_render_prefix_names(pool: &AstPool, intern: &InternPool, resource: i32
 // The struct name beneath one level of pointer, or "" for a shape with no
 // name to shorten by (a C string, a pointer to a pointer, `void *`).
 fn facade_render_struct_name(text: &str) -> str:
-    var t: str = text.clone()
+    var t: str = text
     if t.starts_with("*mut "): t = t.slice(5, t.len())
     else if t.starts_with("*const "): t = t.slice(7, t.len())
     if t.starts_with("*") or t.starts_with("[") or t.starts_with("fn(") or t == "c_void" or t == "i8" or t == "c_char" or t == "u8":
@@ -1248,7 +1248,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
     let deps = facade_render_item_deps(pool, intern, ci, item)
     if not deps.ok:
         return ("", facade_render_no_error_use())
-    let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text.clone()
+    let field = if pinned: "Box[" ++ repr_text ++ "]" else: repr_text
     // Stage 9 (ruling §45, spec §16.2b.9): userdata a callback method
     // retains is kept by the resource — each value in its own Box cell,
     // handed to C as the pointer, and released after the resource is
@@ -1351,7 +1351,7 @@ fn facade_render_resource(pool: &AstPool, intern: &InternPool, ci: &List[i32], i
         // bridge's prologue locals, made before the call.
         let pro = facade_render_indent(bridge.prologue, "    ")
         let call = facade_render_call(pool, intern, producer, args)
-        var result = name.clone()
+        var result = name
         if facade_render_unalias(pool, intern, repr_text).starts_with("*"):
             // Unknown nullability is nullable, never silently non-null
             // (§16.2b.8): a pointer producer yields `Option[R]`, and a NULL
@@ -1720,8 +1720,8 @@ fn facade_render_init(pool: &AstPool, intern: &InternPool, name: &str, repr_text
     let status_type = ret.slice(4, ret.len())
     if ok_syms.len() == 0:
         return out ++ " -> (" ++ status_type ++ ", " ++ name ++ "):\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", " ++ made ++ ")\n"
-    let err = if shared.len() > 0: shared.clone() else: facade_render_error_name(name)
-    let failed_args = if shared_message: status ++ ", \"\"" else: status.clone()
+    let err = if shared.len() > 0: shared else: facade_render_error_name(name)
+    let failed_args = if shared_message: status ++ ", \"\"" else: status
     out ++ " -> Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]:\n    var " ++ repr ++ " = " ++ storage ++ "\n    let " ++ status ++ " = " ++ call ++ "\n    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ": return Err(" ++ err ++ ".Failed(" ++ failed_args ++ "))\n    Ok(" ++ facade_render_ok_value(ok_syms, status, made) ++ ")\n"
 
 // The failure test of `ok C1, C2, …` over the status local (§16.2b.4, ruling
@@ -1738,10 +1738,10 @@ fn facade_render_not_ok(intern: &InternPool, ok_syms: &List[i32], status: &str) 
 // (`(status, Option[R])`, an in-place `(status, R)`). One success status
 // needs no carrying: it is the constant.
 fn facade_render_ok_type(ok_syms: &List[i32], status_type: &str, name: &str) -> str:
-    if ok_syms.len() > 1: "(" ++ status_type ++ ", " ++ name ++ ")" else: name.clone()
+    if ok_syms.len() > 1: "(" ++ status_type ++ ", " ++ name ++ ")" else: name
 
 fn facade_render_ok_value(ok_syms: &List[i32], status: &str, made: &str) -> str:
-    if ok_syms.len() > 1: "(" ++ status ++ ", " ++ made ++ ")" else: made.clone()
+    if ok_syms.len() > 1: "(" ++ status ++ ", " ++ made ++ ")" else: made
 
 // An out-parameter producer's constructor (ruling §16, spec §16.2b.4). The
 // physical commitment: initialize the slot to NULL, call, inspect the slot —
@@ -1810,13 +1810,13 @@ fn facade_render_out_producer(pool: &AstPool, intern: &InternPool, name: &str, r
     if ok_syms.len() == 0:
         let result = "(" ++ status_type ++ ", Option[" ++ name ++ "])"
         return (head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n    (" ++ status ++ ", if " ++ slot_var ++ " == null: None else: Some(" ++ made ++ "))\n", result)
-    let err = if shared.len() > 0: shared.clone() else: facade_render_error_name(name)
+    let err = if shared.len() > 0: shared else: facade_render_error_name(name)
     let result = "Result[" ++ facade_render_ok_type(ok_syms, status_type, name) ++ ", " ++ err ++ "]"
     var out = head ++ " -> " ++ result ++ ":\n" ++ null_slot ++ "    let " ++ status ++ " = " ++ call ++ "\n"
     out = out ++ "    if " ++ facade_render_not_ok(intern, ok_syms, status) ++ ":\n"
     // The text is read first: destroying what a failure produced is another
     // call into the library, which may overwrite it.
-    var failed_args = status.clone()
+    var failed_args = status
     if message_call.len() > 0:
         let text = facade_render_fresh("facade_text", taken)
         let message = facade_render_fresh("facade_message", taken)
@@ -1912,7 +1912,7 @@ fn facade_render_shared_error_type(pool: &AstPool, intern: &InternPool, ci: &Lis
     var status_type = ""
     var nothing_produced = false
     for k in 0..uses.len():
-        if status_type.len() == 0: status_type = uses[k].status_type.clone()
+        if status_type.len() == 0: status_type = uses[k].status_type
         if uses[k].nothing_produced: nothing_produced = true
     if status_type.len() == 0:
         let extra_start = pool.get_data1(facade as NodeId)
@@ -2021,7 +2021,7 @@ fn facade_render_repr_arg(pool: &AstPool, intern: &InternPool, decl: i32, repr_t
         return ""
     let p0 = facade_render_unalias(pool, intern, render_type_expr(pool, intern, pool.fn_param_type(pool.fn_meta_param_start(meta), 0) as NodeId))
     let repr = facade_render_unalias(pool, intern, repr_text)
-    if p0 == repr: return if pinned: "" else: place.clone()
+    if p0 == repr: return if pinned: "" else: place
     if facade_render_const_of(p0, repr): return place ++ " as " ++ p0
     if (p0 == "*mut c_void" or p0 == "*const c_void") and repr.starts_with("*"): return place ++ " as " ++ p0
     if p0 == "*mut " ++ repr: return if pinned: place ++ ".as_mut_ptr()" else: "&raw mut " ++ place
@@ -2088,7 +2088,7 @@ fn facade_render_unalias(pool: &AstPool, intern: &InternPool, text: &str) -> str
         return "*mut " ++ facade_render_unalias(pool, intern, text.slice(5, text.len()))
     if text.starts_with("*const "):
         return "*const " ++ facade_render_unalias(pool, intern, text.slice(7, text.len()))
-    var t: str = text.clone()
+    var t: str = text
     facade_render_alias_index(pool, intern)
     for _ in 0..16:
         let target: str = g_facade_alias_targets.get(t) ?? ""
@@ -2126,7 +2126,7 @@ fn facade_render_params(pool: &AstPool, intern: &InternPool, decl: i32, skip: i3
 // nothing — facade_render_deps).
 fn facade_render_params_but(pool: &AstPool, intern: &InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> (str, str):
     let bridge = facade_render_bridge(pool, intern, decl, skip, slot, slot_arg)
-    (bridge.params.clone(), bridge.args.clone())
+    (bridge.params, bridge.args)
 
 // ── D64: buffer pairing and fixed arguments (§16.2b.8, §16.2b.11) ──────
 //
@@ -2244,7 +2244,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             b.prologue = "let " ++ local ++ ": Option[" ++ raw ++ "] = None\n"
             b.args = "unsafe { transmute[" ++ raw ++ "](" ++ local ++ ") }"
             return b
-        b.args = fixed.clone()
+        b.args = fixed
         return b
     let (bp, bl, inout, elements) = facade_render_buffer_of(pool, intern, decl, pi)
     if bp < 0 and bl >= 0 or bl < 0 and bp >= 0:
@@ -2261,7 +2261,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         let local = facade_render_fresh(pname ++ "_ptr", taken)
         b.prologue = "let " ++ local ++ ": " ++ ptype ++ " = if " ++ pname ++ ".len() == 0: null else: " ++ addr ++ " as " ++ ptype ++ "\n"
         b.params = pname ++ ": " ++ slicety
-        b.args = local.clone()
+        b.args = local
         return b
     if bl == pi:
         let bname = facade_render_param_name(pool, intern, start, bp)
@@ -2269,7 +2269,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         if inout != 0 and not unaliased.starts_with("*mut "):
             b.ok = false
             return b
-        let count_type = if inout == 0: ptype.clone() else: unaliased.slice(5, unaliased.len())
+        let count_type = if inout == 0: ptype else: unaliased.slice(5, unaliased.len())
         let count = facade_render_fresh(bname ++ "_count", taken)
         let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
         let unit = if elements != 0: "elements" else: "bytes"
@@ -2277,10 +2277,10 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         b.prologue = b.prologue ++ "if " ++ count ++ " < 0 or " ++ count ++ " as u64 != " ++ bname ++ ".len() as u64: panic(\"" ++ fname ++ ": buffer count in " ++ unit ++ " does not fit the C count type (§16.2b.8)\")\n"
         b.args = (if inout == 0: "" else: "&raw mut ") ++ count
         if inout != 0:
-            b.cap_var = count.clone()
-            b.cap_type = count_type.clone()
-            b.cap_of = bname.clone()
-            b.cap_unit = unit.clone()
+            b.cap_var = count
+            b.cap_type = count_type
+            b.cap_of = bname
+            b.cap_unit = unit
         return b
     // D122 (§16.2b.8): `text param N` — input text of any C character
     // type takes a `str`, copied to a NUL-terminated temporary for the
@@ -2293,8 +2293,8 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
         b.params = pname ++ ": &str"
         b.args = "(" ++ local ++ ".as_cstr().ptr() as " ++ ptype ++ ")"
         return b
-    var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
-    var arg = pname.clone()
+    var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype
+    var arg = pname
     // D121 step 6 (§16.2b.8): `nullable param N` on a C string presents
     // `Option[&str]`; the text crosses as a NUL-terminated temporary that
     // outlives the call, None as NULL (libxml2's optional encoding).
@@ -2335,9 +2335,9 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             let local = facade_render_fresh(pname ++ "_raw", taken)
             b.prologue = "let " ++ local ++ ": " ++ raw ++ " = unsafe { transmute[" ++ raw ++ "](" ++ pname ++ ") }\n"
             shown = "Option[" ++ ptype ++ "]"
-            arg = local.clone()
+            arg = local
     b.params = pname ++ ": " ++ shown
-    b.args = arg.clone()
+    b.args = arg
     b
 
 fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge) -> FacadeBridge:
@@ -2351,10 +2351,10 @@ fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge) -> Fa
         b.args = b.args ++ part.args
     b.prologue = b.prologue ++ part.prologue
     if part.cap_var.len() > 0:
-        b.cap_var = part.cap_var.clone()
-        b.cap_type = part.cap_type.clone()
-        b.cap_of = part.cap_of.clone()
-        b.cap_unit = part.cap_unit.clone()
+        b.cap_var = part.cap_var
+        b.cap_type = part.cap_type
+        b.cap_of = part.cap_of
+        b.cap_unit = part.cap_unit
     b
 
 fn facade_render_bridge(pool: &AstPool, intern: &InternPool, decl: i32, skip: i32, slot: i32, slot_arg: &str) -> FacadeBridge:
@@ -2546,7 +2546,7 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
         let bridge = facade_render_bridge(pool, intern, decl, 0, -1, "")
         if not bridge.ok:
             continue
-        let base = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
+        let base = if li.rename != 0: presented else: facade_render_bridge_name(cname)
         if li.variadic != 0:
             // One function per case (D66, §16.2b.5), `<base>__<CONST>`;
             // a call to the presented name is retargeted to the case
@@ -2567,7 +2567,7 @@ fn facade_render_free_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32], f
             continue
         if facade_render_fn_oks(pool, intern, decl).len() > 0:
             out = out ++ facade_render_fn_error_type(pool, intern, decl, presented, false)
-        let rendered = if li.rename != 0: presented.clone() else: facade_render_bridge_name(cname)
+        let rendered = if li.rename != 0: presented else: facade_render_bridge_name(cname)
         let (result, body) = facade_render_bridge_body(pool, intern, decl, &bridge, facade_render_call(pool, intern, decl, bridge.args), presented, "    ", "")
         out = out ++ "fn " ++ rendered ++ "(" ++ bridge.params ++ ")" ++ result ++ ":\n" ++ facade_render_indent(bridge.prologue, "    ") ++ body
     out
@@ -2617,11 +2617,11 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
         if not bridge.ok:
             continue
         let value = facade_render_fresh("value", taken)
-        var params = bridge.params.clone()
+        var params = bridge.params
         if params.len() > 0: params = params ++ ", "
-        var args = bridge.args.clone()
+        var args = bridge.args
         if args.len() > 0: args = args ++ ", "
-        var pro = bridge.prologue.clone()
+        var pro = bridge.prologue
         if pool.get_extra(ops + 2) != 0:
             // A callback case (D66 §16.2b.5, §16.2b.9): the callback's C
             // type is the case's explicit `as T`, presented with its one
@@ -2663,7 +2663,7 @@ fn facade_render_variadic_cases(pool: &AstPool, intern: &InternPool, decl: i32, 
         else:
             params = params ++ value ++ ": " ++ ty
             args = args ++ value
-        let call_args = if repr_arg.len() > 0: repr_arg ++ ", " ++ args else: args.clone()
+        let call_args = if repr_arg.len() > 0: repr_arg ++ ", " ++ args else: args
         out = out ++ head ++ facade_render_variadic_case_name(base, sel) ++ "(" ++ params ++ ")" ++ ret ++ ":\n" ++ facade_render_indent(pro, indent) ++ indent ++ facade_render_call(pool, intern, decl, call_args) ++ "\n"
     out
 
@@ -2688,7 +2688,7 @@ fn facade_render_record_view_type(pool: &AstPool, intern: &InternPool, decl: i32
 // parameter list, so it is spelled `p_N` (ci_escape_param_name).
 fn facade_render_param_name(pool: &AstPool, intern: &InternPool, start: i32, pi: i32) -> str:
     let pname: str = intern.resolve(pool.fn_param_name(start, pi))
-    let bare: str = if pname.starts_with("__param_"): pname.slice(8, pname.len()) else: pname.clone()
+    let bare: str = if pname.starts_with("__param_"): pname.slice(8, pname.len()) else: pname
     ci_escape_param_name(bare)
 
 // Every parameter name of the declaration, ", "-separated.
@@ -2709,7 +2709,7 @@ fn facade_render_param_names(pool: &AstPool, intern: &InternPool, decl: i32) -> 
 // a C parameter may well be named `repr`, `status` or `slot`.
 fn facade_render_fresh(base: &str, taken: &str) -> str:
     let names = ", " ++ taken ++ ", "
-    var name: str = base.clone()
+    var name: str = base
     while names.contains(", " ++ name ++ ", "):
         name = name ++ "_"
     name
@@ -3045,7 +3045,7 @@ fn facade_render_is_callable_type(text: &str) -> bool:
 // The C callback type less `unsafe` — what the typed callback is
 // transmuted to (a safe extern fn passes where C declares an unsafe one).
 fn facade_render_callback_raw_type(text: &str) -> str:
-    if text.starts_with("unsafe "): text.slice(7, text.len()) else: text.clone()
+    if text.starts_with("unsafe "): text.slice(7, text.len()) else: text
 
 // A callable type's text split at its parameter list: the text through the
 // opening parenthesis, each top-level parameter, and the rest from the
@@ -3096,7 +3096,7 @@ fn facade_render_callback_type(pool: &AstPool, intern: &InternPool, text: &str) 
     var out = ""
     for pi in 0..parts.len():
         let p = facade_render_unalias(pool, intern, parts[pi])
-        var shown = parts[pi].clone()
+        var shown = parts[pi]
         if p == "*mut c_void" or p == "*const c_void":
             slots = slots + 1
             shown = "&U"
@@ -3169,12 +3169,12 @@ fn facade_render_wrapped_type(pool: &AstPool, intern: &InternPool, cbi: &FacadeC
     for j in 0..parts.len():
         if k >= 0 and j == cbi.argc_index[k]:
             continue
-        var shown = parts[j].clone()
+        var shown = parts[j]
         if k >= 0 and j == cbi.argv_index[k]:
-            shown = cbi.argv_type[k].clone()
+            shown = cbi.argv_type[k]
         else:
             let handle = facade_render_handle_for(pool, intern, facade_render_unalias(pool, intern, parts[j]))
-            if handle.len() > 0: shown = handle.clone()
+            if handle.len() > 0: shown = handle
         out = out ++ (if n > 0: ", " else: "") ++ shown
         n = n + 1
     head ++ out ++ (if n > 0: ", " else: "") ++ "&U" ++ tail
@@ -3199,7 +3199,7 @@ fn facade_render_wrapper(pool: &AstPool, intern: &InternPool, ci: &List[i32], cb
     var h = -1
     for j in 0..parts.len():
         let a = facade_render_fresh(f"facade_a{j}", taken)
-        names.push(a.clone())
+        names.push(a)
         params = params ++ (if j > 0: ", " else: "") ++ a
         if facade_render_unalias(pool, intern, parts[j]) == hrepr: h = j as i32
     if h < 0:
@@ -3209,9 +3209,9 @@ fn facade_render_wrapper(pool: &AstPool, intern: &InternPool, ci: &List[i32], cb
     body = body ++ inner ++ "let " ++ d ++ " = " ++ facade_render_call(pool, intern, acc_decl, names[h]) ++ " as *const " ++ cell_type ++ "\n"
     let k = facade_render_argv_of(cbi, pi)
     if k >= 0:
-        let argc = names[cbi.argc_index[k]].clone()
-        let argv = names[cbi.argv_index[k]].clone()
-        let list_type = cbi.argv_type[k].clone()
+        let argc = names[cbi.argc_index[k]]
+        let argv = names[cbi.argv_index[k]]
+        let list_type = cbi.argv_type[k]
         let hname = if list_type.starts_with("&[]"): list_type.slice(3, list_type.len()) else: list_type.slice(2, list_type.len())
         let alias = facade_render_slice_alias(hname)
         body = body ++ inner ++ "if " ++ argc ++ " < 0: panic(\"" ++ fname ++ ": C passed a callback a negative count for its argument vector (§16.2b.9)\")\n"
@@ -3222,7 +3222,7 @@ fn facade_render_wrapper(pool: &AstPool, intern: &InternPool, ci: &List[i32], cb
     for j in 0..parts.len():
         if k >= 0 and j == cbi.argc_index[k]:
             continue
-        var arg = names[j].clone()
+        var arg = names[j]
         if k >= 0 and j == cbi.argv_index[k]:
             arg = (if cbi.argv_type[k].starts_with("&"): "&" else: "") ++ s
         else:
@@ -3274,7 +3274,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
         let decl = cbi.decl
         let meta = pool.find_fn_meta(decl as NodeId)
         let fname: str = intern.resolve(pool.get_data0(decl as NodeId))
-        let mname = if hosted: facade_render_present(pool, intern, ci, resource, fname) else: if cbi.rename != 0: intern.resolve(cbi.rename).clone() else: facade_render_bridge_name(fname)
+        let mname = if hosted: facade_render_present(pool, intern, ci, resource, fname) else: if cbi.rename != 0: intern.resolve(cbi.rename) else: facade_render_bridge_name(fname)
         let repr_arg = if hosted: facade_render_repr_arg(pool, intern, decl, repr_text, "self.repr", pinned) else: ""
         if hosted and repr_arg.len() == 0:
             continue
@@ -3318,13 +3318,13 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
             // handle (§16.2b.9).
             cb_type = facade_render_handle_callback_type(pool, intern, cb_type)
         var bridge = facade_render_empty_bridge()
-        bridge.args = repr_arg.clone()
+        bridge.args = repr_arg
         var ud_name = ""
         var cb_name = ""
         for pi in skip..pool.fn_meta_param_count(meta):
             if pi == cbi.destroy:
                 var destroy_part = facade_render_empty_bridge()
-                destroy_part.args = free.clone()
+                destroy_part.args = free
                 bridge = facade_render_append_bridge(move bridge, &destroy_part)
                 continue
             if wrapped.contains(pi):
@@ -3336,7 +3336,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
                 // D102 (§16.2b.8): `nullable param N` presents a wrapped
                 // callback as `Option` of its shape; `None` reaches C as NULL
                 // through the code-pointer transmute below.
-                wrapped_part.params = wname ++ ": " ++ (if facade_render_param_is_nullable(pool, intern, decl, pi): "Option[" ++ wshown ++ "]" else: wshown.clone())
+                wrapped_part.params = wname ++ ": " ++ (if facade_render_param_is_nullable(pool, intern, decl, pi): "Option[" ++ wshown ++ "]" else: wshown)
                 wrapped_part.args = facade_render_fresh(f"facade_c{pi}", taken)
                 bridge = facade_render_append_bridge(move bridge, &wrapped_part)
                 wrapped_names.push(wname)
@@ -3349,41 +3349,41 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
                 continue
             let pname = facade_render_param_name(pool, intern, start, pi)
             let ptype = facade_render_param_type(pool, intern, decl, pi)
-            var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype.clone()
-            var arg = pname.clone()
+            var shown = if ptype == "*const i8" or ptype == "*const c_char": "&str" else: ptype
+            var arg = pname
             if pi == cbi.userdata:
-                ud_name = pname.clone()
+                ud_name = pname
                 if kept:
                     shown = "U"
-                    arg = ptr.clone()
+                    arg = ptr
                 else if cbi.nullable:
                     // A nullable callback's userdata (#1618): absent with
                     // it — `Option[&U]`, NULL to C for None.
                     shown = "Option[&U]"
-                    arg = nud.clone()
+                    arg = nud
                 else:
                     shown = "&U"
                     arg = pname ++ " as *const U as " ++ facade_render_unalias(pool, intern, ptype)
             else if pi == cbi.callback:
-                cb_name = pname.clone()
+                cb_name = pname
                 if cbi.nullable:
                     // `nullable param N` on the paired callback (ruling
                     // §43, spec §16.2b.8): `Option` of the typed callback,
                     // NULL to C for None.
                     shown = "Option[" ++ cb_type ++ "]"
-                    arg = ncb.clone()
+                    arg = ncb
                 else:
-                    shown = cb_type.clone()
+                    shown = cb_type
                     arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
             var callback_part = facade_render_empty_bridge()
             callback_part.params = pname ++ ": " ++ shown
-            callback_part.args = arg.clone()
+            callback_part.args = arg
             bridge = facade_render_append_bridge(move bridge, &callback_part)
         if not bridge.ok:
             continue
         let call = facade_render_call(pool, intern, decl, bridge.args)
         let (ret, call_body) = facade_render_bridge_body(pool, intern, decl, &bridge, call, mname, indent, if hosted: facade_render_message_call(pool, intern, ci, resource) else: "")
-        let shown_ret = if not hosted and ret.len() == 0: " -> Unit" else: ret.clone()
+        let shown_ret = if not hosted and ret.len() == 0: " -> Unit" else: ret
         let head = (if not hosted: "fn " else: if cbi.retained: "    mut fn " else: "    fn ") ++ mname ++ (if generic: "[U]" else: "") ++ "(" ++ bridge.params ++ ")" ++ shown_ret ++ ":\n"
         var body = facade_render_indent(bridge.prologue, indent)
         var wrapped_failed = false
@@ -3405,7 +3405,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
         if generic and kept:
             let ud_type = facade_render_unalias(pool, intern, facade_render_param_type(pool, intern, decl, cbi.userdata))
             // The program's callbacks ride in the box as code pointers.
-            var boxed = ud_name.clone()
+            var boxed = ud_name
             for wi in 0..wrapped.len():
                 let p = facade_render_fresh(f"facade_p{wrapped[wi]}", taken)
                 body = body ++ indent ++ "let " ++ p ++ ": *mut c_void = unsafe { transmute[*mut c_void](" ++ wrapped_names[wi] ++ ") }\n"

@@ -158,7 +158,7 @@ fn resolution_violation(mut report: AnalysisReport, sema: &Sema, site: &Resoluti
     fact.node = node
     fact.body_sym = body.fn_sym
     fact.symbol = body.fn_sym
-    fact.path = site.path.clone()
+    fact.path = site.path
     fact.name = with_str_clone_ref(fn_name)
     fact.detail = "resolution: " ++ message
     if node > 0 and node < sema.ast.node_count():

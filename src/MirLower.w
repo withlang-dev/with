@@ -3084,7 +3084,7 @@ impl MirBuilder:
         -1
 
     mut fn try_resolve_module_const_type(sym: i32) -> i32:
-        let target_name = self.pool.resolve_symbol(sym).clone()
+        let target_name = self.pool.resolve_symbol(sym)
         for di in 0..self.ast.decl_count():
             let decl = self.ast.get_decl(di)
             if self.ast.kind(decl) != NodeKind.NK_LET_DECL:
@@ -3113,7 +3113,7 @@ impl MirBuilder:
     mut fn mark_unsupported():
         if with_getenv_str("WITH_MIR_AUDIT").len() > 0:
             let node_kind = if self.cur_node != 0: self.ast.kind(self.cur_node) else: 0
-            let fn_name = self.pool.resolve(self.body.fn_sym).clone()
+            let fn_name = self.pool.resolve(self.body.fn_sym)
             var detail = ""
             if self.cur_node != 0:
                 detail = f" span={self.ast.get_start(self.cur_node)}..{self.ast.get_end(self.cur_node)}"
@@ -3674,14 +3674,14 @@ impl MirBuilder:
             self.lower_debug_enum(buf_op, place, resolved, enum_base)
             return
         let name_sym = if base != 0: base else: self.sema.get_type_d0(resolved as TypeId)
-        let type_name = self.sema.pool_resolve(name_sym).clone()
+        let type_name = self.sema.pool_resolve(name_sym)
         let field_count = self.sema.type_reflection_field_count(resolved)
         if field_count == 0:
             self.lower_debug_write_literal(buf_op, type_name ++ " {}", 0)
             return
         self.lower_debug_write_literal(buf_op, type_name ++ " { ", 0)
         for fi in 0..field_count:
-            let field_name = self.sema.pool_resolve(self.sema.type_reflection_field_name(resolved, fi)).clone()
+            let field_name = self.sema.pool_resolve(self.sema.type_reflection_field_name(resolved, fi))
             self.lower_debug_write_literal(buf_op, if fi > 0: ", " ++ field_name ++ ": " else: field_name ++ ": ", 0)
             let field_ty = self.sema.type_reflection_field_type_frozen(resolved, fi)
             let field_sym = self.pool.intern(field_name)
@@ -3723,7 +3723,7 @@ impl MirBuilder:
             // Each arm's formatted payload texts drop inside the arm: another
             // arm's path never initializes them (the #771 loop shape).
             let arm_frame = self.push_stmt_temp_frame()
-            let variant_name = self.sema.pool_resolve(variant_name_sym).clone()
+            let variant_name = self.sema.pool_resolve(variant_name_sym)
             self.lower_debug_write_literal(buf_op, variant_name, 0)
             if payload_count > 0:
                 self.lower_debug_write_literal(buf_op, "(", 0)

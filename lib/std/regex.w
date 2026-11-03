@@ -423,7 +423,7 @@ pub fn Regex.__capture_count(code: *const i8) -> i32:
 
 impl Regex:
     pub fn pattern() -> str:
-        self.pattern_text.clone()
+        self.pattern_text
 
     pub fn num_captures() -> i32:
         self.capture_count

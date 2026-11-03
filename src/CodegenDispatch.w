@@ -28,7 +28,7 @@ impl Codegen:
         let decl_index = self.find_decl_index(fn_node)
         let source_path =
             if decl_index >= 0: self.decl_source_path(decl_index)
-            else: self.current_decl_source_file.clone()
+            else: self.current_decl_source_file
         var msg =
             if reason == "lowering-failed":
                 "error: MIR lowering failed for function '" ++ fn_name ++ "'"
@@ -4329,7 +4329,7 @@ impl Codegen:
         let entry: i32 = entry_opt.unwrap()
         let mono: i32 = self.sema.debug_fmt_monos[entry]
         let sig: i32 = self.sema.debug_fmt_sigs[entry]
-        let name = self.sema_symbol_text(mono).clone()
+        let name = self.sema_symbol_text(mono)
         let callee = self.ensure_concrete_mir_function(0, sig, mono, mono, "`:?` formatter " ++ name)
         if callee.sym == 0:
             sema_phase_bug(f"BUG: `:?` formatter for type {resolved} has no function (D61)")
@@ -12358,7 +12358,7 @@ impl Codegen:
                 // template is interned raw at parse time. {name}->$N substitution
                 // already happened in the parser.
                 let asm_tmpl = self.decode_string_escapes(self.intern.resolve(asm_tmpl_sym))
-                let asm_constr = self.intern.resolve(asm_constr_sym).clone()
+                let asm_constr = self.intern.resolve(asm_constr_sym)
                 let asm_is_volatile = (asm_flags & 1) != 0
                 let asm_has_output = (asm_flags & 2) != 0
                 // Determine return type and collect input values.
@@ -18321,10 +18321,10 @@ impl Codegen:
     fn gen_src_intrinsic(node: i32) -> i64:
         let span_start = self.pool.get_start(node)
         let source_path = if self.current_decl_source_file.len() > 0 and self.current_decl_source_file != "<unknown>":
-            self.current_decl_source_file.clone()
+            self.current_decl_source_file
         else:
-            self.source_file.clone()
-        var source_text = self.source_text.clone()
+            self.source_file
+        var source_text = self.source_text
         if source_path.len() > 0 and source_path != self.source_file:
             let file_text = with_fs_read_file(source_path)
             if file_text.len() > 0:

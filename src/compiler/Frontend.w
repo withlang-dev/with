@@ -726,8 +726,8 @@ impl Zcu:
             for oi in 0..owns:
                 let entry = self.c_import_owns_entry_frontend(out, decl, oi)
                 let parts = entry.split("->")
-                let ctor = if parts.len() == 2: parts[0].trim().clone() else: ""
-                let dtor = if parts.len() == 2: parts[1].trim().clone() else: ""
+                let ctor = if parts.len() == 2: parts[0].trim() else: ""
+                let dtor = if parts.len() == 2: parts[1].trim() else: ""
                 let (found, ret, _) = facade_render_import_shape(out, self.pool, &self.decl_is_c_import, &ctor)
                 if ctor.len() == 0 or dtor.len() == 0:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: owns: \"{entry}\" is not 'ctor -> dtor'; owns: is a deprecated spelling of a facade resource (§16.2b.3)", span))
@@ -743,9 +743,9 @@ impl Zcu:
             for bi in 0..borrows:
                 let entry = self.c_import_borrows_entry_frontend(out, decl, bi)
                 let parts = entry.split("->")
-                let lhs = if parts.len() == 2: parts[0].trim().clone() else: ""
+                let lhs = if parts.len() == 2: parts[0].trim() else: ""
                 let open = lhs.split("(")
-                let fname = if open.len() == 2 and lhs.ends_with(")"): open[0].trim().clone() else: ""
+                let fname = if open.len() == 2 and lhs.ends_with(")"): open[0].trim() else: ""
                 if fname.len() == 0:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" is not 'fn(index) -> ctor'; borrows: is a deprecated spelling of a facade lend (§16.2b.5)", span))
                     continue
@@ -1166,7 +1166,7 @@ fn c_import_declared_and_omitted(synthetic: &str) -> List[str]:
             // prefix), never a call inside a body.
             let head = decl_line.slice(0, at as i64)
             if head.len() == 0 or head == "pub " or head == "unsafe " or head == "pub unsafe " or head == "extern " or head == "pub extern " or c_import_starts_with(head, "extern \"C\" ") or c_import_starts_with(head, "pub extern \"C\" "):
-                out.push(name.clone())
+                out.push(name)
                 break
     out
 
@@ -2618,7 +2618,7 @@ impl Zcu:
                     continue
                 // Each c_import is an owner of its own (#1753): two headers
                 // that define one constant are two imports (D70).
-                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path.clone()
+                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path
                 let name = pool.get_data0(decl)
                 if not taken.contains(name):
                     taken.insert(name, frontend_owned_text(owner))
@@ -2699,7 +2699,7 @@ impl Zcu:
                 if (pass == 0) == from_c_import:
                     continue
                 let path = self.decl_source_path_frontend(di)
-                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path.clone()
+                let owner = if from_c_import: path ++ f"/c_import{self.decl_is_c_import[di]}" else: path
                 let name = pool.get_data0(decl)
                 if not taken.contains(name):
                     taken.insert(name, frontend_owned_text(owner))
@@ -3498,7 +3498,7 @@ impl Zcu:
                     return embedded_fallback
             // Not embedded — fall through to filesystem resolution
 
-        let source_dir = if source_dir_raw.len() > 0: with_str_clone_ref(source_dir_raw) else: self.source_dir.clone()
+        let source_dir = if source_dir_raw.len() > 0: with_str_clone_ref(source_dir_raw) else: self.source_dir
         let has_root_fallback = source_dir != self.source_dir
 
         let primary = frontend_resolve_module_rel(source_dir, rel_primary)

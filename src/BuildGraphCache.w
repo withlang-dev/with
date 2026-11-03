@@ -253,7 +253,7 @@ fn build_cache_binary_self_id(path: &str) -> str:
     argv = build_graph_argv_append(argv, "version")
     argv = build_graph_argv_append(argv, "--self-id")
     let rc = build_graph_rt_exec_argv_capture(argv, base ++ ".out", base ++ ".err", 30000)
-    let text = if rc == 0: build_graph_rt_read_file(base ++ ".out").trim().clone() else: ""
+    let text = if rc == 0: build_graph_rt_read_file(base ++ ".out").trim() else: ""
     let _ = build_graph_rt_remove_file(base ++ ".out")
     let _ = build_graph_rt_remove_file(base ++ ".err")
     if build_cache_is_hex_digest(text): text else: ""
@@ -791,7 +791,7 @@ fn build_cache_changed_signature_parts(target: &BuildGraphTarget, root: &str, st
     for part in build_cache_signature_parts(target, root):
         let line = "\nsigpart:" ++ part.name ++ ":" ++ build_cache_sha256_text(part.text) ++ "\n"
         if not state_text.contains(line):
-            changed = if changed.len() == 0: part.name.clone() else: changed ++ ", " ++ part.name
+            changed = if changed.len() == 0: part.name else: changed ++ ", " ++ part.name
     if changed.len() == 0: "" else: " (" ++ changed ++ ")"
 
 fn build_cache_collect_input_paths(root: &str, target: &BuildGraphTarget) -> List[str]:
@@ -1006,7 +1006,7 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
             let read = effect.slice(5, effect.len())
             deps.push(if runtime_path_is_absolute(read): read else: root ++ "/" ++ read)
         else:
-            other_effects.push(effect.clone())
+            other_effects.push(effect)
     let dep_paths = build_cache_sorted_unique_strings(&deps)
     for idx in 0..dep_paths.len():
         let path = dep_paths[idx]
@@ -1131,9 +1131,9 @@ fn build_cache_store_key(root: &str, target: &BuildGraphTarget) -> str:
 // WITH_FILE_PREFIX_MAP=<root>=/with-src (#2016) included. A sibling sharing
 // its prefix (<root>-drivers/) stays as it is.
 fn build_cache_store_portable(root: &str, text: &str) -> str:
-    if root.len() == 0 or not text.contains(root): return text.clone()
+    if root.len() == 0 or not text.contains(root): return text
     var out = ""
-    var rest = text.clone()
+    var rest = text
     while true:
         let at = rest.find(root)
         if at < 0: break
@@ -1193,7 +1193,7 @@ fn build_cache_store_names_root(root: &str, rels: &List[str]) -> str:
                 if build_cache_store_text_names_root(build_graph_rt_read_file(files[fi]), root):
                     return build_cache_project_relative(root, files[fi])
         else if build_cache_store_text_names_root(build_graph_rt_read_file(path), root):
-            return rel.clone()
+            return rel
     ""
 
 fn build_cache_store_touch(entry: &str):
@@ -1252,7 +1252,7 @@ fn build_cache_store_prune(dir: &str):
         let entry = dir ++ "/" ++ entries[i]
         let used = entry ++ "/used"
         if build_graph_rt_file_exists(used) == 0: continue
-        names.push(entry.clone())
+        names.push(entry)
         stamps.push(build_cache_parse_i64(build_graph_rt_read_file(used)))
     if names.len() <= keep: return
     // Drop the oldest until `keep` remain; a few entries, so the quadratic
@@ -1291,17 +1291,17 @@ fn build_cache_store_repin_effects(state_text: &str, hash: &str) -> str:
     var out = ""
     for line in state_text.split("\n"):
         if line.len() == 0: continue
-        out = out ++ (if line.starts_with("effects:"): "effects:" ++ hash else: line.clone()) ++ "\n"
+        out = out ++ (if line.starts_with("effects:"): "effects:" ++ hash else: line) ++ "\n"
     out
 
 fn build_cache_forget_restored_fingerprints(root: &str, rels: &List[str]):
     for i in 0..rels.len():
         let path = root ++ "/" ++ rels[i]
-        build_cache_fp_memo.remove(path.clone())
+        build_cache_fp_memo.remove(path)
         if build_graph_rt_is_dir(path) != 0:
             let files = build_cache_split_lines(build_graph_rt_list_files(path))
             for fi in 0..files.len():
-                build_cache_fp_memo.remove(files[fi].clone())
+                build_cache_fp_memo.remove(files[fi])
     build_cache_tree_fp_memo = HashMap.new()
 
 fn build_cache_store_repin_signature(state_text: &str, target: &BuildGraphTarget, root: &str) -> str:
@@ -1332,7 +1332,7 @@ fn build_cache_store_record_mismatch(root: &str, state_text: &str) -> str:
             let stored_path = entry.slice(0, split as i64)
             // An `in:` line names the path as the record joined it to the
             // root; a `dep:` line names it from the root, or absolutely.
-            let current = if is_input: stored_path.clone() else: build_cache_dep_path(root, stored_path)
+            let current = if is_input: stored_path else: build_cache_dep_path(root, stored_path)
             if build_cache_fingerprint_file(current) != entry.slice((split + 1) as i64, entry.len()):
                 return "made from another " ++ build_cache_project_relative(root, stored_path)
         else if line.starts_with("env:"):

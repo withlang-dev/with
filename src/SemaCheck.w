@@ -2163,7 +2163,7 @@ impl Sema:
             if sub_kind != TypeDeclKind.Struct and sub_kind != TypeDeclKind.Union: continue
             for fi in 0..self.ast.get_extra(extra_start):
                 if self.ast.get_extra(extra_start + 1 + fi * 3 + 1) == node: return self.decl_source_path_for_node(decl)
-        self.current_module_path.clone()
+        self.current_module_path
 
     // A use that demands the numeric type `demanded` of a value whose type
     // is an inferred field's (`actual`): heard while demands are collected.
@@ -3447,7 +3447,7 @@ impl Sema:
         else:
             let qtext: str = with_str_clone_ref(self.pool_resolve(qualifier))
             let dot = qtext.find(".")
-            let root_text = if dot > 0: qtext.slice(0, dot) else: qtext.clone()
+            let root_text = if dot > 0: qtext.slice(0, dot) else: qtext
             let root = self.pool_lookup_symbol(root_text)
             if root != 0 and self.is_clause_global(root):
                 self.emit_error_with_help(f"`{word} {qtext}.{name_text}` names part of the global `{root_text}`: a `{word}` clause names whole globals", node, f"write `{word} {root_text}`")
@@ -3474,7 +3474,7 @@ impl Sema:
             if interface_decl:
                 self.emit_interface_clause_error(word, name_text, node)
             else:
-                self.emit_error(if none_text.len() > 0: none_text.clone() else: f"`{word} {name_text}`: `{name_text}` is no global", node)
+                self.emit_error(if none_text.len() > 0: none_text else: f"`{word} {name_text}`: `{name_text}` is no global", node)
             return 0
         sym
 
@@ -3528,7 +3528,7 @@ impl Sema:
                 // parameter `a`": an entry names a parameter whole.
                 let qtext: str = with_str_clone_ref(self.pool_resolve(qualifier))
                 let dot = qtext.find(".")
-                let root_text = if dot > 0: qtext.slice(0, dot) else: qtext.clone()
+                let root_text = if dot > 0: qtext.slice(0, dot) else: qtext
                 var field_of = false
                 for pi in 0..param_count:
                     if self.pool_resolve(self.ast.fn_param_name(param_start, pi)) == root_text:
@@ -13146,12 +13146,12 @@ impl Sema:
             let state = self.scope_lookup_state(sym)
             if state == VarState.MOVED and sym != self.assign_target_revive_sym:
                 if sema_debug_move_enabled():
-                    let name = self.pool_resolve(sym).clone()
+                    let name = self.pool_resolve(sym)
                     with_eprint(
                         f"[moved-use] sym={name} tid={tid} node_kind={self.ast.kind(node)}"
                     )
                 if self.discard_lets.contains(sym):
-                    let name = self.pool_resolve(sym).clone()
+                    let name = self.pool_resolve(sym)
                     let line = self.node_line(self.discard_lets.get(sym) ?? 0)
                     self.emit_error_with_help("use of moved value", node, f"`let _ = {name}` dropped `{name}` at line {line}; remove it to keep `{name}`")
                 else:
@@ -17843,7 +17843,7 @@ impl Sema:
     mut fn comptime_callable_chain(fn_sym: i32) -> str:
         if fn_sym == 0: return ""
         if self.comptime_callable_memo.contains(fn_sym):
-            return if self.comptime_callable_memo.get(fn_sym).unwrap() != 0: "" else: self.comptime_callable_chain.get(fn_sym).unwrap().clone()
+            return if self.comptime_callable_memo.get(fn_sym).unwrap() != 0: "" else: self.comptime_callable_chain.get(fn_sym).unwrap()
         if self.comptime_callable_visiting.contains(fn_sym): return ""
         let name: str = self.pool_resolve(fn_sym)
         if self.extern_fn_names.contains(fn_sym) or self.fn_is_in_unit_runtime_abi_def(fn_sym):
@@ -17891,7 +17891,7 @@ impl Sema:
             if inner.len() > 0: chain = name ++ " -> " ++ inner
         self.comptime_callable_visiting.remove(fn_sym)
         self.comptime_callable_memo.insert(fn_sym, (chain.len() == 0) as i32)
-        self.comptime_callable_chain.insert(fn_sym, chain.clone())
+        self.comptime_callable_chain.insert(fn_sym, chain)
         chain
 
     fn fn_symbol_is_comptime(fn_sym: i32) -> bool:
@@ -21934,7 +21934,7 @@ impl Sema:
             self.record_view_producer_origins(node, expr)
             return elem_view
         if container_tk == TypeKind.TY_GENERIC_INST:
-            let base_name = self.pool_resolve(self.get_type_d0(container_tid)).clone()
+            let base_name = self.pool_resolve(self.get_type_d0(container_tid))
             let is_type_level_index = self.index_expr_is_type_level(expr)
             if is_type_level_index and base_name == "List" and self.get_generic_inst_arg_count(container_tid) > 0:
                 let elem_ty = self.get_generic_inst_arg(container_tid, 0)
@@ -23869,7 +23869,7 @@ impl Sema:
             let sname: str = with_str_clone_ref(self.pool_resolve(self.get_type_d0(ty as TypeId)))
             return sname ++ " { " ++ parts ++ " }"
         for fi in 0..fields.len():
-            parts = if fi == 0: fields[fi].clone() else: parts ++ ", " ++ fields[fi]
+            parts = if fi == 0: fields[fi] else: parts ++ ", " ++ fields[fi]
         if cls == SemaExhClass.Tuple:
             return if fields.len() == 1: "(" ++ parts ++ ",)" else: "(" ++ parts ++ ")"
         let vname: str = with_str_clone_ref(self.pool_resolve(self.unqualified_enum_variant_sym(self.type_reflection_variant_name(ty, ctor))))
@@ -23943,11 +23943,11 @@ impl Sema:
                     if sub.missing:
                         let field_ws: List[str] = List.new()
                         for fi in 0..arity:
-                            field_ws.push(sub.witness[fi].clone())
+                            field_ws.push(sub.witness[fi])
                         let w: List[str] = List.new()
                         w.push(self.exh_render(cls, ty, ctor, &field_ws))
                         for ci in arity..sub_width:
-                            w.push(sub.witness[ci].clone())
+                            w.push(sub.witness[ci])
                         return SemaPatMissing { missing: true, witness: w }
                 return SemaPatMissing { missing: false, witness: List.new() }
             let dflt = self.exh_default_rows(m, &heads, &origins, width)
@@ -23961,7 +23961,7 @@ impl Sema:
             let w: List[str] = List.new()
             w.push(self.exh_render(cls, ty, first_absent, &blanks))
             for ci in 0..sub.witness.len():
-                w.push(sub.witness[ci].clone())
+                w.push(sub.witness[ci])
             return SemaPatMissing { missing: true, witness: w }
 
         // Open column: only the catch-all rows reach the next column.
@@ -23972,7 +23972,7 @@ impl Sema:
         let w: List[str] = List.new()
         w.push("_")
         for ci in 0..sub.witness.len():
-            w.push(sub.witness[ci].clone())
+            w.push(sub.witness[ci])
         SemaPatMissing { missing: true, witness: w }
 
     // A slice pattern's fixed element count: its head names plus its tail
@@ -24029,7 +24029,7 @@ impl Sema:
                 let w: List[str] = List.new()
                 w.push(self.exh_render_slice_length(n, n > longest))
                 for ci in 0..sub.witness.len():
-                    w.push(sub.witness[ci].clone())
+                    w.push(sub.witness[ci])
                 return SemaPatMissing { missing: true, witness: w }
         SemaPatMissing { missing: false, witness: List.new() }
 
@@ -24107,7 +24107,7 @@ impl Sema:
             let w: List[str] = List.new()
             w.push(if starts.len() == 1: "_" else: int_to_string(witness_value))
             for ci in 0..sub.witness.len():
-                w.push(sub.witness[ci].clone())
+                w.push(sub.witness[ci])
             return SemaPatMissing { missing: true, witness: w }
         for si in 0..starts.len():
             let seg_lo = starts[si]
@@ -24126,7 +24126,7 @@ impl Sema:
                 let w: List[str] = List.new()
                 w.push(int_to_string(seg_lo))
                 for ci in 0..sub.witness.len():
-                    w.push(sub.witness[ci].clone())
+                    w.push(sub.witness[ci])
                 return SemaPatMissing { missing: true, witness: w }
         SemaPatMissing { missing: false, witness: List.new() }
 
@@ -24144,7 +24144,7 @@ impl Sema:
         let tys: List[i32] = List.new()
         tys.push(subject_type)
         let r = self.exh_missing(SemaPatRows { cells: cells, count: count }, &tys)
-        if not r.missing: "" else: r.witness[0].clone()
+        if not r.missing: "" else: r.witness[0]
 
 impl Sema:
     fn generic_type_param_index(tp_start: i32, tp_count: i32, param_sym: i32) -> i32:
@@ -27089,7 +27089,7 @@ impl Sema:
             let truthy = self.eval_comptime_if_condition_truthy(cond)
             if truthy < 0:
                 // #2248: the evaluator's reason, when it gave one.
-                let reason = self.comptime_truthy_error.clone()
+                let reason = self.comptime_truthy_error
                 if reason.len() > 0: self.emit_error(reason, cond)
                 else: self.emit_error("comptime if condition is not comptime-evaluable", cond)
                 return -1
@@ -31247,7 +31247,7 @@ impl Sema:
             let contents = self.embed_file_contents.get(node)
             if contents.is_none():
                 return None
-            return Some(contents.unwrap().clone())
+            return Some(contents.unwrap())
         None
 
     // The module-level `let` declaring `sym`, 0 when none does.
@@ -33056,7 +33056,7 @@ impl Sema:
                 sig_idx = self.check_fn_body_concrete(method_node, subst.names, subst.types, mono_sym, concrete_params)
         if sig_idx < 0 or mono_sym == 0:
             return
-        let method = self.pool_resolve(eq_sym).clone()
+        let method = self.pool_resolve(eq_sym)
         let params = if method == "key": 1 else: 2
         var by_view = self.sig_get_param_count(sig_idx) == params
         for pi in 0..params:
@@ -36025,7 +36025,7 @@ impl Sema:
         if self.implicit_param_fillable(sig_idx, pi):
             self.emit_error("implicit parameter not provided; add a 'with' binding of the matching type", call_node)
             return
-        let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi)).clone()
+        let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi))
         let ty_name = self.type_name(self.sig_param_type(sig_idx, pi) as i32)
         self.emit_error_with_help(f"implicit parameter `{pname}` takes a non-Copy `{ty_name}`, which is never filled implicitly (§7.3a)", call_node, f"an implicit fill never consumes the `with` binding: pass the argument explicitly (`{pname}: value`, which moves it), or declare the parameter `{pname}: implicit &{ty_name}` to borrow the context")
 
@@ -36073,11 +36073,11 @@ impl Sema:
                     matched = pi
                     break
             if matched < 0:
-                let aname = self.pool_resolve(name_sym).clone()
+                let aname = self.pool_resolve(name_sym)
                 self.emit_error(f"no parameter named '{aname}'", call_node)
                 continue
             if resolved_map.contains(matched):
-                let aname = self.pool_resolve(name_sym).clone()
+                let aname = self.pool_resolve(name_sym)
                 self.emit_error(f"parameter '{aname}' specified more than once", call_node)
                 continue
             resolved_map.insert(matched, self.ast.get_extra(extra_start + ai))
@@ -36105,7 +36105,7 @@ impl Sema:
                 if fn_param_is_implicit(self.ast.fn_param_flags(ps, pi)) != 0:
                     self.emit_implicit_param_unfilled(sig_idx, ps, pi, call_node)
                 else:
-                    let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi)).clone()
+                    let pname = self.pool_resolve(self.ast.fn_param_name(ps, pi))
                     self.emit_error(f"missing argument for parameter '{pname}'", call_node)
             final_args.push(resolved_map.get(pi) ?? 0)
         self.store_resolved_call_args(call_node, final_args)
@@ -37356,7 +37356,7 @@ impl Sema:
         // check argument types and return types for builtin generic methods
         if self.get_type_kind(recv_type) == TypeKind.TY_GENERIC_INST:
             let mc_call_name = self.pool_resolve(type_name_sym) ++ "." ++ self.pool_resolve(field)
-            let mc_method_name_raw = self.pool_resolve(field).clone()
+            let mc_method_name_raw = self.pool_resolve(field)
             if type_name_sym == self.syms.fixed_string and field == self.syms.new:
                 if arg_count != 0:
                     self.emit_error("FixedString.new() expects no arguments", node)
@@ -38125,12 +38125,12 @@ impl Sema:
             if comptime_value_is_valid(path_value) == false or path_value.kind != ComptimeValueKind.CV_STR:
                 self.emit_error("embed_file() argument must be a comptime string", path_node)
                 return self.ty_str as i32
-            let source_path = self.current_module_path.clone()
+            let source_path = self.current_module_path
             let read_result = self.read_tracked_embed_file(source_path, path_value.text)
             if not read_result.ok:
                 self.emit_error(read_result.error_msg, node)
             else:
-                self.embed_file_contents.insert(node, read_result.contents.clone())
+                self.embed_file_contents.insert(node, read_result.contents)
             return self.ty_str as i32
         // Free math builtin: `cos(x)`, `pow(x, y)`. Width-generic — the result
         // is the argument's float type, and a second operand must share it.
@@ -38458,7 +38458,7 @@ impl Sema:
         let di = self.find_decl_index(decl)
         if di < 0 or di >= self.decl_source_paths.len(): return
         if di < self.decl_is_c_import.len() and self.decl_is_c_import[di] != 0: return
-        let path = self.decl_source_paths[di].clone()
+        let path = self.decl_source_paths[di]
         if self.package_of(path) == self.package_of(self.current_module_path): return
         if self.suppress_errors != 0: return
         let type_name: str = self.type_name(owner)
@@ -38720,7 +38720,7 @@ impl Sema:
         let field = self.typeinfo_module_field(callee)
         if field == 0:
             return 0
-        let method_name = self.pool_resolve(field).clone()
+        let method_name = self.pool_resolve(field)
         if self.in_comptime_fn == 0:
             self.emit_error("TypeInfo is only available in comptime context", node)
             return 0
@@ -41770,7 +41770,7 @@ impl Sema:
         if impl_node != 0 and self.ast.get_data2(impl_node) != 0: return true
         if (self.ast.get_data2(decl) / FnFlags.PUB) % 2 == 1: return true
         let path: str = match self.fn_decl_source_paths.get(method_fn):
-            Some(p) => p.clone()
+            Some(p) => p
             None => ""
         // Reached through a value, not an import: only the package decides.
         if self.package_of(path) == self.package_of(self.current_module_path) or self.decl_visible_from_current(path, 0) != 0: return true

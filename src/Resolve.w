@@ -1437,7 +1437,7 @@ fn resolve_header_namespace(header: &str) -> str:
         let ok = (c >= 'a' and c <= 'z') or (c >= 'A' and c <= 'Z') or c == '_' or (i > 0 and c >= '0' and c <= '9')
         if not ok:
             return ""
-    name.clone()
+    name
 
 // The embedded bundle whose interface names module `dotted`, or "".
 fn embedded_bundle_providing(dotted: &str) -> str:

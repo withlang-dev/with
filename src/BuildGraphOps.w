@@ -217,7 +217,7 @@ fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
     // operands are resolved; the object holds the bytes, not the names.
     let source_text = build_graph_rt_read_file(source_path)
     let resolved_text = build_graph_asm_resolve_operands(root, &source_text)
-    var assembled_path = source_path.clone()
+    var assembled_path = source_path
     if resolved_text != source_text:
         assembled_path = output_path ++ ".resolved.s"
         if build_graph_rt_write_file(assembled_path, resolved_text) != 0:
@@ -605,7 +605,7 @@ fn build_graph_run_corpus_test(root: &str, target: &BuildGraphTarget) -> i32:
     let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
-        target.entry.clone()
+        target.entry
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])
@@ -680,7 +680,7 @@ fn build_graph_run_command(root: &str, target: &BuildGraphTarget) -> i32:
     let runner_path = if runtime_path_is_absolute(target.entry) or target.entry.contains("/"):
         build_graph_resolve_project_path(root, target.entry)
     else:
-        target.entry.clone()
+        target.entry
     argv = build_graph_argv_append(argv, runner_path)
     for ai in 0..target.args.len():
         argv = build_graph_argv_append(argv, target.args[ai])

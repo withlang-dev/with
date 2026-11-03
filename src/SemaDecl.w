@@ -2210,7 +2210,7 @@ impl Sema:
         // Bind Self to method owner type for dot-name methods
         let self_sym: i32 = self.syms.self_type
         var self_type_id: i32 = 0
-        let fn_name_str = self.pool_resolve(method_base_sym).clone()
+        let fn_name_str = self.pool_resolve(method_base_sym)
         if method_owner_sym != 0:
             self_type_id = self.lookup_named_type_visible(method_owner_sym)
             if self_type_id != 0:
@@ -2680,12 +2680,12 @@ impl Sema:
         let di = self.find_decl_index(node)
         if di >= 0 and di < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[di])
-        self.current_module_path.clone()
+        self.current_module_path
 
     fn decl_source_path_for_index(decl_index: i32) -> str:
         if decl_index >= 0 and decl_index < self.decl_source_paths.len():
             return with_str_clone_ref(self.decl_source_paths[decl_index])
-        self.current_module_path.clone()
+        self.current_module_path
 
     fn decl_source_file_id_for_index(decl_index: i32) -> i32:
         if decl_index >= 0 and decl_index < self.decl_source_file_ids.len():
@@ -3332,7 +3332,7 @@ impl Sema:
         if trait_sym == 0:
             return
 
-        let trait_name = self.pool_resolve(trait_sym).clone()
+        let trait_name = self.pool_resolve(trait_sym)
         let is_lang_trait = self.lang_trait_syms.contains(trait_sym)
         if not is_lang_trait and not self.trait_name_known(trait_sym):
             self.emit_error("unknown trait", node)
@@ -4327,7 +4327,7 @@ impl Sema:
     // Validate ordering constraints for Atomic methods.
     // Checks disc enum variant value at sema time.
     mut fn validate_atomic_ordering(method_sym: i32, extra_start: i32, arg_count: i32, node: i32):
-        let method_name = self.pool_resolve_symbol(method_sym).clone()
+        let method_name = self.pool_resolve_symbol(method_sym)
         // store cannot use Acquire(1) or AcqRel(3)
         if method_name == "store" and arg_count >= 2:
             let order_node = self.ast.get_extra(extra_start + 1)

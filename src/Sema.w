@@ -4738,7 +4738,7 @@ impl Sema:
         self.index_named_type_candidate(sym, self.named_type_candidate_syms.len() as i32)
         self.named_type_candidate_syms.push(sym)
         self.named_type_candidate_tids.push(tid)
-        let path = self.current_module_path.clone()
+        let path = self.current_module_path
         self.named_type_candidate_paths.push(sema_owned_text(path))
         self.named_type_candidate_pub.push(is_pub)
         let di = if decl_node != 0: self.find_decl_index(decl_node) else: -1
@@ -4766,7 +4766,7 @@ impl Sema:
             return
         let record = self.decl_visibility_syms.len() as i32
         self.decl_visibility_syms.push(sym)
-        let path = self.current_module_path.clone()
+        let path = self.current_module_path
         self.decl_visibility_paths.push(sema_owned_text(path))
         self.decl_visibility_pub.push(is_pub)
         self.decl_visibility_nodes.push(node)
@@ -4995,7 +4995,7 @@ impl Sema:
             let text = self.module_import_paths[idx]
             if text == "std.prelude" or text == "std.prelude_core" or text == "std.prelude_alloc":
                 continue
-            let selected = if idx < self.module_import_selected.len(): self.module_import_selected[idx].clone() else: ""
+            let selected = if idx < self.module_import_selected.len(): self.module_import_selected[idx] else: ""
             if (selected.len() == 0 or sema_selection_names(selected, name)) and self.module_import_offsets[idx] > best:
                 best = self.module_import_offsets[idx]
         best
@@ -5024,7 +5024,7 @@ impl Sema:
         for fi in 0..fallback.len():
             let path = paths[fallback[fi]]
             let dotted = sema_std_module_dotted(path)
-            let mod_name = if dotted.len() > 0: dotted else: path.clone()
+            let mod_name = if dotted.len() > 0: dotted else: path
             listed = listed ++ (if fi > 0: " | " else: "") ++ "use " ++ mod_name ++ "." ++ name
         self.emit_error("'" ++ name ++ "' is ambiguous: several standard-library modules provide it; candidates: " ++ listed, node)
 
@@ -5134,7 +5134,7 @@ impl Sema:
             None => ""
 
     fn package_of(path: &str) -> str:
-        if self.package_keys.contains(path): return self.package_keys.get(path).unwrap().clone()
+        if self.package_keys.contains(path): return self.package_keys.get(path).unwrap()
         if sema_tier_path_is_std_implementation(path): "<std>" else: "<program>"
 
     fn decl_visible_from_current(target_path: &str, is_pub: i32) -> i32:
@@ -5250,7 +5250,7 @@ impl Sema:
             let text = self.module_import_paths[idx]
             if text == "std.prelude" or text == "std.prelude_core" or text == "std.prelude_alloc":
                 continue
-            let selected = if idx < self.module_import_selected.len(): self.module_import_selected[idx].clone() else: ""
+            let selected = if idx < self.module_import_selected.len(): self.module_import_selected[idx] else: ""
             if selected.len() == 0 or sema_selection_names(selected, name):
                 return ""
             excluded_by = with_str_clone_ref(text)
@@ -5605,7 +5605,7 @@ impl Sema:
                 let by = self.unselected_import_path(decl_path, sym)
                 if by.len() > 0:
                     let infix = name.index_of("$in$")
-                    let short = if infix > 0: name.slice(0, infix) else: name.clone()
+                    let short = if infix > 0: name.slice(0, infix) else: name
                     self.emit_error("'" ++ short ++ "' is not imported: `use " ++ by ++ "` names only what it selects (§18.2); add `" ++ short ++ "` to that import, or import the whole module", node)
                     return
             i = self.decl_visibility_prev[i]
@@ -6346,7 +6346,7 @@ impl Sema:
         let canonical = codegen_canonical_module_path(path)
         if canonical.starts_with("<embedded-std>/"): return canonical
         if runtime_path_is_absolute(path) and fn_abi_file_prefix_map_names(path): return canonical
-        path.clone()
+        path
 
     fn source_location_for_file_id(file_id: i32, offset: i32) -> SemaSourceLocation:
         var source_index = 0

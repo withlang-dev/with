@@ -400,7 +400,7 @@ fn xz_decompress(data: &str) -> List[str]:
             at = dec.lzma2(at)
             if at < 0:
                 result.push("")
-                result.push(dec.problem.clone())
+                result.push(dec.problem)
                 return result
             while (at - block_start) % 4 != 0: at = at + 1
             let check_size = xz_check_size(check)

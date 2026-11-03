@@ -119,7 +119,7 @@ fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, p
     fact.owner = owner
     fact.index = index
     fact.node = node
-    fact.path = site.path.clone()
+    fact.path = site.path
     fact.name = with_str_clone_ref(name)
     fact.detail = with_str_clone_ref(detail)
     if node > 0 and node < sema.ast.node_count():
@@ -140,7 +140,7 @@ fn contract_row(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, pa
 fn contract_join(parts: &List[str], sep: &str) -> str:
     var out = ""
     for i in 0..parts.len():
-        out = out ++ (if i > 0: with_str_clone_ref(sep) else: "") ++ parts[i].clone()
+        out = out ++ (if i > 0: with_str_clone_ref(sep) else: "") ++ parts[i]
     out
 
 fn contract_push_unique(xs0: List[str], x: &str) -> List[str]:
@@ -158,7 +158,7 @@ fn contract_list(names: &List[str], empty: &str) -> str:
     var seams = 0
     for i in 0..names.len():
         if names[i].starts_with("with_"): seams = seams + 1
-        else: shown.push(names[i].clone())
+        else: shown.push(names[i])
     var out = if shown.len() > 0: contract_join(&shown, ", ") else: with_str_clone_ref(empty)
     if seams > 0: out = out ++ f" (and {seams} compiler runtime seams)"
     out
@@ -232,7 +232,7 @@ fn contract_collect_resource(mut report: AnalysisReport, sema: &Sema, ri: i32, s
             c = c ++ (if k > 0: ", " else: "") ++ sema.safe_symbol_text(r.ok_consts[k])
         // Several success statuses: the Ok side carries the one that matched
         // beside the produced value (§16.2b.4).
-        let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname.clone()
+        let ok_side = if r.ok_consts.len() > 1: f"(status, {rname})" else: rname
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, clause, r.ok_consts[0], owner, -1, "status", f"ok {c}; a status-returning producer is Result[{ok_side}, {rname}Error]", contract_clause_at(sema, &site, clause))
     else if r.handle == 0:
         contract_row(report, sema, &site, subject, CONTRACT_RESOURCE, node, 0, owner, -1, "status", "none; a producer's failure is None, or (status, None) through an out parameter", "default:no status convention is inferred (§16.2b.4)")
@@ -637,7 +637,7 @@ fn contract_name_resembles_destroyer(name: &str) -> str:
         if i == n or name[i] == '_':
             if seg.len() > 0:
                 for w in 0..words.len():
-                    if seg.starts_with(words[w]): return words[w].clone()
+                    if seg.starts_with(words[w]): return words[w]
             seg = ""
         else:
             seg = seg ++ name.slice(i, i + 1)
@@ -815,19 +815,19 @@ fn contract_view_render(report: &AnalysisReport) -> str:
         if fact.kind != AnalysisFactKind.ForeignContract: continue
         if (fact.flags & CONTRACT_FACT) != 0:
             lines.push("    ")
-            lines.push(fact.detail.clone())
+            lines.push(fact.detail)
             lines.push("\n")
             continue
         subjects = subjects + 1
-        lines.push(fact.detail.clone())
+        lines.push(fact.detail)
         lines.push("\n")
     if subjects == 0:
         lines.push("no `c facade` block describes this program; the contract view is empty\n")
     // The audit's verdict without the report's fact count, so a checked-in
     // snapshot of the view does not move with the prelude.
     for i in 0..report.notes.len():
-        lines.push("note: " ++ report.notes[i].clone() ++ "\n")
+        lines.push("note: " ++ report.notes[i] ++ "\n")
     for i in 0..report.violations.len():
-        lines.push("violation: " ++ report.violations[i].clone() ++ "\n")
+        lines.push("violation: " ++ report.violations[i] ++ "\n")
     lines.push(f"contract-audit: violations={report.violations.len()}" ++ (if report.ok(): " ok\n" else: " FAILED\n"))
     lines.join("")

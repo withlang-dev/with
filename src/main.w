@@ -283,7 +283,7 @@ fn cli_unknown_flag(argc: i32) -> str:
         if arg.len() > 1 and arg.starts_with("-") and not arg.starts_with("-I") and not arg.starts_with("-D") and not arg.starts_with("-l"):
             let eq = arg.find("=")
             let name = arg.slice(0, if eq > 0: eq else: arg.len())
-            if not known.contains(name): return arg.clone()
+            if not known.contains(name): return arg
         i = i + (if cli_option_takes_value(arg): 2 else: 1)
     ""
 
@@ -297,7 +297,7 @@ fn cli_nearest_flag(arg: &str) -> str:
         while n < flag.len() and n < arg.len() and flag[n] == arg[n]: n = n + 1
         if n > best_len:
             best_len = n
-            best = flag.clone()
+            best = flag
     if best_len * 2 > arg.len(): best else: ""
 
 fn cli_option_takes_value(arg: &str) -> bool:
@@ -1963,8 +1963,8 @@ fn run_build_action_runner_process(runner_path: &str, target: &BuildGraphTarget,
 // dependent (pcre2's heap-8 test once ran a pcre2test from such a state).
 fn build_runner_discard_partial_outputs(root: &str, target: &BuildGraphTarget):
     var paths: List[str] = List.new()
-    if target.output.len() > 0: paths.push(target.output.clone())
-    for oi in 0..target.extra_outputs.len(): paths.push(target.extra_outputs[oi].clone())
+    if target.output.len() > 0: paths.push(target.output)
+    for oi in 0..target.extra_outputs.len(): paths.push(target.extra_outputs[oi])
     for pi in 0..paths.len():
         let path = build_graph_resolve_project_path(root, paths[pi])
         if with_fs_file_exists(path) == 0: continue
@@ -2741,7 +2741,7 @@ fn build_graph_dep_outputs_unchanged(root: &str, graph: &BuildGraph, dep_name: &
     if not build_graph_early_cutoff_enabled(): return false
     var before = ""
     for i in 0..names.len():
-        if names[i] == dep_name: before = digests[i].clone()
+        if names[i] == dep_name: before = digests[i]
     if before.len() == 0: return false
     let index = build_graph_find_target_index_by_name(graph, dep_name)
     if index < 0: return false
@@ -2765,7 +2765,7 @@ fn build_graph_refuse_shared_gen_dir(root: &str) -> i32:
 // The first dependency of `target` that failed or was skipped, or "".
 fn build_graph_first_broken_dep(target: &BuildGraphTarget, failed: &List[str]) -> str:
     for dep in target.deps:
-        if failed.contains(dep): return dep.clone()
+        if failed.contains(dep): return dep
     ""
 
 // `with run` builds a target only to run it: the person asked for their
@@ -4631,7 +4631,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 let _ = 0
             else if line.starts_with("//!"):
                 if unknown_line.len() == 0:
-                    unknown_line = line.clone()
+                    unknown_line = line
                     unknown_line_no = nr_of_offset(text, i)
             else:
                 let header_error = test_header_error(unknown_line, unknown_line_no, result)
@@ -5030,7 +5030,7 @@ fn test_line_count(lines: &List[str], wanted: &str) -> isize:
 
 fn test_line_containing(lines: &List[str], fragment: &str) -> str:
     for i in 0..lines.len():
-        if lines[i].contains(fragment): return lines[i].clone()
+        if lines[i].contains(fragment): return lines[i]
     ""
 
 // The number of leading lines the two agree on.

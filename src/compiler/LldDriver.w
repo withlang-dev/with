@@ -56,7 +56,7 @@ fn lld_flavor_from_option(name: &str) -> str:
 // A GNU-flavor link with `-m <x>pe` is MinGW's, as lld decides.
 fn lld_gnu_is_mingw(args: &List[str]) -> bool:
     for i in 0..args.len():
-        let emulation = if args[i] == "-m" and i + 1 < args.len(): args[i + 1].clone() else if args[i].starts_with("-m") and args[i] != "-m": args[i].slice(2, args[i].len()) else: ""
+        let emulation = if args[i] == "-m" and i + 1 < args.len(): args[i + 1] else if args[i].starts_with("-m") and args[i] != "-m": args[i].slice(2, args[i].len()) else: ""
         if emulation.ends_with("pe") or emulation.ends_with("pep"):
             return true
     false

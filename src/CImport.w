@@ -1564,7 +1564,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
         let child = with_ci_child(session, decl_cursor, i)
         if with_ci_cursor_kind(session, child) == CK_FIELD:
             let raw_name = with_ci_cursor_spelling(session, child)
-            var actual_name = if raw_name.len() > 0: raw_name.clone() else: f"anon_{anon_idx}"
+            var actual_name = if raw_name.len() > 0: raw_name else: f"anon_{anon_idx}"
             let field_cxtype = with_ci_cursor_type(session, child)
             var field_ty = with_ci_type_translated(session, field_cxtype)
             // D102: a function-pointer field may be NULL.
@@ -2004,7 +2004,7 @@ fn ci_migrate_unprototyped_call_shape(session: i64, name: &str) -> str:
             refs = refs + 1
             continue
         if entry.starts_with("!"):
-            return entry.clone()
+            return entry
         calls = calls + 1
         if calls == 1:
             shape = entry.slice(1, entry.len())
@@ -3328,7 +3328,7 @@ fn ci_value_fits_int(value: i64) -> bool: value >= -2147483648 and value <= 2147
 // type, every one of them: clang types `-ESC_B` unsigned in
 // `enum { ESC_B = 2, BIG = 0x80000000u }`, verified by compiling it.
 fn ci_enum_const_type(all_fit_int: bool, int_type: &str) -> str:
-    if all_fit_int: "i32" else: int_type.clone()
+    if all_fit_int: "i32" else: int_type
 
 fn ci_translate_enum(session: i64, idx: i32) -> str:
     let const_count = with_cimport_enum_const_count(session, idx)
@@ -3670,7 +3670,7 @@ fn ci_collect_object_macro_values(session: i64) -> HashMap[str, str]:
         // Header order determines the first definition, as in the old
         // registry. Values are independent strings, so C's bitwise-or and
         // quoted pipes cannot be mistaken for record delimiters.
-        if not values.contains(name): values.insert(name.clone(), value.clone())
+        if not values.contains(name): values.insert(name, value)
     values
 
 fn ci_offsetof_record_type_name(raw_type: &str) -> str:
@@ -3746,7 +3746,7 @@ fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> List
             for fi in 0..count:
                 if with_cimport_struct_field_name(session, sidx, fi) == field:
                     let ty = with_cimport_struct_field_type_translated(session, sidx, fi)
-                    out.push(ty.clone())
+                    out.push(ty)
                     out.push(ci_offsetof_field_emitted_name(session, field, ty, fi, count, is_union))
                     return out
             return out
@@ -3760,7 +3760,7 @@ fn ci_record_field_for_offsetof(session: i64, record: &str, field: &str) -> List
             for fi in 0..count:
                 if with_cimport_typedef_anon_field_name(session, tidx, fi) == field:
                     let ty = with_cimport_typedef_anon_field_type(session, tidx, fi)
-                    out.push(ty.clone())
+                    out.push(ty)
                     out.push(ci_offsetof_field_emitted_name(session, field, ty, fi, count, is_union))
                     return out
             return out
@@ -3913,7 +3913,7 @@ fn ci_try_translate_offsetof_expr(session: i64, expr: &str) -> str:
     let args = ci_offsetof_text_args(t)
     if args.len() == 0:
         return ""
-    var type_arg = args[0].clone()
+    var type_arg = args[0]
     for _ in 0..8:
         let expanded = ci_peek_macro_value(type_arg)
         if expanded.len() == 0 or not ci_is_c_identifier(expanded):
@@ -4008,7 +4008,7 @@ impl CiMacroProbes:
             let value = ci_trim(ci_strip_c_comments(with_cimport_macro_value(ci_session, i)))
             if name.len() == 0 or value.len() == 0 or self.order.contains(name): continue
             if not ci_macro_value_delims_balanced(value): continue
-            self.order.insert(name.clone(), self.order.len() as i32)
+            self.order.insert(name, self.order.len() as i32)
             names.push_str("|")
             names.push_str(name)
             names.push_str("|")
@@ -4242,7 +4242,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
     // once so private expansion and aliases never scan a whole SDK header.
     var indices: HashMap[str, i32] = HashMap.new()
     for i in 0..count:
-        indices.insert(with_cimport_macro_name(session, i).clone(), i)
+        indices.insert(with_cimport_macro_name(session, i), i)
     var output = ""
     var known_values = ""
     var known_macro_returns = ""
@@ -4378,8 +4378,8 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     if translated.len() == 0 and param_count == 1:
                         // The body names the raw parameter, or its binding
                         // once an uppercase parameter was renamed.
-                        let body_param = if renamed: bindings[0].clone() else: with_cimport_macro_param_name(session, fn_index, 0)
-                        let safe_param = bindings[0].clone()
+                        let body_param = if renamed: bindings[0] else: with_cimport_macro_param_name(session, fn_index, 0)
+                        let safe_param = bindings[0]
                         let stripped_identity = ci_strip_parens(ci_trim(work_value))
                         if stripped_identity == body_param:
                             let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "[T](" ++ safe_param ++ ": T) -> T", "    " ++ safe_param)
@@ -4400,7 +4400,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                     if translated.len() == 0 and ci_has_stringify(work_value, param_names):
                         // Simple #x → identity function (returns the string of the expression)
                         if param_count == 1:
-                            let p0 = bindings[0].clone()
+                            let p0 = bindings[0]
                             let body_trimmed = ci_trim(work_value)
                             if body_trimmed == "#" ++ p0 or body_trimmed == "(#" ++ p0 ++ ")":
                                 let r = ci_render_generated_fn_body("fn " ++ safe_name ++ "(x: str) -> str", "    x")
@@ -15629,7 +15629,7 @@ fn ci_hoist_compound_literal_record(session: i64, literal_cursor: i32) -> bool:
     true
 
 fn ci_take_body_hoisted_decls() -> str:
-    let taken = g_ci_body_hoisted_decls.clone()
+    let taken = g_ci_body_hoisted_decls
     g_ci_body_hoisted_decls = ""
     taken
 
@@ -16033,7 +16033,7 @@ fn ci_c_binary(lhs: &str, op: &str, rhs: &str) -> str:
         // else the wider signed one, which holds every value of the other.
         let unsigned_wins = (lu and lw >= rw) or (ru and rw >= lw)
         let left_wins = if lu == ru: lw >= rw else if unsigned_wins: lu else: not lu
-        common = if left_wins: lp.clone() else: rp.clone()
+        common = if left_wins: lp else: rp
         if lu != ru:
             if left_wins: r = "(" ++ rhs ++ " as " ++ common ++ ")" else: l = "(" ++ lhs ++ " as " ++ common ++ ")"
     else if lt.len() > 0 and ci_is_int_literal(ci_strip_parens(ci_trim(rhs))):
@@ -16045,7 +16045,7 @@ fn ci_c_binary(lhs: &str, op: &str, rhs: &str) -> str:
     let out = "(" ++ l ++ " " ++ op ++ " " ++ r ++ ")"
     let is_comparison = op == "==" or op == "!=" or op == "<" or op == ">" or op == "<=" or op == ">="
     if common.len() > 0 and not is_comparison:
-        g_ci_translated_int_types.insert(out.clone(), common)
+        g_ci_translated_int_types.insert(out, common)
     out
 
 fn ci_int_annotation_for_value(v0: &str) -> str:
@@ -20598,7 +20598,7 @@ impl CiStmtPool:
 
         let result = stackify_graph(move ctx.state.cfg.graph)
         if not result.ok:
-            g_ci_bail_location = if ctx.state.location.len() > 0: ctx.state.location.clone() else: with_ci_cursor_location(session, body_cursor)
+            g_ci_bail_location = if ctx.state.location.len() > 0: ctx.state.location else: with_ci_cursor_location(session, body_cursor)
             g_ci_bail_message = "stackify: " ++ result.message
             g_ci_bail_kind = CXK_GOTO_STMT
             return 0

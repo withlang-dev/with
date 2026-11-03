@@ -531,7 +531,7 @@ fn link_stage_make_darwin_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_p
         for j in 0..dw_la.len():
             args.push(with_str_clone_ref(dw_la[j]))
     for arg in link_stage_driver_args_for_ld(link_args):
-        args.push(arg.clone())
+        args.push(arg)
     args.push("-lSystem")
     let cleanup_files = link_stage_collect_cleanup_files(extras)
     LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
@@ -571,7 +571,7 @@ fn link_stage_make_linux_own_sysroot_command(linker: &str, sysroot: &str, obj_pa
     args.push("-m")
     args.push(link_stage_linux_emulation())
     for a in ["--eh-frame-hdr", "--hash-style=gnu", "--build-id", "--gc-sections", "--as-needed", "-dynamic-linker"]:
-        args.push(a.clone())
+        args.push(a)
     args.push(link_stage_linux_own_dynamic_linker())
     // The sysroot's libc is link stubs: they define what a program may name,
     // not glibc's private interfaces (GLIBC_PRIVATE). A shared library from
@@ -725,7 +725,7 @@ fn link_stage_make_linux_llvm_link_command(llvm_ld: &str, obj_path: &str, bin_pa
         if not input.starts_with("-l"): inputs.push(input)
     if link_libs.len() > 0: args.push(link_stage_archive_group_marker(1, 0, 0))
     for arg in link_stage_driver_args_for_ld(link_args):
-        args.push(arg.clone())
+        args.push(arg)
     args.push("-lc")
     args.push("-lgcc")
 
@@ -1430,10 +1430,10 @@ fn link_stage_driver_args_for_ld(link_args: &List[str]) -> List[str]:
         let arg = link_args[i]
         if arg == "-Xlinker" and i + 1 < link_args.len():
             i += 1
-            out.push(link_args[i].clone())
+            out.push(link_args[i])
         else if arg.starts_with("-Wl,"):
             for part in arg.slice(4, arg.len()).split(","):
-                if part.len() > 0: out.push(part.clone())
+                if part.len() > 0: out.push(part)
         else:
             out.push(with_str_clone_ref(arg))
         i += 1

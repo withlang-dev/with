@@ -718,9 +718,9 @@ impl Compilation:
     fn project_config_for_source(source_path: &str) -> ProjectConfig:
         var cfg = self.apply_runtime_config(project_config_load_for_source(source_path))
         for path in self.link_search_paths:
-            cfg.link_search_paths.push(path.clone())
+            cfg.link_search_paths.push(path)
         for path in self.link_rpaths:
-            cfg.link_rpaths.push(path.clone())
+            cfg.link_rpaths.push(path)
         cfg
 
     mut fn set_link_paths(search_paths: &List[str], rpaths: &List[str]):
@@ -969,7 +969,7 @@ fn compilation_compiler_hook_call_args(pool: &AstPool, intern: &InternPool, hook
 impl Compilation:
     fn compiler_hook_runner_source(pool: &AstPool, source_path: &str, diag_path: &str, emitted_source_path: &str, token: &str) -> str:
         let taken_zcu = &self.zcu
-        let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
+        let root = if taken_zcu.project_config.root_dir.len() > 0: taken_zcu.project_config.root_dir else: frontend_dirname(source_path)
         let hook_count = pool.compiler_hook_count()
         var out = "use std.compiler\n"
         let imported: HashMap[str, i32] = HashMap.new()
@@ -1038,7 +1038,7 @@ impl Compilation:
             return true
         if not self.config.compiler_hooks_enabled:
             return true
-        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir.clone() else: frontend_dirname(source_path)
+        let root = if self.zcu.project_config.root_dir.len() > 0: self.zcu.project_config.root_dir else: frontend_dirname(source_path)
         // Hook scratch lives in the system temp dir, never beside the source:
         // rooting it at frontend_dirname scattered pid-stamped runners and
         // dSYM bundles into source test directories (#741). The stamped dir
@@ -1109,7 +1109,7 @@ impl Compilation:
             return AstPool.new()
         if self.compiler_hook_emitted_source.len() == 0:
             return pool.clone()
-        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text.clone() else: runtime_read_file(source_path)
+        let base_source = if self.zcu.current_source_text.len() > 0: self.zcu.current_source_text else: runtime_read_file(source_path)
         let cfg = move self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
         self.compiler_hook_emitted_source = ""
@@ -1319,7 +1319,7 @@ impl Compilation:
         var _sp_dla = move self.zcu.project_config.dep_link_args
         let rpath_args = link_stage_rpath_driver_args(self.zcu.project_config.link_rpaths, target_spec_os())
         for arg in rpath_args:
-            _sp_dla.push(arg.clone())
+            _sp_dla.push(arg)
         var unit_objects = codegen_unit_extra_objects(obj_path, self.zcu.last_codegen_unit_count)
         // D38: `--link-object` objects (a stage link's .wo bundles) join the
         // link exactly as codegen units do — full linker inputs, probed for
@@ -1340,7 +1340,7 @@ impl Compilation:
     mut fn execute_binary_link_plan(plan: CompilationBinaryLinkPlan) -> str:
         if not plan.ok:
             return ""
-        let bin_path = plan.bin_path.clone()
+        let bin_path = plan.bin_path
         var link_result = compilation_execute_binary_link_plan(self.config.debug_info, plan)
         self.last_link_command_available = 1
         self.last_link_command = move link_result.command
@@ -2232,9 +2232,9 @@ impl Compilation:
         let pair_report = check_foreign_pairs(mir_mod, active_pool, &sema)
         for fi in 0..pair_report.findings.len():
             let finding = &pair_report.findings[fi]
-            var pair_diag = Diagnostic.err(finding.message.clone(), compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
-            if finding.note.len() > 0: pair_diag.add_note(finding.note.clone())
-            if finding.help.len() > 0: pair_diag.add_help(finding.help.clone())
+            var pair_diag = Diagnostic.err(finding.message, compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
+            if finding.note.len() > 0: pair_diag.add_note(finding.note)
+            if finding.help.len() > 0: pair_diag.add_help(finding.help)
             sema.diags.emit(move pair_diag)
         if pair_report.findings.len() > 0 and pairs_dump_enabled():
             runtime_eprint(f"pair-flow findings={pair_report.findings.len()} diagnostics={sema.diags.count()}")

@@ -235,7 +235,7 @@ impl Sema:
     // its element first (`Vector[T, N]`, like `[T; N]`); Mask keeps its
     // count first (`Mask[N, W]`).
     mut fn resolve_vector_generic(base_sym: i32, arg_count: i32, a0: i32, a1: i32, node: i32) -> i32:
-        let name = self.pool_resolve_symbol(base_sym).clone()
+        let name = self.pool_resolve_symbol(base_sym)
         if arg_count != 2:
             self.emit_error(f"{name} takes two arguments: " ++ (if name == "Vector": "`Vector[T, N]`" else: "`Mask[N, W]`") ++ " (§4.3d)", node)
             return 0
@@ -297,7 +297,7 @@ impl Sema:
             if bk != NodeKind.NK_IDENT and bk != NodeKind.NK_INDEX: return -1
             let base_ty = self.vector_type_named_by(base)
             if base_ty == 0: return -1
-            let method = self.pool_resolve_symbol(self.ast.get_data1(callee)).clone()
+            let method = self.pool_resolve_symbol(self.ast.get_data1(callee))
             let type_text = self.type_name(base_ty)
             if method == "splat":
                 if arg_count != 1:
@@ -416,7 +416,7 @@ impl Sema:
     mut fn check_vector_method(node: i32, recv_node: i32, recv_ty0: i32, field: i32, arg_count: i32) -> i32:
         let recv_ty = self.vector_value_type(recv_node, recv_ty0)
         if not self.is_vector_or_mask_type(recv_ty): return -1
-        let name = self.pool_resolve_symbol(field).clone()
+        let name = self.pool_resolve_symbol(field)
         let type_text = self.type_name(recv_ty)
         var op: i32 = 0
         if self.is_mask_type(recv_ty):
@@ -456,7 +456,7 @@ impl Sema:
     // swizzles, for N ≤ 4. -1 when `field` is no component spelling.
     mut fn check_vector_swizzle(node: i32, recv_node: i32, recv_ty0: i32, field: i32) -> i32:
         let recv_ty = self.vector_value_type(recv_node, recv_ty0)
-        let name = self.pool_resolve_symbol(field).clone()
+        let name = self.pool_resolve_symbol(field)
         if name.len() == 0: return -1
         if self.is_mask_type(recv_ty):
             var components = true

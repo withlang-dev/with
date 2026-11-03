@@ -31,7 +31,7 @@ fn green_git_output(root: &str, args: &List[str], label: &str) -> str:
 fn green_first_line(text: &str) -> str:
     for i in 0..text.len():
         if text[i] == '\n': return text.slice(0, i as i64)
-    text.clone()
+    text
 
 /// The battery's inputs, as the text `git hash-object` identifies (D50: key
 /// on what the output is made from). `top_level` is `git ls-tree HEAD`. The
@@ -50,7 +50,7 @@ fn green_identity_inputs(top_level: &str, bench_level: &str) -> str:
     for line in top_level.split("\n"):
         if line.len() == 0: continue
         let tab = line.find("\t")
-        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line.clone()
+        let path = if tab >= 0: line.slice(tab + 1, line.len()) else: line
         if path == "docs" or path.ends_with(".md"): continue
         if path == "benchmarks":
             for bench_line in bench_level.split("\n"):
@@ -125,7 +125,7 @@ fn green_by_source_identity(root: &str) -> str:
         let line = store_lines[i]
         if line.starts_with(identity ++ "\t"):
             let fields = line.split("\t")
-            return if fields.len() > 1: fields[1].clone() else: "recorded"
+            return if fields.len() > 1: fields[1] else: "recorded"
     ""
 
 // The ceremony census bar (tools/ceremony_census.w): the installed tree's
