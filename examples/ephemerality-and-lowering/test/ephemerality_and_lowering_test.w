@@ -13,7 +13,7 @@ var defer_order_len: Atomic[i32] = Atomic.new(0)
 var defer_order_third: Atomic[i32] = Atomic.new(0)
 var defer_order_fourth: Atomic[i32] = Atomic.new(0)
 
-fn with_connection(pool: ConnectionPool) -> DbConnection:
+fn with_connection(pool: ConnectionPool):
     print(f"Acquiring connection to {pool.url}...")
     defer: print("Releasing connection...")
     DbConnection { id: 42 }
@@ -29,8 +29,7 @@ fn test_with_blocks:
             assert(x + y == 30)
 
 fn run_defer_order:
-    var order = List.new()
-    order.push(1)
+    var order = [1]
     defer: defer_order_len.store(order.len(), .SeqCst)
     defer: defer_order_third.store(order[2], .SeqCst)
     defer: defer_order_fourth.store(order[3], .SeqCst)
@@ -50,17 +49,13 @@ fn test_defer_order:
 
 @[test]
 fn test_list_mutation:
-    var buffer = List.new()
-    buffer.push(1)
-    buffer.push(2)
-    buffer.push(3)
+    var buffer = [1, 2, 3]
     assert(buffer.len() == 3)
 
     buffer.push(42)
     assert(buffer.len() == 4)
 
-async fn process_item(id: i32) -> i32:
-    id * 10
+async fn process_item(id: i32): id * 10
 
 // A task is observed, never discarded (§14.7): the test is itself async and
 // awaits the tracked tasks through the scope.
