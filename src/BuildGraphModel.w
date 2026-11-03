@@ -382,7 +382,7 @@ fn build_graph_resolve_rss_budgets(graph: BuildGraph) -> BuildGraph:
     for ti in 0..out.targets.len():
         let target = &out.targets[ti]
         let args: List[str] = List.new()
-        var limit: i64 = target.rss_limit_bytes
+        var limit = target.rss_limit_bytes
         for ai in 0..target.args.len():
             let arg = &target.args[ai]
             if arg.starts_with("rss-limit-bytes="):

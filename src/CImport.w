@@ -8194,8 +8194,8 @@ impl CiStmtPool:
                 continue
             // The element already names a temporary (an array compound
             // literal): read it; otherwise compute it into one.
-            var read: CiExprId = lowered.value_expr
-            var element_setup: CiStmtId = lowered.setup_stmt
+            var read = lowered.value_expr
+            var element_setup = lowered.setup_stmt
             if exprs.kind(lowered.value_expr) != CiExprKind.CIE_IDENT:
                 let temp = ci_expr_temp_name(session, value, "init")
                 let temp_ty = types.type_from_libclang(session, ci_value_cursor_type(session, value))
@@ -19887,7 +19887,7 @@ impl CiGotoSwitchCase:
 
 impl CiGotoCfgContext:
     mut fn lower_case_children(session: i64, cursor: i32, first_child: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
+        let saved_cases = self.state.switch_cases
         self.state.switch_cases = cases
         let case_mark = ci_scope_mark(scope)
         var case_scope = scope
@@ -19943,7 +19943,7 @@ impl CiGotoCfgContext:
         self.fail("expected switch case/default in goto CFG", with_ci_cursor_location(session, cursor))
 
     mut fn lower_switch_body(session: i64, body_cursor: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool, scope: CiScope, cases: CiGotoSwitchCase):
-        let saved_cases: CiGotoSwitchCase = self.state.switch_cases
+        let saved_cases = self.state.switch_cases
         self.state.switch_cases = cases
         let nc = with_ci_num_children(session, body_cursor)
         let switch_mark = ci_scope_mark(scope)
@@ -20834,7 +20834,7 @@ fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
     if trace: eprint("generic: wanted=" ++ wanted ++ " spelled=" ++ wanted_spelled)
     var default_at = -1
     for k in 1..segments.len():
-        let segment: str = segments[k]
+        let segment = segments[k]
         let colon = segment.find(":")
         if colon < 0: return -1
         let type_text = ci_trim(segment[..colon])
@@ -20853,7 +20853,7 @@ fn ci_generic_selection_selected(session: i64, cursor: i32) -> i32:
         // child's type names it.
         if ci_generic_key_is_bare_name(key) and not ci_generic_key_is_builtin(key):
             for j in 1..segments.len():
-                let other: str = segments[j]
+                let other = segments[j]
                 let other_colon = other.find(":")
                 if other_colon < 0: continue
                 let other_expr = ci_trim(other[other_colon + 1..])

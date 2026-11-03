@@ -438,7 +438,7 @@ fn build_graph_rss_budget_error(graph: &BuildGraph, name: &str, peak: i64) -> st
     for i in 0..graph.targets.len():
         let target = &graph.targets[i]
         if target.name != name: continue
-        let limit: i64 = target.rss_limit_bytes
+        let limit = target.rss_limit_bytes
         if limit > 0 and peak > limit:
             return "rss tripwire: target '" ++ name ++ f"' peaked at {peak} bytes (limit {limit} bytes)"
         return ""

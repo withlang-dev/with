@@ -150,20 +150,20 @@ fn facts_read(path: &str, source: str) -> Result[Facts, str]:
         if clause == "lend":
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "lend", record: "", cite: cite })
         else if clause.starts_with("consumes param "):
-            let n: str = clause.slice(15, clause.len()).trim()
+            let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`consumes param N` takes a parameter index"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "consumes:" ++ n, record: "", cite: cite })
         else if clause.starts_with("returns borrow ") and clause.contains(" from param "):
             let at = clause.find(" from param ")
-            let n: str = clause.slice(at + 12, clause.len()).trim()
+            let n = clause.slice(at + 12, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`returns borrow R from param N` takes a parameter index"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "borrow:" ++ n, record: "", cite: cite })
         else if clause.starts_with("nullable param "):
-            let n: str = clause.slice(15, clause.len()).trim()
+            let n = clause.slice(15, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`nullable param N` takes a parameter index"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "nullable:" ++ n, record: "", cite: cite })
         else if clause.starts_with("text param "):
-            let n: str = clause.slice(11, clause.len()).trim()
+            let n = clause.slice(11, clause.len()).trim()
             if n.len() == 0 or not is_digit(n[0]): return Err(facts_error(path, line_no, "`text param N` takes a parameter index"))
             facts.entries.push(FactsEntry { fn_name: current_fn, kind: "text_param:" ++ n, record: "", cite: cite })
         else if clause.starts_with("text return"):

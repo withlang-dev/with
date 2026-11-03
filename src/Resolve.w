@@ -1545,7 +1545,7 @@ fn resolve_fetched_facade_candidate(root: &str, rel_path: &str) -> str:
     for line in with_fs_read_file(resolve_join(root, "with.toml")).split("\n"):
         let t = line.trim()
         if not t.starts_with(key): continue
-        let rest: str = t.slice(key.len(), t.len()).trim()
+        let rest = t.slice(key.len(), t.len()).trim()
         if not rest.starts_with("="): continue
         let open = rest.find("\"")
         if open < 0: continue

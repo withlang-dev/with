@@ -12110,7 +12110,7 @@ impl CCodegen:
         if done.is_some():
             return done.unwrap()
         let tid = self.place_sema_tid(body, place_id)
-        var out: str = text
+        var out = text
         if hold == MIR_HOLD_TAKE:
             out = f"__with_take{self.hold_counter}"
             self.hold_counter = self.hold_counter + 1

@@ -559,7 +559,7 @@ impl Zcu:
             // c_import error and warning). Its decls keep the importer's
             // module path — ownership is the importer's — but carry this file
             // id, so span reasoning never crosses the two coordinate spaces.
-            let ci_file_id: i32 = self.next_file_id
+            let ci_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(ci_file_id, "<c_import " ++ header_spec ++ ">", synthetic)
             var lexer = Lexer.init(synthetic, ci_file_id)
@@ -689,7 +689,7 @@ impl Zcu:
     // of decl `owner`, like a `<c_import …>` translation.
     mut fn splice_facade_text_frontend(pool: AstPool, text: &str, file_name: &str, owner: i32) -> AstPool:
         var out = pool
-        let file_id: i32 = self.next_file_id
+        let file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, file_name, text)
         let before = out.decl_count()
@@ -2085,7 +2085,7 @@ impl Zcu:
         for extra_i in 0..self.extra_source_names.len():
             let extra_name: str = with_str_clone_ref(self.extra_source_names[extra_i])
             let extra_text = frontend_normalize_source_text(self.extra_source_texts[extra_i])
-            let extra_file_id: i32 = self.next_file_id
+            let extra_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(extra_file_id, extra_name, extra_text)
             let before = pool.decl_count()
@@ -2708,7 +2708,7 @@ impl Zcu:
 
     mut fn parse_interface_chunk(pool: AstPool, path: &str, chunk: &str) -> AstPool:
         var out = pool
-        let chunk_file_id: i32 = self.next_file_id
+        let chunk_file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         var lexer = Lexer.init(chunk, chunk_file_id)
         let tokens = lexer.tokenize()
@@ -2859,7 +2859,7 @@ impl Zcu:
             // use-expansion above deduped to a no-op); otherwise (legacy
             // entries) the closure was just appended from initial_count on.
             // Nested USE decls get expanded transitively either way.
-            let prefix_decls: i32 = self.prelude_prefix_decls
+            let prefix_decls = self.prelude_prefix_decls
             var pi = if prefix_decls > 0: 1 else: initial_count
             while (prefix_decls > 0 and pi < prefix_decls) or (prefix_decls == 0 and pi < merged_pool.decl_count()):
                 let decl = merged_pool.get_decl(pi)
@@ -3057,7 +3057,7 @@ impl Zcu:
                 if ik == NodeKind.NK_FN_DECL:
                     let shadowed_name = merged_pool.get_data0(id)
                     if frontend_name_shadowed_by_extern(root_ordered, merged_pool, shadowed_name):
-                        let sname: str = self.pool.resolve(shadowed_name)
+                        let sname = self.pool.resolve(shadowed_name)
                         self.diagnostics.emit(Diagnostic.err(f"extern fn '{sname}' shadows prelude function '{sname}'", Span { file: 0, start: merged_pool.get_start(id), end: merged_pool.get_end(id) }))
                         continue
                 // A runtime ABI symbol (FnAbi's codegen_is_runtime_abi_symbol:
@@ -3549,7 +3549,7 @@ impl Zcu:
         // declarations are parsed on demand once every source module is in.
         let on_demand = src.interface and not (self.interface_eager or self.bundle_corpus.len() > 0)
         if on_demand:
-            let section_file_id: i32 = self.next_file_id
+            let section_file_id = self.next_file_id
             self.next_file_id = self.next_file_id + 1
             self.add_source_text_mapping(section_file_id, path, full_text)
             // Path and text go in together, before the imports below recurse
@@ -3580,7 +3580,7 @@ impl Zcu:
         let text = full_text
 
         let before = target_pool.decl_count()
-        let file_id: i32 = self.next_file_id
+        let file_id = self.next_file_id
         self.next_file_id = self.next_file_id + 1
         self.add_source_text_mapping(file_id, path, text)
 

@@ -108,7 +108,7 @@ fn link_stage_archive_macos_minos(data: &str) -> i64:
         let size = host_lib_decimal(header.slice(48, 58).trim())
         if size < 0: break
         let body = offset + 60
-        let name: str = header.slice(0, 16).trim()
+        let name = header.slice(0, 16).trim()
         let name_len = if name.starts_with("#1/"): host_lib_decimal(name.slice(3, name.len())) else: 0
         let minos = link_stage_macho_minos_at(data, body + name_len)
         if minos > best: best = minos

@@ -633,7 +633,7 @@ extend Codegen:
 
 fn Codegen.init_with_opt_and_intern(module_name: &str, opt_level: i32, intern: InternPool, sema: Sema) -> Codegen:
     var cg = Codegen.init_with_opt(module_name, opt_level)
-    let overflow_mode: i32 = sema.overflow_mode
+    let overflow_mode = sema.overflow_mode
     cg.intern = intern
     cg.sema = sema
     cg.overflow_mode = overflow_mode
@@ -1046,7 +1046,7 @@ impl Codegen:
         let share = sig >= 0 and param_index < self.sema.sig_get_param_count(sig) and self.sema.sig_param_uses_value_ref_abi(sig, param_index) != 0
         let ref_table = self.is_ref_param(fn_sym, param_index)
         let incoming_ptr = incoming != 0 and wl_get_type_kind(wl_type_of(incoming)) == wl_pointer_type_kind()
-        let name: str = self.sema.pool_resolve(fn_sym)
+        let name = self.sema.pool_resolve(fn_sym)
         var fact = AnalysisFact.new(AnalysisStage.Codegen, AnalysisFactKind.Parameter)
         fact.id = param_index
         fact.parent = sig
@@ -2215,7 +2215,7 @@ impl Codegen:
         self.loop_depth = st.depth
 
     mut fn push_loop_context(break_bb: i64, continue_bb: i64, result_alloca: i64, label_sym: i32):
-        let idx: i32 = self.loop_depth
+        let idx = self.loop_depth
         var labels: List[i32] = move self.loop_labels
         with_codegen_loop_set_break(idx, break_bb)
         with_codegen_loop_set_continue(idx, continue_bb)
@@ -2452,7 +2452,7 @@ impl Codegen:
             if ptr != 0:
                 out = ptr
 
-        let had_error_before: i32 = self.had_error
+        let had_error_before = self.had_error
         let coerced = self.enforce_coerced_type(out, param_ty, "wrong argument type")
         if self.had_error != had_error_before:
             self.debug_call_coerce_failure(call_context, call_node, arg_index, arg_node, out, param_ty)
@@ -3667,7 +3667,7 @@ impl Codegen:
         self.type_bodies_pending = self.type_bodies_pending - 1
         let saved_file = with_str_clone_ref(self.current_decl_source_file)
         let saved_module = with_str_clone_ref(self.sema.current_module_path)
-        let saved_len: i32 = self.type_bindings_len
+        let saved_len = self.type_bindings_len
         let saved_syms = move self.type_binding_syms
         let saved_types = move self.type_binding_types
         let saved_sema = move self.type_binding_sema
@@ -5727,7 +5727,7 @@ impl Codegen:
         let ctx_sym = self.sema.fn_decl_semantic_symbol_at(fn_node, self.pool.get_data0(fn_node), decl_index)
         if ctx_sym == 0:
             return
-        let saved_decl_fn_sym: i32 = self.current_function_name_sym
+        let saved_decl_fn_sym = self.current_function_name_sym
         self.current_function_name_sym = ctx_sym
         self.declare_function_at_inner(fn_node, decl_index)
         self.current_function_name_sym = saved_decl_fn_sym
@@ -5787,7 +5787,7 @@ impl Codegen:
         let param_types: List[i64] = List.new()
 
         // Set method owner before resolving return type so Self can resolve
-        let saved_owner: i32 = self.current_method_owner_sym
+        let saved_owner = self.current_method_owner_sym
         if method_owner_sym != 0:
             self.current_method_owner_sym = method_owner_sym
 
@@ -5831,9 +5831,9 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(uses_c_abi, is_variadic != 0), is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let sret_ty: i64 = abi.ret.source_ty
+        let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
 
         // Use "main" for @[entry] functions
         var effective_name = if sema_name_str.len() > 0: sema_name_str else: self.function_symbol_name(name_sym)
@@ -6109,7 +6109,7 @@ impl Codegen:
         wl_set_linkage(function, wl_internal_linkage())
         let thunk_byval = self.fn_abi_byval_attr_types(thunk_index)
         self.apply_c_abi_byval_attrs(function, thunk_byval, target.arg_count, 1)
-        let saved_fn: i64 = self.current_function
+        let saved_fn = self.current_function
         let saved_bb = wl_get_insert_block(self.builder)
         self.current_function = function
         wl_position_at_end(self.builder, wl_append_bb(self.context, function, "entry"))
@@ -6253,8 +6253,8 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, param_types, places, fn_abi_definition_convention(false, self.sema.sig_is_variadic(sig_idx) != 0), self.sema.sig_is_variadic(sig_idx))
         let abi = self.fn_abis[abi_index]
         let has_sret = (abi.ret.pass == PM_INDIRECT) as i32
-        let sret_ty: i64 = abi.ret.source_ty
-        let fn_type: i64 = abi.llvm_ty
+        let sret_ty = abi.ret.source_ty
+        let fn_type = abi.llvm_ty
         // #839: reuse only a same-typed entry. A mismatched occupant (e.g. a
         // link_name extern claiming this bare name) keeps the C symbol; the
         // With fn takes an LLVM-uniquified name — resolution is value-keyed.
@@ -6957,9 +6957,9 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, orig_param_types, places, if uses_internal_abi: FN_ABI_WITH else: FN_ABI_C, is_variadic)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let sret_ty: i64 = abi.ret.source_ty
+        let sret_ty = abi.ret.source_ty
         let byval_types = self.fn_abi_byval_attr_types(abi_index)
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
 
         // @[link_name("symbol")] overrides the C symbol this extern links against
         // (stored as a "link_name:" callconv prefix). Otherwise canonicalize the
@@ -7571,7 +7571,7 @@ impl Codegen:
         let abi_index = self.compute_fn_abi(ret_ty, sources, places, if is_async: FN_ABI_ASYNC else: FN_ABI_WITH, 0)
         let abi = self.fn_abis[abi_index]
         let has_sret = abi.ret.pass == PM_INDIRECT
-        let fn_type: i64 = abi.llvm_ty
+        let fn_type = abi.llvm_ty
         let name = self.intern.resolve(mono_sym)
         let function = wl_add_function(self.llmod, name, fn_type)
         // A module object keeps every specialization it instantiates — a

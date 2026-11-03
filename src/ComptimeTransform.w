@@ -269,7 +269,7 @@ impl AstPool:
             let decl = self.get_decl(di)
             if self.kind(decl) == NodeKind.NK_TRAIT_DECL: traits.push(decl as i32)
         if traits.len() == 0: return
-        let saved_file: i32 = st.current_file_id
+        let saved_file = st.current_file_id
         for di in 0..self.decl_count():
             let impl_node = self.get_decl(di) as i32
             if self.kind(impl_node) != NodeKind.NK_IMPL_DECL: continue
@@ -3379,7 +3379,7 @@ impl Sema:
         // A derive diagnostic is rendered against the declaring file, not
         // whichever file the pre-sema last checked (it pointed a module's
         // derive error at a `use` line of the importer).
-        let saved_file_id: i32 = self.local_file_id
+        let saved_file_id = self.local_file_id
 
         for di in 0..base_decl_count:
             let decl = out.get_decl(di)

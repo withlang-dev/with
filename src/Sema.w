@@ -5120,7 +5120,7 @@ impl Sema:
     // (resolved without a node).
     mut fn record_name_use(node: i32, kind: &str, path: str, name_sym: i32):
         if path.len() == 0: return
-        let name: str = self.pool_resolve(name_sym)
+        let name = self.pool_resolve(name_sym)
         self.name_use_nodes.push(node)
         self.name_use_kinds.push(kind)
         self.name_use_paths.push(path)
@@ -9614,7 +9614,7 @@ impl Sema:
     mut fn emit_facade_invalidated_view_error(view_sym: i32, origin_sym: i32, call_node: i32, binding_node: i32, use_node: i32):
         let view_name = self.pool_resolve(view_sym)
         let fx: i32 = self.facade_touch_nodes.get(call_node).unwrap()
-        let fname: str = self.pool_resolve(self.facade_call_effects[fx].fn_sym)
+        let fname = self.pool_resolve(self.facade_call_effects[fx].fn_sym)
         let ci = self.facade_call_effects[fx].contract
         let pi: i32 = if self.facade_touch_hit_params.contains(view_sym): self.facade_touch_hit_params.get(view_sym).unwrap() else: -1
         let is_domain = self.facade_domain_origin_index.contains(origin_sym)
@@ -9622,7 +9622,7 @@ impl Sema:
         var clause = f"preserves param {pi}"
         if is_domain:
             let di: i32 = self.facade_domain_origin_index.get(origin_sym).unwrap()
-            let dn: str = self.pool_resolve(self.facade_domain_list[di].name)
+            let dn = self.pool_resolve(self.facade_domain_list[di].name)
             origin_text = "foreign-state domain `" ++ dn ++ "`"
             clause = "preserves domain " ++ dn
         let primary_start = if use_node != 0: self.ast.get_start(use_node) else: 0
@@ -9635,7 +9635,7 @@ impl Sema:
         if use_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "used here after the call")
         if ci >= 0:
-            let facade: str = self.pool_resolve(self.foreign_contracts[ci].facade)
+            let facade = self.pool_resolve(self.foreign_contracts[ci].facade)
             diag.add_help("state `" ++ clause ++ "` on fn " ++ fname ++ " in facade " ++ facade ++ " if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
         else:
             diag.add_help("describe " ++ fname ++ " with an fn item in a facade and state `" ++ clause ++ "` if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
@@ -12091,8 +12091,8 @@ impl Sema:
             self.copy_cycle_hits += 1
             return 0
         self.copy_visit_stack.insert(resolved)
-        let incomplete_before: i32 = self.copy_walk_incomplete
-        let hits_before: i32 = self.copy_cycle_hits
+        let incomplete_before = self.copy_walk_incomplete
+        let hits_before = self.copy_cycle_hits
         self.copy_walk_incomplete = 0
         var out: i32 = 1
         let field_count = self.type_reflection_field_count(resolved)

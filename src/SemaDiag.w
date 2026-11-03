@@ -205,7 +205,7 @@ impl Sema:
     // gap (§16.2 structured manifest: "location|category|reason") instead of
     // reading as a misspelled local name. True when the error was emitted.
     mut fn emit_ci_omitted_symbol_error(sym: i32, node: i32) -> bool:
-        let target_name: str = self.pool_resolve(sym)
+        let target_name = self.pool_resolve(sym)
         if not self.ci_omitted_symbols.contains(target_name):
             return false
         let record: str = with_str_clone_ref(self.ci_omitted_symbols.get(target_name).unwrap())

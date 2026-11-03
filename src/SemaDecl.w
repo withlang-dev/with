@@ -2100,7 +2100,7 @@ impl Sema:
         // D117 (§9.5): a `move fn` twin's symbol texts (`Owner.name$move`,
         // `name$move`) enter Sema's pool here; the parser's pool alone held
         // them, and the method symbol rebuild below looks them up.
-        let parsed_text: str = self.pool_resolve(parsed_fn_name)
+        let parsed_text = self.pool_resolve(parsed_fn_name)
         if parsed_text.ends_with("$move"):
             self.pool_intern(parsed_text)
             let twin_dot = parsed_text.rfind(".")
@@ -2141,7 +2141,7 @@ impl Sema:
         // shadowed and its function left declared without a body.
         // D117 (§9.5): `Owner.name$move` is the owned twin of `Owner.name`;
         // a call's receiver syntax selects it (check_method_call_parts_body).
-        let twin_text: str = self.pool_resolve(fn_name)
+        let twin_text = self.pool_resolve(fn_name)
         if twin_text.ends_with("$move"):
             let dot = twin_text.rfind(".")
             let short = twin_text[dot + 1..twin_text.len() - 5]
@@ -2161,7 +2161,7 @@ impl Sema:
                         self.prepare_fn_clause(dispatch_fn_name, existing_node, existing_di)
                         fn_name = self.prepare_fn_clause(dispatch_fn_name, node, current_di)
                     else:
-                        let fn_name_str: str = self.pool_resolve(fn_name)
+                        let fn_name_str = self.pool_resolve(fn_name)
                         self.emit_error(f"function '{fn_name_str}' is already defined", node)
                         return
         if self.ast.is_no_alloc_fn_node(node as NodeId):
@@ -2208,7 +2208,7 @@ impl Sema:
                         self.emit_error_with_help("Drop.drop receiver must be 'move self: Self' — a destructor always consumes (§2.4)", node, "write `move fn drop()`")
 
         // Bind Self to method owner type for dot-name methods
-        let self_sym: i32 = self.syms.self_type
+        let self_sym = self.syms.self_type
         var self_type_id: i32 = 0
         let fn_name_str = self.pool_resolve(method_base_sym)
         if method_owner_sym != 0:
@@ -2480,7 +2480,7 @@ impl Sema:
                 for edi in 0..self.ast.decl_count():
                     if self.ast.get_decl(edi) == existing_node:
                         if self.is_local_or_prelude_decl(edi):
-                            let fn_name_str: str = self.pool_resolve(name)
+                            let fn_name_str = self.pool_resolve(name)
                             self.emit_error(f"'{fn_name_str}' is already defined as a function; extern fn would shadow it", node)
                             return
                         break
@@ -3184,7 +3184,7 @@ impl Sema:
                     if has_mode == 0 and p0_type != 0 and self.ast.kind(p0_type as NodeId) == NodeKind.NK_TYPE_NAMED:
                         let p0_ty_sym = self.ast.get_data0(p0_type as NodeId)
                         if self.pool_resolve(p0_ty_sym) == "Self":
-                            let mt_name_str: str = self.pool_resolve(mt_name)
+                            let mt_name_str = self.pool_resolve(mt_name)
                             self.emit_error(f"trait method '{mt_name_str}' requires an explicit receiver mode: use 'self: &Self', 'mut self: Self', or 'move self: Self'", node)
             for mpi in 0..mt_param_count:
                 self.refuse_dyn_by_value_params(self.ast.fn_param_type(mt_param_start, mpi), true)
@@ -3303,7 +3303,7 @@ impl Sema:
         let decl_index = self.find_decl_index(node)
         if decl_index >= 0 and decl_index < self.decl_is_c_import.len() and self.decl_is_c_import[decl_index] != 0:
             return
-        let threshold: i64 = self.copy_warn_threshold
+        let threshold = self.copy_warn_threshold
         if threshold <= 0 or type_tid <= 0:
             return
         if self.ast.kind(node) == NodeKind.NK_IMPL_DECL and self.ast.find_impl_type_params(node) >= 0:
@@ -3314,7 +3314,7 @@ impl Sema:
             return
         let size = self.type_layout_size_of(type_tid)
         if size > threshold:
-            let name: str = self.pool_resolve(type_name)
+            let name = self.pool_resolve(type_name)
             self.emit_warning(f"large Copy type '{name}' is {size} bytes; implicit copies may be expensive (copy_warn_threshold={threshold})", node)
 
     mut fn collect_impl_decl(node: i32, is_local_impl: bool):
@@ -3994,7 +3994,7 @@ impl Sema:
         false
 
     mut fn validate_copy_derives():
-        let copy_sym: i32 = self.syms.copy_trait
+        let copy_sym = self.syms.copy_trait
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -4063,9 +4063,9 @@ impl Sema:
         false
 
     mut fn validate_generic_type_decls():
-        let saved_file_id: i32 = self.local_file_id
+        let saved_file_id = self.local_file_id
         let saved_module_path = move self.current_module_path
-        let saved_module_has_ci: i32 = self.current_module_has_ci
+        let saved_module_has_ci = self.current_module_has_ci
         for di in 0..self.ast.decl_count():
             if self.decl_is_lazy_skipped(di):
                 continue
@@ -4194,14 +4194,14 @@ impl Sema:
                     // default survives only as cascade suppression when the
                     // arguments already errored.
                     if self.diags.count_by_severity(DiagSeverity.Error) == 0:
-                        let mb_name: str = self.pool_resolve(tp_name)
+                        let mb_name = self.pool_resolve(tp_name)
                         self.emit_error(f"cannot infer type parameter '{mb_name}' for this call; the argument's shape does not match the parameter type that mentions '{mb_name}'", call_node)
                         return
                     self.put_generic_subst(tp_name, self.ty_i32, call_node)
                 else:
                     // #598 (ruled: no turbofish): teach the restructure instead of
                     // a bare "unknown type" cascade.
-                    let ug_name: str = self.pool_resolve(tp_name)
+                    let ug_name = self.pool_resolve(tp_name)
                     self.emit_error(f"cannot infer type parameter '{ug_name}' for this call; annotate the result binding or pass an argument that mentions '{ug_name}'", call_node)
                     return
             pos = pos + 2 + bound_count

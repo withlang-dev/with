@@ -171,8 +171,8 @@ impl Zcu:
                 runtime_eprint(f"error: unit bitcode write failed for unit {k}")
                 let _ = pipeline.finish()
                 return 1
-            let unit_context: i64 = cg.context
-            let unit_module: i64 = cg.llmod
+            let unit_context = cg.context
+            let unit_module = cg.llmod
             cg.release_llvm_module()
             pipeline.submit(k, unit_context, unit_module)
             self.last_sema = cg.take_sema()

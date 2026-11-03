@@ -127,7 +127,7 @@ fn contract_fact(mut report: AnalysisReport, sema: &Sema, site: &ContractSite, p
         fact.end = sema.ast.get_end(node)
         fact.line = contract_line(site.source, fact.start)
         fact.column = contract_column(site.source, fact.start)
-    let id: i32 = fact.id
+    let id = fact.id
     report.add(move fact)
     id
 

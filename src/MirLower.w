@@ -19640,7 +19640,7 @@ fn lower_fn_clause_dispatcher(sema: &Sema, ast_pool: &AstPool, pool: &InternPool
 
 impl MirBody:
     mut fn optimize_self_tail_calls():
-        let fn_sym: i32 = self.fn_sym
+        let fn_sym = self.fn_sym
         if fn_sym == 0 or self.n_params == 0:
             return
         let bb_count = self.block_count()
@@ -19690,7 +19690,7 @@ impl MirBody:
             // Step 1: Read call args into temp locals (aliasing safety)
             let arg_start: i32 = self.call_arg_starts[args_id]
             let arg_count: i32 = self.call_arg_counts[args_id]
-            let n_params: i32 = self.n_params
+            let n_params = self.n_params
             let span: i32 = self.bb_term_spans[bb]
             // Copy args to temps
             for ai in 0..arg_count:
@@ -19959,9 +19959,9 @@ fn lower_concrete_specialization(sema: Sema, ast_pool: &AstPool, pool: &InternPo
         sema.named_types.insert(sym, tid)
         sema.put_generic_subst(sym, tid, fn_node)
 
-    let saved_file_id: i32 = sema.local_file_id
+    let saved_file_id = sema.local_file_id
     let saved_module_path = sema_owned_text(sema.current_module_path)
-    let saved_module_has_ci: i32 = sema.current_module_has_ci
+    let saved_module_has_ci = sema.current_module_has_ci
     let decl_index = sema.find_decl_index(fn_node)
     if decl_index >= 0:
         sema.update_decl_source_context(decl_index)

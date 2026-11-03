@@ -160,7 +160,7 @@ fn emit_indent(indent: i32) -> str:
 // same fill), until none is left (`[[[T; 4]; 3]; 2]` → `[T; 2, 3, 4]`). An
 // outer `[` that indexes (after a name, `]` or `)`) is not an array.
 fn flatten_nested_arrays(source: &str) -> str:
-    var text: str = source
+    var text = source
     for _ in 0..16:
         let next = flatten_nested_arrays_once(text)
         if next == text: return text

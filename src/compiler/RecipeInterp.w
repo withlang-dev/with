@@ -726,7 +726,7 @@ impl PyParser:
             let _ = self.expression()
         self.expect_op(":")
         let header_ok = self.err.len() == 0
-        let body_at: i32 = self.at
+        let body_at = self.at
         let body = self.block()
         var unreadable: i32 = 0
         if self.err.len() > 0 and header_ok:
@@ -1885,7 +1885,7 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
     let compiler_version = ip.setting(env.compiler_version)
     ip.obj_set(compiler.n as i32, "version", compiler_version)
     ip.obj_set(settings, "compiler", compiler)
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     ip.obj_set(self_obj, "settings", pv(V_OBJ, settings as i64, ""))
     ip.obj_set(self_obj, "settings_build", pv(V_OBJ, settings as i64, ""))
     ip.obj_set(self_obj, "settings_target", pv_none())
@@ -1921,7 +1921,7 @@ fn recipe_built_options(recipe: &str, env: &RecipeEnv) -> List[str]:
     var out: List[str] = List.new()
     let (ip, problem) = recipe_interp(recipe, env)
     if problem.len() > 0: return out
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     let at = ip.obj_find(self_obj, "options")
     if at < 0: return out
     let options = ip.objs[self_obj].vals[at].n as i32
@@ -1936,7 +1936,7 @@ fn recipe_package_info(recipe: &str, env: &RecipeEnv) -> RecipePackageInfo:
     ip.notes = List.new()
     if not ip.run_method("package_info"): return recipe_failed("the recipe defines no package_info")
     if ip.problem.len() > 0: return recipe_failed(ip.problem)
-    let self_obj: i32 = ip.self_obj
+    let self_obj = ip.self_obj
     let cpp_info = ip.objs[self_obj].vals[ip.obj_find(self_obj, "cpp_info")].n as i32
     let root = ip.component(cpp_info, "")
     var components: List[RecipeComponent] = List.new()
