@@ -6815,7 +6815,7 @@ impl ComptimeEvaluator:
                 values.push(move arg_signal.value)
             // Pushed after every payload is evaluated: a nested value's own
             // extras must not interleave with this variant's.
-            let start: i32 = self.extra_values.len()
+            let start = self.extra_values.len() as i32
             for v in values.into_iter():
                 self.extra_values.push(v)
             return comptime_control_value(comptime_value_enum(self.node_type_or(node, enum_tid), sym, start, arg_count))
