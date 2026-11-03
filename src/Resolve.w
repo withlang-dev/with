@@ -390,6 +390,36 @@ impl ResolveState:
                 let path_count = ast_pool.get_data1(decl)
                 let dotted = self.use_path_dotted(ast_pool, path_start, path_count)
                 let resolved_path = self.resolve_use_file(module_id, ast_pool, path_start, path_count)
+                // §18.1 (#2948): a group at a package root (`use std.{fs,
+                // process}`): `std` names no module and each member names one,
+                // so the group is one import per member, under the member's name.
+                if resolved_path.len() == 0 and ast_pool.get_data2(decl) > 0 and ast_pool.use_alias(decl as NodeId) == 0:
+                    let member_paths: List[str] = List.new()
+                    var all_members = true
+                    for si in 0..ast_pool.get_data2(decl):
+                        let member = self.pool.resolve(resolve_extra_or_zero(ast_pool, path_start + path_count + si))
+                        let member_path = self.resolve_use_file_dotted(module_id, dotted ++ "." ++ member)
+                        if member_path.len() == 0: all_members = false
+                        member_paths.push(member_path)
+                    if all_members:
+                        for si in 0..ast_pool.get_data2(decl):
+                            let member = self.pool.resolve(resolve_extra_or_zero(ast_pool, path_start + path_count + si))
+                            let member_dotted = dotted ++ "." ++ member
+                            self.result.imports.push(ResolvedImport {
+                                module_id,
+                                index_in_module: import_index,
+                                kind: ImportKind.IK_USE,
+                                path_text: resolve_owned_text(member_dotted),
+                                selected: "",
+                                namespace: resolve_owned_text(member),
+                                module_text: resolve_owned_text(member_dotted),
+                                target_module: self.reserve_module(member_paths[si], resolve_dirname(member_paths[si]), -1),
+                                span_start: start,
+                                span_end: end,
+                            })
+                            import_index = import_index + 1
+                        continue
+
                 var target_module: i32 = -1
                 if resolved_path.len() > 0:
                     target_module = self.reserve_module(resolved_path, resolve_dirname(resolved_path), -1)

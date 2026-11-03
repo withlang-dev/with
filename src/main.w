@@ -6127,7 +6127,7 @@ fn print_usage:
     with_write("  -o <path>        Write output to path\n")
     with_write("  --release        Enable release defaults\n")
     with_write("  --target <triple>\n")
-    with_write("                   Build for a target triple (cross-targets not implemented yet)\n")
+    with_write("                   Build for a target triple (linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64, wasm32)\n")
     with_write("  --emit-c         Emit C instead of a binary\n")
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --dump-project-info\n")
@@ -6215,7 +6215,7 @@ fn print_build_usage:
     with_write("  -o, --output     Write output to path\n")
     with_write("  --release        Enable release defaults\n")
     with_write("  --target <triple>\n")
-    with_write("                   Build for a target triple (cross-targets not implemented yet)\n")
+    with_write("                   Build for a target triple (linux-x86_64, linux-aarch64, windows-x86_64, windows-aarch64, wasm32)\n")
     with_write("  --emit-c         Emit C instead of a binary\n")
     with_write("  --emit-obj       Emit an object file instead of a binary\n")
     with_write("  --graph          Print the build graph and exit\n")
@@ -6362,8 +6362,8 @@ fn print_help_use:
         "  use demo.core      -> lib/demo/core.w relative to the project root\n" ++
         "  use foo.bar.*      -> import all public symbols from the module\n\n" ++
         "Not supported:\n\n" ++
-        "  use foo.{a, b}     Grouped imports are not implemented\n" ++
-        "  use foo as bar     Aliased imports are not implemented\n"
+        "  use foo.{a, b}     Grouped import: a and b from foo\n" ++
+        "  use foo as bar     Aliased import: foo under the name bar\n"
     )
 
 fn print_help_fn:
