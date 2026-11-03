@@ -2314,10 +2314,17 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
             shown = "&" ++ rname
             arg = received
     else:
-        // A callback C passes a handle's representation receives the handle
-        // (§16.2b.9); C gets the callback under its own type.
+        // D122/D187 (§16.2b.6): a pointer to an imported record the facade
+        // hands out as a view (`xmlNode *cur` beside `xmlNode *parent`)
+        // receives the `&T` view; C gets the record's address, as a
+        // record-view method's `self` crosses (facade_render_record_view_methods).
+        let unaliased = facade_render_unalias(pool, intern, ptype)
+        let pointee = if unaliased.starts_with("*mut "): unaliased.slice(5, unaliased.len()).to_owned() else: if unaliased.starts_with("*const "): unaliased.slice(7, unaliased.len()).to_owned() else: ""
         let handled = facade_render_handle_callback_type(pool, intern, ptype)
-        if handled != ptype:
+        if pointee.len() > 0 and facade_render_record_view_names(pool, intern, 0).contains(pointee):
+            shown = "&" ++ pointee
+            arg = if unaliased.starts_with("*const "): "(&raw const *" ++ pname ++ ")" else: "(&raw const *" ++ pname ++ " as " ++ unaliased ++ ")"
+        else if handled != ptype:
             shown = handled
             arg = "transmute[" ++ facade_render_callback_raw_type(facade_render_unalias(pool, intern, ptype)) ++ "](" ++ pname ++ ")"
         // D102 (§16.2b.8): `nullable param N` on a function-pointer

@@ -20,7 +20,7 @@ D184	a script's top-level binding is a local of the implicit main; a helper that
 D185	one comprehension family: the bracket form over Option/Result yields the carrier of the element; the yield expression form is retired; the statement form stays (§13.6, §13.6a)	implemented	test/behavior/behav_for_comprehension_yield_types.w	#2960
 D186	the iterator adapter is skip(n); drop(value) stays the prelude's (§13.3)	implemented	test/behavior/behav_d186_skip_adapter.w	
 D186	zip, chain and zip_with take any iterable (§13.3)	implemented	test/behavior/behav_d186_iterable_zip.w	
-D187	returns borrow T from params N, M: a view borrowed from two parameters (§16.2b.6)	open		#2965
+D187	returns borrow T from params N, M: a view borrowed from two parameters (§16.2b.6)	implemented	test/behavior/behav_d187_borrow_from_two_params.w	#2965
 D188	Duration is a value type over i64 nanoseconds; 50.millis() reads as §14 writes it	implemented	test/behavior/behav_d188_duration.w	
 D189	tuple .await has no arity limit (§14.11)	implemented	test/behavior/behav_d189_tuple_await_any_arity.w	
 §13.3	every operation in the collection-operations table compiles and runs as written	implemented	test/behavior/behav_s13_3_lazy_adapters.w	

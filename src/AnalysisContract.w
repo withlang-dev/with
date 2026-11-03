@@ -398,6 +398,9 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_BORROW, 0)
         let what = sema.safe_symbol_text(c.returns_borrow_resource)
         var origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ (if contract_received(sema, c.fn_sym, c.returns_borrow_from).len() > 0: " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")" else: ", a lent C string")
+        // D187: a view of both origins, invalidated when either is.
+        if c.returns_borrow_from2 >= 0:
+            origin = origin ++ " and " ++ contract_param(sema, c.fn_sym, c.returns_borrow_from2) ++ (if contract_received(sema, c.fn_sym, c.returns_borrow_from2).len() > 0: " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from2) ++ ")" else: ", a lent C string") ++ ", invalidated when either is"
         if c.returns_borrow_parent != 0:
             origin = "parent " ++ sema.safe_symbol_text(c.returns_borrow_parent) ++ " of " ++ origin
         let shape = if what == "CStr": "Option[CStr], nullable" else: f"Option[Borrowed{what}], nullable, no Drop"
@@ -407,7 +410,10 @@ fn contract_collect_fn(mut report: AnalysisReport, sema: &Sema, ci: i32, source_
         // parameter or a foreign-state domain.
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_BORROW, 0)
         let what = sema.safe_symbol_text(c.returns_borrow_record)
-        let origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")"
+        var origin = if c.returns_borrow_domain != 0: "domain " ++ sema.safe_symbol_text(c.returns_borrow_domain) else: contract_param(sema, c.fn_sym, c.returns_borrow_from) ++ " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from) ++ ")"
+        // D187: a view of both origins, invalidated when either is.
+        if c.returns_borrow_from2 >= 0:
+            origin = origin ++ " and " ++ contract_param(sema, c.fn_sym, c.returns_borrow_from2) ++ " (" ++ contract_received(sema, c.fn_sym, c.returns_borrow_from2) ++ "), invalidated when either is"
         contract_row(report, sema, &site, subject, CONTRACT_FN, clause, c.fn_sym, owner, c.returns_borrow_from, "returns", f"borrow {what} from {origin}; Option[&{what}], nullable, a view of the record, no Drop; its pointer fields stay raw", contract_clause_at(sema, &site, clause))
     else if c.returns_static_tid != 0:
         let clause = contract_clause(sema, node, FACADE_CLAUSE_RETURNS_STATIC, 0)
