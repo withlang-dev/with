@@ -2312,6 +2312,18 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_share(self.slot_values[idx]))
         let decl = self.find_module_let_decl(sym)
         if decl == 0:
+            // #2949: a std constant this unit never loaded (`Target` without
+            // `use std.os.Target` on the release compiler, which serves std
+            // as interfaces) is the import gate's case, not a runtime value.
+            let gated = self.invisible_name_message(sym)
+            if gated.contains("requires an explicit import"):
+                return self.fail(node, gated)
+            // The unit holds no declaration of the name at all (the release
+            // compiler never parsed the std module that declares it): say
+            // so, instead of calling a name a runtime value.
+            if self.lookup_slot_index(sym) < 0 and self.find_fn_decl_node(sym) == 0:
+                let name = self.pool.resolve(sym)
+                return self.fail(node, "'" ++ name ++ "' is not a declaration this unit can see at comptime; a standard-library name needs its import, `use std.<module>." ++ name ++ "` (§18.1)")
             return self.fail(node, "runtime value is not available at comptime")
         if self.module_let_visible(decl) == 0:
             return self.fail(node, self.invisible_name_message(sym))
