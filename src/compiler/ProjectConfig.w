@@ -93,22 +93,22 @@ fn project_config_clone(cfg: &ProjectConfig) -> ProjectConfig:
         manifest_error: project_config_clone_str(cfg.manifest_error),
         package_name: project_config_clone_str(cfg.package_name),
         package_version: project_config_clone_str(cfg.package_version),
-        c_import_include_paths: project_config_clone_str_list(&cfg.c_import_include_paths),
-        c_import_defines: project_config_clone_str_list(&cfg.c_import_defines),
+        c_import_include_paths: project_config_clone_str_list(cfg.c_import_include_paths),
+        c_import_defines: project_config_clone_str_list(cfg.c_import_defines),
         c_import_sdk_path: project_config_clone_str(cfg.c_import_sdk_path),
-        link_libs: project_config_clone_str_list(&cfg.link_libs),
-        link_search_paths: project_config_clone_str_list(&cfg.link_search_paths),
-        link_rpaths: project_config_clone_str_list(&cfg.link_rpaths),
-        dep_link_libs: project_config_clone_str_list(&cfg.dep_link_libs),
-        dep_link_args: project_config_clone_str_list(&cfg.dep_link_args),
-        dep_loaded: project_config_clone_str_list(&cfg.dep_loaded),
-        dep_names: project_config_clone_str_list(&cfg.dep_names),
-        dep_constraints: project_config_clone_str_list(&cfg.dep_constraints),
-        c_dep_metadata_names: project_config_clone_str_list(&cfg.c_dep_metadata_names),
-        manual_c_dep_names: project_config_clone_str_list(&cfg.manual_c_dep_names),
-        feature_default: project_config_clone_str_list(&cfg.feature_default),
-        feature_names: project_config_clone_str_list(&cfg.feature_names),
-        feature_values: project_config_clone_str_list(&cfg.feature_values),
+        link_libs: project_config_clone_str_list(cfg.link_libs),
+        link_search_paths: project_config_clone_str_list(cfg.link_search_paths),
+        link_rpaths: project_config_clone_str_list(cfg.link_rpaths),
+        dep_link_libs: project_config_clone_str_list(cfg.dep_link_libs),
+        dep_link_args: project_config_clone_str_list(cfg.dep_link_args),
+        dep_loaded: project_config_clone_str_list(cfg.dep_loaded),
+        dep_names: project_config_clone_str_list(cfg.dep_names),
+        dep_constraints: project_config_clone_str_list(cfg.dep_constraints),
+        c_dep_metadata_names: project_config_clone_str_list(cfg.c_dep_metadata_names),
+        manual_c_dep_names: project_config_clone_str_list(cfg.manual_c_dep_names),
+        feature_default: project_config_clone_str_list(cfg.feature_default),
+        feature_names: project_config_clone_str_list(cfg.feature_names),
+        feature_values: project_config_clone_str_list(cfg.feature_values),
         target_default: project_config_clone_str(cfg.target_default),
         runtime_fiber_stack_size: cfg.runtime_fiber_stack_size,
         runtime_fiber_pool_size: cfg.runtime_fiber_pool_size,
@@ -439,7 +439,7 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
             out.manifest_error = "missing metadata for dependency c." ++ name ++ "@" ++ version ++ " at " ++ meta_path ++ "; run 'with get c." ++ name ++ "@" ++ version ++ "'"
         return out
     let package_key = name ++ "/" ++ version
-    if not project_config_list_contains(&out.dep_loaded, package_key):
+    if not project_config_list_contains(out.dep_loaded, package_key):
         out.dep_loaded.push(package_key)
         // What c_import reads, and the framework stubs `with get` wrote for
         // this package (#1915, compiler.FrameworkStubs), relative to it.
@@ -455,21 +455,21 @@ fn project_config_load_dep_component(cfg: ProjectConfig, name: &str, version: &s
     let components = project_config_json_str_array(meta, "components")
     var wanted: List[str] = List.new()
     if components.len() == 0: wanted.push("")
-    else if component.len() > 0 and project_config_list_contains(&components, component): wanted.push(component.to_owned())
+    else if component.len() > 0 and project_config_list_contains(components, component): wanted.push(component.to_owned())
     else:
         for i in 0..components.len(): wanted.push(with_str_clone_ref(components[i]))
     for wi in 0..wanted.len():
         let key = package_key ++ ":" ++ wanted[wi]
-        if project_config_list_contains(&out.dep_loaded, key): continue
+        if project_config_list_contains(out.dep_loaded, key): continue
         out.dep_loaded.push(key)
         let suffix = if wanted[wi].len() == 0: "" else: ":" ++ wanted[wi]
         let lib_paths = project_config_json_str_array(meta, "lib_paths" ++ suffix)
         for i in 0..lib_paths.len():
             let path = dep_dir ++ "/" ++ lib_paths[i]
-            if not project_config_list_contains(&out.link_search_paths, path): out.link_search_paths.push(path)
+            if not project_config_list_contains(out.link_search_paths, path): out.link_search_paths.push(path)
         let libs = project_config_json_str_array(meta, "libs" ++ suffix)
         for i in 0..libs.len():
-            if not project_config_list_contains(&out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
+            if not project_config_list_contains(out.dep_link_libs, libs[i]): out.dep_link_libs.push(with_str_clone_ref(libs[i]))
         let link_args = project_config_json_str_array(meta, "link_args" ++ suffix)
         for i in 0..link_args.len():
             out.dep_link_args.push(with_str_clone_ref(link_args[i]))

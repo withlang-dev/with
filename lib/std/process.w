@@ -125,7 +125,7 @@ impl Command:
         Command { args: argv }
 
     /// Run the command. Returns the exit status.
-    pub fn run() -> i32: run(&self.args)
+    pub fn run() -> i32: run(self.args)
 
     /// Run the command and return its exit status.
-    pub fn status() -> i32: run(&self.args)
+    pub fn status() -> i32: run(self.args)

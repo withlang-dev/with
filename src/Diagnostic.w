@@ -102,7 +102,7 @@ impl Diagnostic:
     fn render(source: &Source):
         let no_paths: List[str] = List.new()
         let no_texts: List[str] = List.new()
-        self.render_with_label_sources(source, &no_paths, &no_texts)
+        self.render_with_label_sources(source, no_paths, no_texts)
 
     // Render with the primary span shifted back into an original file's
     // coordinates (generated-source mapping). Takes the offset instead of a
@@ -111,7 +111,7 @@ impl Diagnostic:
     fn render_at_offset(source: &Source, gen_start: i32):
         let no_paths: List[str] = List.new()
         let no_texts: List[str] = List.new()
-        self.render_with_label_sources_at_offset(source, &no_paths, &no_texts, gen_start)
+        self.render_with_label_sources_at_offset(source, no_paths, no_texts, gen_start)
 
     // #670: a label whose span lives in another file must resolve line/col
     // against THAT file's text and say which file it is. label_paths/label_texts
@@ -204,7 +204,7 @@ impl DiagnosticList:
         while rest.len() > 0:
             var best = 0
             for i in 1..rest.len():
-                if diagnostic_sorts_before(&rest[i], &rest[best]):
+                if diagnostic_sorts_before(rest[i], rest[best]):
                     best = i as i32
             self.items.push(rest.remove(best))
 

@@ -1835,8 +1835,8 @@ impl Parser:
             self.pool.mark_no_alloc_fn(fn_node)
             self.pending_no_alloc = 0
         self.attach_pending_effect_pins(fn_node)
-        self.attach_global_writes(fn_node, &global_writes)
-        self.attach_view_origins(fn_node, &view_origins)
+        self.attach_global_writes(fn_node, global_writes)
+        self.attach_view_origins(fn_node, view_origins)
         if self.pending_compiler_hook_phase != 0:
             self.pool.mark_compiler_hook_fn(fn_node, self.pending_compiler_hook_phase)
             self.pending_compiler_hook_phase = 0
@@ -2427,7 +2427,7 @@ impl Parser:
 
     mut fn parse_enum_variants() -> i32:
         let list = self.parse_enum_variant_list()
-        self.add_enum_variant_extras(list.count, &list.records)
+        self.add_enum_variant_extras(list.count, list.records)
 
     // Writes the enum-variant extras block: the count, then each variant's
     // `name, payload_count, payload_type...` record.
@@ -2585,7 +2585,7 @@ impl Parser:
             else if self.peek() == TokenKind.TK_IDENT:
                 continue
         self.expect(TokenKind.TK_R_BRACE)
-        self.add_backingless_enum_extras(flags or has_disc, synth_pos, &names, &discs, &pcounts, &payloads_flat)
+        self.add_backingless_enum_extras(flags or has_disc, synth_pos, names, discs, pcounts, payloads_flat)
 
     mut fn parse_enum_variants_block(flags: bool) -> i32:
         // Parses a backing-less enum body. Collects each variant's name, payloads,
@@ -2661,7 +2661,7 @@ impl Parser:
             if next_col != variant_col:
                 break
 
-        self.add_backingless_enum_extras(not has_payload or has_disc or flags, synth_pos, &names, &discs, &pcounts, &payloads_flat)
+        self.add_backingless_enum_extras(not has_payload or has_disc or flags, synth_pos, names, discs, pcounts, payloads_flat)
 
     // §4.4a: an explicit discriminant `= N` / `= -N` is an integer literal;
     // Sema evaluates it against the repr and computes the auto-incremented
@@ -3445,7 +3445,7 @@ impl Parser:
                 self.advance()
                 self.skip_newlines()
             if self.peek() != TokenKind.TK_EQ:
-                return self.add_error_decl(start, err_name, is_pub, wrapper_count, &records)
+                return self.add_error_decl(start, err_name, is_pub, wrapper_count, records)
 
         // error Name = | Variant1 | Variant2(payload), ...
         // error Name from A, B = | Variant ...   (D57: wrappers, then written)
@@ -3465,7 +3465,7 @@ impl Parser:
             at += 2 + written.records[at + 1]
         for ri in 0..written.records.len():
             records.push(written.records[ri])
-        self.add_error_decl(start, err_name, is_pub, wrapper_count + written.count, &records)
+        self.add_error_decl(start, err_name, is_pub, wrapper_count + written.count, records)
 
     mut fn add_error_decl(start: i32, err_name: i32, is_pub: i32, variant_count: i32, records: &List[i32]) -> NodeId:
         let extra_start = self.add_enum_variant_extras(variant_count, records)
@@ -4025,8 +4025,8 @@ impl Parser:
             let meta_flags = flags + required_param_count * FN_META_REQUIRED_UNIT
             let final_m_tp_start = if m_tp_count > 0: m_tp_start else: 0
             self.pool.add_fn_meta(fn_node, meta_flags, ret_type, m_params_start, param_count, final_m_tp_start, m_tp_count)
-            self.attach_global_writes(fn_node, &method_global_writes)
-            self.attach_view_origins(fn_node, &method_view_origins)
+            self.attach_global_writes(fn_node, method_global_writes)
+            self.attach_view_origins(fn_node, method_view_origins)
             if self.pending_iter_of_self != 0:
                 self.pool.mark_iter_of_self_fn(fn_node)
                 self.pending_iter_of_self = 0
@@ -5993,7 +5993,7 @@ impl Parser:
         sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
-        offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start, &normalized.src)
+        offset_interpolated_expr_spans(sub_parser.pool, first_node, base_start, normalized.src)
         let consumed_all = (sub_parser.peek() == TokenKind.TK_EOF) as i32
         let had_errors: i32 = if use_shared_diags != 0: 0 else if sub_parser.diags.has_errors(): 1 else: 0
         InterpolatedExprParseAttempt {
@@ -7329,7 +7329,7 @@ impl Parser:
         if rw_output_sym != 0:
             let rw_ident = self.pool.add_node(NodeKind.NK_IDENT, start, self.prev_end(), rw_output_sym, 0, 0)
             input_exprs.push(rw_ident)
-        let tmpl_sym = self.intern.intern(self.rewrite_asm_template(tmpl_text, &operand_names))
+        let tmpl_sym = self.intern.intern(self.rewrite_asm_template(tmpl_text, operand_names))
         let constr_sym = self.intern.intern(constraints_str)
         // Extras layout: [output_count, out_type_0.., input_count, in_expr_0..]
         let extra_start = self.pool.extra_len()
@@ -7755,7 +7755,7 @@ impl Parser:
             let binds = bind_kinds[bi] == 0
             pats.push(if binds: self.pool.add_node(NodeKind.NK_PAT_IDENT, start, start, bind_syms[bi], 0, 0) else: 0)
             fail_syms.push(if binds: self.intern.intern(f"___fail_{bi}") else: 0)
-        self.pool.build_comprehension_match(start, self.prev_end(), self.intern.intern("_Payload"), self.intern.intern("_Empty"), &fail_syms, &pats, &bind_exprs, &bind_kinds, body_expr, has_yield != 0)
+        self.pool.build_comprehension_match(start, self.prev_end(), self.intern.intern("_Payload"), self.intern.intern("_Empty"), fail_syms, pats, bind_exprs, bind_kinds, body_expr, has_yield != 0)
 
     mut fn finish_labeled_block(start: i32, label_sym: i32, body: NodeId) -> NodeId:
         if body != 0 and self.pool.kind(body) == NodeKind.NK_BLOCK:
@@ -8990,7 +8990,7 @@ impl Parser:
                 self.advance()
                 self.skip_newlines()
         self.expect(TokenKind.TK_R_PAREN)
-        let extra_start = self.add_closure_params(&params)
+        let extra_start = self.add_closure_params(params)
         let param_count = (params.len() / 2) as i32
         self.skip_newlines()
         let ret_type = self.parse_closure_ret_type()
@@ -9038,7 +9038,7 @@ impl Parser:
                 self.advance()
                 self.skip_newlines()
         self.expect(TokenKind.TK_PIPE)
-        let extra_start = self.add_closure_params(&params)
+        let extra_start = self.add_closure_params(params)
         let param_count = (params.len() / 2) as i32
         self.skip_newlines()
         let ret_type = self.parse_closure_ret_type()

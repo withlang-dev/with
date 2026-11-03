@@ -313,8 +313,8 @@ fn fs_sorted(items: &List[str]) -> List[str]:
     let right: List[str] = List.new()
     for i in 0..items.len():
         if i < mid: left.push(items[i]) else: right.push(items[i])
-    let a = fs_sorted(&left)
-    let b = fs_sorted(&right)
+    let a = fs_sorted(left)
+    let b = fs_sorted(right)
     let out: List[str] = List.new()
     var i = 0
     var j = 0
@@ -353,12 +353,12 @@ fn fs_tbd_document(library: &DscLibrary) -> str:
     out = out ++ "compatibility-version: " ++ library.compatibility_version ++ "\n"
     if library.reexports.len() > 0:
         out = out ++ "reexported-libraries:\n  - targets:         " ++ targets ++ "\n"
-        out = fs_yaml_list(out, "libraries", &library.reexports)
+        out = fs_yaml_list(out, "libraries", library.reexports)
     if library.symbols.len() + library.weak_symbols.len() + library.tls_symbols.len() > 0:
         out = out ++ "exports:\n  - targets:         " ++ targets ++ "\n"
-        out = fs_yaml_list(out, "symbols", &library.symbols)
-        out = fs_yaml_list(out, "weak-symbols", &library.weak_symbols)
-        out = fs_yaml_list(out, "thread-local-symbols", &library.tls_symbols)
+        out = fs_yaml_list(out, "symbols", library.symbols)
+        out = fs_yaml_list(out, "weak-symbols", library.weak_symbols)
+        out = fs_yaml_list(out, "thread-local-symbols", library.tls_symbols)
     out
 
 // The .tbd of framework `name`: its document, then one per library it
@@ -380,7 +380,7 @@ fn fs_framework_tbd(cache: &DscCache, name: &str) -> str:
         let library = fs_read_library(cache, current)
         if library.problem.len() > 0:
             return "error: " ++ library.problem
-        text.push_str(fs_tbd_document(&library))
+        text.push_str(fs_tbd_document(library))
         for r in 0..library.reexports.len():
             var known = false
             for s in 0..queue.len():
@@ -397,18 +397,18 @@ fn framework_stubs_write(dir: &str, names: &List[str]) -> str:
         return "Apple framework stubs are generated on macOS only"
     let cache = fs_open_cache()
     if cache.problem.len() > 0:
-        fs_close_cache(&cache)
+        fs_close_cache(cache)
         return cache.problem
     for i in 0..names.len():
-        let tbd = fs_framework_tbd(&cache, names[i])
+        let tbd = fs_framework_tbd(cache, names[i])
         if tbd.starts_with("error: "):
-            fs_close_cache(&cache)
+            fs_close_cache(cache)
             return tbd.slice(7, tbd.len())
         let framework_dir = dir ++ "/" ++ names[i] ++ ".framework"
         if runtime_mkdir_p(framework_dir) != 0 or runtime_write_file(framework_dir ++ "/" ++ names[i] ++ ".tbd", tbd) != 0:
-            fs_close_cache(&cache)
+            fs_close_cache(cache)
             return "could not write " ++ framework_dir ++ "/" ++ names[i] ++ ".tbd"
-    fs_close_cache(&cache)
+    fs_close_cache(cache)
     ""
 
 // The framework names of `-framework <Name>` and `-weak_framework <Name>`
@@ -429,7 +429,7 @@ fn with_framework_stubs_main(args: &List[str]) -> i32:
         return 2
     let names: List[str] = List.new()
     for i in 1..args.len(): names.push(args[i])
-    let problem = framework_stubs_write(args[0], &names)
+    let problem = framework_stubs_write(args[0], names)
     if problem.len() > 0:
         runtime_eprint("error: framework stubs: " ++ problem)
         return 1

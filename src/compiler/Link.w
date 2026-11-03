@@ -161,7 +161,7 @@ fn link_stage_darwin_platform_version(obj_path: &str, extras: &List[str], link_l
     for extra in extras: inputs.push(extra)
     let dirs = link_stage_explicit_search_dirs(extras, link_args, "")
     for lib in link_libs:
-        let archive = link_stage_darwin_lib_archive(&dirs, lib)
+        let archive = link_stage_darwin_lib_archive(dirs, lib)
         if archive.len() > 0: inputs.push(archive)
     for input in inputs:
         let minos = link_stage_macho_macos_minos(input)
@@ -316,7 +316,7 @@ impl LinkStageCommand:
             shown = shown ++ " " ++ self.args[i]
         if link_stage_verbose():
             with_eprint("link: " ++ shown)
-        let saved = link_stage_apply_env(&self.env)
+        let saved = link_stage_apply_env(self.env)
         let linux_target = if target_spec_is_native(): runtime_sysinfo_os() == "Linux" else: target_spec_active_kind() == 1 or target_spec_active_kind() == 2
         // #1915, #1914: a failed macOS or Windows link says why (lld's own
         // diagnostics, or the linker and its exit status), never a bare
@@ -635,7 +635,7 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
         with_eprint("error: link: this compiler carries no linux sysroot, and WITH_LINUX_SYSROOT names none")
         return link_stage_plan_fail()
     let ld_link_args = link_stage_linux_driver_args_for_ld(link_args)
-    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, &ld_link_args, false)
+    var command = link_stage_make_linux_own_sysroot_command(self_exe, sysroot, obj_path, bin_path, extras, link_libs, ld_link_args, false)
     let args: List[str] = List.new()
     args.push("__ld")
     for i in 0..command.args.len():
@@ -1086,7 +1086,7 @@ fn link_stage_make_windows_llvm_link_command(llvm_ld: &str, sdk_dir: &str, obj_p
     let map_root = link_stage_file_prefix_map_root().replace("\\", "/")
     if map_root.len() == 0:
         return LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args, cwd: "", env, inputs, outputs, cleanup_files }
-    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(&args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
+    LinkStageCommand { linker: with_str_clone_ref(llvm_ld), args: link_stage_windows_root_relative_args(args, map_root), cwd: map_root, env, inputs, outputs, cleanup_files }
 
 // Under WITH_FILE_PREFIX_MAP a PDB names nothing under the mapped root:
 // lld-link records its working directory, its command line and each

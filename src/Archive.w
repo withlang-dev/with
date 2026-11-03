@@ -403,7 +403,7 @@ fn ar_expand_response_args(args: &List[str], windows_quoting: bool, depth: i32) 
         if text.len() == 0 or depth >= 8:
             with_eprint("error: archive: cannot read response file: " ++ path)
             return ArResponseArgs { ok: false, args: out }
-        let inner = ar_expand_response_args(&ar_tokenize_response(text, windows_quoting), windows_quoting, depth + 1)
+        let inner = ar_expand_response_args(ar_tokenize_response(text, windows_quoting), windows_quoting, depth + 1)
         if not inner.ok:
             return ArResponseArgs { ok: false, args: out }
         for j in 0..inner.args.len():

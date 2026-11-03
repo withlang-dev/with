@@ -756,7 +756,7 @@ fn build_cache_signature_parts(target: &BuildGraphTarget, root: &str) -> List[Bu
         // Empty closure (mapping unavailable) falls back to hashing all
         // build-graph sources — the always-safe superset.
         if target.action_source_paths.len() > 0:
-            parts.push(BuildCacheSigPart { name: "action-code", text: ":ACTION_CODE:" ++ build_cache_hash_action_sources(root, &target.action_source_paths) })
+            parts.push(BuildCacheSigPart { name: "action-code", text: ":ACTION_CODE:" ++ build_cache_hash_action_sources(root, target.action_source_paths) })
         else:
             parts.push(BuildCacheSigPart { name: "build-graph", text: ":BUILD_GRAPH:" ++ build_cache_hash_build_graph_sources(root) })
     if build_cache_is_stage_target(target):
@@ -1007,18 +1007,18 @@ fn build_cache_record(root: &str, target: &BuildGraphTarget, discovered_deps: &L
             deps.push(if runtime_path_is_absolute(read): read else: root ++ "/" ++ read)
         else:
             other_effects.push(effect)
-    let dep_paths = build_cache_sorted_unique_strings(&deps)
+    let dep_paths = build_cache_sorted_unique_strings(deps)
     for idx in 0..dep_paths.len():
         let path = dep_paths[idx]
         let hash = build_cache_fingerprint_file(path)
         let rel_path = build_cache_project_relative(root, path)
         content = content ++ "dep:" ++ rel_path ++ ":" ++ hash ++ "\n"
-    let effects_text = build_cache_effects_text(&other_effects)
+    let effects_text = build_cache_effects_text(other_effects)
     if effects_text.len() > 0:
         let effects_path = build_cache_effects_path(root, target.name)
         let _write_effects = build_graph_rt_write_file(effects_path, effects_text)
         content = content ++ "effects:" ++ build_cache_sha256_text(effects_text) ++ "\n"
-        let sorted_effects = build_cache_sorted_unique_strings(&other_effects)
+        let sorted_effects = build_cache_sorted_unique_strings(other_effects)
         for idx in 0..sorted_effects.len():
             let env_line = build_cache_effect_env_state_line(sorted_effects[idx])
             if env_line.len() > 0:
@@ -1209,7 +1209,7 @@ fn build_cache_store_publish(root: &str, target: &BuildGraphTarget, state_text: 
     let rels = build_cache_store_output_rel_paths(target)
     for i in 0..rels.len():
         if build_cache_store_tree_has_symlink(root ++ "/" ++ rels[i]): return
-    let named = build_cache_store_names_root(root, &rels)
+    let named = build_cache_store_names_root(root, rels)
     if named.len() > 0:
         build_graph_rt_eprint("[cache] " ++ target.name ++ ": not stored: " ++ named ++ " names this worktree (" ++ root ++ "), so it is not the same output in another")
         return
@@ -1389,7 +1389,7 @@ fn build_cache_store_restore(root: &str, target: &BuildGraphTarget) -> bool:
     // Only the restored outputs changed on disk: the rest of the memo (the
     // compiler sources every stage target's key hashes) stays valid, so a
     // worktree served sixty entries hashes src/ once, not once per entry.
-    build_cache_forget_restored_fingerprints(root, &rels)
+    build_cache_forget_restored_fingerprints(root, rels)
     let reason = build_cache_freshness_reason(root, target, false)
     if reason != "fresh":
         build_graph_rt_eprint("[cache] " ++ target.name ++ ": build store entry " ++ key.slice(0, 12) ++ " does not verify (" ++ reason ++ "); running it")
@@ -1519,18 +1519,18 @@ fn build_cache_graph_write(root: &str, key: &str, graph: &BuildGraph) -> Unit:
         out = bcg_put_str(out, t.entry)
         out = bcg_put_str(out, t.output)
         out = bcg_put_str(out, t.cwd)
-        out = bcg_put_list(out, &t.system_libs)
-        out = bcg_put_list(out, &t.library_paths)
-        out = bcg_put_list(out, &t.rpaths)
-        out = bcg_put_list(out, &t.include_paths)
-        out = bcg_put_list(out, &t.defines)
-        out = bcg_put_list(out, &t.inputs)
-        out = bcg_put_list(out, &t.extra_outputs)
-        out = bcg_put_list(out, &t.write_scopes)
-        out = bcg_put_list(out, &t.deps)
-        out = bcg_put_list(out, &t.args)
-        out = bcg_put_list(out, &t.env)
-        out = bcg_put_list(out, &t.action_source_paths)
+        out = bcg_put_list(out, t.system_libs)
+        out = bcg_put_list(out, t.library_paths)
+        out = bcg_put_list(out, t.rpaths)
+        out = bcg_put_list(out, t.include_paths)
+        out = bcg_put_list(out, t.defines)
+        out = bcg_put_list(out, t.inputs)
+        out = bcg_put_list(out, t.extra_outputs)
+        out = bcg_put_list(out, t.write_scopes)
+        out = bcg_put_list(out, t.deps)
+        out = bcg_put_list(out, t.args)
+        out = bcg_put_list(out, t.env)
+        out = bcg_put_list(out, t.action_source_paths)
     out = out ++ f"g{graph.generated_sources.len()}\n"
     for i in 0..graph.generated_sources.len():
         let g = graph.generated_sources[i]

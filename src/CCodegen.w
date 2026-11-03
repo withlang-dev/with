@@ -767,7 +767,7 @@ fn cc_str_list_contains(values: &List[str], needle: &str) -> bool:
     false
 
 fn cc_push_unique_str(values: List[str], value: &str) -> List[str]:
-    if cc_str_list_contains(&values, value):
+    if cc_str_list_contains(values, value):
         return values
     values.push(with_str_clone_ref(value))
     values
@@ -10008,7 +10008,7 @@ impl CCodegen:
                     out = out ++ "    " ++ self.c_decl(elem_tid, f"field{ti}") ++ ";\n"
                     elem_names.push(f"field{ti}")
                 out = out ++ cc_rbrace() ++ ";\n"
-                out = out ++ self.layout_static_asserts(resolved, name, &elem_names) ++ "\n"
+                out = out ++ self.layout_static_asserts(resolved, name, elem_names) ++ "\n"
                 continue
             let generic_base_name = self.generic_inst_base_name(resolved as i32)
             if self.sema.is_opaque_value_type(resolved as i32):
@@ -10081,7 +10081,7 @@ impl CCodegen:
                 if self.sema.struct_liveness_byte_frozen_tid(self.sema.get_type_d0(resolved), resolved as i32) != 0:
                     out = out ++ "    uint8_t __with_live;\n"
                 out = out ++ cc_rbrace() ++ ";\n"
-                out = out ++ self.layout_static_asserts(resolved as i32, name, &field_names) ++ "\n"
+                out = out ++ self.layout_static_asserts(resolved as i32, name, field_names) ++ "\n"
                 continue
             let start = self.sema.get_type_d1(resolved)
             let count = self.sema.get_type_d2(resolved)
@@ -10113,7 +10113,7 @@ impl CCodegen:
             if self.sema.struct_liveness_byte_frozen_tid(name_sym, resolved) != 0:
                 out = out ++ "    uint8_t __with_live;\n"
             out = out ++ cc_rbrace() ++ ";\n"
-            out = out ++ self.layout_static_asserts(resolved, name, &field_names) ++ "\n"
+            out = out ++ self.layout_static_asserts(resolved, name, field_names) ++ "\n"
         out
 
     // `union` for a §16.4 union type (all fields at offset 0, TypeLayout's
@@ -10205,7 +10205,7 @@ impl CCodegen:
                     self.sema.current_module_path = self.decl_source_path(decl)
                     let body = self.lower_global_init_body(init_sym, value, tid)
                     self.sema.current_module_path = saved_module
-                    let invalid = validate_use_after_kill(&body, &self.intern)
+                    let invalid = validate_use_after_kill(body, self.intern)
                     if invalid.len() > 0:
                         self.fail(f"emit-c: the initializer of global '{cc_intern_resolve(self.intern, sym)}' lowered to invalid MIR: {invalid}")
                         return

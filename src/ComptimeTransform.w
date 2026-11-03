@@ -3343,13 +3343,13 @@ impl Sema:
 
     mut fn comptime_transform_module(source_ast: &AstPool, intern: &InternPool) -> AstPool:
         var out = astpool_clone_deep(source_ast)
-        let saved_module_paths = sema_clone_str_list(&self.module_paths)
-        let saved_module_import_starts = sema_clone_i32_list(&self.module_import_starts)
-        let saved_module_import_counts = sema_clone_i32_list(&self.module_import_counts)
-        let saved_module_import_targets = sema_clone_i32_list(&self.module_import_targets)
-        let saved_module_import_paths = sema_clone_str_list(&self.module_import_paths)
-        let saved_module_import_selected = sema_clone_str_list(&self.module_import_selected)
-        let saved_module_import_offsets = sema_clone_i32_list(&self.module_import_offsets)
+        let saved_module_paths = sema_clone_str_list(self.module_paths)
+        let saved_module_import_starts = sema_clone_i32_list(self.module_import_starts)
+        let saved_module_import_counts = sema_clone_i32_list(self.module_import_counts)
+        let saved_module_import_targets = sema_clone_i32_list(self.module_import_targets)
+        let saved_module_import_paths = sema_clone_str_list(self.module_import_paths)
+        let saved_module_import_selected = sema_clone_str_list(self.module_import_selected)
+        let saved_module_import_offsets = sema_clone_i32_list(self.module_import_offsets)
         let saved_global_module_paths = ct_new_list_str()
         for smi in 0..saved_module_paths.len():
             let module_path = saved_module_paths[smi]
@@ -3542,12 +3542,12 @@ impl Sema:
         let transform_pool = intern
         var transform_sema = Sema.init(transform_pool, move self.diags, out)
         transform_sema.source_text = move self.source_text
-        transform_sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
-        transform_sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
-        transform_sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
-        transform_sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
-        transform_sema.source_text_names = sema_clone_str_list(&self.source_text_names)
-        transform_sema.source_texts = sema_clone_str_list(&self.source_texts)
+        transform_sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
+        transform_sema.decl_source_file_ids = sema_clone_i32_list(self.decl_source_file_ids)
+        transform_sema.decl_is_c_import = sema_clone_i32_list(self.decl_is_c_import)
+        transform_sema.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
+        transform_sema.source_text_names = sema_clone_str_list(self.source_text_names)
+        transform_sema.source_texts = sema_clone_str_list(self.source_texts)
         transform_sema.overflow_mode = self.overflow_mode
         // The transform Sema checks what a `comptime if` condition in a
         // generic body (the prelude's `print[T]`) reaches; its diagnostics
@@ -3559,13 +3559,13 @@ impl Sema:
         transform_sema.lint_partial_statement_match = self.lint_partial_statement_match
         transform_sema.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         transform_sema.interface_eager = self.interface_eager
-        transform_sema.copy_module_graph_parts(&saved_module_paths, &saved_module_import_starts, &saved_module_import_counts, &saved_module_import_targets, &saved_module_import_paths, &saved_module_import_selected, &saved_module_import_offsets, &saved_global_module_paths)
+        transform_sema.copy_module_graph_parts(saved_module_paths, saved_module_import_starts, saved_module_import_counts, saved_module_import_targets, saved_module_import_paths, saved_module_import_selected, saved_module_import_offsets, saved_global_module_paths)
         transform_sema.copy_import_namespaces(self)
         transform_sema.set_tracked_input_context(self.tracked_input_root, self.tracked_input_paths)
         transform_sema.prepare_for_comptime_transform()
         if transform_sema.diags.has_errors():
             self.diags = move transform_sema.diags
-            self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
+            self.merge_tracked_inputs(transform_sema.tracked_input_paths)
             return out
 
         // A method's type parameters (its impl's, then its own) are unbound
@@ -3580,10 +3580,10 @@ impl Sema:
             let decl = out.get_decl(di)
             // Nodes a comptime expansion adds belong to the declaring file.
             out.set_current_file_id(out.file(decl))
-            let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, &impl_decls, decl as i32)
+            let owner = if out.kind(decl) == NodeKind.NK_IMPL_DECL: decl as i32 else: ct_enclosing_impl(out, impl_decls, decl as i32)
             transform_sema.ct_type_param_syms = ct_type_params_in_scope(out, owner, decl as i32)
             transform_sema.ct_transform_decl(out, intern, decl as i32)
             transform_sema.ct_type_param_syms = List.new()
         self.diags = move transform_sema.diags
-        self.merge_tracked_inputs(&transform_sema.tracked_input_paths)
+        self.merge_tracked_inputs(transform_sema.tracked_input_paths)
         out

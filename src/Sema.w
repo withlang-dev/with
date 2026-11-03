@@ -3111,11 +3111,11 @@ impl Sema:
         // Comptime callers replace `ast` before copying Sema. Rebuild this
         // owning map for that AST instead of sharing the source map header.
         self.rebuild_decl_index()
-        self.type_kinds = sema_clone_i32_list(&self.type_kinds)
-        self.type_d0 = sema_clone_i32_list(&self.type_d0)
-        self.type_d1 = sema_clone_i32_list(&self.type_d1)
-        self.type_d2 = sema_clone_i32_list(&self.type_d2)
-        self.type_extra = sema_clone_i32_list(&self.type_extra)
+        self.type_kinds = sema_clone_i32_list(self.type_kinds)
+        self.type_d0 = sema_clone_i32_list(self.type_d0)
+        self.type_d1 = sema_clone_i32_list(self.type_d1)
+        self.type_d2 = sema_clone_i32_list(self.type_d2)
+        self.type_extra = sema_clone_i32_list(self.type_extra)
         self.rebuild_exact_type_cache()
         self.rebuild_named_type_candidate_index()
         self.generic_inst_cache = Memo.new()
@@ -3131,9 +3131,9 @@ impl Sema:
         self.generic_enum_payload_cache_starts = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_counts = sema_new_map_i64_i32()
         self.generic_enum_payload_cache_values = List.new()
-        self.generic_subst_param_syms = sema_clone_i32_list(&self.generic_subst_param_syms)
-        self.generic_subst_type_ids = sema_clone_i32_list(&self.generic_subst_type_ids)
-        self.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
+        self.generic_subst_param_syms = sema_clone_i32_list(self.generic_subst_param_syms)
+        self.generic_subst_type_ids = sema_clone_i32_list(self.generic_subst_type_ids)
+        self.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
         // source_texts / source_text_names / tracked_input_paths are read-only during
         // comptime eval and are restored by the write-back in comptime_eval_finish, so
         // share them (shallow) instead of deep-cloning. Deep-cloning the full source
@@ -3174,7 +3174,7 @@ impl Sema:
             let source_path = source.module_paths[mi]
             if source.global_visible_module_paths.contains(source_path):
                 global_paths.push(sema_owned_text(source_path))
-        self.copy_module_graph_parts(&source.module_paths, &source.module_import_starts, &source.module_import_counts, &source.module_import_targets, &source.module_import_paths, &source.module_import_selected, &source.module_import_offsets, &global_paths)
+        self.copy_module_graph_parts(source.module_paths, source.module_import_starts, source.module_import_counts, source.module_import_targets, source.module_import_paths, source.module_import_selected, source.module_import_offsets, global_paths)
         self.copy_import_namespaces(source)
 
     // D70: std.math, whose transcendental functions are builtins (§17.6a).
@@ -3182,11 +3182,11 @@ impl Sema:
 
     // D70: the import namespaces of `source`'s module graph.
     mut fn copy_import_namespaces(source: &Sema):
-        self.ns_modules = sema_clone_i32_list(&source.ns_modules)
-        self.ns_names = sema_clone_str_list(&source.ns_names)
-        self.ns_fulls = sema_clone_str_list(&source.ns_fulls)
-        self.ns_targets = sema_clone_i32_list(&source.ns_targets)
-        self.ns_offsets = sema_clone_i32_list(&source.ns_offsets)
+        self.ns_modules = sema_clone_i32_list(source.ns_modules)
+        self.ns_names = sema_clone_str_list(source.ns_names)
+        self.ns_fulls = sema_clone_str_list(source.ns_fulls)
+        self.ns_targets = sema_clone_i32_list(source.ns_targets)
+        self.ns_offsets = sema_clone_i32_list(source.ns_offsets)
 
     mut fn copy_module_graph_parts(src_module_paths: &List[str], src_module_import_starts: &List[i32], src_module_import_counts: &List[i32], src_module_import_targets: &List[i32], src_module_import_paths: &List[str], src_module_import_selected: &List[str], src_module_import_offsets: &List[i32], global_paths: &List[str]):
         self.module_paths = sema_new_list_str()
@@ -4866,7 +4866,7 @@ impl Sema:
                 cand_paths.push(sema_owned_text(self.displaced_fn_paths[i]))
                 cand_pub.push(self.displaced_fn_pub[i])
                 i = self.displaced_fn_prev[i]
-            let imported = self.last_import_provider(sym, &cands, &cand_paths, &cand_pub)
+            let imported = self.last_import_provider(sym, cands, cand_paths, cand_pub)
             if imported >= 0:
                 chosen = cands[imported]
                 if chosen == sym:
@@ -4929,7 +4929,7 @@ impl Sema:
         for ci in 0..cands.len():
             if cand_paths[ci] == self.current_module_path and not self.ci_syms.contains(cands[ci]):
                 return self.bind_displaced_global_ident(sym, node, cands[ci])
-        let imported = self.last_import_provider(sym, &cands, &cand_paths, &cand_pub)
+        let imported = self.last_import_provider(sym, cands, cand_paths, cand_pub)
         if imported >= 0:
             return self.bind_displaced_global_ident(sym, node, cands[imported])
         let fallback: List[i32] = List.new()
@@ -4939,7 +4939,7 @@ impl Sema:
         if fallback.len() == 0:
             return sym
         if fallback.len() > 1:
-            self.emit_ambiguous_fallback_use(with_str_clone_ref(self.pool_resolve(sym)), node, &cand_paths, &fallback)
+            self.emit_ambiguous_fallback_use(with_str_clone_ref(self.pool_resolve(sym)), node, cand_paths, fallback)
         self.bind_displaced_global_ident(sym, node, cands[fallback[0]])
 
     // §18.2 tier 3 under Eric's #1221 ruling: of the candidates an explicit
@@ -5500,7 +5500,7 @@ impl Sema:
                 engine_twin = sema_owned_text(path)
             else if self.corpus_private_modules.contains(path):
                 self.vis_note("  bridge: skip " ++ path ++ " (corpus-private, #2248)")
-            else if sema_list_str_contains(&modules, path) == false:
+            else if sema_list_str_contains(modules, path) == false:
                 modules.push(sema_owned_text(path))
         self.vis_note(f"  bridge: {modules.len()} non-engine std module(s) declare it" ++ (if engine_twin.len() > 0: "; engine twin " ++ engine_twin else: "; no engine twin"))
         // Only a name an engine twin displaced takes the bridge: a std name
@@ -5570,7 +5570,7 @@ impl Sema:
             for path in paths:
                 if sema_tier_path_is_std_implementation(path) and (closure_only == 0 or self.module_in_prelude_closure(path)):
                     let dotted = sema_std_module_dotted(path)
-                    if dotted.len() > 0 and sema_list_str_contains(&modules, dotted) == false:
+                    if dotted.len() > 0 and sema_list_str_contains(modules, dotted) == false:
                         modules.push(sema_owned_text(dotted))
         if modules.len() == 0:
             return ""
@@ -6941,10 +6941,10 @@ impl Sema:
         for vi in 0..variant_count:
             let variant_sym = self.type_reflection_variant_name(tid, vi)
             let payloads = self.enum_variant_payload_types(tid, variant_sym)
-            self.cache_generic_enum_payload(tid, variant_sym, &payloads)
+            self.cache_generic_enum_payload(tid, variant_sym, payloads)
             let bare = self.unqualified_enum_variant_sym(variant_sym)
             if bare != variant_sym:
-                self.cache_generic_enum_payload(tid, bare, &payloads)
+                self.cache_generic_enum_payload(tid, bare, payloads)
 
     // A generic inst whose template reflects fields/variants now but whose
     // caches were filled when it reflected none (see eager_type_caches_pass).
@@ -6977,17 +6977,17 @@ impl Sema:
                 if self.type_d0[ti] == list_sym and self.type_d2[ti] >= 1:
                     let vi_args: List[i32] = List.new()
                     vi_args.push(self.type_extra[self.type_d1[ti]])
-                    let _ = self.ensure_generic_inst_type(vi_sym, &vi_args, 1)
+                    let _ = self.ensure_generic_inst_type(vi_sym, vi_args, 1)
                 if self.type_d0[ti] == hashmap_sym and self.type_d2[ti] >= 2:
                     let opt_args: List[i32] = List.new()
                     opt_args.push(self.type_extra[self.type_d1[ti] + 1])
-                    let _ = self.ensure_generic_inst_type(option_sym, &opt_args, 1)
+                    let _ = self.ensure_generic_inst_type(option_sym, opt_args, 1)
 
         // List[str] for str.split(), and ListIter[str] for its .iter().
         let str_args: List[i32] = List.new()
         str_args.push(self.ty_str as i32)
-        let _list_str = self.ensure_generic_inst_type(list_sym, &str_args, 1)
-        let _vi_str = self.ensure_generic_inst_type(vi_sym, &str_args, 1)
+        let _list_str = self.ensure_generic_inst_type(list_sym, str_args, 1)
+        let _vi_str = self.ensure_generic_inst_type(vi_sym, str_args, 1)
 
         // D7 eager layout tables: compute size/align for every type now (types_frozen is
         // still 0, so a layout that needs a dependent type may create it), then the frozen
@@ -7291,7 +7291,7 @@ impl Sema:
             if gi_arg_tid == 0:
                 return 0
             gi_args.push(gi_arg_tid as i32)
-        if self.validate_atomic_payload_type(gi_base_sym, &gi_args, gi_arg_count, node) == false:
+        if self.validate_atomic_payload_type(gi_base_sym, gi_args, gi_arg_count, node) == false:
             return 0
         // A refused argument is reported and the instance kept, so its uses
         // do not cascade into inference errors.
@@ -8623,20 +8623,20 @@ impl Sema:
 
     fn save_moved_field_state() -> MovedFieldSnap:
         MovedFieldSnap {
-            base: sema_clone_i32_list(&self.moved_field_base_syms),
-            starts: sema_clone_i32_list(&self.moved_field_path_starts),
-            counts: sema_clone_i32_list(&self.moved_field_path_counts),
-            syms: sema_clone_i32_list(&self.moved_field_path_syms),
+            base: sema_clone_i32_list(self.moved_field_base_syms),
+            starts: sema_clone_i32_list(self.moved_field_path_starts),
+            counts: sema_clone_i32_list(self.moved_field_path_counts),
+            syms: sema_clone_i32_list(self.moved_field_path_syms),
             poison_syms: self.snapshot_poison_syms(),
             poison_nodes: self.snapshot_poison_nodes(),
         }
 
     mut fn restore_moved_field_state(snap: &MovedFieldSnap):
-        self.moved_field_base_syms = sema_clone_i32_list(&snap.base)
-        self.moved_field_path_starts = sema_clone_i32_list(&snap.starts)
-        self.moved_field_path_counts = sema_clone_i32_list(&snap.counts)
-        self.moved_field_path_syms = sema_clone_i32_list(&snap.syms)
-        self.restore_poison(&snap.poison_syms, &snap.poison_nodes)
+        self.moved_field_base_syms = sema_clone_i32_list(snap.base)
+        self.moved_field_path_starts = sema_clone_i32_list(snap.starts)
+        self.moved_field_path_counts = sema_clone_i32_list(snap.counts)
+        self.moved_field_path_syms = sema_clone_i32_list(snap.syms)
+        self.restore_poison(snap.poison_syms, snap.poison_nodes)
 
     // Set the live field-move set to the union of two branch-exit snapshots
     // (a field is moved-after iff moved at some non-divergent exit). Concatenation
@@ -8680,7 +8680,7 @@ impl Sema:
         for i in 0..b.base.len():
             let bs = b.starts[i]
             let bc = b.counts[i]
-            if self.moved_field_entry_present(&base, &starts, &counts, &path_syms, b.base[i], bs, bc, &b.syms):
+            if self.moved_field_entry_present(base, starts, counts, path_syms, b.base[i], bs, bc, b.syms):
                 continue
             starts.push(path_syms.len() as i32)
             counts.push(bc)
@@ -8704,7 +8704,7 @@ impl Sema:
             else:
                 poison_syms.push(0)
                 poison_nodes.push(0)
-        self.restore_poison(&poison_syms, &poison_nodes)
+        self.restore_poison(poison_syms, poison_nodes)
 
     fn snapshot_poison_syms() -> List[i32]:
         var out: List[i32] = List.new()
@@ -8877,7 +8877,7 @@ impl Sema:
                 i = i + 1
         var post: List[i32] = if has_condition_exit != 0:
             let body_end = self.save_scope_states()
-            self.union_move_states(entry, &body_end)
+            self.union_move_states(entry, body_end)
         else:
             self.union_move_states(entry, entry)
         if frame_idx >= 0 and frame_idx < self.label_break_seen.len() and self.label_break_seen[frame_idx] != 0:
@@ -8889,7 +8889,7 @@ impl Sema:
                     let v = if (off + i) < self.loop_break_flat.len(): self.loop_break_flat[(off + i)] else: VarState.LIVE
                     brk.push(v)
                     i = i + 1
-                post = self.union_move_states(&post, &brk)
+                post = self.union_move_states(post, brk)
         // Free this loop's break-flag and entry-state regions (both are the top of
         // their flat stacks and share the same offset).
         if frame_idx >= 0 and frame_idx < self.label_break_off.len():
@@ -8899,7 +8899,7 @@ impl Sema:
                     self.loop_break_flat.pop()
                 while self.loop_entry_flat.len() > off:
                     self.loop_entry_flat.pop()
-        self.restore_scope_states(&post)
+        self.restore_scope_states(post)
 
     fn clear_binding_view_deps(sym: i32):
         let opt = self.scope_name_map.get(sym)

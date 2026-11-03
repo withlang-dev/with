@@ -43,7 +43,7 @@ impl Codegen:
         let vals: List[i64] = List.new()
         for _ in 0..n:
             vals.push(elem)
-        wl_const_vector(list_data_i64(&vals), n)
+        wl_const_vector(list_data_i64(vals), n)
 
     // The signed minimum and maximum and the unsigned maximum of a `bits`-bit
     // integer as constants of the integer type `ty` (bits <= width(ty)), at
@@ -313,7 +313,7 @@ impl Codegen:
             let c = self.try_eval_const_llvm(arg, lane)
             if c == 0: return 0
             vals.push(c)
-        wl_const_vector(list_data_i64(&vals), n)
+        wl_const_vector(list_data_i64(vals), n)
 
     // A vector aggregate: lane i from operand i.
     mut fn mir_build_vector_aggregate(body: &MirBody, start: i32, count: i32, vec_ty: i64) -> i64:
@@ -353,7 +353,7 @@ impl Codegen:
             wl_position_at_end(self.builder, ok_bb)
         let indices: List[i64] = List.new()
         indices.push(idx64)
-        wl_build_gep(self.builder, wl_get_element_type(vec_ty), vec_ptr, list_data_i64(&indices), 1)
+        wl_build_gep(self.builder, wl_get_element_type(vec_ty), vec_ptr, list_data_i64(indices), 1)
 
     // The SIMD_* intrinsic calls MirVector emits. False for any other.
     mut fn mir_emit_vector_intrinsic_call(body: &MirBody, intrinsic: MirIntrinsic, args_id: i32, dest_place: i32, next_bb: i32) -> bool:

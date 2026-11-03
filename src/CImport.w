@@ -3005,7 +3005,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
         // D147: a bitfield member renders its storage unit where the unit
         // starts, and nothing elsewhere (its accessors stand for it).
         if bit_plan.units.len() > 0 and with_cimport_struct_field_is_bitfield(session, idx, fi) != 0:
-            let started = ci_bit_unit_started_by(&bit_plan, fi)
+            let started = ci_bit_unit_started_by(bit_plan, fi)
             if started >= 0:
                 if field_str.len() > 0: field_str = field_str ++ ", "
                 field_str = field_str ++ "pub __bits_" ++ i64_to_string(started) ++ ": " ++ ci_bit_unit_type(bit_plan.units[started].bits) ++ " = 0"
@@ -3071,7 +3071,7 @@ fn ci_translate_struct(session: i64, idx: i32, is_union: bool, known_structs: &s
     let part3 = part2 ++ field_str
     let decl = part3 ++ " }\n"
     let copy_impl = "impl Copy for " ++ safe_name ++ "\n"
-    let bit_accessors = ci_render_bitfield_accessors(session, idx, safe_name, &bit_plan)
+    let bit_accessors = ci_render_bitfield_accessors(session, idx, safe_name, bit_plan)
     let rendered = anon_decls ++ packed_prefix ++ decl ++ copy_impl ++ flex_accessor ++ bit_accessors
     if ci_migrate_shared_decl_add("type", name, rendered):
         return ""
@@ -4333,7 +4333,7 @@ fn ci_translate_macros(session: i64, type_session: i64, macro_source: &str) -> s
                             renamed = true
                         bindings.push(binding)
                     if renamed:
-                        value = ci_macro_substitute_arguments(session, fn_index, value, &bindings)
+                        value = ci_macro_substitute_arguments(session, fn_index, value, bindings)
                     // Empty function-like macro: #define FOO(x) → void function
                     if ci_trim(value).len() == 0:
                         var empty_params = ""
@@ -7362,7 +7362,7 @@ impl CiStmtPool:
         while si < ids2.len():
             ids.push(ids2[si])
             si = si + 1
-        self.from_flat_ids(&ids)
+        self.from_flat_ids(ids)
 
     fn merge3_ir(first: CiStmtId, second: CiStmtId, third: CiStmtId) -> CiStmtId:
         let intermediate = self.merge_ir(first, second)
@@ -7511,7 +7511,7 @@ impl CiExprPool:
             return self.bool_lit(1, 0)
         if default_text == "va_start()":
             let no_args: List[i32] = List.new()
-            return self.build_named_call_expr_typed("va_start", &no_args, 0)
+            return self.build_named_call_expr_typed("va_start", no_args, 0)
         if default_text == "null":
             return self.null_ptr(0)
         // D119: a hoisted `List` local's zero fill (`[0; 64]`).
@@ -7569,7 +7569,7 @@ impl CiStmtPool:
                 if rewritten != 0:
                     ids.push(rewritten as i32)
                 i = i + 1
-            return self.from_flat_ids(&ids)
+            return self.from_flat_ids(ids)
         if kind == CiStmtKind.CIS_IF:
             let cond = (self.get_d0(stmt_id)) as CiExprId
             let then_id = self.rewrite_switch_continues_ir(exprs, (self.get_d1(stmt_id)) as CiStmtId, flag_expr_sym, flag_ty)
@@ -7886,18 +7886,18 @@ impl CiStmtPool:
         let begin_args: List[i32] = List.new()
         begin_args.push(arg_ids[0])
         begin_args.push(arg_ids[1])
-        let begin_call = exprs.build_named_call_expr("colour_begin", &begin_args)
+        let begin_call = exprs.build_named_call_expr("colour_begin", begin_args)
 
         let fprintf_args: List[i32] = List.new()
         var fi: i64 = 1
         while fi < arg_ids.len():
             fprintf_args.push(arg_ids[fi])
             fi = fi + 1
-        let fprintf_call = exprs.build_named_call_expr("fprintf", &fprintf_args)
+        let fprintf_call = exprs.build_named_call_expr("fprintf", fprintf_args)
 
         let end_args: List[i32] = List.new()
         end_args.push(arg_ids[1])
-        let end_call = exprs.build_named_call_expr("colour_end", &end_args)
+        let end_call = exprs.build_named_call_expr("colour_end", end_args)
 
         let begin_stmt = self.expr_stmt(begin_call)
         let fprintf_stmt = self.expr_stmt(fprintf_call)
@@ -10404,7 +10404,7 @@ impl CiExprPool:
         let args: List[i32] = List.new()
         args.push(arg_id as i32)
         ci_migrate_note_libc_symbol(ctype_fn)
-        self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
+        self.unsafe_expr(self.build_named_call_expr(ctype_fn, args))
 
 fn ci_glibc_ctype_case_function(cursor_name: &str) -> str:
     if cursor_name == "__ctype_tolower_loc": return "tolower"
@@ -10434,7 +10434,7 @@ impl CiExprPool:
         let args: List[i32] = List.new()
         args.push(arg_id as i32)
         ci_migrate_note_libc_symbol(ctype_fn)
-        self.unsafe_expr(self.build_named_call_expr(ctype_fn, &args))
+        self.unsafe_expr(self.build_named_call_expr(ctype_fn, args))
 
     fn lower_binary_pointer(session: i64, cursor: i32, types: CiTypePool, scope: CiScope) -> CiExprId:
         self.lower_plain_value_expr_ir(session, cursor, types, scope)
@@ -11029,7 +11029,7 @@ impl CiExprPool:
     fn some_of(value_id: CiExprId, target_ty_id: CiTypeId) -> CiExprId:
         let args: List[i32] = List.new()
         args.push(value_id as i32)
-        self.build_named_call_expr_typed("Some", &args, target_ty_id)
+        self.build_named_call_expr_typed("Some", args, target_ty_id)
 
     // D102: `value.unwrap()` typed as the non-null function pointer `target`:
     // a NULL where C would call it panics instead of C's undefined behavior.
@@ -11549,7 +11549,7 @@ impl CiExprPool:
                 let accessor = ci_libc_stream_accessor(name)
                 ci_migrate_note_libc_symbol(accessor)
                 let no_args: List[i32] = List.new()
-                return self.build_named_call_expr_typed(accessor, &no_args, types.type_from_libclang(session, with_ci_cursor_type(session, cursor)))
+                return self.build_named_call_expr_typed(accessor, no_args, types.type_from_libclang(session, with_ci_cursor_type(session, cursor)))
             var text = ""
             if mangled.len() > 0:
                 text = mangled
@@ -11907,7 +11907,7 @@ impl CiExprPool:
         if with_ci_type_kind(session, if canonical >= 0: canonical else: field_cxtype) != CXT_Record:
             return 0
         let none: List[i32] = List.new()
-        self.build_named_call_expr_typed(slot_ty_text ++ ".zeroed", &none, types.type_from_translated_text(slot_ty_text))
+        self.build_named_call_expr_typed(slot_ty_text ++ ".zeroed", none, types.type_from_translated_text(slot_ty_text))
 
     // An array value landing in a pointer slot decays to its address (C's
     // array-to-pointer conversion, invisible in libclang's tree): the
@@ -12456,7 +12456,7 @@ impl CiExprPool:
         // `int f() { return __builtin_mul_overflow(...); }` coerce at the return.
         let helper = ci_overflow_helper_name(op, out_ty)
         ci_note_overflow_helper_needed(helper, op, out_ty)
-        let call = self.build_named_call_expr_typed(helper, &args, types.named_type_from_text("bool"))
+        let call = self.build_named_call_expr_typed(helper, args, types.named_type_from_text("bool"))
         self.unsafe_expr(call)
 
     // D101 (#2214): `memset(p, 0, n)` where `p` is `&x` or a pointer to a
@@ -12502,7 +12502,7 @@ impl CiExprPool:
             return 0
         let none: List[i32] = List.new()
         ci_note_rule("D101 memset-to-zero of a record is T.zeroed()", record_text)
-        let zeroed = self.build_named_call_expr_typed(record_text ++ ".zeroed", &none, record_ty)
+        let zeroed = self.build_named_call_expr_typed(record_text ++ ".zeroed", none, record_ty)
         self.add(CiExprKind.CIE_ASSIGN, place as i32, zeroed as i32, 0, record_ty)
 
     fn build_libc_call_value_expr(session: i64, cursor: i32, callee_text: &str, arg_ids: &List[i32], types: CiTypePool) -> CiExprId:
@@ -12516,7 +12516,7 @@ impl CiExprPool:
             sized_args.push(arg_ids[0])
             sized_args.push(arg_ids[1])
             sized_args.push((self.cast(size_ty, (arg_ids[2]) as CiExprId)) as i32)
-            return self.build_named_call_expr("strncmp", &sized_args)
+            return self.build_named_call_expr("strncmp", sized_args)
         let renamed = ci_libc_simple_rename(callee_text)
         if renamed.len() > 0:
             return self.build_named_call_expr(renamed, arg_ids)
@@ -12590,7 +12590,7 @@ impl CiExprPool:
             realloc_args.push(arg_ptr as i32)
             realloc_args.push(old_size as i32)
             realloc_args.push(new_size as i32)
-            let call_id = self.build_named_call_expr("with_realloc", &realloc_args)
+            let call_id = self.build_named_call_expr("with_realloc", realloc_args)
             let void_ptr_ty = types.ty_pointer(c_void_ty, 0)
             return self.cast(void_ptr_ty, call_id)
         let i64_ty = types.named_type_from_text("i64")
@@ -12603,7 +12603,7 @@ impl CiExprPool:
             cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
-            return self.build_named_call_expr(if callee_text == "memcpy" or callee_text == "with_memcpy": "with_memcpy" else: "with_memmove", &cast_args)
+            return self.build_named_call_expr(if callee_text == "memcpy" or callee_text == "with_memcpy": "with_memcpy" else: "with_memmove", cast_args)
         if callee_text == "memset" or callee_text == "with_memset":
             if arg_ids.len() != 3 or i64_ty == 0 or mut_ptr_ty == 0:
                 return 0
@@ -12618,7 +12618,7 @@ impl CiExprPool:
             cast_args.push((self.cast(mut_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push(arg_ids[1])
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
-            return self.build_named_call_expr("with_memset", &cast_args)
+            return self.build_named_call_expr("with_memset", cast_args)
         if callee_text == "memcmp" or callee_text == "with_memcmp":
             if arg_ids.len() != 3 or i64_ty == 0 or const_ptr_ty == 0:
                 return 0
@@ -12626,7 +12626,7 @@ impl CiExprPool:
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push((self.cast(const_ptr_ty, (arg_ids[1]) as CiExprId)) as i32)
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
-            return self.build_named_call_expr("with_memcmp", &cast_args)
+            return self.build_named_call_expr("with_memcmp", cast_args)
         if callee_text == "memchr":
             if arg_ids.len() != 3 or i64_ty == 0:
                 return 0
@@ -12638,7 +12638,7 @@ impl CiExprPool:
             cast_args.push((self.cast(cvoid_ptr, (arg_ids[0]) as CiExprId)) as i32)
             cast_args.push(arg_ids[1])
             cast_args.push((self.cast(i64_ty, (arg_ids[2]) as CiExprId)) as i32)
-            let call_id = self.build_named_call_expr("memchr", &cast_args)
+            let call_id = self.build_named_call_expr("memchr", cast_args)
             let u8_ty = types.named_type_from_text("u8")
             let u8_ptr = types.ty_pointer(u8_ty, 1)
             return self.cast(u8_ptr, call_id)
@@ -12647,8 +12647,8 @@ impl CiExprPool:
                 return 0
             let print_args: List[i32] = List.new()
             print_args.push(arg_ids[0])
-            let print_call = self.build_named_call_expr("is_print", &print_args)
-            let space_call = self.build_named_call_expr("is_space", &print_args)
+            let print_call = self.build_named_call_expr("is_print", print_args)
+            let space_call = self.build_named_call_expr("is_space", print_args)
             let not_space = self.unary(CiUnaryOp.CIUO_LOGICAL_NOT, space_call, 0)
             let cond = self.binary(CiBinOp.CIBO_LOGICAL_AND, print_call, not_space, 0)
             return self.bool_value_expr_ir(session, cursor, cond, types)
@@ -12657,9 +12657,9 @@ impl CiExprPool:
                 return 0
             let shared_args: List[i32] = List.new()
             shared_args.push(arg_ids[0])
-            let print_call = self.build_named_call_expr("is_print", &shared_args)
-            let alnum_call = self.build_named_call_expr("is_alnum", &shared_args)
-            let space_call = self.build_named_call_expr("is_space", &shared_args)
+            let print_call = self.build_named_call_expr("is_print", shared_args)
+            let alnum_call = self.build_named_call_expr("is_alnum", shared_args)
+            let space_call = self.build_named_call_expr("is_space", shared_args)
             let not_alnum = self.unary(CiUnaryOp.CIUO_LOGICAL_NOT, alnum_call, 0)
             let not_space = self.unary(CiUnaryOp.CIUO_LOGICAL_NOT, space_call, 0)
             let lhs_cond = self.binary(CiBinOp.CIBO_LOGICAL_AND, print_call, not_alnum, 0)
@@ -12682,7 +12682,7 @@ impl CiExprPool:
             first_three.push(arg_ids[0])
             first_three.push(arg_ids[1])
             first_three.push(arg_ids[2])
-            return self.build_libc_call_value_expr(session, cursor, if callee_text == "__builtin___memcpy_chk": "memcpy" else: "memmove", &first_three, types)
+            return self.build_libc_call_value_expr(session, cursor, if callee_text == "__builtin___memcpy_chk": "memcpy" else: "memmove", first_three, types)
         if callee_text == "__builtin___memset_chk":
             if arg_ids.len() != 4:
                 return 0
@@ -12690,7 +12690,7 @@ impl CiExprPool:
             first_three.push(arg_ids[0])
             first_three.push(arg_ids[1])
             first_three.push(arg_ids[2])
-            return self.build_libc_call_value_expr(session, cursor, "memset", &first_three, types)
+            return self.build_libc_call_value_expr(session, cursor, "memset", first_three, types)
         if callee_text == "__builtin_object_size":
             let zero_idx = self.add_string("0")
             return self.int_lit(zero_idx, 0)
@@ -13508,7 +13508,7 @@ impl CiStmtPool:
                 ai = ai + 1
             let has_mapped_call = callee_text.len() > 0 and ci_has_value_libc_call_mapping(callee_text)
             let mapped_id = if has_mapped_call:
-                exprs.build_libc_call_value_expr(session, cursor, callee_text, &arg_ids, types)
+                exprs.build_libc_call_value_expr(session, cursor, callee_text, arg_ids, types)
             else:
                 0 as CiExprId
             if mapped_id != 0:
@@ -13527,7 +13527,7 @@ impl CiStmtPool:
             if callee_decl_idx >= 0 and ci_is_c_ident(callee_text) and arg_ids.len() == callee_param_count and callee_param_count >= 1 and (callee_cursor < 0 or ci_cursor_is_function_ref(session, callee_cursor)):
                 let method_shape = ci_migrate_method_shape(callee_text)
                 if method_shape.len() > 0:
-                    return self.lower_method_call_ir(exprs, types, method_shape, &arg_ids, setup)
+                    return self.lower_method_call_ir(exprs, types, method_shape, arg_ids, setup)
             let args_start = exprs.extra_len()
             var j: i64 = 0
             while j < arg_ids.len():
@@ -14054,26 +14054,26 @@ impl CiStmtPool:
                         return 0
                     part_ids.push(inner_id as i32)
                 if ci_stmt_ends_with_terminator(session, inner):
-                    return self.from_flat_ids(&part_ids)
+                    return self.from_flat_ids(part_ids)
         var j = start_idx + 1
         while j < total:
             let next_child = with_ci_child(session, body_cursor, j)
             let next_kind = with_ci_cursor_kind(session, next_child)
             if next_kind == CXK_BREAK_STMT:
-                return self.from_flat_ids(&part_ids)
+                return self.from_flat_ids(part_ids)
             if next_kind == CXK_CASE_STMT or next_kind == CXK_DEFAULT_STMT:
                 let dup_id = self.lower_switch_prong_forward_ir(session, body_cursor, j, total, exprs, types, scope)
                 if dup_id != 0:
                     part_ids.push(dup_id as i32)
-                return self.from_flat_ids(&part_ids)
+                return self.from_flat_ids(part_ids)
             if not ci_is_null_like_stmt(session, next_child):
                 let next_id = self.lower_stmt_ir(session, next_child, exprs, types, 0, scope)
                 if next_id != 0:
                     part_ids.push(next_id as i32)
                 if ci_stmt_ends_with_terminator(session, next_child):
-                    return self.from_flat_ids(&part_ids)
+                    return self.from_flat_ids(part_ids)
             j = j + 1
-        self.from_flat_ids(&part_ids)
+        self.from_flat_ids(part_ids)
 
     // Structural lowering for CXK_SWITCH_STMT. Builds a CIS_MATCH
     // with structural subject and arm bodies. Mirrors the branching
@@ -14182,7 +14182,7 @@ impl CiStmtPool:
                             return 0
                         if fwd_id != 0:
                             body_ids.push(fwd_id as i32)
-                let raw_body = self.from_flat_ids(&body_ids)
+                let raw_body = self.from_flat_ids(body_ids)
                 let body_id = self.strip_trailing_break_ir(raw_body)
                 if body_id == 0 and body_ids.len() > 0 and not hit_break:
                     return 0
@@ -14242,7 +14242,7 @@ impl CiStmtPool:
                             return 0
                         if fwd_id != 0:
                             body_ids.push(fwd_id as i32)
-                let raw_body = self.from_flat_ids(&body_ids)
+                let raw_body = self.from_flat_ids(body_ids)
                 let body_id = self.strip_trailing_break_ir(raw_body)
                 if body_id == 0 and body_ids.len() > 0 and not hit_break:
                     return 0
@@ -15220,7 +15220,7 @@ impl CiStmtPool:
         let new_scope = ci_scope_add_mangled(scope, escaped, storage_name)
         ci_fn_var_names_register(storage_name)
         let no_args: List[i32] = List.new()
-        let start = exprs.build_named_call_expr_typed("va_start", &no_args, list_ty)
+        let start = exprs.build_named_call_expr_typed("va_start", no_args, list_ty)
         let decl_id = self.var_decl(self.add_string(storage_name), list_ty, start, 1)
         CiDeclLoweringIR { updated_scope: new_scope, stmt_id: decl_id }
 
@@ -18630,8 +18630,8 @@ fn ci_aggregate_kind_list(v: &List[i32], label: &str):
 fn ci_dump_raw_fallback_stats():
     if not ci_raw_stats_enabled():
         return
-    ci_aggregate_kind_list(&g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
-    ci_aggregate_kind_list(&g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
+    ci_aggregate_kind_list(g_ci_raw_expr_kinds, "migrate: raw-expr fallback by cursor kind:")
+    ci_aggregate_kind_list(g_ci_raw_stmt_kinds, "migrate: raw-stmt fallback by cursor kind:")
 
 // (ci_ir_shim_stmt was removed in B5e — B5d's statement-level
 // detour covers the same path at finer granularity, so the
@@ -19195,7 +19195,7 @@ fn ci_body_contract_evidence(session: i64, fn_cursor: i32, params: &List[str]) -
         i = i + 1
     if body < 0: return "unanalyzable\n"
     let locals = ci_own_collect_locals(session, body)
-    ci_contract_walk(session, body, params, &locals) ++ ci_contract_out_params(session, body, params)
+    ci_contract_walk(session, body, params, locals) ++ ci_contract_out_params(session, body, params)
 
 // D121: the allocator or deallocator a global's initializer names, through
 // casts: `xmlFreeFunc xmlFree = free`. "" when it names neither.
@@ -20112,14 +20112,14 @@ impl CiGotoCfgContext:
             self.branch_current(target, with_ci_cursor_location(session, cursor))
             return
         if kind == CXK_BREAK_STMT:
-            let target = ci_goto_cfg_top_target(&self.state.break_targets)
+            let target = ci_goto_cfg_top_target(self.state.break_targets)
             if target < 0:
                 self.fail("break without active target in goto CFG", with_ci_cursor_location(session, cursor))
                 return
             self.branch_current(target, with_ci_cursor_location(session, cursor))
             return
         if kind == CXK_CONTINUE_STMT:
-            let target = ci_goto_cfg_top_target(&self.state.continue_targets)
+            let target = ci_goto_cfg_top_target(self.state.continue_targets)
             if target < 0:
                 self.fail("continue without active loop in goto CFG", with_ci_cursor_location(session, cursor))
                 return
@@ -20206,7 +20206,7 @@ impl CiStackEmitContext:
             if self.cfg.stmt_blocks[i] == block:
                 ids.push(self.cfg.stmt_ids[i])
             i = i + 1
-        stmts.stack_emit_stmt_block(&ids)
+        stmts.stack_emit_stmt_block(ids)
 
     mut fn children(tree: &StackifyTree, start: i32, count: i32, stmts: CiStmtPool, exprs: CiExprPool, types: CiTypePool) -> CiStmtId:
         let ids: List[i32] = List.new()
@@ -20217,7 +20217,7 @@ impl CiStackEmitContext:
             if stmt_id != 0:
                 ids.push(stmt_id as i32)
             i = i + 1
-        stmts.stack_emit_stmt_block(&ids)
+        stmts.stack_emit_stmt_block(ids)
 
     mut fn param_transfer(tree: &StackifyTree, node: &StackifyNode, stmts: CiStmtPool) -> CiStmtId:
         if node.values_count == 0 and node.to_values_count == 0:
@@ -20232,7 +20232,7 @@ impl CiStackEmitContext:
             let to_expr = tree.values[(node.to_values_start + i)] as CiExprId
             ids.push(stmts.assign(to_expr, from_expr) as i32)
             i = i + 1
-        stmts.stack_emit_stmt_block(&ids)
+        stmts.stack_emit_stmt_block(ids)
 
     mut fn emit_return(tree: &StackifyTree, node: &StackifyNode, stmts: CiStmtPool) -> CiStmtId:
         if node.values_count == 0:
@@ -20310,7 +20310,7 @@ impl CiStmtPool:
             i = i + 1
         if not ctx.ok:
             return 0
-        self.stack_emit_stmt_block(&ids)
+        self.stack_emit_stmt_block(ids)
 
 fn ci_native_goto_fail(msg: &str) -> CiStmtId:
     g_ci_bail_kind = CXK_GOTO_STMT
@@ -20508,7 +20508,7 @@ impl CiStmtPool:
                         block_ids.push(cfg.stmt_ids[li])
                 li = li + 1
             if not ci_goto_cfg_block_ends_noreturn(cfg, block):
-                let term = self.native_goto_emit_terminator(cfg, block, &labels, exprs)
+                let term = self.native_goto_emit_terminator(cfg, block, labels, exprs)
                 if term == 0:
                     return 0
                 block_ids.push(term as i32)
@@ -20526,7 +20526,7 @@ impl CiStmtPool:
         // close the impossible textual end explicitly. Without this sentinel,
         // non-Unit cyclic functions are diagnosed as needing Default (#740).
         ids.push(self.native_goto_unreachable_stmt(exprs) as i32)
-        self.from_flat_ids(&ids)
+        self.from_flat_ids(ids)
 
 impl CiGotoCfgContext:
     mut fn verify_labels():
@@ -20594,7 +20594,7 @@ impl CiStmtPool:
             return 0
 
         if not migrate_convert_goto_to_structured():
-            return self.native_goto_emit_cfg(ctx.state.cfg, &hoisted_stmt_ids, exprs, types)
+            return self.native_goto_emit_cfg(ctx.state.cfg, hoisted_stmt_ids, exprs, types)
 
         let result = stackify_graph(move ctx.state.cfg.graph)
         if not result.ok:
@@ -20620,7 +20620,7 @@ impl CiStmtPool:
         while bi < body_ids.len():
             ids.push(body_ids[bi])
             bi = bi + 1
-        self.from_flat_ids(&ids)
+        self.from_flat_ids(ids)
 
 // Find a function cursor in the cursor tree by name.
 fn ci_find_var_cursor(session: i64, name: &str) -> i32:
@@ -21616,7 +21616,7 @@ impl CiExprPool:
                     return 0
                 math_args.push(arg_id as i32)
                 mai = mai + 1
-            return self.build_named_call_expr(callee_text, &math_args)
+            return self.build_named_call_expr(callee_text, math_args)
         if renamed.len() > 0:
             ci_trace_port("STRUCTURAL[b11.9.libc_call]")
             // Lower each argument structurally.

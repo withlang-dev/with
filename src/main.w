@@ -898,13 +898,13 @@ fn run_cli(full_argc: i32) -> i32:
     if cli_command(argc) == "__framework-stubs":
         let stub_args: List[str] = List.new()
         for i in 2..argc: stub_args.push(with_arg_at(i))
-        return with_framework_stubs_main(&stub_args)
+        return with_framework_stubs_main(stub_args)
     // `with __windows-import-libs <dir> <name>...`: the import libraries of
     // in-box DLLs `with get` writes for a package that links them (#1915).
     if cli_command(argc) == "__windows-import-libs":
         let lib_args: List[str] = List.new()
         for i in 2..argc: lib_args.push(with_arg_at(i))
-        return with_windows_import_libs_main(&lib_args)
+        return with_windows_import_libs_main(lib_args)
     // `with __ar qc lib.a a.o b.o` / `with __ranlib lib.a`: what CMake asks of
     // an archiver, so a source build needs no binutils. They are the compiler
     // invoking itself (the `__` prefix), not commands a user types. The
@@ -918,7 +918,7 @@ fn run_cli(full_argc: i32) -> i32:
         for i in 4..argc: named.push(with_arg_at(i))
         // `@objects.rsp`: the members a build system wrote to a file because
         // the command line would be too long.
-        let members = ar_expand_response_args(&named, with_sysinfo_os() == "Windows", 0)
+        let members = ar_expand_response_args(named, with_sysinfo_os() == "Windows", 0)
         if not members.ok: return 1
         return create_static_archive(with_arg_at(3), members.args)
     let opt_level = cli_opt_level(argc)
@@ -1038,7 +1038,7 @@ fn run_cli(full_argc: i32) -> i32:
         // D38: `--bundle-corpus` keeps a corpus on its source (owned, defined
         // in-unit) even in a compiler that embeds its bundle, and
         // `--link-bundle` reads the same flags every compiling command does.
-        comp.set_link_bundles(&driver_link_bundle_args(argc))
+        comp.set_link_bundles(driver_link_bundle_args(argc))
         comp.set_bundle_fingerprint(driver_bundle_corpus_arg(argc), "")
         let pool = comp.compile_entry_file(source)
         if pool.decl_count() == 0:
@@ -1064,7 +1064,7 @@ fn run_cli(full_argc: i32) -> i32:
             with_eprint("error: " ++ analysis_target.error_msg)
             return 1
         comp.set_target_kind(analysis_target.kind)
-        comp.set_link_bundles(&driver_link_bundle_args(argc))
+        comp.set_link_bundles(driver_link_bundle_args(argc))
         let result = comp.analyze_file(source, cli_analysis_request(argc, source))
         with_write(result.text)
         return result.status
@@ -1131,7 +1131,7 @@ fn run_cli(full_argc: i32) -> i32:
             with_eprint("error: " ++ check_target.error_msg)
             return 1
         comp.set_target_kind(check_target.kind)
-        comp.set_link_bundles(&driver_link_bundle_args(argc))
+        comp.set_link_bundles(driver_link_bundle_args(argc))
         // D39: `--bundle-fingerprint` on check is the interface-side pass of
         // the bundle build's fingerprint comparison; a `.wi` root holding
         // `module` sections is checked as the whole bundle it is.
@@ -1596,7 +1596,7 @@ fn run_reduce_command(argc: i32) -> i32:
         changed = false
         var i: i32 = 0
         while i < lines.len():
-            let candidate = reduce_join_lines(&lines, i)
+            let candidate = reduce_join_lines(lines, i)
             if with_fs_write_file(candidate_path, candidate) != 0:
                 with_eprint("error: reduce could not write candidate")
                 return 1
@@ -1609,7 +1609,7 @@ fn run_reduce_command(argc: i32) -> i32:
                     i = i + 1
             else:
                 i = i + 1
-    let final_text = reduce_join_lines(&lines, -1)
+    let final_text = reduce_join_lines(lines, -1)
     let output = reduce_output_arg(argc, source)
     if with_fs_write_file(output, final_text) != 0:
         with_eprint("error: reduce could not write output: " ++ output)
@@ -2000,7 +2000,7 @@ fn build_pool_finalize_retire(root: &str, graph: &BuildGraph, options: &BuildCom
     let ti = build_graph_find_target_index_by_name(graph, retire.name)
     if ti < 0:
         return retire.rc
-    build_runner_postprocess(root, &graph.targets[ti], retire.rc, retire.effects_path, options)
+    build_runner_postprocess(root, graph.targets[ti], retire.rc, retire.effects_path, options)
 
 fn build_action_worker_env_enabled() -> bool:
     with_getenv_str("WITH_BUILD_ACTION_WORKER").len() > 0
@@ -2523,7 +2523,7 @@ unsafe fn run_build_action_from_build_w(root: &str, cfg: &ProjectConfig, target:
         return build_action_run_result(1)
     // The evaluator consumes its List params (write_scope frees them); the
     // target still owns these buffers, so pass independent clones (#715 class).
-    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_list(&target.inputs), target.output, bg_clone_str_list(&target.extra_outputs), bg_clone_str_list(&target.args), bg_clone_str_list(&target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_list(&target.env), target.network, (options.strict_effects) as i32)
+    var result = comptime_eval_tool_action_result(sema_ptr, (*sema_ptr).ast, (*sema_ptr).pool, target.action_fn, cfg.package_name, cfg.package_version, root, target.name, bg_clone_str_list(target.inputs), target.output, bg_clone_str_list(target.extra_outputs), bg_clone_str_list(target.args), bg_clone_str_list(target.write_scopes), target.timeout_ms, target.cwd, bg_clone_str_list(target.env), target.network, (options.strict_effects) as i32)
     if result.runtime_exit_code != 0:
         if result.runtime_stderr.len() > 0:
             with_ewrite(result.runtime_stderr)
@@ -2577,7 +2577,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         // placeholder; a worker admits it for the graph data alone.
         var cache_admitted = worker_name.len() == 0 and build_runner_built(root, options)
         if not cache_admitted:
-            let wi = build_graph_find_target_index_by_name(&cached, worker_name)
+            let wi = build_graph_find_target_index_by_name(cached, worker_name)
             cache_admitted = wi >= 0 and (&cached.targets[wi]).kind != 23
         if cache_admitted:
             return BuildGraphLoadResult { graph: cached, sema: Sema.placeholder(InternPool.init(), DiagnosticList.init(), AstPool.new()) }
@@ -2610,7 +2610,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     build_cache_record_build_effects(root, eval_result.effect_records)
     // Keyed on the environment this evaluation just read (#1925), not the
     // previous one's.
-    build_cache_graph_write(root, build_cache_graph_key(root, options.target_kind, (options.strict_effects) as i32), &materialized.graph)
+    build_cache_graph_write(root, build_cache_graph_key(root, options.target_kind, (options.strict_effects) as i32), materialized.graph)
     BuildGraphLoadResult { graph: move materialized.graph, sema: move materialized.sema }
 
 fn build_graph_find_build_root(start_dir: &str) -> str:
@@ -2717,11 +2717,11 @@ fn build_options_for_graph_target(root: &str, base: &BuildCommandOptions, target
     if target.optimize_mode == 1 and options.opt_level < 2:
         options.opt_level = 2
     options.target_kind = target.target_kind
-    options.include_paths = build_graph_resolve_paths(root, &target.include_paths)
-    options.defines = build_graph_clone_strings(&target.defines)
-    options.link_libs = build_graph_clone_strings(&target.system_libs)
-    options.link_search_paths = build_graph_resolve_paths(root, &target.library_paths)
-    options.link_rpaths = build_graph_clone_strings(&target.rpaths)
+    options.include_paths = build_graph_resolve_paths(root, target.include_paths)
+    options.defines = build_graph_clone_strings(target.defines)
+    options.link_libs = build_graph_clone_strings(target.system_libs)
+    options.link_search_paths = build_graph_resolve_paths(root, target.library_paths)
+    options.link_rpaths = build_graph_clone_strings(target.rpaths)
     if target.kind == 1 or target.kind == 4:
         options.output_kind = BuildOutputKind.Archive
     else if target.kind == 3:
@@ -2974,7 +2974,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             timed_rss.push(peak)
             build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
             if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
-                if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+                if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
                 return 1
             timing_name = ""
         if build_graph_kind_removed(target.kind):
@@ -3018,7 +3018,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         if target.kind != 9 and pool_dep_inflight:
             while pool.has_live():
                 var retire = pool.retire_oldest()
-                let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
+                let final_rc = build_pool_finalize_retire(root, graph, options, retire)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
@@ -3038,7 +3038,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             for di in 0..target.deps.len():
                 let dep_name = target.deps[di]
                 if skipped_targets.contains(dep_name) or not completed_targets.contains(dep_name): continue
-                if build_graph_dep_outputs_unchanged(root, graph, dep_name, &cutoff_names, &cutoff_digests): continue
+                if build_graph_dep_outputs_unchanged(root, graph, dep_name, cutoff_names, cutoff_digests): continue
                 dep_rebuilt = true
                 break
         // Survey keeps going past a failure, never through one: a target whose
@@ -3046,7 +3046,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         // once overwrote lib/std/engines/zlib after zlib-test failed), and counts as a
         // failure of the run.
         if survey:
-            let broken_dep = build_graph_first_broken_dep(target, &survey_failed)
+            let broken_dep = build_graph_first_broken_dep(target, survey_failed)
             if broken_dep.len() > 0:
                 with_eprint("survey: skipping '" ++ target.name ++ "' (dependency '" ++ broken_dep ++ "' did not succeed)")
                 survey_failed.push(with_str_clone_ref(target.name))
@@ -3131,7 +3131,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             // replays and a failure stops the run as soon as order allows.
             while pool.head_done():
                 var retire = pool.retire_oldest()
-                let retire_rc = build_pool_finalize_retire(root, graph, options, &retire)
+                let retire_rc = build_pool_finalize_retire(root, graph, options, retire)
                 timed_names.push(with_str_clone_ref(retire.name))
                 timed_ns.push(retire.spent)
                 timed_rss.push(retire.maxrss)
@@ -3143,7 +3143,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                     if not survey:
                         while pool.has_live():
                             var drain = pool.retire_oldest()
-                            let drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
+                            let drain_rc = build_pool_finalize_retire(root, graph, options, drain)
                             timed_names.push(with_str_clone_ref(drain.name))
                             timed_ns.push(drain.spent)
                             timed_rss.push(drain.maxrss)
@@ -3155,7 +3155,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             let worker_stdout = resolve_join(pool_capture_dir, "worker.stdout")
             let worker_stderr = resolve_join(pool_capture_dir, "worker.stderr")
             let spawn_t0 = with_clock_nanos()
-            let via_runner = build_runner_target_eligible(target, options, runner_path, &runner_fallback)
+            let via_runner = build_runner_target_eligible(target, options, runner_path, runner_fallback)
             let effects_path = if via_runner: build_runner_effects_path(root, target.name) else: "" ++ ""
             let background = priority[ti] * 2 < longest
             let lane_slot = held_slot
@@ -3167,7 +3167,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
                 with_eprint("error: could not spawn worker for build.w target '" ++ target.name ++ "'")
                 while pool.has_live():
                     var drain = pool.retire_oldest()
-                    let drain_rc = build_pool_finalize_retire(root, graph, options, &drain)
+                    let drain_rc = build_pool_finalize_retire(root, graph, options, drain)
                     timed_names.push(with_str_clone_ref(drain.name))
                     timed_ns.push(drain.spent)
                     timed_rss.push(drain.maxrss)
@@ -3201,7 +3201,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             // (2026-10-14, 961 s of a cold battery's wall).
             if not build_action_worker_env_enabled() and (runner_path.len() > 0 or options.strict_effects):
                 var worker_rc: i32 = 0
-                if build_runner_target_eligible(target, options, runner_path, &runner_fallback):
+                if build_runner_target_eligible(target, options, runner_path, runner_fallback):
                     let effects_path = build_runner_effects_path(root, target.name)
                     let raw_rc = run_build_action_runner_process(runner_path, target, effects_path)
                     worker_rc = build_runner_postprocess(root, target, raw_rc, effects_path, options)
@@ -3294,12 +3294,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
-            build_graph_restore_target_env(&saved_env)
+            build_graph_restore_target_env(saved_env)
             if built == "":
                 with_eprint("error: build.w library target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            emit_c_header_next_to(&comp, ar_path)
+            emit_c_header_next_to(comp, ar_path)
             build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
             completed_targets.push(with_str_clone_ref(target.name))
             continue
@@ -3312,12 +3312,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_object_to_path_with_build_settings(source_path, obj_path, target_options.include_paths, target_options.defines, target_options.link_libs)
-            build_graph_restore_target_env(&saved_env)
+            build_graph_restore_target_env(saved_env)
             if built == "":
                 with_eprint("error: build.w object target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            emit_c_header_next_to(&comp, obj_path)
+            emit_c_header_next_to(comp, obj_path)
             build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
             completed_targets.push(with_str_clone_ref(target.name))
             continue
@@ -3330,12 +3330,12 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
             comp.configure_options(target_options)
             let saved_env = build_graph_apply_target_env(target)
             let built = comp.emit_archive_to_path_with_build_settings(source_path, ar_path, target_options.include_paths, target_options.defines, target_options.link_libs)
-            build_graph_restore_target_env(&saved_env)
+            build_graph_restore_target_env(saved_env)
             if built == "":
                 with_eprint("error: build.w archive target failed: " ++ target.name)
                 return 1
             comp.print_warnings()
-            emit_c_header_next_to(&comp, ar_path)
+            emit_c_header_next_to(comp, ar_path)
             build_cache_record(root, target, comp.tracked_input_paths(), no_strings)
             completed_targets.push(with_str_clone_ref(target.name))
             continue
@@ -3347,7 +3347,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         comp.configure_options(target_options)
         let saved_env = build_graph_apply_target_env(target)
         let built = comp.build_binary_to_path_with_build_settings(source_path, bin_path, target_options.include_paths, target_options.defines, target_options.link_libs)
-        build_graph_restore_target_env(&saved_env)
+        build_graph_restore_target_env(saved_env)
         if built == "":
             with_eprint("error: build.w target failed: " ++ target.name)
             return 1
@@ -3356,7 +3356,7 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         completed_targets.push(with_str_clone_ref(target.name))
     while pool.has_live():
         var retire = pool.retire_oldest()
-        let final_rc = build_pool_finalize_retire(root, graph, options, &retire)
+        let final_rc = build_pool_finalize_retire(root, graph, options, retire)
         timed_names.push(with_str_clone_ref(retire.name))
         timed_ns.push(retire.spent)
         timed_rss.push(retire.maxrss)
@@ -3377,10 +3377,10 @@ unsafe fn run_build_graph(root: &str, cfg: &ProjectConfig, graph: &BuildGraph, a
         timed_rss.push(peak)
         build_graph_time_eprint("[time] " ++ timing_name ++ " " ++ build_graph_time_fmt(spent))
         if build_graph_enforce_rss(root, graph, timing_name, peak) != 0:
-            if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+            if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
             return 1
     if times_top_level:
-        if not build_graph_quiet_times: build_graph_times_report(root, &timed_names, &timed_ns, &timed_rss, with_clock_nanos() - run_t0)
+        if not build_graph_quiet_times: build_graph_times_report(root, timed_names, timed_ns, timed_rss, with_clock_nanos() - run_t0)
     if survey and survey_failed.len() > 0:
         with_eprint(f"survey: {survey_failed.len()} target(s) failed:")
         for sfi in 0..survey_failed.len():
@@ -3804,7 +3804,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 let self_exe = with_self_exe()
                 if self_exe.len() > 0:
                     let _named = with_setenv_str("WITH", self_exe)
-            var load_result = load_build_graph_from_build_w(root, &cfg, &actual_options)
+            var load_result = load_build_graph_from_build_w(root, cfg, actual_options)
             let graph = load_result.graph
             if not graph.ok:
                 with_eprint("error: " ++ graph.error_msg)
@@ -3824,7 +3824,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 // copy an empty default_target (#782 class).
                 selected_names.push(with_str_clone_ref(graph.default_target))
             let selected_target_name = selected_names.join("+")
-            let selected_graph = if graph_options.no_deps: build_graph_filter_single_targets(&graph, selected_names) else: build_graph_filter_targets(&graph, selected_names)
+            let selected_graph = if graph_options.no_deps: build_graph_filter_single_targets(graph, selected_names) else: build_graph_filter_targets(graph, selected_names)
             if not selected_graph.ok:
                 with_eprint("error: " ++ selected_graph.error_msg)
                 return 1
@@ -3836,7 +3836,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                     with_eprint("error: --no-deps is only supported for build.w action, test and corpus-test targets")
                     return 1
             if graph_options.explain_target.len() > 0:
-                return explain_build_target(root, &graph, graph_options.explain_target)
+                return explain_build_target(root, graph, graph_options.explain_target)
             if graph_options.graph_only or graph_options.dry_run:
                 with_write(selected_graph.raw_text)
                 return 0
@@ -3844,7 +3844,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
                 return 1
             // #1835: what --no-deps skipped is what the target's full closure
             // holds beyond itself; only a skipped root prepare is refused.
-            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(&build_graph_filter_targets(&graph, selected_names), BUILD_RUNNER_ROOT_PREPARE) >= 0
+            let skipped_root_prepare = graph_options.no_deps and build_graph_find_target_index_by_name(build_graph_filter_targets(graph, selected_names), BUILD_RUNNER_ROOT_PREPARE) >= 0
             let build_rc = unsafe { run_build_graph(root, cfg, selected_graph, &raw mut load_result.sema as *mut Sema, actual_options, graph_options.survey, skipped_root_prepare) }
             repo_lock_release()
             link_stage_cleanup_current_process_temp_archives()
@@ -3928,7 +3928,7 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     options.prelude_mode = prelude_mode
     options.debug_info = debug_info
     options.release = cli_release_flag()
-    var load_result = load_build_graph_from_build_w(root, &cfg, &options)
+    var load_result = load_build_graph_from_build_w(root, cfg, options)
     let graph = load_result.graph
     if not graph.ok:
         with_eprint("error: " ++ graph.error_msg)
@@ -3941,14 +3941,14 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     if selected_target_name.len() == 0:
         with_eprint("error: 'run' needs an executable default target in build.w or ':target'")
         return 1
-    let selected_index = build_graph_find_target_index_by_name(&graph, selected_target_name)
+    let selected_index = build_graph_find_target_index_by_name(graph, selected_target_name)
     if selected_index < 0:
         with_eprint("error: target '" ++ selected_target_name ++ "' not found in build graph")
         return 1
     if (&graph.targets[selected_index]).kind != 0:
         with_eprint("error: run target '" ++ selected_target_name ++ "' is not executable")
         return 1
-    let selected_graph = build_graph_filter_target(&graph, selected_target_name)
+    let selected_graph = build_graph_filter_target(graph, selected_target_name)
     if not selected_graph.ok:
         with_eprint("error: " ++ selected_graph.error_msg)
         return 1
@@ -3960,11 +3960,11 @@ fn run_run_project_command(selected_target_hint: &str, opt_level: i32, no_std: b
     repo_lock_release()
     if build_rc != 0:
         return build_rc
-    let built_index = build_graph_find_target_index_by_name(&selected_graph, selected_target_name)
+    let built_index = build_graph_find_target_index_by_name(selected_graph, selected_target_name)
     if built_index < 0:
         with_eprint("error: target '" ++ selected_target_name ++ "' vanished from the filtered build graph")
         return 1
-    let bin_path = build_graph_output_path(root, &selected_graph.targets[built_index], "", selected_graph.targets.len() as i32)
+    let bin_path = build_graph_output_path(root, selected_graph.targets[built_index], "", selected_graph.targets.len() as i32)
     if bin_path.len() == 0 or with_fs_file_exists(bin_path) == 0:
         with_eprint("error: run target '" ++ selected_target_name ++ "' did not produce executable output")
         return 1
@@ -4129,7 +4129,7 @@ fn cli_check_compilation(no_std: bool, alloc_mode: bool, runtime_available: bool
     var comp = Compilation.init()
     comp.configure(0, no_std, alloc_mode, runtime_available)
     comp.set_prelude_mode(prelude_mode)
-    comp.set_link_bundles(&driver_link_bundle_args(with_arg_count()))
+    comp.set_link_bundles(driver_link_bundle_args(with_arg_count()))
     // D38: a dump or trace of a bundle corpus reads the corpus's source,
     // as `check` does; without this every `--dump-*`/`--trace-*` resolved
     // the corpus to the embedded interface and dumped no corpus body.
@@ -5185,7 +5185,7 @@ fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
         if test_flag_configures_compilation(token):
             kept = kept ++ " " ++ token
     vd.extra_args = kept ++ " --validate-all"
-    let result = run_test_compiler_command(target, "check", &vd)
+    let result = run_test_compiler_command(target, "check", vd)
     if result.rc == 0 and result.stdout.contains("validate-all: ok"):
         return 0
     emit_test_stage_error("validate-all failed", target, "check", "")
@@ -5194,7 +5194,7 @@ fn run_test_validate_all(target: &str, directives: &TestDirectives) -> i32:
 
 fn run_test_file_env_applied(target: &str, opt_level: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool, verbose: bool, quiet: bool, keep_binary: bool, filter: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str], link_search_paths: &List[str], link_rpaths: &List[str]) -> i32:
     let directives = parse_test_directives_for_target(target)
-    if cli_has_flag(with_arg_count(), "--validate-all") and run_test_validate_all(target, &directives) != 0:
+    if cli_has_flag(with_arg_count(), "--validate-all") and run_test_validate_all(target, directives) != 0:
         print_test_summary(target, 0, 1, quiet)
         return 1
     let directive_rc = run_test_directive_command(target, directives, quiet)
@@ -5351,7 +5351,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         var lane = empty_build_graph_target()
         lane.name = "with-test"
         lane.args = test_command_pass_through_args(argc)
-        return build_graph_run_test_files_pool(test_command_root(), &lane, test_running_compiler_path(), &files, true)
+        return build_graph_run_test_files_pool(test_command_root(), lane, test_running_compiler_path(), files, true)
     run_test_file(files[0], opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter)
 
 // The options each file's run takes: every argument that is not a test file
@@ -6974,7 +6974,7 @@ fn run_get_command(argc: i32) -> i32:
         let pins = cli_manifest_c_deps(with_fs_read_file(root ++ "/with.toml"))
         let lock = lock_load(root)
         for pin in pins:
-            if lock_pin_is_exact(pin.constraint) and not lock_holds_pin(&lock, pin.name, pin.constraint):
+            if lock_pin_is_exact(pin.constraint) and not lock_holds_pin(lock, pin.name, pin.constraint):
                 let rc = get_install_c_dep(root, pin.name, pin.constraint, options.force_reinstall)
                 if rc != 0: return rc
         return lock_restore(root)

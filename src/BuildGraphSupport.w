@@ -460,7 +460,7 @@ fn build_graph_times_report(root: &str, names: &List[str], ns_list: &List[i64], 
     while picked.len() < 5 and picked.len() < names.len():
         var best: i64 = -1
         for i in 0..names.len():
-            if not build_graph_time_picked(&picked, i as i64):
+            if not build_graph_time_picked(picked, i as i64):
                 if best < 0 or ns_list[i] > ns_list[best]:
                     best = i as i64
         picked.push(best)

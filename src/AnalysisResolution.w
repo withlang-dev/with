@@ -182,12 +182,12 @@ fn resolution_audit_calls(mut report: AnalysisReport, sema: &Sema, mir_mod: &Mir
             if body.term_kind(bb) != TermKind.TK_CALL: continue
             checked = checked + 1
             let answer = resolution_sema_answer(sema, mir_mod, pool, body, bb)
-            let message = mir_resolution_check_call(mir_mod, body, bb, &answer)
+            let message = mir_resolution_check_call(mir_mod, body, bb, answer)
             if message.len() == 0: continue
             if not site_ready:
                 site = resolution_site(sema, pool, body, source_path, source_text)
                 site_ready = true
-            resolution_violation(report, sema, &site, body, bb, body.call_ast_node(body.term_data1(bb)), fn_name, message)
+            resolution_violation(report, sema, site, body, bb, body.call_ast_node(body.term_data1(bb)), fn_name, message)
     checked
 
 // The indices 0..keys.len() ordered by key (heap sort). The stdlib has no
@@ -316,7 +316,7 @@ fn resolution_audit_unlowered_calls(mut report: AnalysisReport, sema: &Sema, mir
         let sig = sema.resolved_call_sigs.get(node).unwrap()
         let callee = if sig >= 0 and sig < sema.sig_names.len(): with_str_clone_ref(sema.pool_resolve(sema.sig_names[sig])) else: "<unresolved>"
         let fn_name = with_str_clone_ref(pool.resolve(body.fn_sym))
-        resolution_violation(report, sema, &site, body, -1, node, fn_name, "Sema resolved this call node to `" ++ callee ++ f"` (signature {sig}) inside a lowered body, MIR lowered no call carrying the node (D65: a call Sema accepted has exactly one MIR call fact)")
+        resolution_violation(report, sema, site, body, -1, node, fn_name, "Sema resolved this call node to `" ++ callee ++ f"` (signature {sig}) inside a lowered body, MIR lowered no call carrying the node (D65: a call Sema accepted has exactly one MIR call fact)")
     report.note(f"resolution-audit: drop-impl-calls-materialized-as-drops={drop_calls} calls-mir-states-elided={elided}")
     checked
 
@@ -378,7 +378,7 @@ fn resolution_audit_field_places(mut report: AnalysisReport, sema: &Sema, mir_mo
             let inst_ty = sema.field_access_type_in_body(body.instance_sym, node)
             if inst_ty <= 0 and body.instance_sym != 0:
                 unrecorded = unrecorded + 1
-                report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: MIR lowered a field place Sema never checked in this instance (field `{pool.resolve(sema.ast.get_data1(node))}`)")
+                report.fail(f"resolution: {fn_name} at {resolution_where(sema, site, node)}: MIR lowered a field place Sema never checked in this instance (field `{pool.resolve(sema.ast.get_data1(node))}`)")
                 continue
             let sema_ty = if inst_ty > 0: inst_ty else: sema.typed_expr_types.get(node) ?? 0
             let mir_ty = body.place_sema_types[place]
@@ -389,7 +389,7 @@ fn resolution_audit_field_places(mut report: AnalysisReport, sema: &Sema, mir_mo
             let mir_base = if base >= 0 and base < body.place_sema_types.len(): resolution_peeled(sema, body.place_sema_types[base]) else: 0
             let verdict = mir_field_place_verdict(kind, proj_field, sema.ast.get_data1(node), if mir_ty > 0: sema.resolve_alias(mir_ty as TypeId) as i32 else: 0, if sema_ty > 0: sema.resolve_alias(sema_ty as TypeId) as i32 else: 0, mir_base, sema_base)
             if verdict.len() > 0:
-                report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: {verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`, MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
+                report.fail(f"resolution: {fn_name} at {resolution_where(sema, site, node)}: {verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`, MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
             // The projection carries the declaration index Sema resolved the
             // node to in this body's instance (#1647: not a name lookup).
             let sema_decl = sema.field_decl_index_in_body(body.instance_sym, node)
@@ -397,7 +397,7 @@ fn resolution_audit_field_places(mut report: AnalysisReport, sema: &Sema, mir_mo
                 decls = decls + 1
                 let decl_verdict = mir_field_decl_verdict(body.proj_decl_index(last), sema_decl)
                 if decl_verdict.len() > 0:
-                    report.fail(f"resolution: {fn_name} at {resolution_where(sema, &site, node)}: {decl_verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`)")
+                    report.fail(f"resolution: {fn_name} at {resolution_where(sema, site, node)}: {decl_verdict} (field `{pool.resolve(sema.ast.get_data1(node))}`)")
     report.note(f"resolution-audit: field-places judged={checked} in-specialization-bodies={in_specializations} declaration-indexes={decls} unrecorded={unrecorded}")
     checked
 
@@ -426,7 +426,7 @@ fn resolution_audit_let_bindings(mut report: AnalysisReport, sema: &Sema, mir_mo
             if (sema.view_bound_let_nodes.get(node) ?? 0) == 2: views = views + 1
             let verdict = mir_let_binding_verdict(body.let_binding_aliases[li] != 0, (sema.view_bound_let_nodes.get(node) ?? 0) == 2)
             if verdict.len() > 0:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: `{pool.resolve(sema.ast.get_data0(node))}`: {verdict}")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: `{pool.resolve(sema.ast.get_data0(node))}`: {verdict}")
     report.note(f"resolution-audit: let-bindings judged={checked} mir-aliases={aliases} sema-place-views={views}")
     checked
 
@@ -455,7 +455,7 @@ fn resolution_audit_index_places(mut report: AnalysisReport, sema: &Sema, mir_mo
             let kind = if count > 0: body.proj_kinds[(body.place_proj_starts[place] + count - 1)] else: -1
             let sema_elem = sema.index_element_in_body(body.instance_sym, node)
             if sema_elem <= 0:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR lowered an index place Sema never checked as a positional index in this body")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: MIR lowered an index place Sema never checked as a positional index in this body")
                 continue
             let sema_ty = sema.resolve_alias(sema_elem as TypeId) as i32
             let mir_ty_raw = body.place_sema_types[place]
@@ -464,7 +464,7 @@ fn resolution_audit_index_places(mut report: AnalysisReport, sema: &Sema, mir_mo
             let mir_base = if base >= 0 and base < body.place_sema_types.len(): resolution_peeled(sema, body.place_sema_types[base]) else: 0
             let verdict = mir_index_place_verdict(kind, mir_ty, sema_ty, sema_ty, mir_base, sema_base)
             if verdict.len() > 0:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: {verdict} (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: {verdict} (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)})")
     report.note(f"resolution-audit: index-places judged={checked} in-specialization-bodies={in_specializations} unjudged=0")
     checked
 
@@ -495,7 +495,7 @@ fn resolution_audit_view_origins(mut report: AnalysisReport, sema: &Sema, mir_mo
                 if sema.pool_resolve(sema.expr_view_dep_at(value, oi)) == root_text: in_origins = true
             let verdict = mir_view_origin_verdict(origins > 0, root_text.len() > 0 and not root_text.starts_with("$"), in_origins)
             if verdict.len() > 0:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: `{pool.resolve(sema.ast.get_data0(node))}`: {verdict} (MIR root `{root_text}`)")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: `{pool.resolve(sema.ast.get_data0(node))}`: {verdict} (MIR root `{root_text}`)")
     report.note(f"resolution-audit: alias-lets judged={checked} with-sema-origins={with_origins}")
     checked
 
@@ -520,14 +520,14 @@ fn resolution_audit_captures(mut report: AnalysisReport, sema: &Sema, mir_mod: &
             for k in 0..child.anonymous_capture_kinds.len():
                 if child.anonymous_capture_kinds[k] != MIR_CAPTURE_PROTOCOL: mir_count = mir_count + 1
             if mir_count != sema_count:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: the closure has {mir_count} captures in MIR, {sema_count} in Sema's capture record")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: the closure has {mir_count} captures in MIR, {sema_count} in Sema's capture record")
                 continue
             for k in 0..sema_count:
                 if k >= child.anonymous_capture_kinds.len(): break
                 checked = checked + 1
                 let verdict = mir_capture_verdict(child.anonymous_capture_kinds[k], sema.closure_capture_by_place(node, k))
                 if verdict.len() > 0:
-                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: capture {k} `{sema.pool_resolve(sema.closure_capture_summary_sym(node, k))}`: {verdict}")
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: capture {k} `{sema.pool_resolve(sema.closure_capture_summary_sym(node, k))}`: {verdict}")
     checked
 
 // Phase 4: every call argument that reads a named owned binding transfers
@@ -571,7 +571,7 @@ fn resolution_audit_call_effects(mut report: AnalysisReport, sema: &Sema, mir_mo
                     if borrows: judged_borrows = judged_borrows + 1
                 let verdict = mir_call_arg_transfer_verdict(kind, named and place_owned, borrows, owned and not borrows)
                 if verdict.len() > 0:
-                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, body.call_ast_node(call_id))}: call to `{sema.pool_resolve(callee)}` argument {ai}: {verdict}")
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, body.call_ast_node(call_id))}: call to `{sema.pool_resolve(callee)}` argument {ai}: {verdict}")
     report.note(f"resolution-audit: call-arguments named-owned={judged} into-borrowing-params={judged_borrows}")
     checked
 
@@ -644,7 +644,7 @@ fn resolution_audit_callee_kinds(mut report: AnalysisReport, sema: &Sema, mir_mo
                 method_intrinsics = method_intrinsics + 1
                 let mir_intrinsic = body.call_intrinsic(call_id)
                 if mir_intrinsic != MirIntrinsic.NONE and mir_intrinsic != MirIntrinsic.GENERIC_CALL and mir_intrinsic != sema_intrinsic:
-                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR call intrinsic {mir_intrinsic as i32} disagrees with Sema's {sema_intrinsic as i32}")
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: MIR call intrinsic {mir_intrinsic as i32} disagrees with Sema's {sema_intrinsic as i32}")
             // Every method call MIR lowered was checked as one by Sema in this
             // instance, so its lowering kind is Sema's record (MethodLowering).
             if sema.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS and not sema.call_callable_types.contains(node):
@@ -652,24 +652,24 @@ fn resolution_audit_callee_kinds(mut report: AnalysisReport, sema: &Sema, mir_mo
                 if not sema.method_call_recorded_in_body(body.instance_sym, node):
                     method_calls_unrecorded = method_calls_unrecorded + 1
                     if method_calls_unrecorded <= 3:
-                        report.note(f"resolution-audit: method call without a Sema lowering record: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}")
+                        report.note(f"resolution-audit: method call without a Sema lowering record: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}")
             if (sema.call_builtins.get(node) ?? 0) >= CallBuiltin.BoxNew as i32:
                 method_builtins = method_builtins + 1
             if any_kind == CallCalleeKind.TypeLevelBuiltin or any_kind == CallCalleeKind.Intrinsic or any_kind == CallCalleeKind.SourceLocation:
                 builtins = builtins + 1
                 if sema.call_builtin(node) == CallBuiltin.None and not sema.math_builtin_calls.contains(node) and not sema.va_start_calls.contains(node):
-                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin call carries no Sema builtin kind")
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: builtin call carries no Sema builtin kind")
             if sema.ast.kind(callee) != NodeKind.NK_IDENT: continue
             checked = checked + 1
             let kind = sema.call_callee_kind(node)
             if kind == CallCalleeKind.None:
-                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: MIR lowered a call of `{pool.resolve(sema.ast.get_data0(callee))}` Sema recorded no callee kind for")
+                report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: MIR lowered a call of `{pool.resolve(sema.ast.get_data0(callee))}` Sema recorded no callee kind for")
             // #2043: a builtin's arguments are its MIR operands; a call that
             // carries fewer leaves codegen reading another call's operands.
             if kind == CallCalleeKind.Intrinsic:
                 let source_argc = if sema.has_resolved_call_args(node): sema.get_resolved_call_arg_count(node) else: sema.ast.get_data2(node)
                 if body.call_arg_counts[call_id] != source_argc:
-                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
+                    report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: builtin `{pool.resolve(sema.ast.get_data0(callee))}` lowered with {body.call_arg_counts[call_id]} MIR operands for {source_argc} arguments")
     report.note(f"resolution-audit: name-callee-kinds judged={checked} builtin-calls={builtins} method-builtin-calls={method_builtins} method-intrinsic-calls={method_intrinsics} method-calls={method_calls} without-lowering-record={method_calls_unrecorded}")
     checked
 
@@ -758,7 +758,7 @@ fn resolution_audit_resolved_calls(mut report: AnalysisReport, sema: &Sema, mir_
                 site_ready = true
             let mir_name = if mir_sym != 0: with_str_clone_ref(pool.resolve(mir_sym)) else: "a place"
             let want: i32 = sema.comp_resolved.get(call) ?? 0
-            resolution_violation(report, sema, &site, body, bb, call, with_str_clone_ref(pool.resolve(body.fn_sym)), verdict ++ f" (MIR calls `{mir_name}`, Sema resolved `{sema.pool_resolve(want)}`" ++ (if conv != 0: f", converted by `{sema.pool_resolve(conv)}`)" else: ")"))
+            resolution_violation(report, sema, site, body, bb, call, with_str_clone_ref(pool.resolve(body.fn_sym)), verdict ++ f" (MIR calls `{mir_name}`, Sema resolved `{sema.pool_resolve(want)}`" ++ (if conv != 0: f", converted by `{sema.pool_resolve(conv)}`)" else: ")"))
     report.note(f"resolution-audit: resolved-calls judged={checked} foreign={foreign} redirected={redirected} retargeted-methods={methods} value-conversions={conversions}")
     checked
 
@@ -786,7 +786,7 @@ fn resolution_audit_expr_operands(mut report: AnalysisReport, sema: &Sema, mir_m
             checked = checked + 1
             if sema_ty == mir_ty or sema.types_identical(sema_ty, mir_ty): continue
             disagree = disagree + 1
-            report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, &site, node)}: an expression lowered to an operand of another type (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)}, node kind {sema.ast.kind(node) as i32})")
+            report.fail(f"resolution: {pool.resolve(body.fn_sym)} at {resolution_where(sema, site, node)}: an expression lowered to an operand of another type (MIR {sema.type_name(mir_ty)}, Sema {sema.type_name(sema_ty)}, node kind {sema.ast.kind(node) as i32})")
     report.note(f"resolution-audit: expression-operands judged={checked} disagree={disagree}")
     checked
 

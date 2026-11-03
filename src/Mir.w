@@ -606,7 +606,7 @@ fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -
     out.push_str(f"drop-state module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
-        out.push_str(dump_drop_state_body(&mir_mod.bodies[i], pool))
+        out.push_str(dump_drop_state_body(mir_mod.bodies[i], pool))
     out.to_str()
 
 
@@ -699,7 +699,7 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
     out.push_str(f"drop-plan module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
-        out.push_str(dump_drop_plan_body(&mir_mod.bodies[i], pool, sema))
+        out.push_str(dump_drop_plan_body(mir_mod.bodies[i], pool, sema))
     out.to_str()
 
 // Drop elaboration — the "Dead" arm (#614, drop-elaboration-soundness.md).
@@ -722,7 +722,7 @@ fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
     out.push_str(f"place-map module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
         if i > 0: out.push_str("\n")
-        out.push_str(dump_place_map_body(mir_mod, &mir_mod.bodies[i], pool))
+        out.push_str(dump_place_map_body(mir_mod, mir_mod.bodies[i], pool))
     out.to_str()
 
 

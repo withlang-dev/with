@@ -641,7 +641,7 @@ fn comptime_tar_sum(data: &str) -> i64:
 fn comptime_gzip_deflate(data: &str) -> str:
     let bytes: List[u8] = List.with_capacity(data.len())
     for i in 0..data.len(): bytes.push(data[i] as u8)
-    match compress_gzip(&bytes):
+    match compress_gzip(bytes):
         .Ok(packed) =>
             var out = StringBuilder.with_capacity(packed.len())
             for i in 0..packed.len(): out.push_byte(packed[i])
@@ -1191,15 +1191,15 @@ fn ce_clone_capability_record(r: &ComptimeCapabilityRecord) -> ComptimeCapabilit
         project_root: with_str_clone_ref(r.project_root),
         workspace_id: r.workspace_id,
         target_name: with_str_clone_ref(r.target_name),
-        inputs: ce_clone_str_list(&r.inputs),
-        outputs: ce_clone_str_list(&r.outputs),
-        args: ce_clone_str_list(&r.args),
-        write_scope: ce_clone_str_list(&r.write_scope),
+        inputs: ce_clone_str_list(r.inputs),
+        outputs: ce_clone_str_list(r.outputs),
+        args: ce_clone_str_list(r.args),
+        write_scope: ce_clone_str_list(r.write_scope),
         write_scoped: r.write_scoped,
         scratch_path: with_str_clone_ref(r.scratch_path),
         timeout_ms: r.timeout_ms,
         cwd: with_str_clone_ref(r.cwd),
-        env: ce_clone_str_list(&r.env),
+        env: ce_clone_str_list(r.env),
         network: r.network,
     }
 
@@ -1219,12 +1219,12 @@ fn ce_clone_link_env_list(values: &List[LinkStageEnvVar]) -> List[LinkStageEnvVa
 fn ce_clone_link_command(c: &LinkStageCommand) -> LinkStageCommand:
     LinkStageCommand {
         linker: with_str_clone_ref(c.linker),
-        args: ce_clone_str_list(&c.args),
+        args: ce_clone_str_list(c.args),
         cwd: with_str_clone_ref(c.cwd),
-        env: ce_clone_link_env_list(&c.env),
-        inputs: ce_clone_str_list(&c.inputs),
-        outputs: ce_clone_str_list(&c.outputs),
-        cleanup_files: ce_clone_str_list(&c.cleanup_files),
+        env: ce_clone_link_env_list(c.env),
+        inputs: ce_clone_str_list(c.inputs),
+        outputs: ce_clone_str_list(c.outputs),
+        cleanup_files: ce_clone_str_list(c.cleanup_files),
     }
 
 // Independent deep clone: every workspace-record read below goes through
@@ -1233,16 +1233,16 @@ fn ce_clone_link_command(c: &LinkStageCommand) -> LinkStageCommand:
 fn ce_clone_workspace_record(r: &ComptimeWorkspaceRecord) -> ComptimeWorkspaceRecord:
     ComptimeWorkspaceRecord {
         name: with_str_clone_ref(r.name),
-        files: ce_clone_str_list(&r.files),
-        string_names: ce_clone_str_list(&r.string_names),
-        string_sources: ce_clone_str_list(&r.string_sources),
+        files: ce_clone_str_list(r.files),
+        string_names: ce_clone_str_list(r.string_names),
+        string_sources: ce_clone_str_list(r.string_sources),
         options: comptime_value_clone(r.options),
         migrate_options: comptime_value_clone(r.migrate_options),
         intercept_active: r.intercept_active,
         intercept_terminal: r.intercept_terminal,
         generation: r.generation,
         intercept_phase: r.intercept_phase,
-        messages: ce_clone_value_list(&r.messages),
+        messages: ce_clone_value_list(r.messages),
         message_cursor: r.message_cursor,
         intercept_started: r.intercept_started,
         pending_link_active: r.pending_link_active,
@@ -1251,7 +1251,7 @@ fn ce_clone_workspace_record(r: &ComptimeWorkspaceRecord) -> ComptimeWorkspaceRe
         pending_link_output_path: with_str_clone_ref(r.pending_link_output_path),
         pending_link_output_kind: r.pending_link_output_kind,
         pending_link_debug_info: r.pending_link_debug_info,
-        pending_link_command: ce_clone_link_command(&r.pending_link_command),
+        pending_link_command: ce_clone_link_command(r.pending_link_command),
     }
 
 // Independent deep clone: thread jobs and the consuming executor own
@@ -1266,12 +1266,12 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
         absolute_output: with_str_clone_ref(p.absolute_output),
         output_kind: p.output_kind,
         has_strings: p.has_strings,
-        source_paths: ce_clone_str_list(&p.source_paths),
-        source_texts: ce_clone_str_list(&p.source_texts),
+        source_paths: ce_clone_str_list(p.source_paths),
+        source_texts: ce_clone_str_list(p.source_texts),
         absolute_source: with_str_clone_ref(p.absolute_source),
-        include_paths: ce_clone_str_list(&p.include_paths),
-        defines: ce_clone_str_list(&p.defines),
-        link_libs: ce_clone_str_list(&p.link_libs),
+        include_paths: ce_clone_str_list(p.include_paths),
+        defines: ce_clone_str_list(p.defines),
+        link_libs: ce_clone_str_list(p.link_libs),
         opt_level: p.opt_level,
         no_std: p.no_std,
         alloc_mode: p.alloc_mode,
@@ -1282,9 +1282,9 @@ fn ce_clone_compile_plan(p: &ComptimeWorkspaceCompilePlan) -> ComptimeWorkspaceC
         overflow_mode: p.overflow_mode,
         migrate_is_dir: p.migrate_is_dir,
         migrate_source: with_str_clone_ref(p.migrate_source),
-        migrate_include_paths: ce_clone_str_list(&p.migrate_include_paths),
-        migrate_forced_includes: ce_clone_str_list(&p.migrate_forced_includes),
-        migrate_defines: ce_clone_str_list(&p.migrate_defines),
+        migrate_include_paths: ce_clone_str_list(p.migrate_include_paths),
+        migrate_forced_includes: ce_clone_str_list(p.migrate_forced_includes),
+        migrate_defines: ce_clone_str_list(p.migrate_defines),
         migrate_exclude_basenames: with_str_clone_ref(p.migrate_exclude_basenames),
         migrate_no_c_export: p.migrate_no_c_export,
         migrate_c_export_functions: p.migrate_c_export_functions,
@@ -1341,12 +1341,12 @@ fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan) -> str:
     out = cpp_put_str(out, p.absolute_output)
     out = cpp_put_int(out, p.output_kind)
     out = cpp_put_int(out, p.has_strings)
-    out = cpp_put_list(out, &p.source_paths)
-    out = cpp_put_list(out, &p.source_texts)
+    out = cpp_put_list(out, p.source_paths)
+    out = cpp_put_list(out, p.source_texts)
     out = cpp_put_str(out, p.absolute_source)
-    out = cpp_put_list(out, &p.include_paths)
-    out = cpp_put_list(out, &p.defines)
-    out = cpp_put_list(out, &p.link_libs)
+    out = cpp_put_list(out, p.include_paths)
+    out = cpp_put_list(out, p.defines)
+    out = cpp_put_list(out, p.link_libs)
     out = cpp_put_int(out, p.opt_level)
     out = cpp_put_bool(out, p.no_std)
     out = cpp_put_bool(out, p.alloc_mode)
@@ -1357,9 +1357,9 @@ fn comptime_plan_serialize(p: &ComptimeWorkspaceCompilePlan) -> str:
     out = cpp_put_int(out, p.overflow_mode)
     out = cpp_put_int(out, p.migrate_is_dir)
     out = cpp_put_str(out, p.migrate_source)
-    out = cpp_put_list(out, &p.migrate_include_paths)
-    out = cpp_put_list(out, &p.migrate_forced_includes)
-    out = cpp_put_list(out, &p.migrate_defines)
+    out = cpp_put_list(out, p.migrate_include_paths)
+    out = cpp_put_list(out, p.migrate_forced_includes)
+    out = cpp_put_list(out, p.migrate_defines)
     out = cpp_put_str(out, p.migrate_exclude_basenames)
     out = cpp_put_bool(out, p.migrate_no_c_export)
     out = cpp_put_bool(out, p.migrate_c_export_functions)
@@ -1571,7 +1571,7 @@ impl ComptimeEvaluator:
 
     fn cleanup_workspace_pending_links():
         for wi in 0..self.workspace_records.len():
-            var record = ce_clone_workspace_record(&self.workspace_records[wi])
+            var record = ce_clone_workspace_record(self.workspace_records[wi])
             if record.pending_link_active == 0:
                 continue
             link_stage_cleanup_files(record.pending_link_command.cleanup_files)
@@ -1586,7 +1586,7 @@ impl ComptimeEvaluator:
         if self.had_error != 0:
             return
         for wi in 0..self.workspace_records.len():
-            let record = ce_clone_workspace_record(&self.workspace_records[wi])
+            let record = ce_clone_workspace_record(self.workspace_records[wi])
             if record.intercept_active == 0:
                 continue
             if record.intercept_terminal != 0 and record.message_cursor >= record.messages.len():
@@ -2045,7 +2045,7 @@ impl ComptimeEvaluator:
         if handle_id < 0 or handle_id >= self.capability_records.len():
             let _ = self.fail(node, "invalid tool capability handle for " ++ method)
             return -1
-        let record = ce_clone_capability_record(&self.capability_records[handle_id])
+        let record = ce_clone_capability_record(self.capability_records[handle_id])
         if record.kind != expected_kind or record.generation != value.extra_start:
             let _ = self.fail(node, "stale or invalid tool capability handle for " ++ method)
             return -1
@@ -2482,7 +2482,7 @@ impl ComptimeEvaluator:
             let idx = self.lookup_slot_index(sym)
             if idx < 0:
                 return self.fail(node, "comptime collection mutation requires a local identifier receiver")
-            self.update_slot_value(idx, comptime_value_clone(&value))
+            self.update_slot_value(idx, comptime_value_clone(value))
             if self.pipeline_receiver_carrier_depth > 0:
                 return comptime_control_value(value)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
@@ -2581,7 +2581,7 @@ impl ComptimeEvaluator:
         if self.reserve_string_bytes(node, chunk.len()) == 0:
             return comptime_value_invalid()
         self.builders[builder.extra_start].push_str(chunk)
-        comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(&builder))
+        comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(builder))
 
     mut fn string_builder_from_struct(value: &ComptimeValue, node: i32) -> ComptimeValue:
         let bytes_value = self.struct_field_value_by_name(value, "bytes")
@@ -2598,7 +2598,7 @@ impl ComptimeEvaluator:
                     let _ = self.fail(node, "StringBuilder bytes field must contain u8 values")
                     return comptime_value_invalid()
                 self.builders[builder.extra_start].push_byte(comptime_value_intlike(elem) as u8)
-            return comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(&builder))
+            return comptime_value_string_builder(builder.type_id, builder.extra_start, self.string_builder_len(builder))
         if bytes_value.kind == ComptimeValueKind.CV_INVALID:
             let _ = self.fail(node, "StringBuilder comptime value is missing its bytes field")
             return comptime_value_invalid()
@@ -2618,7 +2618,7 @@ impl ComptimeEvaluator:
         let builder = self.string_builder_from_value(value, node)
         if builder.kind != ComptimeValueKind.CV_STRING_BUILDER:
             return ""
-        if self.reserve_string_bytes(node, self.string_builder_len(&builder)) == 0:
+        if self.reserve_string_bytes(node, self.string_builder_len(builder)) == 0:
             return ""
         self.builders[builder.extra_start].to_str()
 
@@ -2685,11 +2685,11 @@ impl ComptimeEvaluator:
         if method == "len":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.len() takes no arguments")
-            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), self.string_builder_len(&builder)))
+            return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i64 as i32), self.string_builder_len(builder)))
         if method == "is_empty":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.is_empty() takes no arguments")
-            return comptime_control_value(comptime_value_bool(self.string_builder_len(&builder) == 0))
+            return comptime_control_value(comptime_value_bool(self.string_builder_len(builder) == 0))
         if method == "to_str":
             if arg_count != 0:
                 return self.fail(node, "StringBuilder.to_str() takes no arguments")
@@ -2772,7 +2772,7 @@ impl ComptimeEvaluator:
             let elems: List[i32] = List.new()
             for i in 0..value.extra_count:
                 let elem = self.extra_value_at((value.extra_start + i) as i64)
-                let et = self.comptime_value_semantic_type(&elem)
+                let et = self.comptime_value_semantic_type(elem)
                 if et == 0:
                     return 0
                 elems.push(et)
@@ -3629,7 +3629,7 @@ impl ComptimeEvaluator:
         // any plain function does (D104), through the user-method path.
         var typed_recv = comptime_value_clone(recv_value)
         if typed_recv.type_id == 0: typed_recv.type_id = self.sema.ty_str as i32
-        self.eval_user_method_value(0, &typed_recv, field, extra_start, arg_count, node, 0)
+        self.eval_user_method_value(0, typed_recv, field, extra_start, arg_count, node, 0)
 
     mut fn concrete_method_comptime_type_args(fn_sym: i32, concrete_sig: i32, node: i32) -> ComptimeGenericResolvedArgs:
         let out_syms: List[i32] = List.new()
@@ -3733,7 +3733,7 @@ impl ComptimeEvaluator:
             if self.last_call_has_mut_receiver == 0:
                 return self.fail(node, "comptime mut method did not preserve its receiver value")
             final_receiver = move self.last_call_mut_receiver
-            let write_back = self.write_back_mut_receiver(recv_node, comptime_value_clone(&final_receiver), node)
+            let write_back = self.write_back_mut_receiver(recv_node, comptime_value_clone(final_receiver), node)
             if write_back.kind != ComptimeControlKind.CTL_VALUE:
                 return write_back
 
@@ -4178,7 +4178,7 @@ impl ComptimeEvaluator:
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_WORKSPACE, method, node)
         if handle < 0:
             return -1
-        let capability = ce_clone_capability_record(&self.capability_records[handle])
+        let capability = ce_clone_capability_record(self.capability_records[handle])
         let workspace_id = capability.workspace_id
         if workspace_id < 0 or workspace_id >= self.workspace_records.len():
             let _ = self.fail(node, "invalid Workspace handle for " ++ method)
@@ -4998,10 +4998,10 @@ fn comptime_execute_workspace_compile_plan(plan: &ComptimeWorkspaceCompilePlan) 
             // The Compilation retains these vec handles (Zcu source storage)
             // through share-place-classified params, while the plan keeps its
             // own drop in the caller — pass independent clones (#729 class).
-            if comp.check_source_texts(ce_clone_str_list(&plan.source_paths), ce_clone_str_list(&plan.source_texts)):
+            if comp.check_source_texts(ce_clone_str_list(plan.source_paths), ce_clone_str_list(plan.source_texts)):
                 success = true
         else:
-            artifact_path = comp.build_entry_binary_from_sources_to_path(ce_clone_str_list(&plan.source_paths), ce_clone_str_list(&plan.source_texts), plan.absolute_output)
+            artifact_path = comp.build_entry_binary_from_sources_to_path(ce_clone_str_list(plan.source_paths), ce_clone_str_list(plan.source_texts), plan.absolute_output)
             success = artifact_path.len() > 0
     else:
         if plan.output_kind == 0:
@@ -5045,7 +5045,7 @@ impl ComptimeEvaluator:
         if native.rc == 0 and native.is_migrate == 0 and native.comp as i64 != 0:
             unsafe:
                 let tracked_paths = (*native.comp).tracked_input_paths()
-                self.sema.merge_tracked_inputs(&tracked_paths)
+                self.sema.merge_tracked_inputs(tracked_paths)
         comptime_workspace_native_compile_result_free(native)
         if self.had_error != 0:
             return comptime_workspace_compile_invalid()
@@ -5213,21 +5213,21 @@ impl ComptimeEvaluator:
             if args_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return args_signal
             let name = self.capability_arg_str(args_signal.value, 0, method, node)
-            return self.create_workspace_for_capability(ce_clone_capability_record(&self.capability_records[handle]), name, node)
+            return self.create_workspace_for_capability(ce_clone_capability_record(self.capability_records[handle]), name, node)
         if method == "current_workspace":
             if not self.capability_expect_arg_count(arg_count, 0, method, node):
                 return comptime_control_error()
             let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
             if handle < 0:
                 return comptime_control_error()
-            return self.current_workspace_for_capability(ce_clone_capability_record(&self.capability_records[handle]), "BuildCtx", node)
+            return self.current_workspace_for_capability(ce_clone_capability_record(self.capability_records[handle]), "BuildCtx", node)
         if method == "new_build":
             if not self.capability_expect_arg_count(arg_count, 0, method, node):
                 return comptime_control_error()
             let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
             if handle < 0:
                 return comptime_control_error()
-            let build_value = self.eval_new_build_value(ce_clone_capability_record(&self.capability_records[handle]), node)
+            let build_value = self.eval_new_build_value(ce_clone_capability_record(self.capability_records[handle]), node)
             if build_value.kind == ComptimeValueKind.CV_INVALID:
                 return comptime_control_error()
             return comptime_control_value(build_value)
@@ -5237,7 +5237,7 @@ impl ComptimeEvaluator:
             let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_CTX, method, node)
             if handle < 0:
                 return comptime_control_error()
-            let record = ce_clone_capability_record(&self.capability_records[handle])
+            let record = ce_clone_capability_record(self.capability_records[handle])
             let project_info_type = self.capability_type_id(CapabilityKind.CK_BUILD_PROJECT_INFO, node)
             if project_info_type == 0:
                 return comptime_control_error()
@@ -5261,7 +5261,7 @@ impl ComptimeEvaluator:
             let child_type = self.capability_type_id(child_kind, node)
             if child_type == 0:
                 return comptime_control_error()
-            let record = ce_clone_capability_record(&self.capability_records[handle])
+            let record = ce_clone_capability_record(self.capability_records[handle])
             let child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
             return comptime_control_value(self.mint_capability(child_type, move child))
         self.fail(node, "BuildCtx capability method '" ++ method ++ "' is not implemented yet")
@@ -5272,7 +5272,7 @@ impl ComptimeEvaluator:
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_PROJECT_INFO, method, node)
         if handle < 0:
             return comptime_control_error()
-        let record = ce_clone_capability_record(&self.capability_records[handle])
+        let record = ce_clone_capability_record(self.capability_records[handle])
         if method == "package_name":
             return comptime_control_value(comptime_value_str(record.package_name))
         if method == "package_version":
@@ -5695,7 +5695,7 @@ impl ComptimeEvaluator:
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_TOOL_FS, method, node)
         if handle < 0:
             return comptime_control_error()
-        let record = ce_clone_capability_record(&self.capability_records[handle])
+        let record = ce_clone_capability_record(self.capability_records[handle])
 
         // In worker mode the parent already performed every ToolFs mutation during
         // its own build(ctx) evaluation; the worker re-evaluates build(ctx) only to
@@ -5996,7 +5996,7 @@ impl ComptimeEvaluator:
             if self.had_error != 0:
                 return comptime_control_error()
             let entries_value = self.extra_value_at((args_signal.value.extra_start + 1) as i64)
-            let rc = self.toolfs_write_tar(&record, output_path, entries_value, method, node)
+            let rc = self.toolfs_write_tar(record, output_path, entries_value, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), rc as i64))
@@ -6010,7 +6010,7 @@ impl ComptimeEvaluator:
             let output_dir = self.capability_arg_str(args_signal.value, 1, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
-            let rc = self.toolfs_extract_tar(&record, archive_path, output_dir, method, node)
+            let rc = self.toolfs_extract_tar(record, archive_path, output_dir, method, node)
             if self.had_error != 0:
                 return comptime_control_error()
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_i32 as i32), rc as i64))
@@ -6052,7 +6052,7 @@ impl ComptimeEvaluator:
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_PROCESS_RUNNER, method, node)
         if handle < 0:
             return comptime_control_error()
-        let record = ce_clone_capability_record(&self.capability_records[handle])
+        let record = ce_clone_capability_record(self.capability_records[handle])
         if method == "run_spec":
             if not self.capability_expect_arg_count(arg_count, 3, method, node):
                 return comptime_control_error()
@@ -6246,7 +6246,7 @@ impl ComptimeEvaluator:
         let handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_ACTION_CTX, method, node)
         if handle < 0:
             return comptime_control_error()
-        var record = ce_clone_capability_record(&self.capability_records[handle])
+        var record = ce_clone_capability_record(self.capability_records[handle])
         if method == "env_input":
             if not self.capability_expect_arg_count(arg_count, 1, method, node):
                 return comptime_control_error()
@@ -6309,15 +6309,15 @@ impl ComptimeEvaluator:
         // at evaluator teardown, so the child owns clones (#715 class).
         var child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
         child.target_name = move record.target_name
-        child.inputs = ce_clone_str_list(&record.inputs)
-        child.outputs = ce_clone_str_list(&record.outputs)
-        child.args = ce_clone_str_list(&record.args)
+        child.inputs = ce_clone_str_list(record.inputs)
+        child.outputs = ce_clone_str_list(record.outputs)
+        child.args = ce_clone_str_list(record.args)
         if child_kind == CapabilityKind.CK_BUILD_TOOL_FS:
-            child.write_scope = ce_clone_str_list(&record.write_scope)
+            child.write_scope = ce_clone_str_list(record.write_scope)
             child.write_scoped = 1
             child.scratch_path = move record.scratch_path
         else if child_kind == CapabilityKind.CK_BUILD_PROCESS_RUNNER:
-            child.write_scope = ce_clone_str_list(&record.write_scope)
+            child.write_scope = ce_clone_str_list(record.write_scope)
             child.write_scoped = record.write_scoped
             child.network = record.network
         comptime_control_value(self.mint_capability(child_type, move child))
@@ -6326,11 +6326,11 @@ impl ComptimeEvaluator:
         let workspace_id = self.workspace_record_index(recv_value, method, node)
         if workspace_id < 0:
             return comptime_control_error()
-        var record = ce_clone_workspace_record(&self.workspace_records[workspace_id])
+        var record = ce_clone_workspace_record(self.workspace_records[workspace_id])
         let capability_handle = self.validate_capability(recv_value, CapabilityKind.CK_BUILD_WORKSPACE, method, node)
         if capability_handle < 0:
             return comptime_control_error()
-        let capability = ce_clone_capability_record(&self.capability_records[capability_handle])
+        let capability = ce_clone_capability_record(self.capability_records[capability_handle])
         if method == "name":
             if not self.capability_expect_arg_count(arg_count, 0, method, node):
                 return comptime_control_error()
@@ -6418,7 +6418,7 @@ impl ComptimeEvaluator:
                 if self.had_error != 0:
                     return comptime_control_error()
                 self.store_workspace_record(workspace_id, record)
-                record = ce_clone_workspace_record(&self.workspace_records[workspace_id])
+                record = ce_clone_workspace_record(self.workspace_records[workspace_id])
             if record.message_cursor < record.messages.len():
                 let message: ComptimeValue = comptime_value_clone(record.messages[record.message_cursor])
                 let phase = self.compiler_message_phase_id(message)
@@ -7385,9 +7385,9 @@ impl ComptimeEvaluator:
         // fit is left as-is so sema still reports the mismatch — narrowing it
         // here would turn a diagnosable error into a silently masked one, which
         // is the defect this fix exists to remove.
-        let retype_to = self.local_annotation_int_type(flags, &value_signal.value)
+        let retype_to = self.local_annotation_int_type(flags, value_signal.value)
         if retype_to != 0:
-            let raw = comptime_value_intlike(&value_signal.value)
+            let raw = comptime_value_intlike(value_signal.value)
             self.bind_value(self.ast.get_data0(node), self.checked_int_value(retype_to, raw), is_mut)
             return comptime_control_value(comptime_value_void(self.sema.ty_void as i32))
         self.bind_value(self.ast.get_data0(node), move value_signal.value, is_mut)
@@ -8574,11 +8574,11 @@ impl ComptimeEvaluator:
             let capability_handle = self.validate_capability(workspace_value, CapabilityKind.CK_BUILD_WORKSPACE, "parallel", node)
             if capability_handle < 0:
                 return comptime_control_error()
-            let record = ce_clone_workspace_record(&self.workspace_records[workspace_id])
+            let record = ce_clone_workspace_record(self.workspace_records[workspace_id])
             if record.intercept_active != 0:
                 if record.intercept_started != 0 or record.messages.len() > 0 or record.pending_link_active != 0:
                     return self.fail(node, "parallel does not support partially consumed intercepted workspaces yet")
-            let capability = ce_clone_capability_record(&self.capability_records[capability_handle])
+            let capability = ce_clone_capability_record(self.capability_records[capability_handle])
             if par_project_root.len() == 0:
                 // A bare field read here MOVES the str out of the owned local
                 // (blanking it) and workspace_compile_plan below would see an
@@ -8592,7 +8592,7 @@ impl ComptimeEvaluator:
             intercepted.push((record.intercept_active != 0) as i32)
         let native_results: List[ComptimeWorkspaceNativeCompileResult] = List.new()
         if plans.len() == 1:
-            native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[0])))
+            native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(plans[0])))
         else:
             // D24 (#729, BDFL ruling 2026-07-26): independent builds never
             // share an address space. Each parallel workspace compile runs as
@@ -8618,7 +8618,7 @@ impl ComptimeEvaluator:
                 let out_path = par_dir ++ f"/stdout-{i}.log"
                 let err_path = par_dir ++ f"/stderr-{i}.log"
                 let _rm_result = with_fs_remove_file(result_path)
-                if with_fs_write_file(plan_path, comptime_plan_serialize(&plans[i])) != 0:
+                if with_fs_write_file(plan_path, comptime_plan_serialize(plans[i])) != 0:
                     return self.fail(node, "parallel could not write the workspace plan file")
                 var argv = self_exe ++ "\0"
                 argv = argv ++ "__workspace-compile\0"
@@ -8632,7 +8632,7 @@ impl ComptimeEvaluator:
                 err_paths.push(err_path)
             for i in 0..plans.len():
                 if pids[i] < 0:
-                    native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(&plans[i])))
+                    native_results.push(comptime_execute_workspace_compile_plan(ce_clone_compile_plan(plans[i])))
                     continue
                 let wait_rc = with_exec_wait(pids[i], 1200000)
                 let result_text = with_fs_read_file(result_paths[i])
@@ -8662,7 +8662,7 @@ impl ComptimeEvaluator:
                 comptime_workspace_native_compile_result_free(native)
                 return comptime_control_error()
             if intercepted[i] != 0:
-                var record = ce_clone_workspace_record(&self.workspace_records[workspace_ids[i]])
+                var record = ce_clone_workspace_record(self.workspace_records[workspace_ids[i]])
                 let messages =
                     if native.rc == 0 and native.comp as i64 != 0:
                         unsafe:

@@ -82,7 +82,7 @@ impl Codegen:
         // (dyn_drop_slot) — what a `Box[dyn Trait]` runs before it frees.
         vtable_fields.push(ptr_ty)
 
-        let vtable_ty = wl_struct_type(self.context, list_data_i64(&vtable_fields), method_count + 1, 0)
+        let vtable_ty = wl_struct_type(self.context, list_data_i64(vtable_fields), method_count + 1, 0)
         let trait_idx = self.trait_vtable_types.len() as i32
         self.trait_vtable_types.push(vtable_ty)
         self.trait_method_starts.push(method_start)
@@ -425,7 +425,7 @@ impl Codegen:
             let pval = wl_get_param(method_fn, pi)
             wrapper_param_types.push(wl_type_of(pval))
             pi = pi + 1
-        let wrapper_ft = wl_function_type(ret_ty, list_data_i64(&wrapper_param_types), orig_param_count + base, 0)
+        let wrapper_ft = wl_function_type(ret_ty, list_data_i64(wrapper_param_types), orig_param_count + base, 0)
         let wrapper_fn = wl_add_function(self.llmod, wrapper_name, wrapper_ft)
         wl_set_linkage(wrapper_fn, wl_internal_linkage())
 
@@ -463,16 +463,16 @@ impl Codegen:
                 let task_fields: List[i64] = List.new()
                 task_fields.push(wl_i32_type(self.context))
                 task_fields.push(ptr_ty)
-                async_task_ty = wl_struct_type(self.context, list_data_i64(&task_fields), 2, 0)
-            call_val = self.emit_async_fn_spawn_task_value(impl_fn_sym, method_fn, method_ft, &call_args, async_task_ty)
+                async_task_ty = wl_struct_type(self.context, list_data_i64(task_fields), 2, 0)
+            call_val = self.emit_async_fn_spawn_task_value(impl_fn_sym, method_fn, method_ft, call_args, async_task_ty)
         else:
-            call_val = wl_build_call(self.builder, method_ft, method_fn, list_data_i64(&call_args), orig_param_count)
+            call_val = wl_build_call(self.builder, method_ft, method_fn, list_data_i64(call_args), orig_param_count)
         if consumes_self != 0:
             let free_fn = self.ensure_box_free_fn()
             if free_fn != 0:
                 let free_args: List[i64] = List.new()
                 free_args.push(data_ptr)
-                let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(&free_args), 1)
+                let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(free_args), 1)
         if has_sret:
             let _ = wl_build_store(self.builder, call_val, wl_get_param(wrapper_fn, 0))
             let _ = wl_build_ret_void(self.builder)
@@ -935,7 +935,7 @@ impl Codegen:
         let type_name = self.intern.resolve(impl_type_sym)
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(&entries), method_count + 1)
+        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
@@ -1015,7 +1015,7 @@ impl Codegen:
 
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_name
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(&entries), method_count + 1)
+        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
@@ -1084,7 +1084,7 @@ impl Codegen:
         let key = codegen_hash_type_trait_key(impl_type_sym, trait_sym)
         let global_name = "__vtable_" ++ type_name ++ "_" ++ trait_text
         let vg = wl_add_global(self.llmod, vtable_ty, global_name)
-        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(&entries), method_count + 1)
+        let vconst = wl_const_named_struct(vtable_ty, list_data_i64(entries), method_count + 1)
         wl_set_initializer(vg, vconst)
         wl_set_global_constant(vg, 1)
         wl_set_linkage(vg, wl_internal_linkage())
@@ -1113,7 +1113,7 @@ impl Codegen:
             return existing
         let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
-        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(&params), 1, 0)
+        let fn_ty = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
         let thunk = wl_add_function(self.llmod, fn_name, fn_ty)
         wl_set_linkage(thunk, wl_internal_linkage())
         self.dyn_drop_thunks.push(thunk)
@@ -1666,10 +1666,10 @@ impl Codegen:
         // Sema-lowered module). WITH_DUMP_INIT_MIR exposes them; #719 was
         // invisible without it.
         if with_getenv_str("WITH_DUMP_INIT_MIR").len() > 0:
-            with_eprint(dump_mir_body(init_body, &self.intern, &self.sema))
+            with_eprint(dump_mir_body(init_body, self.intern, self.sema))
         // #719 class: a synthesized body that reads a killed local computes from
         // zeroed storage. Report it here rather than emitting silently broken code.
-        let uak = validate_use_after_kill(init_body, &self.intern)
+        let uak = validate_use_after_kill(init_body, self.intern)
         if uak.len() > 0:
             // #2006: an error line with the build still green is a silent
             // fallback; the unit must not link.
@@ -2064,8 +2064,8 @@ impl Codegen:
                 if coerced == 0:
                     return 0
                 fields[llvm_idx] = coerced
-                return wl_const_named_struct(struct_ty, list_data_i64(&fields), llvm_field_count)
-            return wl_const_named_struct(struct_ty, list_data_i64(&fields), llvm_field_count)
+                return wl_const_named_struct(struct_ty, list_data_i64(fields), llvm_field_count)
+            return wl_const_named_struct(struct_ty, list_data_i64(fields), llvm_field_count)
         for fi in 0..source_field_count:
             let field_name = self.sema.type_extra[(te_start + fi * 3)]
             let field_tid: i32 = self.sema.type_extra[(te_start + fi * 3 + 1)]
@@ -2091,7 +2091,7 @@ impl Codegen:
         let live_idx = self.liveness_byte_indices.get(struct_ty) ?? -1
         if live_idx >= 0 and live_idx < llvm_field_count:
             fields[live_idx] = wl_const_int(wl_i8_type(self.context), 1, 0)
-        wl_const_named_struct(struct_ty, list_data_i64(&fields), llvm_field_count)
+        wl_const_named_struct(struct_ty, list_data_i64(fields), llvm_field_count)
 
     // Folds an integer expression. An arithmetic node's overflow is checked
     // at the node's own type, Sema's (D65), never at the destination's:
@@ -2274,7 +2274,7 @@ impl Codegen:
                 if elem_val == 0:
                     return 0
                 elems.push(elem_val)
-            return wl_const_array(elem_llvm, list_data_i64(&elems), elem_count)
+            return wl_const_array(elem_llvm, list_data_i64(elems), elem_count)
 
         if tk == TypeKind.TY_STRUCT:
             return self.try_eval_const_struct_llvm(cur, resolved as i32)
@@ -2523,7 +2523,7 @@ impl Codegen:
             let fields: List[i64] = List.new()
             fields.push(wl_const_bitcast(bytes_global, wl_ptr_type(self.context)))
             fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
-            let str_init = wl_const_named_struct(str_ty, list_data_i64(&fields), 2)
+            let str_init = wl_const_named_struct(str_ty, list_data_i64(fields), 2)
 
             let _ = self.define_module_binding_global(name_sym, str_ty, str_init, is_mut)
             return

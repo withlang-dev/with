@@ -60,7 +60,7 @@ fn cp_patched_text(path: &str, creates: bool, original: &str, hunks: &List[CpHun
     var shift: i32 = 0
     for hi in 0..hunks.len():
         let want: i32 = hunks[hi].old_start - 1 + shift
-        let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(&file, want, &hunks[hi].old)
+        let at = if hunks[hi].old.len() == 0: (if want < 0: 0 else: want) else: cp_locate(file, want, hunks[hi].old)
         if at < 0: return ("", f"hunk {hi + 1} of the patch does not apply to " ++ path)
         let rebuilt: List[str] = List.new()
         for i in 0..at: rebuilt.push(file[i])
@@ -87,10 +87,10 @@ fn conan_apply_patch(patch: &str, root: &str, read: fn(&str) -> str, write: fn(&
         if at_end or file_header:
             if path.len() > 0 and hunks.len() > 0:
                 let full = root ++ "/" ++ path
-                let original = if creates: "" else: read(&full)
-                let (text, problem) = cp_patched_text(path, creates, &original, &hunks)
+                let original = if creates: "" else: read(full)
+                let (text, problem) = cp_patched_text(path, creates, original, hunks)
                 if problem.len() > 0: return problem
-                if write(&full, &text) != 0: return "could not write " ++ path
+                if write(full, text) != 0: return "could not write " ++ path
             if at_end: break
             creates = cp_header_path(line) == "/dev/null"
             path = cp_header_path(lines[i + 1])

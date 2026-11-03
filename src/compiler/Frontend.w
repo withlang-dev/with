@@ -680,10 +680,10 @@ impl Zcu:
                 owner = i
         if owner < 0:
             return out
-        let text = libc_facade_select(out, self.pool, &self.decl_is_c_import, &claimed)
+        let text = libc_facade_select(out, self.pool, self.decl_is_c_import, claimed)
         if text.len() == 0:
             return out
-        self.splice_facade_text_frontend(out, &text, "<toolchain facade libc>", owner)
+        self.splice_facade_text_frontend(out, text, "<toolchain facade libc>", owner)
 
     // A facade's text parsed as its own synthetic file, owned by the module
     // of decl `owner`, like a `<c_import …>` translation.
@@ -728,14 +728,14 @@ impl Zcu:
                 let parts = entry.split("->")
                 let ctor = if parts.len() == 2: parts[0].trim() else: ""
                 let dtor = if parts.len() == 2: parts[1].trim() else: ""
-                let (found, ret, _) = facade_render_import_shape(out, self.pool, &self.decl_is_c_import, &ctor)
+                let (found, ret, _) = facade_render_import_shape(out, self.pool, self.decl_is_c_import, ctor)
                 if ctor.len() == 0 or dtor.len() == 0:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: owns: \"{entry}\" is not 'ctor -> dtor'; owns: is a deprecated spelling of a facade resource (§16.2b.3)", span))
                     continue
                 if not found:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: owns: \"{entry}\" names '{ctor}', which this c_import does not declare (§16.2b.13)", span))
                     continue
-                let rname = facade_owns_resource_name(&ctor)
+                let rname = facade_owns_resource_name(ctor)
                 text = text ++ f"    resource {rname} wraps {ret}\n        from {ctor}\n        drop {dtor}\n"
                 var w = Diagnostic.warn(f"c_import: owns: \"{entry}\" is a deprecated spelling of a facade resource; `{ctor}` produces a `{rname}` whose Drop calls `{dtor}` (§16.2b.3)", span)
                 w.add_help(f"write it in a facade: `c facade NAME:` / `resource {rname} wraps {ret}` / `from {ctor}` / `drop {dtor}`")
@@ -749,7 +749,7 @@ impl Zcu:
                 if fname.len() == 0:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" is not 'fn(index) -> ctor'; borrows: is a deprecated spelling of a facade lend (§16.2b.5)", span))
                     continue
-                let (found, _, _) = facade_render_import_shape(out, self.pool, &self.decl_is_c_import, &fname)
+                let (found, _, _) = facade_render_import_shape(out, self.pool, self.decl_is_c_import, fname)
                 if not found:
                     self.diagnostics.emit(Diagnostic.err(f"c_import: borrows: \"{entry}\" names '{fname}', which this c_import does not declare (§16.2b.13)", span))
                     continue
@@ -758,7 +758,7 @@ impl Zcu:
                 w.add_help(f"write it in a facade: `c facade NAME:` / `fn {fname}` / `lend`")
                 self.diagnostics.emit(w)
             if text.len() > 0:
-                out = self.splice_facade_text_frontend(out, &("c facade c_import_annotations:\n" ++ text), "<c_import annotations>", i)
+                out = self.splice_facade_text_frontend(out, ("c facade c_import_annotations:\n" ++ text), "<c_import annotations>", i)
         out
 
     // The names a program's facade block states: its resources, its
@@ -803,15 +803,15 @@ impl Zcu:
                 if out.kind(item as NodeId) != NodeKind.NK_FACADE_CONVENTION:
                     continue
                 let dotted = facade_profile_dotted(out, self.pool, item)
-                let profile = facade_profile_find(out, self.pool, &dotted)
+                let profile = facade_profile_find(out, self.pool, dotted)
                 if profile == 0:
-                    if self.resolve_module_path_frontend(&dotted, self.decl_source_dir_frontend(i)).len() > 0:
+                    if self.resolve_module_path_frontend(dotted, self.decl_source_dir_frontend(i)).len() > 0:
                         let span = Span { file: self.decl_source_file_id_frontend(i), start: out.get_start(item as NodeId), end: out.get_end(item as NodeId) }
                         var d = Diagnostic.err(f"use convention {dotted}: module '{dotted}' declares no convention profile '{dotted}' (§16.2b.12)", span)
                         d.add_help(f"a profile is the block `c convention {dotted}:` in the package it is named after; its rules are '<name>: drop *_unref', '<name>: from *_new', '<name>: fn *_get lend'")
                         self.diagnostics.emit(d)
                     continue
-                out = facade_profile_apply(out, self.pool, &self.decl_is_c_import, decl as i32, item, profile)
+                out = facade_profile_apply(out, self.pool, self.decl_is_c_import, decl as i32, item, profile)
         out
 
     // D51 §16.2b stage 4a: each `c facade` block's resources, rendered as
@@ -890,19 +890,19 @@ impl Zcu:
             // takes the import's origin: every rule that asks whether a
             // function is a c_import translation, and which library it
             // belongs to, answers for it as for the function it names.
-            let (aliases, origins) = facade_render_presentation_aliases(out, self.pool, decl as i32, &self.decl_is_c_import)
+            let (aliases, origins) = facade_render_presentation_aliases(out, self.pool, decl as i32, self.decl_is_c_import)
             if aliases.len() > 0:
                 let first = out.decl_count()
-                out = self.splice_facade_text_frontend(out, &aliases, "<facade " ++ facade_name ++ " presentations>", i)
+                out = self.splice_facade_text_frontend(out, aliases, "<facade " ++ facade_name ++ " presentations>", i)
                 for k in 0..origins.len(): self.adopt_decl_origin((first + k) as i32, origins[k])
-            let text = facade_render_block(out, self.pool, decl as i32, &self.decl_is_c_import)
+            let text = facade_render_block(out, self.pool, decl as i32, self.decl_is_c_import)
             if text.len() == 0:
                 continue
             // WITH_DUMP_FACADE=1: the rendered text, as the parser sees it — a
             // diagnostic at `<facade NAME>:line:col` points into this.
             if with_getenv_str("WITH_DUMP_FACADE").len() > 0:
                 eprint("<facade " ++ facade_name ++ ">\n" ++ text)
-            out = self.splice_facade_text_frontend(out, &text, "<facade " ++ facade_name ++ ">", i)
+            out = self.splice_facade_text_frontend(out, text, "<facade " ++ facade_name ++ ">", i)
         out
 
     fn c_import_cache_key_frontend(pool: &AstPool, decl: i32, header_spec: &str) -> str:
@@ -1999,14 +1999,14 @@ impl Zcu:
     mut fn new_module_sema(text: &str, pool: &AstPool) -> Sema:
         var sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
         sema.source_text = with_str_clone_ref(text)
-        sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+        sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
         sema.package_keys = self.package_key_map()
-        sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
-        sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
-        sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
-        sema.source_text_names = sema_clone_str_list(&self.source_text_names)
-        sema.source_texts = sema_clone_str_list(&self.source_texts)
-        sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
+        sema.decl_source_file_ids = sema_clone_i32_list(self.decl_source_file_ids)
+        sema.decl_is_c_import = sema_clone_i32_list(self.decl_is_c_import)
+        sema.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
+        sema.source_text_names = sema_clone_str_list(self.source_text_names)
+        sema.source_texts = sema_clone_str_list(self.source_texts)
+        sema.ci_omitted_symbols = sema_clone_str_str_hashmap(self.c_import_omitted_symbols)
         sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
         sema.runtime_available = (self.project_config.runtime_available) as i32
         sema.runtime_fiber_stack_size = self.project_config.runtime_fiber_stack_size
@@ -2020,7 +2020,7 @@ impl Zcu:
             sema.no_std = 1
         if self.project_config.alloc_mode:
             sema.alloc = 1
-        sema.init_module_graph(&self.last_resolved)
+        sema.init_module_graph(self.last_resolved)
         sema
 
     mut fn compile_source_frontend_mode(text: &str, name: &str, file_id: i32, implicit_main_mode: i32) -> AstPool:
@@ -2162,7 +2162,7 @@ impl Zcu:
             let pending_texts = move self.pending_iface_texts
             self.pending_iface_paths = frontend_new_list_str()
             self.pending_iface_texts = frontend_new_list_str()
-            pool = self.merge_interface_sections_on_demand(pool, &pending_paths, &pending_texts, root_local_decl_count)
+            pool = self.merge_interface_sections_on_demand(pool, pending_paths, pending_texts, root_local_decl_count)
         let t_cimport = runtime_clock_nanos()
         self.trace_c_import_cache = self.read_trace_c_import_cache_frontend()
         pool = self.expand_c_imports_frontend(pool)
@@ -2197,16 +2197,16 @@ impl Zcu:
                 runtime_eprint("[frontend] compile_source:comptime-transform")
             var pre_sema = self.configure_tracked_input_sema(Sema.init(self.pool, move self.diagnostics, pool))
             pre_sema.source_text = with_str_clone_ref(text)
-            pre_sema.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+            pre_sema.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
             pre_sema.package_keys = self.package_key_map()
-            pre_sema.decl_source_file_ids = sema_clone_i32_list(&self.decl_source_file_ids)
-            pre_sema.decl_is_c_import = sema_clone_i32_list(&self.decl_is_c_import)
-            pre_sema.source_text_file_ids = sema_clone_i32_list(&self.source_text_file_ids)
-            pre_sema.source_text_names = sema_clone_str_list(&self.source_text_names)
-            pre_sema.source_texts = sema_clone_str_list(&self.source_texts)
+            pre_sema.decl_source_file_ids = sema_clone_i32_list(self.decl_source_file_ids)
+            pre_sema.decl_is_c_import = sema_clone_i32_list(self.decl_is_c_import)
+            pre_sema.source_text_file_ids = sema_clone_i32_list(self.source_text_file_ids)
+            pre_sema.source_text_names = sema_clone_str_list(self.source_text_names)
+            pre_sema.source_texts = sema_clone_str_list(self.source_texts)
             // PR#713: clone — the same map is handed to pre_sema AND sema below;
             // a shared header is a teardown double-free.
-            pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(&self.c_import_omitted_symbols)
+            pre_sema.ci_omitted_symbols = sema_clone_str_str_hashmap(self.c_import_omitted_symbols)
             pre_sema.tool_mode_entry_path = frontend_owned_text(self.tool_mode_entry_path)
             pre_sema.runtime_available = (self.project_config.runtime_available) as i32
             // The pre-sema collects every declaration the comptime transform
@@ -2226,7 +2226,7 @@ impl Zcu:
             pre_sema.overflow_mode = self.project_config.overflow_mode
             let profile_comptime = runtime_getenv("WITH_PROFILE").len() > 0
             let t_prepare = runtime_clock_nanos()
-            pre_sema.init_module_graph(&self.last_resolved)
+            pre_sema.init_module_graph(self.last_resolved)
             pre_sema.prepare_for_comptime_transform()
             if profile_comptime:
                 let prepare_ns = runtime_clock_nanos() - t_prepare
@@ -2241,15 +2241,15 @@ impl Zcu:
                 let transform_ns = runtime_clock_nanos() - t_transform
                 runtime_eprint(f"[profile] frontend.comptime.transform  {transform_ns / 1000000}.{(transform_ns % 1000000) / 1000} ms")
             self.diagnostics = move pre_sema.diags
-            self.decl_source_paths = sema_clone_str_list(&pre_sema.decl_source_paths)
-            self.decl_source_file_ids = sema_clone_i32_list(&pre_sema.decl_source_file_ids)
-            self.decl_is_c_import = sema_clone_i32_list(&pre_sema.decl_is_c_import)
-            self.source_text_file_ids = sema_clone_i32_list(&pre_sema.source_text_file_ids)
-            self.source_text_names = sema_clone_str_list(&pre_sema.source_text_names)
-            self.source_texts = sema_clone_str_list(&pre_sema.source_texts)
-            self.c_import_omitted_symbols = sema_clone_str_str_hashmap(&pre_sema.ci_omitted_symbols)
+            self.decl_source_paths = sema_clone_str_list(pre_sema.decl_source_paths)
+            self.decl_source_file_ids = sema_clone_i32_list(pre_sema.decl_source_file_ids)
+            self.decl_is_c_import = sema_clone_i32_list(pre_sema.decl_is_c_import)
+            self.source_text_file_ids = sema_clone_i32_list(pre_sema.source_text_file_ids)
+            self.source_text_names = sema_clone_str_list(pre_sema.source_text_names)
+            self.source_texts = sema_clone_str_list(pre_sema.source_texts)
+            self.c_import_omitted_symbols = sema_clone_str_str_hashmap(pre_sema.ci_omitted_symbols)
             var tracked_paths = move self.tracked_input_paths
-            self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &pre_sema.tracked_input_paths)
+            self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, pre_sema.tracked_input_paths)
             if self.diagnostics.has_errors() and self.analysis_partial_semantics == 0:
                 self.render_all_diagnostics_frontend()
                 self.set_typed_snapshot("", AstPool.new())
@@ -2273,7 +2273,7 @@ impl Zcu:
             let text_name = self.source_text_names[si]
             if text_name.starts_with("<c_import ") or text_name.starts_with("<facade ") or text_name.starts_with("<toolchain facade "):
                 generated_files.push(self.source_text_file_ids[si])
-        pool.resolve_receiver_field_names(self.pool, &self.decl_is_c_import, &generated_files)
+        pool.resolve_receiver_field_names(self.pool, self.decl_is_c_import, generated_files)
         // Each impl's own copy of its trait's default method bodies.
         pool.clone_default_method_bodies()
 
@@ -2302,7 +2302,7 @@ impl Zcu:
             self.diagnostics.truncate(reported)
         let reported_before_check = self.diagnostics.count()
         var sema = self.new_module_sema(text, pool)
-        sema.field_decisions = sema_clone_i32_list(&field_decisions)
+        sema.field_decisions = sema_clone_i32_list(field_decisions)
         sema.check_module()
         // D93 (§4.3c rule 1): a binding whose literal takes its type from
         // its uses makes the program one that is checked twice, as D89's
@@ -2324,8 +2324,8 @@ impl Zcu:
             self.diagnostics = move sema.diags
             self.diagnostics.truncate(reported_before_check)
             sema = self.new_module_sema(text, pool)
-            sema.field_decisions = sema_clone_i32_list(&field_decisions)
-            sema.literal_decisions = sema_clone_i32_list(&literal_decisions)
+            sema.field_decisions = sema_clone_i32_list(field_decisions)
+            sema.literal_decisions = sema_clone_i32_list(literal_decisions)
             sema.check_module()
             literal_rounds += 1
         if do_profile:
@@ -2390,7 +2390,7 @@ impl Zcu:
                 continue
 
             let src = module_source_read(path)
-            if self.runtime_source_is_refused(path, &src):
+            if self.runtime_source_is_refused(path, src):
                 refused_runtime.push(frontend_owned_text(path))
                 continue
             let text = frontend_normalize_source_text(src.text)
@@ -2427,7 +2427,7 @@ impl Zcu:
         let base = out.decl_count()
         let t_start = runtime_clock_nanos()
         self.iface_mentioned = HashMap.new()
-        self.note_interface_mentions(&out, 0, out.node_count())
+        self.note_interface_mentions(out, 0, out.node_count())
         // A call the compiler emits on its own, which no source mentions:
         // main's `?` exit (§10.2, D190). Seeded here so its interface line
         // is merged and Sema resolves the callee it names (D65).
@@ -2720,7 +2720,7 @@ impl Zcu:
         self.diagnostics = move parser.diags
         self.add_source_text_mapping(chunk_file_id, path, chunk)
         self.append_decl_source_paths(out.decl_count() - before_decls, path, chunk_file_id)
-        self.note_interface_mentions(&out, before_nodes, out.node_count())
+        self.note_interface_mentions(out, before_nodes, out.node_count())
         out
 
     fn interface_line_demanded(kind: i32, name: &str) -> bool:
@@ -3537,7 +3537,7 @@ impl Zcu:
 
     mut fn parse_imported_file_frontend(path: &str, target_pool: AstPool) -> AstPool:
         let src = module_source_read(path)
-        if self.runtime_source_is_refused(path, &src):
+        if self.runtime_source_is_refused(path, src):
             self.note_refused_runtime_source(path)
             return target_pool
         let full_text = frontend_normalize_source_text(src.text)

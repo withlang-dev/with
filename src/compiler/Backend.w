@@ -45,9 +45,9 @@ impl Zcu:
         // Cloned, never moved (here and at the other Codegen seams): the root
         // file's warnings render after codegen (#1447).
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
-        cg.add_bundle_prefixes(&self.link_bundle_prefixes)
+        cg.add_bundle_prefixes(self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         cg.module_object_mode = (module_object_mode) as i32
         if not debug_info:
@@ -68,12 +68,12 @@ impl Zcu:
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
-        self.last_bundle_unlowered_globals = sema_clone_str_list(&cg.bundle_unlowered_globals)
-        self.last_bundle_carried_paths = sema_clone_str_list(&cg.bundle_carried_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, cg.tracked_input_paths)
+        self.last_bundle_unlowered_globals = sema_clone_str_list(cg.bundle_unlowered_globals)
+        self.last_bundle_carried_paths = sema_clone_str_list(cg.bundle_carried_paths)
         if result != 0:
             self.last_sema = cg.take_sema()
-            runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))
+            runtime_eprint(codegen_failure_message("error: code generation failed", cg.codegen_error_detail))
             return 1
         if do_profile:
             let codegen_ns = runtime_clock_nanos() - t_codegen
@@ -138,9 +138,9 @@ impl Zcu:
             var cg = Codegen.init_with_opt_and_intern(f"with_module_u{k}", opt_level, backend_intern, move self.last_sema)
             cg.source_file = with_str_clone_ref(self.current_source_path)
             cg.source_text = with_str_clone_ref(self.current_source_text)
-            cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+            cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
             cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
-            cg.add_bundle_prefixes(&self.link_bundle_prefixes)
+            cg.add_bundle_prefixes(self.link_bundle_prefixes)
             cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
             cg.module_object_mode = 0
             if not debug_info:
@@ -159,10 +159,10 @@ impl Zcu:
             if do_profile:
                 runtime_eprint(f"[profile] llvm.unit{k}.symbols_added {cg.intern.symbol_count() - unit_symbols_before}")
             var tracked = move self.tracked_input_paths
-            self.tracked_input_paths = tracked_input_merge_unique(move tracked, &cg.tracked_input_paths)
+            self.tracked_input_paths = tracked_input_merge_unique(move tracked, cg.tracked_input_paths)
             if rc != 0:
                 self.last_sema = cg.take_sema()
-                runtime_eprint(codegen_failure_message(f"error: code generation failed for unit {k}", &cg.codegen_error_detail))
+                runtime_eprint(codegen_failure_message(f"error: code generation failed for unit {k}", cg.codegen_error_detail))
                 let _ = pipeline.finish()
                 return 1
             codegen_units_apply_global_ownership(cg.llmod, k)
@@ -207,9 +207,9 @@ impl Zcu:
         var cg = Codegen.init_with_opt_and_intern("with_module", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
-        cg.add_bundle_prefixes(&self.link_bundle_prefixes)
+        cg.add_bundle_prefixes(self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         if self.pool.symbol_count() <= 3 or sema_symbols <= 3 or backend_debug_pool_flow_enabled():
             runtime_eprint(f"[backend] zcu.pool symbols={self.pool.symbol_count()}")
@@ -221,10 +221,10 @@ impl Zcu:
         var backend_mir = move self.last_mir_module
         let result = cg.gen_module_from_mir(&raw const backend_mir as i64, backend_pool)
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, &cg.tracked_input_paths)
+        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, cg.tracked_input_paths)
         self.last_sema = cg.take_sema()
         if result != 0:
-            runtime_eprint(codegen_failure_message("error: code generation failed", &cg.codegen_error_detail))
+            runtime_eprint(codegen_failure_message("error: code generation failed", cg.codegen_error_detail))
             return false
         cg.print_ir()
         true
@@ -251,9 +251,9 @@ impl Zcu:
         var cg = Codegen.init_with_opt_and_intern("with_analysis", opt_level, backend_intern, move self.last_sema)
         cg.source_file = with_str_clone_ref(self.current_source_path)
         cg.source_text = with_str_clone_ref(self.current_source_text)
-        cg.decl_source_paths = sema_clone_str_list(&self.decl_source_paths)
+        cg.decl_source_paths = sema_clone_str_list(self.decl_source_paths)
         cg.current_decl_source_file = with_str_clone_ref(self.current_source_path)
-        cg.add_bundle_prefixes(&self.link_bundle_prefixes)
+        cg.add_bundle_prefixes(self.link_bundle_prefixes)
         cg.bundle_corpus = with_str_clone_ref(self.bundle_corpus)
         cg.enable_analysis(query)
         var backend_mir = move self.last_mir_module

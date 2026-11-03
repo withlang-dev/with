@@ -863,7 +863,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
             let local_ty = body.local_type_ids[li]
             if suspend_type_is_no_await_guard(sema, local_ty):
                 let site = suspend_site_span(ast, body, bb)
-                if not suspend_reported_site(&reported_starts, &reported_ends, &reported_locals, &reported_origins, site, li, li):
+                if not suspend_reported_site(reported_starts, reported_ends, reported_locals, reported_origins, site, li, li):
                     reported_starts.push(site.start)
                     reported_ends.push(site.end)
                     reported_locals.push(li)
@@ -887,7 +887,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
                     continue
                 let guard_local = guard_locals[gi]
                 let site2 = suspend_site_span(ast, body, bb)
-                if not suspend_reported_site(&reported_starts, &reported_ends, &reported_locals, &reported_origins, site2, vi, guard_local):
+                if not suspend_reported_site(reported_starts, reported_ends, reported_locals, reported_origins, site2, vi, guard_local):
                     reported_starts.push(site2.start)
                     reported_ends.push(site2.end)
                     reported_locals.push(vi)
@@ -909,7 +909,7 @@ fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMa
         if suspend_term_may_suspend(body, body_by_fn, body_may_suspend, bb) == 0:
             continue
         let site = suspend_no_suspend_site_span(ast, body, bb, no_suspend_node)
-        if suspend_reported_no_suspend_site(&reported_starts, &reported_ends, &reported_nodes, site, no_suspend_node):
+        if suspend_reported_no_suspend_site(reported_starts, reported_ends, reported_nodes, site, no_suspend_node):
             continue
         reported_starts.push(site.start)
         reported_ends.push(site.end)

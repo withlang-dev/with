@@ -2076,8 +2076,8 @@ fn mir_elaborate_dead_drops(body: MirBody) -> MirBody:
             if body.stmt_kind(stmt_id) == StmtKind.Drop:
                 if state.place(blocks.keys, body.stmt_data0(stmt_id)) == MirDropState.Moved:
                     to_nop.push(stmt_id)
-            state.transfer_stmt(blocks.keys, &body, stmt_id)
-        state.transfer_term(blocks.keys, &body, bb)
+            state.transfer_stmt(blocks.keys, body, stmt_id)
+        state.transfer_term(blocks.keys, body, bb)
     for i in 0..to_nop.len():
         body.stmt_kinds[to_nop[i]] = StmtKind.Nop
     body
@@ -2759,10 +2759,10 @@ fn validate_read_after_drop(body: &MirBody) -> str:
         for bb in 0..block_count:
             if reached[bb] == 0:
                 continue
-            var state = mir_dropped_input(&out, &pred_start, &pred_list, bb, width)
+            var state = mir_dropped_input(out, pred_start, pred_list, bb, width)
             for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
-                state.transfer_stmt(body, &slot, si)
-            state.transfer_term(body, &slot, bb)
+                state.transfer_stmt(body, slot, si)
+            state.transfer_term(body, slot, bb)
             for i in 0..width:
                 if out[bb * width + i] != state.flags[i]:
                     out[bb * width + i] = state.flags[i]
@@ -2770,11 +2770,11 @@ fn validate_read_after_drop(body: &MirBody) -> str:
     for bb in 0..block_count:
         if reached[bb] == 0:
             continue
-        var state = mir_dropped_input(&out, &pred_start, &pred_list, bb, width)
+        var state = mir_dropped_input(out, pred_start, pred_list, bb, width)
         for si in body.bb_stmt_starts[bb]..body.bb_stmt_starts[bb] + body.bb_stmt_counts[bb]:
             if body.stmt_kind(si) == StmtKind.Assign:
                 for local in mir_rvalue_read_locals(body, body.stmt_data1(si)):
-                    if state.has(&slot, local):
+                    if state.has(slot, local):
                         return f"fn sym{body.fn_sym} stmt{si} span={body.stmt_spans[si]}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
                 for op in mir_rvalue_operands(body, body.stmt_data1(si)):
                     if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE):
@@ -2782,19 +2782,19 @@ fn validate_read_after_drop(body: &MirBody) -> str:
                         if mir_place_starts_with_deref(body, p):
                             let base = body.place_locals[p]
                             let borrowed = if base >= 0 and base < local_count: ref_target[base] else: -1
-                            if state.has(&slot, borrowed):
+                            if state.has(slot, borrowed):
                                 return f"fn sym{body.fn_sym} stmt{si} span={body.stmt_spans[si]}: read of _{borrowed} after every path reaching it dropped _{borrowed}: the value it reads is freed (§2.5.1)"
-            state.transfer_stmt(body, &slot, si)
+            state.transfer_stmt(body, slot, si)
         for op in mir_term_operands(body, bb):
             let local = mir_local_of_operand(body, op)
-            if state.has(&slot, local):
+            if state.has(slot, local):
                 return f"fn sym{body.fn_sym} bb{bb}: read of _{local} after every path reaching it dropped _{local}: the value it reads is freed (§2.5.1)"
             if op >= 0 and op < body.operand_kinds.len() and (body.operand_kinds[op] == OperandKind.OK_COPY or body.operand_kinds[op] == OperandKind.OK_MOVE):
                 let p = body.operand_d0[op]
                 if mir_place_starts_with_deref(body, p):
                     let base = body.place_locals[p]
                     let borrowed = if base >= 0 and base < local_count: ref_target[base] else: -1
-                    if state.has(&slot, borrowed):
+                    if state.has(slot, borrowed):
                         return f"fn sym{body.fn_sym} bb{bb}: read of _{borrowed} after every path reaching it dropped _{borrowed}: the value it reads is freed (§2.5.1)"
     ""
 

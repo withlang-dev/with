@@ -358,7 +358,7 @@ fn uat_darwin_screen_locked(scratch: &str) -> bool:
     argv.push("-n")
     argv.push("Root")
     argv.push("-d1")
-    if uat_probe_capture(&argv, scratch) != 0: return false
+    if uat_probe_capture(argv, scratch) != 0: return false
     uat_read_text(scratch ++ "/probe.stdout").contains("\"CGSSessionScreenIsLocked\"=Yes")
 
 // "" when the requirement is met, else the reason the scenario skips.

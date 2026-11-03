@@ -51,7 +51,7 @@ fn bundle_fingerprint_text(model: &BundleInterfaceModel) -> str:
             if end > start:
                 lines.push(with_str_clone_ref(rows.slice(start, end)))
             start = end + 1
-    let sorted = bf_sorted_lines(&lines)
+    let sorted = bf_sorted_lines(lines)
     var out = "bundle-fingerprint\tv1\ttarget:" ++ target_spec_resolved_name() ++ "\tcorpus:" ++ model.corpus ++ "\n"
     for li in 0..sorted.len():
         out = out ++ sorted[li] ++ "\n"

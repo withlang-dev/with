@@ -216,7 +216,7 @@ fn build_graph_assemble_to_object(root: &str, target: &BuildGraphTarget) -> i32:
     // directory, which need not be the root, so it reads a copy whose
     // operands are resolved; the object holds the bytes, not the names.
     let source_text = build_graph_rt_read_file(source_path)
-    let resolved_text = build_graph_asm_resolve_operands(root, &source_text)
+    let resolved_text = build_graph_asm_resolve_operands(root, source_text)
     var assembled_path = source_path
     if resolved_text != source_text:
         assembled_path = output_path ++ ".resolved.s"
@@ -634,7 +634,7 @@ fn build_graph_exec_target_capture(root: &str, target: &BuildGraphTarget, argv: 
     let timeout_ms = build_graph_target_timeout_ms(target)
     let saved_env = build_graph_apply_target_env(target)
     let rc = if target.cwd.len() > 0: build_graph_rt_exec_argv_capture_cwd(argv, stdout_path, stderr_path, timeout_ms, build_graph_resolve_project_path(root, target.cwd)) else: build_graph_rt_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
-    build_graph_restore_target_env(&saved_env)
+    build_graph_restore_target_env(saved_env)
     rc
 
 // #965: every output a target declares exists once it succeeds: its output

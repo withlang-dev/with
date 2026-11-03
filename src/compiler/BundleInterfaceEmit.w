@@ -696,7 +696,7 @@ impl BundleEmitter:
             return ""
         let written_clause = self.written_writes_clause(sema, node)
         if not ast.fn_decl_body_is_interface(node):
-            self.check_declared_global_writes(sema, sig, &declared, full, written_clause.len() > 0)
+            self.check_declared_global_writes(sema, sig, declared, full, written_clause.len() > 0)
             if self.failed:
                 return ""
         var writes_row = ""
@@ -812,7 +812,7 @@ impl BundleEmitter:
             for ei in 0..entries.len():
                 if not out.contains(entries[ei]):
                     out.push(with_str_clone_ref(entries[ei]))
-        bx_sorted_strings(&out)
+        bx_sorted_strings(out)
 
     // The clause as its author wrote it (`writes COUNTER, other.TOTAL`), in
     // source order, "" for none: the `.wi` prints exactly that spelling.
@@ -874,7 +874,7 @@ impl BundleEmitter:
     // The refusal offers the literal fix: "add 'writes COUNTER' to bump's
     // declaration", or the name to append to an existing clause.
     mut fn check_declared_global_writes(sema: &Sema, sig: i32, declared: &List[str], fn_name: &str, has_clause: bool):
-        let written = sema.fn_global_effects(sig, &self.call_index)
+        let written = sema.fn_global_effects(sig, self.call_index)
         var actual: List[str] = List.new()
         for wi in 0..written.len():
             let sym = written[wi]
@@ -885,7 +885,7 @@ impl BundleEmitter:
                 // corpus global, or a global of a module compiled from source
                 // beside the bundle — named, since a consumer can view it.
                 if not self.corpus_global_names.contains(name):
-                    self.warnings.push(self.context ++ ": writes `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ "), a global outside this bundle that is no bundle export: the write contract covers only exported globals (§21.1 rule 1)")
+                    self.warnings.push(self.context ++ ": writes `" ++ name ++ "` (" ++ sema.fn_global_write_chain(sig, sym, self.call_index) ++ "), a global outside this bundle that is no bundle export: the write contract covers only exported globals (§21.1 rule 1)")
                 continue
             for ei in 0..entries.len():
                 if actual.contains(entries[ei]):
@@ -894,7 +894,7 @@ impl BundleEmitter:
                 if not declared.contains(entries[ei]):
                     let fix = if has_clause: "add '" ++ name ++ "' to " ++ fn_name ++ "'s `writes` clause" else: "add 'writes " ++ name ++ "' to " ++ fn_name ++ "'s declaration"
                     let what = if self.origin_global_names.contains(name) and not self.global_is_pub_export(name): "global `" ++ name ++ "`, an origin of an exported function's returned view," else: "exported global `" ++ name ++ "`"
-                    self.refuse("writes " ++ what ++ " (" ++ sema.fn_global_write_chain(sig, sym, &self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rules 1 and 6, D39, D79); " ++ fix)
+                    self.refuse("writes " ++ what ++ " (" ++ sema.fn_global_write_chain(sig, sym, self.call_index) ++ ") but its declaration does not say so: a bundle function's global writes are a declared, checked contract, and no clause declares none (§21.1 rules 1 and 6, D39, D79); " ++ fix)
         for di in 0..declared.len():
             if not actual.contains(declared[di]):
                 self.warnings.push(self.context ++ ": declares a write of `" ++ declared[di] ++ "` its body never makes (a conservative contract: every caller treats it as written)")
@@ -1017,7 +1017,7 @@ impl BundleEmitter:
                 let mnode = ast.get_decl(mdi) as i32
                 method_names.push(with_str_clone_ref(sema.pool_resolve(sema.fn_decl_semantic_symbol_at(mnode, ast.get_data0(mnode), mdi))))
                 method_decls.push(mdi)
-            let ordered = bx_sorted_strings(&method_names)
+            let ordered = bx_sorted_strings(method_names)
             var body = ""
             var rows = ""
             var method_count = 0
@@ -1365,7 +1365,7 @@ impl BundleEmitter:
 fn bundle_interface_build(sema: &Sema, corpus: &str, unlowered_globals: &List[str]) -> BundleInterfaceModel:
     var em = bx_new_emitter(corpus, unlowered_globals)
     em.walk(sema)
-    let ordered = bx_sorted_strings(&em.modules)
+    let ordered = bx_sorted_strings(em.modules)
     var sources: List[str] = List.new()
     for oi in 0..ordered.len():
         for mi in 0..em.modules.len():
@@ -1393,7 +1393,7 @@ fn bx_module_export_order(model: &BundleInterfaceModel, mod_path: &str) -> List[
             let e = model.exports[ei]
             if e.kind == kind and e.mod_path == mod_path:
                 names.push(with_str_clone_ref(e.name))
-        let sorted = bx_sorted_strings(&names)
+        let sorted = bx_sorted_strings(names)
         for si in 0..sorted.len():
             for ei in 0..model.exports.len() as i32:
                 let e = model.exports[ei]

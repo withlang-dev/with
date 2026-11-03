@@ -1266,7 +1266,7 @@ impl Sema:
                     self.emit_error("opaque types cannot be stored in struct fields; use a pointer or reference", f_type_node)
                 if is_generic_decl and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32):
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral structs", f_type_node, f_tid as i32, node)
-                self.check_duplicate_field(name, &field_names, f_name, f_type_node)
+                self.check_duplicate_field(name, field_names, f_name, f_type_node)
                 field_names.push(f_name)
                 field_tids.push(f_tid as i32)
                 field_defaults.push(f_default)
@@ -1282,7 +1282,7 @@ impl Sema:
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
-            self.record_pub_fields(node, extra_start, field_count, &field_names)
+            self.record_pub_fields(node, extra_start, field_count, field_names)
             if type_decl_is_bitpacked(packed_kind) != 0:
                 self.bitpacked_types.insert(tid as i32, 1)
             if type_decl_is_packed(packed_kind) != 0:
@@ -1322,7 +1322,7 @@ impl Sema:
                 epos = epos + 1
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
-                self.check_duplicate_variant(name, &variant_names, v_name, node)
+                self.check_duplicate_variant(name, variant_names, v_name, node)
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
                 for pi in 0..payload_count:
@@ -1386,7 +1386,7 @@ impl Sema:
                 epos = epos + 1
                 let payload_count = self.ast.get_extra(epos)
                 epos = epos + 1
-                self.check_duplicate_variant(name, &variant_names, v_name, node)
+                self.check_duplicate_variant(name, variant_names, v_name, node)
                 variant_names.push(v_name)
                 payload_counts.push(payload_count)
                 var disc_value: i64 = (doubling) as i32
@@ -1525,7 +1525,7 @@ impl Sema:
                     self.emit_error("opaque types cannot be stored in union fields; use a pointer or reference", f_type_node)
                 if is_generic_decl and not is_ephemeral and f_tid != 0 and self.type_is_ephemeral_value(f_tid as i32):
                     self.emit_ephemeral_storage_error("ephemeral values cannot be stored in non-ephemeral unions", f_type_node, f_tid as i32, node)
-                self.check_duplicate_field(name, &field_names, f_name, f_type_node)
+                self.check_duplicate_field(name, field_names, f_name, f_type_node)
                 field_names.push(f_name)
                 field_tids.push(f_tid as i32)
                 field_defaults.push(f_default)
@@ -1541,7 +1541,7 @@ impl Sema:
             let tid = self.add_type(TypeKind.TY_STRUCT, name, te_start, field_count)
             self.record_named_type_with_pub(name, tid as i32, decl_is_pub, node)
             self.record_type_decl_tid(node, tid as i32)
-            self.record_pub_fields(node, extra_start, field_count, &field_names)
+            self.record_pub_fields(node, extra_start, field_count, field_names)
 
         if self.ast.is_must_use_type_node(node):
             self.must_use_types.insert(name, 1)
@@ -1966,7 +1966,7 @@ impl Sema:
     mut fn generator_body_fn_type(yield_ty: i32) -> i32:
         let params: List[i32] = List.new()
         params.push(yield_ty)
-        self.ensure_fn_type(&params, 1, self.ty_bool) as i32
+        self.ensure_fn_type(params, 1, self.ty_bool) as i32
 
     mut fn mark_generator_state_ephemeral(state_tid: i32):
         if state_tid <= 0:
@@ -2976,7 +2976,7 @@ impl Sema:
         self.generic_subst_type_ids = List.new()
         if impl_type_tid != 0:
             self.named_types.insert(self.syms.self_type, impl_type_tid)
-        self.install_trait_default_type_args(trait_sym, impl_node, &saved_subst_syms, &saved_subst_tys)
+        self.install_trait_default_type_args(trait_sym, impl_node, saved_subst_syms, saved_subst_tys)
         let resolved = self.resolve_type_expr(type_node) as i32
         if impl_type_tid != 0:
             if saved_self != 0:
