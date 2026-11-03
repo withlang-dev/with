@@ -1114,6 +1114,11 @@ type Sema {
     // standalone constructors, resolved to std's `iter_ctor_*`: a static
     // call, so MIR passes no receiver.
     iter_ctor_call_nodes: HashMap[i32, i32],
+    // §14.10 (#2956): a select await arm whose expression is not a Task
+    // (`rx.recv()`) runs as its own fiber, as an async block whose body is
+    // the expression; keyed by the arm's expression node, the Task type the
+    // select races.
+    select_arm_spawn_types: HashMap[i32, i32],
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
@@ -3668,6 +3673,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         pipeline_implicit_iter: HashMap.new(),
         implicit_iter_args: HashMap.new(),
         iter_ctor_call_nodes: HashMap.new(),
+        select_arm_spawn_types: HashMap.new(),
         derives_assumed: HashMap.new(),
         recursion_open_sym: 0,
         recursion_inferred_type: 0,

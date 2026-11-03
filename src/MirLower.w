@@ -16769,7 +16769,12 @@ impl MirBuilder:
         self.bind_alias_place(sym, deref, source.value_ty)
 
     mut fn prepare_anonymous_body(node: i32, ty: i32, is_async: bool) -> i32:
-        let body_node = self.ast.get_data0(node)
+        self.prepare_anonymous_body_of(node, self.ast.get_data0(node), ty, is_async)
+
+    // The body is `body_node`: the closure's or async block's own (d0), or,
+    // for a select await arm spawned as a fiber (§14.10, #2956), the arm's
+    // expression itself, keyed by that node.
+    mut fn prepare_anonymous_body_of(node: i32, body_node: i32, ty: i32, is_async: bool) -> i32:
         let body_sym = self.pool.intern(f"$anonymous${self.body.fn_sym}${node}")
         let captures: List[i32] = List.new()
         if is_async:
@@ -16863,6 +16868,19 @@ impl MirBuilder:
         while finished.anonymous_bodies.len() > 0:
             self.anonymous_bodies.push(finished.anonymous_bodies.pop().unwrap())
         body_sym
+
+    // A Task of `body_node` run as its own fiber: an async block's body, or
+    // a select await arm's expression (§14.10, #2956). The concrete body is
+    // retained under `node`; codegen spawns the fiber from its constant.
+    mut fn lower_async_body(node: i32, body_node: i32, ab_ty: i32) -> i32:
+        let body_sym = self.prepare_anonymous_body_of(node, body_node, ab_ty, true)
+        let ab_tmp = self.new_temp(ab_ty)
+        let ab_place = self.place_for_local(ab_tmp)
+        let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, body_sym, 0, ab_ty)
+        let ab_op = self.body.new_operand(OperandKind.OK_CONSTANT, ab_const)
+        let ab_rv = self.body.new_rvalue(RvalueKind.RK_USE, ab_op, 0, 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, ab_place, ab_rv, self.ast.get_start(node))
+        self.body.new_operand(OperandKind.OK_COPY, ab_place)
 
     mut fn lower_closure(_captured_start: i32, _captured_count: i32, _params_start: i32, _params_count: i32, node: i32) -> i32:
         let ty = self.expr_type(node)
@@ -18360,18 +18378,10 @@ impl MirBuilder:
             return body_result
 
         if kind == NodeKind.NK_ASYNC_BLOCK:
-            // Retain the concrete body; codegen handles the fiber spawn.
             let ab_ty = self.expr_type(node)
             if ab_ty == 0:
                 return self.unit_operand()
-            let body_sym = self.prepare_anonymous_body(node, ab_ty, true)
-            let ab_tmp = self.new_temp(ab_ty)
-            let ab_place = self.place_for_local(ab_tmp)
-            let ab_const = self.body.new_const(ConstKind.CK_ASYNC_BLOCK, node, body_sym, 0, ab_ty)
-            let ab_op = self.body.new_operand(OperandKind.OK_CONSTANT, ab_const)
-            let ab_rv = self.body.new_rvalue(RvalueKind.RK_USE, ab_op, 0, 0)
-            self.body.push_stmt(self.cur_bb, StmtKind.Assign, ab_place, ab_rv, self.ast.get_start(node))
-            return self.body.new_operand(OperandKind.OK_COPY, ab_place)
+            return self.lower_async_body(node, self.ast.get_data0(node), ab_ty)
 
         if kind == NodeKind.NK_SELECT_AWAIT:
             let extra_start = self.ast.get_data0(node)
@@ -18387,6 +18397,15 @@ impl MirBuilder:
             var sel_owns: List[bool] = List.new()
             for ai in 0..arm_count:
                 let task_node = self.ast.get_extra(extra_start + ai * 3 + 1)
+                // §14.10 (#2956): an arm expression that is not a Task runs
+                // as its own fiber, an async block whose body is the
+                // expression; the select then owns that Task like any other
+                // temporary.
+                if self.sema.select_arm_spawn_types.contains(task_node):
+                    let spawn_ty: i32 = self.sema.select_arm_spawn_types.get(task_node).unwrap()
+                    sel_owns.push(true)
+                    task_ops.push(self.lower_async_body(task_node, task_node, spawn_ty))
+                    continue
                 sel_owns.push(self.await_task_owns_result(task_node))
                 self.cancel_scheduled_value_drop_for_receiver_expr(task_node)
                 let task_op = self.lower_expr(task_node)
@@ -18448,7 +18467,7 @@ impl MirBuilder:
                 self.body.set_call_intrinsic(await_call_id, MirIntrinsic.FIBER_AWAIT)
                 self.body.set_call_ast_node(await_call_id, node)
                 var await_result_ty = self.expr_type(task_node)
-                if await_result_ty != 0:
+                if await_result_ty != 0 and not self.sema.select_arm_spawn_types.contains(task_node):
                     await_result_ty = self.sema.unwrap_task_type(await_result_ty as TypeId) as i32
                 if await_result_ty == 0:
                     await_result_ty = self.expr_type(node)
