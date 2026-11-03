@@ -12702,9 +12702,22 @@ impl Sema:
                 let task = self.ast.get_extra(extra_start + ai * 3 + 1)
                 let arm_body = self.ast.get_extra(extra_start + ai * 3 + 2)
                 let task_ty = self.check_expr(task)
+                var arm_result_ty = self.unwrap_task_type(task_ty)
                 if self.expr_is_awaitable_task_value(task) == false:
-                    self.emit_error("select await arm requires a Task value", task)
-                let arm_result_ty = self.unwrap_task_type(task_ty)
+                    if task_ty != 0 and not self.type_is_task(task_ty as i32):
+                        // §14.10 (#2956): an arm races any async expression.
+                        // One that is not already a Task (`rx.recv()`) runs
+                        // as its own fiber, as an async block whose body is
+                        // the expression does; its value is the arm's binding.
+                        self.record_global_concurrency_evidence(task, "select await arm")
+                        self.note_allocation_site(task, AllocConstructKind.ASYNC_FIBER, false, 0)
+                        let spawn_args: List[i32] = [task_ty as i32]
+                        let spawn_task_ty = self.ensure_generic_inst_type(self.syms.task, spawn_args, 1)
+                        if spawn_task_ty != 0:
+                            self.select_arm_spawn_types.insert(task, spawn_task_ty as i32)
+                        arm_result_ty = task_ty
+                    else:
+                        self.emit_error("select await arm requires a Task value; this arm is '" ++ self.type_name(task_ty) ++ "'", task)
                 self.push_scope()
                 self.scope_put_at(arm_name, arm_result_ty as i32, 0, task)
                 self.scope_set_is_task(arm_name, false)
