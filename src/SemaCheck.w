@@ -30776,6 +30776,20 @@ impl Sema:
                     matches = false
                     break
                 score = score + self.generic_type_pattern_specificity(param_type, tp_start, tp_count)
+            // A bound's trait arguments pattern the parameter as the
+            // parameter's own type would: `tasks: I` under `I:
+            // Iter[Task[Result[T, E]]]` is more specific than under `I:
+            // Iter[Task[T]]`, as `impl IntoIter[Task[Result[T, E]]]` is
+            // (§14.11.1's two await_all over an iterator).
+            var bpos = tp_start
+            for _ in 0..tp_count:
+                let bound_count = self.ast.get_extra(bpos + 1)
+                for bi in 0..bound_count:
+                    let bound_meta = self.ast.find_type_bound_args(bpos + 2 + bi)
+                    if bound_meta >= 0:
+                        for bound_arg in self.ast.type_bound_arg_nodes(bound_meta):
+                            score = score + self.generic_type_pattern_specificity(bound_arg, tp_start, tp_count)
+                bpos = bpos + 2 + bound_count
         if matches and self.generic_bound_set_accepts(tp_start, tp_count) == false:
             matches = false
         if matches:

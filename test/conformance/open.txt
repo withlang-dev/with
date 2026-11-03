@@ -5,5 +5,4 @@
 # changelog's NON-COMPLIANT sentence, and move the fixture out of here.
 test/conformance/open_d29_fallback_tier.w
 test/conformance/open_s14_10_channel_select_arm.w
-test/conformance/open_s14_11_1_await_all_pipeline.w
 test/conformance/open_d91_target_os.w
