@@ -34408,7 +34408,7 @@ impl Sema:
         if fn_node == 0:
             return 0
         if deferred.len() > 0:
-            arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, &deferred, arg_types, &arg_nodes, node)
+            arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, deferred, arg_types, arg_nodes, node)
         self.resolved_generic_call_nodes.insert(node, fn_node)
         let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_count, node)
         if ret == 0:

@@ -118,3 +118,28 @@ impl Random for f32:
         let u: f32 = next()
         let v = lo + (hi - lo) * u
         if v < hi: v else: lo
+
+// Fisher–Yates over this RNG (seed it for a reproducible order); every
+// element moves by bits. Here rather than std.algorithms so sorting stays
+// free of the RNG and its sync state.
+impl[T] List[T]:
+    /// Shuffles the elements in place, uniformly, drawing from std.random
+    /// (seed it for a reproducible order); every element moves by bits.
+    pub mut fn shuffle():
+        let n = self.len()
+        if n < 2: return
+        let size = sizeof[T]() as i64
+        let base = self.ptr as i64
+        let tmp = with_alloc(size)
+        var i = n - 1
+        while i > 0:
+            let j = range(0, i + 1)
+            if j != i:
+                let a = (base + i as i64 * size) as *mut u8
+                let b = (base + j as i64 * size) as *mut u8
+                with_memcpy(tmp, a as *const u8, size)
+                with_memcpy(a, b as *const u8, size)
+                with_memcpy(b, tmp as *const u8, size)
+            i = i - 1
+        with_free(tmp)
+
