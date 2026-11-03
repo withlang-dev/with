@@ -4405,6 +4405,83 @@ fn bs_migrate_expect_success(ctx: &ActionCtx, compiler_path: &str, case_dir: &st
 // and non-null when its only test aborts (`assert`) and nobody passes
 // NULL; callers wrap `Some` only where the callee is `Option`, and a NULL
 // comparison on a non-null parameter folds to its constant.
+// #2972: a bare `-D NAME` is `NAME=1`, as a C compiler defines it, so a
+// unit's `#if NAME` takes the defined branch (sqlite3.c's
+// `#if HAVE_LOCALTIME_R` under its package's defines failed to preprocess
+// as `#if` with nothing to test); and a unit that does fail to preprocess
+// is reported with the file, line and column clang names, not the
+// diagnostic's spelling alone.
+fn bs_check_migrate_bare_define_is_one(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let src = bs_join(case_dir, "bare.c")
+    let out_w = bs_join(case_dir, "bare.w")
+    var rc = bs_write_fixture(ctx, src, "#if HAVE_LOCALTIME_R\nint picked(void) { return 1; }\n#else\nint picked(void) { return 0; }\n#endif\n", "bare define fixture")
+    if rc != 0: return rc
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, src))
+    args |> push("-D")
+    args |> push("HAVE_LOCALTIME_R")
+    args |> push("--no-c-export")
+    args |> push("-o")
+    args |> push(bs_abs(root, out_w))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-bare-define", args)
+    if result.rc != 0: return result.rc
+    rc = bs_file_contains(ctx, out_w, "return 1", "bare -D NAME is NAME=1: the defined branch is taken")
+    if rc != 0: return rc
+    // The located failure: `#if` of a macro defined empty.
+    let bad = bs_join(case_dir, "empty.c")
+    rc = bs_write_fixture(ctx, bad, "#define EMPTY\n#if EMPTY\nint picked(void) { return 1; }\n#endif\n", "empty define fixture")
+    if rc != 0: return rc
+    var bad_args: List[str] = List.new()
+    bad_args |> push("migrate")
+    bad_args |> push(bs_abs(root, bad))
+    bad_args |> push("--no-c-export")
+    bad_args |> push("-o")
+    bad_args |> push(bs_abs(root, bs_join(case_dir, "empty.w")))
+    let failed = bs_run_cli_capture_cwd(ctx, compiler_path, "migrate-empty-define", bad_args, BS_HANG_GUARD_MS, case_dir)
+    if failed.rc == 0:
+        return bs_fail(ctx, "migrator selfhost case 'migrate-empty-define' was expected to fail to preprocess and did not")
+    bs_assert_contains(ctx, failed.stderr, "empty.c:2:10: expected value in expression", "a preprocessing failure names its file, line and column")
+
+// #2980: a unity build `#include`s a .c unit into another, so the global
+// and the function the included unit defines are seen from two units at
+// one definition site: one definition (the first owner publishes it, the
+// other imports it), never a duplicate that marks the units unreadable
+// (libcurl's unity_0_c.c left 183 units unread). And `main` is an entry
+// point per unit, never a project symbol: a package's examples each
+// carry one beside the library's (libcurl's docs/examples).
+fn bs_check_migrate_unity_include_is_one_definition(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
+    let root = ctx.project_info().project_root()
+    let lib_dir = bs_join(case_dir, "unitylib")
+    var rc = bs_write_fixture(ctx, bs_join(lib_dir, "unity.h"), "#ifndef UNITY_H\n#define UNITY_H\n#include <stdlib.h>\nstruct item { int v; };\nextern int item_count;\nstruct item *item_new(int v);\nvoid item_free(struct item *it);\nint item_value(const struct item *it);\n#endif\n", "unity header")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "item.c"), "#include \"unity.h\"\nint item_count = 0;\nstruct item *item_new(int v) { struct item *it = malloc(sizeof(struct item)); it->v = v; item_count++; return it; }\nvoid item_free(struct item *it) { item_count--; free(it); }\n", "unity included unit")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "unity_0_c.c"), "#include \"item.c\"\n#include \"value.c\"\n", "unity unit")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "value.c"), "#include \"unity.h\"\nint item_value(const struct item *it) { return it->v + item_count; }\n", "unity second included unit")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "example_a.c"), "#include \"unity.h\"\nint main(void) { struct item *it = item_new(1); int v = item_value(it); item_free(it); return v; }\n", "unity example a")
+    if rc != 0: return rc
+    rc = bs_write_fixture(ctx, bs_join(lib_dir, "example_b.c"), "#include \"unity.h\"\nint main(void) { return item_count; }\n", "unity example b")
+    if rc != 0: return rc
+    let draft = bs_join(case_dir, "unity_facade.w")
+    var args: List[str] = List.new()
+    args |> push("migrate")
+    args |> push(bs_abs(root, lib_dir))
+    args |> push("--facade")
+    args |> push("unity")
+    args |> push("-o")
+    args |> push(bs_abs(root, draft))
+    let result = bs_migrate_expect_success(ctx, compiler_path, case_dir, "migrate-unity-include", args)
+    if result.rc != 0: return result.rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "duplicate", "unity: a definition included by two units is one definition")
+    if rc != 0: return rc
+    rc = bs_assert_not_contains(ctx, result.stderr, "could not be read", "unity: every unit is read")
+    if rc != 0: return rc
+    bs_file_contains(ctx, draft, "resource Item wraps *mut item", "unity: the included unit's producer and destroyer make the resource")
+
 fn bs_check_migrate_nullable_by_evidence(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -> i32:
     let root = ctx.project_info().project_root()
     let src = bs_join(case_dir, "evidence.c")
@@ -6592,6 +6669,10 @@ pub fn run_cli_selfhost_migrate_basic_action(ctx: ActionCtx) -> i32:
     rc = bs_check_migrate_nullable_by_evidence(ctx, compiler_path, bs_join(output_dir, "nullable_by_evidence"))
     if rc != 0: return rc
     rc = bs_check_migrate_facade_by_evidence(ctx, compiler_path, bs_join(output_dir, "facade_by_evidence"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_bare_define_is_one(ctx, compiler_path, bs_join(output_dir, "bare_define_is_one"))
+    if rc != 0: return rc
+    rc = bs_check_migrate_unity_include_is_one_definition(ctx, compiler_path, bs_join(output_dir, "unity_include_is_one_definition"))
     if rc != 0: return rc
     rc = bs_check_migrate_nullable_fn_pointer(ctx, compiler_path, bs_join(output_dir, "nullable_fn_pointer"))
     if rc != 0: return rc

@@ -2000,6 +2000,17 @@ fn conan_facade_of_binary(name: &str, version: &str, project_root: &str, dep_dir
         let _gone = runtime_remove_tree(work)
         return
     conan_write_facade(name, version, dep_dir, tree.source_dir, work ++ "/b")
+    conan_remove_build_tree(work)
+
+// The fetched and configured source tree is removed once the facade is
+// written, unless `WITH_KEEP_BUILD` is set: then it stays under
+// `dep_dir/.build` (its `b/compile_commands.json` names every unit's
+// defines and include paths), so a unit the facade report says could not
+// be read can be migrated by hand under the same inputs.
+fn conan_remove_build_tree(work: &str):
+    if runtime_getenv("WITH_KEEP_BUILD").len() > 0:
+        runtime_eprint("  WITH_KEEP_BUILD: keeping " ++ work)
+        return
     let _gone = runtime_remove_tree(work)
 
 fn conan_install_from_source(name: &str, version: &str, project_root: &str, depth: i32) -> str:
@@ -2057,7 +2068,7 @@ fn conan_install_from_source(name: &str, version: &str, project_root: &str, dept
     runtime_eprint("  built " ++ name ++ "/" ++ version ++ " into .with/deps/c/" ++ name ++ "/" ++ version ++ "/")
     // D121 step 5: the facade, from the build that just ran.
     conan_write_facade(name, version, dep_dir, source_dir, work ++ "/b")
-    let _work = runtime_remove_tree(work)
+    conan_remove_build_tree(work)
     version.to_owned()
 
 // A lock entry that was built from source: reuse the build, or build the same
