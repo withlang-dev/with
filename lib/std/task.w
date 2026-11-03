@@ -96,6 +96,17 @@ pub fn await_all[T, E](tasks: impl IntoIter[Task[Result[T, E]]]) -> Result[List[
         ordered.push(values.remove(0).unwrap())
     Ok(ordered)
 
+/// `tasks |> await_all` over an iterator of tasks (§14.11.1: `ids |> map(fetch(it))
+/// |> await_all`): the tasks are gathered, then awaited as a List is.
+pub fn await_all[T, E, I: Iter[Task[Result[T, E]]]](tasks: I) -> Result[List[T], E]:
+    var i = tasks
+    let pending: List[Task[Result[T, E]]] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(task) => pending.push(task)
+    await_all(pending)
+
 /// Await all tasks (infallible version). Returns List[T] in input order.
 pub fn await_all[T](tasks: impl IntoIter[Task[T]]) -> List[T]:
     let pending: List[Task[T]] = List.new()
@@ -376,3 +387,13 @@ impl[T] Drop for Pulled[T]:
         else:
             ((unsafe *head).drop_gen)(self.core)
         with_free(self.core)
+
+/// `tasks |> await_all` over an iterator of tasks (infallible version).
+pub fn await_all[T, I: Iter[Task[T]]](tasks: I) -> List[T]:
+    var i = tasks
+    let pending: List[Task[T]] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(task) => pending.push(task)
+    await_all(pending)

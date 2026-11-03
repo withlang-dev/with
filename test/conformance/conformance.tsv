@@ -27,7 +27,7 @@ D189	tuple .await has no arity limit (§14.11)	implemented	test/behavior/behav_d
 §13.5a	a label may appear alone on a line and label the next statement	implemented	test/behavior/behav_s13_5a_label_alone.w	#2947
 §18.1	a grouped import at the package root: use std.{a, b}	implemented	test/behavior/behav_s18_1_root_grouped_import.w	#2948
 §14.10	a channel receive is a select await arm	open		#2956
-§14.11.1	ids |> map(f(it)) |> await_all	open		#2954
+§14.11.1	ids |> map(f(it)) |> await_all	implemented	test/behavior/behav_s14_11_1_await_all_pipeline.w	
 D190	`?` in fn main: and in a script: an Err ends the program (stderr, exit 1)	implemented	test/behavior/behav_d190_question_in_main_err.w	#2935
 §14.19	@[ffi_stack]	open		#583
 §8.3	List.new_in(allocator)	open		#570
