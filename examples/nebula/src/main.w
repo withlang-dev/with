@@ -89,7 +89,7 @@ async fn main -> Result[Unit, AppError]:
 
     let batch = build_test_batch(5)
     print(f"\nBatch of {batch.len()} telemetry records built.")
-    db.insert_bulk(&batch)?
+    db.insert_bulk(batch)?
 
     // --- Select Await Demo ---
     //
@@ -104,7 +104,7 @@ async fn main -> Result[Unit, AppError]:
         sleep(Duration.millis(300)).await
         data_rx.recv() ?? ""
     let shutdown_task = async:
-        shutdown_rx.recv().unwrap()
+        shutdown_rx.recv() ?? 0
 
     select await:
         _ = data_task =>
@@ -114,10 +114,8 @@ async fn main -> Result[Unit, AppError]:
 
     // --- Compute Final Stats ---
 
-    let sessions = with List.new() as mut sessions:
-        sessions.push(Session { id: 1, addr: "127.0.0.1", packets_received: 5 })
-        sessions.push(Session { id: 2, addr: "127.0.0.2", packets_received: 3 })
-    let stats = compute_stats(&sessions)
+    let sessions = [Session { id: 1, addr: "127.0.0.1", packets_received: 5 }, Session { id: 2, addr: "127.0.0.2", packets_received: 3 }]
+    let stats = compute_stats(sessions)
     print(f"\nFinal stats: {stats.active_count} active, {stats.total_packets} packets")
 
     print("\n=== Clean shutdown complete ===")

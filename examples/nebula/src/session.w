@@ -45,7 +45,7 @@ gen fn extract_packets(count: i32) -> Telemetry:
     for i in 0..count:
         yield Telemetry {
             device_id: f"dev-{i}",
-            temp: 20.0 + (i as f64) * 0.5,
+            temp: 20.0 + i * 0.5,
         }
 
 // --- Generator: Range Stepper ---
@@ -67,11 +67,11 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
     if raw.len() == 0:
         return None
 
-    Some(Telemetry {
+    Telemetry {
         device_id: raw,
         temp: 0.0,
         status: .Active,
-    })
+    }
 
 // --- Batch Parser ---
 //
@@ -79,10 +79,7 @@ fn parse_telemetry(raw: &str) -> Option[Telemetry]:
 // Uses a with-block for scoped mutable access to the result List.
 
 fn parse_batch(lines: &List[str]) -> Result[List[Telemetry], SessionError]:
-    with List.new() as mut results:
-        for line in lines:
-            let t = parse_telemetry(line) ?? return Err(.ParseFailed("invalid input"))
-            results.push(t)
+    [parse_telemetry(line) ?? return Err(.ParseFailed("invalid input")) for line in lines]
 
 // --- Async Session Handler ---
 //
@@ -114,11 +111,11 @@ pub async fn handle_session(id: i32, rx: Receiver[str]) -> Result[i32, SessionEr
 async fn handle_priority(
     primary: Receiver[str],
     secondary: Receiver[str],
-) -> str:
+):
     let primary_task = async:
-        primary.recv().unwrap()
+        primary.recv() ?? ""
     let secondary_task = async:
-        secondary.recv().unwrap()
+        secondary.recv() ?? ""
 
     select await:
         msg = primary_task =>
@@ -131,18 +128,11 @@ async fn handle_priority(
 // Query sessions to compute aggregate statistics.
 
 pub type SessionStats {
-    active_count: i64,
-    total_packets: i32,
+    active_count: isize,
+    total_packets: isize,
 }
 
-pub fn compute_stats(sessions: &List[Session]) -> SessionStats:
-    var total: i32 = 0
-    for s in sessions:
-        total += s.packets_received
-    SessionStats {
-        active_count: sessions.len(),
-        total_packets: total,
-    }
+pub fn compute_stats(sessions: &List[Session]): SessionStats { active_count: sessions.len(), total_packets: sessions |> map(it.packets_received) |> sum() }
 
 // --- Structured Concurrency Demo ---
 //
