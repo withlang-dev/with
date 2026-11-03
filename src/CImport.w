@@ -1550,7 +1550,7 @@ fn ci_translate_anon_record_cursor(session: i64, decl_cursor: i32, synth_name: &
         // D147: a migration never demotes a bitfield record silently; a
         // member record with one is refused until it, too, keeps its layout.
         if ci_translate_in_migrate_mode() and ci_record_cursor_has_bitfield(session, decl_cursor):
-            g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': a bitfield in a member record is not supported yet (D147)\n"
+            g_ci_refused_records = g_ci_refused_records ++ "migrate: untranslatable record '" ++ synth_name ++ "': a bitfield in a member record is not supported yet (D147, #3014)\n"
         return "type " ++ ci_escape_reserved(synth_name) ++ " = opaque\n"
 
     let is_union = with_ci_cursor_kind(session, decl_cursor) == CK_UNION

@@ -248,7 +248,7 @@ fn uat_parse(path: &str, text: &str) -> UatScenario:
                     return uat_error(move sc, lineno, "'expect file' is 'expect file <path> exists' or 'expect file <path> contains: <text>'")
                 sc.steps.push(uat_step(UAT_EXPECT_FILE_CONTAINS, rest.slice(0, at).trim().clone(), rest.slice(at + 10, rest.len()).trim().clone(), lineno))
         else if line.starts_with("expect image:"):
-            return uat_error(move sc, lineno, "'expect image:' is not implemented yet (uat-plan.md §5); record the check as 'expect (human):' meanwhile")
+            return uat_error(move sc, lineno, "'expect image:' is not implemented yet (uat-plan.md §5, #3013); record the check as 'expect (human):' meanwhile")
         else if line.starts_with("expect (human):"):
             sc.steps.push(uat_step(UAT_EXPECT_HUMAN, uat_rest_after(line, "expect (human):"), "", lineno))
         else:

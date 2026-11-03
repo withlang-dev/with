@@ -12184,7 +12184,7 @@ impl CCodegen:
 
     mut fn key_refuse_projection(resolved: i32) -> bool:
         if self.sema.concrete_key_sigs.contains(resolved):
-            self.fail("emit-c: a map key of type " ++ self.sema.type_name(resolved) ++ " hashes and compares by its key projection, which the C backend does not call yet (#2180)")
+            self.fail("emit-c: a map key of type " ++ self.sema.type_name(resolved) ++ " hashes and compares by its key projection, which the C backend does not call yet (#3011)")
             return true
         false
 

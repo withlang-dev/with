@@ -1828,7 +1828,7 @@ impl Sema:
             // would have to outlive the resource as a C string (§16.3c).
             for si in 0..c.variadic_slots.len():
                 if c.variadic_slots[si].callback_type == 0:
-                    self.emit_error("a retained pointer case of a variadic contract ('case CONST: <type> retains by param N') is not modeled yet (#1652); leave the case out and set that option through the raw function under unsafe (§16.2b.5)", c.variadic_slots[si].clause)
+                    self.emit_error("a retained pointer case of a variadic contract ('case CONST: <type> retains by param N') is not modeled yet (#3010); leave the case out and set that option through the raw function under unsafe (§16.2b.5)", c.variadic_slots[si].clause)
                     return c
             return c
         if kind == FACADE_CLAUSE_OK:
