@@ -274,6 +274,10 @@ type MirBuilder = ephemeral {
     // call against this exact place. The override is scoped by lower_pipeline.
     pipeline_receiver_override_node: i32,
     pipeline_receiver_override_place: i32,
+    // D186 (§13.3): the iterable argument whose `.iter()` is being lowered
+    // (lower_expr calls it once around the argument, then reads the
+    // argument itself); 0 elsewhere.
+    implicit_iter_arg_active: i32,
     // D69 (§13.4): the producer's `body` parameter — or a loop closure's
     // capture of it — while lowering a gen fn's body; -1 elsewhere. A
     // `yield e` is a call of it.
@@ -409,6 +413,7 @@ fn MirBuilder.init(sema: &Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32) -
         contextual_fact_sig_idx: -1,
         pipeline_receiver_override_node: 0,
         pipeline_receiver_override_place: -1,
+        implicit_iter_arg_active: 0,
         gen_body_local: -1,
         gen_loop_flag_local: -1,
         gen_loop_ret_local: -1,
@@ -16988,6 +16993,15 @@ impl MirBuilder:
 
 
     mut fn lower_expr(node: i32) -> i32:
+        // D186 (§13.3): an iterable argument of `zip`, `chain` or `zip_with`
+        // is handed to the stage as the iterator its `.iter()` yields; Sema
+        // recorded the call under the argument (implicit_iter_args).
+        if node > 0 and node != self.implicit_iter_arg_active and self.sema.implicit_iter_args.contains(node):
+            let saved_active = self.implicit_iter_arg_active
+            self.implicit_iter_arg_active = node
+            let iter_place = self.lower_for_implicit_iter_call(node, node)
+            self.implicit_iter_arg_active = saved_active
+            return self.body.new_operand(OperandKind.OK_MOVE, iter_place)
         var op = self.lower_expr_node(node)
         // D183 (§4.2.6): a checked narrowing Sema recorded on this node.
         if node > 0 and op >= 0 and self.sema.checked_narrowings.contains(node):
