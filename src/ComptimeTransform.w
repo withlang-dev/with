@@ -581,6 +581,23 @@ impl Sema:
             return pool.add_node(NodeKind.NK_STRING_LIT, pool.get_start(node), pool.get_end(node), sym, 0, 0) as i32
         if value.kind == ComptimeValueKind.CV_VOID:
             return pool.ct_empty_block(node)
+        if value.kind == ComptimeValueKind.CV_ENUM:
+            // §17 (#2950): a variant with its payload is written back as the
+            // shorthand `.Variant(payload...)`; the binding's type names the
+            // enum (a qualified `Shape.Dot` keeps its bare name).
+            let full: str = self.pool_resolve(value.data0 as i32)
+            let dot = full.rfind(".")
+            let bare: str = if dot >= 0: full[(dot + 1)..] else: full
+            let arg_nodes: List[i32] = List.new()
+            for i in 0..value.extra_count:
+                let arg_node = self.ct_build_value_tree(pool, intern, extras[(value.extra_start + i)], node, extras)
+                if arg_node == 0:
+                    return 0
+                arg_nodes.push(arg_node)
+            let args_start = pool.extra_len()
+            for i in 0..arg_nodes.len():
+                pool.add_extra(arg_nodes[i])
+            return pool.add_node(NodeKind.NK_VARIANT_SHORTHAND, pool.get_start(node), pool.get_end(node), intern.intern(bare), args_start, value.extra_count) as i32
         if value.kind == ComptimeValueKind.CV_ARRAY or value.kind == ComptimeValueKind.CV_TUPLE:
             let elem_nodes: List[i32] = List.new()
             for i in 0..value.extra_count:

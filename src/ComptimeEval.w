@@ -6783,11 +6783,42 @@ impl ComptimeEvaluator:
 
     mut fn eval_variant_shorthand(node: i32) -> ComptimeControl:
         let arg_count = self.ast.get_data2(node)
-        if arg_count != 0:
-            return self.fail(node, "comptime enum variant shorthand with payload is not supported yet")
-        var sym = self.ast.get_data0(node)
+        let spelled = self.ast.get_data0(node)
+        var sym = spelled
         if self.sema.comp_resolved.contains(node):
             sym = self.sema.comp_resolved.get(node).unwrap()
+        // The variant tables hold the bare name and `Enum.Variant`; a
+        // resolution spelled otherwise falls back to the name as written.
+        if not self.sema.variant_lookup.contains(sym) and self.sema.variant_lookup.contains(spelled):
+            sym = spelled
+        // §17 (#2950): a variant of an enum that carries payloads is the
+        // enum value Option and Result already are at comptime — the
+        // variant with its evaluated payload (CV_ENUM); a bare one of such
+        // an enum too. A discriminant-only enum stays its integer.
+        var payload_enum = false
+        if self.sema.variant_lookup.contains(sym):
+            let owner_tid = self.sema.resolve_alias(self.sema.variant_type_ids.get(sym).unwrap() as TypeId) as i32
+            // An enum with no discriminant representation is a payload enum
+            // (its variants are not integers), as is one the payload table
+            // names.
+            payload_enum = not self.sema.disc_repr_types.contains(owner_tid) or self.sema.disc_has_payload.contains(owner_tid)
+        if arg_count != 0 or payload_enum:
+            if not self.sema.variant_lookup.contains(sym):
+                return self.unsupported(node)
+            let enum_tid: i32 = self.sema.variant_type_ids.get(sym).unwrap()
+            let args_start = self.ast.get_data1(node)
+            let values: List[ComptimeValue] = List.new()
+            for ai in 0..arg_count:
+                var arg_signal = self.eval_expr(self.ast.get_extra(args_start + ai))
+                if arg_signal.kind != ComptimeControlKind.CTL_VALUE:
+                    return arg_signal
+                values.push(move arg_signal.value)
+            // Pushed after every payload is evaluated: a nested value's own
+            // extras must not interleave with this variant's.
+            let start = self.extra_values.len() as i32
+            for v in values.into_iter():
+                self.extra_values.push(v)
+            return comptime_control_value(comptime_value_enum(self.node_type_or(node, enum_tid), sym, start, arg_count))
         self.eval_disc_variant_sym(sym, node)
 
     mut fn eval_ident(node: i32) -> ComptimeControl:
@@ -6829,6 +6860,16 @@ impl ComptimeEvaluator:
         let sema_sym = self.sema.pool_lookup_symbol(self.pool.resolve(sym))
         if sema_sym != 0 and self.sema.named_type_candidate_head(sema_sym) >= 0 and self.sema.lookup_named_type_visible(sema_sym) == 0:
             return self.fail(node, self.invisible_name_message(sym))
+        // #2949: a name the unit holds no declaration of at all (`Target`
+        // without `use std.os.Target` on the release compiler, whose unit
+        // never parsed std.os): the import gate's case when the gate knows
+        // the module, else said plainly — never "a runtime value".
+        let gated = self.invisible_name_message(sym)
+        if gated.contains("requires an explicit import"):
+            return self.fail(node, gated)
+        if self.lookup_slot_index(sym) < 0 and not self.sema.binding_decl_nodes.contains(sym):
+            let name = self.pool.resolve(sym)
+            return self.fail(node, "'" ++ name ++ "' is not a declaration this unit can see at comptime; a standard-library name needs its import, `use std.<module>." ++ name ++ "` (§18.1)")
         self.fail(node, "runtime value is not available at comptime")
 
     mut fn eval_field_access(node: i32) -> ComptimeControl:
@@ -6932,6 +6973,30 @@ impl ComptimeEvaluator:
             return comptime_control_value(comptime_value_int(self.node_type_or(node, self.sema.ty_u8 as i32), (base.text[index] as i64) & 255))
         self.fail(node, "comptime index requires an array, tuple, vec, or str")
 
+    // §17 (#2950): a format spec at comptime formats through the runtime's
+    // own writers, the ones a runtime f-string's FMT_BUF_WRITE_FMT calls:
+    // numbers by their spec, everything else as its display text padded.
+    mut fn fstring_spec_text(value: ComptimeValue, spec_node: i32, node: i32) -> str:
+        let flags = self.ast.get_data0(spec_node)
+        let mode = flags & 255
+        let width = self.ast.get_data1(spec_node)
+        let precision = self.ast.get_data2(spec_node)
+        if mode == 63:
+            let _ = self.fail(node, "comptime f-string `:?` (debug formatting) is not supported yet")
+            return ""
+        let buf = with_fmt_buf_new()
+        if value.kind == ComptimeValueKind.CV_INT:
+            let ty = self.sema.resolve_alias(value.type_id as TypeId)
+            let bits = if self.sema.get_type_kind(ty) == TypeKind.TY_INT: self.sema.get_type_d0(ty) else: 64
+            let int_flags = if bits > 0 and bits < 64: flags | (bits << 24) else: flags
+            with_fmt_buf_write_i64_spec(buf, value.data0, (self.sema.is_unsigned_int_type(value.type_id)) as i32, int_flags as i64, width, precision, mode)
+        else if value.kind == ComptimeValueKind.CV_FLOAT:
+            with_fmt_buf_write_f64_spec(buf, value.real, flags as i64, width, precision, mode)
+        else:
+            let text = self.fstring_segment_text(move value, node)
+            with_fmt_buf_write_str_spec_ref(buf, text, flags as i64, width, precision)
+        with_fmt_buf_finish(buf)
+
     mut fn fstring_segment_text(value: ComptimeValue, node: i32) -> str:
         if value.kind == ComptimeValueKind.CV_STR:
             return with_str_clone_ref(value.text)
@@ -6962,14 +7027,15 @@ impl ComptimeEvaluator:
                 let expr_node = self.ast.get_extra(cursor)
                 let spec_node = self.ast.get_extra(cursor + 1)
                 cursor = cursor + 2
-                if spec_node != 0:
-                    return self.fail(node, "comptime f-string format specs are not supported yet")
                 var value_signal = self.eval_expr(expr_node)
                 if value_signal.kind != ComptimeControlKind.CTL_VALUE:
                     return value_signal
                 if self.had_error != 0:
                     return comptime_control_error()
-                parts.push(self.fstring_segment_text(move value_signal.value, expr_node))
+                if spec_node != 0:
+                    parts.push(self.fstring_spec_text(move value_signal.value, spec_node, expr_node))
+                else:
+                    parts.push(self.fstring_segment_text(move value_signal.value, expr_node))
             else:
                 return self.fail(node, "invalid comptime f-string segment")
         self.concat_comptime_string_parts(node, parts)

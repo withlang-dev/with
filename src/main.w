@@ -6009,7 +6009,7 @@ fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available
             with_eprint("error: unknown repl command '" ++ trimmed ++ "'")
             return 1
         if repl_line_requires_session_state(trimmed):
-            with_eprint("error: repl persistent declarations are not implemented yet; use expression or statement snippets")
+            with_eprint("error: repl persistent declarations are not implemented yet (#3012); use expression or statement snippets")
             return 1
         let rc = run_repl_line(trimmed, no_std, alloc_mode, runtime_available, prelude_mode)
         if rc != 0:
