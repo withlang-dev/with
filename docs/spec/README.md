@@ -27,7 +27,6 @@ element, the `yield` expression form is retired, the statement form stays
 any iterable (D186). §16.2b.6: `returns borrow T from params N, M` (D187).
 std.time: `Duration` is `i64` nanoseconds (D188). §14.11: no tuple-await
 arity limit (D189). §14.6's example no longer writes `Ok(...)` or `String`.
-The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.34:** three modeled-C rulings for the facade proof engine,
 2026-10-15 (D134). §16.2b.6: a borrowed value's origin is the argument's
 origin, bound per call, one borrowed type for every origin; `detaches param
@@ -44,7 +43,7 @@ that differ are an error naming both; never changes a compiling program.
 in argument position and views it; it demands no collection. §3.1: a view
 of a constant is a view of an immutable static, materialized once at the
 demanded type, with static lifetime; a mutable view of a constant is an
-error. The implementation is NON-COMPLIANT until it catches up.
+error.
 **Changelog v7.31:** literal join arms and what a cast does, 2026-10-09
 (D125). §4.2.1 rule 8: an untyped literal arm of an `if`, `match` or `??`,
 or a literal return of a function whose return type is inferred, takes the
@@ -53,14 +52,13 @@ view, the number's type); an all-literal join is typed by its outer context;
 typed arms that disagree are an error. §4.2.1: exact constant evaluation has
 no width limit. §4.2.6: integer casts keep the low two's-complement bits;
 float to integer truncates and saturates, NaN gives 0; to a float, nearest
-ties-to-even, overflow to ±infinity. The implementation is NON-COMPLIANT
-until it catches up.
+ties-to-even, overflow to ±infinity.
 **Changelog v7.30:** a cast converts an untyped constant exactly,
 2026-10-09 (D124). §4.2.1: an untyped constant expression is evaluated
 exactly, with no width, until a context types it; a cast is such a context
 (rule 7) and converts the exact value with the runtime cast's wrap and
 truncate rule, never through `isize`; float constants follow the runtime
-rule. The implementation is NON-COMPLIANT until it catches up.
+rule.
 **Changelog v7.29:** `offsetof[T](field)`, 2026-10-07 (D109, delegated).
 §16.12: a built-in generic function returning a field's byte offset in a
 struct's layout for the compilation target, beside `sizeof` and
@@ -71,31 +69,27 @@ C's `offsetof(T, f)` with it instead of folding the host's number
 `len()`, `count()` and `position()` return `isize`, the signed
 pointer-width integer; `Int` stays the fixed 64-bit alias. §4.2: `usize`
 and `isize` are pointer-width, 32 bits on wasm32 (the previous sentence
-predated that target). The implementation is NON-COMPLIANT until #2262
-catches up.
+predated that target).
 **Changelog v7.27:** visibility, 2026-10-05 (D100). §18.3: a declaration
 without `pub` is visible throughout its package, and `pub` means it leaves
 the package (it was private to its file); the rule covers methods and
 fields too. A module under an `internal` path segment is importable only
 from inside its parent's tree. §18.4: a package is a directory with
 `with.toml`; a file run outside one is its own package; the standard
-library is one package. The implementation is NON-COMPLIANT until it
-catches up.
+library is one package.
 **Changelog v7.26:** three rulings, 2026-10-05 (D97). §11.7: `std.TotalF64`
 (and `TotalF32`) is a float key: NaN equals NaN and sorts last, `-0.0` equals
 `0.0` (#2182). §11.8: derived `Ord` orders an enum's variants by
 declaration, then their payloads; §10.1: `Option` is declared
 `None | Some(T)`, so `None` sorts first. §16.2b.4: a facade may state one
 error type for all of its fallible operations, `error SqliteError` (#2179).
-The implementation is NON-COMPLIANT until it catches up.
 **Changelog v7.25:** keys and maps, 2026-10-05 (D96). §11.7: a key is any
 type whose `==` is structural and that holds no float; every key implements
 `Key`; a type whose equality is about one part of its value states that
 part as its key projection (`fn key()`), from which `==` and the hash both
 follow; the hash is the compiler's, seeded per process; `Hash` is no longer
 written or derived (§11.8). Collection operations: `HashMap` and `HashSet`
-iterate in insertion order. The implementation is NON-COMPLIANT until it
-catches up.
+iterate in insertion order.
 **Changelog v7.24:** five rulings, 2026-10-05 (D95). §29.6: `_` binds
 nothing, so `let _ = x` moves a non-`Copy` `x` and drops it there (#2074).
 §9.1b: a `pub const` may omit its type as a private one may; §4.2.1: a use
@@ -103,22 +97,20 @@ the value does not fit is an error at that use (#2101). §9.9: `??` has its
 own level between the comparisons and `|>`, right-associative (#2142).
 §11.8: a tuple, a fixed array, `Option` and `Result` implement `Clone`, `Eq`,
 `Ord`, `Hash` and `Debug` when every element type does; a clone that panics
-partway drops what it cloned (#2161). The implementation is NON-COMPLIANT
-until it catches up.
+partway drops what it cloned (#2161).
 **Changelog v7.23:** a collection literal's binding, 2026-10-05 (D93).
 §4.3c rule 1: an annotation may name the collection without its arguments
 (`let w: List = [1, 2, 3]`); a binding with no annotation takes its type
 from its uses (a parameter, a typed place, a return, a method exactly one
 collection has), element type included; a slice demand is met by the fixed
 array; two demanded types are an error; an empty literal with no demand is
-an error (#2144). The implementation is NON-COMPLIANT until it catches up.
+an error (#2144).
 **Changelog v7.22:** modeled-C Amendment 3, 2026-10-04 (D92). §16.2b.4: an
 fn item whose C function returns a status may state `ok`, with one
 constant or several, and is then presented as a `Result`; a resource may
 name the operation that describes its most recent failure (`message`),
 and its operations' errors carry the text. §16.2b.11: an fn item may be
-written more than once under distinct `rename`s. The implementation is
-NON-COMPLIANT until it catches up.
+written more than once under distinct `rename`s.
 **Changelog v7.21:** the target at compile time, 2026-10-04 (D91). §17.1a:
 `Target` is a declared build input. §17.5: `Target.os` and `Target.arch`
 are compile-time constants of `OsKind` and `ArchKind`; a per-target value
@@ -131,11 +123,12 @@ literals has no numeric type of its own; each use is typed as the
 initializer would be there (#2096). §4.3: a field with a default may omit
 its type; an unsuffixed numeric default takes the type its uses in the
 module demand, the default type when none does, and two demands are an
-error (#2097). The implementation is NON-COMPLIANT until it catches up.
+error (#2097).
 **Changelog v7.19:** implicit fills, 2026-10-03 (D87). §7.3a: an implicit
 fill observes the binding and never consumes it; a non-Copy `implicit T`
 is passed explicitly; `std.context` APIs take `implicit &Context`. The
-implementation is NON-COMPLIANT until it catches up.
+implementation is NON-COMPLIANT until it catches up (no `std.context`
+API takes an `implicit` parameter yet).
 **Changelog v7.18:** #1930 answers and the `from` grammar, 2026-10-03
 (D83 and D84 amendments). §9.5: a bare name that resolves to a receiver
 field and to any other name in scope is an error at that use; a
@@ -144,8 +137,7 @@ by the last segment of its module path, a qualifier only; a stem that is
 not an identifier is sanitized. §18.2: every prelude function and bare
 intrinsic is reachable as `builtins.name`. §21.1 rule 6: what a `from`
 origin names, the union over several views, inference, and the bundle
-boundary. §30: `FROM_CLAUSE`, `ORIGIN`. The implementation is
-NON-COMPLIANT until it catches up.
+boundary. §30: `FROM_CLAUSE`, `ORIGIN`.
 **Changelog v7.17:** four rulings of 2026-10-03. §9.5: in an instance
 method declared in its type's own module, receiver fields are in scope by
 bare name; every collision is a shadowing error (D83; #1930). §21.1 rule 6:
@@ -154,7 +146,7 @@ one, and a global origin widens a bundle's `writes` clause past exported
 globals (D84, amends D79; #1903). §16.2b.6: `returns borrow T from parent
 T of param N` (D85; #2003). §18.2: `assert`, `require`, `check` are
 compiler-known forms whose message is evaluated only on failure (D86;
-#1864). The implementation is NON-COMPLIANT until it catches up.
+#1864).
 **Changelog v7.16:** §4.3d masks (D80 amendment): a mask lane is
 writable, a `bool` literal in a mask context and a scalar operand of
 `m.select` broadcast, the width-cast example is `m as Mask[4, 8]`; `m == n`,
