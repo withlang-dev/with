@@ -1105,6 +1105,11 @@ type Sema {
     // by the `for` rule; the value is the iterator type MIR's inserted
     // `.iter()` call builds (for_iter_* keyed by the pipeline node).
     pipeline_implicit_iter: HashMap[i32, i32],
+    // D186 (§13.3): the argument of a `zip`, `chain` or `zip_with` stage
+    // that is an iterable but no Iter, with the iterator type its `.iter()`
+    // yields; the for_iter_* records keyed by the argument node say which
+    // `.iter()` MIR calls there.
+    implicit_iter_args: HashMap[i32, i32],
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
@@ -3657,6 +3662,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         comptime_callable_visiting: HashSet[i32].new(),
         value_to_option_nodes: HashMap.new(),
         pipeline_implicit_iter: HashMap.new(),
+        implicit_iter_args: HashMap.new(),
         derives_assumed: HashMap.new(),
         recursion_open_sym: 0,
         recursion_inferred_type: 0,

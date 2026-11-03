@@ -26573,7 +26573,19 @@ impl Sema:
                 deferred.push(ai + 1)
                 arg_types.push(0)
             else:
-                arg_types.push(self.check_expr_value_context(arg_node) as i32)
+                var arg_ty = self.check_expr_value_context(arg_node) as i32
+                // D186 (§13.3): `zip`, `chain` and `zip_with` take any
+                // iterable. An argument that is no Iter iterates by the
+                // rule `for` uses; MIR calls the `.iter()` recorded under
+                // the argument node (implicit_iter_args, for_iter_*).
+                if ai == 0 and arg_ty != 0 and (name_text == "zip" or name_text == "chain" or name_text == "zip_with"):
+                    let iter_trait = self.pool_lookup_symbol("Iter")
+                    if iter_trait != 0 and self.type_implements_trait(arg_ty, iter_trait) == false:
+                        let implicit = self.resolve_implicit_iter_for(arg_node, arg_node, arg_ty)
+                        if implicit != 0:
+                            self.implicit_iter_args.insert(arg_node, implicit)
+                            arg_ty = implicit
+                arg_types.push(arg_ty)
         var fn_sym = self.pool_lookup_symbol(fn_name)
         var fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count + 1, node)
         if fn_node == 0:
@@ -26600,9 +26612,10 @@ impl Sema:
         if ret == 0:
             return 0
         // Every adapter takes its iterator by value: the receiver is consumed.
+        // An iterable the stage iterates (D186) is observed by its `.iter()`.
         self.note_place_effect(expr, EFF_CONSUME)
         for ai in 0..arg_nodes.len():
-            if arg_nodes[ai] > 0:
+            if arg_nodes[ai] > 0 and not self.implicit_iter_args.contains(arg_nodes[ai]):
                 self.mark_moved_if_consumed(arg_nodes[ai])
         self.comp_resolved.insert(node, fn_sym)
         self.receiver_arg_call_nodes.insert(node, 1)
