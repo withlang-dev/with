@@ -7535,7 +7535,17 @@ impl MirBuilder:
             // path (an alias left the field glue skipping a field nobody
             // owned: the 84ebff6d leak, now bound as an owning local whose
             // drop precedes the glue — spec_ss02_4 pins the WFN order).
-            if not self.copy_is_bits(bind_ty) and not self.sema.drop_consumed_binding_values.contains(rhs_expr):
+            // #3026 (D65): Sema owns whether a field let is a view of its
+            // place (view_bound_let_nodes) or takes the value (a str, plain
+            // bits, D179); a field access is aliased only when Sema said
+            // view. Aliasing a str field let on syntax alone read the new
+            // value through a replaced parent (`let p = x.inner.s; x.inner
+            // = …; print(p)` printed the replacement).
+            var rhs_core = rhs_expr
+            while rhs_core != 0 and self.ast.kind(rhs_core) == NodeKind.NK_GROUPED:
+                rhs_core = self.ast.get_data0(rhs_core)
+            let field_let_is_value = rhs_core != 0 and self.ast.kind(rhs_core) == NodeKind.NK_FIELD_ACCESS and not self.sema.view_bound_let_nodes.contains(node)
+            if not self.copy_is_bits(bind_ty) and not self.sema.drop_consumed_binding_values.contains(rhs_expr) and not field_let_is_value:
                 let alias_place = self.lower_binding_alias_place(rhs_expr)
                 if alias_place >= 0:
                     // A live str view of this place: later self-appends must
