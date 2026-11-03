@@ -236,3 +236,49 @@ impl[T] List[T]:
 
 
 
+
+// ── §13.3 (#2943): the sorting consumers ─────────────────────────────
+// Here, beside `sort` and `sort_by`, which this module extends List with.
+
+/// `it.sorted()`: the elements as a List, ascending by `Ord`.
+pub fn iter_sorted[T: Ord, I: Iter[T]](iter: I) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort()
+    out
+
+pub fn iter_sorted_views[T: Ord, I: Iter[&T]](iter: I) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort()
+    out
+
+/// `it.sorted_by(cmp)`: the elements as a List, ordered by `cmp`
+/// (negative: a before b).
+pub fn iter_sorted_by[T, I: Iter[T]](iter: I, cmp: fn(&T, &T) -> i32) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort_by(cmp)
+    out
+
+pub fn iter_sorted_by_views[T, I: Iter[&T]](iter: I, cmp: fn(&T, &T) -> i32) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort_by(cmp)
+    out

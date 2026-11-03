@@ -6840,6 +6840,48 @@ impl MirBuilder:
         self.forget_string_flow_facts()
         some_op
 
+    // D119 (§13.3): `shape()` fills its `[isize; k]` with the dimensions,
+    // outermost first: a List's length (LIST_LEN), then the fixed sizes the
+    // types state. Sema typed the result (seq_shape_result_type).
+    mut fn lower_seq_shape(self_expr: i32, node: i32) -> i32:
+        let span = self.ast.get_start(node)
+        let result_ty = self.expr_type(node)
+        var recv_ty = self.expr_type(self_expr)
+        if recv_ty == 0 or recv_ty == self.sema.ty_void:
+            recv_ty = self.type_receiver_type(self_expr)
+        if result_ty == 0 or recv_ty == 0:
+            self.mark_unsupported()
+            return self.unit_operand()
+        var t = self.sema.resolve_alias(recv_ty as TypeId) as i32
+        if self.sema.get_type_kind(t) == TypeKind.TY_REF:
+            t = self.sema.resolve_alias(self.sema.get_type_d0(t) as TypeId) as i32
+        let result_local = self.new_temp(result_ty)
+        let result_place = self.place_for_local(result_local)
+        // The entries, as the aggregate an owned `rest()` builds.
+        let fields: List[i32] = List.new()
+        let names: List[i32] = List.new()
+        if self.sema.get_type_kind(t) == TypeKind.TY_GENERIC_INST and self.sema.get_generic_inst_base(t) == self.sema.syms.list:
+            let list_place = self.lower_expr_place(self_expr)
+            let len_local = self.new_temp(self.sema.ty_i64)
+            let len_place = self.place_for_local(len_local)
+            let len_args: List[i32] = List.new()
+            len_args.push(self.body.new_operand(OperandKind.OK_COPY, list_place))
+            let len_args_id = self.body.new_call_args(len_args)
+            self.body.set_call_intrinsic(len_args_id, MirIntrinsic.LIST_LEN)
+            let after_bb = self.new_block()
+            self.terminate(TermKind.TK_CALL, self.unit_operand(), len_args_id, len_place, after_bb)
+            self.switch_to(after_bb)
+            fields.push(self.lower_value_cast(self.body.new_operand(OperandKind.OK_COPY, len_place), self.sema.ty_i64 as i32, self.sema.ty_isize as i32, span))
+            names.push(0)
+            t = self.sema.resolve_alias(self.sema.get_generic_inst_arg(t, 0) as TypeId) as i32
+        while self.sema.get_type_kind(t) == TypeKind.TY_ARRAY:
+            fields.push(self.int_const_operand(self.sema.get_type_d1(t) as i64, self.sema.ty_isize as i32))
+            names.push(0)
+            t = self.sema.resolve_alias(self.sema.get_type_d0(t) as TypeId) as i32
+        let rv = self.body.new_rvalue(RvalueKind.RK_AGGREGATE, 0, self.body.new_agg_fields(fields, names), 0)
+        self.body.push_stmt(self.cur_bb, StmtKind.Assign, result_place, rv, span)
+        self.body.new_operand(OperandKind.OK_MOVE, result_place)
+
     // An owned array element the take leaves behind drops at the take, as
     // the elements a slice pattern discards do — not at scope exit.
     mut fn seq_drop_discarded(elem_place: i32, elem_ty: i32, span: i32):
@@ -13793,6 +13835,9 @@ impl MirBuilder:
         if lowering == MethodLowering.SeqFirst or lowering == MethodLowering.SeqLast or lowering == MethodLowering.SeqRest:
             return self.lower_seq_method(lowering, self_expr, node)
 
+        if lowering == MethodLowering.SeqShape:
+            return self.lower_seq_shape(self_expr, node)
+
         if lowering == MethodLowering.UnwrapOr:
             return self.lower_unwrap_or_method(self_expr, arg_start, arg_count, node)
 
@@ -13903,6 +13948,11 @@ impl MirBuilder:
                         let gc_idx_sym = self.ast.get_data0(gc_idx_base)
                         if self.lookup_local(gc_idx_sym) < 0 and self.sema.named_types.contains(gc_idx_sym):
                             gc_is_static = true
+                // §13.3: `Iter.once(v)` and the other constructors name a
+                // trait, not a type; Sema resolved them to std's free
+                // `iter_ctor_*` (iter_ctor_call_nodes).
+                if self.sema.iter_ctor_call_nodes.contains(node):
+                    gc_is_static = true
                 if self.sema.receiver_arg_call_nodes.contains(node):
                     // Sema resolved the method syntax to a free function
                     // whose first parameter is the receiver: an ordinary

@@ -561,11 +561,9 @@ impl[T, I: Iter[&T]] Iter[&T] for TakenWhileViews[T, I]:
         match self.inner.next():
             None => None
             Some(x) =>
-                if (self.pred)(x):
-                    x
-                else:
-                    self.done = true
-                    None
+                if (self.pred)(x): return Some(x)
+                self.done = true
+                None
 
 pub fn iter_take_while_views[T, I: Iter[&T]](iter: I, pred: fn(&T) -> bool) -> TakenWhileViews[T, I]: TakenWhileViews { inner: iter, pred, done: false }
 
