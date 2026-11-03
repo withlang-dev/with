@@ -6815,7 +6815,7 @@ impl ComptimeEvaluator:
                 values.push(move arg_signal.value)
             // Pushed after every payload is evaluated: a nested value's own
             // extras must not interleave with this variant's.
-            let start = self.extra_values.len() as i32
+            let start: i32 = self.extra_values.len()
             for v in values.into_iter():
                 self.extra_values.push(v)
             return comptime_control_value(comptime_value_enum(self.node_type_or(node, enum_tid), sym, start, arg_count))
@@ -6982,7 +6982,7 @@ impl ComptimeEvaluator:
         let width = self.ast.get_data1(spec_node)
         let precision = self.ast.get_data2(spec_node)
         if mode == 63:
-            let _ = self.fail(node, "comptime f-string `:?` (debug formatting) is not supported yet")
+            self.fail(node, "comptime f-string `:?` (debug formatting) is not supported yet")
             return ""
         let buf = with_fmt_buf_new()
         if value.kind == ComptimeValueKind.CV_INT:
