@@ -13227,7 +13227,10 @@ impl Codegen:
 
         else if intrinsic == MirIntrinsic.MIN or intrinsic == MirIntrinsic.MAX:
             let mm_a = self.mir_intrinsic_arg(body, args_id, 0)
-            let mm_b = self.mir_intrinsic_arg(body, args_id, 1)
+            // The argument is the receiver's type (Sema demanded it; a narrower
+            // integer widened into it): coerce, or icmp meets i64 beside i32.
+            let mm_a_ty = wl_type_of(mm_a)
+            let mm_b = self.coerce_value_to_type(self.mir_intrinsic_arg(body, args_id, 1), mm_a_ty)
             let mm_ty = wl_type_of(mm_a)
             let mm_tk = wl_get_type_kind(mm_ty)
             let mm_is_float = mm_tk == wl_float_type_kind() or mm_tk == wl_double_type_kind()
