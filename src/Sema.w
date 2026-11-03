@@ -556,6 +556,7 @@ type ForeignContract {
     retains_by: List[i32],
     returns_borrow_resource: i32,   // a resource, or `CStr` (the borrowed modeled text, §16.2b.8)
     returns_borrow_from: i32,       // the origin parameter, or -1
+    returns_borrow_from2: i32,      // D187 (§16.2b.6): `from params N, M` — the second origin parameter, or -1
     returns_borrow_domain: i32,     // the origin foreign-state domain (`from domain D`, §16.2b.7), or 0
     returns_borrow_parent: i32,     // D85 (§16.2b.6): `from parent P of param N` — the parent resource P of the resource param N receives, or 0
     returns_static_tid: i32,
@@ -692,6 +693,7 @@ type FacadeCallEffect {
     touch_domains: List[i32], // facade_domain_list indices
     borrow_domain: i32,      // facade_domain_list index, or -1
     borrow_param: i32,       // a presented call's origin parameter (a C string it is lent), or -1
+    borrow_param2: i32,      // D187: its second origin parameter (`from params N, M`), or -1
     // A producer sig's C parameter per presented one (its out slot gone, an
     // init's preinit parameters ahead), as the mask was projected; empty for
     // every other call (facade_effect_source_param inverts their projection).
@@ -7120,6 +7122,13 @@ impl Sema:
         if tk == TypeKind.TY_TRAIT_OBJ:
             return true
         if self.type_is_ephemeral_value(resolved):
+            return true
+        // #3019 (D122, §16.2b.6): an imported record a facade hands out as
+        // a view (`returns borrow T`) is foreign memory whose identity is
+        // its address — every operation through the view hands C that
+        // address — so a copy of its bits, plain as they are, is not the
+        // node. The binding stays a view, as a facade view token's does.
+        if self.facade_record_is_view_type(resolved):
             return true
         var parts: List[i32] = List.new()
         self.type_inline_parts(resolved, mut parts)

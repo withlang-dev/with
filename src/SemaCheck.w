@@ -19265,8 +19265,16 @@ impl Sema:
                         self.expr_view_into_temporary.insert(call_node, carried_temp)
                     union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
                     storage_mask = storage_mask | (if views_storage: self.arg_storage_origin_mask(origin_arg, is_recv) else: self.arg_viewed_storage_origin_mask(origin_arg, is_recv))
-                    let dep_len_before = concrete_deps.len()
-                    concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
+                    // The argument's own deps, counted before they join the
+                    // call's: two arguments viewing one origin (`r1.pick(c1)`,
+                    // both nodes of `d1`, D187) add nothing on the second,
+                    // which read as "no origin" and pinned the result to
+                    // the second argument's local binding.
+                    var arg_deps: List[i32] = List.new()
+                    arg_deps = self.collect_expr_view_deps(origin_arg, arg_deps)
+                    let arg_has_deps = arg_deps.len() > 0
+                    for di in 0..arg_deps.len():
+                        concrete_deps = self.push_unique_i32(move concrete_deps, arg_deps[di])
                     // The result may reference the origin argument's own
                     // storage, so a VALUE argument is an origin itself — an
                     // ephemeral value carrying views (`tok`, a dependent
@@ -19285,7 +19293,7 @@ impl Sema:
                     // storage — `V { origin: self }`, `&self.n`, a facade
                     // child `borrows param 0` — dies with the receiver place.
                     let in_place_recv = is_recv and self.sig_receiver_mode(sig_idx) != ReceiverMode.Move
-                    if (not in_place_recv or views_storage) and (concrete_deps.len() == dep_len_before or self.expr_type_is_value(origin_arg)):
+                    if (not in_place_recv or views_storage) and (not arg_has_deps or self.expr_type_is_value(origin_arg)):
                         concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         // A facade operation (D51 stage 7, ruling §33-§38): its result may
         // borrow from a foreign-state domain, and the call invalidates the
@@ -19296,16 +19304,20 @@ impl Sema:
         // A presented call's text is borrowed from the C string it is lent
         // (`returns borrow CStr from param N` on `strchr`): the argument's
         // own storage when it is a value, its origins through a reference.
+        // D187: `from params N, M` names two; the result views both.
         if fx >= 0 and self.facade_call_effects[fx].borrow_param >= 0 and self.facade_presented_calls.contains(call_node):
-            let bp = self.facade_call_effects[fx].borrow_param
-            let origin_arg = if bp >= 0 and bp < args.len(): args[bp] else: 0
-            if origin_arg > 0:
-                union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
-                storage_mask = storage_mask | self.arg_storage_origin_mask(origin_arg, has_receiver and bp == 0)
-                let dep_len_before = concrete_deps.len()
-                concrete_deps = self.collect_expr_view_deps(origin_arg, move concrete_deps)
-                if concrete_deps.len() == dep_len_before or self.expr_type_is_value(origin_arg):
-                    concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
+            let borrow_params = [self.facade_call_effects[fx].borrow_param, self.facade_call_effects[fx].borrow_param2]
+            for bp in borrow_params:
+                let origin_arg = if bp >= 0 and bp < args.len(): args[bp] else: 0
+                if origin_arg > 0:
+                    union_mask = union_mask | self.compute_expr_view_origin_mask(origin_arg)
+                    storage_mask = storage_mask | self.arg_storage_origin_mask(origin_arg, has_receiver and bp == 0)
+                    var arg_deps: List[i32] = List.new()
+                    arg_deps = self.collect_expr_view_deps(origin_arg, arg_deps)
+                    for di in 0..arg_deps.len():
+                        concrete_deps = self.push_unique_i32(move concrete_deps, arg_deps[di])
+                    if arg_deps.len() == 0 or self.expr_type_is_value(origin_arg):
+                        concrete_deps = self.push_unique_i32(move concrete_deps, self.place_root_sym(origin_arg))
         // #1903 (§21.1 rule 6): the result views every global the callee's
         // returned view views, so a call that writes one while the result is
         // live is refused (§21.1 rule 1, check_calls_against_live_global_views).

@@ -297,7 +297,7 @@ impl CiProject:
             if ct_is_pointer(self.symbols[si].ret_ty) and self.ct_ret_from(si, pi):
                 out.push(f"ret-from:{pi}")
                 continue
-            if self.symbols[si].borrow_from == pi:
+            if self.symbols[si].borrow_from == pi or self.symbols[si].borrow_from2 == pi:
                 // The ownership proof's borrow is broader than a view: a
                 // pointer loaded from a field, arithmetic on one, or a NULL
                 // on some path (which that proof skips) is no part of the

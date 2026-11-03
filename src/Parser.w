@@ -5139,6 +5139,23 @@ impl Parser:
                     ops.push(r)
                     ops.push(0)
                     ops.push(parent)
+                else if self.current_ident_is("params"):
+                    // D187 (§16.2b.6): `from params N, M` — the view borrows
+                    // from both origins at each call.
+                    self.advance()
+                    let r = self.parse_facade_param_ref_after(self.current_start())
+                    if r == 0: return 0
+                    if self.peek() != TokenKind.TK_COMMA:
+                        self.emit_error("a borrow from two parameters is written 'returns borrow <Resource> from params <ref>, <ref>' (§16.2b.6)")
+                        return 0
+                    self.advance()
+                    let r2 = self.parse_facade_param_ref_after(self.current_start())
+                    if r2 == 0: return 0
+                    ops.push(res)
+                    ops.push(r)
+                    ops.push(0)
+                    ops.push(0)
+                    ops.push(r2)
                 else:
                     let r = self.parse_facade_param_ref()
                     if r == 0: return 0

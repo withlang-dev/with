@@ -1059,7 +1059,7 @@ impl Sema:
                 return
             self.emit_error(f"fn '{fname}' is described by two facade blocks with different clauses; one function has one contract — restate it word for word or describe it once (§16.2b)", item)
             return
-        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
+        var c = ForeignContract { fn_sym, decl, facade, node: item, lend: 0, destroys: 0, consumes: List.new(), consumes_destroyed_by: List.new(), retains: List.new(), retains_by: List.new(), returns_borrow_resource: 0, returns_borrow_from: -1, returns_borrow_from2: -1, returns_borrow_domain: 0, returns_borrow_parent: 0, returns_static_tid: 0, preserves_params: List.new(), preserves_domains: List.new(), of_resource: 0, rename: 0, callback_thread_any: 0, callbacks_none: 0, callback_consumes: List.new(), callback_userdata_cb: List.new(), callback_userdata_of: List.new(), valid_on_failed: 0, nullable_params: List.new(), text_params: List.new(), text_return_free: 0, bridged: 0, buffer_ptr: List.new(), buffer_len: List.new(), buffer_inout: List.new(), buffer_elements: List.new(), fixed_params: List.new(), fixed_literals: List.new(), ok_const: 0, ok_count: 0, variadic_node: 0, variadic_selector: -1, variadic_case_syms: List.new(), variadic_case_values: List.new(), variadic_case_tids: List.new(), variadic_case_kinds: List.new(), variadic_slots: List.new(), returns_borrow_record: 0, argv_cb: List.new(), argv_index: List.new(), argc_index: List.new(), argv_handle: List.new(), argv_nodes: List.new(), user_data_fn: 0, user_data_handle: -1, user_data_node: 0, text_bytes: 0, detaches: -1 }
         let extra_start = self.ast.get_data1(item)
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
@@ -1369,6 +1369,8 @@ impl Sema:
             let res = self.ast.get_extra(ops)
             let domain = self.ast.get_extra(ops + 2)
             let parent = self.ast.get_extra(ops + 3)
+            // D187 (§16.2b.6): `from params N, M` carries a second origin.
+            let from2_ref = if self.ast.get_data2(clause) > 4: self.ast.get_extra(ops + 4) else: 0
             // `returns borrow T from parent T of param N` (D85, spec
             // §16.2b.6): a borrow of the parent of the resource param N
             // receives. Only a resource has a parent; that the argument's
@@ -1418,6 +1420,10 @@ impl Sema:
                         self.emit_error(f"fn '{fname}': 'returns borrow CStr from param {from}' names {shown}, which {why}; a borrowed CStr is a view of the resource or the C string its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.7)", clause)
                         return c
                     c.returns_borrow_from = from
+                    let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 2)
+                    if from2 == -2:
+                        return c
+                    c.returns_borrow_from2 = from2
                 c.returns_borrow_resource = res
                 return c
             // `returns borrow T from param N` / `from domain D` for an
@@ -1452,6 +1458,10 @@ impl Sema:
                     if origin.len() == 0 and self.facade_param_receives_record(fn_sym, from) != 0:
                         c.returns_borrow_from = from
                         c.returns_borrow_record = res
+                        let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 1)
+                        if from2 == -2:
+                            return c
+                        c.returns_borrow_from2 = from2
                         return c
                     if origin.len() != 1:
                         let shown = self.facade_param_display(fn_sym, sig, from)
@@ -1459,6 +1469,10 @@ impl Sema:
                         self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed record is a view of the resource its origin parameter receives, or of a domain ('from domain <name>') — With does not invent an origin (§16.2b.6, §16.2b.7)", clause)
                         return c
                     c.returns_borrow_from = from
+                    let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 1)
+                    if from2 == -2:
+                        return c
+                    c.returns_borrow_from2 = from2
                 c.returns_borrow_record = res
                 return c
             if domain != 0:
@@ -1481,6 +1495,10 @@ impl Sema:
                 return c
             c.returns_borrow_resource = res
             c.returns_borrow_from = from
+            let from2 = self.facade_second_borrow_origin(from2_ref, from, fn_sym, sig, clause, 0)
+            if from2 == -2:
+                return c
+            c.returns_borrow_from2 = from2
             return c
         if kind == FACADE_CLAUSE_RETURNS_STATIC:
             let tid = self.resolve_type_expr(self.ast.get_extra(ops)) as i32
@@ -3651,6 +3669,35 @@ impl Sema:
     // one view type. The net checks the type and the method were rendered,
     // and the method's signature gets the origin as a declared summary, as
     // the constructors do (apply_facade_dependency_effects).
+    // D187 (§16.2b.6): the second origin of `returns borrow R from params
+    // N, M`, resolved as the first is: -1 when the clause names one, -2
+    // after an error. `kind` is what the first origin receives — 0 a
+    // resource (its receipt is verified with the first's, once every
+    // resource is known), 1 a record view (D122), 2 a C string.
+    mut fn facade_second_borrow_origin(from2_ref: i32, from: i32, fn_sym: i32, sig: i32, clause: i32, kind: i32) -> i32:
+        if from2_ref == 0:
+            return -1
+        let fname = self.pool_resolve(fn_sym)
+        let from2 = self.facade_resolve_param(from2_ref, fn_sym, sig)
+        if from2 < 0:
+            return -2
+        if from2 == from:
+            self.emit_error(f"fn '{fname}': 'from params {from}, {from2}' names one parameter twice; a borrow from one parameter is written 'from param {from}' (§16.2b.6)", clause)
+            return -2
+        if kind == 0:
+            return from2
+        let origin = self.facade_param_receives(fn_sym, from2)
+        if origin.len() == 1:
+            return from2
+        if kind == 1 and self.facade_param_receives_record(fn_sym, from2) != 0:
+            return from2
+        if kind == 2 and (self.ci_type_is_const_c_string_input(self.sig_param_type(sig, from2)) or self.facade_param_is_text(fn_sym, from2)):
+            return from2
+        let shown = self.facade_param_display(fn_sym, sig, from2)
+        let why = if origin.len() == 0: "receives no modeled resource" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+        self.emit_error(f"fn '{fname}': 'from params {from}, {from2}' names {shown}, which {why}; a borrowed value is a view of what each origin parameter receives — With does not invent an origin (§16.2b.6, §16.2b.7)", clause)
+        -2
+
     mut fn verify_facade_borrowed_returns():
         for ci in 0..self.foreign_contracts.len() as i32:
             let res = self.foreign_contracts[ci].returns_borrow_resource
@@ -3677,6 +3724,13 @@ impl Sema:
                 let n = origin.len()
                 let why = if n == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
                 self.emit_error(f"fn '{fname}': 'returns borrow {rn} from param {from}' names {shown}, which {why}; a borrowed '{rn}' is a view of the resource its origin parameter receives (§16.2b.6)", node)
+                continue
+            // D187: the second origin receives a resource as the first does.
+            let from2 = self.foreign_contracts[ci].returns_borrow_from2
+            if from2 >= 0 and self.facade_param_receives(fn_sym, from2).len() != 1:
+                let shown2 = self.facade_param_display(fn_sym, sig, from2)
+                let why2 = if self.facade_param_receives(fn_sym, from2).len() == 0: "receives no modeled resource, and With does not invent an origin (§16.2b.7)" else: "receives a representation several resources wrap; the facade has not assigned it (§16.2b.3)"
+                self.emit_error(f"fn '{fname}': 'returns borrow {rn} from params {from}, {from2}' names {shown2}, which {why2}; a borrowed '{rn}' is a view of the resources its origin parameters receive (§16.2b.6)", node)
                 continue
             let parent = self.foreign_contracts[ci].returns_borrow_parent
             if parent != 0 and not self.verify_facade_parent_borrow(ci, origin[0], sig, shown):
@@ -3732,6 +3786,11 @@ impl Sema:
                 // a borrow) is a generic method, declared on instantiation.
                 let none: List[i32] = List.new()
                 self.facade_note_generic(facade_render_borrowed_name(host) ++ "." ++ mname, 2, fn_sym, ci, 0, none, 0, from)
+                // D187: `from params N, M` — the result views the second
+                // origin too, on the resource and on its borrowed view.
+                if from2 >= 0:
+                    self.facade_declare_view_of_param(msig, from2)
+                    self.facade_note_generic(facade_render_borrowed_name(host) ++ "." ++ mname, 2, fn_sym, ci, 0, none, 0, from2)
 
     // ── record views (D66, spec §16.2b.6) ────────────────────────────────
     //
@@ -3750,6 +3809,19 @@ impl Sema:
                 return 0
             return self.lookup_named_type_ambient(self.ast.get_data0(decl))
         0
+
+    // Whether `tid` is an imported record some facade item hands out as a
+    // view (`returns borrow T` for a record no resource wraps, D66/D122).
+    fn facade_record_is_view_type(tid: i32) -> bool:
+        let resolved = self.resolve_alias(tid as TypeId)
+        if self.get_type_kind(resolved) != TypeKind.TY_STRUCT:
+            return false
+        let name = self.safe_symbol_text(self.get_type_name(resolved))
+        for ci in 0..self.foreign_contracts.len():
+            let rec = self.foreign_contracts[ci].returns_borrow_record
+            if rec != 0 and self.pool_resolve(rec) == name:
+                return true
+        false
 
     // Whether signature `sig` returns `Option[&T]` for the record named `rn`.
     fn facade_sig_returns_record_view(sig: i32, rn: &str) -> bool:
@@ -3800,6 +3872,11 @@ impl Sema:
                 return
             if from >= 0:
                 self.facade_declare_view_of_param(msig, 0)
+            // D187: the result views the second origin too — what that
+            // `&T` view views (its record's origin), never the argument's
+            // own binding, as D85's parent borrow is declared.
+            if self.foreign_contracts[ci].returns_borrow_from2 >= 0:
+                self.facade_declare_view_through_param(msig, self.foreign_contracts[ci].returns_borrow_from2)
             return
         if not hosted:
             if recv0.len() > 1:
@@ -3842,6 +3919,8 @@ impl Sema:
                 else if from >= 0:
                     let none: List[i32] = List.new()
                     self.facade_note_generic(mtext, 2, fn_sym, ci, 0, none, 0, from)
+                    if self.foreign_contracts[ci].returns_borrow_from2 >= 0:
+                        self.facade_note_generic(mtext, 3, fn_sym, ci, 0, none, 0, self.foreign_contracts[ci].returns_borrow_from2)
                 continue
             if not self.facade_sig_returns_record_view(msig, rn):
                 let rt: str = self.type_name(self.sig_return_type(msig))
@@ -3849,6 +3928,10 @@ impl Sema:
                 continue
             if from >= 0:
                 self.facade_declare_view_of_param(msig, from)
+                // D187: the result views what the second origin's `&T`
+                // view views (D85's through form).
+                if self.foreign_contracts[ci].returns_borrow_from2 >= 0:
+                    self.facade_declare_view_through_param(msig, self.foreign_contracts[ci].returns_borrow_from2)
 
     // ── text views (ruling §32, §40-§42; spec §16.2b.8) ──────────────────
     //
@@ -4155,7 +4238,9 @@ impl Sema:
         for i in 0..domains.len():
             touched.push(domains[i])
         self.facade_call_effect_index.insert(sig, self.facade_call_effects.len() as i32)
-        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, param_sources: List.new() })
+        // D187: a presented call's second origin (`from params N, M`).
+        let borrow_param2 = if borrow_param >= 0 and ci >= 0: self.foreign_contracts[ci].returns_borrow_from2 else: -1
+        self.facade_call_effects.push(FacadeCallEffect { sig, fn_sym, contract: ci, touch_params: mask, touch_domains: touched, borrow_domain: borrow, borrow_param, borrow_param2, param_sources: List.new() })
 
     // The parameters of `fn_sym` (from `first`) that receive one modeled
     // resource and are not preserved by its fn item, as origin bits.

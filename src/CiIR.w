@@ -967,6 +967,7 @@ type CiProjectSymbol {
     param_destroys: List[i32],
     owns_return: i32,
     borrow_from: i32,
+    borrow_from2: i32,   // D187: a second parameter the returned pointer is a part of on other paths, else -1
     own_reason: str,
     // 1 when a prototype declares the function (a header's API); a
     // definition no prototype declares is internal: its proofs feed its
@@ -1065,6 +1066,7 @@ fn CiProjectSymbol.new(name: &str, kind: i32) -> CiProjectSymbol:
         param_destroys: List.new(),
         owns_return: 0,
         borrow_from: -1,
+        borrow_from2: -1,
         own_reason: "",
         gir: "",
         registry: "",
