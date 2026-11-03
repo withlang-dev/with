@@ -32,11 +32,11 @@ type JsonKV {
 // --- Errors ---
 
 error JsonError =
-    UnexpectedChar(usize, str, u8)
-    | UnexpectedEof(usize, str)
-    | InvalidNumber(usize, str)
-    | InvalidEscape(usize, u8)
-    | TrailingContent(usize)
+    UnexpectedChar(isize, str, u8)
+    | UnexpectedEof(isize, str)
+    | InvalidNumber(isize, str)
+    | InvalidEscape(isize, u8)
+    | TrailingContent(isize)
 
 // --- Token Types ---
 
@@ -57,7 +57,7 @@ enum Token {
 
 type Tokenizer {
     input: str,
-    pos: usize = 0,
+    pos: isize = 0,
 }
 
 fn is_whitespace(ch: u8): ch in [b' ', b'\t', b'\n', b'\r']
@@ -69,7 +69,7 @@ fn Tokenizer.new(input: str): Tokenizer { input }
 extend Tokenizer:
     fn peek() -> Option[u8]:
         if self.pos < self.input.len():
-            Some(self.input.byte_at(self.pos as i64) as u8)
+            Some(self.input[self.pos])
         else:
             None
 
@@ -130,7 +130,7 @@ extend Tokenizer:
                         None => return Err(.UnexpectedEof(self.pos, "escape sequence"))
                 Some(_) =>
                     // Build string one character at a time
-                    result = result ++ self.input.slice((self.pos - 1) as i64, self.pos as i64)
+                    result = result ++ self.input.slice(self.pos - 1, self.pos)
         result
 
     mut fn read_number() -> Result[f64, JsonError]:
@@ -153,7 +153,7 @@ extend Tokenizer:
                 self.pos += 1
             self.read_digits()
 
-        let text = self.input.slice(start as i64, self.pos as i64)
+        let text = self.input.slice(start, self.pos)
         // Simple manual number parsing
         parse_number_str(text, start)
 
@@ -166,32 +166,32 @@ extend Tokenizer:
     mut fn expect_literal(expected: &str) -> Result[Unit, JsonError]:
         for i in 0..expected.len():
             match self.advance():
-                Some(got) if got == expected.byte_at(i as i64) => ()
+                Some(got) if got == expected[i] => ()
                 Some(got) => return Err(.UnexpectedChar(self.pos - 1, expected, got))
                 None => return Err(.UnexpectedEof(self.pos, "literal"))
 
 // Simple number parsing helper
-fn parse_number_str(text: str, start: usize) -> Result[f64, JsonError]:
+fn parse_number_str(text: str, start: isize) -> Result[f64, JsonError]:
     var result = 0.0
     var sign = 1.0
-    var i: usize = 0
+    var i = 0
 
     // handle sign
-    if i < text.len() and text.byte_at(i as i64) == b'-':
+    if i < text.len() and text[i] == b'-':
         sign = -1.0
         i += 1
 
     // integer part
-    while i < text.len() and is_digit(text.byte_at(i as i64) as u8):
-        result = result * 10.0 + (text.byte_at(i as i64) - b'0') as f64
+    while i < text.len() and is_digit(text[i]):
+        result = result * 10.0 + (text[i] - b'0')
         i += 1
 
     // fractional part
-    if i < text.len() and text.byte_at(i as i64) == b'.':
+    if i < text.len() and text[i] == b'.':
         i += 1
         var frac = 0.1
-        while i < text.len() and is_digit(text.byte_at(i as i64) as u8):
-            result = result + (text.byte_at(i as i64) - b'0') as f64 * frac
+        while i < text.len() and is_digit(text[i]):
+            result = result + (text[i] - b'0') * frac
             frac = frac * 0.1
             i += 1
 
@@ -251,7 +251,7 @@ extend Parser:
     mut fn parse_array() -> Result[JsonValue, JsonError]:
         var items = List.new()
         // empty array
-        if is_rbracket(&self.current):
+        if is_rbracket(self.current):
             self.advance()?
             return Ok(.Array(items))
         // first element
@@ -259,11 +259,11 @@ extend Parser:
         items.push(first)
         // remaining elements
         loop:
-            if is_comma(&self.current):
+            if is_comma(self.current):
                 self.advance()?
                 let elem = self.parse_value()?
                 items.push(elem)
-            else if is_rbracket(&self.current):
+            else if is_rbracket(self.current):
                 self.advance()?
                 break
             else:
@@ -274,7 +274,7 @@ extend Parser:
     mut fn parse_object() -> Result[JsonValue, JsonError]:
         var entries = List.new()
         // empty object
-        if is_rbrace(&self.current):
+        if is_rbrace(self.current):
             self.advance()?
             return Ok(.Object(entries))
         // first key-value pair
@@ -282,11 +282,11 @@ extend Parser:
         entries.push(first_kv)
         // remaining pairs
         loop:
-            if is_comma(&self.current):
+            if is_comma(self.current):
                 self.advance()?
                 let kv = self.parse_kv()?
                 entries.push(kv)
-            else if is_rbrace(&self.current):
+            else if is_rbrace(self.current):
                 self.advance()?
                 break
             else:
@@ -324,17 +324,10 @@ fn json_to_string(val: &JsonValue):
         .Number(n)  => f"{n}"
         .Str(s)     => "\"" ++ s ++ "\""
         .Array(items) =>
-            var parts = List.new()
-            for item in items:
-                parts.push(json_to_string(item))
-            let inner = parts.join(", ")
+            let inner = [json_to_string(item) for item in items].join(", ")
             "[" ++ inner ++ "]"
         .Object(entries) =>
-            var parts = List.new()
-            for entry in entries:
-                let v = json_to_string(&entry.value)
-                parts.push("\"" ++ entry.key ++ "\": " ++ v)
-            let inner = parts.join(", ")
+            let inner = ["\"" ++ entry.key ++ "\": " ++ json_to_string(entry.value) for entry in entries].join(", ")
             "{" ++ inner ++ "}"
 
 fn json_get_field(val: &JsonValue, key: str) -> Option[&JsonValue]:
@@ -361,22 +354,22 @@ fn main:
     match parse(input):
         Ok(value) =>
             print("Parsed successfully!\n")
-            let pretty = json_to_string(&value)
+            let pretty = json_to_string(value)
             print(f"Pretty: {pretty}\n")
 
             // Access nested values through views
-            if let Some(.Str(name)) = json_get_field(&value, "name"):
+            if let Some(.Str(name)) = json_get_field(value, "name"):
                 print(f"Name: {name}")
             else:
                 print("Name: unknown")
 
-            let version = match json_get_field(&value, "version"):
+            let version = match json_get_field(value, "version"):
                 Some(.Number(n)) => n
                 _ => 0.0
             print(f"Version: {version}")
 
             // Access array elements
-            let features = json_get_field(&value, "features")
+            let features = json_get_field(value, "features")
             if let Some(list) = features:
                 if let Some(.Str(first)) = json_get_index(list, 0):
                     print(f"First feature: {first}")
@@ -386,7 +379,7 @@ fn main:
                 print("First feature: none")
 
             // Count features
-            let feature_count = match json_get_field(&value, "features"):
+            let feature_count = match json_get_field(value, "features"):
                 Some(.Array(arr)) => arr.len()
                 _ => 0
             print(f"\nFeature count: {feature_count}")
@@ -396,17 +389,9 @@ fn main:
 
     // Demonstrate error handling
     print("\n--- Error cases ---")
-    let bad1 = "{\"key\": }"
-    let bad2 = "[1, 2,"
-    let bad3 = "\"hello"
-    match parse(bad1):
-        Ok(_)  => print("  missing value: unexpectedly succeeded")
-        Err(e) => print(f"  missing value: {e}")
-    match parse(bad2):
-        Ok(_)  => print("  unterminated array: unexpectedly succeeded")
-        Err(e) => print(f"  unterminated array: {e}")
-    match parse(bad3):
-        Ok(_)  => print("  unterminated string: unexpectedly succeeded")
-        Err(e) => print(f"  unterminated string: {e}")
+    for (label, bad) in [("missing value", "{\"key\": }"), ("unterminated array", "[1, 2,"), ("unterminated string", "\"hello")]:
+        match parse(bad):
+            Ok(_)  => print(f"  {label}: unexpectedly succeeded")
+            Err(e) => print(f"  {label}: {e}")
 
     print("\n=== Demo complete ===")
