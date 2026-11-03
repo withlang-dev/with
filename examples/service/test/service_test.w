@@ -23,7 +23,7 @@ fn result_code(r: ServiceResult) -> i32:
         InvalidInput => 2
         ServerError => 3
 
-fn make_user(id: i32, name: str, email: str, score: i32) -> User: User { id, name, email, score }
+fn make_user(id: i32, name: str, email: str, score: i32): User { id, name, email, score }
 
 fn find_user(users: &[5]User, id: i32) -> ServiceResult:
     var found = false
@@ -44,11 +44,11 @@ type Service {
     request_count: i32,
 }
 
-fn Service.new(config: ServiceConfig) -> Service: Service { config, request_count: 0 }
+fn Service.new(config: ServiceConfig): Service { config, request_count: 0 }
 
 extend Service:
 
-    fn get_timeout(self: &Self) -> i32: self.config.timeout_ms
+    fn get_timeout(): self.config.timeout_ms
 
 fn validate_id(id: i32) -> ServiceResult: if id in 1..=1000: Ok else: InvalidInput
 

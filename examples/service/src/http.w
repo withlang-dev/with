@@ -52,7 +52,7 @@ pub type AppState {
 // place, so the handlers are `mut fn` receivers (§3.1).
 
 extend AppState:
-    pub mut fn handle_request(req: HttpRequest) -> HttpResponse:
+    pub mut fn handle_request(req: HttpRequest):
         // The router observes the request (§3.8); the handler that keeps
         // it receives it whole.
         match (&req.method, &req.path):
@@ -62,11 +62,11 @@ extend AppState:
 
     // --- Handlers ---
 
-    fn handle_list() -> HttpResponse:
+    fn handle_list():
         let size = self.service.clamp_page_size(20)
         HttpResponse.ok(f"listing users, page_size={size}")
 
-    mut fn handle_create(req: HttpRequest) -> HttpResponse:
+    mut fn handle_create(req: HttpRequest):
         var request = req
         let user_req = CreateUserRequest {
             name: move request.body,

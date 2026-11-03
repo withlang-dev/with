@@ -18,27 +18,26 @@ type PgUserRepo {
 }
 
 extend PgUserRepo:
-    fn new(conn: str) -> PgUserRepo:
-        PgUserRepo { connection_string: conn }
+    fn new(conn: str): PgUserRepo { connection_string: conn }
 
 impl UserRepository for PgUserRepo:
-    async fn find_by_id(self: &PgUserRepo, id: UserId) -> Option[User]:
+    async fn find_by_id(id: UserId) -> Option[User]:
         // In production: SELECT id, name, email, role, active FROM users WHERE id = $1
         None
 
-    async fn find_by_email(self: &PgUserRepo, email: str) -> Option[User]:
+    async fn find_by_email(email: str) -> Option[User]:
         // In production: SELECT ... FROM users WHERE email = $1
         None
 
-    async fn list_active(self: &PgUserRepo, limit: i32, offset: i32) -> List[User]:
+    async fn list_active(limit: i32, offset: i32) -> List[User]:
         // In production: SELECT ... FROM users WHERE active = true LIMIT $1 OFFSET $2
         List.new()
 
-    async fn insert(self: &PgUserRepo, user: User) -> UserId:
+    async fn insert(user: User) -> UserId:
         // In production: INSERT INTO users ... RETURNING id
         UserId { value: 1 }
 
-    async fn update(self: &PgUserRepo, id: UserId, fields: UserUpdate) -> bool:
+    async fn update(id: UserId, fields: UserUpdate) -> bool:
         // Build SET clause dynamically
         let sets = with List.new() as mut parts:
             if fields.name.is_some():
@@ -51,27 +50,27 @@ impl UserRepository for PgUserRepo:
         if sets.is_empty():
             return false
 
-        let sep = ", "
-        let joined = sets.join(sep)
-        let _query = "UPDATE users SET " ++ joined ++ " WHERE id = $1"
+
+
+        let _query = "UPDATE users SET " ++ sets.join(", ") ++ " WHERE id = $1"
         // In production: execute the query
         true
 
-    async fn delete(self: &PgUserRepo, id: UserId) -> bool:
+    async fn delete(id: UserId) -> bool:
         // In production: DELETE FROM users WHERE id = $1
         true
 
-    async fn count_posts(self: &PgUserRepo, id: UserId) -> i32:
+    async fn count_posts(id: UserId) -> i32:
         // In production: SELECT COUNT(*) FROM posts WHERE author_id = $1
         0
 
-    async fn count_followers(self: &PgUserRepo, id: UserId) -> i32:
+    async fn count_followers(id: UserId) -> i32:
         // In production: SELECT COUNT(*) FROM follows WHERE followed_id = $1
         0
 
 // --- Helper: Convert role enum to string ---
 
-fn role_to_str(role: Role) -> str:
+fn role_to_str(role: Role):
     match role:
         .Admin     => "admin"
         .Moderator => "moderator"
