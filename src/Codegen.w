@@ -706,7 +706,7 @@ impl Codegen:
 
     mut fn analysis_add(fact: AnalysisFact):
         if self.analysis_enabled != 0:
-            self.analysis_report.add(move fact)
+            self.analysis_report.add(fact)
 
     mut fn analysis_fail(message: &str):
         if self.analysis_enabled != 0:
@@ -797,7 +797,7 @@ impl Codegen:
                 fact.name = with_str_clone_ref(self.sema.pool_resolve(sema_sym))
                 fact.detail = f"share-place declaration emitted={function != 0} ref-table={ref_table} llvm-pointer={llvm_pointer}"
                 let selected = self.analysis_fact_selected(fact)
-                self.analysis_add(move fact)
+                self.analysis_add(fact)
                 if selected and function != 0 and (not ref_table or not llvm_pointer):
                     self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si} param={pi}: share-place contract ref-table={ref_table} llvm-pointer={llvm_pointer}")
 
@@ -838,7 +838,7 @@ impl Codegen:
             fact.name = with_str_clone_ref(self.sema.pool_resolve(sema_sym))
             fact.detail = f"return-shape sema-ret={sema_ret} llvm-void={llvm_is_void} sret={has_sret}"
             let selected = self.analysis_fact_selected(fact)
-            self.analysis_add(move fact)
+            self.analysis_add(fact)
             if selected and sema_returns_value and llvm_is_void and not has_sret:
                 self.analysis_fail(f"declaration {self.sema.pool_resolve(sema_sym)} sig={si}: Sema return type {sema_ret} emitted as LLVM void without sret")
 
@@ -1026,7 +1026,7 @@ impl Codegen:
         let has_copy = strategy == AnalysisMarshalStrategy.TemporaryAddress or via_call_builder
         fact.detail = analysis_marshal_strategy_name(strategy) ++ f" raw={raw} marshaled={marshaled} sig={sig} fn-abi={descriptor} sema-share={share} ref-table={ref_table} needs-copy={needs_copy}"
         let selected = self.analysis_fact_selected(fact)
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
         let abi_ty = if has_descriptor and via_call_builder: self.fn_abi_arg(descriptor, param_index).source_ty else if has_descriptor: self.fn_abi_arg(descriptor, param_index).llvm_ty else: 0
         if selected and has_descriptor and (marshaled == 0 or wl_type_of(marshaled) != abi_ty):
             self.analysis_fail(f"call {name} body={body.fn_sym} args={args_id} param={param_index}: marshaled LLVM type disagrees with FnAbi")
@@ -1061,7 +1061,7 @@ impl Codegen:
         let strategy_not_alias = strategy != AnalysisMarshalStrategy.CalleePlaceAlias
         fact.detail = analysis_marshal_strategy_name(strategy) ++ f" incoming={incoming} storage={storage} sig={sig} sema-share={share} ref-table={ref_table} llvm-pointer={incoming_ptr}"
         let selected = self.analysis_fact_selected(fact)
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
         if selected and share and not ref_table:
             self.analysis_fail(f"callee {name} sig={sig} param={param_index}: Sema share-place contract is absent from Codegen ref table")
         if selected and share and strategy_not_alias:

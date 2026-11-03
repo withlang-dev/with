@@ -261,7 +261,7 @@ pub fn wo_bundle_targets(out: Build, ctx: &BuildCtx, plan: &WoBundle, compiler: 
     build_target = build_target.input(wo_owned_text(compiler))
     build_target = build_target.input(wo_owned_text(rt_manifest))
     build_target = build_target.input("docs/with-abi.sha256")
-    build_target = target_with_wo_corpus_inputs(move build_target, ctx, plan)
+    build_target = target_with_wo_corpus_inputs(build_target, ctx, plan)
     build_target = build_target.write_scope(wo_owned_text(plan.tree_dir))
     build_target = build_target.write_scope("out/command/" ++ build_name)
     build_target = build_target.timeout(900000)
@@ -351,7 +351,7 @@ pub fn wo_drift_target(ctx: &BuildCtx, plan: &WoBundle, compiler: &str, compiler
     kinds.push("manifest")
     for ki in 0..kinds.len():
         target = target.input(wo_prefix(plan) ++ "." ++ kinds[ki])
-    target = target_with_wo_corpus_inputs(move target, ctx, plan)
+    target = target_with_wo_corpus_inputs(target, ctx, plan)
     target = target.write_scope(wo_owned_text(dir))
     target = target.write_scope("out/command/" ++ name)
     target = target.timeout(900000)

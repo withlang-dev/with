@@ -300,7 +300,7 @@ impl Sema:
             var diag = Diagnostic.err(f"{what} `{self.pool_resolve(name)}` is declared twice in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(first), "first declared here")
             diag.add_label(self.diagnostic_node_span(decl), "declared again here")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.report_function_named_like_global()
 
     // #2066: a free function and a module `const`/`var` of one name are two
@@ -348,7 +348,7 @@ impl Sema:
             var diag = Diagnostic.err(f"`{self.pool_resolve(name)}` is declared as a function and as a global in this module", self.diagnostic_node_span(decl))
             diag.add_label(self.diagnostic_node_span(global_decl), "the global")
             diag.add_label(self.diagnostic_node_span(decl), "the function")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
 
     mut fn compute_method_origins():
         self.compute_colliding_type_names()
@@ -1816,7 +1816,7 @@ impl Sema:
                 diag.add_label(Span { file: self.local_file_id, start: e_start, end: e_end }, "type `" ++ from_name ++ "` depends on `" ++ to_name ++ "` here")
 
         diag.add_help("break the cycle by using a pointer (`*" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) or reference (`&" ++ self.pool_resolve_symbol(fwd_syms[0]) ++ "`) for one field")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     fn fn_param_uses_value_ref_abi(param_start: i32, param_idx: i32, method_owner_sym: i32, self_type_id: i32) -> bool:
         // D12 receivers occupy parameter 0 only. Matching later params by

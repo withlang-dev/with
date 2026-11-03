@@ -155,7 +155,7 @@ type InterpolatedExprParseAttempt {
 }
 
 fn Parser.init(tokens: TokenList, source: &str, file_id: i32, intern: &InternPool, diags: DiagnosticList) -> Parser:
-    Parser.init_with_pool(move tokens, source, file_id, intern, move diags, AstPool.new())
+    Parser.init_with_pool(tokens, source, file_id, intern, diags, AstPool.new())
 
 // The parser owns the node pool it fills (the caller takes it back from
 // parse_module) and holds the caller's intern pool as another holder
@@ -304,7 +304,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.pool.get_start(stmt), end: self.pool.get_end(stmt) }
         var diag = Diagnostic.err("module '" ++ self.module_label ++ "' holds an executable statement at its top level; a module file holds declarations, and only an entry source runs statements (§18.5b, D74)", span)
         diag.add_help("move the statement into a function the entry source calls, or make this file the entry source")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // D39 interface mode: the body slot of a declaration. A body in a `.wi`
     // is an error (the object holds the code); the recovery still parses it
@@ -401,7 +401,7 @@ impl Parser:
             let main_span = Span { file: self.file_id, start: self.pool.get_start(self.explicit_main_decl as NodeId), end: self.pool.get_end(self.explicit_main_decl as NodeId) }
             diag.add_label(main_span, "`fn main` defined here")
         diag.add_help("move the statement inside `fn main`, or remove `fn main` to use implicit main mode")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn synthesize_implicit_main():
         if self.implicit_main_mode == 0:
@@ -500,7 +500,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
         var diag = Diagnostic.err(msg, span)
         diag.add_help(help)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn expect_use_path_segment() -> i32:
         let t = self.peek()
@@ -514,7 +514,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
             var diag = Diagnostic.err("'" ++ keyword ++ "' is a reserved keyword and cannot be used as a module name", span)
             diag.add_help("rename the module to avoid the keyword, e.g. '" ++ keyword ++ "s'")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
             return 0
         self.emit_error("expected identifier")
         0
@@ -588,7 +588,7 @@ impl Parser:
         let span = Span { file: self.file_id, start: self.current_start(), end: self.current_end() }
         var diag = Diagnostic.err(msg, span)
         diag.set_code(code)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     fn effect_name_bit(name: &str) -> i32:
         if name == "read":
@@ -3499,7 +3499,7 @@ impl Parser:
                     diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, write `{}` for an empty body, or drop the ':' for a bodyless " ++ construct)
                 else:
                     diag.add_help("a ':' that ends the line introduces an indented body (§29.13): indent the members under the header, or write `{}` for an empty body")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
             return DeclBody.Indented
         if bodyless_ok and (t == TokenKind.TK_NEWLINE or t == TokenKind.TK_EOF):
             let header = Span { file: self.file_id, start, end: self.prev_end() }
@@ -3510,7 +3510,7 @@ impl Parser:
                 var diag = Diagnostic.err("`" ++ header_text ++ "` has no ':' or '{', so it is a bodyless " ++ construct ++ " that ends at its newline; the indented lines below it are not its members (§29.13)", span)
                 diag.add_label(header, "bodyless header")
                 diag.add_help("add ':' to the end of the header to make them its body: `" ++ header_text ++ ":`")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
             return DeclBody.Bodyless
         self.emit_error("expected ':' or '{' after the " ++ construct ++ " header")
         DeclBody.Missing
@@ -3532,7 +3532,7 @@ impl Parser:
             var diag = Diagnostic.err("an inline " ++ construct ++ " body is a single member: it ended at the end of the header line, so this member is outside it (§29.13)", span)
             diag.add_label(Span { file: self.file_id, start: introducer_end - 1, end: introducer_end }, "inline body starts after this ':'")
             diag.add_help("end the line after `" ++ header_text ++ "` and indent the first member like the rest, one member per line")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         true
 
     // A trait/impl method's colon body: the members are the declaration's
@@ -4106,7 +4106,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.pool.get_start(rhs), end: self.pool.get_end(rhs) }
             var diag = Diagnostic.err("a pipeline stage is one call, and this stage is an operator expression: `|>` binds looser than the operator after the stage (§9.9)", span)
             diag.add_help("parenthesize the pipeline to apply the operator to its result: `(xs |> sum()) * 2`")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.pool.add_node(NodeKind.NK_PIPELINE, self.pool.get_start(lhs), self.pool.get_end(rhs), lhs, rhs, 0)
 
     mut fn parse_precedence(min_prec: i32) -> NodeId:
@@ -5989,7 +5989,7 @@ impl Parser:
         let sub_tokens = lexer.tokenize()
         let parse_diags = if use_shared_diags != 0: move self.diags else: DiagnosticList.init()
         let first_node = self.pool.node_count()
-        var sub_parser = Parser.init_with_pool(move sub_tokens, source_text, self.file_id, self.intern, move parse_diags, self.pool.clone())
+        var sub_parser = Parser.init_with_pool(sub_tokens, source_text, self.file_id, self.intern, parse_diags, self.pool.clone())
         sub_parser.implicit_it_depth = self.implicit_it_depth
         let result = sub_parser.parse_expr()
         sub_parser.skip_newlines()
@@ -8431,7 +8431,7 @@ impl Parser:
             let span = Span { file: self.file_id, start: self.prev_start(), end: self.prev_end() }
             var diag = Diagnostic.err("expected ':' after 'else': a let-else branch on the next line is a body (§9.7)", span)
             diag.add_help("write `else:` to introduce the indented block; only a single diverging expression may follow a bare `else`, on the same line")
-            self.diags.emit(move diag)
+            self.diags.emit(diag)
         self.parse_block_or_expr()
 
     // Whether the tokens after `let`/`var` begin a pattern rather than a
@@ -9096,7 +9096,7 @@ impl Parser:
         let intro = self.source.slice(intro_start as i64, intro_end as i64)
         var diag = Diagnostic.err("expected an indented block after '" ++ intro ++ "'", Span { file: self.file_id, start: intro_start, end: intro_end })
         diag.add_help("a '" ++ intro ++ "' that ends the line opens a body on the lines below it, indented deeper than the line that holds the '" ++ intro ++ "' (§29.13)")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
         false
 
     mut fn parse_block_or_expr() -> NodeId:
@@ -9151,7 +9151,7 @@ impl Parser:
                 let bad_start = self.current_start()
                 var diag = Diagnostic.err(f"unexpected indentation: this line is indented to column {next_col}, which is no enclosing block's indentation (the block here starts at column {block_col})", Span { file: self.file_id, start: bad_start, end: self.current_end() })
                 diag.add_help("a block's statements all start at its column; a line indented deeper than the statement before it belongs to a body that statement opens with ':' at the end of its line (§29.13)")
-                self.diags.emit(move diag)
+                self.diags.emit(diag)
 
             stmts.push(last_expr as i32)
             last_expr = self.parse_expr()

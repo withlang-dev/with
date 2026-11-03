@@ -736,7 +736,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             let start = source.len() as i32
             source.push_str(rewritten)
             source.push_str("\n")
-            syn = cli_synthetic_add_mapping(move syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
+            syn = cli_synthetic_add_mapping(syn, start, rewritten, "<cli -e #" ++ f"{i + 1}" ++ ">")
         syn.source = source.to_str()
         return syn
     // The per-line loop takes a brace body (§29.13, the same AST as the
@@ -760,7 +760,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
             let start = source.len() as i32
             source.push_str(uses)
             source.push_str("\n")
-            syn = cli_synthetic_add_mapping(move syn, start, uses, f"<cli {flag} #{i + 1}>")
+            syn = cli_synthetic_add_mapping(syn, start, uses, f"<cli {flag} #{i + 1}>")
         rewritten_parts.push(rewritten)
         use_lens.push(use_len)
     source.push_str("var nr: i64 = 0\n")
@@ -771,7 +771,7 @@ fn cli_build_synthetic_source(one: &CliOneLiner) -> CliSyntheticSource:
         let start = source.len() as i32
         source.push_str(cli_blank_prefix(rewritten_parts[i], use_lens[i]))
         source.push_str("\n")
-        syn = cli_synthetic_add_mapping(move syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
+        syn = cli_synthetic_add_mapping(syn, start, rewritten_parts[i], f"<cli {flag} #{i + 1}>")
     if not lines_mode: source.push_str("print(line)\n")
     source.push_str("}\n")
     syn.source = source.to_str()
@@ -1778,7 +1778,7 @@ fn build_runner_ensure(root: &str, options: &BuildCommandOptions) -> str:
     var comp = Compilation.init()
     var runner_options = build_command_options_clone(options)
     runner_options.opt_level = 1
-    comp.configure_options(move runner_options)
+    comp.configure_options(runner_options)
     comp.set_tool_mode_entry_path(entry_path)
     let no_settings: List[str] = List.new()
     // #1797/#1906: the runner links exactly as stage1 does — against a
@@ -2587,7 +2587,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
     comp.configure_options(build_command_options_clone(options))
     comp.set_tool_mode_entry_path(entry_path)
     let compile_cfg = project_config_clone(cfg)
-    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), move compile_cfg)
+    let pool = comp.compile_source_text_with_config(entry_path, build_tool_eval_entry_source(), compile_cfg)
     var sema = move comp.zcu.last_sema
     if pool.decl_count() == 0 or comp.has_errors():
         graph.error_msg = "build.w evaluation wrapper compilation failed"
@@ -2606,7 +2606,7 @@ fn load_build_graph_from_build_w(root: &str, cfg: &ProjectConfig, options: &Buil
         graph.ok = false
         graph.error_msg = move eval_result.error_msg
         return BuildGraphLoadResult { graph, sema }
-    var materialized = materialize_build_graph_from_comptime(move sema, eval_result.value, move eval_result.extras)
+    var materialized = materialize_build_graph_from_comptime(sema, eval_result.value, move eval_result.extras)
     build_cache_record_build_effects(root, eval_result.effect_records)
     // Keyed on the environment this evaluation just read (#1925), not the
     // previous one's.
@@ -3469,7 +3469,7 @@ fn run_graph_target_command(target_name: &str) -> i32:
     var graph_options = build_graph_command_options_default()
     graph_options.selected_target = with_str_clone_ref(target_name)
     graph_options.selected_targets.push(with_str_clone_ref(target_name))
-    run_build_command(move build_options, graph_options)
+    run_build_command(build_options, graph_options)
 
 // Returns the INDEX, not a copy: returning the element bit-copied its
 // inputs/outputs/args vectors out of the caller's graph, and the copy's drop
@@ -3781,7 +3781,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
-        actual_options = build_command_apply_project_target_default(move actual_options, cfg)
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
         if build_command_validate_target(actual_options, cfg) != 0:
             return 1
         if project_config_file_exists(build_path):
@@ -3860,7 +3860,7 @@ fn run_build_command(options: BuildCommandOptions, graph_options: &BuildGraphCom
         if cfg.manifest_error.len() > 0:
             with_eprint("error: invalid with.toml: " ++ cfg.manifest_error)
             return 1
-        actual_options = build_command_apply_project_target_default(move actual_options, cfg)
+        actual_options = build_command_apply_project_target_default(actual_options, cfg)
         if build_command_validate_target(actual_options, cfg) != 0:
             return 1
         // #747 instance E: `var actual_source = actual_options.source_path`
@@ -4039,7 +4039,7 @@ fn dump_ast(source_file: &str, no_std: bool, alloc_mode: bool, include_header: b
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -4312,7 +4312,7 @@ fn discover_test_functions(text: &str) -> TestDiscovery:
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -4342,7 +4342,7 @@ fn discover_bench_functions(text: &str) -> BenchDiscovery:
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     let pool = parser.parse_module()
     diags = move parser.diags
 
@@ -5330,7 +5330,7 @@ fn run_test_command(argc: i32, opt_level: i32, no_std: bool, alloc_mode: bool, r
         build_options.release = cli_release_flag()
         var graph_options = build_graph_command_options_default()
         graph_options.selected_target = "test"
-        return run_build_command(move build_options, graph_options)
+        return run_build_command(build_options, graph_options)
     // Two or more files run as a build.w test lane runs them: on the build
     // graph's pool, a worker per core, every failure reported and passes
     // cached machine-wide. Before, the files ran one after another and the
@@ -7017,7 +7017,7 @@ fn get_install_c_dep(root: &str, pkg_name: &str, pkg_version: &str, force_reinst
     if resolved_version.len() == 0:
         return 1
     let loaded_lock = lock_load(root)
-    let updated_lock = lock_upsert_installed_c_dep_tree(move loaded_lock, root, pkg_name, resolved_version)
+    let updated_lock = lock_upsert_installed_c_dep_tree(loaded_lock, root, pkg_name, resolved_version)
     if updated_lock.entries.len() == 0:
         return 1
     if lock_write(root, updated_lock) != 0:
@@ -7063,7 +7063,7 @@ fn run_remove_command(argc: i32) -> i32:
             return 1
     if with_fs_file_exists(lock_file_path(root)) != 0:
         let existing_lock = lock_load(root)
-        let next_lock = lock_remove(move existing_lock, "c." ++ pkg_name)
+        let next_lock = lock_remove(existing_lock, "c." ++ pkg_name)
         if lock_write(root, next_lock) != 0:
             return 1
     with_eprint("removed c." ++ pkg_name)
@@ -7089,7 +7089,7 @@ fn run_update_command(argc: i32) -> i32:
         let resolved_version = conan_install(dep.name, dep.constraint, root, true)
         if resolved_version.len() == 0:
             return 1
-        next_lock = lock_upsert_installed_c_dep_tree(move next_lock, root, dep.name, resolved_version)
+        next_lock = lock_upsert_installed_c_dep_tree(next_lock, root, dep.name, resolved_version)
         if next_lock.entries.len() == 0:
             return 1
         toml = cli_update_manifest_dep(toml, dep.name, resolved_version)

@@ -512,11 +512,11 @@ fn comptime_tool_path_normalize(path: &str) -> str:
         if ch == 47 or ch == 92:
             if i > start:
                 let part = path.slice(start as i64, i as i64)
-                parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
+                parts = comptime_tool_path_push_part(parts, part, is_absolute, root_parts)
             start = (i + 1) as i32
     if start < path.len():
         let part = path.slice(start as i64, path.len() as i64)
-        parts = comptime_tool_path_push_part(move parts, part, is_absolute, root_parts)
+        parts = comptime_tool_path_push_part(parts, part, is_absolute, root_parts)
     if parts.len() == 0:
         if is_absolute:
             return runtime_path_root_prefix(path)
@@ -1115,7 +1115,7 @@ fn comptime_eval_result_invalid() -> ComptimeEvalResult:
 // those reads were silent aliasing bit-copies — the caller's drop then
 // freed what the result now owns (D22 §13.6, #730).
 unsafe fn comptime_eval_finish(sema_ptr: *mut Sema, evaluator: ComptimeEvaluator, value: ComptimeValue) -> ComptimeEvalResult:
-    var owned = move evaluator
+    var owned = evaluator
     let has_pending_diag = owned.has_pending_diag
     let pending_diag = move owned.pending_diag
     let extras = move owned.extra_values
@@ -1126,7 +1126,7 @@ unsafe fn comptime_eval_finish(sema_ptr: *mut Sema, evaluator: ComptimeEvaluator
     let synced_sema = move owned.sema
     *sema_ptr = synced_sema
     if has_pending_diag != 0:
-        sema_ptr.diags.emit(move pending_diag)
+        sema_ptr.diags.emit(pending_diag)
     ComptimeEvalResult {
         value,
         extras,
@@ -1487,7 +1487,7 @@ unsafe fn comptime_plan_deserialize(plan_out: *mut ComptimeWorkspaceCompilePlan,
     out.migrate_one = migrate_one
     out.migrate_shared_fragment = migrate_shared_fragment
     unsafe:
-        *plan_out = move out
+        *plan_out = out
     0
 
 // Child entry for `with __workspace-compile <plan> <result>` (D24, #729).
@@ -1618,14 +1618,14 @@ unsafe fn comptime_take_sema(sema_ptr: *mut Sema, ast: &AstPool) -> Sema:
 unsafe fn comptime_try_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
-    var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 0)
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 0)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
 unsafe fn comptime_force_eval_expr_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, node: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
-    var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     let value = evaluator.eval_root(node)
     comptime_eval_finish(sema_ptr, evaluator, value)
 
@@ -1640,7 +1640,7 @@ unsafe fn comptime_force_eval_expr(sema_ptr: *mut Sema, ast: &AstPool, pool: &In
 unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, strict_effects: i32, suppress_side_effects: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
-    var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
     evaluator.strict_effects = strict_effects
     evaluator.suppress_toolfs_writes = suppress_side_effects
@@ -1651,7 +1651,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, po
     if ctx_type == 0:
         return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
     let ctx_record = comptime_capability_record(CapabilityKind.CK_BUILD_CTX, package_name, package_version, project_root)
-    let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
+    let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: List[ComptimeValue] = List.new()
     args.push(ctx_value)
     var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
@@ -1667,7 +1667,7 @@ unsafe fn comptime_eval_tool_build_result(sema_ptr: *mut Sema, ast: &AstPool, po
 unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: &AstPool, pool: &InternPool, fn_sym: i32, package_name: &str, package_version: &str, project_root: &str, target_name: &str, inputs: List[str], output: &str, extra_outputs: &List[str], args_values: List[str], write_scopes: &List[str], timeout_ms: i32, cwd: &str, env: List[str], network: i32, strict_effects: i32) -> ComptimeEvalResult:
     var sema = comptime_take_sema(sema_ptr, ast)
     sema = sema.prepare_comptime_eval_copy()
-    var evaluator = ComptimeEvaluator.init(move sema, ast, pool, 1)
+    var evaluator = ComptimeEvaluator.init(sema, ast, pool, 1)
     evaluator.allow_runtime_calls = 1
     evaluator.strict_effects = strict_effects
     evaluator.step_budget = COMPTIME_TOOL_STEP_LIMIT
@@ -1676,8 +1676,8 @@ unsafe fn comptime_eval_tool_action_result(sema_ptr: *mut Sema, ast: &AstPool, p
     let ctx_type = evaluator.capability_type_id(CapabilityKind.CK_BUILD_ACTION_CTX, call_node)
     if ctx_type == 0:
         return comptime_eval_finish(sema_ptr, evaluator, comptime_value_invalid())
-    let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, move inputs, output, extra_outputs, move args_values, write_scopes, timeout_ms, cwd, move env, network)
-    let ctx_value = evaluator.mint_capability(ctx_type, move ctx_record)
+    let ctx_record = comptime_action_capability_record(package_name, package_version, project_root, target_name, inputs, output, extra_outputs, args_values, write_scopes, timeout_ms, cwd, env, network)
+    let ctx_value = evaluator.mint_capability(ctx_type, ctx_record)
     let args: List[ComptimeValue] = List.new()
     args.push(ctx_value)
     var signal = evaluator.eval_fn_symbol_call_values(fn_sym, args, call_node)
@@ -1899,7 +1899,7 @@ impl ComptimeEvaluator:
                     owned_coll.value.type_id = ret_type
                     return owned_coll
         if signal.kind == ComptimeControlKind.CTL_RETURN:
-            var owned = move signal
+            var owned = signal
             return comptime_control_value(move owned.value)
         signal
 
@@ -2023,7 +2023,7 @@ impl ComptimeEvaluator:
     fn store_workspace_record(workspace_id: i32, record: ComptimeWorkspaceRecord):
         let slot_index = workspace_id as i64
         with self.workspace_records.slot(slot_index) as mut slot:
-            slot.set(move record)
+            slot.set(record)
 
     mut fn mint_capability(type_id: i32, record: ComptimeCapabilityRecord) -> ComptimeValue:
         var stored = record
@@ -2031,7 +2031,7 @@ impl ComptimeEvaluator:
         self.next_capability_generation = self.next_capability_generation + 1
         let handle_id = self.capability_records.len() as i32
         let result = comptime_value_capability(type_id, stored.kind, handle_id, stored.generation)
-        self.capability_records.push(move stored)
+        self.capability_records.push(stored)
         result
 
     mut fn validate_capability(value: &ComptimeValue, expected_kind: i32, method: &str, node: i32) -> i32:
@@ -2081,7 +2081,7 @@ impl ComptimeEvaluator:
     fn update_slot_value(idx: i32, value: ComptimeValue) -> Unit:
         let slot_index = idx as i64
         with self.slot_values.slot(slot_index) as mut slot:
-            slot.set(move value)
+            slot.set(value)
 
     mut fn record_runtime_env_set(name: &str) -> Unit:
         for i in 0..self.runtime_env_names.len():
@@ -2113,7 +2113,7 @@ fn comptime_effect_escape(text: &str) -> str:
 impl ComptimeEvaluator:
     mut fn record_effect(line: &str):
         var records = move self.effect_records
-        self.effect_records = tracked_input_insert_unique(move records, line)
+        self.effect_records = tracked_input_insert_unique(records, line)
 
     mut fn record_env_input_effect(target_name: &str, name: &str):
         let value = with_getenv_str(name)
@@ -4288,7 +4288,7 @@ fn comptime_workspace_compile_result(result: ComptimeValue, messages: List[Compt
 
 fn comptime_workspace_compile_invalid() -> ComptimeWorkspaceCompileResult:
     let messages: List[ComptimeValue] = List.new()
-    comptime_workspace_compile_result(comptime_value_invalid(), move messages)
+    comptime_workspace_compile_result(comptime_value_invalid(), messages)
 
 fn comptime_module_name_for_path(root: &str, path: &str) -> str:
     var rel = with_str_clone_ref(path)
@@ -4490,21 +4490,21 @@ impl ComptimeEvaluator:
 
     mut fn workspace_success_messages(comp: &Compilation, ast_pool: &AstPool, node: i32) -> List[ComptimeValue]:
         var messages: List[ComptimeValue] = List.new()
-        messages = self.workspace_phase_message_append(move messages, 0, node)
-        messages = self.workspace_phase_message_append(move messages, 1, node)
-        messages = self.workspace_phase_message_append(move messages, 2, node)
+        messages = self.workspace_phase_message_append(messages, 0, node)
+        messages = self.workspace_phase_message_append(messages, 1, node)
+        messages = self.workspace_phase_message_append(messages, 2, node)
         let typechecked = self.workspace_typechecked_messages(comp, ast_pool, node)
         for mi in 0..typechecked.len():
             messages.push(comptime_value_clone(typechecked[mi]))
-        messages = self.workspace_phase_message_append(move messages, 4, node)
-        messages = self.workspace_phase_message_append(move messages, 5, node)
-        messages = self.workspace_phase_message_append(move messages, 6, node)
+        messages = self.workspace_phase_message_append(messages, 4, node)
+        messages = self.workspace_phase_message_append(messages, 5, node)
+        messages = self.workspace_phase_message_append(messages, 6, node)
         if comp.last_link_command_available != 0:
-            messages = self.workspace_phase_message_append(move messages, 7, node)
+            messages = self.workspace_phase_message_append(messages, 7, node)
             let prelink = self.compiler_message_prelink_value(comp.last_link_command, node)
             if prelink.kind != ComptimeValueKind.CV_INVALID:
                 messages.push(prelink)
-            messages = self.workspace_phase_message_append(move messages, 8, node)
+            messages = self.workspace_phase_message_append(messages, 8, node)
             let linked = self.compiler_message_linked_value(comp.last_link_command, comp.last_link_rc, node)
             if linked.kind != ComptimeValueKind.CV_INVALID:
                 messages.push(linked)
@@ -4684,7 +4684,7 @@ impl ComptimeEvaluator:
         var out = record
         for mi in 0..messages.len():
             out.messages.push(comptime_value_clone(messages[mi]))
-        out = self.enqueue_artifact_messages(move out, result, node)
+        out = self.enqueue_artifact_messages(out, result, node)
         if self.had_error != 0:
             return out
         let phase_message = self.compiler_message_phase_value(9, node)
@@ -5021,7 +5021,7 @@ fn comptime_execute_workspace_compile_plan(plan: &ComptimeWorkspaceCompilePlan) 
                 success = true
         else:
             return comptime_workspace_native_compile_invalid()
-    comptime_workspace_native_compile_result((not (success)) as i32, artifact_path, move comp, 0)
+    comptime_workspace_native_compile_result((not (success)) as i32, artifact_path, comp, 0)
 
 impl ComptimeEvaluator:
     mut fn compile_workspace_record(record: &ComptimeWorkspaceRecord, capability: &ComptimeCapabilityRecord, node: i32, want_messages: i32) -> ComptimeWorkspaceCompileResult:
@@ -5049,7 +5049,7 @@ impl ComptimeEvaluator:
         comptime_workspace_native_compile_result_free(native)
         if self.had_error != 0:
             return comptime_workspace_compile_invalid()
-        comptime_workspace_compile_result(result, move messages)
+        comptime_workspace_compile_result(result, messages)
 
     mut fn start_intercept_workspace_compile(record: ComptimeWorkspaceRecord, capability: &ComptimeCapabilityRecord, node: i32) -> ComptimeWorkspaceRecord:
         var out = record
@@ -5113,7 +5113,7 @@ impl ComptimeEvaluator:
                 cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
             for li in 0..link_libs.len():
                 cfg.dep_link_libs.push(with_str_clone_ref(link_libs[li]))
-            ast_pool = comp.compile_entry_file_with_config(absolute_source, move cfg)
+            ast_pool = comp.compile_entry_file_with_config(absolute_source, cfg)
 
         var link_plan = comp.prepare_binary_link_from_pool(ast_pool, source_name, obj_path, absolute_output)
         if not link_plan.ok:
@@ -5160,7 +5160,7 @@ impl ComptimeEvaluator:
         let result = self.workspace_build_result_value(out.name, link_result.rc, self.workspace_artifact_kind_for_output(out.pending_link_output_kind), out.pending_link_output_path, node)
         if result.kind == ComptimeValueKind.CV_INVALID:
             return out
-        out = self.enqueue_artifact_messages(move out, result, node)
+        out = self.enqueue_artifact_messages(out, result, node)
         let phase_message = self.compiler_message_phase_value(9, node)
         if phase_message.kind != ComptimeValueKind.CV_INVALID:
             out.messages.push(phase_message)
@@ -5177,18 +5177,18 @@ impl ComptimeEvaluator:
         var record = parent
         record.kind = CapabilityKind.CK_BUILD_WORKSPACE
         record.workspace_id = workspace_id
-        comptime_control_value(self.mint_capability(workspace_type, move record))
+        comptime_control_value(self.mint_capability(workspace_type, record))
 
     mut fn create_workspace_for_capability(parent: ComptimeCapabilityRecord, name: &str, node: i32) -> ComptimeControl:
         let workspace_id = self.workspace_records.len() as i32
         self.workspace_records.push(self.new_workspace_record(name, node))
         self.current_workspace_id = workspace_id
-        self.mint_workspace_capability(move parent, workspace_id, node)
+        self.mint_workspace_capability(parent, workspace_id, node)
 
     mut fn current_workspace_for_capability(parent: ComptimeCapabilityRecord, owner_name: &str, node: i32) -> ComptimeControl:
         if self.current_workspace_id < 0:
             return self.fail(node, owner_name ++ ".current_workspace called before create_workspace")
-        self.mint_workspace_capability(move parent, self.current_workspace_id, node)
+        self.mint_workspace_capability(parent, self.current_workspace_id, node)
 
     mut fn eval_buildctx_capability_method(recv_value: &ComptimeValue, method: &str, arg_count: i32, node: i32) -> ComptimeControl:
         if method == "env_input":
@@ -5242,7 +5242,7 @@ impl ComptimeEvaluator:
             if project_info_type == 0:
                 return comptime_control_error()
             let child = comptime_capability_record(CapabilityKind.CK_BUILD_PROJECT_INFO, record.package_name, record.package_version, record.project_root)
-            return comptime_control_value(self.mint_capability(project_info_type, move child))
+            return comptime_control_value(self.mint_capability(project_info_type, child))
         if method == "diagnostics" or method == "source_emitter" or method == "fs" or method == "process_runner":
             if not self.capability_expect_arg_count(arg_count, 0, method, node):
                 return comptime_control_error()
@@ -5263,7 +5263,7 @@ impl ComptimeEvaluator:
                 return comptime_control_error()
             let record = ce_clone_capability_record(self.capability_records[handle])
             let child = comptime_capability_record(child_kind, record.package_name, record.package_version, record.project_root)
-            return comptime_control_value(self.mint_capability(child_type, move child))
+            return comptime_control_value(self.mint_capability(child_type, child))
         self.fail(node, "BuildCtx capability method '" ++ method ++ "' is not implemented yet")
 
     mut fn eval_project_info_capability_method(recv_value: &ComptimeValue, method: &str, arg_count: i32, node: i32) -> ComptimeControl:
@@ -6263,11 +6263,11 @@ impl ComptimeEvaluator:
             if args_signal.kind != ComptimeControlKind.CTL_VALUE:
                 return args_signal
             let name = self.capability_arg_str(args_signal.value, 0, method, node)
-            return self.create_workspace_for_capability(move record, name, node)
+            return self.create_workspace_for_capability(record, name, node)
         if not self.capability_expect_arg_count(arg_count, 0, method, node):
             return comptime_control_error()
         if method == "current_workspace":
-            return self.current_workspace_for_capability(move record, "ActionCtx", node)
+            return self.current_workspace_for_capability(record, "ActionCtx", node)
         if method == "target_name":
             return comptime_control_value(comptime_value_str(record.target_name))
         if method == "inputs":
@@ -6320,7 +6320,7 @@ impl ComptimeEvaluator:
             child.write_scope = ce_clone_str_list(record.write_scope)
             child.write_scoped = record.write_scoped
             child.network = record.network
-        comptime_control_value(self.mint_capability(child_type, move child))
+        comptime_control_value(self.mint_capability(child_type, child))
 
     mut fn eval_workspace_capability_method(recv_value: &ComptimeValue, method: &str, extra_start: i32, arg_count: i32, node: i32) -> ComptimeControl:
         let workspace_id = self.workspace_record_index(recv_value, method, node)
@@ -6412,9 +6412,9 @@ impl ComptimeEvaluator:
                 return self.fail(node, "Workspace.wait_for_message called without active interception")
             if record.message_cursor >= record.messages.len() and record.intercept_terminal == 0:
                 if record.pending_link_active != 0:
-                    record = self.finish_intercept_workspace_link(move record, node)
+                    record = self.finish_intercept_workspace_link(record, node)
                 else if record.intercept_started == 0:
-                    record = self.start_intercept_workspace_compile(move record, capability, node)
+                    record = self.start_intercept_workspace_compile(record, capability, node)
                 if self.had_error != 0:
                     return comptime_control_error()
                 self.store_workspace_record(workspace_id, record)
@@ -6482,7 +6482,7 @@ impl ComptimeEvaluator:
                 // The enqueue retains the result inside the Complete message;
                 // hand it an independent clone so the `result` we return to the
                 // build script stays valid (a consumed view blanks its source).
-                record = self.enqueue_workspace_compile_result(move record, comptime_value_clone(result), compiled.messages, node)
+                record = self.enqueue_workspace_compile_result(record, comptime_value_clone(result), compiled.messages, node)
                 if self.had_error != 0:
                     return comptime_control_error()
                 self.store_workspace_record(workspace_id, record)
@@ -6993,7 +6993,7 @@ impl ComptimeEvaluator:
         else if value.kind == ComptimeValueKind.CV_FLOAT:
             with_fmt_buf_write_f64_spec(buf, value.real, flags as i64, width, precision, mode)
         else:
-            let text = self.fstring_segment_text(move value, node)
+            let text = self.fstring_segment_text(value, node)
             with_fmt_buf_write_str_spec_ref(buf, text, flags as i64, width, precision)
         with_fmt_buf_finish(buf)
 
@@ -7752,7 +7752,7 @@ impl ComptimeEvaluator:
     // clause order. The result is the collection Sema typed the node as.
     mut fn eval_array_comprehension(node: i32) -> ComptimeControl:
         let start_state = ComptimeComprehension { signal: comptime_control_value(comptime_value_void(self.sema.ty_void as i32)), elems: List.new() }
-        var done = self.eval_comprehension_clause(node, 0, move start_state)
+        var done = self.eval_comprehension_clause(node, 0, start_state)
         if done.signal.kind != ComptimeControlKind.CTL_VALUE:
             return move done.signal
         let count = done.elems.len() as i32
@@ -7770,7 +7770,7 @@ impl ComptimeEvaluator:
         if clause == self.ast.get_data2(node):
             var elem_signal = self.eval_expr(self.ast.get_data0(node))
             if elem_signal.kind != ComptimeControlKind.CTL_VALUE:
-                state.signal = move elem_signal
+                state.signal = elem_signal
                 return state
             state.elems.push(move elem_signal.value)
             return state
@@ -7779,7 +7779,7 @@ impl ComptimeEvaluator:
         let filter = self.ast.get_extra(extra + 2)
         var iterable_signal = self.eval_expr(self.ast.get_extra(extra + 1))
         if iterable_signal.kind != ComptimeControlKind.CTL_VALUE:
-            state.signal = move iterable_signal
+            state.signal = iterable_signal
             return state
         let source = move iterable_signal.value
         var count = 0
@@ -7799,7 +7799,7 @@ impl ComptimeEvaluator:
                 var filter_signal = self.eval_expr(filter)
                 if filter_signal.kind != ComptimeControlKind.CTL_VALUE:
                     self.pop_scope()
-                    state.signal = move filter_signal
+                    state.signal = filter_signal
                     return state
                 let truthy = comptime_value_truthy(filter_signal.value)
                 if truthy < 0:
@@ -7807,7 +7807,7 @@ impl ComptimeEvaluator:
                     state.signal = self.fail(filter, "a comprehension's filter is a bool")
                     return state
                 keep = truthy != 0
-            if keep: state = self.eval_comprehension_clause(node, clause + 1, move state)
+            if keep: state = self.eval_comprehension_clause(node, clause + 1, state)
             self.pop_scope()
             if state.signal.kind != ComptimeControlKind.CTL_VALUE:
                 return state
@@ -7893,7 +7893,7 @@ impl ComptimeEvaluator:
 
     // Consumes: saved subst vecs move back into sema (see restore_label_registry).
     mut fn restore_generic_substitutions(snapshot: ComptimeGenericSubstSnapshot):
-        var owned = move snapshot
+        var owned = snapshot
         // Last to first: a parameter listed twice was saved twice, and only
         // the first save is the caller's binding.
         var i = owned.tp_syms.len() - 1
@@ -8587,7 +8587,7 @@ impl ComptimeEvaluator:
             let plan = self.workspace_compile_plan(record, capability, node)
             if plan.valid == 0:
                 return comptime_control_error()
-            plans.push(move plan)
+            plans.push(plan)
             workspace_ids.push(workspace_id)
             intercepted.push((record.intercept_active != 0) as i32)
         let native_results: List[ComptimeWorkspaceNativeCompileResult] = List.new()
@@ -8673,7 +8673,7 @@ impl ComptimeEvaluator:
                 // The enqueue retains the result inside the Complete message;
                 // hand it a clone so the copy pushed into `results` below (the
                 // value returned to the build script) stays valid.
-                record = self.enqueue_workspace_compile_result(move record, comptime_value_clone(result), messages, node)
+                record = self.enqueue_workspace_compile_result(record, comptime_value_clone(result), messages, node)
                 if self.had_error != 0:
                     comptime_workspace_native_compile_result_free(native)
                     return comptime_control_error()

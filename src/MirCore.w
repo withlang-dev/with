@@ -492,7 +492,7 @@ impl MirModule:
     mut fn add_body(body: MirBody):
         let body_idx = self.bodies.len() as i32
         let fn_sym = body.fn_sym
-        self.bodies.push(move body)
+        self.bodies.push(body)
         self.body_fn_syms.push(fn_sym)
         if fn_sym != 0:
             self.body_index_by_fn_sym.insert(fn_sym, body_idx)

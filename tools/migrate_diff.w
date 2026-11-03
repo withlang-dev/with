@@ -45,18 +45,18 @@ fn split_bodies(dump: &str) -> BTreeMap[str, List[str]]:
     var body: List[str] = List.new()
     for line in dump.split("\n"):
         if line.starts_with("fn sym") and line.ends_with(") {"):
-            if name.len() > 0: out.insert(name.clone(), move body)
+            if name.len() > 0: out.insert(name.clone(), body)
             body = List.new()
             let open = line.find("(")
             name = line[open + 1..line.len() - 3].to_owned()
         else if name.len() > 0:
             if line == "}":
-                out.insert(name.clone(), move body)
+                out.insert(name.clone(), body)
                 body = List.new()
                 name = ""
             else:
                 body.push(normalize(line))
-    if name.len() > 0: out.insert(name, move body)
+    if name.len() > 0: out.insert(name, body)
     out
 
 fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:

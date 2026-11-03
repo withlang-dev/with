@@ -464,7 +464,7 @@ impl LspDocument:
         let tokens = lexer.tokenize()
         var intern = InternPool.init()
         var diags = DiagnosticList.init()
-        var parser = Parser.init(move tokens, self.text, 0, intern, move diags)
+        var parser = Parser.init(tokens, self.text, 0, intern, diags)
         parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
         self.fast_pool = parser.parse_module()
         self.fast_intern = intern
@@ -531,7 +531,7 @@ impl LspDocument:
                             mi = mi + 1
                 ti = ti + 1
             if methods.len() > 0:
-                self.cached_trait_methods.insert(with_str_clone_ref(type_name), move methods)
+                self.cached_trait_methods.insert(with_str_clone_ref(type_name), methods)
         self.cached_text_len = self.text.len() as i32
         self.cache_valid = true
 
@@ -591,7 +591,7 @@ impl LspState:
         reparsed.ensure_parsed()
         let parsed_slot_idx = idx as i64
         with self.documents.slot(parsed_slot_idx) as mut slot:
-            slot.set(move reparsed)
+            slot.set(reparsed)
 
     fn ensure_doc_analyzed(idx: i32):
         if idx < 0:
@@ -604,7 +604,7 @@ impl LspState:
         reanalyzed.ensure_analyzed()
         let analyzed_slot_idx = idx as i64
         with self.documents.slot(analyzed_slot_idx) as mut slot:
-            slot.set(move reanalyzed)
+            slot.set(reanalyzed)
 
     fn get_parsed(uri: &str, text: &str) -> LspParseResult:
         // Always a fresh caller-owned parse. Returning the cached fast_pool /
@@ -1279,7 +1279,7 @@ fn lsp_parse_file(text: &str) -> LspParseResult:
     let tokens = lexer.tokenize()
     var intern = InternPool.init()
     var diags = DiagnosticList.init()
-    var parser = Parser.init(move tokens, text, 0, intern, move diags)
+    var parser = Parser.init(tokens, text, 0, intern, diags)
     parser.enable_implicit_main_mode()  // §18.5b (D74): an open root is an entry source
     let pool = parser.parse_module()
     LspParseResult { pool, intern }

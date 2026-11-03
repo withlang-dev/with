@@ -91,7 +91,7 @@ fn stdlib_tree_files(dir: &str):
                 if path.ends_with(".w") and not path.starts_with(excluded):
                     paths.push(path)
             start = i + 1
-    sort_paths(move paths)
+    sort_paths(paths)
 
 fn usage: with_eprint("usage: generate_embedded_stdlib <repo-root> <output-file> <stdlib-files...> | --tree <repo-root> <output-file> <stdlib-dir>")
 

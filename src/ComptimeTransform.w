@@ -25,7 +25,7 @@ impl Sema:
     mut fn ct_emit_error_help(ast: &AstPool, node: i32, msg: &str, help: &str):
         var diag = Diagnostic.err(msg, Span { file: self.local_file_id, start: ast.get_start(node), end: ast.get_end(node) })
         diag.add_help(help)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
 fn astpool_clone_deep(src: &AstPool) -> AstPool:
     var out = AstPool.new()
@@ -2141,7 +2141,7 @@ impl Sema:
         let before = out.decl_count()
         var lexer = Lexer.init(source, self.local_file_id)
         let tokens = lexer.tokenize()
-        var parser = Parser.init_with_pool(move tokens, source, self.local_file_id, intern, move self.diags, out.clone())
+        var parser = Parser.init_with_pool(tokens, source, self.local_file_id, intern, move self.diags, out.clone())
         let parsed = parser.parse_module()
         self.diags = move parser.diags
         if parsed.decl_count() <= before:

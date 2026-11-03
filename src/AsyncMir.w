@@ -93,7 +93,7 @@ impl AsyncMirModule:
 
     mut fn add_body(body: AsyncMirBody) -> Unit:
         let fn_sym = body.fn_sym
-        self.bodies.push(move body)
+        self.bodies.push(body)
         self.body_fn_syms.push(fn_sym)
 
     fn body_count() -> i32:

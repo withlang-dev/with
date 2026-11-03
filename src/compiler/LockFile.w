@@ -408,14 +408,14 @@ fn lock_upsert_installed_c_dep_tree_seen(walk: LockDepWalk, project_root: &str, 
             runtime_eprint("error: unsupported locked Conan requirement reference: " ++ req)
             out.lock = LockFile { entries: List.new() }
             return out
-        out = lock_upsert_installed_c_dep_tree_seen(move out, project_root, req_name, req_version)
+        out = lock_upsert_installed_c_dep_tree_seen(out, project_root, req_name, req_version)
         if out.lock.entries.len() == 0:
             return out
     out
 
 fn lock_upsert_installed_c_dep_tree(lock: LockFile, project_root: &str, name: &str, version: &str) -> LockFile:
     let walk = LockDepWalk { lock, seen: List.new() }
-    var done = lock_upsert_installed_c_dep_tree_seen(move walk, project_root, name, version)
+    var done = lock_upsert_installed_c_dep_tree_seen(walk, project_root, name, version)
     return move done.lock
 
 fn lock_c_name(entry_name: &str) -> str:

@@ -201,7 +201,7 @@ fn py_lex(src: &str) -> List[PyTok]:
                 let raw = word.contains("r") or word.contains("R")
                 let is_f = word.contains("f") or word.contains("F")
                 let (body, next, lines) = py_lex_string_body(src, i)
-                if is_f: out = py_lex_fstring(py_unescape(body, raw), line, move out)
+                if is_f: out = py_lex_fstring(py_unescape(body, raw), line, out)
                 else: out.push(py_tok(PT_STR, py_unescape(body, raw), line))
                 line = line + lines
                 i = next
@@ -973,7 +973,7 @@ impl PyInterp:
     mut fn new_str_list(items: &List[str]) -> PyVal:
         var out: List[PyVal] = List.new()
         for s in items: out.push(pv_str(s))
-        self.new_list(move out)
+        self.new_list(out)
 
     mut fn new_dict() -> PyVal:
         self.dkeys.push(PyList { items: List.new() })
@@ -1140,7 +1140,7 @@ impl PyInterp:
             if name == "libdirs": items.push(pv_str("lib"))
             if name == "includedirs": items.push(pv_str("include"))
             if name == "bindirs": items.push(pv_str("bin"))
-            let list = self.new_list(move items)
+            let list = self.new_list(items)
             self.obj_set(obj, name, pv_copy(list))
             return list
         if name == "set_property" or name == "get_property": return self.bound(pv(V_OBJ, obj as i64, ""), name)
@@ -1269,7 +1269,7 @@ impl PyInterp:
             if name == "copy":
                 var items: List[PyVal] = List.new()
                 for i in 0..self.lists[id].items.len(): items.push(pv_copy(self.lists[id].items[i]))
-                return self.new_list(move items)
+                return self.new_list(items)
             return pv_unknown()
         if receiver.k == V_STR or receiver.k == V_OPT:
             let s = receiver.s
@@ -1282,7 +1282,7 @@ impl PyInterp:
             if name == "split" and arg0.k == V_STR:
                 var items: List[PyVal] = List.new()
                 for part in s.split(arg0.s): items.push(pv_str(part))
-                return self.new_list(move items)
+                return self.new_list(items)
             if name == "format":
                 // `{}` takes the next argument, `{N}` the Nth.
                 var out = ""
@@ -1338,8 +1338,8 @@ impl PyInterp:
                         var pair: List[PyVal] = List.new()
                         pair.push(pv_copy(self.dkeys[id].items[i]))
                         pair.push(pv_copy(self.dvals[id].items[i]))
-                        items.push(self.new_list(move pair))
-                return self.new_list(move items)
+                        items.push(self.new_list(pair))
+                return self.new_list(items)
             return pv_unknown()
         if receiver.k != V_OBJ: return pv_unknown()
         let obj = receiver.n as i32
@@ -1508,7 +1508,7 @@ impl PyInterp:
             if self.nodes[arg].kind == N_KW: args.push(self.eval(self.nodes[arg].a))
             else: args.push(self.eval(arg))
         if callee.k == V_SINK: return pv_sink()
-        if callee.k == V_FUNC: return self.call_def(callee.n as i32, move args, line)
+        if callee.k == V_FUNC: return self.call_def(callee.n as i32, args, line)
         if callee.k == V_NAMED: return self.call_named(callee.s, args, line)
         if callee.k == V_BOUND:
             let receiver = pv_copy(self.recv[callee.n as i32])
@@ -1542,7 +1542,7 @@ impl PyInterp:
         if kind == N_LIST:
             var items: List[PyVal] = List.new()
             for i in 0..self.nodes[node].kids.len(): items.push(self.eval(self.nodes[node].kids[i]))
-            return self.new_list(move items)
+            return self.new_list(items)
         if kind == N_DICT:
             let dict = self.new_dict()
             var i = 0
@@ -1637,7 +1637,7 @@ impl PyInterp:
                     var items: List[PyVal] = List.new()
                     for i in 0..self.lists[left.n as i32].items.len(): items.push(pv_copy(self.lists[left.n as i32].items[i]))
                     for i in 0..self.lists[right.n as i32].items.len(): items.push(pv_copy(self.lists[right.n as i32].items[i]))
-                    return self.new_list(move items)
+                    return self.new_list(items)
                 if left.k == V_INT and right.k == V_INT: return pv(V_INT, left.n + right.n, "")
                 if (left.k == V_STR or left.k == V_OPT) and (right.k == V_STR or right.k == V_OPT): return pv_str(left.s ++ right.s)
             if op == "-" and left.k == V_INT and right.k == V_INT: return pv(V_INT, left.n - right.n, "")
@@ -1656,7 +1656,7 @@ impl PyInterp:
                     if t < 0: return pv_unknown()
                     if t == 0: continue
                 items.push(self.eval(self.nodes[node].a))
-            return self.new_list(move items)
+            return self.new_list(items)
         pv_unknown()
 
     // ── Statements ──

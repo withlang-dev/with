@@ -67,7 +67,7 @@ fn collect_targets(entry: &str) -> CollectResult:
             var decl_path = owned_text(fact.path)
             if decl_path.starts_with("<embedded-std>/std/"):
                 decl_path = "lib/std/" ++ decl_path.slice(19, decl_path.len() as i64)
-            decls.push(DeclSpan { path: move decl_path, name: owned_text(fact.name), start: fact.start, end: fact.end })
+            decls.push(DeclSpan { path: decl_path, name: owned_text(fact.name), start: fact.start, end: fact.end })
     for i in 0..result.report.facts.len():
         let fact = &result.report.facts[i]
         if fact.kind != AnalysisFactKind.Parameter: continue
@@ -95,7 +95,7 @@ fn collect_targets(entry: &str) -> CollectResult:
         let decl_name = base_name(fact.name)
         if decl_for(&decls, src_path, decl_name) < 0:
             continue
-        targets.push(ShareTarget { path: move src_path, fn_name: owned_text(fact.name), sig_index: fact.index, has_receiver: is_recv_sig })
+        targets.push(ShareTarget { path: src_path, fn_name: owned_text(fact.name), sig_index: fact.index, has_receiver: is_recv_sig })
     CollectResult { targets, decls }
 
 fn find_dollar(name: &str) -> i32:

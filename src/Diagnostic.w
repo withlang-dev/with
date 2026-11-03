@@ -191,7 +191,7 @@ impl DiagnosticList:
                existing.message == diag.message and
                existing.code == diag.code:
                 return
-        self.items.push(move diag)
+        self.items.push(diag)
 
     // The diagnostics from `start` on in source order: file, then offset,
     // then message; equal keys keep their emission order. A phase whose

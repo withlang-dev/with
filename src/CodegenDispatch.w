@@ -3680,7 +3680,7 @@ impl Codegen:
         // `key:value` words: a query splits on `=`, so `detail~fn:main` and
         // `detail~route:float` select.
         fact.detail = f"route:{self.binop_route} fn:{self.sema.pool_resolve(body.fn_sym)} span:{self.cur_stmt_span} lhs:{lhs_name} rhs:{rhs_name} llvm-lhs-kind:{wl_get_type_kind(wl_type_of(lhs))} llvm-rhs-kind:{wl_get_type_kind(wl_type_of(rhs))}"
-        self.analysis_add(move fact)
+        self.analysis_add(fact)
 
     mut fn mir_build_bin_op(op: i32, lhs: i64, rhs: i64, is_unsigned: bool, lhs_sema: i32, rhs_sema: i32) -> i64:
         let lk = wl_get_type_kind(wl_type_of(lhs))

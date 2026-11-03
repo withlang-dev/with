@@ -4456,7 +4456,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
     return s
 
 fn Sema.placeholder(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
-    return sema_empty_state(pool, move diags, ast)
+    return sema_empty_state(pool, diags, ast)
 
 // #602: mark param `idx` of extern/c_import fn `name_sym` as retaining its ptr.
 impl Sema:
@@ -4543,7 +4543,7 @@ impl Sema:
             self.register_retains_entry(self.ast.get_extra(ep + i))
 
 fn Sema.init(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> Sema:
-    var s = sema_empty_state(pool, move diags, ast)
+    var s = sema_empty_state(pool, diags, ast)
 
     // Index 0 = error type (sentinel).
     s.add_type(TypeKind.TY_ERR, 0, 0, 0)
@@ -4668,11 +4668,11 @@ impl Sema:
 
     mut fn record_tracked_input(path: &str):
         var paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_insert_unique(move paths, path)
+        self.tracked_input_paths = tracked_input_insert_unique(paths, path)
 
     mut fn merge_tracked_inputs(paths: &List[str]):
         var tracked_paths = move self.tracked_input_paths
-        self.tracked_input_paths = tracked_input_merge_unique(move tracked_paths, paths)
+        self.tracked_input_paths = tracked_input_merge_unique(tracked_paths, paths)
 
     mut fn read_tracked_embed_file(source_path: &str, raw_path: &str) -> TrackedReadResult:
         let result = tracked_embed_read(source_path, raw_path, self.tracked_input_root)
@@ -8687,10 +8687,10 @@ impl Sema:
             base.push(b.base[i])
             for k in 0..bc:
                 path_syms.push(b.syms[(bs + k)])
-        self.moved_field_base_syms = move base
-        self.moved_field_path_starts = move starts
-        self.moved_field_path_counts = move counts
-        self.moved_field_path_syms = move path_syms
+        self.moved_field_base_syms = base
+        self.moved_field_path_starts = starts
+        self.moved_field_path_counts = counts
+        self.moved_field_path_syms = path_syms
         // Poisoned at the join iff poisoned at some non-divergent exit.
         var poison_syms: List[i32] = List.new()
         var poison_nodes: List[i32] = List.new()
@@ -8987,9 +8987,9 @@ impl Sema:
         var merged: List[i32] = List.new()
         let existing = self.binding_view_dep_count(sym)
         for i in 0..existing:
-            merged = self.push_unique_i32(move merged, self.binding_view_dep_at(sym, i))
+            merged = self.push_unique_i32(merged, self.binding_view_dep_at(sym, i))
         for i in 0..deps.len():
-            merged = self.push_unique_i32(move merged, deps[i])
+            merged = self.push_unique_i32(merged, deps[i])
         let merged_mask = self.binding_view_origin_mask(sym) | param_mask
         self.set_binding_view_deps(sym, merged_mask, merged)
         self.note_view_fact(sym, 0, 2)
@@ -9603,8 +9603,8 @@ impl Sema:
         else:
             diag.add_help("declare `" ++ view_name ++ "` after `" ++ origin_name ++ "`, or clear/drop `" ++ view_name ++ "` before `" ++ origin_name ++ "` goes out of scope")
         // §8, §57: a facade resource that depends on the origin says why.
-        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
-        self.diags.emit(move diag)
+        diag = self.with_facade_dependency_notes(diag, self.scope_lookup(view_sym))
+        self.diags.emit(diag)
 
     // D51 stage 7 (ruling §38, spec §16.2b.7): a view a foreign call
     // invalidated — a resource it received without `preserves param N`, or a
@@ -9639,7 +9639,7 @@ impl Sema:
             diag.add_help("state `" ++ clause ++ "` on fn " ++ fname ++ " in facade " ++ facade ++ " if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
         else:
             diag.add_help("describe " ++ fname ++ " with an fn item in a facade and state `" ++ clause ++ "` if it leaves that storage valid, or copy `" ++ view_name ++ "` out (`to_owned()`) before the call")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     mut fn emit_returned_view_origin_use_error(view_sym: i32, use_node: i32):
         let origin_sym = self.binding_poisoned_origin_sym(view_sym)
@@ -9662,8 +9662,8 @@ impl Sema:
         if use_node != 0:
             diag.add_label(Span { file: self.local_file_id, start: self.ast.get_start(use_node), end: self.ast.get_end(use_node) }, "view is used here after a possible origin died")
         diag.add_help("copy the data out before the origin's scope ends, or declare `" ++ origin_name ++ "` in the outer scope")
-        diag = self.with_facade_dependency_notes(move diag, self.scope_lookup(view_sym))
-        self.diags.emit(move diag)
+        diag = self.with_facade_dependency_notes(diag, self.scope_lookup(view_sym))
+        self.diags.emit(diag)
 
     fn binding_decl_node(sym: i32) -> i32:
         if self.binding_decl_nodes.contains(sym):
@@ -9723,9 +9723,9 @@ impl Sema:
                 let start = self.ast.get_start(err_node)
                 let end = self.ast.get_end(err_node)
                 var diag = Diagnostic.err("view '" ++ view_name ++ "' may outlive its origin '" ++ origin_name ++ "'", Span { file: self.local_file_id, start: start, end: end })
-                diag = self.with_copy_view_fixit(move diag, view_sym, true)
-                diag = self.with_facade_dependency_notes(move diag, view_ty)
-                self.diags.emit(move diag)
+                diag = self.with_copy_view_fixit(diag, view_sym, true)
+                diag = self.with_facade_dependency_notes(diag, view_ty)
+                self.diags.emit(diag)
                 return
 
     mut fn set_expr_view_deps(expr_node: i32, param_mask: i32, deps: &List[i32]):
@@ -11322,7 +11322,7 @@ impl Sema:
         diag.set_origin(origin_file, origin_fn, origin_line as i32, node)
         if suggestion.len() > 0:
             diag.add_help("did you mean '" ++ suggestion ++ "'?")
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // ── Type compatibility ───────────────────────────────────────────
 

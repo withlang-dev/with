@@ -402,7 +402,7 @@ fn build_cache_sorted_strings(items: &List[str]) -> List[str]:
 fn build_cache_sorted_unique_strings(items: &List[str]) -> List[str]:
     var sorted: List[str] = List.new()
     for i in 0..items.len():
-        sorted = tracked_input_insert_unique(move sorted, items[i])
+        sorted = tracked_input_insert_unique(sorted, items[i])
     sorted
 
 fn build_cache_last_colon(text: &str) -> isize:
@@ -1650,7 +1650,7 @@ fn build_cache_graph_try_read(root: &str, key: &str) -> BuildGraph:
         t.action_source_paths = r.read_list()
         if not r.ok:
             return empty_build_graph()
-        graph.targets.push(move t)
+        graph.targets.push(t)
     let gheader = r.read_line()
     if not r.ok or gheader.len() == 0 or gheader[0] != 103:
         return empty_build_graph()

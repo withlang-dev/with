@@ -273,7 +273,7 @@ fn parse_build_graph(text: &str) -> BuildGraph:
                 graph.error_msg = "invalid target line in build graph"
                 return graph
             if has_current:
-                graph.targets.push(move current)
+                graph.targets.push(current)
             let output = if graph_version == 2: with_str_clone_ref(fields[6]) else: ""
             current = build_graph_target_new(
                 build_graph_parse_i32(fields[1]),
@@ -359,9 +359,9 @@ fn parse_build_graph(text: &str) -> BuildGraph:
             return graph
         i = i + 1
     if has_current:
-        graph.targets.push(move current)
+        graph.targets.push(current)
     graph.ok = true
-    build_graph_resolve_rss_budgets(move graph)
+    build_graph_resolve_rss_budgets(graph)
 
 // The builder transports this driver policy in an argument so a pinned seed
 // can still compile a graph declaring a budget. Consume it before dispatch:
@@ -623,20 +623,20 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
     let target = &graph.targets[index]
     out.visiting_names.push(with_str_clone_ref(name))
     for di in 0..target.deps.len():
-        out = build_graph_selected_targets_add(move out, graph, target.deps[di])
+        out = build_graph_selected_targets_add(out, graph, target.deps[di])
         if not out.ok:
             return out
     let entry_producer = build_graph_find_output_producer_index(graph, target.entry, target.name)
     if entry_producer >= 0:
         let producer = &graph.targets[entry_producer]
-        out = build_graph_selected_targets_add(move out, graph, producer.name)
+        out = build_graph_selected_targets_add(out, graph, producer.name)
         if not out.ok:
             return out
     for ii in 0..target.inputs.len():
         let input_producer = build_graph_find_output_producer_index(graph, target.inputs[ii], target.name)
         if input_producer >= 0:
             let producer = &graph.targets[input_producer]
-            out = build_graph_selected_targets_add(move out, graph, producer.name)
+            out = build_graph_selected_targets_add(out, graph, producer.name)
             if not out.ok:
                 return out
     out.selected_names.push(with_str_clone_ref(name))
@@ -645,7 +645,7 @@ fn build_graph_selected_targets_add(selected: BuildGraphSelectedTargets, graph: 
 
 fn build_graph_select_target_closure(graph: &BuildGraph, target_name: &str) -> BuildGraphSelectedTargets:
     var selected = build_graph_selected_targets_new()
-    build_graph_selected_targets_add(move selected, graph, target_name)
+    build_graph_selected_targets_add(selected, graph, target_name)
 
 // The closure of several roots at once (`build :a :b`): each root's
 // closure is added to one selection, so shared dependencies appear once.

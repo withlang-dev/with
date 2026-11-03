@@ -8922,7 +8922,7 @@ impl MirBuilder:
         child.assign_bool_to_local(0, false)
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.pop_scope_inline()
-        self.finish_gen_loop(for_node, gen_op, flag_local, move child)
+        self.finish_gen_loop(for_node, gen_op, flag_local, child)
 
     // D69 (§13.4, §13.6, #1727): a comprehension clause over a Gen[T] runs
     // the rest of the comprehension — its filter, the later clauses and the
@@ -8980,7 +8980,7 @@ impl MirBuilder:
         child.assign_bool_to_local(0, true)
         child.terminate(TermKind.TK_RETURN, 0, 0, 0, 0)
         child.pop_scope_inline()
-        let _ = self.finish_gen_loop(iter_expr, gen_op, flag_local, move child)
+        let _ = self.finish_gen_loop(iter_expr, gen_op, flag_local, child)
 
     // The owning frame's flag for one gen loop: what the loop body's closure
     // tells this frame to do once `each` returns (GEN_LOOP_*).
@@ -19783,7 +19783,7 @@ fn lower_generator_functions(sema: &Sema, ast_pool: &AstPool, pool: &InternPool,
     let run_sym: i32 = sema.generator_fn_run_syms.get(fn_sym).unwrap()
     var producer_builder = MirBuilder.init(sema, ast_pool, pool, mir_symbol_for_pool(sema, pool, run_sym))
     producer_builder.body.instance_sym = instance_sym
-    var lowered = lower_fn_with_sig(move producer_builder, fn_node, sema.get_sig(run_sym))
+    var lowered = lower_fn_with_sig(producer_builder, fn_node, sema.get_sig(run_sym))
     lowered.anonymous_bodies.push(lower_generator_constructor(sema, ast_pool, pool, fn_node, fn_sym, body_sym, sig_idx))
     lowered.anonymous_bodies.push(lower_generator_each_body(sema, ast_pool, pool, fn_sym))
     lowered
@@ -20062,7 +20062,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
         // mir_fn_sym belongs to the output pool; treating its numeric ID as a
         // Sema symbol can select an unrelated but valid signature in large
         // combined modules and corrupt every parameter type during lowering.
-        mir_mod.add_lowered_function(lower_fn_with_sig(move builder, decl as i32, sig_idx))
+        mir_mod.add_lowered_function(lower_fn_with_sig(builder, decl as i32, sig_idx))
 
     for gi in 0..sema.fn_clause_group_count():
         let dispatch_sym = sema.fn_clause_group_name(gi)
@@ -20100,7 +20100,7 @@ fn lower_module(input_sema: Sema, ast_pool: &AstPool, pool: &InternPool) -> MirL
         while specialization < sema.concrete_specialization_nodes.len():
             let mono_sym: i32 = sema.concrete_specialization_syms[specialization]
             if mir_mod.find_body(mono_sym) < 0:
-                var lowered = lower_concrete_specialization(move sema, ast_pool, pool, specialization)
+                var lowered = lower_concrete_specialization(sema, ast_pool, pool, specialization)
                 sema = move lowered.sema
                 mir_mod.add_lowered_function(move lowered.lowered)
             specialization = specialization + 1
@@ -20615,7 +20615,7 @@ impl MirModule:
             if scc.len() == 1:
                 let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(decl_node), scc_syms, 1, 0, tailrec_no_drop_state())
                 if recursive_violation.node != 0:
-                    violations.push(move recursive_violation)
+                    violations.push(recursive_violation)
                 continue
 
             var all_annotated = 1
@@ -20635,7 +20635,7 @@ impl MirModule:
                 if member_decl != 0:
                     let recursive_violation = tailrec_verify_recursive_edges(sema, ast_pool.get_data1(member_decl), scc_syms, 1, 0, tailrec_no_drop_state())
                     if recursive_violation.node != 0:
-                        violations.push(move recursive_violation)
+                        violations.push(recursive_violation)
                         recursive_violation_found = 1
                         break
             if recursive_violation_found != 0:

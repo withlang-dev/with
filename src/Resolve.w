@@ -195,7 +195,7 @@ fn resolve_normalize_source_text(text: &str) -> str:
     out.to_str()
 
 fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool) -> ResolveArtifacts:
-    resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, move diags, emit_resolve_diags, 0, 1, "")
+    resolve_from_root_pool_with_prefix(root_path, root_text, root_file_id, root_pool, pool, diags, emit_resolve_diags, 0, 1, "")
 
 // `first_file_id` is the caller's next unused file id: imported modules are
 // numbered from it so their ids never collide with texts the caller already
@@ -206,7 +206,7 @@ fn resolve_from_root_pool(root_path: &str, root_text: &str, root_file_id: i32, r
 // importing module's directory does not answer resolves: a compiler hook
 // runner is generated into the temp dir but imports the project's modules.
 fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_file_id: i32, root_pool: &AstPool, pool: &InternPool, diags: DiagnosticList, emit_resolve_diags: bool, root_prefix_skip: i32, first_file_id: i32, import_root: &str) -> ResolveArtifacts:
-    var state = ResolveState.init(pool, move diags, emit_resolve_diags)
+    var state = ResolveState.init(pool, diags, emit_resolve_diags)
     state.root_prefix_skip = root_prefix_skip
     state.next_file_id = first_file_id
     let normalized_root_text = resolve_normalize_source_text(root_text)
@@ -247,7 +247,7 @@ fn resolve_from_root_pool_with_prefix(root_path: &str, root_text: &str, root_fil
             let file_id = state.module_file_ids[work]
             var lexer = Lexer.init(text, file_id)
             let tokens = lexer.tokenize()
-            var parser = Parser.init(move tokens, text, file_id, state.pool, move state.diags)
+            var parser = Parser.init(tokens, text, file_id, state.pool, move state.diags)
             parser.enable_module_mode(path)
             if src.interface:
                 parser.enable_interface_mode()

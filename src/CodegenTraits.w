@@ -205,7 +205,7 @@ impl Codegen:
             fact.flags = 256
             fact.name = with_str_clone_ref(trait_name)
             fact.detail = f"trait-table methods={collected_count} ast-methods={ast_method_count} vtable-slots={vtable_slots}"
-            self.analysis_add(move fact)
+            self.analysis_add(fact)
             canonical_method_start = canonical_method_start + ast_method_count
         if canonical_method_start != method_count:
             self.analysis_fail(f"trait method rows={method_count} canonical AST rows={canonical_method_start}")

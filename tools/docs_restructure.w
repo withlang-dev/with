@@ -329,7 +329,7 @@ fn split_spec:
     assert(part_start > 0)
 
     var readme: List[str] = List.new()
-    readme = push_range(move readme, lines, 0, part_start)
+    readme = push_range(readme, lines, 0, part_start)
     readme.push("## Table of Contents")
     readme.push("")
 
@@ -349,7 +349,7 @@ fn split_spec:
             else if not fence and chapter_id(lines[i]).len() > 0: starts_chapter = true
         if starts_part or starts_chapter: boundary = true
         if boundary and chapter_start >= 0:
-            readme = emit_chapter(lines, chapter_start, i, chapter_id_now, chapters, sections, move readme)
+            readme = emit_chapter(lines, chapter_start, i, chapter_id_now, chapters, sections, readme)
             chapter_start = -1
         if boundary and pending_part.len() > 0 and (starts_chapter or i == n):
             // The lines between the part heading and its first chapter are
@@ -395,7 +395,7 @@ fn emit_chapter(lines: &List[str], start: i32, end: i32, id: &str, chapters: &Li
             let stext = stitle.slice(sid.len() + 1, stitle.len())
             var sec: List[str] = List.new()
             sec.push("# " ++ stitle)
-            sec = push_range(move sec, lines, i + 1, send)
+            sec = push_range(sec, lines, i + 1, send)
             write_lines("docs/spec/" ++ sfile, sec)
             readme.push("  - [§" ++ stitle ++ "](" ++ sfile ++ ")")
             out.push(pointer_line(sid, stext, sfile))
@@ -436,7 +436,7 @@ fn reassemble_spec -> List[str]:
             toc = i as i32
             break
     assert(toc > 0)
-    out = push_range(move out, readme, 0, toc)
+    out = push_range(out, readme, 0, toc)
     var i = toc + 1
     var in_raw = false
     while i < readme.len():
@@ -446,7 +446,7 @@ fn reassemble_spec -> List[str]:
             in_raw = true
         else if line.starts_with("- [§"):
             in_raw = false
-            out = inline_chapter("docs/spec/" ++ link_target(line), move out)
+            out = inline_chapter("docs/spec/" ++ link_target(line), out)
         else if in_raw:
             out.push(line)
         i = i + 1
@@ -462,7 +462,7 @@ fn inline_chapter(path: &str, acc: List[str]) -> List[str]:
         if sfile.len() > 0:
             let sec = read_lines("docs/spec/" ++ sfile)
             out.push("##" ++ sec[0])
-            out = push_range(move out, sec, 1, sec.len() as i32)
+            out = push_range(out, sec, 1, sec.len() as i32)
             if sec.len() > 1 and sec[sec.len() - 1].len() == 0 and i + 1 < lines.len() and lines[i + 1].len() == 0: i = i + 1
         else:
             out.push(lines[i].clone())
@@ -511,7 +511,7 @@ fn split_decisions:
             first = i
             break
     assert(first > 0)
-    readme = push_range(move readme, lines, 0, first)
+    readme = push_range(readme, lines, 0, first)
     readme.push("## Decisions")
     readme.push("")
     var start = first
@@ -533,7 +533,7 @@ fn split_decisions:
             let file = if id.len() > 0: date ++ "-" ++ id ++ "-" ++ slug(rest) ++ ".md" else: date ++ "-" ++ slug(rest) ++ ".md"
             var entry: List[str] = List.new()
             entry.push("# " ++ title)
-            entry = push_range(move entry, lines, start + 1, i)
+            entry = push_range(entry, lines, start + 1, i)
             write_lines("docs/meetings/" ++ file, entry)
             readme.push("- [" ++ title ++ "](" ++ file ++ ")")
             start = i
@@ -551,12 +551,12 @@ fn reassemble_decisions -> List[str]:
             idx = i as i32
             break
     assert(idx > 0)
-    out = push_range(move out, readme, 0, idx)
+    out = push_range(out, readme, 0, idx)
     for i in idx..readme.len() as i32:
         if not readme[i].starts_with("- ["): continue
         let entry = read_lines("docs/meetings/" ++ link_target(readme[i]))
         out.push("#" ++ entry[0])
-        out = push_range(move out, entry, 1, entry.len() as i32)
+        out = push_range(out, entry, 1, entry.len() as i32)
     out
 
 // ---------------------------------------------------------------- move

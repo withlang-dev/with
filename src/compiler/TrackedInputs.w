@@ -50,7 +50,7 @@ fn tracked_input_insert_unique(paths: List[str], path: &str) -> List[str]:
 fn tracked_input_merge_unique(left: List[str], right: &List[str]) -> List[str]:
     var out = left
     for i in 0..right.len():
-        out = tracked_input_insert_unique(move out, right[i])
+        out = tracked_input_insert_unique(out, right[i])
     out
 
 fn tracked_dirname(path: &str) -> str:

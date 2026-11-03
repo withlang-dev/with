@@ -220,7 +220,7 @@ impl AnalysisFact:
         }
 
 impl AnalysisReport:
-    mut fn add(fact: AnalysisFact): self.facts.push(move fact)
+    mut fn add(fact: AnalysisFact): self.facts.push(fact)
     mut fn fail(message: &str): self.violations.push(with_str_clone_ref(message))
     mut fn note(message: &str): self.notes.push(with_str_clone_ref(message))
     fn ok(): self.violations.len() == 0

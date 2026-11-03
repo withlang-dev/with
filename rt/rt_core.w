@@ -4815,12 +4815,12 @@ fn with_lines_data_out(out: *mut u8, sp: *const u8, sl: i64) -> Unit:
     while i < sl:
         if (unsafe sp[i]) == 10:  // '\n'
             let line = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push_str(out, move line)
+            with_vec_push_str(out, line)
             start = i + 1
         i = i + 1
     if start < sl:
         let line = alloc_str((sp as i64 + start) as *const u8, sl - start)
-        with_vec_push_str(out, move line)
+        with_vec_push_str(out, line)
 
 pub fn with_lines_out_ref(out: *mut u8, s: &str) -> Unit:
     with_lines_data_out(out, unsafe *(s as *const str as *const *const u8), s.len())
@@ -4872,7 +4872,7 @@ fn str_split_list_ref(out: *mut u8, s: &str, delim: &str):
     let dl = str_length(delim)
     if dl == 0:
         let whole = alloc_str(str_data(s), sl)
-        with_vec_push_str(out, move whole)
+        with_vec_push_str(out, whole)
         return
     let sp = str_data(s)
     let dp = str_data(delim)
@@ -4881,13 +4881,13 @@ fn str_split_list_ref(out: *mut u8, s: &str, delim: &str):
     while i <= sl - dl:
         if rt_memcmp((sp as i64 + i) as *const u8, dp, dl) == 0:
             let part = alloc_str((sp as i64 + start) as *const u8, i - start)
-            with_vec_push_str(out, move part)
+            with_vec_push_str(out, part)
             start = i + dl
             i = start
         else:
             i = i + 1
     let last = alloc_str((sp as i64 + start) as *const u8, sl - start)
-    with_vec_push_str(out, move last)
+    with_vec_push_str(out, last)
 
 pub fn with_str_split_vec_ref(out: *mut u8, s: &str, delim: &str) -> Unit:
     str_split_list_ref(out, s, delim)

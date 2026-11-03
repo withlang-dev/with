@@ -641,7 +641,7 @@ fn link_stage_linux_native_link_plan(obj_path: &str, bin_path: &str, extras: &Li
     for i in 0..command.args.len():
         args.push(with_str_clone_ref(command.args[i]))
     command.args = args
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 // The driver spellings a program's link arguments use on Linux, for lld:
 // `-Wl,` unwrapped as on macOS, and `-pthread` (a driver flag) its library.
@@ -1343,7 +1343,7 @@ fn link_stage_link_with_extras_libs_args_plan(obj_path: &str, bin_path: &str, ex
     if link_stage_linux_uses_own_sysroot():
         return link_stage_linux_native_link_plan(obj_path, bin_path, extras, link_libs, link_args)
     let command = link_stage_make_link_command("cc", obj_path, bin_path, extras, link_libs, link_args)
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 // #2131 / #1915: a wasm32 link with no external wasm-ld is this binary's own
 // lld wasm driver (`with __ld -flavor wasm`, src/compiler/LldDriver.w).
@@ -1363,7 +1363,7 @@ fn link_stage_wasm_native_link_plan(obj_path: &str, bin_path: &str, extras: &Lis
         args.push(with_str_clone_ref(command.args[i]))
     command.args = args
     command.linker = with_str_clone_ref(self_exe)
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 // #1915 (D81): a native Windows link with no SDK named is this binary's own
 // lld-link (`with __ld -flavor link`, src/compiler/LldDriver.w) over the
@@ -1385,7 +1385,7 @@ fn link_stage_windows_native_link_plan(toolchain: &str, obj_path: &str, bin_path
         args.push(with_str_clone_ref(command.args[i]))
     command.args = args
     command.linker = with_str_clone_ref(self_exe)
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 // #1915: a native macOS link is this binary's own lld (`with __ld`, src/
 // compiler/LldDriver.w) over the darwin sysroot (compiler.EmbeddedSysroot):
@@ -1416,7 +1416,7 @@ fn link_stage_darwin_native_link_plan(obj_path: &str, bin_path: &str, extras: &L
     for i in 0..command.args.len():
         args.push(with_str_clone_ref(command.args[i]))
     command.args = args
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 // A program's link arguments are written for a C compiler driver (`cc`), as
 // they were when the native link ran through one: `-Wl,a,b` hands `a` and `b`
@@ -1482,7 +1482,7 @@ fn link_stage_link_with_llvm_args_plan(obj_path: &str, bin_path: &str, extras: &
     let command = link_stage_make_llvm_link_command(llvm_ld, obj_path, bin_path, extras, link_libs, link_args)
     if command.linker.len() == 0:
         return link_stage_plan_fail()
-    link_stage_plan_for_command(move command)
+    link_stage_plan_for_command(command)
 
 fn link_stage_str_contains(hay: &str, needle: &str) -> bool:
     let hay_len = hay.len()
@@ -2471,15 +2471,15 @@ fn link_stage_output_path_for_source(source_path: &str) -> str:
 
 fn link_stage_link_object_to_binary(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], needs_async_runtime: bool) -> bool:
     let link_args: List[str] = List.new()
-    link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, move link_args, needs_async_runtime).ok
+    link_stage_link_object_to_binary_result(obj_path, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime).ok
 
 fn link_stage_link_object_to_binary_result(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStageResult:
     let no_extra_objects: List[str] = List.new()
-    link_stage_result_for_plan(link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, move link_args, needs_async_runtime))
+    link_stage_result_for_plan(link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime))
 
 fn link_stage_link_object_to_binary_plan(obj_path: &str, bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
     let no_extra_objects: List[str] = List.new()
-    link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, move link_args, needs_async_runtime)
+    link_stage_link_object_to_binary_plan_with_units(obj_path, no_extra_objects, bin_path, link_libs, link_search_paths, link_args, needs_async_runtime)
 
 fn link_stage_link_object_to_binary_plan_with_units(obj_path: &str, extra_objects: &List[str], bin_path: &str, link_libs: List[str], link_search_paths: &List[str], link_args: List[str], needs_async_runtime: bool) -> LinkStagePlan:
     let extras: List[str] = List.new()

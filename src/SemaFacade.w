@@ -850,7 +850,7 @@ impl Sema:
         var r = FacadeResource { name, facade, node: item, decl, repr_tid, producers: List.new(), out_params: List.new(), init: 0, preinit: 0, drop: 0, destroyers: List.new(), ok_consts: List.new(), ok_node: 0, borrows: List.new(), borrows_owner: List.new(), borrows_nodes: List.new(), last_producer: -2, independent: 0, independent_node: 0, movable: 0, thread_caps: 0, abandon: 0, abandon_node: 0, message: 0, message_node: 0, handle: 0 }
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + 1 + ci)
-            r = self.collect_resource_clause(rname, move r, clause)
+            r = self.collect_resource_clause(rname, r, clause)
         self.facade_resource_index.insert(name, self.facade_resources.len() as i32)
         self.facade_resources.push(r)
 
@@ -1064,7 +1064,7 @@ impl Sema:
         let clause_count = self.ast.get_data2(item)
         for ci in 0..clause_count:
             let clause = self.ast.get_extra(extra_start + ci)
-            c = self.collect_fn_clause(fname, move c, sig, clause)
+            c = self.collect_fn_clause(fname, c, sig, clause)
         self.foreign_contract_index.insert(fn_sym, self.foreign_contracts.len() as i32)
         self.foreign_contracts.push(c)
 
@@ -3553,7 +3553,7 @@ impl Sema:
             let hname = self.pool_resolve(self.facade_resources[hi].name)
             var hdiag = Diagnostic.err(f"{msg}: '{hname}' is a callback-scope handle, borrowed for the callback's invocation, and cannot outlive it (§16.2b.9)", Span { file: self.local_file_id, start: self.ast.get_start(node), end: self.ast.get_end(node) })
             hdiag.add_help(f"use the '{hname}' inside the callback C passes it to; copy out what must outlive it (the values its operations return)")
-            self.diags.emit(move hdiag)
+            self.diags.emit(hdiag)
             return
         let ri = self.facade_dependent_resource_in(tid, 0)
         if ri < 0:
@@ -3598,7 +3598,7 @@ impl Sema:
         let independence = self.facade_dependency_help(ri)
         if independence.len() > 0:
             diag.add_help(independence)
-        self.diags.emit(move diag)
+        self.diags.emit(diag)
 
     // `'Database'`, or `'Database' and 'Cache'`: the resources `ri` depends on.
     fn facade_parent_names(ri: i32) -> str:

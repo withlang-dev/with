@@ -1174,12 +1174,12 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
     let leaf = if split < 0: with_str_clone_ref(name) else: name.slice(split + 1, name.len())
     let path_prefix = if split < 0: "" else: name.slice(0, split)
     var prefix: List[u8] = List.new()
-    prefix = tool_tar_append_str_padded(move prefix, leaf, 100)
-    prefix = tool_tar_append_octal_nul(move prefix, mode as i64, 8)
-    prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
-    prefix = tool_tar_append_octal_nul(move prefix, 0, 8)
-    prefix = tool_tar_append_octal_nul(move prefix, size, 12)
-    prefix = tool_tar_append_octal_nul(move prefix, 0, 12)
+    prefix = tool_tar_append_str_padded(prefix, leaf, 100)
+    prefix = tool_tar_append_octal_nul(prefix, mode as i64, 8)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 8)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 8)
+    prefix = tool_tar_append_octal_nul(prefix, size, 12)
+    prefix = tool_tar_append_octal_nul(prefix, 0, 12)
     if prefix.len() == 0:
         return List.new()
     var suffix: List[u8] = List.new()
@@ -1189,19 +1189,19 @@ fn tool_tar_build_header(name: &str, mode: i32, size: i64, kind: ArchiveEntryKin
         suffix.push(50 as u8)
     else:
         suffix.push(48 as u8)
-    suffix = tool_tar_append_str_padded(move suffix, link_name, 100)
-    suffix = tool_tar_append_str_padded(move suffix, "ustar", 6)
-    suffix = tool_tar_append_str_padded(move suffix, "00", 2)
-    suffix = tool_tar_append_zeroes(move suffix, 80)
-    suffix = tool_tar_append_str_padded(move suffix, path_prefix, 155)
-    suffix = tool_tar_append_zeroes(move suffix, 12)
+    suffix = tool_tar_append_str_padded(suffix, link_name, 100)
+    suffix = tool_tar_append_str_padded(suffix, "ustar", 6)
+    suffix = tool_tar_append_str_padded(suffix, "00", 2)
+    suffix = tool_tar_append_zeroes(suffix, 80)
+    suffix = tool_tar_append_str_padded(suffix, path_prefix, 155)
+    suffix = tool_tar_append_zeroes(suffix, 12)
     if suffix.len() == 0:
         return List.new()
     let checksum = tool_tar_sum(&prefix) + 256 + tool_tar_sum(&suffix)
     var header: List[u8] = List.new()
-    header = tool_tar_append_bytes(move header, &prefix)
-    header = tool_tar_append_checksum(move header, checksum)
-    header = tool_tar_append_bytes(move header, &suffix)
+    header = tool_tar_append_bytes(header, &prefix)
+    header = tool_tar_append_checksum(header, checksum)
+    header = tool_tar_append_bytes(header, &suffix)
     if header.len() != 512:
         return List.new()
     header
@@ -1215,14 +1215,14 @@ fn ToolFs.tar_bytes(self: &Self, entries: &List[ArchiveEntry]) -> List[u8]:
             let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Directory, "")
             if header.len() == 0:
                 return List.new()
-            out = tool_tar_append_bytes(move out, &header)
+            out = tool_tar_append_bytes(out, &header)
         else if entry.kind == ArchiveEntryKind.Symlink:
             let name = tool_tar_entry_name(entry.archive_path, false)
             let link_name = tool_tar_link_name(entry.source_path)
             let header = tool_tar_build_header(name, entry.mode, 0, ArchiveEntryKind.Symlink, link_name)
             if header.len() == 0:
                 return List.new()
-            out = tool_tar_append_bytes(move out, &header)
+            out = tool_tar_append_bytes(out, &header)
         else:
             if entry.source_path.len() == 0:
                 return List.new()
@@ -1232,11 +1232,11 @@ fn ToolFs.tar_bytes(self: &Self, entries: &List[ArchiveEntry]) -> List[u8]:
             let header = tool_tar_build_header(name, entry.mode, contents.len(), ArchiveEntryKind.File, "")
             if header.len() == 0:
                 return List.new()
-            out = tool_tar_append_bytes(move out, &header)
-            out = tool_tar_append_bytes(move out, &contents)
+            out = tool_tar_append_bytes(out, &header)
+            out = tool_tar_append_bytes(out, &contents)
             let padding = (512 - (contents.len() % 512)) % 512
-            out = tool_tar_append_zeroes(move out, padding)
-    out = tool_tar_append_zeroes(move out, 1024)
+            out = tool_tar_append_zeroes(out, padding)
+    out = tool_tar_append_zeroes(out, 1024)
     out
 
 fn tool_gzip_append_u16_le(out: List[u8], value: i32) -> List[u8]:
@@ -1271,28 +1271,28 @@ fn tool_gzip_stored(bytes: &List[u8]) -> List[u8]:
     out.push(139 as u8)
     out.push(8 as u8)
     out.push(0 as u8)
-    out = tool_gzip_append_u32_le(move out, 0 as u32)
+    out = tool_gzip_append_u32_le(out, 0 as u32)
     out.push(0 as u8)
     out.push(255 as u8)
     var offset: i64 = 0
     if bytes.len() == 0:
         out.push(1 as u8)
-        out = tool_gzip_append_u16_le(move out, 0)
-        out = tool_gzip_append_u16_le(move out, 0xffff)
+        out = tool_gzip_append_u16_le(out, 0)
+        out = tool_gzip_append_u16_le(out, 0xffff)
     while offset < bytes.len():
         let remaining = bytes.len() - offset
         let chunk = if remaining > 65535: 65535 else: remaining
         let final_block = offset + chunk == bytes.len()
         out.push(if final_block: 1 as u8 else: 0 as u8)
-        out = tool_gzip_append_u16_le(move out, chunk as i32)
-        out = tool_gzip_append_u16_le(move out, 0xffff - chunk as i32)
+        out = tool_gzip_append_u16_le(out, chunk as i32)
+        out = tool_gzip_append_u16_le(out, 0xffff - chunk as i32)
         var i: i64 = 0
         while i < chunk:
             out.push(bytes[offset + i])
             i = i + 1
         offset = offset + chunk
-    out = tool_gzip_append_u32_le(move out, tool_gzip_crc32(bytes))
-    out = tool_gzip_append_u32_le(move out, bytes.len() as u32)
+    out = tool_gzip_append_u32_le(out, tool_gzip_crc32(bytes))
+    out = tool_gzip_append_u32_le(out, bytes.len() as u32)
     out
 
 pub fn ToolFs.write_tar(self: &Self, output_path: &str, entries: &List[ArchiveEntry]) -> i32:
@@ -1318,7 +1318,7 @@ pub fn ToolFs.write_tar_gz(self: &Self, output_path: &str, entries: &List[Archiv
     var compressed = List[u8].with_capacity(65536)
     for _ in 0..65536: compressed.push(0)
     // state never moves while zlib retains its address.
-    var writer = ToolGzipStream { file: move file, state: &raw mut state, buffer: move compressed }
+    var writer = ToolGzipStream { file: file, state: &raw mut state, buffer: compressed }
     var buffer = List[u8].with_capacity(65535)
     for _ in 0..65535: buffer.push(0)
     for i in 0..entries.len():
@@ -2318,7 +2318,7 @@ pub fn Target.allow_parallel(move self: Target) -> Target:
 
 pub fn Build.add_target(move self: Build, target: Target) -> Build:
     var out = self
-    out.targets.push(move target)
+    out.targets.push(target)
     out
 
 pub fn Build.generated_source(move self: Build, path: str, contents: str) -> Build:
@@ -2328,121 +2328,121 @@ pub fn Build.generated_source(move self: Build, path: str, contents: str) -> Bui
 
 pub fn Build.add_generated_source(move self: Build, source: GeneratedSource) -> Build:
     var out = self
-    out.generated_sources.push(move source)
+    out.generated_sources.push(source)
     out
 
 pub fn Build.executable(move self: Self, name: str, entry: str) -> Build:
     let target = target_new(.Executable, name, entry)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.library(move self: Self, name: str, entry: str) -> Build:
     let target = target_new(.Library, name, entry)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.test(move self: Self, name: str, entry: str) -> Build:
     let target = target_new(.Test, name, entry)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.object(move self: Self, name: str, entry: str) -> Build:
     let target = target_new(.Object, name, entry)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.archive(move self: Self, name: str, entry: str) -> Build:
     let target = target_new(.Archive, name, entry)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.action(move self: Self, name: str, action: fn(ActionCtx) -> i32) -> Build:
     var target = target_new(.Action, name, "")
     target.action = action
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.command(move self: Self, name: str, runner: str) -> Build:
     let target = target_new(.Command, name, runner)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.install(move self: Self, name: str, source: str, dest: str) -> Build:
     let target = target_new(.Install, name, source).output(dest)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.group(move self: Self, name: str) -> Build:
     let target = target_new(.Group, name, "")
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.binary_compare(move self: Self, name: str, left: str, right: str) -> Build:
     var target = target_new(.BinaryCompare, name, left)
     target = target.arg(right)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.fixpoint_compare(move self: Self, name: str, left: str, right: str) -> Build:
     var target = target_new(.FixpointCompare, name, left)
     target = target.arg(right)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.compile_c_object(move self: Self, name: str, source: str, output: str) -> Build:
     let target = target_new(.CompileCObject, name, source).output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.compile_asm_object(move self: Self, name: str, source: str, output: str) -> Build:
     let target = target_new(.CompileAsmObject, name, source).output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.compile_llvm_ir_object(move self: Self, name: str, source: str, output: str) -> Build:
     let target = target_new(.CompileLlvmIrObject, name, source).output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.create_static_archive(move self: Self, name: str, output: str) -> Build:
     let target = target_new(.CreateStaticArchive, name, "").output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.generate_response_file(move self: Self, name: str, output: str) -> Build:
     let target = target_new(.GenerateResponseFile, name, "").output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.embed_object_files(move self: Self, name: str, output: str) -> Build:
     let target = target_new(.EmbedObjectFiles, name, "").output(output)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.copy_tree(move self: Self, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.CopyTree, name, source_dir).output(output_dir)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.copy_file(move self: Self, name: str, source: str, dest: str) -> Build:
     let target = target_new(.CopyFile, name, source).output(dest)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.clean(move self: Self, name: str) -> Build:
     let target = target_new(.Clean, name, "")
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.run_corpus_test(move self: Self, name: str, runner: str) -> Build:
     let target = target_new(.RunCorpusTest, name, runner)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.promote_tree_if_verified(move self: Self, name: str, source_dir: str, output_dir: str) -> Build:
     let target = target_new(.PromoteTreeIfVerified, name, source_dir).output(output_dir)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub type Download {
     pub url: str,
@@ -2459,7 +2459,7 @@ pub fn Build.download(move self: Self, name: str, spec: Download) -> Build:
     target = target.arg(with_str_clone_ref(spec.url))
     target = target.arg(with_str_clone_ref(spec.sha256))
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 pub fn Build.extract_tar_gz(move self: Self, name: str, archive: str, output_dir: str) -> Build:
     var target = target_new(.Action, with_str_clone_ref(name), "").output(with_str_clone_ref(output_dir))
@@ -2468,7 +2468,7 @@ pub fn Build.extract_tar_gz(move self: Self, name: str, archive: str, output_dir
     target = target.write_scope(output_dir)
     target = target.write_scope("out/command/" ++ name)
     var out = self
-    out.add_target(move target)
+    out.add_target(target)
 
 fn build_path_dirname(path: &str) -> str:
     var last_slash = -1

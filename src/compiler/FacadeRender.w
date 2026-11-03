@@ -2341,7 +2341,7 @@ fn facade_render_bridge_param(pool: &AstPool, intern: &InternPool, decl: i32, pi
     b
 
 fn facade_render_append_bridge(initial: FacadeBridge, part: &FacadeBridge) -> FacadeBridge:
-    var b = move initial
+    var b = initial
     if not part.ok: b.ok = false
     if part.params.len() > 0:
         if b.params.len() > 0: b.params = b.params ++ ", "
@@ -2368,7 +2368,7 @@ fn facade_render_bridge(pool: &AstPool, intern: &InternPool, decl: i32, skip: i3
             b.args = b.args ++ slot_arg
             continue
         let part = facade_render_bridge_param(pool, intern, decl, pi)
-        b = facade_render_append_bridge(move b, part)
+        b = facade_render_append_bridge(b, part)
     b
 
 // Each line of `text` prefixed with `indent`.
@@ -3325,7 +3325,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
             if pi == cbi.destroy:
                 var destroy_part = facade_render_empty_bridge()
                 destroy_part.args = free
-                bridge = facade_render_append_bridge(move bridge, destroy_part)
+                bridge = facade_render_append_bridge(bridge, destroy_part)
                 continue
             if wrapped.contains(pi):
                 let wname = facade_render_param_name(pool, intern, start, pi)
@@ -3338,14 +3338,14 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
                 // through the code-pointer transmute below.
                 wrapped_part.params = wname ++ ": " ++ (if facade_render_param_is_nullable(pool, intern, decl, pi): "Option[" ++ wshown ++ "]" else: wshown)
                 wrapped_part.args = facade_render_fresh(f"facade_c{pi}", taken)
-                bridge = facade_render_append_bridge(move bridge, wrapped_part)
+                bridge = facade_render_append_bridge(bridge, wrapped_part)
                 wrapped_names.push(wname)
                 wrapped_raw.push(raw)
                 wrapped_shown.push(wshown)
                 continue
             if pi != cbi.userdata and pi != cbi.callback:
                 let part = facade_render_bridge_param(pool, intern, decl, pi)
-                bridge = facade_render_append_bridge(move bridge, part)
+                bridge = facade_render_append_bridge(bridge, part)
                 continue
             let pname = facade_render_param_name(pool, intern, start, pi)
             let ptype = facade_render_param_type(pool, intern, decl, pi)
@@ -3378,7 +3378,7 @@ fn facade_render_callback_ops(pool: &AstPool, intern: &InternPool, ci: &List[i32
             var callback_part = facade_render_empty_bridge()
             callback_part.params = pname ++ ": " ++ shown
             callback_part.args = arg
-            bridge = facade_render_append_bridge(move bridge, callback_part)
+            bridge = facade_render_append_bridge(bridge, callback_part)
         if not bridge.ok:
             continue
         let call = facade_render_call(pool, intern, decl, bridge.args)

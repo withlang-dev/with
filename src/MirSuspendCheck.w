@@ -796,7 +796,7 @@ fn suspend_emit_no_suspend_error(diags: DiagnosticList, sema: &Sema, body: &MirB
         else:
             diag.add_note("this call may yield the current fiber")
     diag.add_help("move the suspension outside the no_suspend block, or remove the no_suspend assertion")
-    out.emit(move diag)
+    out.emit(diag)
     out
 
 fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, guard_local: i32) -> DiagnosticList:
@@ -809,7 +809,7 @@ fn suspend_emit_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, 
     if guard_name.len() > 0:
         diag.add_note("`" ++ guard_name ++ "` is still live here")
     diag.add_help("move, copy, or clone the needed data before awaiting, or drop the guard before the suspension point")
-    out.emit(move diag)
+    out.emit(diag)
     out
 
 fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &MirBody, site: SuspendSiteSpan, view_local: i32, guard_local: i32) -> DiagnosticList:
@@ -826,7 +826,7 @@ fn suspend_emit_derived_guard_error(diags: DiagnosticList, sema: &Sema, body: &M
     if guard_name.len() > 0:
         diag.add_note("`" ++ guard_name ++ "` is the no_await_guard origin")
     diag.add_help("move, copy, or clone the needed data before awaiting, or drop the derived view before the suspension point")
-    out.emit(move diag)
+    out.emit(diag)
     out
 
 fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32], body_may_suspend: SuspendBits, body: &MirBody, diags: DiagnosticList) -> DiagnosticList:
@@ -868,7 +868,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
                     reported_ends.push(site.end)
                     reported_locals.push(li)
                     reported_origins.push(li)
-                    out = suspend_emit_guard_error(move out, sema, body, site, li)
+                    out = suspend_emit_guard_error(out, sema, body, site, li)
                 reported_direct = 1
                 break
         if reported_direct != 0:
@@ -892,7 +892,7 @@ fn suspend_check_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMap[i32, i32]
                     reported_ends.push(site2.end)
                     reported_locals.push(vi)
                     reported_origins.push(guard_local)
-                    out = suspend_emit_derived_guard_error(move out, sema, body, site2, vi, guard_local)
+                    out = suspend_emit_derived_guard_error(out, sema, body, site2, vi, guard_local)
                 reported_derived = 1
                 break
     out
@@ -914,7 +914,7 @@ fn suspend_check_no_suspend_body(ast: &AstPool, sema: &Sema, body_by_fn: &HashMa
         reported_starts.push(site.start)
         reported_ends.push(site.end)
         reported_nodes.push(no_suspend_node)
-        out = suspend_emit_no_suspend_error(move out, sema, body, body_by_fn, body_may_suspend, site, bb)
+        out = suspend_emit_no_suspend_error(out, sema, body, body_by_fn, body_may_suspend, site, bb)
     out
 
 // Backward liveness of a body's locals to a fixed point: live_in holds, per
@@ -1447,6 +1447,6 @@ fn check_no_await_guard_suspends(mir_mod: &MirModule, ast: &AstPool, sema: &Sema
     let body_may_suspend = suspend_compute_may_suspend(mir_mod, body_by_fn)
     for bi in 0..mir_mod.bodies.len():
         let body = &mir_mod.bodies[bi]
-        out = suspend_check_no_suspend_body(ast, sema, body_by_fn, body_may_suspend, body, move out)
-        out = suspend_check_body(ast, sema, body_by_fn, body_may_suspend, body, move out)
+        out = suspend_check_no_suspend_body(ast, sema, body_by_fn, body_may_suspend, body, out)
+        out = suspend_check_body(ast, sema, body_by_fn, body_may_suspend, body, out)
     out

@@ -414,7 +414,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     var migrate = corpus_target(.Action, corpus, "migrate", corpus_migrated_dir(corpus))
     migrate.action = run_corpus_migrate_action
     migrate = migrate.input(up.reference.clone()).dep(corpus.stem ++ "-prepare-reference")
-    migrate = corpus_migrating_target(move migrate, release_compiler)
+    migrate = corpus_migrating_target(migrate, release_compiler)
     graph = graph.add_target(migrate)
 
     var check = corpus_target(.Action, corpus, "check-generated", "out/gen/." ++ corpus.stem ++ "-check-generated-stamp")
@@ -433,14 +433,14 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     var root = corpus_target(.Action, corpus, "bundle-root", "out/.build-state/" ++ corpus.stem ++ "-bundle-root.stamp")
     root.action = run_corpus_bundle_root_action
     root = root.write_scope(corpus.corpus_dir.clone()).write_scope("out/.build-state")
-    root = target_with_corpus_module_inputs(move root, ctx, corpus)
+    root = target_with_corpus_module_inputs(root, ctx, corpus)
     graph = graph.add_target(root)
 
     let plan = corpus_bundle_plan(ctx, corpus)
     var root_check = corpus_target(.Action, corpus, "bundle-root-check", "out/wo-drift/" ++ corpus.stem ++ "-bundle-root-check.stamp")
     root_check.action = run_corpus_bundle_root_check_action
     root_check = root_check.input(corpus.corpus_dir ++ "/bundle.w")
-    root_check = target_with_corpus_module_inputs(move root_check, ctx, corpus)
+    root_check = target_with_corpus_module_inputs(root_check, ctx, corpus)
     root_check = root_check.write_scope("out/wo-drift")
     graph = graph.add_target(root_check)
     graph = graph.add_target(wo_drift_target(ctx, &plan, release_compiler, "build", corpus.corpus_dir ++ "/" ++ corpus.drift_harness, corpus.drift_harness_arg))
@@ -462,9 +462,9 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
 
     var drift = corpus_target(.Action, corpus, "drift-report", "out/corpus-drift/" ++ corpus.stem ++ ".txt")
     drift.action = run_corpus_drift_report_action
-    drift = corpus_migrating_target(move drift, release_compiler)
+    drift = corpus_migrating_target(drift, release_compiler)
     drift = drift.input(up.reference.clone()).input(corpus.corpus_dir ++ "/bundle.w")
-    drift = target_with_corpus_module_inputs(move drift, ctx, corpus)
+    drift = target_with_corpus_module_inputs(drift, ctx, corpus)
     drift = drift.dep(corpus.stem ++ "-prepare-reference")
     drift = drift.write_scope("out/corpus-drift").allow_parallel()
     graph = graph.add_target(drift)
@@ -478,7 +478,7 @@ pub fn corpus_pipeline(out: Build, ctx: &BuildCtx, corpus: &Corpus, release_comp
     stamp = stamp.write_scope("out/corpus-stamp").write_scope(corpus.corpus_dir.clone())
     graph = graph.add_target(stamp)
 
-    corpus.lanes(move graph, ctx, corpus, release_compiler)
+    corpus.lanes(graph, ctx, corpus, release_compiler)
 
 /// The `wo-drift` group: every corpus's root check and drift lane.
 pub fn corpora_drift_group(ctx: &BuildCtx) -> Target:

@@ -545,7 +545,7 @@ impl Compilation:
         taken_zcu.reset_for_new_invocation(source_dir, root_path, "")
         taken_zcu.project_config = self.project_config_for_source(root_path)
         taken_zcu.set_current_source(source_dir, root_path, root_text)
-        taken_zcu = self.apply_cli_diag_mappings(move taken_zcu)
+        taken_zcu = self.apply_cli_diag_mappings(taken_zcu)
         let pool = taken_zcu.compile_source_frontend_mode(root_text, root_path, 0, 0)
         self.zcu = taken_zcu
         pool
@@ -803,7 +803,7 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         var taken_zcu = move self.zcu
-        let pool = taken_zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(move cfg))
+        let pool = taken_zcu.compile_file_frontend_with_config(path, self.apply_runtime_config(cfg))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_file_with_config:done decls={pool.decl_count()}")
         pool
@@ -823,7 +823,7 @@ impl Compilation:
         if not self.load_link_bundles():
             return AstPool.new()
         var taken_zcu = move self.zcu
-        let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(move cfg))
+        let pool = taken_zcu.compile_file_frontend_entry_with_config(path, self.apply_runtime_config(cfg))
         self.zcu = taken_zcu
         compilation_debug_init(f"Compilation.compile_entry_file_with_config:done decls={pool.decl_count()}")
         pool
@@ -1113,7 +1113,7 @@ impl Compilation:
         let cfg = move self.zcu.project_config
         let combined = base_source ++ "\n\n// <with compiler hook emitted source>\n" ++ self.compiler_hook_emitted_source
         self.compiler_hook_emitted_source = ""
-        self.compile_source_text_with_config(source_path, combined, move cfg)
+        self.compile_source_text_with_config(source_path, combined, cfg)
 
     fn has_errors() -> bool:
         self.zcu.diagnostics.has_errors()
@@ -1197,7 +1197,7 @@ impl Compilation:
         var taken_zcu = move self.zcu
         let source_dir = frontend_dirname(source_path)
         taken_zcu.reset_for_new_invocation(source_dir, source_path, "")
-        taken_zcu.project_config = self.apply_runtime_config(move cfg)
+        taken_zcu.project_config = self.apply_runtime_config(cfg)
         if taken_zcu.project_config.manifest_error.len() > 0:
             runtime_eprint("error: invalid with.toml: " ++ taken_zcu.project_config.manifest_error)
             self.zcu = taken_zcu
@@ -1241,8 +1241,8 @@ impl Compilation:
         for i in 1..source_paths.len():
             extra_names.push(with_str_clone_ref(source_paths[i]))
             extra_texts.push(with_str_clone_ref(source_texts[i]))
-        taken_zcu.set_extra_sources(move extra_names, move extra_texts)
-        taken_zcu = self.apply_cli_diag_mappings(move taken_zcu)
+        taken_zcu.set_extra_sources(extra_names, extra_texts)
+        taken_zcu = self.apply_cli_diag_mappings(taken_zcu)
         let pool = taken_zcu.compile_source_frontend_mode(source_text, source_path, 0, if self.statements_entry: 2 else: 1)
         self.zcu = taken_zcu
         pool
@@ -1267,7 +1267,7 @@ impl Compilation:
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
-        let pool = self.compile_file_with_config(source_path, move cfg)
+        let pool = self.compile_file_with_config(source_path, cfg)
         self.check_pool(pool, source_path)
 
     mut fn check_source_texts(source_paths: &List[str], source_texts: &List[str]) -> bool:
@@ -1326,7 +1326,7 @@ impl Compilation:
         // undefined symbols like any other unit.
         for loi in 0..self.link_objects.len():
             unit_objects.push(with_str_clone_ref(self.link_objects[loi]))
-        var link_plan = link_stage_link_object_to_binary_plan_with_units(obj_path, unit_objects, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, move _sp_dla, requires_async_runtime)
+        var link_plan = link_stage_link_object_to_binary_plan_with_units(obj_path, unit_objects, bin_path, all_link_libs, self.zcu.project_config.link_search_paths, _sp_dla, requires_async_runtime)
         if not link_plan.ok:
             compilation_cleanup_build_products(obj_path, bin_path)
             return compilation_binary_link_plan_fail()
@@ -1378,7 +1378,7 @@ fn compilation_write_unit_digests(obj_path: &str) -> bool:
 fn compilation_execute_binary_link_plan(debug_info: bool, plan: CompilationBinaryLinkPlan) -> LinkStageResult:
     if not plan.ok:
         return link_stage_result_fail()
-    var owned = move plan
+    var owned = plan
     let t_link = profile_now()
     let link_result = link_stage_result_for_command(move owned.command)
     let keep_units = runtime_getenv("WITH_KEEP_UNIT_OBJECTS").len() > 0
@@ -1629,7 +1629,7 @@ impl Compilation:
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
-        let pool = self.compile_file_with_config(source_path, move cfg)
+        let pool = self.compile_file_with_config(source_path, cfg)
         if pool.decl_count() == 0:
             return ""
         if not self.ensure_codegen_mir(pool):
@@ -1684,7 +1684,7 @@ impl Compilation:
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
-        let pool = self.compile_entry_file_with_config(source_path, move cfg)
+        let pool = self.compile_entry_file_with_config(source_path, cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn build_binary_to_path_with_link_libs(source_path: &str, bin_path: &str, link_libs: &List[str]) -> str:
@@ -1720,7 +1720,7 @@ impl Compilation:
             cfg.c_import_defines.push(with_str_clone_ref(defines[di]))
         for li in 0..link_libs.len():
             cfg.link_libs.push(with_str_clone_ref(link_libs[li]))
-        let pool = self.compile_source_text_with_config(source_path, source_text, move cfg)
+        let pool = self.compile_source_text_with_config(source_path, source_text, cfg)
         self.finish_binary_from_pool(pool, source_path, obj_path, bin_path)
 
     mut fn build_entry_binary_from_source_to_path(source_path: &str, source_text: &str, bin_path: &str) -> str:
@@ -1832,7 +1832,7 @@ impl Compilation:
         // #782: restore sema's wholeness before the whole-value transfer —
         // sync_from_sema must never see the blanked diags slot.
         sema.diags = DiagnosticList.init()
-        taken_zcu.sync_from_sema(move sema)
+        taken_zcu.sync_from_sema(sema)
         taken_zcu.set_typed_snapshot("", typed_pool)
         taken_zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
 
@@ -2082,7 +2082,7 @@ impl Compilation:
         let text = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
         var mir_snapshot = move self.zcu.last_mir_module
         var async_snapshot = move self.zcu.last_async_mir_module
-        self.zcu.set_codegen_snapshot(move mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), move async_snapshot, text)
+        self.zcu.set_codegen_snapshot(mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), async_snapshot, text)
         text
 
     mut fn dump_async_mir_file(source_path: &str) -> str:
@@ -2177,7 +2177,7 @@ impl Compilation:
         // Check for sema errors before lowering
         if sema.diags.has_errors():
             self.zcu.diagnostics = move sema.diags
-            self.zcu.sync_from_sema(move sema)
+            self.zcu.sync_from_sema(sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             self.zcu.render_current_diagnostics()
             self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
@@ -2188,7 +2188,7 @@ impl Compilation:
         // the complete module. This makes the phase transfer explicit: no shallow
         // Sema alias survives a List reallocation while generic specializations add
         // their final dependent types.
-        var lowered = lower_module(move sema, active_pool, self.zcu.pool)
+        var lowered = lower_module(sema, active_pool, self.zcu.pool)
         sema = move lowered.sema
         let mir_mod = move lowered.mir_module
         sema.freeze_symbols()
@@ -2205,14 +2205,14 @@ impl Compilation:
                     let span = Span { file: sema.local_file_id, start, end }
                     sema.diags.emit(Diagnostic.err(violation.message, span))
                 self.zcu.diagnostics = move sema.diags
-                self.zcu.sync_from_sema(move sema)
+                self.zcu.sync_from_sema(sema)
                 compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
                 self.zcu.render_all_diagnostics_frontend()
                 self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
                 return
         if sema.diags.has_errors():
             self.zcu.diagnostics = move sema.diags
-            self.zcu.sync_from_sema(move sema)
+            self.zcu.sync_from_sema(sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             self.zcu.render_all_diagnostics_frontend()
             self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
@@ -2224,7 +2224,7 @@ impl Compilation:
         // #782: the callee borrows &sema while diags is moved out — hand it a
         // whole sema (fresh empty slot; it returns the merged list).
         sema.diags = DiagnosticList.init()
-        sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, sema, move _sp_diags)
+        sema.diags = check_no_await_guard_suspends(mir_mod, active_pool, sema, _sp_diags)
         if do_profile:
             profile_emit("mir.suspend_check", t_suspend_check, "")
         // D66 (#1652, §16.2b.9): a resource's callback pair is proven
@@ -2235,12 +2235,12 @@ impl Compilation:
             var pair_diag = Diagnostic.err(finding.message, compilation_mir_span_range(self.zcu, active_pool, finding.fn_sym, finding.start, finding.end))
             if finding.note.len() > 0: pair_diag.add_note(finding.note)
             if finding.help.len() > 0: pair_diag.add_help(finding.help)
-            sema.diags.emit(move pair_diag)
+            sema.diags.emit(pair_diag)
         if pair_report.findings.len() > 0 and pairs_dump_enabled():
             runtime_eprint(f"pair-flow findings={pair_report.findings.len()} diagnostics={sema.diags.count()}")
         if sema.diags.has_errors():
             self.zcu.diagnostics = move sema.diags
-            self.zcu.sync_from_sema(move sema)
+            self.zcu.sync_from_sema(sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             self.zcu.render_all_diagnostics_frontend()
             self.zcu.set_codegen_snapshot(MirModule.init(), "", AsyncMirModule.init(), "")
@@ -2258,20 +2258,20 @@ impl Compilation:
             let body_name = sema.safe_symbol_text(mir_err.fn_sym)
             sema.diags.emit(Diagnostic.err("internal compiler error: invalid MIR before codegen (a bug in the With compiler, not in this program): " ++ mir_err.message ++ f" in `{body_name}`", diag_span))
             self.zcu.diagnostics = move sema.diags
-            self.zcu.sync_from_sema(move sema)
+            self.zcu.sync_from_sema(sema)
             compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
             self.zcu.render_all_diagnostics_frontend()
             // The invalid module stays for the dumps (`--dump-mir`,
             // `--trace-place`): the invalid body is what the hunt needs to
             // read. Codegen refuses it (ensure_codegen_mir: errors).
-            self.zcu.set_codegen_snapshot(move mir_mod, "", AsyncMirModule.init(), "")
+            self.zcu.set_codegen_snapshot(mir_mod, "", AsyncMirModule.init(), "")
             return
         let t_async = profile_now()
         var _async_diags = move sema.diags
         // #782: same shape as the suspend check above — whole sema borrowed
         // while diags is taken; reinit before the borrow.
         sema.diags = DiagnosticList.init()
-        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, sema, move _async_diags)
+        var async_artifacts: AsyncLowerResult = lower_async_module(mir_mod, active_pool, self.zcu.pool, sema, _async_diags)
         if do_profile:
             profile_emit("async.lower", t_async, "")
         sema.diags = move async_artifacts.diags
@@ -2280,16 +2280,16 @@ impl Compilation:
         // Sync sema AFTER MIR lowering — type tables are frozen but other
         // sema state (e.g. diagnostics) may have been updated.
         self.zcu.diagnostics = move sema.diags
-        self.zcu.sync_from_sema(move sema)
+        self.zcu.sync_from_sema(sema)
         compilation_debug_pool_flow("run_mir_lower:after_sync", self.zcu.pool, active_pool, self.zcu.last_sema)
         var async_mod = move async_artifacts.out_mod
-        self.zcu.set_codegen_snapshot(move mir_mod, "", move async_mod, "")
+        self.zcu.set_codegen_snapshot(mir_mod, "", async_mod, "")
 
     mut fn run_async_mir_lower(pool: &AstPool):
         let _ = self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
             var mir_snapshot = move self.zcu.last_mir_module
-            self.zcu.set_codegen_snapshot(move mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), AsyncMirModule.init(), "")
+            self.zcu.set_codegen_snapshot(mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), AsyncMirModule.init(), "")
             return
 
     mut fn ensure_codegen_mir(pool: &AstPool) -> bool:
