@@ -13,12 +13,12 @@ fn main:
         defer: EndDrawing()
         ClearBackground(background)
 
-        // raylib draws in f32; the clock is the one f64, narrowed once.
-        let t = GetTime() as f32
+        // raylib draws in f32; the clock is the one f64, which converts where f32 is demanded (D182).
+        let t: f32 = GetTime()
         let mouse = GetMousePosition()
 
         for i in 0..140:
-            let p = i as f32 / 140.0
+            let p: f32 = i / 140.0
             let angle = p * 4 * PI + t * 0.8
             let radius = 40 + p * 220 + sin(t * 1.4 + p * 6) * 30
             let color = ColorFromHSV(p * 360 + t * 50, 0.85, 1)
