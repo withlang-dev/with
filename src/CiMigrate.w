@@ -891,7 +891,11 @@ fn migrate_add_define(define: &str) -> Unit:
             let value = define.slice((eq_pos + 1) as i64, define.len())
             g_migrate_defines = g_migrate_defines ++ "#define " ++ name ++ " " ++ value ++ "\n"
     else:
-        g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ "\n"
+        // A bare `-DNAME` is `NAME=1` to a C compiler (C17 §6.10.1 as the
+        // compilers implement `-D`). Defined empty, `#if HAVE_LOCALTIME_R`
+        // is `#if` with nothing to test, and sqlite3.c failed to
+        // preprocess under its package's defines (#2972).
+        g_migrate_defines = g_migrate_defines ++ "#define " ++ define ++ " 1\n"
 
 // What precedes a migrated unit. It names no platform and includes no
 // header: a libc header included here would fix the feature set before the
@@ -1179,6 +1183,7 @@ impl CiProject:
                     self.symbols[symbol_id].owner_module = module_id
                     self.symbols[symbol_id].owner_rank = owner_rank
                     self.symbols[symbol_id].owner_definition_kind = owner_kind
+                    self.symbols[symbol_id].definition_location = ci_migrate_definition_identity(loc)
                     // owner_type's bytes live in THIS FILE's cimport session,
                     // which is disposed before emission — store an owned copy.
                     self.symbols[symbol_id].resolved_ty_text = ci_ir_owned_text(owner_type)
@@ -1187,6 +1192,13 @@ impl CiProject:
                     continue
 
                 let existing_path = self.owner_module_path(symbol_id)
+                // #2980: one definition both units include (a unity unit
+                // `#include`s the .c that defines it) is one definition,
+                // as the function path reads it: the first owner publishes
+                // it and this unit imports it.
+                if existing_path != input_path and loc.len() > 0 and self.symbols[symbol_id].definition_location == ci_migrate_definition_identity(loc):
+                    i = i + 1
+                    continue
                 if self.symbols[symbol_id].owner_rank == owner_rank:
                     if self.symbols[symbol_id].owner_definition_kind == CI_VAR_FULL_DEF and owner_kind == CI_VAR_FULL_DEF and existing_path != input_path:
                         return self.scan_fail(session, "duplicate full global definition for " ++ name ++ " in " ++ existing_path ++ " and " ++ input_path)
@@ -1205,7 +1217,11 @@ impl CiProject:
                 if name.len() == 0 or ci_is_system_decl(name) or (loc.len() > 0 and ci_is_system_path(loc)):
                     i = i + 1
                     continue
-                if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC:
+                // #2972/#2980: `main` is an entry point per unit, never a
+                // project symbol: a package's examples each carry one beside
+                // the library's (libcurl's docs/examples), and two `main`s
+                // are not a duplicate definition.
+                if with_cimport_fn_storage_class(session, i) == CX_SC_STATIC or name == "main":
                     // D107: a static definition's NULL arguments are corpus
                     // caller evidence even though it is no project symbol,
                     // and its own body is the evidence for ITS fn-pointer
@@ -2133,9 +2149,21 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     var report = project.facade_report(facade_name)
     if uninstalled_count > 0:
         report = report ++ f"  {uninstalled_count} function(s) are declared only by headers the package does not install, so no facade item presents them: " ++ uninstalled ++ (if uninstalled_count > 12: ", …" else: "") ++ "\n"
-    if project.unread.len() > 0:
-        report = report ++ f"  {project.unread.len()} unit(s) could not be read; a function only an unread unit defines is unproven:\n"
-        for line in project.unread: report = report ++ "    " ++ line ++ "\n"
+    // #2972: a unit the build generates (libcurl's tool_hugehelp.c, its
+    // test servers) lives under the build directory, not the source
+    // tree, and a configured-only tree has not made it yet: said apart
+    // from a source unit the parser refused.
+    let source_root = ci_migrate_fs_path(source_dir)
+    var unread: List[str] = List.new()
+    var generated: List[str] = List.new()
+    for line in project.unread:
+        if line.starts_with(source_root): unread.push(line) else: generated.push(line)
+    if unread.len() > 0:
+        report = report ++ f"  {unread.len()} unit(s) could not be read; a function only an unread unit defines is unproven:\n"
+        for line in unread: report = report ++ "    " ++ line ++ "\n"
+    if generated.len() > 0:
+        report = report ++ f"  {generated.len()} unit(s) the build generates were not there (the package was configured, not built); a function only one of them defines is unproven:\n"
+        for line in generated: report = report ++ "    " ++ line ++ "\n"
     ci_migrate_ensure_parent_dir(ci_migrate_fs_path(facade_path))
     if with_fs_write_file(ci_migrate_fs_path(facade_path), text) != 0:
         eprint("with get: could not write " ++ facade_path)
@@ -2148,8 +2176,10 @@ fn migrate_c_facade_for_package(units: &List[str], include_paths: &List[str], de
     // #2635: a unit that could not be read is said where `with get` prints,
     // not only in the report: a facade from unreadable units was announced
     // as `0 functions` and nothing else.
-    if project.unread.len() > 0:
-        return summary ++ f"; {project.unread.len()} unit(s) could not be read (the first: " ++ project.unread[0] ++ ")"
+    if unread.len() > 0:
+        return summary ++ f"; {unread.len()} unit(s) could not be read (the first: " ++ unread[0] ++ ")"
+    if generated.len() > 0:
+        return summary ++ f"; {generated.len()} generated unit(s) not there (the first: " ++ generated[0] ++ ")"
     summary
 
 fn migrate_c_directory(input_dir_arg: &str, output_dir_arg: &str, exclude_basenames: &str) -> i32:

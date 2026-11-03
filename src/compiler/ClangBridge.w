@@ -2436,7 +2436,28 @@ unsafe fn cimport_record_parse_error(s: *mut CImportSession):
         let diag = clang_getDiagnostic((*s).tu, i)
         if clang_getDiagnosticSeverity(diag) >= CXDiagnostic_Error:
             let msg = clang_getDiagnosticSpelling(diag)
-            (*s).err_msg = c_strdup(clang_getCString(msg))
+            // The error names where it is (#2972): a migrated unit that
+            // fails to preprocess under its package's defines was reported
+            // by its spelling alone, and the failing `#if` could not be
+            // found among 250k lines of amalgamation.
+            let loc = clang_getDiagnosticLocation(diag)
+            var presumed_bits: [2]i64 = [0 as i64; 2]
+            var presumed_line: u32 = 0
+            var presumed_col: u32 = 0
+            clang_getPresumedLocation(loc, &raw mut presumed_bits as *mut [2]i64 as *mut CXString, &raw mut presumed_line, &raw mut presumed_col)
+            let presumed_file = *(&raw mut presumed_bits as *mut [2]i64 as *mut CXString)
+            let presumed_name = clang_getCString(presumed_file)
+            var text = make_str(clang_getCString(msg))
+            if presumed_name as i64 != 0 and *presumed_name != 0:
+                let at_file = make_str(presumed_name)
+                // The synthetic main file is a throwaway temp with a
+                // per-run name (collect_inclusion skips it too): a c_import
+                // snippet's own error stays located by the snippet, as
+                // before. A migrated unit's `#line` names its real path.
+                if not at_file.starts_with("/tmp/with_cimport_") and not at_file.starts_with("/private/tmp/with_cimport_"):
+                    text = at_file ++ f":{presumed_line}:{presumed_col}: " ++ text
+            clang_disposeString(presumed_file)
+            (*s).err_msg = cimport_path_to_cstr(text)
             clang_disposeString(msg)
             clang_disposeDiagnostic(diag)
             return true
