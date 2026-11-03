@@ -11080,7 +11080,7 @@ impl Sema:
         let tk = self.ast.kind(target)
         if tk == NodeKind.NK_IDENT:
             let global_opt = self.global_value_ident_nodes.get(target)
-            if global_opt.is_some() and self.type_needs_drop(place_ty) != 0:
+            if global_opt.is_some() and self.type_needs_drop(place_ty) != 0 and self.get_type_kind(self.resolve_alias(place_ty as TypeId)) != TypeKind.TY_STR:
                 self.emit_error_with_help("cannot move out of global `" ++ self.pool_resolve(global_opt.unwrap()) ++ "`: a global always holds a value; clone it (`.clone()`) instead", target, help)
             return
         let place = render_expr(self.ast, self.pool, target as NodeId, 0)
@@ -16930,6 +16930,12 @@ impl Sema:
         // written). A `var` of plain bits is the value too; of anything else
         // it keeps the value semantics it had.
         if v_fty != 0 and self.type_is_plain_bits(v_fty):
+            return false
+        // #3026 (D111, D179): a str is a value; the binding takes it (a
+        // count increment, as the annotated `let s: str = self.f` did),
+        // so a later write of the owner or a consume of the record is
+        // fine. The view form had no use the value lacks.
+        if v_fty != 0 and self.get_type_kind(self.resolve_alias(v_fty as TypeId)) == TypeKind.TY_STR:
             return false
         if is_mut != 0:
             return false
@@ -41481,6 +41487,10 @@ impl Sema:
             return false
         let sym: i32 = global_opt.unwrap()
         if self.type_needs_drop(tid) == 0:
+            return false
+        // #3026 (D111): a str read out of a global is a count increment,
+        // never a move; the global keeps its value.
+        if self.get_type_kind(self.resolve_alias(tid as TypeId)) == TypeKind.TY_STR:
             return false
         self.emit_error("cannot move out of global `" ++ self.pool_resolve(sym) ++ "`: a global always holds a value; clone it (`.clone()`) instead", node)
         true
