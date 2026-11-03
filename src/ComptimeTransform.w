@@ -787,6 +787,12 @@ impl Sema:
         let evald = unsafe { comptime_try_eval_expr_result(self as *mut Sema, pool, self.pool, node) }
         if comptime_value_is_valid(evald.value) == false:
             return node
+        // A variant with a payload stays the call it was written as: folded
+        // to the shorthand, `AppError.Db(DbError.NotFound("users", "42"))`
+        // no longer matched `.Db(.NotFound(..))` at run time (#3016). The
+        // fold serves a `comptime` block's result (ct_rewrite_comptime).
+        if evald.value.kind == ComptimeValueKind.CV_ENUM and evald.value.extra_count > 0:
+            return node
         let folded = self.ct_build_value_tree(pool, intern, evald.value, node, evald.extras)
         if folded != 0:
             return folded
