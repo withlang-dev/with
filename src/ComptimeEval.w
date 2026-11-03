@@ -3990,7 +3990,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "capability method " ++ method ++ " expects a string argument")
             return ""
         // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-        value.text
+        value.text.clone()
 
     mut fn capability_arg_i32(args: &ComptimeValue, index: i32, method: &str, node: i32) -> i32:
         let value = self.extra_value_at((args.extra_start + index) as i64)
@@ -4208,7 +4208,7 @@ impl ComptimeEvaluator:
         let value = self.struct_field_value_by_name(options, field_name)
         if value.kind == ComptimeValueKind.CV_STR:
             // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-            return value.text
+            return value.text.clone()
         ""
 
     fn workspace_i32_option(options: &ComptimeValue, field_name: &str, default_value: i32) -> i32:
@@ -4592,7 +4592,7 @@ impl ComptimeEvaluator:
             let _ = self.fail(node, "LinkCommand." ++ name ++ " must be a string")
             return ""
         // D32: take intended; clone until the D32 compiler is the seed (old §2.4 Drop-owner gate)
-        field.text
+        field.text.clone()
 
     mut fn link_command_str_list_field(value: &ComptimeValue, name: &str, node: i32) -> List[str]:
         let out: List[str] = List.new()
@@ -4626,7 +4626,7 @@ impl ComptimeEvaluator:
                 return out
             // D32: take intended; clone until the D32 compiler is the seed
             // (old §2.4 Drop-owner gate on ComptimeValue).
-            out.push(LinkStageEnvVar { name: name.text, value: env_value.text })
+            out.push(LinkStageEnvVar { name: name.text.clone(), value: env_value.text.clone() })
         out
 
     mut fn link_command_from_value(value: &ComptimeValue, node: i32) -> LinkStageCommand:
@@ -5356,8 +5356,8 @@ impl ComptimeEvaluator:
             kind,
             // D32: take intended; clone until the D32 compiler is the seed
             // (old §2.4 Drop-owner gate on ComptimeValue).
-            source_path: source_value.text,
-            archive_path: archive_value.text,
+            source_path: source_value.text.clone(),
+            archive_path: archive_value.text.clone(),
             mode: mode_value.data0 as i32,
         }
 
@@ -8155,7 +8155,7 @@ impl ComptimeEvaluator:
                 if line_value > 0:
                     location.text ++ f":{line_value}"
                 else:
-                    location.text
+                    location.text.clone()
             self.runtime_exit_code = 134
             self.runtime_stderr = "panic at " ++ rendered_location ++ ": " ++ message.text ++ "\n"
             self.had_error = 1
