@@ -59,7 +59,7 @@ pub fn World.new() -> World:
 extend World:
     // --- Entity Lifecycle ---
 
-    pub mut fn spawn_entity(name: str) -> Entity:
+    pub mut fn spawn_entity(name: str):
         let id = self.next_id
         self.next_id += 1
         self.entity_names.push(name)
@@ -69,7 +69,7 @@ extend World:
 
     pub mut fn despawn(entity: Entity):
         if entity.id >= 0 and entity.id < self.entity_alive.len():
-            let alive: bool = self.entity_alive[entity.id]
+            let alive = self.entity_alive[entity.id]
             if alive:
                 self.entity_alive[entity.id] = false
                 self.entity_generations[entity.id] += 1
@@ -80,58 +80,42 @@ extend World:
                 self.sprites.remove(entity)
                 self.input_states.remove(entity)
 
-    pub mut fn queue_despawn(entity: Entity):
-        self.despawn_queue.push(entity)
+    pub mut fn queue_despawn(entity: Entity): self.despawn_queue.push(entity)
 
     pub mut fn flush_despawns():
         // Process deferred removals
-        var i: i32 = 0
+        var i = 0
         while i < self.despawn_queue.len():
-            let entity: Entity = self.despawn_queue[i]
+            let entity = self.despawn_queue[i]
             self.despawn(entity)
             i += 1
         self.despawn_queue.clear()
 
-    pub fn is_alive(entity: Entity) -> bool:
+    pub fn is_alive(entity: Entity):
         if entity.id >= 0 and entity.id < self.entity_alive.len():
-            let alive: bool = self.entity_alive[entity.id]
-            let generation: i32 = self.entity_generations[entity.id]
+            let alive = self.entity_alive[entity.id]
+            let generation = self.entity_generations[entity.id]
             alive and entity.generation == generation
         else:
             false
 
     // A view of the stored name (§3.8): the caller reads it, the world
     // keeps it.
-    pub fn entity_name(entity: Entity) -> Option[&str]:
-        if self.is_alive(entity):
-            Some(self.entity_names[entity.id])
-        else:
-            None
+    pub fn entity_name(entity: Entity) -> Option[&str]: if self.is_alive(entity): Some(self.entity_names[entity.id]) else: None
 
-    pub fn entity_count() -> i32:
-        var count: i32 = 0
-        for i in 0..self.entity_alive.len():
-            let alive: bool = self.entity_alive[i]
-            if alive:
-                count += 1
-        count
+    pub fn entity_count(): self.entity_alive |> filter(it) |> count()
 
     // --- Component Access ---
 
-    pub mut fn add_transform(entity: Entity, component: Transform):
-        self.transforms.insert(entity, component)
+    pub mut fn add_transform(entity: Entity, component: Transform): self.transforms.insert(entity, component)
 
-    pub mut fn add_velocity(entity: Entity, component: Velocity):
-        self.velocities.insert(entity, component)
+    pub mut fn add_velocity(entity: Entity, component: Velocity): self.velocities.insert(entity, component)
 
-    pub mut fn add_collider(entity: Entity, component: Collider):
-        self.colliders.insert(entity, component)
+    pub mut fn add_collider(entity: Entity, component: Collider): self.colliders.insert(entity, component)
 
-    pub mut fn add_sprite(entity: Entity, component: Sprite):
-        self.sprites.insert(entity, component)
+    pub mut fn add_sprite(entity: Entity, component: Sprite): self.sprites.insert(entity, component)
 
-    pub mut fn add_input_state(entity: Entity, component: InputState):
-        self.input_states.insert(entity, component)
+    pub mut fn add_input_state(entity: Entity, component: InputState): self.input_states.insert(entity, component)
 
     // --- Debug ---
 

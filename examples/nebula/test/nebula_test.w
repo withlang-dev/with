@@ -23,7 +23,7 @@ type ServerConfig {
 
 // --- Status helpers ---
 
-fn is_fatal(s: Status) -> bool:
+fn is_fatal(s: Status):
     match s:
         Fatal(_) => true
         _        => false
@@ -42,8 +42,7 @@ fn classify_temp(temp: f64) -> i32:
     else if temp > 60.0: 1  // Medium
     else: 0                      // Low
 
-fn should_alert(severity: i32) -> bool:
-    severity >= 2  // High or Critical
+fn should_alert(severity: i32): severity >= 2  // High or Critical
 
 // --- Config defaults and record update ---
 
@@ -56,7 +55,7 @@ fn default_config -> ServerConfig:
         db_path: "telemetry.db",
     }
 
-fn config_with_port(base: ServerConfig, port: i32) -> ServerConfig: { base with port }
+fn config_with_port(base: ServerConfig, port: i32): { base with port }
 
 // --- Packet extraction helpers ---
 
@@ -64,7 +63,7 @@ fn count_nonempty_lines(lines: [5]i32, count: i32) -> i32:
     var result: i32 = 0
     for i in 0..count:
         if lines[i] > 0:
-            result = result + 1
+            result += 1
     result
 
 // --- CSV field parsing helper ---
@@ -73,7 +72,7 @@ fn parse_field_count(field_lens: [4]i32, total: i32) -> i32:
     var valid: i32 = 0
     for i in 0..total:
         if field_lens[i] > 0:
-            valid = valid + 1
+            valid += 1
     valid
 
 // --- Batch builder ---
@@ -83,8 +82,7 @@ fn build_batch_status(index: i32) -> i32:
     else if index % 5 == 0: 1 // Warning
     else: 0                        // Ok
 
-fn batch_temp(index: i32) -> f64:
-    20.0 + (index as f64) * 0.5
+fn batch_temp(index: i32): 20.0 + (index as f64) * 0.5
 
 // --- Session stats ---
 

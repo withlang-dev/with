@@ -19,14 +19,10 @@ type EmailNotifier {
 }
 
 extend EmailNotifier:
-    fn new(host: str, from: str) -> EmailNotifier:
-        EmailNotifier {
-            smtp_host: host,
-            from_addr: from,
-        }
+    fn new(host: str, from: str): EmailNotifier { smtp_host: host, from_addr: from }
 
 impl NotificationService for EmailNotifier:
-    async fn send(self: &EmailNotifier, notif: Notification) -> bool:
+    async fn send(notif: Notification) -> bool:
         let priority_num = match notif.priority:
             .Urgent => 1
             .Normal => 3
@@ -36,7 +32,5 @@ impl NotificationService for EmailNotifier:
         print(f"Sending email to {notif.recipient} (priority={priority_num})")
         true
 
-    async fn send_batch(self: &EmailNotifier, notifs: List[Notification]) -> i32:
-        var sent = 0
+    async fn send_batch(notifs: List[Notification]) -> i32: 0
         // In production: batch send with rate limiting
-        sent

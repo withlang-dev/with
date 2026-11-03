@@ -87,7 +87,7 @@ pub const TEXTURE_ENEMY: TextureId  = TextureId { value: 1 }
 pub const TEXTURE_WALL: TextureId   = TextureId { value: 2 }
 pub const TEXTURE_BULLET: TextureId = TextureId { value: 3 }
 
-pub fn texture_name(id: TextureId) -> str:
+pub fn texture_name(id: TextureId):
     match id.value:
         0 => "player.png"
         1 => "enemy.png"

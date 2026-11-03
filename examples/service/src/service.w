@@ -41,20 +41,12 @@ pub type UserServiceBuilder {
     config: ServiceConfig,
 }
 
-pub fn UserService.builder() -> UserServiceBuilder:
-    UserServiceBuilder {
-        config: ServiceConfig {},
-    }
+pub fn UserService.builder(): UserServiceBuilder { config: ServiceConfig {} }
 
 extend UserServiceBuilder:
-    pub move fn with_config(cfg: ServiceConfig) -> UserServiceBuilder:
-        { self with config: cfg }
+    pub move fn with_config(cfg: ServiceConfig): { self with config: cfg }
 
-    pub move fn build() -> UserService:
-        UserService {
-            config: self.config,
-            metrics: ServiceMetrics {},
-        }
+    pub move fn build(): UserService { config: self.config, metrics: ServiceMetrics {} }
 
 // --- Service Methods ---
 
@@ -78,7 +70,7 @@ extend UserService:
     // In a real service, this would insert into a database
     // and send notifications.
 
-    pub mut fn create_user(req: CreateUserRequest, actor: UserId) -> User:
+    pub mut fn create_user(req: CreateUserRequest, actor: UserId):
         self.metrics.requests += 1
 
         // Build the user -- active defaults to true via default field value.
@@ -93,26 +85,16 @@ extend UserService:
 
     // --- Build a profile from a user ---
 
-    pub fn make_profile(user: User, posts: i32, followers: i32) -> UserProfile:
-        UserProfile {
-            user,
-            post_count: posts,
-            followers,
-        }
+    pub fn make_profile(user: User, posts: i32, followers: i32):
+        UserProfile { user, post_count: posts, followers }
 
     // --- Clamp pagination ---
 
-    pub fn clamp_page_size(per_page: i32) -> i32:
-        if per_page > self.config.max_batch_size:
-            self.config.max_batch_size
-        else if per_page < 1:
-            1
-        else:
-            per_page
+    pub fn clamp_page_size(per_page: i32): per_page.max(1).min(self.config.max_batch_size)
 
     // --- Generate welcome message based on role ---
 
-    pub fn welcome_body(role: Role) -> str:
+    pub fn welcome_body(role: Role):
         match role:
             .Admin     => "Welcome, administrator. Full access granted."
             .Moderator => "Welcome, moderator. You can manage content."
@@ -121,7 +103,7 @@ extend UserService:
 
     // --- Build a notification ---
 
-    pub fn make_welcome_notification(user: &User) -> Notification:
+    pub fn make_welcome_notification(user: &User):
         Notification {
             recipient: user.email,
             subject: "Welcome to the platform",
@@ -142,15 +124,12 @@ extend UserService:
 
 // --- Helper: describe changes between two users ---
 
-pub fn describe_changes(old: &User, new_user: &User) -> str:
+pub fn describe_changes(old: &User, new_user: &User):
     let changes = with List.new() as mut changes:
         if old.name != new_user.name:
             changes.push("name changed")
         if old.email != new_user.email:
             changes.push("email changed")
         if old.active != new_user.active:
-            if new_user.active:
-                changes.push("activated")
-            else:
-                changes.push("deactivated")
+            changes.push(if new_user.active: "activated" else: "deactivated")
     changes.join(", ")

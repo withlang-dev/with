@@ -42,7 +42,7 @@ type AuctionResult { winner_id: i32, winning_bid: i32, total_bids: i32 }
 // sender drops (§14.15).
 // ---------------------------------------------------------------------------
 
-async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
+async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]):
     defer: cleanup_count.fetch_add(1, .SeqCst)
     for round in 0i32..3:
         let amount = base_price + round * id * 7
@@ -54,7 +54,7 @@ async fn bidder(id: i32, base_price: i32, tx: Sender[Bid]) -> i32:
 // Slow bidder: will be cancelled by select, exercises cancel + unwind
 // ---------------------------------------------------------------------------
 
-async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
+async fn slow_bidder(id: i32, tx: Sender[Bid]):
     defer: cleanup_count.fetch_add(1, .SeqCst)
     // Simulate slow thinking with sleep
     sleep(Duration.millis(500)).await
@@ -65,7 +65,7 @@ async fn slow_bidder(id: i32, tx: Sender[Bid]) -> i32:
 // Bid collector: reads bids from channel, tracks highest
 // ---------------------------------------------------------------------------
 
-async fn collect_bids(rx: Receiver[Bid], expected: i32) -> Bid:
+async fn collect_bids(rx: Receiver[Bid], expected: i32):
     var best = Bid { bidder_id: -1, amount: 0 }
     for _ in 0..expected:
         let bid = rx.recv() ?? break
@@ -77,16 +77,12 @@ async fn collect_bids(rx: Receiver[Bid], expected: i32) -> Bid:
 // Nested async: multi-stage bid valuation
 // ---------------------------------------------------------------------------
 
-async fn base_valuation(amount: i32) -> i32:
-    amount * 100
+async fn base_valuation(amount: i32): amount * 100
 
 @[stack_size(131072)]
-async fn adjusted_valuation(amount: i32, factor: i32) -> i32:
-    let base = base_valuation(amount).await
-    base + factor
+async fn adjusted_valuation(amount: i32, factor: i32): base_valuation(amount).await + factor
 
-async fn full_valuation(bid: Bid) -> i32:
-    adjusted_valuation(bid.amount, bid.bidder_id * 3).await
+async fn full_valuation(bid: Bid): adjusted_valuation(bid.amount, bid.bidder_id * 3).await
 
 // ---------------------------------------------------------------------------
 // Async fn returning Result for errdefer + ? demonstration
@@ -106,15 +102,13 @@ async fn process_winning_bid(amount: i32) -> Result[i32, str]:
 // Task escaping a sync function
 // ---------------------------------------------------------------------------
 
-fn spawn_valuation(bid: Bid):
-    full_valuation(bid)
+fn spawn_valuation(bid: Bid): full_valuation(bid)
 
 // ---------------------------------------------------------------------------
 // Defer LIFO helper (top-level because nested fn not in expression context)
 // ---------------------------------------------------------------------------
 
-fn trace(digit: i32):
-    defer_trace.store(defer_trace.load(.SeqCst) * 10 + digit, .SeqCst)
+fn trace(digit: i32): defer_trace.store(defer_trace.load(.SeqCst) * 10 + digit, .SeqCst)
 
 fn check_defer_lifo:
     defer: trace(3)
@@ -177,8 +171,7 @@ async fn run_auction() -> AuctionResult:
     // --- Phase 5: Async block capturing locals ---
     print("phase 5: async block")
     let bonus = 42
-    let block_task = async:
-        best.amount + bonus
+    let block_task = async: best.amount + bonus
     let block_result = block_task.await
     assert(block_result == best.amount + 42)
     print("phase 5 done")
@@ -202,23 +195,14 @@ async fn run_auction() -> AuctionResult:
 
     // --- Phase 8: await all tasks ---
     print("phase 8: await all")
-    var valuations = List.new()
-    valuations.push(base_valuation(1))
-    valuations.push(base_valuation(2))
-    valuations.push(base_valuation(3))
+    let valuations = [base_valuation(1), base_valuation(2), base_valuation(3)]
     let results = await_all(valuations)
-    var sum = 0
-    for r in results:
-        sum += r
-    assert(sum == 600)  // 100 + 200 + 300
+    assert(results |> sum() == 600)  // 100 + 200 + 300
     print("phase 8 done")
 
     // --- Phase 9: await first ---
     print("phase 9: await first")
-    var racers = List.new()
-    racers.push(base_valuation(10))
-    racers.push(base_valuation(20))
-    let first = await_first(racers)
+    let first = await_first([base_valuation(10), base_valuation(20)])
     assert(first == 1000 or first == 2000)
     print("phase 9 done")
 

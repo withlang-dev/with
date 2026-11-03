@@ -18,7 +18,7 @@ fn update_depth(depth: i32, cls: i32) -> i32:
     else if cls in [2, 4]: depth - 1
     else: depth
 
-fn max(a: i32, b: i32) -> i32: if a > b: a else: b
+
 
 fn count_depth(input: [10]i32, len: i32) -> i32:
     var max_depth: i32 = 0
@@ -26,10 +26,10 @@ fn count_depth(input: [10]i32, len: i32) -> i32:
     for i in 0..len:
         let cls = classify_char(input[i])
         depth = update_depth(depth, cls)
-        max_depth = max(max_depth, depth)
+        max_depth = max_depth.max(depth)
     max_depth
 
-fn is_digit(ch: i32) -> bool: ch in 48..=57
+fn is_digit(ch: i32): ch in 48..=57
 
 fn classify_value(first_char: i32) -> i32:
     if first_char == 110: 0
@@ -39,7 +39,7 @@ fn classify_value(first_char: i32) -> i32:
     else if first_char == 34: 4
     else: 5
 
-fn is_json_char(ch: i32) -> bool:
+fn is_json_char(ch: i32):
     let cls = classify_char(ch)
     cls > 0 or is_digit(ch) or ch in [34, 32]
 

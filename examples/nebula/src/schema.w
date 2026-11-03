@@ -44,20 +44,19 @@ pub trait SqlRecord:
 // this automatically by inspecting T's fields at compile time.
 
 impl SqlRecord for Telemetry:
-    fn table_name() -> str:
-        "telemetry"
+    fn table_name(): "telemetry"
 
-    fn to_insert_query() -> str:
+    fn to_insert_query():
         f"INSERT INTO telemetry (device_id, temp) VALUES ('{self.device_id}', {self.temp})"
 
 // --- Status Helpers ---
 
-pub fn is_fatal(s: &Status) -> bool:
+pub fn is_fatal(s: &Status):
     match s:
         .Fatal(_) => true
         _         => false
 
-pub fn status_label(s: &Status) -> str:
+pub fn status_label(s: &Status):
     match s:
         .Active     => "ok"
         .Warning(w) => f"warn: {w}"
@@ -76,7 +75,7 @@ pub type ServerConfig {
     db_path: str = "telemetry.db",
 }
 
-pub fn load_config(env_port: Option[u16]) -> ServerConfig:
+pub fn load_config(env_port: Option[u16]):
     let base = ServerConfig {}  // All defaults
     match env_port:
         Some(port) => { base with port }  // Record update + field shorthand
@@ -88,14 +87,13 @@ pub fn load_config(env_port: Option[u16]) -> ServerConfig:
 
 pub enum Severity { Low | Medium | High | Critical }
 
-pub fn classify_temp(temp: f64) -> Severity:
+pub fn classify_temp(temp: f64):
     if temp > 100.0: .Critical
     else if temp > 80.0: .High
     else if temp > 60.0: .Medium
     else: .Low
 
-pub fn should_alert(sev: Severity) -> bool:
-    sev in [.High, .Critical]
+pub fn should_alert(sev: Severity): sev in [.High, .Critical]
 
 // --- Batch Builder ---
 //
@@ -110,6 +108,6 @@ pub fn build_test_batch(count: usize) -> List[Telemetry]:
                          else: .Active
             batch.push(Telemetry {
                 device_id: f"dev-{i}",
-                temp: 20.0 + (i as f64) * 0.5,
+                temp: 20.0 + i * 0.5,
                 status,
             })

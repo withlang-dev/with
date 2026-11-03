@@ -23,8 +23,7 @@ fn test_with_blocks:
     print(f"Got connection #{conn.id}")
 
     // with-as for scoped naming
-    with "hello world" as greeting:
-        print(greeting)
+    with "hello world" as greeting: print(greeting)
 
     // Nested with blocks
     with 10 as x:
@@ -34,8 +33,7 @@ fn test_with_blocks:
 
 // --- Async scope for structured concurrency ---
 
-async fn process_item(id: i32) -> i32:
-    id * 10
+async fn process_item(id: i32): id * 10
 
 async fn test_async_scope:
     // Tracked tasks are observed, never discarded: the scope waits for
@@ -61,10 +59,7 @@ fn test_defer:
 // --- List mutation ---
 
 fn test_list_mutation:
-    var buffer = List.new()
-    buffer.push(1)
-    buffer.push(2)
-    buffer.push(3)
+    var buffer = [1, 2, 3]
     assert(buffer.len() == 3)
 
     buffer.push(42)

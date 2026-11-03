@@ -29,7 +29,7 @@ fn c_calls_an_exported_with_function:
 
 @[test]
 fn an_empty_slice_reaches_c_as_null_and_zero:
-    let none: List[i32] = List.new()
+    let none: List[i32] = []
     assert(visited(none).len() == 0 and total(none) == 0)
 
 @[test]

@@ -23,7 +23,7 @@ use tally
 type Bonus { points: i32 }
 fn boosted(ctx: Context, args: &[Value], bonus: &Bonus):
     var sum = 0
-    for i in 0..args.len() as i32: sum = sum + args[i].int()
+    for a in args: sum += a.int()
     ctx.result_int(sum + bonus.points)
 
 fn scores -> Result[Unit, SqliteError]:

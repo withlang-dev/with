@@ -9,7 +9,7 @@ fn seeded -> Database:
 type Scale { by: i32 }
 fn scaled(ctx: Context, args: &[Value], scale: &Scale):
     var sum = 0
-    for i in 0..args.len() as i32: sum = sum + args[i].int()
+    for a in args: sum += a.int()
     ctx.result_int(sum * scale.by)
 
 @[test]

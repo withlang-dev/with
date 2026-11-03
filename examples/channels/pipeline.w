@@ -11,18 +11,8 @@
 
 use std.channel
 
-// --- Domain Types ---
 
-type WorkItem {
-    id: i32,
-    payload: str,
-}
 
-type ProcessedItem {
-    id: i32,
-    result: str,
-    worker_id: i32,
-}
 
 // --- Demo 1: Simple Pipeline ---
 
@@ -43,18 +33,18 @@ async fn demo_simple_pipeline:
 
         // worker: process items
         s.track(async:
-            for i in 0..item_count:
-                let item = work_rx.recv().unwrap()
+            for _ in 0..item_count:
+                let item = work_rx.recv() ?? break
                 result_tx.send(item * 10)
             print(f"  worker: processed {item_count} items")
         )
 
         // collector: gather results
         var total = 0
-        for i in 0..item_count:
-            let result = result_rx.recv().unwrap()
+        for _ in 0..item_count:
+            let result = result_rx.recv() ?? break
             print(f"  collected: {result}")
-            total = total + result
+            total += result
 
         print(f"\nTotal: {total}")
 
@@ -77,14 +67,14 @@ async fn demo_fan_out:
         // 3 workers sharing work_rx
         for worker_id in 0..3:
             s.track(async:
-                for j in 0..3:
-                    let item = work_rx.recv().unwrap()
+                for _ in 0..3:
+                    let item = work_rx.recv() ?? break
                     result_tx.send(item * 10 + worker_id)
             )
 
         // collector
         for i in 0..item_count:
-            let result = result_rx.recv().unwrap()
+            let result = result_rx.recv() ?? break
             print(f"  result: {result}")
 
 // --- Demo 3: Fan-in from Multiple Sources ---
@@ -114,8 +104,8 @@ async fn demo_fan_in:
         )
 
         // multiplexed consumer: five values, whichever source they came from
-        for round in 0..5:
-            let val = merged_rx.recv().unwrap()
+        for _ in 0..5:
+            let val = merged_rx.recv() ?? break
             print(f"  received: {val}")
 
 // --- Main ---

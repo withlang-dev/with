@@ -1,36 +1,25 @@
-// Idiomatic With — demonstrates concise error handling,
-// pattern matching, pipeline operators, and async.
+// Idiomatic With — concise error handling, pattern matching, pipelines, async.
 
 type User { id: i32, name: str, active: bool }
 
-enum LookupResult {
+enum LookupResult:
     Found(User)
     | Suspended(str)
     | NotFound
-}
 
 fn find_user(id: i32) -> LookupResult:
-    if id == 1:
-        .Found(User { id: 1, name: "Alice", active: true })
-    else if id == 2:
-        .Suspended("policy violation")
-    else:
-        .NotFound
+    match id:
+        1 => .Found(User { id: 1, name: "Alice", active: true })
+        2 => .Suspended("policy violation")
+        _ => .NotFound
 
-fn format_user(user: User):
-    f"{user.name} (#{user.id})"
+fn format_user(user: User): f"{user.name} (#{user.id})"
 
-fn get_dashboard(user_id: i32) -> str:
+fn get_dashboard(user_id: i32):
     match find_user(user_id):
-        .Found(user) =>
-            let display = user |> format_user
-            f"Dashboard for {display}"
-
-        .Suspended(reason) =>
-            f"Account suspended: {reason}"
-
-        .NotFound =>
-            "User not found"
+        .Found(user) => f"Dashboard for {user |> format_user}"
+        .Suspended(reason) => f"Account suspended: {reason}"
+        .NotFound => "User not found"
 
 // --- Pipeline composition ---
 
@@ -48,34 +37,21 @@ fn pipeline_demo:
 error FetchError = NotFound(i32) | Timeout
 
 fn fetch_data(id: i32) -> Result[str, FetchError]:
-    if id > 0:
-        Ok(f"data-{id}")
-    else:
-        Err(.NotFound(id))
+    if id > 0: Ok(f"data-{id}") else: Err(.NotFound(id))
 
 fn process_with_errors:
     match fetch_data(1):
         Ok(data) => print(f"got: {data}")
         Err(e) => print(f"error: {e}")
-
     match fetch_data(-1):
         Ok(data) => print(f"unexpected: {data}")
         Err(.NotFound(id)) => print(f"not found: {id}")
         Err(.Timeout) => print("timeout")
 
-// --- Main ---
-
-fn main:
-    print("=== Idiomatic With Demo ===\n")
-
-    print(get_dashboard(1))
-    print(get_dashboard(2))
-    print(get_dashboard(3))
-
-    print("")
-    pipeline_demo()
-
-    print("")
-    process_with_errors()
-
-    print("\n=== Done ===")
+print("=== Idiomatic With Demo ===\n")
+for id in 1..=3: print(get_dashboard(id))
+print("")
+pipeline_demo()
+print("")
+process_with_errors()
+print("\n=== Done ===")

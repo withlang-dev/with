@@ -6,8 +6,7 @@ use facades.tally
 
 // TallyRange is C's struct, and With's: it is built, passed and returned by
 // value with no declaration here.
-pub fn range_of(values: []i32) -> TallyRange:
-    tally_range(values)
+pub fn range_of(values: []i32): tally_range(values)
 
 // A by-value call is a lend (src/facades/tally.w): no `unsafe`.
 pub fn widened(range: TallyRange, by: i32) -> TallyRange: tally_widen(range, by)
@@ -20,7 +19,7 @@ pub fn calls -> i32: tally_calls
 fn collect(visit: &fn(i32) -> Unit, value: i32): visit(value)
 
 pub fn visited(values: []i32) -> List[i32]:
-    var seen: List[i32] = List.new()
+    var seen: List[i32] = []
     tally_each(values, collect, value => seen.push(value))
     seen
 
@@ -30,5 +29,4 @@ pub fn visited(values: []i32) -> List[i32]:
 @[c_export("c_interop_score")]
 fn score(value: i32) -> i32: if value < 0: 0 else: value * value
 
-pub fn total(values: []i32) -> i32:
-    tally_total(values)
+pub fn total(values: []i32): tally_total(values)

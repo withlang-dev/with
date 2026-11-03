@@ -5,56 +5,20 @@ use service.ServiceConfig
 use domain.*
 use http.*
 
-// --- Entry Point ---
-//
-// Demonstrates:
-//   - Builder pattern for service configuration
-//   - Request routing via pattern matching
-//   - Domain types with default values
-//   - f-string interpolation
+// The builder pattern for the configuration, request routing by pattern
+// matching, domain types with default values, f-strings.
 
 fn main:
-    // Configuration -- only override fields that differ from defaults
-    let config = ServiceConfig {
-        cache_ttl_secs: 600,
-        notify_on_delete: true,
-        max_batch_size: 50,
-    }
-
-    // Build the service: the setters consume and return the builder
+    // Only the fields that differ from the defaults
+    let config = ServiceConfig { cache_ttl_secs: 600, notify_on_delete: true, max_batch_size: 50 }
+    // The setters consume and return the builder
     let service = UserService.builder().with_config(config).build()
-
     var state = AppState { service }
 
     print("=== Service Demo ===")
-
-    // Simulate some HTTP requests
-    let create_req = HttpRequest {
-        method: "POST",
-        path: "/users",
-        body: "Alice",
-    }
-
-    let resp = state.handle_request(create_req)
-    print(f"POST /users -> {resp.status}: {resp.body}")
-
-    let list_req = HttpRequest {
-        method: "GET",
-        path: "/users",
-        body: "",
-    }
-
-    let resp2 = state.handle_request(list_req)
-    print(f"GET /users  -> {resp2.status}: {resp2.body}")
-
-    // Try a 404
-    let bad_req = HttpRequest {
-        method: "DELETE",
-        path: "/unknown",
-        body: "",
-    }
-
-    let resp3 = state.handle_request(bad_req)
-    print(f"DELETE /unknown -> {resp3.status}: {resp3.body}")
-
+    let requests = [HttpRequest { method: "POST", path: "/users", body: "Alice" }, HttpRequest { method: "GET", path: "/users", body: "" }, HttpRequest { method: "DELETE", path: "/unknown", body: "" }]
+    for req in requests:
+        let route = f"{req.method} {req.path}"
+        let resp = state.handle_request(req)
+        print(f"{route} -> {resp.status}: {resp.body}")
     print("=== Done ===")

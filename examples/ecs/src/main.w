@@ -21,8 +21,7 @@ use systems.*
 
 fn main:
     var world = World.new()
-    let dt: f32 = 1.0 / 60.0
-    world.dt = dt
+    world.dt = 1.0 / 60.0
 
     // --- Spawn Entities ---
 
@@ -38,32 +37,23 @@ fn main:
 
     // Frame 0: player presses Right
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev0 = List.new()
-    ev0.push(InputEvent.KeyDown(.Right))
-    world.run_frame(&ev0)
+    world.run_frame([InputEvent.KeyDown(.Right)])
 
     // Frame 1: key held (no new events)
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    let ev1: List[InputEvent] = List.new()
-    world.run_frame(&ev1)
+    world.run_frame([])
 
     // Frame 2: player also presses Up (diagonal movement)
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev2 = List.new()
-    ev2.push(InputEvent.KeyDown(.Up))
-    world.run_frame(&ev2)
+    world.run_frame([InputEvent.KeyDown(.Up)])
 
     // Frame 3: release Right, keep Up
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev3 = List.new()
-    ev3.push(InputEvent.KeyUp(.Right))
-    world.run_frame(&ev3)
+    world.run_frame([InputEvent.KeyUp(.Right)])
 
     // Frame 4: release everything
     print(f"--- Frame {world.frame} (t={world.time:.2}s) ---")
-    var ev4 = List.new()
-    ev4.push(InputEvent.KeyUp(.Up))
-    world.run_frame(&ev4)
+    world.run_frame([InputEvent.KeyUp(.Up)])
 
     // --- Final State ---
 
@@ -76,16 +66,14 @@ fn main:
         let entity = Entity.new(world.transforms.dense_entities[i])
         if let Some(sprite) = world.sprites.get(entity):
             let tf = world.transforms.dense_data[i]
-            let label = match world.entity_name(entity):
-                Some(name) => f"{name}"
-                None => "?"
+            let label = world.entity_name(entity) ?? "?"
             print(f"  {label} -> ({tf.position.x:.1}, {tf.position.y:.1}) tex={texture_name(sprite.texture)}")
 
     // --- Demonstrate despawning ---
 
     print("\nDespawning first enemy...")
     if enemies.len() > 0:
-        let first_enemy: Entity = enemies[0]
+        let first_enemy = enemies[0]
         world.despawn(first_enemy)
 
         print(f"Entities after despawn: {world.entity_count()}")
@@ -135,12 +123,12 @@ extend World:
             for i in 0..count:
                 let enemy = self.spawn_entity(f"enemy_{i}")
                 self.add_transform(enemy, Transform {
-                    position: Vec2.new(200.0 + (i as f32) * 80.0, 300.0),
+                    position: Vec2.new(200.0 + i * 80.0, 300.0),
                     rotation: 0.0,
                     scale: 1.0,
                 })
                 self.add_velocity(enemy, Velocity {
-                    linear: Vec2.new(0.0, 30.0 + (i as f32) * 5.0),
+                    linear: Vec2.new(0.0, 30.0 + i * 5.0),
                     angular: 0.5,
                 })
                 self.add_sprite(enemy, Sprite {
