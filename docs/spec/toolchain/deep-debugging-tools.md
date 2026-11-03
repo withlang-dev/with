@@ -76,8 +76,12 @@ and the runtime, so lldb on the *program* resolves `rt_core.w` lines
    works on it without the runner.
 4. **Resolve the second free's site**: `lldb --batch -o "settings set
    target.env-vars WITH_TEST_FILTER=<test> WITH_DEBUG_ALLOC=1" -o
-   "breakpoint set --name dbg_report_double_free" -o run -o "bt 24" -o quit
-   -- ./bin`. One hit, seconds. Do **not** put unconditional breakpoints on
+   "breakpoint set -r dbg_report_double_free$" -o run -o "bt 24" -o quit
+   -- ./bin`. One hit, seconds. By regex (`-r`): on the release binary the
+   runtime's functions carry module-mangled names
+   (`___with_mod_<n>__dbg_report_double_free`), and `--name` is "pending,
+   no locations" — the run then exits as if nothing were set. Do **not**
+   put unconditional breakpoints on
    `rt_alloc`/`rt_free` with backtraces — that is thousands of stops and
    times out on a four-test fixture.
 5. **Resolve the first free and every touch of the block** with the
@@ -92,6 +96,13 @@ and the runtime, so lldb on the *program* resolves `rt_core.w` lines
        -o "settings set target.env-vars WITH_DEBUG_ALLOC=1 WITH_DEBUG_ALLOC_TRAP_FREE=<addr>" \
        -o run -o "bt 24" -o quit -- ./bin
    ```
+   The learn and trap runs must carry the same environment set, the learn
+   run's trap value zero-padded to the address's length
+   (`WITH_DEBUG_ALLOC_TRAP_FREE=0000000000`): a variable added to one run
+   only shifts the heap. A program that runs work in parallel (the build
+   runner: `with build` of a multi-workspace project) replays only with
+   `WITH_BUILD_JOBS=1` in both runs; its address moved every run until
+   then (#3032's hunt).
    The trap prints `trap-alloc hit=` / `trap-free hit=` for every alloc and
    free of that payload, and, for a str buffer, `trap-retain` /
    `trap-release holders-before=<n>` for every change of its holder count

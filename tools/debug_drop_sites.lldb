@@ -45,10 +45,13 @@
 # the store retries forever at one instruction. The trap reports that
 # count's traffic itself (trap-retain / trap-release lines).
 
-breakpoint set --name dbg_trap_hit
+# By regex: on the release binary the runtime's functions carry
+# module-mangled names (___with_mod_<n>__dbg_trap_hit), and `--name` is
+# "pending, no locations" — the run then stops nowhere, silently.
+breakpoint set -r dbg_trap_hit$
 breakpoint command add
 thread backtrace -c 12
 continue
 DONE
 
-breakpoint set --name dbg_report_double_free
+breakpoint set -r dbg_report_double_free$
