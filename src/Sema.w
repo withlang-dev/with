@@ -1110,6 +1110,10 @@ type Sema {
     // yields; the for_iter_* records keyed by the argument node say which
     // `.iter()` MIR calls there.
     implicit_iter_args: HashMap[i32, i32],
+    // §13.3 (#2943): the call nodes of `Iter.empty()` and the other
+    // standalone constructors, resolved to std's `iter_ctor_*`: a static
+    // call, so MIR passes no receiver.
+    iter_ctor_call_nodes: HashMap[i32, i32],
     // D143: the unannotated function whose body is in its first pass, with
     // its own calls open (`Never`); the self-call nodes; the type the other
     // paths gave it, for the second pass's message.
@@ -3663,6 +3667,7 @@ fn sema_empty_state(pool: &InternPool, diags: DiagnosticList, ast: &AstPool) -> 
         value_to_option_nodes: HashMap.new(),
         pipeline_implicit_iter: HashMap.new(),
         implicit_iter_args: HashMap.new(),
+        iter_ctor_call_nodes: HashMap.new(),
         derives_assumed: HashMap.new(),
         recursion_open_sym: 0,
         recursion_inferred_type: 0,

@@ -16,8 +16,8 @@
 // row): STC's sort is a quicksort with an insertion-sort tail and promises
 // no order among equal elements, so the stable sort is a merge sort over
 // the same reference layout, written here (the sourcing rule: a small,
-// stable primitive is owned). `shuffle` is a Fisher–Yates over std.random
-// (the With RNG, not the engine's `c_shuffle_array` macro and its own
+// stable primitive is owned). `shuffle` lives in std.random (a Fisher–Yates
+// over the With RNG, not the engine's `c_shuffle_array` macro and its own
 // generator). `find`, `position`, `index_of` and `contains` are the
 // language's iterator adapters, not facades.
 
@@ -25,7 +25,6 @@ use std.option
 use std.traits
 use std.engines.stc.defs
 use std.engines.stc.facade_shapes
-use std.random
 use rt.rt_core
 
 /// The slot reference the engine orders, laid out as the shapes unit's
@@ -195,26 +194,6 @@ impl[T] List[T]:
         if n < 2: return
         unsafe { stable_sort_through_refs(self.ptr as *mut T, n, by_compare(cmp)) }
 
-    /// Shuffles the elements in place, uniformly, drawing from std.random
-    /// (seed it for a reproducible order); every element moves by bits.
-    pub mut fn shuffle():
-        let n = self.len()
-        if n < 2: return
-        let size = sizeof[T]() as i64
-        let base = self.ptr as i64
-        let tmp = with_alloc(size)
-        var i = n - 1
-        while i > 0:
-            let j = range(0, i + 1)
-            if j != i:
-                let a = (base + i as i64 * size) as *mut u8
-                let b = (base + j as i64 * size) as *mut u8
-                with_memcpy(tmp, a as *const u8, size)
-                with_memcpy(a, b as *const u8, size)
-                with_memcpy(b, tmp as *const u8, size)
-            i = i - 1
-        with_free(tmp)
-
     /// Reverses the elements in place (every element moves once, by bits).
     pub mut fn reverse():
         let n = self.len()
@@ -236,3 +215,49 @@ impl[T] List[T]:
 
 
 
+
+// ── §13.3 (#2943): the sorting consumers ─────────────────────────────
+// Here, beside `sort` and `sort_by`, which this module extends List with.
+
+/// `it.sorted()`: the elements as a List, ascending by `Ord`.
+pub fn iter_sorted[T: Ord, I: Iter[T]](iter: I) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort()
+    out
+
+pub fn iter_sorted_views[T: Ord, I: Iter[&T]](iter: I) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort()
+    out
+
+/// `it.sorted_by(cmp)`: the elements as a List, ordered by `cmp`
+/// (negative: a before b).
+pub fn iter_sorted_by[T, I: Iter[T]](iter: I, cmp: fn(&T, &T) -> i32) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort_by(cmp)
+    out
+
+pub fn iter_sorted_by_views[T, I: Iter[&T]](iter: I, cmp: fn(&T, &T) -> i32) -> List[T]:
+    var i = iter
+    var out: List[T] = List.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) => out.push(x)
+    out.sort_by(cmp)
+    out

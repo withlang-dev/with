@@ -26473,7 +26473,7 @@ impl Sema:
             return 0
         let fn_node = self.generic_fn_node_for_symbol(fn_sym)
         let fn_path = self.fn_symbol_source_path(fn_sym)
-        if fn_node == 0 or not (fn_path.ends_with("std/traits.w") or fn_path.ends_with("std/collections.w") or fn_path.ends_with("std/string.w")):
+        if fn_node == 0 or not (fn_path.ends_with("std/traits.w") or fn_path.ends_with("std/collections.w") or fn_path.ends_with("std/algorithms.w") or fn_path.ends_with("std/string.w")):
             return 0
         fn_node
 
@@ -26519,7 +26519,40 @@ impl Sema:
                 let pv_resolved = self.resolve_alias(pv_elem as TypeId)
                 if self.get_type_kind(pv_resolved) == TypeKind.TY_REF and self.get_type_d1(pv_resolved) == 0:
                     fn_name = fn_name ++ "_views"
-        let values_from_views = field == self.syms.collect or name_text == "sum" or name_text == "product" or name_text == "min" or name_text == "max" or name_text == "min_by" or name_text == "max_by" or name_text == "reduce" or name_text == "partition" or name_text == "unzip"
+        let values_from_views = field == self.syms.collect or name_text == "sum" or name_text == "product" or name_text == "min" or name_text == "max" or name_text == "min_by" or name_text == "max_by" or name_text == "reduce" or name_text == "partition" or name_text == "unzip" or name_text == "chunks" or name_text == "windows" or name_text == "dedup" or name_text == "unique" or name_text == "intersperse" or name_text == "sorted" or name_text == "sorted_by" or name_text == "group_by"
+        // §13.3 (#2943): `filter_map` over views of a Copy element hands
+        // `f` the value (iter_filter_map_views), so `Some(x)` is a value,
+        // never a view that outlives the step; `flatten` dispatches by its
+        // element, as flat_map chooses its IntoIter twin: views of Lists
+        // read their Copy elements out, an Iter element yields its own, a
+        // collection moves them out.
+        if name_text == "filter_map" or name_text == "flatten":
+            var el = self.iterator_element_type(recv_type)
+            if el == 0:
+                el = self.user_iter_element_type(recv_type)
+            let el_resolved = if el != 0: self.resolve_alias(el as TypeId) else: 0 as TypeId
+            let el_is_view = el != 0 and self.get_type_kind(el_resolved) == TypeKind.TY_REF and self.get_type_d1(el_resolved) == 0
+            let pointee = if el_is_view: self.get_type_d0(el_resolved) else: 0
+            if name_text == "filter_map":
+                if el_is_view and pointee != 0 and self.get_type_kind(self.resolve_alias(pointee)) != TypeKind.TY_REF and self.is_copy(pointee) != 0:
+                    fn_name = "iter_filter_map_views"
+            else if el != 0:
+                let iter_sym = self.pool_lookup_symbol("Iter")
+                let into_sym = self.pool_lookup_symbol("IntoIter")
+                let pointee_resolved = if pointee != 0: self.resolve_alias(pointee) else: 0 as TypeId
+                if el_is_view and pointee != 0 and self.get_type_kind(pointee_resolved) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(pointee_resolved as i32) == self.syms.list:
+                    let inner = self.get_generic_inst_arg(pointee_resolved as i32, 0)
+                    if self.is_copy(inner) == 0:
+                        self.emit_error(f"`flatten` over views of `{self.type_name(pointee)}` cannot copy their `{self.type_name(inner)}` elements out (D22 §6.2 copies a Copy view): spell the copy, `map(it.clone())`", node)
+                        return 0
+                    fn_name = "iter_flatten_views"
+                else if iter_sym != 0 and self.type_implements_trait(el, iter_sym):
+                    fn_name = "iter_flatten"
+                else if into_sym != 0 and self.type_implements_trait(el, into_sym):
+                    fn_name = "iter_flatten_into"
+                else:
+                    self.emit_error(f"`flatten` over elements of `{self.type_name(el)}`: an element must be an iterator or a collection (§13.3)", node)
+                    return 0
         if values_from_views:
             var cv_elem = self.iterator_element_type(recv_type)
             if cv_elem == 0:
@@ -28417,9 +28450,11 @@ impl Sema:
         let demand = if self.has_expected_type != 0 and self.current_value_expr_root == node: self.expected_expr_type else: 0
         let call_name = f"{self.pool_resolve(trait_sym)}.{self.pool_resolve(method_sym)}"
         let method_index = self.trait_method_index(trait_idx, method_sym)
-        // §13.3's `Iter.empty()` and friends keep their own diagnostic.
-        if method_index < 0 and self.pool_resolve(trait_sym) == "Iter" and self.iterator_constructor_known_but_unimplemented(self.pool_resolve(method_sym)):
-            return -1
+        // §13.3's `Iter.empty()` and friends are std's constructors
+        // (check_iter_constructor), not trait methods.
+        if method_index < 0 and self.pool_resolve(trait_sym) == "Iter" and self.iterator_constructor_name(self.pool_resolve(method_sym)):
+            let ctor_name: str = with_str_clone_ref(self.pool_resolve(method_sym))
+            return self.check_iter_constructor(node, ctor_name, extra_start, arg_count)
         if method_index < 0:
             self.emit_error(f"trait '{self.pool_resolve(trait_sym)}' declares no method '{self.pool_resolve(method_sym)}'", node)
             return 0
@@ -33906,6 +33941,8 @@ impl Sema:
             return 0
         let resolved = self.resolve_alias(recv_type as TypeId)
         let kind = self.get_type_kind(resolved)
+        if self.pool_resolve(field) == "shape":
+            return self.seq_shape_result_type(node, resolved, arg_count)
         if kind != TypeKind.TY_ARRAY and kind != TypeKind.TY_SLICE:
             return 0
         let name: str = self.pool_resolve(field)
@@ -33936,6 +33973,27 @@ impl Sema:
             self.record_builtin_receiver_view_origins(node, expr)
         if result != 0:
             self.typed_expr_types.insert(node, result)
+        result
+
+    // D119 (§13.3): `shape()` lists the dimensions outermost first, a
+    // `[isize; k]`: every nesting level of a fixed array is one; a List of
+    // fixed rows has its own length first. 0 when the receiver is neither.
+    mut fn seq_shape_result_type(node: i32, resolved: TypeId, arg_count: i32) -> i32:
+        var dims = 0
+        var t = resolved
+        if self.get_type_kind(t) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(t as i32) == self.syms.list:
+            dims = 1
+            t = self.resolve_alias(self.get_generic_inst_arg(t as i32, 0) as TypeId)
+        while self.get_type_kind(t) == TypeKind.TY_ARRAY:
+            dims += 1
+            t = self.resolve_alias(self.get_type_d0(t) as TypeId)
+        if dims == 0:
+            return 0
+        if arg_count != 0:
+            self.emit_error(f"`shape` takes no arguments, found {arg_count}", node)
+            return 0
+        let result = self.ensure_exact_type(TypeKind.TY_ARRAY, self.ty_isize as i32, dims, 0) as i32
+        self.typed_expr_types.insert(node, result)
         result
 
     mut fn ensure_option_type_for(elem_ty: i32) -> i32:
@@ -34318,28 +34376,50 @@ impl Sema:
         elems.push(range_ty)
         self.ensure_tuple_type(elems, 2) as i32
 
-    fn iterator_operation_known_but_unimplemented(method_name: &str) -> bool:
-        if method_name == "flatten": return true
-        if method_name == "peekable": return true
-        if method_name == "chunks": return true
-        if method_name == "windows": return true
-        if method_name == "dedup": return true
-        if method_name == "unique": return true
-        if method_name == "intersperse": return true
-        if method_name == "scan": return true
-        if method_name == "join": return true
-        if method_name == "sorted": return true
-        if method_name == "sorted_by": return true
-        if method_name == "group_by": return true
-        false
+    // §13.3: every adapter and consumer of the table is std's (#2943);
+    // `join` alone stays a builtin of the compiler's own iterators.
+    fn iterator_operation_known_but_unimplemented(method_name: &str) -> bool: method_name == "join"
 
-    fn iterator_constructor_known_but_unimplemented(method_name: &str) -> bool:
-        if method_name == "empty": return true
-        if method_name == "once": return true
-        if method_name == "repeat": return true
-        if method_name == "unfold": return true
-        if method_name == "from_fn": return true
-        false
+    // §13.3 (#2943): `Iter.empty()`, `Iter.once(v)`, `Iter.repeat(v)`,
+    // `Iter.unfold(s, f)` and `Iter.from_fn(f)` are std's `iter_ctor_*`.
+    fn iterator_constructor_name(method_name: &str) -> bool:
+        method_name == "empty" or method_name == "once" or method_name == "repeat" or method_name == "unfold" or method_name == "from_fn"
+
+    // `Iter.<name>(args)`: the generic call `iter_ctor_<name>(args)`, typed
+    // as a free generic call; MIR lowers the static call by comp_resolved.
+    mut fn check_iter_constructor(node: i32, name: &str, extra_start: i32, arg_count: i32) -> i32:
+        let fn_sym = self.pool_lookup_symbol("iter_ctor_" ++ name)
+        let generic_fn_node = if fn_sym > 0: self.generic_fn_node_for_symbol(fn_sym) else: 0
+        if generic_fn_node == 0:
+            self.emit_error("iterator constructor 'Iter." ++ name ++ "' needs the standard library (§13.3)", node)
+            return 0
+        var arg_types: List[i32] = List.new()
+        let arg_nodes: List[i32] = List.new()
+        let deferred: List[i32] = List.new()
+        for ai in 0..arg_count:
+            let arg_node = self.ast.get_extra(extra_start + ai)
+            arg_nodes.push(arg_node)
+            if self.arg_waits_for_fn_demand(arg_node):
+                deferred.push(ai)
+                arg_types.push(0)
+            else:
+                arg_types.push(self.check_expr_value_context(arg_node) as i32)
+        let fn_node = self.select_generic_fn_node(fn_sym, arg_types, arg_count, node)
+        if fn_node == 0:
+            return 0
+        if deferred.len() > 0:
+            arg_types = self.check_deferred_generic_closure_args(fn_node, fn_sym, deferred, arg_types, arg_nodes, node)
+        self.resolved_generic_call_nodes.insert(node, fn_node)
+        let ret = self.check_generic_call(fn_sym, fn_node, arg_types, arg_nodes, arg_count, node)
+        if ret == 0:
+            return 0
+        for ai in 0..arg_nodes.len():
+            if arg_nodes[ai] > 0:
+                self.mark_moved_if_consumed(arg_nodes[ai])
+        self.comp_resolved.insert(node, fn_sym)
+        self.iter_ctor_call_nodes.insert(node, 1)
+        self.typed_expr_types.insert(node, ret)
+        ret
 
     // The owned collection type demanded of the collect call `node`: its
     // expected type, or, as the function's final expression (the call or
@@ -36301,11 +36381,15 @@ impl Sema:
         // D117: first/last/rest on a fixed array or slice (recv is after
         // auto-deref). List and str keep their declared/intrinsic paths.
         if arg_count == 0 and recv != 0:
-            let recv_kind = self.get_type_kind(self.resolve_alias(recv as TypeId))
+            let recv_resolved = self.resolve_alias(recv as TypeId)
+            let recv_kind = self.get_type_kind(recv_resolved)
             if recv_kind == TypeKind.TY_ARRAY or recv_kind == TypeKind.TY_SLICE:
                 if name == "first": return MethodLowering.SeqFirst
                 if name == "last": return MethodLowering.SeqLast
                 if name == "rest": return MethodLowering.SeqRest
+            // D119: shape() on a fixed array or a List (of fixed rows).
+            if name == "shape" and (recv_kind == TypeKind.TY_ARRAY or (recv_kind == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(recv_resolved as i32) == self.syms.list)):
+                return MethodLowering.SeqShape
         MethodLowering.None
 
     // The type a static receiver expression names (a local of the same
@@ -36434,9 +36518,6 @@ impl Sema:
                 self.method_call_fields.insert(node, field)
         let static_type_sym = self.static_receiver_base_sym(expr)
         let early_method_name: str = with_str_clone_ref(self.pool_resolve(field))
-        if static_type_sym != 0 and self.pool_resolve(static_type_sym) == "Iter" and self.iterator_constructor_known_but_unimplemented(early_method_name):
-            self.emit_error("iterator constructor 'Iter." ++ early_method_name ++ "' from §13.3 is not implemented yet", node)
-            return 0
         var obj_type = if known_recv_ty != 0: known_recv_ty as TypeId else: self.check_expr(expr)
         let static_receiver_is_tiered_type = self.static_receiver_type_is_known(expr) or self.is_pending_generic_collection_base(static_type_sym) or self.symbol_requires_std_tier(static_type_sym)
         if static_type_sym != 0 and static_receiver_is_tiered_type:
@@ -42218,7 +42299,7 @@ impl Sema:
 // §13.3 (#1746): the operations std.traits defines over any Iter[T], by
 // their method names.
 fn sema_iter_adapter_name(name: &str) -> bool:
-    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "skip" or name == "take_while" or name == "skip_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with"
+    name == "zip" or name == "map" or name == "filter" or name == "filter_map" or name == "take" or name == "skip" or name == "take_while" or name == "skip_while" or name == "enumerate" or name == "chain" or name == "step_by" or name == "collect" or name == "fold" or name == "count" or name == "for_each" or name == "any" or name == "all" or name == "none" or name == "find" or name == "position" or name == "sum" or name == "product" or name == "min" or name == "max" or name == "min_by" or name == "max_by" or name == "reduce" or name == "partition" or name == "unzip" or name == "flat_map" or name == "zip_with" or name == "chunks" or name == "windows" or name == "dedup" or name == "unique" or name == "intersperse" or name == "scan" or name == "flatten" or name == "peekable" or name == "sorted" or name == "sorted_by" or name == "group_by"
 
 impl Sema:
     // D93's second check exists to retype a literal's binding at the type

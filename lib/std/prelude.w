@@ -8,6 +8,7 @@ use std.regex
 use std.option
 use std.result
 use std.traits
+use std.algorithms
 use std.box
 use std.rc
 use std.task

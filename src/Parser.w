@@ -4340,14 +4340,15 @@ impl Parser:
             self.advance()
             // One implicit closure per call argument: its first `it` opens
             // it (the depth counts open closures, not uses), a later `it` in
-            // the same argument reads the same parameter (`it * it`, #2545),
-            // and an `it` inside a nested argument is the ambiguous one.
+            // the same argument reads the same parameter (`it * it`, #2545).
+            // An `it` inside a nested argument opens that argument's
+            // closure; whether it is the body of the enclosing one (`twice`
+            // takes a value, D161) or a forbidden nesting (`filter` takes a
+            // function) is Sema's call, by the parameter's type
+            // (it_closure_host, E0951 there): the parser cannot tell
+            // `map(if it > 2: twice(it) else: it)` from
+            // `map(it.children |> filter(it.active))`.
             if self.saw_implicit_it == 0:
-                if self.implicit_it_depth > 0:
-                    let err_span = Span { file: self.file_id, start: start, end: end_pos }
-                    var diag = Diagnostic.err("nested implicit closure is ambiguous; use explicit parameter for inner closure", err_span)
-                    diag.set_code("E0951")
-                    self.diags.emit(move diag)
                 self.saw_implicit_it = 1
                 self.implicit_it_depth = self.implicit_it_depth + 1
             let sym = self.intern.intern("__it")

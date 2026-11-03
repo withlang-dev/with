@@ -420,6 +420,9 @@ enum MethodLowering: i32:
     SeqFirst
     SeqLast
     SeqRest
+    // D119 (§13.3): `shape()` on a fixed array or a List of fixed rows —
+    // the dimensions, outermost first, as a `[isize; k]`.
+    SeqShape
 
 impl Copy for MethodLowering
 

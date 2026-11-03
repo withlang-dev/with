@@ -13,6 +13,7 @@ use std.collections.stack.Stack
 use std.collections.queue.Queue
 use std.collections.linked_list.LinkedList
 use std.algorithms
+use std.random
 use std.time
 use std.process
 use std.builtins

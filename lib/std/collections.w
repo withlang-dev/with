@@ -1469,3 +1469,378 @@ pub fn iter_unzip_views[A, B, I: Iter[(&A, &B)]](iter: I) -> (List[A], List[B]):
     (firsts, seconds)
 
 
+
+// ── §13.3 (#2943): the lodash-grade operations ─────────────────────
+// Each adapter over `Iter[T]` has a `_views` twin over `Iter[&T]` for a
+// Copy element (D22 §6.2 reads a Copy view as its value), as collect
+// and sum do; Sema dispatches by the element type.
+
+/// `it.chunks(n)`: fixed-size groups, the last one shorter.
+pub type Chunked[T, I] { inner: I, n: i64, done: bool }
+
+impl[T, I: Iter[T]] Iter[List[T]] for Chunked[T, I]:
+    mut fn next() -> Option[List[T]]:
+        if self.done: return None
+        var out: List[T] = List.new()
+        var left = self.n
+        while left > 0:
+            match self.inner.next():
+                None =>
+                    self.done = true
+                    break
+                Some(x) =>
+                    out.push(x)
+                    left -= 1
+        if out.len() == 0: None else: Some(out)
+
+pub fn iter_chunks[T, I: Iter[T]](iter: I, n: i64) -> Chunked[T, I]: Chunked { inner: iter, n, done: false }
+
+pub type ChunkedViews[T, I] { inner: I, n: i64, done: bool }
+
+impl[T, I: Iter[&T]] Iter[List[T]] for ChunkedViews[T, I]:
+    mut fn next() -> Option[List[T]]:
+        if self.done: return None
+        var out: List[T] = List.new()
+        var left = self.n
+        while left > 0:
+            match self.inner.next():
+                None =>
+                    self.done = true
+                    break
+                Some(x) =>
+                    out.push(x)
+                    left -= 1
+        if out.len() == 0: None else: Some(out)
+
+pub fn iter_chunks_views[T, I: Iter[&T]](iter: I, n: i64) -> ChunkedViews[T, I]: ChunkedViews { inner: iter, n, done: false }
+
+/// `it.windows(n)`: every run of `n` consecutive elements.
+pub type Windowed[T, I] { inner: I, n: i64, buf: List[T], primed: bool }
+
+impl[T: Clone, I: Iter[T]] Iter[List[T]] for Windowed[T, I]:
+    mut fn next() -> Option[List[T]]:
+        if self.primed:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    self.buf.remove(0)
+                    self.buf.push(x)
+        else:
+            self.primed = true
+            var left = self.n
+            while left > 0:
+                match self.inner.next():
+                    None => return None
+                    Some(x) => self.buf.push(x)
+                left -= 1
+        Some(self.buf)
+
+pub fn iter_windows[T: Clone, I: Iter[T]](iter: I, n: i64) -> Windowed[T, I]: Windowed { inner: iter, n, buf: List.new(), primed: false }
+
+pub type WindowedViews[T, I] { inner: I, n: i64, buf: List[T], primed: bool }
+
+impl[T, I: Iter[&T]] Iter[List[T]] for WindowedViews[T, I]:
+    mut fn next() -> Option[List[T]]:
+        if self.primed:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    self.buf.remove(0)
+                    self.buf.push(x)
+        else:
+            self.primed = true
+            var left = self.n
+            while left > 0:
+                match self.inner.next():
+                    None => return None
+                    Some(x) => self.buf.push(x)
+                left -= 1
+        Some(self.buf)
+
+pub fn iter_windows_views[T, I: Iter[&T]](iter: I, n: i64) -> WindowedViews[T, I]: WindowedViews { inner: iter, n, buf: List.new(), primed: false }
+
+/// `it.dedup()`: consecutive equal elements collapse to the first.
+// `last` holds at most one element (an `Option` payload matched out of a
+// field is a copy today, #2541).
+pub type Deduped[T, I] { inner: I, last: List[T] }
+
+impl[T: Eq + Clone, I: Iter[T]] Iter[T] for Deduped[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if self.last.len() == 0 or not self.last[0].eq(x):
+                        self.last = [x.clone()]
+                        return Some(x)
+
+pub fn iter_dedup[T: Eq + Clone, I: Iter[T]](iter: I) -> Deduped[T, I]: Deduped { inner: iter, last: List.new() }
+
+pub type DedupedViews[T, I] { inner: I, last: List[T] }
+
+impl[T: Eq, I: Iter[&T]] Iter[T] for DedupedViews[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if self.last.len() == 0 or not self.last[0].eq(x):
+                        self.last = [x]
+                        return Some(x)
+
+pub fn iter_dedup_views[T: Eq, I: Iter[&T]](iter: I) -> DedupedViews[T, I]: DedupedViews { inner: iter, last: List.new() }
+
+/// `it.unique()`: each element once, in first-seen order.
+pub type Uniqued[T, I] { inner: I, seen: HashSet[T] }
+
+impl[T: Key + Clone, I: Iter[T]] Iter[T] for Uniqued[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if not self.seen.contains(x):
+                        self.seen.insert(x.clone())
+                        return Some(x)
+
+pub fn iter_unique[T: Key + Clone, I: Iter[T]](iter: I) -> Uniqued[T, I]: Uniqued { inner: iter, seen: HashSet.new() }
+
+pub type UniquedViews[T, I] { inner: I, seen: HashSet[T] }
+
+impl[T: Key, I: Iter[&T]] Iter[T] for UniquedViews[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    if not self.seen.contains(x):
+                        self.seen.insert(x)
+                        return Some(x)
+
+pub fn iter_unique_views[T: Key, I: Iter[&T]](iter: I) -> UniquedViews[T, I]: UniquedViews { inner: iter, seen: HashSet.new() }
+
+/// `it.intersperse(sep)`: `sep` between every two elements.
+// `pending` holds the element that follows the next separator.
+pub type Interspersed[T, I] { inner: I, sep: T, pending: List[T], started: bool }
+
+impl[T: Clone, I: Iter[T]] Iter[T] for Interspersed[T, I]:
+    mut fn next() -> Option[T]:
+        match self.pending.pop():
+            Some(x) => return Some(x)
+            None => ()
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                if not self.started:
+                    self.started = true
+                    return Some(x)
+                self.pending.push(x)
+                Some(self.sep.clone())
+
+pub fn iter_intersperse[T: Clone, I: Iter[T]](iter: I, sep: T) -> Interspersed[T, I]: Interspersed { inner: iter, sep, pending: List.new(), started: false }
+
+pub type InterspersedViews[T, I] { inner: I, sep: T, pending: List[T], started: bool }
+
+impl[T, I: Iter[&T]] Iter[T] for InterspersedViews[T, I]:
+    mut fn next() -> Option[T]:
+        match self.pending.pop():
+            Some(x) => return Some(x)
+            None => ()
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                if not self.started:
+                    self.started = true
+                    return Some(x)
+                self.pending.push(x)
+                Some(self.sep)
+
+pub fn iter_intersperse_views[T, I: Iter[&T]](iter: I, sep: T) -> InterspersedViews[T, I]: InterspersedViews { inner: iter, sep, pending: List.new(), started: false }
+
+/// `it.scan(init, f)`: a stateful map; `f` takes the state and an element
+/// and gives the next state and the output.
+// `state` holds exactly one value (#2541).
+pub type Scanned[S, T, U, I] { inner: I, state: List[S], f: fn(S, T) -> (S, U) }
+
+impl[S, T, U, I: Iter[T]] Iter[U] for Scanned[S, T, U, I]:
+    mut fn next() -> Option[U]:
+        match self.inner.next():
+            None => None
+            Some(x) =>
+                let s = self.state.pop().unwrap()
+                let (s2, u) = (self.f)(s, x)
+                self.state.push(s2)
+                Some(u)
+
+pub fn iter_scan[S, T, U, I: Iter[T]](iter: I, init: S, f: fn(S, T) -> (S, U)) -> Scanned[S, T, U, I]: Scanned { inner: iter, state: [init], f }
+
+/// `it.peekable()`: an iterator with `peek()`, the next element without
+/// taking it.
+// `peeked` holds at most one element (#2541).
+pub type Peekable[T, I] { inner: I, peeked: List[T] }
+
+impl[T, I: Iter[T]] Peekable[T, I]:
+    pub mut fn peek() -> Option[&T]:
+        if self.peeked.len() == 0:
+            match self.inner.next():
+                None => return None
+                Some(x) => self.peeked.push(x)
+        self.peeked.first()
+
+impl[T, I: Iter[T]] Iter[T] for Peekable[T, I]:
+    mut fn next() -> Option[T]:
+        match self.peeked.pop():
+            Some(x) => Some(x)
+            None => self.inner.next()
+
+pub fn iter_peekable[T, I: Iter[T]](iter: I) -> Peekable[T, I]: Peekable { inner: iter, peeked: List.new() }
+
+/// `it.flatten()`: an iterator of iterators yields their elements in
+/// order; of collections (`IntoIter`), their elements move out; of views
+/// of Lists (`[[1, 2], [3]]` iterates `&List[T]`), the elements as values.
+// The parameters bind in order: `I` from the argument, `C` from I's
+// element, `U` from C's.
+pub type Flattened[C, U, I] { inner: I, current: List[C] }
+
+impl[C: Iter[U], U, I: Iter[C]] Iter[U] for Flattened[C, U, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.current.pop():
+                Some(c) =>
+                    var cur = c
+                    match cur.next():
+                        Some(x) =>
+                            self.current.push(cur)
+                            return Some(x)
+                        None => ()
+                None =>
+                    match self.inner.next():
+                        None => return None
+                        Some(c) => self.current.push(c)
+
+pub fn iter_flatten[I: Iter[C], C: Iter[U], U](iter: I) -> Flattened[C, U, I]: Flattened { inner: iter, current: List.new() }
+
+pub type FlattenedInto[C, U, I] { inner: I, pending: ListIntoIter[U] }
+
+impl[C: IntoIter[U], U, I: Iter[C]] Iter[U] for FlattenedInto[C, U, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.pending.next():
+                Some(x) => return Some(x)
+                None =>
+                    match self.inner.next():
+                        None => return None
+                        Some(c) => self.pending = c.into_iter()
+
+pub fn iter_flatten_into[I: Iter[C], C: IntoIter[U], U](iter: I) -> FlattenedInto[C, U, I]:
+    let none: List[U] = List.new()
+    FlattenedInto { inner: iter, pending: none.into_iter() }
+
+pub type FlattenedViews[T, I] { inner: I, cur: List[T], idx: isize }
+
+impl[T, I: Iter[&List[T]]] Iter[T] for FlattenedViews[T, I]:
+    mut fn next() -> Option[T]:
+        loop:
+            if self.idx < self.cur.len():
+                let x = self.cur[self.idx]
+                self.idx += 1
+                return Some(x)
+            match self.inner.next():
+                None => return None
+                Some(l) =>
+                    self.cur = l
+                    self.idx = 0
+
+pub fn iter_flatten_views[T, I: Iter[&List[T]]](iter: I) -> FlattenedViews[T, I]: FlattenedViews { inner: iter, cur: List.new(), idx: 0 }
+
+/// `it.filter_map(f)` over views of Copy elements: `f` takes the value.
+pub type FilterMappedViews[T, U, I] { inner: I, f: fn(T) -> Option[U] }
+
+impl[T, U, I: Iter[&T]] Iter[U] for FilterMappedViews[T, U, I]:
+    mut fn next() -> Option[U]:
+        loop:
+            match self.inner.next():
+                None => return None
+                Some(x) =>
+                    match (self.f)(x):
+                        None => {}
+                        Some(y) => return Some(y)
+
+pub fn iter_filter_map_views[T, U, I: Iter[&T]](iter: I, f: fn(T) -> Option[U]) -> FilterMappedViews[T, U, I]: FilterMappedViews { inner: iter, f }
+
+/// `it.group_by(f)`: the elements in buckets keyed by `f`. A bucket is
+/// taken out, grown and put back (lookup observes, removal transfers, D22).
+pub fn iter_group_by[T, K: Key, I: Iter[T]](iter: I, f: fn(&T) -> K) -> HashMap[K, List[T]]:
+    var i = iter
+    var groups: HashMap[K, List[T]] = HashMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                let k = f(x)
+                match groups.remove(k):
+                    Some(bucket) =>
+                        var grown = bucket
+                        grown.push(x)
+                        groups.insert(k, grown)
+                    None => groups.insert(k, [x])
+    groups
+
+// The key is cloned in: `f` takes the element's view, so the origin
+// analysis reads its result as a possible view of that element.
+pub fn iter_group_by_views[T, K: Key + Clone, I: Iter[&T]](iter: I, f: fn(&T) -> K) -> HashMap[K, List[T]]:
+    var i = iter
+    var groups: HashMap[K, List[T]] = HashMap.new()
+    while true:
+        match i.next():
+            None => break
+            Some(x) =>
+                let k = f(x)
+                match groups.remove(k):
+                    Some(bucket) =>
+                        var grown = bucket
+                        grown.push(x)
+                        groups.insert(k.clone(), grown)
+                    None => groups.insert(k.clone(), [x])
+    groups
+
+// ── §13.3 standalone constructors ───────────────────────────────────
+
+/// `Iter.empty()`: no elements.
+pub type EmptyIter[T] { done: bool }
+impl[T] Iter[T] for EmptyIter[T]:
+    mut fn next() -> Option[T]: None
+pub fn iter_ctor_empty[T]() -> EmptyIter[T]: EmptyIter { done: true }
+
+/// `Iter.once(value)`: one element.
+pub type OnceIter[T] { value: List[T] }
+impl[T] Iter[T] for OnceIter[T]:
+    mut fn next() -> Option[T]: self.value.pop()
+pub fn iter_ctor_once[T](value: T) -> OnceIter[T]: OnceIter { value: [value] }
+
+/// `Iter.repeat(value)`: the value forever; pair it with `take`.
+pub type RepeatIter[T] { value: T }
+impl[T: Clone] Iter[T] for RepeatIter[T]:
+    mut fn next() -> Option[T]: Some(self.value.clone())
+pub fn iter_ctor_repeat[T: Clone](value: T) -> RepeatIter[T]: RepeatIter { value }
+
+/// `Iter.unfold(init, f)`: `f` turns the state into the next element and
+/// state, or `None` to end.
+pub type UnfoldIter[S, T] { state: List[S], f: fn(S) -> Option[(T, S)] }
+impl[S, T] Iter[T] for UnfoldIter[S, T]:
+    mut fn next() -> Option[T]:
+        match self.state.pop():
+            None => None
+            Some(s) =>
+                match (self.f)(s):
+                    None => None
+                    Some(pair) =>
+                        self.state.push(pair.1)
+                        Some(pair.0)
+pub fn iter_ctor_unfold[S, T](init: S, f: fn(S) -> Option[(T, S)]) -> UnfoldIter[S, T]: UnfoldIter { state: [init], f }
+
+/// `Iter.from_fn(f)`: `f` gives each element, `None` to end.
+pub type FromFnIter[T] { f: fn() -> Option[T] }
+impl[T] Iter[T] for FromFnIter[T]:
+    mut fn next() -> Option[T]: (self.f)()
+pub fn iter_ctor_from_fn[T](f: fn() -> Option[T]) -> FromFnIter[T]: FromFnIter { f }
