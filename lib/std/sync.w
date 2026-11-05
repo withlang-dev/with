@@ -180,7 +180,7 @@ impl[T] Scoped[&T] for MutexGuardMut[T]:
         let state = self.ptr as *mut MutexState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self) -> Unit: ()
+    fn with_exit(self: &Self): ()
 
 impl[T] ScopedMut[T] for MutexGuardMut[T]:
     fn with_enter_mut(self: &Self) -> T:
@@ -318,7 +318,7 @@ impl[T] Scoped[&T] for RwWriteGuard[T]:
         let state = self.ptr as *mut RwLockState
         unsafe { (*state).value as &T }
 
-    fn with_exit(self: &Self) -> Unit: ()
+    fn with_exit(self: &Self): ()
 
 impl[T] ScopedMut[T] for RwWriteGuard[T]:
     fn with_enter_mut(self: &Self) -> T:
@@ -348,7 +348,7 @@ pub fn rwlock_read(rw: &RwLock[i64]) -> i64:
     guard.exit()
 
 /// Set a new value inside a RwLock.
-pub fn RwLock.set[T](self: &Self, value: T) -> Unit:
+pub fn RwLock.set[T](self: &Self, value: T):
     let state = self.ptr as *mut RwLockState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
     while true:
