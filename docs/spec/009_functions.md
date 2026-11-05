@@ -535,11 +535,11 @@ ownership is still retained by the receiver.
 
 ```
 impl Counter:
-    fn get() -> i32: self.n            # read borrow — no `self` parameter
-    mut fn bump(): self.n = self.n + 1  # mutable borrow
-    move fn into_n() -> i32: self.n     # consuming
+    fn get() -> i32: self.n            // read borrow — no `self` parameter
+    mut fn bump(): self.n = self.n + 1  // mutable borrow
+    move fn into_n() -> i32: self.n     // consuming
 
-fn Counter.zero() -> Counter: Counter { n: 0 }   # top level: associated
+fn Counter.zero() -> Counter: Counter { n: 0 }   // top level: associated
 ```
 
 *Transition:* the explicit receiver-parameter forms (`self: &Self`,
@@ -557,9 +557,9 @@ extend i32:
     mut fn bump(): self += 1
 
 var x = 5
-x.bump()        # x == 6 — mutation reaches the caller
+x.bump()        // x == 6 — mutation reaches the caller
 let y = 5
-y.bump()        # error: cannot mutate immutable binding `y`
+y.bump()        // error: cannot mutate immutable binding `y`
 ```
 
 A scalar primitive is `Copy`, yet `mut fn` still borrows it in place: the
@@ -572,13 +572,13 @@ The idiomatic use is a domain verb on a distinct/newtype, where the method
 names an operation the bare operator cannot:
 
 ```
-distinct type Health = i32
+type Health = distinct i32
 extend Health:
-    mut fn damage(n: i32): self = Health(self.value - n)
-    mut fn heal(n: i32):   self = Health(self.value + n)
+    mut fn damage(n: i32): self = Health((self as i32) - n)
+    mut fn heal(n: i32):   self = Health((self as i32) + n)
 
 var hp = Health(100)
-hp.damage(30)   # reads as the domain verb, not `hp = Health(hp.value - 30)`
+hp.damage(30)   // reads as the domain verb, not `hp = Health((hp as i32) - 30)`
 ```
 
 On a bare primitive with no domain meaning, prefer the operator (`x += 1`)
@@ -888,7 +888,7 @@ match day:
 ```
 match event:
     click @ MouseClick { button: Left, pos } =>
-        log("click at {pos}")
+        log(f"click at {pos}")
         handle(click)
 ```
 
@@ -928,10 +928,10 @@ one:
 
 ```
 match status_code:
-    code @ in 200..=299 => log("success: {code}")
-    code @ in 400..=499 => log("client error: {code}")
-    code @ in 500..=599 => log("server error: {code}")
-    other               => log("unexpected: {other}")
+    code @ in 200..=299 => log(f"success: {code}")
+    code @ in 400..=499 => log(f"client error: {code}")
+    code @ in 500..=599 => log(f"server error: {code}")
+    other               => log(f"unexpected: {other}")
 ```
 
 `in` patterns compose naturally with other match features:
@@ -965,7 +965,7 @@ match point:
 ```
 match (x, y):
     (0, 0) => "origin"
-    (x, 0) => "x-axis at {x}"
+    (x, 0) => f"x-axis at {x}"
     _      => "elsewhere"
 ```
 
@@ -978,7 +978,7 @@ pattern as `p`. A one-element tuple pattern requires a comma: `(p,)`.
 match items:
     []              => "empty"
     [only]          => "single"
-    [first, ..rest] => "head: {first}, {rest.len()} more"
+    [first, ..rest] => f"head: {first}, {rest.len()} more"
 ```
 
 For fixed-size arrays, the compiler performs compile-time length matching:
@@ -1178,9 +1178,9 @@ for &(key, val) in items:
     print(f"{key}: {val}")
 
 // Works with match on borrowed enums:
-fn describe(opt: &Option[String]) -> &str:
+fn describe(opt: &Option[str]) -> &str:
     match opt:
-        Some(s) => s       // s: &String, not String
+        Some(s) => s       // s: &str, not str
         None    => "none"
 ```
 
@@ -1220,7 +1220,7 @@ No macros or special syntax required.
 ```
 let results = world
     |> query[Position, Velocity]()
-    |> where((pos, _) => pos.x > 0.0)
+    |> filter((pos, _) => pos.x > 0.0)
     |> order_by((_, vel) => vel.magnitude())
     |> limit(100)
     |> collect[List]()
@@ -1228,13 +1228,12 @@ let results = world
 
 **HTTP request builder:**
 ```
-let response = HttpClient.new()
+let response = (HttpClient.new()
     |> base_url("https://api.example.com")
-    |> header("Authorization", "Bearer {token}")
+    |> header("Authorization", f"Bearer {token}")
     |> get("/users")
     |> query_param("page", "1")
-    |> send()
-    |> await?
+    |> send()).await?
 ```
 
 **Shader pipeline:**
@@ -1459,14 +1458,14 @@ fn is_primary(c: Color) -> bool:
 
 // Map key existence
 if key in cache:
-    cache[key]
+    *cache.get(key).unwrap()
 else:
     let val = compute(key)
-    cache[key] = val
+    cache.insert(key, val)
     val
 
 // Range checks
-fn is_ascii_letter(c: char) -> bool:
+fn is_ascii_letter(c: i32) -> bool:
     c in 'a'..='z' or c in 'A'..='Z'
 
 fn is_valid_port(port: u16) -> bool:

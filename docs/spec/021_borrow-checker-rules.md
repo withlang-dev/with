@@ -63,7 +63,7 @@ At every program point, the following must hold:
    prevents use-after-free in cases like:
 
    ```
-   type Holder = ephemeral { items: List[&str] }
+   type Holder ephemeral { items: List[&str] }
    impl Drop for Holder:
        move fn drop():
            for s in self.items: print(*s)

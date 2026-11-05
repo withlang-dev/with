@@ -4,10 +4,10 @@
 
 ```
 trait Show:
-    fn show(self: &Self) -> String
+    fn show(self: &Self) -> str
 
 impl Show for Point:
-    fn show(self: &Point) -> String: "({self.x}, {self.y})"
+    fn show(self: &Point) -> str: f"({self.x}, {self.y})"
 ```
 
 **The impl's signature is the trait's (D140).** A method in an impl of a
@@ -80,7 +80,7 @@ fn merge[A, B, C](a: A, b: B) -> C
 `where` clauses may appear on functions, type declarations, and impl blocks:
 
 ```
-type Wrapper[T] where T: Eq = { inner: T }
+type Wrapper[T] where T: Eq { inner: T }
 
 impl Showable for Pair where Pair: Describable:
     fn show(self: &Self) -> str: self.describe()
@@ -157,18 +157,18 @@ rules to prevent method conflicts across packages:
 
 ```
 // In package `slug`:
-extend String:
-    fn to_slug(self: &Self) -> String: ...
+extend str:
+    fn to_slug(self: &Self) -> str: ...
 
 // In package `url`:
-extend String:
-    fn to_slug(self: &Self) -> String: ...
+extend str:
+    fn to_slug(self: &Self) -> str: ...
 
 // In user code:
 use slug
 use url
-let s = "hello".to_owned()
-s.to_slug()               // ERROR: ambiguous — slug::to_slug or url::to_slug?
+let s = "hello"
+s.to_slug()               // ERROR: ambiguous — slug.to_slug or url.to_slug?
 slug.to_slug(&s)          // OK: fully qualified
 ```
 
@@ -342,15 +342,15 @@ uniform across `List`, fixed arrays, slices, and user types implementing
 **Examples:**
 
 ```
-// A matrix type that supports m[row, col] syntax
+// A matrix type that supports m[(row, col)] syntax
 type Matrix { data: List[f64], rows: usize, cols: usize }
 
-impl Index[(usize, usize), f64] for Matrix:
-    fn index(self: &Self, (r, c): (usize, usize)) -> &f64:
+impl IndexGet[(usize, usize), &f64] for Matrix:
+    fn get(self: &Self, (r, c): (usize, usize)) -> &f64:
         &self.data[r * self.cols + c]
 
 let m = Matrix.new(3, 3)
-let val = m[(1, 2)]    // calls Matrix::index
+let val = m[(1, 2)]    // calls Matrix.get
 ```
 
 **Generalized indexing:**
@@ -392,8 +392,8 @@ enum ParseResult[T]:
     ParseOk(T, remaining: str)
     ParseErr(msg: str, pos: usize)
 
-impl Try[T, ParseError] for ParseResult[T]:
-    fn branch(move self: Self) -> ControlFlow[ParseError, T]:
+impl[T] Try[T, ParseError] for ParseResult[T]:
+    move fn branch() -> ControlFlow[ParseError, T]:
         match self:
             ParseOk(v, _) => ControlFlow.Continue(v)
             ParseErr(m, p) => ControlFlow.Break(ParseError { msg: m, pos: p })
@@ -604,7 +604,7 @@ fails because `a` was consumed. With auto-referencing, the pattern
 is:
 
 ```
-impl Add for Vector:
+impl Vector:
     fn add(self: &Self, rhs: &Self) -> Self:
         Vector { x: self.x + rhs.x, y: self.y + rhs.y }
 

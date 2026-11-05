@@ -70,15 +70,15 @@ vocabulary, not exotica — and everything funnels through the same
 let total = numbers.iter() |> fold(0, (acc, x) => acc + x)
 
 let words = lines.iter()
-    |> flat_map(line => line.split(' '))
-    |> collect[List[String]]()
+    |> flat_map(line => line.split(" "))
+    |> collect[List]()
 
 let (adults, minors) = people.iter()
     |> partition(p => p.age >= 18)
 
 // zip_with: combine two iterators with a function
 let distances = xs.iter()
-    |> zip_with(ys.iter(), (x, y) => (x - y).abs())
+    |> zip_with(ys, (x, y) => (x - y).abs())
     |> collect[List]()
 
 // unfold: generate sequence from state
@@ -90,7 +90,7 @@ let report = transactions.iter()
     |> filter(t => t.amount > 100.0)
     |> sorted_by((a, b) => b.date.cmp(a.date))
     |> take(10)
-    |> map(t => "{t.date}: ${t.amount}")
+    |> map(t => f"{t.date}: ${t.amount}")
     |> join("\n")
 ```
 

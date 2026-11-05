@@ -5,7 +5,7 @@
 `ephemeral` is a type qualifier that marks a type as second-class.
 
 ```
-type StrView = ephemeral { ptr: *const u8, len: usize }
+type StrView ephemeral { ptr: *const u8, len: usize }
 ```
 
 Ephemeral values may exist as local bindings and function parameters.
@@ -80,13 +80,13 @@ This is the idiomatic pattern for parsers, tokenizers, iterators,
 and any "processing context" that borrows from input data:
 
 ```
-type Token = ephemeral {
+type Token ephemeral {
     text: StrView,          // borrows from source
     kind: TokenKind,
     span: Span,
 }
 
-type Parser = ephemeral {
+type Parser ephemeral {
     source: StrView,        // borrows from input
     pos: usize,
 }
