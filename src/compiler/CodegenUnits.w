@@ -215,7 +215,7 @@ impl CodegenUnitPipeline:
             // next generates, as none did before the pipeline.
             let handle = if self.window <= 1: -1 as i64 else: with_thread_spawn(codegen_unit_emit_thread_entry as *mut u8, job_ptr as *mut u8)
             if handle < 0:
-                let _ = codegen_unit_emit_thread_entry(job_ptr as *mut u8)
+                codegen_unit_emit_thread_entry(job_ptr as *mut u8)
             else:
                 self.handles.push(handle)
 

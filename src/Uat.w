@@ -347,7 +347,7 @@ fn uat_platform_matches(value: &str) -> i32:
     -1
 
 fn uat_probe_capture(argv: &List[str], scratch: &str) -> i32:
-    let _ = with_fs_mkdir_p(scratch)
+    with_fs_mkdir_p(scratch)
     with_exec_argv_capture_cwd(uat_argv_blob(argv), scratch ++ "/probe.stdout", scratch ++ "/probe.stderr", 20000, ".")
 
 // Whether the console session's screen is locked: `ioreg` (in the base
@@ -439,7 +439,7 @@ fn uat_dirname(path: &str) -> str:
     if cut <= 0: "." else: path.slice(0, cut)
 
 fn uat_write_text(path: &str, text: &str) -> i32:
-    let _ = with_fs_mkdir_p(uat_dirname(path))
+    with_fs_mkdir_p(uat_dirname(path))
     with_fs_write_file(path, text)
 
 fn uat_read_text(path: &str) -> str: with_fs_read_file(path)
@@ -470,13 +470,13 @@ fn uat_run_scenario(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -
     let outcome = uat_run_steps(sc, root, self_path, keep)
     if not keep:
         for path in created:
-            let _ = with_fs_remove_file(path)
+            with_fs_remove_file(path)
     outcome
 
 fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> UatOutcome:
     var human: List[str] = List.new()
     let capture_dir = uat_join(root, "out/uat/" ++ sc.name)
-    let _ = with_fs_mkdir_p(capture_dir)
+    with_fs_mkdir_p(capture_dir)
     var cwd = root
     var temp_dir = ""
     var stdin_text = ""
@@ -490,7 +490,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
         let verb = step.verb
         if verb == UAT_NEW_DIRECTORY:
             temp_dir = uat_join(capture_dir, "tmp")
-            let _ = with_fs_remove_tree(temp_dir)
+            with_fs_remove_tree(temp_dir)
             if with_fs_mkdir_p(temp_dir) != 0: return uat_fail(steps, step, "could not create " ++ temp_dir, "", human)
             cwd = temp_dir
         else if verb == UAT_RUN or verb == UAT_RUN_FAILS:
@@ -563,7 +563,7 @@ fn uat_run_steps(sc: &UatScenario, root: &str, self_path: &str, keep: bool) -> U
                 if with_fs_file_exists(p) == 0: return uat_fail(steps, step, "no file " ++ step.a, err_path, human)
                 if not uat_read_text(p).contains(step.b): return uat_fail(steps, step, step.a ++ " did not contain '" ++ step.b ++ "'", err_path, human)
     if temp_dir.len() > 0 and not keep:
-        let _ = with_fs_remove_tree(temp_dir)
+        with_fs_remove_tree(temp_dir)
     UatOutcome { verdict: "pass", detail: "", stderr_path: "", steps, human }
 
 // ── the command ──────────────────────────────────────────────────────────
@@ -688,5 +688,5 @@ fn run_uat_command(argv: &List[str]) -> i32:
     if human_count > 0:
         print("human checks for this host:")
         print(uat_trim_trailing_line_endings(human_all))
-        let _ = uat_write_text(uat_join(root, "out/uat/human-checks.txt"), human_all)
+        uat_write_text(uat_join(root, "out/uat/human-checks.txt"), human_all)
     (fail > 0) as i32

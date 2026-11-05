@@ -212,7 +212,7 @@ impl DiagnosticList:
     // was to hear something reports nothing.
     mut fn truncate(count: i32):
         while self.items.len() > count:
-            let _ = self.items.remove(count)
+            self.items.remove(count)
 
     fn count() -> i32:
         self.items.len() as i32

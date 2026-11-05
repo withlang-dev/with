@@ -197,7 +197,7 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     if view.rc != 0:
         let notes_path = rp_join(scratch, "notes.md")
         let no_rows: List[str] = List.new()
-        let _ = fs.write_text(notes_path, rp_notes(prose, channel, tag, source_sha, &no_rows))
+        fs.write_text(notes_path, rp_notes(prose, channel, tag, source_sha, &no_rows))
         var create_rest: List[str] = List.new()
         create_rest.push("--target")
         create_rest.push(source_sha ++ "")
@@ -363,6 +363,6 @@ pub fn run_publish_release_asset_action(ctx: ActionCtx) -> i32:
     print(f"publish: {tag} now carries {rows.len()} asset(s)")
     let output_dir = ctx.output()
     if output_dir.len() > 0:
-        let _ = fs.mkdir_all(output_dir)
-        let _ = fs.write_text(rp_join(output_dir, ".stamp"), tag ++ "\n")
+        fs.mkdir_all(output_dir)
+        fs.write_text(rp_join(output_dir, ".stamp"), tag ++ "\n")
     0

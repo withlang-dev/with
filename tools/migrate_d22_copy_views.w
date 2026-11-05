@@ -182,7 +182,7 @@ fn main:
         else:
             print("usage: migrate_d22_copy_views <candidate-with> [source.w] [--apply]")
             exit_code(2)
-    let _ = mkdir_p("out/tmp")
+    mkdir_p("out/tmp")
     let out_path = "out/tmp/with-d22-migrate.stdout"
     let err_path = "out/tmp/with-d22-migrate.stderr"
     var cmd: List[str] = List.new()

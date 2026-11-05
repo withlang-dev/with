@@ -91,8 +91,7 @@ fn test_c1_copy_not_moved:
     assert_eq(b.x, 1, "C1.3: Copy copy valid")
 
 // C1.4: Moved value is dropped by new owner, not original scope
-fn consume_res(r: Res):
-    let _ = r
+fn consume_res(r: Res) {}
 
 fn test_c1_move_drops:
     drop_log = ""
@@ -189,7 +188,7 @@ fn helper_defer_early -> i32:
 
 fn test_h1_defer_early:
     defer_log = ""
-    let _ = helper_defer_early()
+    helper_defer_early()
     assert_eq_str(defer_log, "early,", "H1.2: defer early return")
 
 // H1.3: multiple defers LIFO order

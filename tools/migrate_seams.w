@@ -69,7 +69,7 @@ fn main:
 
     let out_path = "out/tmp/seam-sites.tsv"
     let err_path = "out/tmp/seam-sites.err"
-    let _ = mkdir_p("out/tmp")
+    mkdir_p("out/tmp")
     var cmd: List[str] = List.new()
     cmd.push("/bin/sh")
     cmd.push("-c")

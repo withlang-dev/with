@@ -125,7 +125,6 @@ fn fiber_take_detached_completed(fiber_id: i32, result_buf: *mut u8) -> i32:
     let took = unsafe { fiber_take_completed(fiber_id, &raw mut panic_msg as *mut *const u8, &raw mut panic_msg_len as *mut i32, &raw mut cancelled_return as *mut i32) }
     if took == 0:
         return 0
-    let _ = cancelled_return
     if result_buf as i64 != 0:
         with_free(result_buf)
     if panic_msg as i64 != 0 and panic_msg_len > 0:

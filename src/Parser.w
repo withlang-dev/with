@@ -1243,7 +1243,7 @@ impl Parser:
         if self.peek() == TokenKind.TK_L_PAREN:
             self.advance()
             let inner = self.parse_target_condition()
-            let _ = self.expect(TokenKind.TK_R_PAREN)
+            self.expect(TokenKind.TK_R_PAREN)
             return inner
         let field = self.parse_target_field()
         if field.len() == 0:
@@ -1337,7 +1337,7 @@ impl Parser:
             self.pool.truncate_decls(decl_start)
             self.pending_post_decls = List.new()
             self.explicit_main_decl = main_before
-            while self.top_level_stmts.len() > stmts_before: let _ = self.top_level_stmts.pop()
+            while self.top_level_stmts.len() > stmts_before: self.top_level_stmts.pop()
 
     // ── Declaration parsing ──────────────────────────────────────────
 

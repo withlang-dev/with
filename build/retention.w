@@ -714,28 +714,28 @@ fn ret_require_pinned_driver(ctx: &ActionCtx, asset: &str) -> str:
     let fs = ctx.fs()
     let lock = seed_lock_read(fs)
     if lock.len() == 0:
-        let _ = ret_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
+        ret_fail(ctx, "seed.lock is missing: the tree has no pinned seed")
         return ""
     if asset.len() == 0:
-        let _ = ret_fail(ctx, "no host seed asset (release_asset_for_host) for " ++ os() ++ "/" ++ arch())
+        ret_fail(ctx, "no host seed asset (release_asset_for_host) for " ++ os() ++ "/" ++ arch())
         return ""
     let expected = seed_lock_value(lock, asset)
     let version = seed_lock_version_for(lock, asset)
     if version.len() == 0 or expected.len() != 64:
-        let _ = ret_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
+        ret_fail(ctx, "seed.lock has no version or no 64-hex digest for " ++ asset)
         return ""
     let capture_dir = ret_join("out/command", ctx.target_name())
     if fs.mkdir_all(capture_dir) != 0:
-        let _ = ret_fail(ctx, "could not create " ++ capture_dir)
+        ret_fail(ctx, "could not create " ++ capture_dir)
         return ""
     let driver_arg = compiler_resolve_seed(ctx)
     let driver = compiler_resolve_command_file(ctx, capture_dir, driver_arg)
     let actual = ret_sha256_file(ctx, "driver", driver)
     if actual.len() == 0:
-        let _ = ret_fail(ctx, "could not hash the driving compiler: " ++ driver)
+        ret_fail(ctx, "could not hash the driving compiler: " ++ driver)
         return ""
     if actual != expected:
-        let _ = ret_fail(ctx, ret_pinned_driver_fix("the driving compiler " ++ driver ++ " (sha256 " ++ actual ++ ") is not the pinned seed " ++ version ++ " (" ++ expected ++ ")"))
+        ret_fail(ctx, ret_pinned_driver_fix("the driving compiler " ++ driver ++ " (sha256 " ++ actual ++ ") is not the pinned seed " ++ version ++ " (" ++ expected ++ ")"))
         return ""
     if ret_driver_ancestry_verdict(ctx, expected, version) != 0:
         return ""

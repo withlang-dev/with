@@ -620,7 +620,6 @@ unsafe fn session_strdup(s: *mut CImportSession, p: *const u8) -> *mut u8:
 // (The seed-era leak note retired with the 2026-08-17 reseed — the flip
 // seed drops owned strs, so the copy is properly owned everywhere.)
 unsafe fn session_make_str(s: *mut CImportSession, p: *const u8) -> str:
-    let _ = s
     make_str(p)
 
 unsafe fn clang_str_to_with(s: *mut CImportSession, cxs: CXString) -> str:
@@ -1248,7 +1247,7 @@ unsafe fn translate_type_recursive_mode(s: *mut CImportSession, ty: CXType, dept
     if kind == CXType_Enum:
         let decl = clang_getTypeDeclaration(canonical)
         var probe = EnumFitProbe { fits: 1 }
-        let _ = clang_visitChildren(decl, probe_enum_const_fits as *const u8, &raw mut probe as *mut EnumFitProbe as *mut u8)
+        clang_visitChildren(decl, probe_enum_const_fits as *const u8, &raw mut probe as *mut EnumFitProbe as *mut u8)
         if probe.fits != 0:
             return session_strdup(s, "i32\0" as *const u8)
         return translate_type_recursive_mode(s, clang_getEnumDeclIntegerType(decl), depth + 1, 0, 0)
@@ -1490,7 +1489,7 @@ unsafe fn session_append_decl(s: *mut CImportSession, cursor: CXCursor):
 unsafe fn collect_nested_tag(cursor: CXCursor, parent: CXCursor, data: *mut u8) -> i32:
     let kind = clang_getCursorKind(cursor)
     if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
-        let _ = clang_visitChildren(cursor, collect_nested_tag as *const u8, data)
+        clang_visitChildren(cursor, collect_nested_tag as *const u8, data)
         if clang_Cursor_isAnonymous(cursor) == 0 and clang_isCursorDefinition(cursor) != 0:
             session_append_decl(data as *mut CImportSession, cursor)
     else if kind == CXCursor_EnumDecl:
@@ -1510,7 +1509,7 @@ unsafe fn hoist_nested_tags(s: *mut CImportSession):
         let cursor = *((old as i64 + i as i64 * 32) as *const CXCursor)
         let kind = clang_getCursorKind(cursor)
         if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
-            let _ = clang_visitChildren(cursor, collect_nested_tag as *const u8, s as *mut u8)
+            clang_visitChildren(cursor, collect_nested_tag as *const u8, s as *mut u8)
         session_append_decl(s, cursor)
         i = i + 1
     with_free(old as *mut u8)
@@ -1570,7 +1569,7 @@ unsafe fn collect_undefined_records(s: *mut CImportSession):
         let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
         let kind = clang_getCursorKind(cursor)
         if kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl:
-            let _ = clang_visitChildren(cursor, collect_member_record_types as *const u8, s as *mut u8)
+            clang_visitChildren(cursor, collect_member_record_types as *const u8, s as *mut u8)
         else if kind == CXCursor_FunctionDecl or kind == CXCursor_VarDecl:
             collect_undefined_record_type(s, clang_getCursorType(cursor), 0)
         else if kind == CXCursor_TypedefDecl:
@@ -1831,7 +1830,7 @@ unsafe fn collect_member_slot(cursor: CXCursor, parent: CXCursor, data: *mut u8)
 unsafe fn name_member_anon_records(s: *mut CImportSession, record: CXCursor, parent: *const u8, depth: i32):
     if depth > MAX_TYPE_DEPTH: return
     var mc = MemberCollector { cursors: 0 as *mut CXCursor, count: 0, cap: 0 }
-    let _ = clang_visitChildren(record, collect_member_slot as *const u8, &raw mut mc as *mut MemberCollector as *mut u8)
+    clang_visitChildren(record, collect_member_slot as *const u8, &raw mut mc as *mut MemberCollector as *mut u8)
     var anon_idx: i64 = 0
     var fi = 0
     while fi < mc.count:
@@ -1895,7 +1894,7 @@ unsafe fn name_local_anon_record(cursor: CXCursor, parent: CXCursor, data: *mut 
         let lk = clang_getCursorKind(ldecl)
         if (lk == CXCursor_StructDecl or lk == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(ldecl) != 0 and session_anon_record_name(s, ldecl) as i64 == 0:
             if session_anon_record_slot(s, ldecl) < 0:
-                let _ = session_anon_record_append(s, ldecl)
+                session_anon_record_append(s, ldecl)
             let base = anon_join((*namer).fn_name, "_literal_anon\0" as *const u8, 0 as *const u8, -1)
             name_anon_record(s, ldecl, base as *const u8)
             let synthesized = session_anon_record_name(s, ldecl)
@@ -1910,7 +1909,7 @@ unsafe fn name_local_anon_record(cursor: CXCursor, parent: CXCursor, data: *mut 
     if not anon_record_behind_indirection(clang_getCursorType(cursor), true, true, &raw mut reached, 0): return CXChildVisit_Recurse
     if session_anon_record_name(s, reached) as i64 != 0: return CXChildVisit_Recurse
     if session_anon_record_slot(s, reached) < 0:
-        let _ = session_anon_record_append(s, reached)
+        session_anon_record_append(s, reached)
     let spelling = clang_getCursorSpelling(cursor)
     let var_stem = anon_join((*namer).fn_name, "_\0" as *const u8, clang_getCString(spelling), -1)
     clang_disposeString(spelling)
@@ -1929,7 +1928,7 @@ unsafe fn name_file_scope_anon_records(s: *mut CImportSession):
         let cursor = *(((*s).decls as i64 + i as i64 * 32) as *const CXCursor)
         let kind = clang_getCursorKind(cursor)
         if (kind == CXCursor_StructDecl or kind == CXCursor_UnionDecl) and clang_Cursor_isAnonymous(cursor) != 0:
-            let _ = session_anon_record_append(s, cursor)
+            session_anon_record_append(s, cursor)
         i = i + 1
     (*s).anon_file_scope_count = (*s).anon_record_count
     if (*s).anon_file_scope_count > 0:
@@ -1991,7 +1990,7 @@ unsafe fn name_local_anon_records(s: *mut CImportSession):
         if clang_getCursorKind(cursor) == CXCursor_FunctionDecl and clang_isCursorDefinition(cursor) != 0:
             let fn_spelling = clang_getCursorSpelling(cursor)
             var namer = LocalAnonNamer { s: s, fn_name: clang_getCString(fn_spelling) }
-            let _ = clang_visitChildren(cursor, name_local_anon_record as *const u8, &raw mut namer as *mut LocalAnonNamer as *mut u8)
+            clang_visitChildren(cursor, name_local_anon_record as *const u8, &raw mut namer as *mut LocalAnonNamer as *mut u8)
             clang_disposeString(fn_spelling)
         i = i + 1
 
@@ -2049,7 +2048,7 @@ unsafe fn ensure_fields_cached(s: *mut CImportSession, idx: isize):
     (*cache).fields_cached = 1
     var fc = FieldCollector { fields: 0 as *mut FieldInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-    let _ = clang_visitChildren(decl, collect_field as *const u8, &raw mut fc as *mut FieldCollector as *mut u8)
+    clang_visitChildren(decl, collect_field as *const u8, &raw mut fc as *mut FieldCollector as *mut u8)
     (*cache).fields = fc.fields
     (*cache).field_count = fc.count
 
@@ -2099,7 +2098,7 @@ unsafe fn ensure_enum_consts_cached(s: *mut CImportSession, idx: i32):
     (*cache).enum_consts_cached = 1
     var ec = EnumConstCollector { consts: 0 as *mut EnumConstInfo, count: 0, cap: 0 }
     let decl = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-    let _ = clang_visitChildren(decl, collect_enum_const as *const u8, &raw mut ec as *mut EnumConstCollector as *mut u8)
+    clang_visitChildren(decl, collect_enum_const as *const u8, &raw mut ec as *mut EnumConstCollector as *mut u8)
     (*cache).enum_consts = ec.consts
     (*cache).enum_const_count = ec.count
 
@@ -2510,9 +2509,9 @@ fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
             return s as i64
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len())
-        let _ = rt_write(fd, "\n\0" as *const u8, 1)
-        let _ = rt_close(fd)
+        rt_write(fd, src_ptr, header_code.len())
+        rt_write(fd, "\n\0" as *const u8, 1)
+        rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         (*s).index = clang_createIndex(0, 0)
@@ -2527,7 +2526,7 @@ fn with_cimport_parse(header_code: &str, cxx: bool = false) -> i64:
         // Collect top-level declarations
         let root = clang_getTranslationUnitCursor((*s).tu)
         (*s).header_file = 0 as *mut u8
-        let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
         hoist_nested_tags(s)
         collect_undefined_records(s)
         name_file_scope_anon_records(s)
@@ -2586,7 +2585,7 @@ fn with_cimport_dispose(session: i64):
             with_free((*s).cursor_spellings as *mut u8)
         // Cleanup temp file
         if (*s).tmp_path as i64 != 0:
-            let _ = ci_unlink((*s).tmp_path as *const u8)
+            ci_unlink((*s).tmp_path as *const u8)
             with_free((*s).tmp_path)
         if (*s).tu as i64 != 0: clang_disposeTranslationUnit((*s).tu)
         if (*s).index as i64 != 0: clang_disposeIndex((*s).index)
@@ -2626,11 +2625,8 @@ var g_bridge_inclusion_files: str = ""
 
 @[callconv("c")]
 unsafe fn collect_inclusion(included_file: *mut u8, inclusion_stack: *mut u8, include_len: u32, data: *mut u8):
-    let _ = inclusion_stack
-    let _ = include_len
     if included_file as i64 == 0:
         return
-    let _ = data
     let path = clang_path_to_with(clang_getFileName(included_file))
     if path.len() == 0:
         return
@@ -2708,7 +2704,7 @@ fn with_ci_record_requires_cxx_semantics(session: i64, cursor_idx: i32) -> bool:
         if s as i64 == 0 or not (*s).cxx or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         var unsupported = false
-        let _ = clang_visitChildren(cursor, collect_cxx_record_semantics as *const u8, &raw mut unsupported as *mut bool as *mut u8)
+        clang_visitChildren(cursor, collect_cxx_record_semantics as *const u8, &raw mut unsupported as *mut bool as *mut u8)
         unsupported
 
 fn with_cimport_decl_name(session: i64, idx: isize) -> str:
@@ -3145,7 +3141,7 @@ fn with_cimport_struct_field_offset(session: i64, idx: i32, field: i32) -> i64:
             var anon_offset_bits = clang_Cursor_getOffsetOfField((*fi).cursor)
             if anon_offset_bits < 0 and (*s).cxx:
                 var offset = AnonymousRecordOffset { parent: ty, record: (*fi).clang_type, bits: -1 }
-                let _ = clang_visitChildren((*fi).cursor, collect_anonymous_record_offset as *const u8, &raw mut offset as *mut AnonymousRecordOffset as *mut u8)
+                clang_visitChildren((*fi).cursor, collect_anonymous_record_offset as *const u8, &raw mut offset as *mut AnonymousRecordOffset as *mut u8)
                 anon_offset_bits = offset.bits
             if anon_offset_bits < 0: return -1
             return anon_offset_bits / 8
@@ -3810,9 +3806,9 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
         with_cimport_dispose(s as i64)
         return 0
     let src_ptr = *(header_code as *const str as *const *const u8)
-    let _ = rt_write(fd, src_ptr, header_code.len())
-    let _ = rt_write(fd, "\n\0" as *const u8, 1)
-    let _ = rt_close(fd)
+    rt_write(fd, src_ptr, header_code.len())
+    rt_write(fd, "\n\0" as *const u8, 1)
+    rt_close(fd)
     (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
     (*s).index = clang_createIndex(0, 0)
@@ -3823,7 +3819,7 @@ unsafe fn cimport_collect_macros_from_libclang(ms: *mut MacroSession, header_cod
 
     var ctx = MacroCollectContext { session: s, macros: ms }
     let root = clang_getTranslationUnitCursor((*s).tu)
-    let _ = clang_visitChildren(root, collect_macro_def as *const u8, &raw mut ctx as *mut MacroCollectContext as *mut u8)
+    clang_visitChildren(root, collect_macro_def as *const u8, &raw mut ctx as *mut MacroCollectContext as *mut u8)
     with_cimport_dispose(s as i64)
     1
 
@@ -3862,8 +3858,8 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
             return ""
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len())
-        let _ = rt_write(fd, "\n\0" as *const u8, 1)
+        rt_write(fd, src_ptr, header_code.len())
+        rt_write(fd, "\n\0" as *const u8, 1)
 
         var pos: i32 = 0
         while pos < macro_names.len():
@@ -3876,8 +3872,8 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
                 let name = macro_names.slice(start as i64, pos as i64)
                 let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ ";\n"
                 let probe_ptr = *(&probe_line as *const *const u8)
-                let _ = rt_write(fd, probe_ptr, probe_line.len())
-        let _ = rt_close(fd)
+                rt_write(fd, probe_ptr, probe_line.len())
+        rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         (*s).index = clang_createIndex(0, 0)
@@ -3888,7 +3884,7 @@ fn with_cimport_collect_object_macro_types(header_code: &str, macro_names: &str,
 
         (*s).header_file = clang_getFile((*s).tu, (*s).tmp_path as *const u8)
         let root = clang_getTranslationUnitCursor((*s).tu)
-        let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
 
         let prefix = "__with_macro_probe_"
         var result = ""
@@ -3940,14 +3936,14 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
             return 0
 
         let src_ptr = *(header_code as *const str as *const *const u8)
-        let _ = rt_write(fd, src_ptr, header_code.len())
-        let _ = rt_write(fd, "\n\0" as *const u8, 1)
+        rt_write(fd, src_ptr, header_code.len())
+        rt_write(fd, "\n\0" as *const u8, 1)
         for name in macro_names.split("|"):
             if name.len() == 0: continue
             let probe_line = "__typeof__(" ++ name ++ ") __with_macro_probe_" ++ name ++ " = " ++ name ++ ";\n"
             let probe_ptr = *(&probe_line as *const *const u8)
-            let _ = rt_write(fd, probe_ptr, probe_line.len())
-        let _ = rt_close(fd)
+            rt_write(fd, probe_ptr, probe_line.len())
+        rt_close(fd)
         (*s).tmp_path = c_strdup(&template_path as *const [4096]u8 as *const u8)
 
         (*s).index = clang_createIndex(0, 0)
@@ -3958,7 +3954,7 @@ fn with_cimport_parse_macro_probe(header_code: &str, macro_names: &str, cxx: boo
 
         (*s).header_file = clang_getFile((*s).tu, (*s).tmp_path as *const u8)
         let root = clang_getTranslationUnitCursor((*s).tu)
-        let _ = clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
+        clang_visitChildren(root, collect_decl as *const u8, s as *mut u8)
         s as i64
 
 // The probe file is the header, a newline, then one probe per line.
@@ -4297,7 +4293,7 @@ unsafe fn ensure_children_cached(s: *mut CImportSession, cursor_idx: i32):
     // Collect children
     let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
     var cc = ChildCollector { session: s, indices: 0 as *mut i32, count: 0, cap: 0 }
-    let _ = clang_visitChildren(cursor, collect_child_cursor as *const u8, &raw mut cc as *mut ChildCollector as *mut u8)
+    clang_visitChildren(cursor, collect_child_cursor as *const u8, &raw mut cc as *mut ChildCollector as *mut u8)
     // Store results
     let flat_start = (*s).child_indices_count
     if cc.count > 0:
@@ -5550,7 +5546,7 @@ fn with_ci_member_field_name(session: i64, cursor_idx: i32) -> str:
                 break
             let outer = clang_getCursorSemanticParent(member)
             var counter = AnonOrdinalCounter { target: member, ordinal: 0, found: 0 }
-            let _ = clang_visitChildren(outer, count_anon_member_ordinal as *const u8, &raw mut counter as *mut AnonOrdinalCounter as *mut u8)
+            clang_visitChildren(outer, count_anon_member_ordinal as *const u8, &raw mut counter as *mut AnonOrdinalCounter as *mut u8)
             if counter.found == 0:
                 break
             let seg = f"anon_{counter.ordinal}"

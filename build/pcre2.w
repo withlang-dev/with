@@ -590,7 +590,7 @@ fn pcre2_ensure_generated_dependencies(ctx: &ActionCtx, generated_dir: &str) -> 
 pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compiler: &str, print_summary: bool) -> i32:
     let fs = ctx.fs()
     if not fs.is_dir(generated_dir):
-        let _ = pcre2_fail(ctx, "missing generated directory: " ++ generated_dir)
+        pcre2_fail(ctx, "missing generated directory: " ++ generated_dir)
         return -1
     if pcre2_ensure_generated_dependencies(ctx, generated_dir) != 0:
         return -1
@@ -643,7 +643,7 @@ pub fn pcre2_count_generated_errors(ctx: &ActionCtx, generated_dir: &str, compil
         print(f"pcre2 cohesive check rc={rc}")
     if rc == 0: 0 else:
         eprint(fs.read_text(stderr))
-        let _ = pcre2_fail(ctx, f"the migrated library does not type-check with its harness (exit {rc}); see " ++ stderr)
+        pcre2_fail(ctx, f"the migrated library does not type-check with its harness (exit {rc}); see " ++ stderr)
         1
 
 fn pcre2_prepare_reference_tree(ctx: &ActionCtx, ref_dir: &str) -> i32:

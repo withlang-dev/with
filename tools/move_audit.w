@@ -355,7 +355,7 @@ fn find_sub(s: &str, sub: &str) -> i64:
 
 fn classify(with_bin: &str, dir: &str, idx: i32, source: &str) -> str:
     let path = dir ++ f"/cell_{idx}.w"
-    let _ = write_file(path, source)
+    write_file(path, source)
     let outp = dir ++ f"/cell_{idx}.out"
     let errp = dir ++ f"/cell_{idx}.err"
     let _rc = exec_capture(argv3(with_bin, "check", path), outp, errp, 60000)
@@ -380,7 +380,7 @@ fn main:
     let baseline = if argv.len() >= 3: argv[2] ++ "" else: ""
     // Per process: two batteries at once shared one cell directory (#2004).
     let dir = f"/tmp/move-audit-cells-{pid()}"
-    let _ = mkdirs(dir)
+    mkdirs(dir)
     let cells = build_cells()
     var failures = 0
     var regressions = 0

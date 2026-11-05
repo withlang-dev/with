@@ -154,7 +154,7 @@ fn version(key: &str, scratch: &str) -> str:
     for a in version_args(key): argv.push(a.clone())
     let out = scratch ++ "/version.stdout"
     let err = scratch ++ "/version.stderr"
-    let _ = run_to_files(&argv, out, err, 60000)
+    run_to_files(&argv, out, err, 60000)
     let out_text = read_file(out) ?? ""
     let err_text = read_file(err) ?? ""
     let stdout = out_text.trim()
@@ -321,7 +321,7 @@ fn stem(path: &str) -> str:
 /// Copy the source with a unique trailing comment so no build cache can
 /// return a previous compilation of this exact program.
 fn with_unique_comment(source: &str, work: &str) -> str:
-    let _ = mkdir_p(work)
+    mkdir_p(work)
     let copied = work ++ "/" ++ basename(source)
     let text = read_file(source) ?? ""
     assert(write_file(copied, f"{text}\n// bench-{now_ns()}\n") == 0)
@@ -335,7 +335,7 @@ type Compiled {
 
 fn compile_once(key: &str, level: &str, source: &str, work: &str) -> Compiled:
     let output = work ++ "/" ++ stem(source) ++ "-" ++ level
-    if file_exists(output): let _ = remove_file(output)
+    if file_exists(output): remove_file(output)
     let argv = compile_command(key, level, source, output)
     let started = now_ns()
     let finished = run_to_files_in(work, &argv, work ++ ".compile.stdout", work ++ ".compile.stderr")
@@ -353,7 +353,7 @@ fn strip_binary(path: &str) -> i64:
     var argv: List[str] = List.new()
     argv.push("strip")
     argv.push(stripped.clone())
-    let _ = run_to_files(&argv, "/dev/null", "/dev/null", 0)
+    run_to_files(&argv, "/dev/null", "/dev/null", 0)
     (read_file(stripped) ?? "").len()
 
 type RunResult {
@@ -404,14 +404,14 @@ fn measure(root: &str, workload: &str, key: &str, level: &str, runs: i32, timeou
         cell.detail = "no source"
         return cell
     let work = f"{work_root}/{workload}-{key}-{level}"
-    let _ = mkdir_p(work)
-    let _ = set_env("CARGO_INCREMENTAL", "0")
-    let _ = set_env("ZIG_LOCAL_CACHE_DIR", work ++ "/zig-cache")
+    mkdir_p(work)
+    set_env("CARGO_INCREMENTAL", "0")
+    set_env("ZIG_LOCAL_CACHE_DIR", work ++ "/zig-cache")
 
     // Warm the toolchain (std library caches, first-run setup) on a
     // throwaway copy, then time a genuinely uncached build of the program.
     let warm = with_unique_comment(source, work ++ "/warm")
-    let _ = compile_once(key, level, warm, work ++ "/warm")
+    compile_once(key, level, warm, work ++ "/warm")
     let timed = with_unique_comment(source, work ++ "/timed")
     let compiled = compile_once(key, level, timed, work ++ "/timed")
     cell.compile_s = Some(compiled.elapsed_s)
@@ -735,7 +735,7 @@ for key in options.languages:
         eprint(f"skipping {language_name(key)}: '{compiler(key)}' not found on PATH")
 if active.len() == 0:
     eprint("no toolchains available")
-    let _ = remove_tree(work_root)
+    remove_tree(work_root)
     exit_code(1)
 
 var cells: List[Cell] = List.new()
@@ -766,4 +766,4 @@ if options.output.len() > 0:
     eprint(f"wrote {md}, {csv}, {json}")
 print(report)
 if options.keep: eprint(f"build directory kept: {work_root}")
-else: let _ = remove_tree(work_root)
+else: remove_tree(work_root)

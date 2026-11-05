@@ -495,7 +495,7 @@ fn fiber_effective_pool_limit() -> i32:
 fn allocate_stack_region(size: i64) -> *mut u8:
     let page_sz = guard_page_size()
     let total = FIBER_GUARD_HEADROOM + page_sz + size
-    let _ = rt_fiber_mmap_flags()
+    rt_fiber_mmap_flags()
     let region = rt_mmap(total)
     if region as i64 == 0 or region as i64 == MAP_FAILED:
         return 0 as *mut u8
@@ -581,10 +581,10 @@ fn fiber_write_i32(fd: i32, n: i32):
     var buf: [16]u8 = [0 as u8; 16]
     var i = 0
     if value < 0:
-        let _ = rt_write(fd, "-" as *const u8, 1)
+        rt_write(fd, "-" as *const u8, 1)
         value = 0 - value
     if value == 0:
-        let _ = rt_write(fd, "0" as *const u8, 1)
+        rt_write(fd, "0" as *const u8, 1)
         return
     while value > 0 and i < 15:
         buf[i] = (48 + (value % 10)) as u8
@@ -592,7 +592,7 @@ fn fiber_write_i32(fd: i32, n: i32):
         i = i + 1
     var j = i - 1
     while j >= 0:
-        let _ = rt_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
+        rt_write(fd, (&raw const buf as i64 + j as i64) as *const u8, 1)
         j = j - 1
 
 fn fiber_guard_hit(f: i64, fault_addr: i64) -> bool:
@@ -620,13 +620,13 @@ pub fn with_fiber_veh(exception_info: *mut u8) -> i32:
     let fault_addr = load_i64(rec, 40)
     let worker = current_worker_index()
     if fiber_guard_hit(worker_current_coros[worker], fault_addr):
-        let _ = rt_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
+        rt_write(2, "fatal: fiber stack overflow (pulled generator)\n" as *const u8, 47)
         rt_exit(134)
     let current = worker_current_fibers[worker]
     if fiber_guard_hit(current, fault_addr):
-        let _ = rt_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
+        rt_write(2, "fatal: fiber stack overflow (fiber #" as *const u8, 36)
         fiber_write_i32(2, fiber_id(current))
-        let _ = rt_write(2, ")\n" as *const u8, 2)
+        rt_write(2, ")\n" as *const u8, 2)
         rt_exit(134)
     0
 
@@ -911,7 +911,7 @@ pub fn with_fiber_sleep_until(wake_at: i64) -> i32:
         scheduler_unlock()
         if earliest > now:
             let idle = earliest - now
-            let _ = rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
+            rt_nanosleep(if idle < FIBER_SLEEP_SLICE_NS: idle else: FIBER_SLEEP_SLICE_NS)
         with_fiber_yield()
         scheduler_lock()
         fiber_set_wake_at(current, 0)

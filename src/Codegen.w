@@ -2143,12 +2143,10 @@ impl Codegen:
         raw.len() > 0 and raw != "0"
 
     fn debug_pool_flow_enabled() -> bool:
-        let _ = self
         let raw = with_getenv_str("WITH_DEBUG_POOL_FLOW")
         raw.len() > 0 and raw != "0"
 
     fn debug_type_layout_enabled() -> bool:
-        let _ = self
         let raw = with_getenv_str("WITH_DEBUG_TYPE_LAYOUT")
         raw.len() > 0 and raw != "0"
 
@@ -2226,7 +2224,7 @@ impl Codegen:
 
     mut fn pop_loop_context():
         var labels: List[i32] = move self.loop_labels
-        let _ = labels.pop()
+        labels.pop()
         self.loop_labels = labels
         self.loop_depth = self.loop_depth - 1
 
@@ -3401,7 +3399,7 @@ impl Codegen:
     // clang expands va_arg — the LLVM va_arg instruction is not lowered for
     // every target this compiler emits (AAPCS64 Linux, Windows' 8-byte slots).
 
-    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64):
+    fn emit_c_va_list_marker(intrinsic_name: &str, list_ptr: i64) -> Unit:
         let params: List[i64] = List.new()
         params.push(wl_ptr_type(self.context))
         let ft = wl_function_type(wl_void_type(self.context), list_data_i64(params), 1, 0)
@@ -3410,7 +3408,7 @@ impl Codegen:
             func = wl_add_function(self.llmod, intrinsic_name, ft)
         let args: List[i64] = List.new()
         args.push(list_ptr)
-        let _ = wl_build_call(self.builder, ft, func, list_data_i64(args), 1)
+        wl_build_call(self.builder, ft, func, list_data_i64(args), 1)
 
     // The next argument of the list at `list_ptr` as `ty` — an integer at
     // least as wide as C's int, a double or a pointer (Sema refused every
@@ -6800,7 +6798,7 @@ impl Codegen:
     mut fn ensure_llvm_memcpy_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memcpy.p0.p0.i64", wl_ptr_type(self.context))
     mut fn ensure_llvm_memset_declared() -> i64: self.ensure_llvm_mem_intrinsic("llvm.memset.p0.i64", wl_i8_type(self.context))
 
-    mut fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64):
+    mut fn emit_llvm_memcpy(dst: i64, src: i64, byte_count: i64) -> Unit:
         let fn_val = self.ensure_llvm_memcpy_declared()
         let fn_ty = wl_global_get_value_type(fn_val)
         let args: List[i64] = List.new()
@@ -6808,7 +6806,7 @@ impl Codegen:
         args.push(src)
         args.push(wl_const_int(wl_i64_type(self.context), byte_count, 0))
         args.push(wl_const_int(wl_i1_type(self.context), 0, 0))
-        let _ = wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 4)
+        wl_build_call(self.builder, fn_ty, fn_val, list_data_i64(args), 4)
 
     mut fn c_abi_pack_direct_value(value: i64, abi_ty: i64) -> i64:
         if value == 0 or abi_ty == 0:
@@ -8243,8 +8241,8 @@ impl Codegen:
             let exit_args: List[i64] = List.new()
             exit_args.push(exit_val)
             wl_build_call(self.builder, wl_global_get_value_type(exit_fn), exit_fn, list_data_i64(exit_args), 1)
-            let _ = wl_build_ret_void(self.builder)
+            wl_build_ret_void(self.builder)
             self.debug_clear_location()
             return
-        let _ = wl_build_ret(self.builder, exit_val)
+        wl_build_ret(self.builder, exit_val)
         self.debug_clear_location()

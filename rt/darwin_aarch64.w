@@ -180,28 +180,28 @@ fn darwin_store_i32(base: i64, offset: i64, value: i32):
     unsafe:
         *((base + offset) as *mut i32) = value
 
-fn darwin_zero_sigaction(sig: i32):
+fn darwin_zero_sigaction(sig: i32) -> Unit:
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
-    let _ = rt_libc_sigaction(sig, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(sig, sa_base as *const u8, 0 as *mut u8)
 
 pub fn rt_fiber_reset_signal_handler(sig: i32):
     darwin_zero_sigaction(sig)
 
-pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64):
+pub fn rt_fiber_install_signal_handlers(alt_stack: *mut u8, alt_stack_size: i64, handler: i64) -> Unit:
     var ss: [24]u8 = [0 as u8; 24]
     let ss_base = (&raw mut ss) as *mut [24]u8 as i64
     darwin_store_i64(ss_base, 0, alt_stack as i64)
     darwin_store_i64(ss_base, 8, alt_stack_size)
     darwin_store_i32(ss_base, 16, 0)
-    let _ = rt_libc_sigaltstack(ss_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaltstack(ss_base as *const u8, 0 as *mut u8)
 
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     darwin_store_i64(sa_base, 0, handler)
     darwin_store_i32(sa_base, 12, 0x0040 | 0x0001)
-    let _ = rt_libc_sigaction(11, sa_base as *const u8, 0 as *mut u8)
-    let _ = rt_libc_sigaction(10, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(11, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(10, sa_base as *const u8, 0 as *mut u8)
 
 // ── I/O ─────────────────────────────────────────────────────────
 
@@ -327,8 +327,8 @@ pub fn rt_mmap(size: i64) -> *mut u8:
         return 0 as *mut u8
     p
 
-pub fn rt_munmap(ptr: *mut u8, size: i64):
-    let _ = rt_libc_munmap(ptr, size as u64)
+pub fn rt_munmap(ptr: *mut u8, size: i64) -> Unit:
+    rt_libc_munmap(ptr, size as u64)
 
 // ── Process ─────────────────────────────────────────────────────
 
@@ -346,7 +346,7 @@ var timebase_denom: i64 = 0
 pub fn rt_clock_ns() -> i64:
     if timebase_denom == 0:
         var info = MachTimebaseInfo { numer: 0, denom: 0 }
-        let _ = rt_libc_mach_timebase_info(&raw mut info)
+        rt_libc_mach_timebase_info(&raw mut info)
         timebase_numer = info.numer as i64
         timebase_denom = info.denom as i64
     let ticks = rt_libc_mach_absolute_time() as i64
@@ -420,7 +420,7 @@ pub fn rt_backtrace_print():
     if n <= 0:
         return
     let header = "backtrace (innermost first; `atos -o <binary> <addr>` for a line):\n"
-    let _ = rt_write(2, header as *const u8, header.len())
+    rt_write(2, header as *const u8, header.len())
     backtrace_symbols_fd(&raw mut frames as *mut [64]*mut u8 as *mut *mut u8, n, 2)
 
 pub fn rt_getpid() -> i32:
@@ -446,7 +446,7 @@ pub fn rt_thread_spawn(start_routine: *mut u8, arg: *mut u8) -> i64:
         return -(rc as i64)
     rc = rt_libc_pthread_attr_setstacksize(&raw mut attr[0], 16 * 1024 * 1024)
     if rc != 0:
-        let _ = rt_libc_pthread_attr_destroy(&raw mut attr[0])
+        rt_libc_pthread_attr_destroy(&raw mut attr[0])
         return -(rc as i64)
     rc = rt_libc_pthread_create(&raw mut handle, &raw const attr[0], start_routine, arg)
     let destroy_rc = rt_libc_pthread_attr_destroy(&raw mut attr[0])
@@ -777,7 +777,7 @@ fn rt_list_push(acc: *mut i64, text: *const u8, n: i64):
         cap = new_cap
         unsafe *(acc as *mut *mut u8) = buf
         unsafe *((acc as i64 + 16) as *mut i64) = cap
-    let _ = with_memcpy((buf as i64 + len) as *mut u8, text, n)
+    with_memcpy((buf as i64 + len) as *mut u8, text, n)
     unsafe *((buf as i64 + len + n) as *mut u8) = 10 as u8
     unsafe *((acc as i64 + 8) as *mut i64) = len + n + 1
 
@@ -965,10 +965,10 @@ fn rt_net_connect_any(host: &str, port: i32, socktype: i32, protocol: i32, timeo
         let fd = rt_libc_socket((unsafe *p).ai_family, (unsafe *p).ai_socktype, (unsafe *p).ai_protocol)
         if fd >= 0:
             if timeout_ms > 0:
-                let _ = rt_net_apply_timeout(fd, timeout_ms)
+                rt_net_apply_timeout(fd, timeout_ms)
                 // IPPROTO_TCP / TCP_CONNECTIONTIMEOUT, in seconds.
                 var secs: i32 = (timeout_ms + 999) / 1000
-                let _ = rt_libc_setsockopt(fd, 6, 32, &secs as *const i32 as *const u8, 4 as u32)
+                rt_libc_setsockopt(fd, 6, 32, &secs as *const i32 as *const u8, 4 as u32)
             let rc = rt_libc_connect(fd, (unsafe *p).ai_addr as *const u8, (unsafe *p).ai_addrlen)
             if rc == 0:
                 rt_libc_freeaddrinfo(res)
@@ -1009,14 +1009,14 @@ pub fn with_net_tcp_listen(port: i32, backlog: i32) -> i32:
         return -get_errno()
     var one: i32 = 1
     // SOL_SOCKET / SO_REUSEADDR (Darwin values)
-    let _ = rt_libc_setsockopt(fd, 65535, 4, &one as *const i32 as *const u8, 4 as u32)
+    rt_libc_setsockopt(fd, 65535, 4, &one as *const i32 as *const u8, 4 as u32)
     if rt_net_bind_inaddr_any(fd, port) < 0:
         let bind_err = get_errno()
-        let _ = rt_close(fd)
+        rt_close(fd)
         return -bind_err
     if rt_libc_listen(fd, backlog) < 0:
         let listen_err = get_errno()
-        let _ = rt_close(fd)
+        rt_close(fd)
         return -listen_err
     fd
 
@@ -1036,7 +1036,7 @@ pub fn with_net_udp_bind(port: i32) -> i32:
         return -get_errno()
     if rt_net_bind_inaddr_any(fd, port) < 0:
         let bind_err = get_errno()
-        let _ = rt_close(fd)
+        rt_close(fd)
         return -bind_err
     fd
 
@@ -1100,13 +1100,13 @@ pub fn rt_sysinfo(out_raw: *mut u8) -> i32:
     // CPU cores: sysctl hw.logicalcpu
     var cores: i32 = 0
     var cores_len: i64 = 4
-    let _ = rt_libc_sysctlbyname(c"hw.logicalcpu".ptr, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
+    rt_libc_sysctlbyname(c"hw.logicalcpu".ptr, &cores as *mut u8, &raw mut cores_len, 0 as *const u8, 0)
     (unsafe *out).cpu_cores = if cores > 0: cores else: 1
 
     // Total memory: sysctl hw.memsize
     var memsize: i64 = 0
     var memsize_len: i64 = 8
-    let _ = rt_libc_sysctlbyname(c"hw.memsize".ptr, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
+    rt_libc_sysctlbyname(c"hw.memsize".ptr, &memsize as *mut u8, &raw mut memsize_len, 0 as *const u8, 0)
     (unsafe *out).memory_total = memsize
 
     // Page size: sysconf(_SC_PAGESIZE)
@@ -1215,11 +1215,11 @@ fn posix_str_to_c_buf(s: &str) -> *mut c_char:
     unsafe *((out as i64 + s.len()) as *mut u8) = 0
     out as *mut c_char
 
-fn posix_restore_default_signal_handler(signo: i32):
+fn posix_restore_default_signal_handler(signo: i32) -> Unit:
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
-    let _ = rt_libc_sigaction(signo, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(signo, sa_base as *const u8, 0 as *mut u8)
 
 fn posix_block_interrupt_signals(prev_mask: *mut u32) -> i32:
     var blocked: u32 = 0 as u32
@@ -1230,7 +1230,7 @@ fn posix_block_interrupt_signals(prev_mask: *mut u32) -> i32:
 
 fn posix_restore_signal_mask(prev_mask: *const u32):
     if prev_mask as i64 != 0:
-        let _ = rt_libc_sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut u32)
+        rt_libc_sigprocmask(POSIX_SIG_SETMASK, prev_mask, 0 as *mut u32)
 
 fn posix_wait_child(pid: i32, timeout_ms: i32) -> i32:
     var status: i32 = -1
@@ -1299,9 +1299,9 @@ fn posix_redirect_fd_to_path(path: *const c_char, fd: i32) -> i32:
     if out_fd < 0:
         return -1
     if rt_libc_dup2(out_fd, fd) < 0:
-        let _ = rt_close(out_fd)
+        rt_close(out_fd)
         return -1
-    let _ = rt_close(out_fd)
+    rt_close(out_fd)
     0
 
 fn posix_redirect_fd_from_path(path: *const c_char, fd: i32) -> i32:
@@ -1309,15 +1309,15 @@ fn posix_redirect_fd_from_path(path: *const c_char, fd: i32) -> i32:
     if in_fd < 0:
         return -1
     if rt_libc_dup2(in_fd, fd) < 0:
-        let _ = rt_close(in_fd)
+        rt_close(in_fd)
         return -1
-    let _ = rt_close(in_fd)
+    rt_close(in_fd)
     0
 
 fn posix_child_common(mask_rc: i32, prev_mask: *const u32):
     if mask_rc == 0:
         posix_restore_signal_mask(prev_mask)
-    let _ = rt_libc_setpgid(0, 0)
+    rt_libc_setpgid(0, 0)
     posix_restore_default_signal_handler(POSIX_SIGINT)
     posix_restore_default_signal_handler(POSIX_SIGTERM)
     posix_restore_default_signal_handler(POSIX_SIGHUP)
@@ -1347,7 +1347,7 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
     let table_bytes = (argc as i64 + 1) * 8
     let table = rt_mmap(table_bytes) as *mut *const u8
     if table as i64 == 0:
-        let _ = rt_write(2, c"error: could not map the argument table for a command\n".ptr as *const u8, 54)
+        rt_write(2, c"error: could not map the argument table for a command\n".ptr as *const u8, 54)
         return -1
     var prev_mask: u32 = 0 as u32
     let mask_rc = posix_block_interrupt_signals(&raw mut prev_mask)
@@ -1363,16 +1363,16 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
         if cwd as i64 != 0:
             if rt_libc_chdir(cwd) != 0:
                 posix_child_fail(c"error: could not change to a command's directory '".ptr, cwd)
-            let _ = rt_libc_setenv(c"PWD".ptr, cwd, 1)
+            rt_libc_setenv(c"PWD".ptr, cwd, 1)
         let _argc2 = posix_fill_argv(blob, len, table)
-        let _ = rt_libc_execvp(unsafe *table, table as *const *const u8)
+        rt_libc_execvp(unsafe *table, table as *const *const u8)
         posix_child_fail(c"error: could not run '".ptr, unsafe *table as *const c_char)
     rt_munmap(table as *mut u8, table_bytes)
     if pid < 0:
         if mask_rc == 0:
             posix_restore_signal_mask(&prev_mask as *const u32)
         return -1
-    let _ = rt_libc_setpgid(pid, pid)
+    rt_libc_setpgid(pid, pid)
     if mask_rc == 0:
         posix_restore_signal_mask(&prev_mask as *const u32)
     if not wait:
@@ -1385,7 +1385,7 @@ fn posix_run_argv(blob: *const u8, len: i64, stdout_path: *const c_char, stderr_
 fn posix_interrupt_signal_handler(signo: i32):
     posix_interrupt_flag = 1
     if posix_active_child_pgid > 0:
-        let _ = rt_libc_kill(-posix_active_child_pgid, signo)
+        rt_libc_kill(-posix_active_child_pgid, signo)
     rt_libc_exit(128 + signo)
 
 fn posix_interrupted() -> bool:
@@ -1404,14 +1404,14 @@ pub fn rt_compat_setenv_str(name: &str, value: &str) -> i32:
     with_free(value_buf)
     rc
 
-pub fn rt_compat_install_interrupt_handlers():
+pub fn rt_compat_install_interrupt_handlers() -> Unit:
     var sa: [16]u8 = [0 as u8; 16]
     let sa_base = (&raw mut sa) as *mut [16]u8 as i64
     with_memset(sa_base as *mut u8, 0, POSIX_SIGACTION_SIZE)
     posix_store_i64(sa_base, 0, posix_interrupt_signal_handler as i64)
-    let _ = rt_libc_sigaction(POSIX_SIGINT, sa_base as *const u8, 0 as *mut u8)
-    let _ = rt_libc_sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
-    let _ = rt_libc_sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(POSIX_SIGINT, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(POSIX_SIGTERM, sa_base as *const u8, 0 as *mut u8)
+    rt_libc_sigaction(POSIX_SIGHUP, sa_base as *const u8, 0 as *mut u8)
 
 pub fn rt_compat_raise_stack_limit():
     var lim: [16]u8 = [0 as u8; 16]
@@ -1425,7 +1425,7 @@ pub fn rt_compat_raise_stack_limit():
     let lim_cur = posix_load_u64(lim_base, 0)
     if want > lim_cur:
         posix_store_i64(lim_base, 0, want as i64)
-        let _ = rt_libc_setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
+        rt_libc_setrlimit(POSIX_RLIMIT_STACK, lim_base as *const u8)
 
 pub fn rt_set_process_memory_limit_bytes(limit: i64) -> i32:
     if limit <= 0:

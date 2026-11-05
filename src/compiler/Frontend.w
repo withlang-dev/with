@@ -48,7 +48,7 @@ fn frontend_cimport_lock():
     while frontend_cimport_lock_word.swap(1, .Acquire) != 0:
         spins = spins + 1
         if spins >= 1024:
-            let _ = runtime_nanosleep(1000)
+            runtime_nanosleep(1000)
             spins = 0
 
 fn frontend_cimport_unlock():
@@ -262,7 +262,6 @@ fn c_import_str_contains(text: &str, needle: &str) -> bool:
 
 impl Zcu:
     fn read_trace_c_import_cache_frontend() -> bool:
-        let _ = self
         let raw = runtime_getenv("WITH_TRACE_CIMPORT_CACHE")
         if raw.len() == 0:
             return false
@@ -1205,7 +1204,6 @@ impl Zcu:
             pos = line_end + 1
 
     mut fn c_import_emit_header_error_detail_frontend(decl: i32, header_spec: &str, detail: &str):
-        let _ = decl
         let span = Span {
             file: 0,
             start: self.current_source_text.len() as i32,

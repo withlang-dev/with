@@ -62,7 +62,7 @@ fn split_bodies(dump: &str) -> BTreeMap[str, List[str]]:
 fn dump_side(label: &str, src_dir: &str, main: &str, sub: &str) -> str:
     let root = "out/tmp/migrate-diff/" ++ label
     let lib_dir = root ++ "/lib/std/" ++ sub
-    let _ = remove_tree(root)
+    remove_tree(root)
     if mkdir_p(lib_dir) != 0: fail("could not create " ++ lib_dir)
     for entry in list_files_text(src_dir).split("\n"):
         if not entry.ends_with(".w"): continue

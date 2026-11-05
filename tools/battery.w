@@ -192,14 +192,14 @@ fn step_live(name: &str, argv: &List[str], log: &str, status: &str) -> i32:
     assert(set_env("WITH_BATTERY_LIVE_CMD", argv.join("\n")) == 0)
     assert(set_env("WITH_BATTERY_LIVE_LOG", log) == 0)
     assert(set_env("WITH_BATTERY_LIVE_DONE", f"out/battery/{name}.done") == 0)
-    let _ = remove_file(live_done())
+    remove_file(live_done())
     let t0 = now()
     let worker = spawn_os(live_worker)
     var reported = " "
     var finished = false
     while not finished:
         finished = file_exists(live_done())
-        if not finished: let _ = sleep_secs(1)
+        if not finished: sleep_secs(1)
         for target in (failed_targets(log) ++ " " ++ failed_targets(log ++ ".stderr")).split(" "):
             if target.len() == 0 or reported.contains(" " ++ target ++ " "): continue
             reported = reported ++ target ++ " "
@@ -249,7 +249,7 @@ fn merge_times(ledger: &str, times: &str):
     assert(write_file(ledger, text) == 0)
     // build.w reads the ledger when the graph is evaluated, once per
     // build-source hash; drop the evaluated graph so the next build re-reads.
-    let _ = remove_file("out/.build-state/build-graph.cache")
+    remove_file("out/.build-state/build-graph.cache")
 
 var fail_fast = false
 var survey = false
@@ -342,6 +342,6 @@ if file_exists(ledger) and file_exists(green_dir):
     write_file(green_dir ++ "/battery-times.tsv", read_file(ledger) ?? "")
 let verdict = if rc == 0: "GREEN" else: "RED"
 append(status, verdict ++ "\nBATTERY_DONE")
-let _ = remove_file(slot)
+remove_file(slot)
 print(f"battery: {verdict} ({head}); logs in out/battery/")
 exit_code(rc)

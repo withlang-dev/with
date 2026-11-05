@@ -7643,7 +7643,6 @@ pub fn run_cli_selfhost_migrate_core_action(ctx: ActionCtx) -> i32:
 
 
 fn bs_build_w_write_fixture(ctx: &ActionCtx, path: &str, contents: &str, _target_name: &str, label: &str) -> i32:
-    let _ = _target_name
     bs_write_fixture(ctx, path, contents, label)
 
 fn bs_argv_append(argv_blob: &str, arg: &str) -> str:
@@ -9756,7 +9755,7 @@ pub fn run_build_helper_programs_action(ctx: ActionCtx) -> i32:
             return bs_fail(ctx, f"{source} failed to build with exit code {result.rc}: " ++ bs_error_lines(result.stderr))
         if not fs.exists(bs_join(output_dir, name)):
             return bs_fail(ctx, source ++ " built but produced no " ++ name)
-    let _ = fs.write_text(bs_join(output_dir, ".stamp"), "ok")
+    fs.write_text(bs_join(output_dir, ".stamp"), "ok")
     0
 
 /// The diagnostic lines of a compiler's stderr (each `error:` and its `-->`

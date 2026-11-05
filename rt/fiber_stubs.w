@@ -10,28 +10,22 @@ extern fn rt_write(fd: i32, buf: *const u8, len: i64) -> i64
 extern fn rt_nanosleep(ns: i64) -> i32
 extern fn rt_clock_ns() -> i64
 
-pub fn with_runtime_init():
-    let _ = 0
+pub fn with_runtime_init() {}
 
-pub fn with_runtime_run():
-    let _ = 0
+pub fn with_runtime_run() {}
 
 pub fn with_runtime_shutdown():
     with_debug_alloc_report_leaks()
 
-pub fn with_runtime_run_one_step():
-    let _ = 0
+pub fn with_runtime_run_one_step() {}
 
 pub fn with_runtime_fiber_is_completed(fiber_id: i32) -> i32:
-    let _ = fiber_id
     0
 
 pub fn with_runtime_fiber_is_live(fiber_id: i32) -> i32:
-    let _ = fiber_id
     0
 
 pub unsafe fn with_runtime_take_completed_fiber(fiber_id: i32, panic_msg_out: *mut *const u8, panic_msg_len_out: *mut i32, cancelled_return_out: *mut i32) -> i32:
-    let _ = fiber_id
     *panic_msg_out = 0 as *const u8
     *panic_msg_len_out = 0
     *cancelled_return_out = 0
@@ -43,38 +37,28 @@ pub unsafe fn with_runtime_take_panicked_fiber(fiber_id_out: *mut i32, panic_msg
     *panic_msg_len_out = 0
     0
 
-pub fn with_fiber_await(fiber_id: i32):
-    let _ = fiber_id
+pub fn with_fiber_await(fiber_id: i32) {}
 
-pub fn with_fiber_cleanup_await(fiber_id: i32):
-    let _ = fiber_id
+pub fn with_fiber_cleanup_await(fiber_id: i32) {}
 
 pub fn with_fiber_cancel(fiber_id: i32) -> i32:
-    let _ = fiber_id
     0
 
 pub fn with_runtime_request_cancel(fiber_id: i32) -> i32:
-    let _ = fiber_id
     0
 
 pub fn with_fiber_detach(fiber_id: i32, result_buf: *mut u8) -> i32:
-    let _ = fiber_id
-    let _ = result_buf
     0
 
 pub fn with_fiber_detach_cancel(fiber_id: i32, result_buf: *mut u8) -> i32:
-    let _ = fiber_id
-    let _ = result_buf
     0
 
 pub fn with_runtime_current_cancel_requested() -> i32:
     0
 
-pub fn with_runtime_current_set_cancel_requested():
-    let _ = 0
+pub fn with_runtime_current_set_cancel_requested() {}
 
-pub fn with_runtime_current_set_cancelled_return():
-    let _ = 0
+pub fn with_runtime_current_set_cancelled_return() {}
 
 pub fn with_runtime_current_cancelled_return() -> i32:
     0
@@ -85,20 +69,16 @@ pub fn with_runtime_current_cancelled_return() -> i32:
 pub fn with_fiber_wait_cancelled() -> i32:
     0
 
-pub fn with_fiber_set_cancelled_return():
-    let _ = 0
+pub fn with_fiber_set_cancelled_return() {}
 
 pub fn with_runtime_completed_cancelled_return(fiber_id: i32) -> i32:
-    let _ = fiber_id
     0
 
 // No fiber completes here: the sequence of a completion that never was.
 pub fn with_runtime_fiber_completion_sequence(fiber_id: i32) -> i64:
-    let _ = fiber_id
     0
 
-pub fn with_fiber_yield():
-    let _ = 0
+pub fn with_fiber_yield() {}
 
 // §14.3: with no fiber runtime linked there is no fiber to suspend; the
 // thread sleeps until the wake time.
@@ -128,12 +108,9 @@ pub fn with_fiber_cross_thread_cancels() -> i64:
     0
 
 pub fn with_runtime_fiber_running_worker(fiber_id: i32) -> i32:
-    let _ = fiber_id
     -1
 
 pub fn with_fiber_panic_capture(msg: *const u8, msg_len: i32):
-    let _ = msg
-    let _ = msg_len
     rt_libc_abort()
 
 // ── Foreign-state domain rows (ruling §52, spec §16.2b.14) ────────────────
@@ -176,30 +153,23 @@ c facade libc:
 // std.task definitions still reference them, so each is defined here and
 // stops the program loudly instead of pretending to step.
 fn with_fiber_coro_unavailable() -> Never:
-    let _ = rt_write(2, "fatal: a generator's pull() needs the fiber runtime, which this program was linked without\n" as *const u8, 91)
+    rt_write(2, "fatal: a generator's pull() needs the fiber runtime, which this program was linked without\n" as *const u8, 91)
     rt_libc_abort()
-    loop:
-        let _ = 0
+    loop {}
 
 pub fn with_fiber_coro_new(entry: *const u8, arg: *mut u8) -> i64:
-    let _ = entry
-    let _ = arg
     with_fiber_coro_unavailable()
 
 pub fn with_fiber_coro_resume(co: i64):
-    let _ = co
     with_fiber_coro_unavailable()
 
 pub fn with_fiber_coro_suspend(co: i64):
-    let _ = co
     with_fiber_coro_unavailable()
 
 pub fn with_fiber_coro_finish(co: i64):
-    let _ = co
     with_fiber_coro_unavailable()
 
 pub fn with_fiber_coro_free(co: i64):
-    let _ = co
     with_fiber_coro_unavailable()
 
 // On WebAssembly this module stands in for the fiber runtime and the channel

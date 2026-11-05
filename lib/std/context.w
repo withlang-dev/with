@@ -19,15 +19,9 @@ pub type NoopLogger {}
 impl Copy for NoopLogger
 
 impl Logger for NoopLogger:
-    fn info(message: str) -> Unit:
-        let _ = self
-        let _ = message
-    fn warn(message: str) -> Unit:
-        let _ = self
-        let _ = message
-    fn error(message: str) -> Unit:
-        let _ = self
-        let _ = message
+    fn info(message: str) {}
+    fn warn(message: str) {}
+    fn error(message: str) {}
 
 pub type Context ephemeral {
     pub temp: TempArena,

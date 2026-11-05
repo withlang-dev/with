@@ -257,6 +257,6 @@ pub fn run_examples_tests_action(ctx: ActionCtx) -> i32:
     if failures > 0:
         ctx.diagnostics().error(f"examples-tests: {failures} step(s) failed; an example tracks the current spec (D55 ruling 4): a spec change updates it in the same change, a compiler or stdlib change that breaks it is a defect")
     let total = ex_checked().len() + ex_programs().len() + ex_packages().len() + ex_projects().len() * 2 + (ex_fetched_projects().len() - skipped) * 2 + ex_tests().len()
-    let _ = fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps, {skipped} skipped\n")
+    fs.write_text(ex_join(out_dir, ".stamp"), f"ok: {total} example steps, {skipped} skipped\n")
     print(f"examples-tests: {total} steps green, {skipped} skipped")
     0

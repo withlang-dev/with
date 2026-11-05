@@ -601,7 +601,6 @@ fn mir_call_args_text(body: &MirBody, args_id: i32, pool: &InternPool, sema: &Se
 // str copied the whole dump per body, quadratic over a stage1 module that
 // lowers every embedded corpus body (13k bodies, never finished).
 fn dump_drop_state_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    let _ = sema
     var out = StringBuilder.new()
     out.push_str(f"drop-state module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():
@@ -717,7 +716,6 @@ fn dump_drop_plan_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) ->
 // original drops; the Nops are applied afterward.
 
 fn dump_place_map_module(mir_mod: &MirModule, pool: &InternPool, sema: &Sema) -> str:
-    let _ = sema
     var out = StringBuilder.new()
     out.push_str(f"place-map module functions={mir_mod.bodies.len()}\n")
     for i in 0..mir_mod.bodies.len():

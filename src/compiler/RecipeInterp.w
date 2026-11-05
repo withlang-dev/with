@@ -167,7 +167,7 @@ fn py_lex(src: &str) -> List[PyTok]:
                 out.push(py_tok(PT_INDENT, "", line))
             else:
                 while col < indents[indents.len() - 1]:
-                    let _ = indents.pop()
+                    indents.pop()
                     out.push(py_tok(PT_DEDENT, "", line))
             continue
         let c = src[i]
@@ -239,7 +239,7 @@ fn py_lex(src: &str) -> List[PyTok]:
         i = i + 1
     if out.len() > 0 and out[out.len() - 1].kind != PT_NEWLINE: out.push(py_tok(PT_NEWLINE, "", line))
     while indents.len() > 1:
-        let _ = indents.pop()
+        indents.pop()
         out.push(py_tok(PT_DEDENT, "", line))
     out.push(py_tok(PT_EOF, "", line))
     out
@@ -475,7 +475,7 @@ impl PyParser:
         while not self.is_op(")") and self.kind() != PT_EOF and self.err.len() == 0:
             if self.is_op("*") or self.is_op("**"):
                 self.advance()
-                let _ = self.expression()
+                self.expression()
                 args.push(self.leaf(N_UNSUPPORTED, "argument unpacking"))
             else if self.kind() == PT_NAME and self.toks[self.at + 1].kind == PT_OP and self.toks[self.at + 1].text == "=":
                 let name = self.text()
@@ -715,7 +715,7 @@ impl PyParser:
             let pline = self.line()
             self.advance()
             if self.accept_op(":"):
-                let _ = self.expression()
+                self.expression()
             if self.accept_op("="):
                 let default = self.expression()
                 params.push(self.mk(N_KW, default, -1, -1, pname, List.new(), pline))
@@ -723,7 +723,7 @@ impl PyParser:
             if not self.accept_op(","): break
         self.expect_op(")")
         if self.accept_op("->"):
-            let _ = self.expression()
+            self.expression()
         self.expect_op(":")
         let header_ok = self.err.len() == 0
         let body_at = self.at
@@ -783,7 +783,7 @@ impl PyParser:
             let body = self.block()
             if self.accept_word("else"):
                 self.expect_op(":")
-                let _ = self.block()
+                self.block()
             return self.mk(N_FOR, targets, iter, -1, "", body, line)
         if self.is_word("try"):
             // The body runs; handlers describe failures that do not happen here.
@@ -838,7 +838,7 @@ impl PyParser:
                 node = self.mk(N_AUG, target, value, -1, op, List.new(), line)
             else if self.accept_op(":"):
                 // An annotation, with or without a value.
-                let _ = self.expression()
+                self.expression()
                 if self.accept_op("="):
                     let value = self.expression_list()
                     node = self.mk(N_ASSIGN, target, value, -1, "", List.new(), line)
@@ -1489,7 +1489,7 @@ impl PyInterp:
         self.frame_vals.push(PyList { items: vals })
         self.depth = self.depth + 1
         self.ret = pv_none()
-        let _ = self.exec_block(node)
+        self.exec_block(node)
         self.depth = self.depth - 1
         let _n = self.frame_names.pop()
         let _v = self.frame_vals.pop()
@@ -1726,7 +1726,7 @@ impl PyInterp:
         if kind == N_EXPR:
             if self.nodes[self.nodes[node].a].kind == N_UNSUPPORTED: self.note(line, "a '" ++ self.nodes[self.nodes[node].a].s ++ "' statement is not evaluated")
             else:
-                let _ = self.eval(self.nodes[node].a)
+                self.eval(self.nodes[node].a)
             return PY_NORMAL
         if kind == N_ASSIGN:
             let value = self.eval(self.nodes[node].b)
@@ -1737,7 +1737,7 @@ impl PyInterp:
             let value = self.eval(self.nodes[node].b)
             if current.k == V_LIST and self.nodes[node].s == "+":
                 // `list += other` grows the list in place.
-                let _ = self.call_method(current, "extend", py_one(value), line)
+                self.call_method(current, "extend", py_one(value), line)
                 return PY_NORMAL
             var result = pv_unknown()
             if self.nodes[node].s == "+":
@@ -1817,7 +1817,7 @@ impl PyInterp:
     mut fn run_method(name: &str) -> bool:
         for i in 0..self.method_names.len():
             if self.method_names[i] != name: continue
-            let _ = self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
+            self.call_def(self.method_nodes[i], List.new(), self.nodes[self.method_nodes[i]].line)
             return true
         false
 
@@ -1855,14 +1855,14 @@ fn recipe_interp(recipe: &str, env: &RecipeEnv) -> (PyInterp, str):
         if tree.nodes[t].kind == N_ASSIGN: top_assigns.push(t)
     ip.nodes = move tree.nodes
     for t in top_assigns:
-        let _ = ip.exec(t)
+        ip.exec(t)
     // The class body is statements too (`default_options = {…}` then
     // `default_options["fPIC"] = True`): run in order, and what they bind
     // is what `self.<name>` finds.
     ip.frame_names.push(PyNames { items: List.new() })
     ip.frame_vals.push(PyList { items: List.new() })
     for k in class_body:
-        let _ = ip.exec(k)
+        ip.exec(k)
     let class_frame: i32 = (ip.frame_names.len() - 1) as i32
     for i in 0..ip.frame_names[class_frame].items.len():
         let name = ip.frame_names[class_frame].items[i]

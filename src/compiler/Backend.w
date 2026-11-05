@@ -163,13 +163,13 @@ impl Zcu:
             if rc != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(codegen_failure_message(f"error: code generation failed for unit {k}", cg.codegen_error_detail))
-                let _ = pipeline.finish()
+                pipeline.finish()
                 return 1
             codegen_units_apply_global_ownership(cg.llmod, k)
             if keep_bitcode and wl_write_bitcode(cg.llmod, f"{output_path}.u{k}.gen.bc") != 0:
                 self.last_sema = cg.take_sema()
                 runtime_eprint(f"error: unit bitcode write failed for unit {k}")
-                let _ = pipeline.finish()
+                pipeline.finish()
                 return 1
             let unit_context = cg.context
             let unit_module = cg.llmod

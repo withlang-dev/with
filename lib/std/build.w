@@ -1654,7 +1654,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
             if self.mkdir_all(output_path) != 0:
                 return tool_tar_extract_fail("could not create directory entry: " ++ output_path)
             if mode > 0:
-                let _ = self.chmod(output_path, mode as i32)
+                self.chmod(output_path, mode as i32)
         else if typeflag == 50 as u8:
             let link_name = if pending_link.len() > 0: pending_link else: tool_tar_field_str(&archive, 157, 100)
             pending_link = ""
@@ -1686,7 +1686,7 @@ pub fn ToolFs.extract_tar(self: &Self, archive_path: &str, output_dir: &str) -> 
             if output.close() != 0:
                 return tool_tar_extract_fail("could not write file entry: " ++ output_path)
             if mode > 0:
-                let _ = self.chmod(output_path, mode as i32)
+                self.chmod(output_path, mode as i32)
         else:
             return tool_tar_extract_fail(f"unsupported tar entry type {typeflag as i32} for " ++ raw_name)
         let consumed = if typeflag == 48 as u8 or typeflag == 0 as u8: size else: 0
@@ -2788,7 +2788,7 @@ fn build_download_action(ctx: ActionCtx) -> i32:
     let tmp_path = output_path ++ ".download.tmp"
     let why = ctx.fetch_url(cmd_dir, url, tmp_path, download_ms)
     if why.len() > 0:
-        let _ = fs.remove_file(tmp_path)
+        fs.remove_file(tmp_path)
         ctx.diagnostics().error(ctx.target_name() ++ ": could not fetch " ++ url ++ ": " ++ why)
     if fs.rename(tmp_path, output_path) != 0:
         ctx.diagnostics().error(ctx.target_name() ++ ": could not publish: " ++ output_path)

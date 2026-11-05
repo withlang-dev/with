@@ -1416,7 +1416,6 @@ impl CCodegen:
         false
 
     fn payload_enum_variant_field(variant_index: i32) -> str:
-        let _ = self
         f"payload{variant_index}"
 
     // The member path from an enum value to payload field `field_idx` of
@@ -1729,7 +1728,6 @@ impl CCodegen:
         if self.sema.get_type_kind(resolved) == TypeKind.TY_FN: true else: false
 
     fn fat_thunk_name(fn_sym: i32, canon_tid: i32) -> str:
-        let _ = self
         f"__with_fn_thunk_{fn_sym}_{canon_tid}"
 
     // Materialize a named function as a fat fn value: register the static
@@ -1829,7 +1827,6 @@ impl CCodegen:
         od
 
     fn storage_copy_assignment(dst_place: &str, rval: &str) -> str:
-        let _ = self
         "    " ++ cc_lbrace() ++ " __typeof__(" ++ rval ++ ") __tmp = " ++ rval ++ "; memcpy(&(" ++ dst_place ++ "), &__tmp, sizeof(" ++ dst_place ++ ") < sizeof(__tmp) ? sizeof(" ++ dst_place ++ ") : sizeof(__tmp)); " ++ cc_rbrace()
 
     fn named_struct_tid(type_name: &str) -> i32:
@@ -2936,7 +2933,6 @@ impl CCodegen:
         out
 
     fn place_has_downcast(body: &MirBody, place_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         let start = body.place_proj_starts[place_id]
@@ -3116,7 +3112,6 @@ impl CCodegen:
         self.local_declared_tid(body, local_id)
 
     fn place_is_direct_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_locals[place_id] != local_id:
@@ -3126,7 +3121,6 @@ impl CCodegen:
         true
 
     fn place_uses_local(body: &MirBody, place_id: i32, local_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_locals[place_id] == local_id:
@@ -4569,7 +4563,6 @@ impl CCodegen:
         body.operand_d0[first_arg]
 
     fn place_same(body: &MirBody, a: i32, b: i32) -> bool:
-        let _ = self
         if a < 0 or b < 0:
             return false
         if a >= body.place_locals.len() or b >= body.place_locals.len():
@@ -5651,23 +5644,12 @@ impl CCodegen:
         result
 
     fn infer_builtin_call_name(body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = self
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         ""
 
     fn infer_print_call_name(body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = self
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         ""
 
     fn extern_call_name(sym: i32, body: &MirBody, args_id: i32, dest_place: i32) -> str:
-        let _ = body
-        let _ = args_id
-        let _ = dest_place
         self.extern_sym_c_name(sym)
 
     mut fn sig_index_for_sym(fn_sym: i32) -> i32:
@@ -6354,7 +6336,6 @@ impl CCodegen:
         fallback
 
     mut fn resolve_call_callee_text(body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> str:
-        let _ = bb
         self.callee_is_str_builtin_ref = 0
         if body.call_requires_contract(args_id):
             return self.fn_c_name(body.call_mono_sym(args_id))
@@ -6420,7 +6401,6 @@ impl CCodegen:
 
     mut fn call_return_tid(body: &MirBody, bb: i32, callee_operand: i32, args_id: i32, dest_place: i32) -> i32:
         let fallback = self.place_local_tid(body, dest_place)
-        let _ = bb
         if body.call_requires_contract(args_id):
             let sig_idx = body.call_sig_index(args_id)
             if sig_idx >= 0:
@@ -8742,7 +8722,6 @@ impl CCodegen:
             kind = self.call_builtin_kind(body, callee_operand, args_id, dest_place)
         if kind == CcBuiltin.NONE:
             return ""
-        let _ = bb
         let argc = self.call_arg_count(body, args_id)
         let ret_tid = self.call_builtin_ret_tid(body, callee_operand, args_id, dest_place)
         let has_ret = (self.is_void_tid(ret_tid) == false) as i32
@@ -8884,7 +8863,6 @@ impl CCodegen:
         self.field_cache_record(base_resolved, field_sym, tid)
 
     fn place_is_single_field(body: &MirBody, place_id: i32) -> bool:
-        let _ = self
         if place_id < 0 or place_id >= body.place_locals.len():
             return false
         if body.place_proj_counts[place_id] != 1:
@@ -9135,7 +9113,6 @@ impl CCodegen:
         raw_field_tid
 
     fn is_unit_rvalue(body: &MirBody, rval_id: i32) -> bool:
-        let _ = self
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return false
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
@@ -9154,7 +9131,6 @@ impl CCodegen:
         false
 
     fn rvalue_direct_local_id(body: &MirBody, rval_id: i32) -> i32:
-        let _ = self
         if rval_id < 0 or rval_id >= body.rval_kinds.len():
             return -1
         if body.rval_kinds[rval_id] != RvalueKind.RK_USE:
@@ -9474,7 +9450,6 @@ impl CCodegen:
             let callee = self.resolve_call_callee_text(body, bb, d0, d1, d2)
             let ret_tid = self.call_return_tid(body, bb, d0, d1, d2)
             if callee == "/*unresolved_call*/" or callee == "/*ambiguous_call*/" or callee == "/*ambiguous_method*/":
-                let _ = ret_tid
                 return "    abort();"
             self.call_lends = List.new()
             var args = if self.callee_is_str_builtin_ref != 0: self.builtin_method_ref_args_text(body, d1) else: self.call_args_text(body, d1, d0)
@@ -10587,11 +10562,11 @@ impl CCodegen:
                 let recv_tid = self.operand_tid_no_infer(body, recv_operand)
                 let value_tid = self.hashmap_value_tid(recv_tid)
                 if value_tid != 0 and self.is_void_tid(value_tid) == false:
-                    let _ = self.option_ref_tid_for_payload(value_tid)
+                    self.option_ref_tid_for_payload(value_tid)
                 let dest_place = body.term_data2(bb)
                 let dst_tid = self.place_local_tid(body, dest_place)
                 if dst_tid != 0 and self.is_void_tid(dst_tid) == false and self.is_scalar_like_tid(dst_tid) == false:
-                    let _ = self.option_ref_tid_for_payload(dst_tid)
+                    self.option_ref_tid_for_payload(dst_tid)
 
     mut fn local_receives_ref(body: &MirBody, local_id: i32) -> bool:
         self.local_ref_target_tid(body, local_id) != 0
@@ -10728,7 +10703,6 @@ impl CCodegen:
         false
 
     fn operand_is_int_const(body: &MirBody, operand_id: i32, value: i64) -> bool:
-        let _ = self
         if operand_id < 0 or operand_id >= body.operand_kinds.len():
             return false
         if body.operand_kinds[operand_id] != OperandKind.OK_CONSTANT:
@@ -10930,15 +10904,12 @@ impl CCodegen:
         if sig_idx >= 0: self.sema.sig_get_param_count(sig_idx) else: 0
 
     fn closure_fn_name(idx: i32) -> str:
-        let _ = self
         f"__with_closure_{idx}"
 
     fn closure_env_struct(idx: i32) -> str:
-        let _ = self
         f"struct __with_env_{idx}"
 
     fn closure_cell_struct(idx: i32) -> str:
-        let _ = self
         f"struct __with_cell_{idx}"
 
     fn closure_body_at(idx: i32) -> &MirBody:

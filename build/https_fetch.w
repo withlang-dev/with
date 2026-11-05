@@ -54,7 +54,7 @@ fn probe(url: &str) -> i32:
     if fd < 0:
         print("could not connect to " ++ target)
         return 1
-    let _ = socket_close(fd)
+    socket_close(fd)
     0
 
 fn main -> i32:

@@ -2073,7 +2073,7 @@ fn run_validate_all_async_action(ctx: ActionCtx) -> i32:
     if vr.rc != 0:
         ctx.diagnostics().error(f"validate-all-async: {count} files, rc={vr.rc}\n" ++ fs.read_text(build_project_join(out_dir, "validate.stderr")))
     print(f"validate-all-async: {count} files ok")
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
@@ -2119,7 +2119,7 @@ fn run_debug_alloc_tests_action(ctx: ActionCtx) -> i32:
     let cr = ctx.process_runner().run_capture_cwd(check_args, cout, cerr, lane_timeout_ms, root)
     if cr.rc != 0:
         ctx.diagnostics().error(f"debug-alloc-tests: lane failed rc={cr.rc}\n" ++ cr.stdout)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // D51 stage 10 (ruling §63): the foreign-contract view over
@@ -2232,7 +2232,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
         ctx.diagnostics().error("uat-tests: missing compiler input")
     let fs = ctx.fs()
     let out_dir = ctx.output()
-    let _ = fs.remove_tree(out_dir)
+    fs.remove_tree(out_dir)
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("uat-tests: could not create output dir: " ++ out_dir)
     if fs.copy_tree("test/uat/uat", build_project_join(out_dir, "uat")) != 0:
@@ -2245,7 +2245,7 @@ fn run_uat_tests_action(ctx: ActionCtx) -> i32:
         eprint(f"error: uat-tests: `with uat` exited {rc}; the planted failures make 1 the expected status:\n" ++ report)
         errors = errors + 1
     let normalized = uat_tests_normalize_host(uat_tests_strip_timings(report))
-    let _ = fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
+    fs.write_text(build_project_join(out_dir, "report.normalized"), normalized)
     let expected = fs.read_text("test/uat/expected.txt")
     if normalized != expected:
         eprint("error: uat-tests: the report differs from test/uat/expected.txt; actual: " ++ build_project_abs(root, build_project_join(out_dir, "report.normalized")))
@@ -2272,8 +2272,8 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
     let fs = ctx.fs()
     let report_rel = ctx.output()
     let out_dir = build_project_dirname(report_rel)
-    let _ = fs.remove_tree(out_dir)
-    let _ = fs.remove_tree("out/uat")
+    fs.remove_tree(out_dir)
+    fs.remove_tree("out/uat")
     if fs.mkdir_all(out_dir) != 0:
         ctx.diagnostics().error("release-uat: could not create output dir: " ++ out_dir)
     let root = ctx.project_info().project_root()
@@ -2306,7 +2306,7 @@ fn run_release_uat_action(ctx: ActionCtx) -> i32:
         if verdict.contains(" FAIL "):
             failed = failed + 1
         if stamp.len() > 0:
-            let _ = fs.write_text(build_project_join(out_dir, name ++ stamp), verdict.trim() ++ "\n")
+            fs.write_text(build_project_join(out_dir, name ++ stamp), verdict.trim() ++ "\n")
     if result.rc != 0 or failed > 0:
         eprint(f"error: release-uat: `with uat` exited {result.rc} with {failed} failing scenario(s); stderr: " ++ build_project_abs(root, build_project_join(out_dir, "report.stderr")))
         return 1
@@ -2372,7 +2372,7 @@ fn run_contract_view_tests_action(ctx: ActionCtx) -> i32:
     if errors > 0:
         return 1
     print(f"contract-view-tests: {checked} fixtures; every audit verdict, needle and snapshot agreed")
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // Drop-exactly-once audit matrix (tools/drop_audit.w — the repo-committed
@@ -2404,8 +2404,7 @@ fn run_drop_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"drop-audit: regressions vs baseline (rc={ar.rc})\n" ++ report)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
-    let _ = report
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // tools/rt_decl_audit.w: every `extern fn with_*` declaration in the tree
@@ -2540,7 +2539,7 @@ fn run_rt_decl_audit_action(ctx: ActionCtx) -> i32:
     if ar.rc != 0:
         ctx.diagnostics().error(f"rt-decl-audit: runtime declarations diverge (rc={ar.rc})\n" ++ fs.read_text(aout_rel) ++ fs.read_text(aerr_rel))
     print("rt-decl-audit: " ++ build_trim_trailing_line_endings(fs.read_text(aout_rel)))
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 // Move-checker verdict matrix (tools/move_audit.w — the compile-time analog of
@@ -2574,8 +2573,7 @@ fn run_move_audit_action(ctx: ActionCtx) -> i32:
     let report = fs.read_text(aout_rel)
     if ar.rc != 0:
         ctx.diagnostics().error(f"move-audit: cells disagree with ground truth (rc={ar.rc})\n" ++ report)
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
-    let _ = report
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 fn complexity_allocation_count(report: &str, span: &str) -> i32:
@@ -3101,7 +3099,7 @@ fn run_deep_debug_tool_tests_action(ctx: ActionCtx) -> i32:
     // this unit is a red lane, not a note.
     if deep_debug_analyze_expect(ctx, root, compiler, ownership_abs, out_dir, "analyze-receiver-surface", "audit:receiver-surface", "receiver-surface-audit: facts=") != 0:
         return 1
-    let _ = fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
+    fs.write_text(build_project_join(out_dir, ".stamp"), "ok")
     0
 
 pub fn build(ctx: BuildCtx) -> Build:

@@ -314,16 +314,16 @@ fn emitc_collect_exports_from_text(ctx: &ActionCtx, text: &str, source_path: &st
             if line.starts_with("pub fn ") or line.starts_with("pub unsafe fn "):
                 let fn_sig = emitc_parse_export_function(pending_symbol, line)
                 if fn_sig.ok == 0:
-                    let _ = emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
+                    emitc_fail(ctx, "could not parse c_export signature for " ++ pending_symbol ++ " in " ++ source_path)
                     return List.new()
                 exports.push(fn_sig)
                 pending_symbol = ""
                 continue
             if line.len() > 0 and not line.starts_with("//"):
-                let _ = emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
+                emitc_fail(ctx, "c_export is not followed by a function in " ++ source_path ++ ": " ++ pending_symbol)
                 return List.new()
     if pending_symbol.len() > 0:
-        let _ = emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
+        emitc_fail(ctx, "unterminated c_export in " ++ source_path ++ ": " ++ pending_symbol)
         return List.new()
     exports
 
@@ -358,7 +358,7 @@ fn emitc_collect_public_abi_from_text(ctx: &ActionCtx, text: &str, source_path: 
             continue
         let fn_sig = emitc_parse_export_function(name, line)
         if fn_sig.ok == 0:
-            let _ = emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
+            emitc_fail(ctx, "could not parse public ABI signature for " ++ name ++ " in " ++ source_path)
             return (false, List.new())
         exports.push(fn_sig)
     (true, exports)
@@ -372,7 +372,7 @@ fn emitc_collect_public_abi(ctx: &ActionCtx, sources: List[str]) -> (bool, List[
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
-            let _ = emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
+            emitc_fail(ctx, "could not read source for ABI scan: " ++ source_path)
             return (false, List.new())
         let (ok, found) = emitc_collect_public_abi_from_text(ctx, text, source_path)
         if not ok:
@@ -389,7 +389,7 @@ fn emitc_collect_exports(ctx: &ActionCtx, sources: List[str]) -> List[EmitCFunct
         let source_path = sources[si]
         let text = if fs.exists(source_path): fs.read_text(source_path) else: ""
         if text.len() == 0:
-            let _ = emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
+            emitc_fail(ctx, "could not read source for export scan: " ++ source_path)
             return List.new()
         var exports = emitc_collect_exports_from_text(ctx, text, source_path)
         if exports.len() == 0:

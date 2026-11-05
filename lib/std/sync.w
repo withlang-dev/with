@@ -288,7 +288,7 @@ impl[T] Drop for RwReadGuard[T]:
     move fn drop():
         let state = self.ptr as *mut RwLockState
         let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
-        let _ = (unsafe *word).fetch_sub(1, .Release)
+        (unsafe *word).fetch_sub(1, .Release)
 
 impl[T] Drop for RwWriteGuard[T]:
     move fn drop():
@@ -366,7 +366,7 @@ pub fn Condvar.wait[T](self: &Self, lock: &Mutex[T]) -> Unit:
     let state = self.ptr as *mut CondvarState
     let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
     let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
-    let _ = (unsafe *waiters).fetch_add(1, .AcqRel)
+    (unsafe *waiters).fetch_add(1, .AcqRel)
     unsafe { sync_mutex_unlock_state(lock.ptr as *mut MutexState) }
     while true:
         let available = (unsafe *signals).load(.Acquire)
@@ -375,7 +375,7 @@ pub fn Condvar.wait[T](self: &Self, lock: &Mutex[T]) -> Unit:
                 Ok(_) => break
                 Err(_) => ()
         sync_wait_for_progress()
-    let _ = (unsafe *waiters).fetch_sub(1, .AcqRel)
+    (unsafe *waiters).fetch_sub(1, .AcqRel)
     unsafe { sync_mutex_lock_state(lock.ptr as *mut MutexState) }
 
 pub fn Condvar.notify_one(self: &Self) -> Unit:
@@ -383,7 +383,7 @@ pub fn Condvar.notify_one(self: &Self) -> Unit:
     let waiters = (&raw mut (unsafe *state).waiters as *mut i32) as *mut Atomic[i32]
     let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
     if (unsafe *waiters).load(.Acquire) > 0:
-        let _ = (unsafe *signals).fetch_add(1, .Release)
+        (unsafe *signals).fetch_add(1, .Release)
 
 pub fn Condvar.notify_all(self: &Self) -> Unit:
     let state = self.ptr as *mut CondvarState
@@ -391,7 +391,7 @@ pub fn Condvar.notify_all(self: &Self) -> Unit:
     let signals = (&raw mut (unsafe *state).signals as *mut i32) as *mut Atomic[i32]
     let count = (unsafe *waiters).load(.Acquire)
     if count > 0:
-        let _ = (unsafe *signals).fetch_add(count, .Release)
+        (unsafe *signals).fetch_add(count, .Release)
 
 impl Drop for Condvar:
     move fn drop():

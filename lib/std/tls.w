@@ -1111,7 +1111,7 @@ fn tls_connect_timeout(hostname: &str, port: i32, connect_ms: i32, idle_ms: i32)
         return TlsConn.new(-1)
     tls_trace(f"TCP connected to {hostname}:{port}; idle bound {idle_ms} ms")
     if connect_ms > 0 or idle_ms > 0:
-        let _ = set_timeout(fd, idle_ms)
+        set_timeout(fd, idle_ms)
     var conn = TlsConn.new(fd)
     let r = unsafe { tls_handshake(&raw mut conn as *mut TlsConn, hostname) }
     if r < 0:

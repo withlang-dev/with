@@ -3476,7 +3476,7 @@ fn sdk_list_fail() -> SdkList:
 // `$(name)` references expanded recursively; `@NAME@` substituted.
 fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_srcdir: &str, depth: i32) -> SdkText:
     if depth > 32:
-        let _ = sdk_fail(ctx, "Makefile.am variable expansion too deep: " ++ text)
+        sdk_fail(ctx, "Makefile.am variable expansion too deep: " ++ text)
         return sdk_text_fail()
     var out = ""
     var i = 0
@@ -3496,7 +3496,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
                     return sdk_text_fail()
                 out = out ++ inner.text
             else:
-                let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am references $(" ++ name ++ "), which it does not define")
+                sdk_fail(ctx, "mingw-w64-crt/Makefile.am references $(" ++ name ++ "), which it does not define")
                 return sdk_text_fail()
             i = j + 1
             continue
@@ -3509,7 +3509,7 @@ fn sdk_make_expand(ctx: &ActionCtx, vars: &List[SdkMakeVar], text: &str, top_src
                 // default configure (sdk_mingw_subst_known).
                 let name = text.slice((i + 1) as i64, j as i64)
                 if not sdk_mingw_subst_known(name):
-                    let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am needs configure substitution @" ++ name ++ "@, which this build does not define (sdk_mingw_subst_known)")
+                    sdk_fail(ctx, "mingw-w64-crt/Makefile.am needs configure substitution @" ++ name ++ "@, which this build does not define (sdk_mingw_subst_known)")
                     return sdk_text_fail()
                 i = j + 1
                 continue
@@ -3560,7 +3560,7 @@ fn sdk_words(text: &str) -> List[str]:
 // A library's compiled members: its `_SOURCES` minus headers and .def inputs.
 fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name: &str, top_srcdir: &str) -> SdkList:
     if not sdk_make_var_has(vars, var_name):
-        let _ = sdk_fail(ctx, "mingw-w64-crt/Makefile.am defines no " ++ var_name)
+        sdk_fail(ctx, "mingw-w64-crt/Makefile.am defines no " ++ var_name)
         return sdk_list_fail()
     let expanded = sdk_make_expand(ctx, vars, sdk_make_var_get(vars, var_name), top_srcdir, 0)
     if not expanded.ok:
@@ -3572,7 +3572,7 @@ fn sdk_mingw_compiled_sources(ctx: &ActionCtx, vars: &List[SdkMakeVar], var_name
         if w.ends_with(".c") or w.ends_with(".S"):
             out.push(sdk_owned_text(w))
         else if not (w.ends_with(".h") or w.ends_with(".def") or w.ends_with(".def.in")):
-            let _ = sdk_fail(ctx, var_name ++ " lists " ++ w ++ ", which this build does not know how to compile")
+            sdk_fail(ctx, var_name ++ " lists " ++ w ++ ", which this build does not know how to compile")
             return sdk_list_fail()
     SdkList { ok: true, items: out }
 
@@ -3683,11 +3683,11 @@ fn sdk_llvm_tool(ctx: &ActionCtx, tools_prefix: &str, tool_dir: &str, name: &str
         let sibling = sdk_tool(tools_prefix, family[i])
         if fs.exists(sibling):
             if fs.copy_file(sibling, staged) != 0:
-                let _ = sdk_fail(ctx, "could not stage " ++ name ++ " from " ++ sibling)
+                sdk_fail(ctx, "could not stage " ++ name ++ " from " ++ sibling)
                 return ""
             let _chmod = fs.chmod(staged, 0o755)
             return sdk_abs(root, staged)
-    let _ = sdk_fail(ctx, "the SDK at " ++ tools_prefix ++ " has no " ++ name ++ " (nor any binary of its multicall family)")
+    sdk_fail(ctx, "the SDK at " ++ tools_prefix ++ " has no " ++ name ++ " (nor any binary of its multicall family)")
     ""
 
 // The compile flags every mingw-w64 source gets here beyond Makefile.am's:
@@ -3718,7 +3718,7 @@ fn sdk_object_name(source: &str) -> str:
 fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[str], flags: &List[str], obj_dir: &str, width: i32) -> SdkList:
     let root = ctx.project_info().project_root()
     if ctx.fs().mkdir_all(obj_dir) != 0:
-        let _ = sdk_fail(ctx, "could not create " ++ obj_dir)
+        sdk_fail(ctx, "could not create " ++ obj_dir)
         return sdk_list_fail()
     var jobs: List[ParJob] = List.new()
     var objects: List[str] = List.new()
@@ -3739,7 +3739,7 @@ fn sdk_compile_all(ctx: &ActionCtx, clang: &str, crt_dir: &str, sources: &List[s
     for i in 0..rcs.len():
         if rcs[i] != 0:
             failed = true
-            let _ = sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
+            sdk_fail(ctx, f"compiling {sources[i]} failed with exit code {rcs[i]}: " ++ sdk_read_or_empty(ctx, objects[i] ++ ".stderr"))
     if failed:
         return sdk_list_fail()
     SdkList { ok: true, items: objects }
@@ -3817,7 +3817,7 @@ fn sdk_mingw_def(ctx: &ActionCtx, clang: &str, crt_dir: &str, arch_name: &str, n
         out = out ++ sdk_strip_stdcall_suffix(lines[i]) ++ "\n"
     let def = sdk_join(work_dir, name ++ ".def")
     if fs.write_text(def, out) != 0:
-        let _ = sdk_fail(ctx, "could not write " ++ def)
+        sdk_fail(ctx, "could not write " ++ def)
         return ""
     def
 

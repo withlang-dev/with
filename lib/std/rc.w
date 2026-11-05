@@ -71,7 +71,7 @@ impl[T] Arc[T]:
     pub fn clone() -> Arc[T]:
         let control = self.ptr as *mut RcControl
         let strong = &raw mut (unsafe *control).strong as *mut Atomic[i64]
-        let _ = (unsafe *strong).fetch_add(1, .AcqRel)
+        (unsafe *strong).fetch_add(1, .AcqRel)
         Arc { ptr: self.ptr }
 
     pub fn strong_count() -> i64:

@@ -89,12 +89,12 @@ fn compilation_ensure_output_dir(path: &str) -> bool:
 fn compilation_remove_file_best_effort(path: &str):
     if path.len() == 0:
         return
-    let _ = runtime_remove_file(path)
+    runtime_remove_file(path)
 
 fn compilation_remove_tree_best_effort(path: &str):
     if path.len() == 0:
         return
-    let _ = runtime_remove_tree(path)
+    runtime_remove_tree(path)
 
 fn compilation_remove_dsym_best_effort(bin_path: &str):
     if bin_path.len() == 0:
@@ -525,7 +525,7 @@ impl Compilation:
             return self.compile_file(wi_path)
         if not self.load_link_bundles():
             return AstPool.new()
-        let _ = bundle_interfaces_register_wi(wi_text)
+        bundle_interfaces_register_wi(wi_text)
         var taken_zcu = move self.zcu
         taken_zcu.interface_eager = true
         self.zcu = taken_zcu
@@ -829,8 +829,7 @@ impl Compilation:
         pool
 
     mut fn resolve_file(path: &str, emit_resolve_diags: bool) -> &ResolveResult:
-        let _ = emit_resolve_diags
-        let _ = self.compile_file(path)
+        self.compile_file(path)
         &self.zcu.last_resolved
 
     mut fn dump_project_info_file(source_path: &str) -> str:
@@ -1256,7 +1255,7 @@ impl Compilation:
         let prepared_pool = self.prepare_pool_after_typecheck_hooks(pool, source_path)
         if prepared_pool.decl_count() == 0:
             return false
-        let _ = self.run_mir_lower(prepared_pool)
+        self.run_mir_lower(prepared_pool)
         not self.has_errors()
 
     mut fn check_file_with_build_settings(source_path: &str, include_paths: &List[str], defines: &List[str], link_libs: &List[str]) -> bool:
@@ -1853,7 +1852,7 @@ impl Compilation:
 
     mut fn print_mir(pool: &AstPool) -> bool:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return false
         print_mir_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
@@ -1867,7 +1866,7 @@ impl Compilation:
 
     mut fn dump_drop_state(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         dump_drop_state_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
@@ -1880,7 +1879,7 @@ impl Compilation:
 
     mut fn trace_place(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         trace_place_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
@@ -1893,7 +1892,7 @@ impl Compilation:
 
     mut fn explain_mir_origin(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         explain_mir_origin_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
@@ -1906,7 +1905,7 @@ impl Compilation:
 
     mut fn trace_ownership(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         trace_ownership_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
@@ -1919,7 +1918,7 @@ impl Compilation:
 
     mut fn dump_drop_plan(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         dump_drop_plan_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
@@ -1932,7 +1931,7 @@ impl Compilation:
 
     mut fn dump_place_map(pool: &AstPool) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         dump_place_map_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema)
@@ -2012,7 +2011,7 @@ impl Compilation:
                 return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
             return CompilerAnalysisResult { text: "error: analysis compilation failed\n", status: 1, needs_codegen: false, codegen_query: "", report: AnalysisReport.init() }
         let active = self.active_pool(pool)
-        let _ = self.run_mir_lower(active)
+        self.run_mir_lower(active)
         if self.zcu.last_mir_module.body_count() == 0:
             if after_mir and self.zcu.last_sema.ast.decl_count() > 0:
                 return compiler_analysis_run(self.zcu.last_sema, self.zcu.last_mir_module, self.zcu.pool, self.zcu.current_source_path, self.zcu.current_source_text, inner_request, self.zcu.diagnostics)
@@ -2035,7 +2034,7 @@ fn compiler_analyze_file(source_path: &str, request: &str) -> CompilerAnalysisRe
 impl Compilation:
     mut fn trace_cleanup_edge(pool: &AstPool, spec: &str) -> str:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             return ""
         trace_cleanup_edge_module(self.zcu.last_mir_module, self.zcu.pool, self.zcu.last_sema, spec)
@@ -2050,7 +2049,7 @@ impl Compilation:
         let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return "compile failed before ownership validation"
-        let _ = self.run_mir_lower(pool)
+        self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             if self.zcu.diagnostics.has_errors():
                 return "diagnostics present before ownership validation"
@@ -2064,7 +2063,7 @@ impl Compilation:
         let pool = self.compile_entry_file(source_path)
         if pool.decl_count() == 0:
             return "compile failed before validation"
-        let _ = self.run_mir_lower(pool)
+        self.run_mir_lower(pool)
         if self.zcu.last_mir_module.body_count() == 0:
             if self.zcu.diagnostics.has_errors():
                 return "diagnostics present before MIR validation"
@@ -2076,7 +2075,7 @@ impl Compilation:
 
     mut fn dump_async_mir(pool: &AstPool) -> str:
         if self.zcu.last_async_mir_module.body_count() == 0:
-            let _ = self.run_async_mir_lower(pool)
+            self.run_async_mir_lower(pool)
         if self.zcu.last_async_mir_module.body_count() == 0:
             return ""
         let text = dump_async_mir_module(self.zcu.last_async_mir_module, self.zcu.pool)
@@ -2286,7 +2285,7 @@ impl Compilation:
         self.zcu.set_codegen_snapshot(mir_mod, "", async_mod, "")
 
     mut fn run_async_mir_lower(pool: &AstPool):
-        let _ = self.run_mir_lower(pool)
+        self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
             var mir_snapshot = move self.zcu.last_mir_module
             self.zcu.set_codegen_snapshot(mir_snapshot, with_str_clone_ref(self.zcu.last_mir_dump), AsyncMirModule.init(), "")
@@ -2294,7 +2293,7 @@ impl Compilation:
 
     mut fn ensure_codegen_mir(pool: &AstPool) -> bool:
         if self.zcu.last_mir_module.body_count() == 0:
-            let _ = self.run_mir_lower(pool)
+            self.run_mir_lower(pool)
         if self.zcu.diagnostics.has_errors():
             return false
         self.zcu.last_mir_module.body_count() > 0

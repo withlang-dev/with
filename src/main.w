@@ -675,7 +675,7 @@ fn emit_c_header_next_to(comp: &Compilation, artifact_path: &str) -> Unit:
     let header = sema.cheader_generate(c_header_guard_for(h_path))
     if header.len() == 0:
         return
-    let _ = with_fs_write_file(h_path, header)
+    with_fs_write_file(h_path, header)
 
 fn cli_one_liner_source_name(mode: i32, count: i32) -> str:
     let name = cli_one_liner_mode_name(mode)
@@ -794,8 +794,6 @@ fn cli_one_liner_out_dir -> str:
     with_user_cache_dir() ++ "/with/one-liners"
 
 fn run_one_liner_command(argc: i32, one: &CliOneLiner, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32, debug_info: bool) -> i32:
-    let _ = argc
-    let _ = debug_info
     if not one.ok:
         with_eprint(one.error_msg)
         return 1
@@ -2691,7 +2689,6 @@ fn build_graph_run_cli_capture(root: &str, target: &BuildGraphTarget, compiler_p
     let rc = with_exec_argv_capture(argv, stdout_path, stderr_path, timeout_ms)
     let out_text = with_fs_read_file(stdout_path)
     let err_text = with_fs_read_file(stderr_path)
-    let _ = label
     if rc == 0:
         let _remove_stdout = with_fs_remove_file(stdout_path)
         let _remove_stderr = with_fs_remove_file(stderr_path)
@@ -3514,13 +3511,13 @@ fn repo_lock_acquire(target_name: &str) -> bool:
         return true
     let lock_dir = repo_lock_path()
     let parent = lock_dir.slice(0, lock_dir.len() - "/repo-serial.lock".len())
-    let _ = with_fs_mkdir_p(parent)
+    with_fs_mkdir_p(parent)
     let rc = with_fs_mkdir(lock_dir)
     if rc == 0:
         let owner_file = repo_lock_owner_path()
         let pid = with_getpid()
-        let _ = with_fs_write_file(owner_file, f"target={target_name} pid={pid}")
-        let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+        with_fs_write_file(owner_file, f"target={target_name} pid={pid}")
+        with_setenv_str("WITH_REPO_LOCKED", "1")
         return true
     if with_fs_file_exists(repo_lock_owner_path()) != 0:
         let owner = with_fs_read_file(repo_lock_owner_path())
@@ -3528,12 +3525,12 @@ fn repo_lock_acquire(target_name: &str) -> bool:
         if owner_pid > 0 and owner_pid == with_getpid():
             return true
         if owner_pid > 0 and with_process_alive(owner_pid) == 0:
-            let _ = with_fs_remove_tree(lock_dir)
+            with_fs_remove_tree(lock_dir)
             let rc2 = with_fs_mkdir(lock_dir)
             if rc2 == 0:
                 let pid = with_getpid()
-                let _ = with_fs_write_file(repo_lock_owner_path(), f"target={target_name} pid={pid}")
-                let _ = with_setenv_str("WITH_REPO_LOCKED", "1")
+                with_fs_write_file(repo_lock_owner_path(), f"target={target_name} pid={pid}")
+                with_setenv_str("WITH_REPO_LOCKED", "1")
                 return true
         with_eprint("error: another build is already running: " ++ owner ++ "\n")
     else:
@@ -3546,7 +3543,7 @@ fn repo_lock_release():
         let owner = with_fs_read_file(repo_lock_owner_path())
         let owner_pid = repo_lock_parse_pid(owner)
         if owner_pid == with_getpid():
-            let _ = with_fs_remove_tree(lock_dir)
+            with_fs_remove_tree(lock_dir)
 
 fn build_command_apply_project_target_default(options: BuildCommandOptions, cfg: &ProjectConfig) -> BuildCommandOptions:
     var out = options
@@ -3992,7 +3989,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
     let run_dir = (if scratch.len() > 0: scratch else: link_stage_artifact_root()) ++ f"/with-run.{with_getpid()}.{with_clock_nanos()}"
     let bin_path = comp.build_binary_to_path(source_file, run_dir ++ "/" ++ link_stage_basename(link_stage_output_path_for_source(source_file)))
     if bin_path == "":
-        let _ = build_graph_rt_remove_tree(run_dir)
+        build_graph_rt_remove_tree(run_dir)
         with_eprint("error: run failed")
         return 1
     comp.print_warnings()
@@ -4003,7 +4000,7 @@ fn run_run_command(source_file: &str, selected_target_hint: &str, opt_level: i32
         build_graph_rt_exec_binary(bin_path)
     else:
         build_graph_rt_exec_argv(bin_path ++ "\0" ++ prog_args)
-    let _ = build_graph_rt_remove_tree(run_dir)
+    build_graph_rt_remove_tree(run_dir)
     run_rc
 
 // A wasm program runs through its emitted JS host under node (WITH_NODE
@@ -4628,7 +4625,7 @@ fn parse_test_directives_for_target(target: &str) -> TestDirectives:
                 result.known_issue = line.slice(known_issue_prefix.len(), line.len())
             else if line.starts_with("//! expect-debug-alloc: ") or line.starts_with("//! debug-alloc-filter: "):
                 // tools/debug_drop.w's directives (the debug-alloc lane).
-                let _ = 0
+                {}
             else if line.starts_with("//!"):
                 if unknown_line.len() == 0:
                     unknown_line = line
@@ -4847,7 +4844,6 @@ fn run_test_directive_command(target: &str, directives: &TestDirectives, quiet: 
         emit_test_stage_error(test_check_failure_message(result.rc), target, "check", "")
         emit_test_child_stderr(result.stderr)
         return 1
-    let _ = quiet
     -1
 
 fn test_extra_arg_present(args: &str, wanted: &str) -> bool:
@@ -5151,7 +5147,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         if eq >= 0:
             let name = pair.slice(0, eq)
             saved.push(with_getenv_str(name) ++ "")
-            let _ = with_setenv_str(name, pair.slice(eq + 1, pair.len()))
+            with_setenv_str(name, pair.slice(eq + 1, pair.len()))
         else:
             saved.push("")
     let env_rc = run_test_file_env_applied(target, opt_level, no_std, alloc_mode, runtime_available, prelude_mode, debug_info, verbose, quiet, keep_binary, filter, include_paths, defines, link_libs, link_search_paths, link_rpaths)
@@ -5159,7 +5155,7 @@ fn run_test_file_with_build_settings_inner(target: &str, opt_level: i32, no_std:
         let pair = env_directives.env_pairs[ei]
         let eq = pair.find("=")
         if eq >= 0:
-            let _ = with_setenv_str(pair.slice(0, eq), saved[ei])
+            with_setenv_str(pair.slice(0, eq), saved[ei])
     env_rc
 
 // #2011: `with test --validate-all` first checks a test that is meant to
@@ -5789,7 +5785,6 @@ fn doc_markdown_entry(kind: &str, path: &str, name: &str, detail: &str, source_t
         out = out ++ "```with\n" ++ line ++ "\n```\n\n"
     if detail.len() > 0:
         out = out ++ detail ++ "\n\n"
-    let _ = kind
     out
 
 fn doc_project_root(info: &str) -> str:
@@ -5988,7 +5983,6 @@ fn print_repl_help:
     with_write("Each input line is compiled and run as normal With code. Persistent declarations are rejected until session state is implemented.\n")
 
 fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
-    let _ = argc
     with_write("With REPL\n")
     print_repl_help()
     while true:
@@ -6500,7 +6494,7 @@ fn cli_configure_build_memory_limit() -> i32:
         limit = parsed
         limit_text = raw
     else:
-        let _ = with_setenv_str("WITH_MEMORY_LIMIT_BYTES", limit_text)
+        with_setenv_str("WITH_MEMORY_LIMIT_BYTES", limit_text)
     with_set_memory_limit_bytes(limit)
     0
 

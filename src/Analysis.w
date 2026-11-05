@@ -2161,7 +2161,6 @@ fn analysis_seam_retention_rows(sema: &Sema, body: &MirBody, fn_name: &str, path
     rows
 
 fn analysis_seam_sites(sema: &Sema, mir_mod: &MirModule, source_path: &str, source_text: &str) -> str:
-    let _ = source_path
     var out = "path\toffset\tfn\tclass\ttier\tcontext\tplace\ttype\n"
     let report_lines: List[str] = List.new()
     let counts: List[i32] = List.new()

@@ -472,15 +472,15 @@ impl Codegen:
             if free_fn != 0:
                 let free_args: List[i64] = List.new()
                 free_args.push(data_ptr)
-                let _ = wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(free_args), 1)
+                wl_build_call(self.builder, wl_global_get_value_type(free_fn), free_fn, list_data_i64(free_args), 1)
         if has_sret:
-            let _ = wl_build_store(self.builder, call_val, wl_get_param(wrapper_fn, 0))
-            let _ = wl_build_ret_void(self.builder)
+            wl_build_store(self.builder, call_val, wl_get_param(wrapper_fn, 0))
+            wl_build_ret_void(self.builder)
         else:
             if ret_ty == wl_void_type(self.context):
-                let _ = wl_build_ret_void(self.builder)
+                wl_build_ret_void(self.builder)
             else:
-                let _ = wl_build_ret(self.builder, call_val)
+                wl_build_ret(self.builder, call_val)
 
         self.current_function = saved_fn
         self.current_function_name_sym = saved_fn_name_sym
@@ -529,11 +529,11 @@ impl Codegen:
         self.generate_default_trait_method_for_impl(impl_type_sym, method_idx, impl_node)
 
         while self.type_binding_syms.len() > saved_list_len:
-            let _ = self.type_binding_syms.pop()
+            self.type_binding_syms.pop()
         while self.type_binding_types.len() > saved_list_len:
-            let _ = self.type_binding_types.pop()
+            self.type_binding_types.pop()
         while self.type_binding_sema.len() > saved_list_len:
-            let _ = self.type_binding_sema.pop()
+            self.type_binding_sema.pop()
         self.type_bindings_len = saved_len
 
     mut fn generate_default_trait_method_for_impl(impl_type_sym: i32, method_idx: i32, impl_node: i32):
@@ -790,7 +790,7 @@ impl Codegen:
             if dtm_bb < 0 or dtm_bb >= self.mir_bb_values.len():
                 continue
             wl_position_at_end(self.builder, self.mir_bb_values[dtm_bb])
-            let _ = self.mir_emit_block_or_report(dtm_body, dtm_bb, mangled, body_node)
+            self.mir_emit_block_or_report(dtm_body, dtm_bb, mangled, body_node)
 
         self.mir_terminate_default_unreachable()
         // Synthesized bodies must pass the same cleanup + verification as
@@ -1153,7 +1153,7 @@ impl Codegen:
             wl_position_at_end(self.builder, entry)
             if llvm_ty != 0:
                 self.mir_emit_drop_ptr_for_sema_type(wl_get_param(thunk, 0), llvm_ty, sema_ty)
-            let _ = wl_build_ret_void(self.builder)
+            wl_build_ret_void(self.builder)
             self.current_function = saved_fn
             self.current_function_name_sym = saved_fn_name_sym
             self.current_function_node = saved_fn_node
@@ -1465,14 +1465,13 @@ impl Codegen:
         self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), 1)
 
     mut fn queue_module_runtime_init(name_sym: i32, value_node: i32, result_tid: i32, is_mut: i32) -> bool:
-        let _ = is_mut
         let global_ty = self.sema_type_to_llvm(result_tid)
         if global_ty == 0:
             return false
         // A `Unit` binding has no storage (a void global traps in LLVM): its
         // initializer still runs before main, for its effects.
         if global_ty != wl_void_type(self.context):
-            let _ = self.record_runtime_init_storage_global(name_sym, global_ty)
+            self.record_runtime_init_storage_global(name_sym, global_ty)
             // Runtime-init storage is writable even for `let` bindings, so its
             // heap-owning value registers for the exit drop regardless of mut.
             self.register_module_global_drop(name_sym, result_tid)
@@ -1702,7 +1701,7 @@ impl Codegen:
             if bb < 0 or bb >= self.mir_bb_values.len():
                 continue
             wl_position_at_end(self.builder, self.mir_bb_values[bb])
-            let _ = self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
+            self.mir_emit_block_or_report(init_body, bb, init_label, value_node)
         self.mir_terminate_default_unreachable()
 
     mut fn emit_module_runtime_init_helpers() -> Unit:
@@ -1749,7 +1748,6 @@ impl Codegen:
             self.module_runtime_init_types.push(init_ty)
 
     fn is_collection_runtime_intrinsic(intrinsic: MirIntrinsic) -> bool:
-        let _ = self
         if intrinsic == MirIntrinsic.LIST_MAKE_UNIQUE or intrinsic == MirIntrinsic.MAP_MAKE_UNIQUE or intrinsic == MirIntrinsic.LIST_NEW or intrinsic == MirIntrinsic.LIST_WITH_CAPACITY or intrinsic == MirIntrinsic.LIST_PUSH or intrinsic == MirIntrinsic.LIST_GET or intrinsic == MirIntrinsic.LIST_LEN or intrinsic == MirIntrinsic.LIST_IS_EMPTY or intrinsic == MirIntrinsic.LIST_LEN32 or intrinsic == MirIntrinsic.LIST_LEN64 or intrinsic == MirIntrinsic.LIST_ULEN32 or intrinsic == MirIntrinsic.LIST_SET or intrinsic == MirIntrinsic.LIST_REMOVE or intrinsic == MirIntrinsic.LIST_CLEAR or intrinsic == MirIntrinsic.LIST_POP or intrinsic == MirIntrinsic.LIST_CONTAINS or intrinsic == MirIntrinsic.LIST_JOIN:
             return true
         if intrinsic == MirIntrinsic.MAP_CAPACITY or intrinsic == MirIntrinsic.MAP_SLOT_OCCUPIED or intrinsic == MirIntrinsic.MAP_KEY_AT or intrinsic == MirIntrinsic.MAP_VALUE_AT or intrinsic == MirIntrinsic.MAP_TAKE_AT:
@@ -2355,7 +2353,7 @@ impl Codegen:
         let init = self.try_eval_const_llvm(value_node, resolved as i32)
         if init == 0:
             return false
-        let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
+        self.record_module_binding_global(name_sym, global_ty, init, is_mut)
         true
 
     mut fn gen_module_constant(let_node: i32):
@@ -2384,7 +2382,7 @@ impl Codegen:
             let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
             if global_ty == 0:
                 return
-            let _ = self.declare_module_binding_global(name_sym, global_ty, is_mut)
+            self.declare_module_binding_global(name_sym, global_ty, is_mut)
             return
         if value_node == 0:
             if resolved_binding_ty == 0:
@@ -2397,7 +2395,7 @@ impl Codegen:
             // drop like a `var` (an imported symbol's owner drops it).
             if is_mut != 0 or not self.current_decl_is_imported_module_symbol():
                 self.register_module_global_drop(name_sym, resolved_binding_ty)
-            let _ = self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
+            self.record_module_binding_global(name_sym, global_ty, self.build_default_value(global_ty), is_mut)
             return
 
         // NK_COMPTIME wrapper is already removed by ComptimeTransform.
@@ -2432,7 +2430,7 @@ impl Codegen:
             if null_tk == TypeKind.TY_PTR or null_tk == TypeKind.TY_REF:
                 let global_ty = self.sema_type_to_llvm(null_ty)
                 if global_ty != 0:
-                    let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
+                    self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                     return
         // §4.3d: a vector global is its constant vector when Sema's splat or
         // construction folds, else storage the main wrapper initializes —
@@ -2441,7 +2439,7 @@ impl Codegen:
             let vector_init = self.try_eval_const_llvm(value_node, const_binding_ty as i32)
             if vector_init != 0:
                 let vector_global_ty = self.sema_type_to_llvm(const_binding_ty)
-                let _ = self.record_module_binding_global(name_sym, vector_global_ty, vector_init, is_mut)
+                self.record_module_binding_global(name_sym, vector_global_ty, vector_init, is_mut)
                 return
             if self.queue_module_runtime_init(name_sym, value_node, const_binding_ty as i32, is_mut):
                 return
@@ -2456,7 +2454,7 @@ impl Codegen:
                 if binding_kind == TypeKind.TY_PTR or binding_kind == TypeKind.TY_REF:
                     let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
                     if global_ty != 0 and val == 0:
-                        let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
+                        self.record_module_binding_global(name_sym, global_ty, wl_const_null(global_ty), is_mut)
                         return
             // A binding whose type lowers to a pointer holds a pointer: C's
             // `#define SQLITE_TRANSIENT ((void (*)(void *))-1)` is all ones at
@@ -2465,11 +2463,11 @@ impl Codegen:
             if resolved_binding_ty != 0:
                 let pointer_ty = self.sema_type_to_llvm(resolved_binding_ty)
                 if pointer_ty != 0 and wl_get_type_kind(pointer_ty) == wl_pointer_type_kind():
-                    let _ = self.record_module_binding_global(name_sym, pointer_ty, self.const_int_address(val, pointer_ty), is_mut)
+                    self.record_module_binding_global(name_sym, pointer_ty, self.const_int_address(val, pointer_ty), is_mut)
                     return
             if resolved_binding_ty != 0 and self.sema.get_type_kind(resolved_binding_ty) == TypeKind.TY_FLOAT:
                 let global_ty = self.sema_type_to_llvm(resolved_binding_ty)
-                let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, val as f64), is_mut)
+                self.record_module_binding_global(name_sym, global_ty, wl_const_real(global_ty, val as f64), is_mut)
                 return
             if is_mut == 0:
                 self.const_int_syms.push(name_sym)
@@ -2480,7 +2478,7 @@ impl Codegen:
                 let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
                 if inferred_llvm != 0:
                     global_ty = inferred_llvm
-            let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_int(global_ty, val, 1), is_mut)
+            self.record_module_binding_global(name_sym, global_ty, wl_const_int(global_ty, val, 1), is_mut)
             return
 
         if const_binding_ty != 0:
@@ -2497,7 +2495,7 @@ impl Codegen:
                             if words.ok != 0 and words.overflow == 0:
                                 self.const_int_syms.push(name_sym)
                                 self.const_int_vals.push(words.lo as i64)
-                        let _ = self.record_module_binding_global(name_sym, global_ty, init, is_mut)
+                        self.record_module_binding_global(name_sym, global_ty, init, is_mut)
                         return
 
         // #2043: a string constant's value is Sema's (const_string_value).
@@ -2510,7 +2508,7 @@ impl Codegen:
                 return
             let str_ty = self.struct_llvm_types[st_opt.unwrap()]
             if self.current_decl_is_imported_module_symbol():
-                let _ = self.declare_module_binding_global(name_sym, str_ty, is_mut)
+                self.declare_module_binding_global(name_sym, str_ty, is_mut)
                 return
             let name_str = self.intern.resolve(name_sym)
             let bytes_name = name_str ++ ".__bytes"
@@ -2525,7 +2523,7 @@ impl Codegen:
             fields.push(wl_const_int(wl_i64_type(self.context), text.len(), 1))
             let str_init = wl_const_named_struct(str_ty, list_data_i64(fields), 2)
 
-            let _ = self.define_module_binding_global(name_sym, str_ty, str_init, is_mut)
+            self.define_module_binding_global(name_sym, str_ty, str_init, is_mut)
             return
 
         let list_tid = self.try_resolve_list_new_global_type(value_node, flags)
@@ -2565,7 +2563,7 @@ impl Codegen:
                 let inferred_llvm = self.sema_type_to_llvm(resolved_binding_ty)
                 if inferred_llvm != 0:
                     global_ty = inferred_llvm
-            let _ = self.record_module_binding_global(name_sym, global_ty, wl_const_real_of_string(global_ty, value_text), is_mut)
+            self.record_module_binding_global(name_sym, global_ty, wl_const_real_of_string(global_ty, value_text), is_mut)
             return
 
         let runtime_tid =
@@ -2594,7 +2592,7 @@ impl Codegen:
             if const_init != 0:
                 let const_ty = self.sema_type_to_llvm(resolved_runtime)
                 if const_ty != 0:
-                    let _ = self.record_module_binding_global(name_sym, const_ty, const_init, is_mut)
+                    self.record_module_binding_global(name_sym, const_ty, const_init, is_mut)
                     return
             // D38 Level 0: a bundle object supplies a global's storage AND its
             // value as data; nothing ever runs an initializer for it. A global

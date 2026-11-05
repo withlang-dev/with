@@ -64,7 +64,7 @@ fn only_in(a: &List[str], b: &List[str]) -> List[str]:
 let argv = args()
 if argv.len() < 4: fail("usage: with run tools/gen_diff.w <compiler-a> <compiler-b> <file.w> [query]")
 let query = if argv.len() > 4: argv[4].to_owned() else: "select:kind=declaration".to_owned()
-let _ = mkdir_p("out/tmp")
+mkdir_p("out/tmp")
 let a = run_side(argv[1], argv[3], query, "a")
 let b = run_side(argv[2], argv[3], query, "b")
 let only_a = only_in(&a, &b)

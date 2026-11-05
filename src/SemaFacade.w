@@ -4004,7 +4004,6 @@ impl Sema:
                 self.facade_declare_view_of_param(msig, from)
             // A domain origin (`from domain D`) is put on the method by
             // facade_index_call_effects.
-            let _ = domain
 
     // ── call effects (ruling §33-§38; spec §16.2b.7) ─────────────────────
     //

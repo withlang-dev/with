@@ -1763,7 +1763,7 @@ impl Sema:
                             return
                 else:
                     // Already visited (gray revisit or black). Pop and mark black.
-                    let _ = stack.pop()
+                    stack.pop()
                     color.insert(cur, 2)
 
     mut fn emit_type_cycle_error(cycle_start: i32, cycle_end: i32, closing_edge_node: i32, parent_sym: &HashMap[i32, i32], parent_edge: &HashMap[i32, i32]):
@@ -2255,7 +2255,7 @@ impl Sema:
                 if bi_tp_count > 0:
                     self.register_generic_fn_node(fn_name, node)
                     self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                    let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                    self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                     self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                     for pi in 0..param_count:
                         self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi), self.ast.state.impl_type_params[(bi_tp_meta + 1)], bi_tp_count, bi_impl)
@@ -2266,7 +2266,7 @@ impl Sema:
             else if self.impl_target_has_bare_type_params(bi_impl):
                 self.register_generic_fn_node(fn_name, node)
                 self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                 self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                 for pi2 in 0..param_count:
                     self.validate_type_expr_with_impl_type_params(self.ast.fn_param_type(param_start, pi2), 0, 0, bi_impl)
@@ -2295,7 +2295,7 @@ impl Sema:
                     if concrete_inst_impl_method == 0 and self.type_tid_decl_tp_count(self_type_id) > 0:
                         self.register_generic_fn_node(fn_name, node)
                         self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-                        let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+                        self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
                         self.register_generic_method_fn(node, fn_name, parsed_fn_name)
                         self.named_types.remove(self_sym)
                         return
@@ -2309,7 +2309,7 @@ impl Sema:
         if tp_count > 0:
             self.register_generic_fn_node(fn_name, node)
             self.fn_decl_source_paths.insert(fn_name, with_str_clone_ref(self.current_module_path))
-            let _ = self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
+            self.register_extension_method_candidate(node, fn_name, parsed_fn_name, -1, decl_index)
             self.register_generic_method_fn(node, fn_name, parsed_fn_name)
             for pi in 0..param_count:
                 let p_type_node = self.ast.fn_param_type(param_start, pi)

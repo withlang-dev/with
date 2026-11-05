@@ -294,12 +294,12 @@ fn link_stage_apply_env(env: &List[LinkStageEnvVar]) -> LinkStageSavedEnv:
         let item = env[i]
         names.push(with_str_clone_ref(item.name))
         values.push(runtime_getenv(item.name) ++ "")
-        let _ = runtime_setenv(item.name, item.value)
+        runtime_setenv(item.name, item.value)
     LinkStageSavedEnv { names, values }
 
 fn link_stage_restore_env(saved: &LinkStageSavedEnv):
     for i in 0..saved.names.len():
-        let _ = runtime_setenv(saved.names[i], saved.values[i])
+        runtime_setenv(saved.names[i], saved.values[i])
 
 // WITH_LINK_VERBOSE=1 prints every link's argv before it runs, and asks a
 // COFF link for lld-link's /verbose (each input it reads, each member it
@@ -1279,7 +1279,7 @@ fn link_stage_extract_runtime_obj(name: &str, path: &str) -> bool:
     if runtime_write_file(tmp_path, data) != 0:
         return true
     if runtime_rename(tmp_path, path) != 0:
-        let _ = runtime_remove_file(tmp_path)
+        runtime_remove_file(tmp_path)
         // A concurrent extractor may have won the rename; accept its complete copy.
         let after = runtime_read_file(path)
         if after.len() == data.len() and after == data:
@@ -1899,7 +1899,7 @@ fn link_stage_extract_blob(data: &str, path: &str) -> bool:
     if runtime_write_file(tmp_path, data) != 0:
         return true
     if runtime_rename(tmp_path, path) != 0:
-        let _ = runtime_remove_file(tmp_path)
+        runtime_remove_file(tmp_path)
         let after = runtime_read_file(path)
         if after.len() == data.len() and after == data:
             return false

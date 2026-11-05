@@ -6977,11 +6977,11 @@ impl Sema:
                 if self.type_d0[ti] == list_sym and self.type_d2[ti] >= 1:
                     let vi_args: List[i32] = List.new()
                     vi_args.push(self.type_extra[self.type_d1[ti]])
-                    let _ = self.ensure_generic_inst_type(vi_sym, vi_args, 1)
+                    self.ensure_generic_inst_type(vi_sym, vi_args, 1)
                 if self.type_d0[ti] == hashmap_sym and self.type_d2[ti] >= 2:
                     let opt_args: List[i32] = List.new()
                     opt_args.push(self.type_extra[self.type_d1[ti] + 1])
-                    let _ = self.ensure_generic_inst_type(option_sym, opt_args, 1)
+                    self.ensure_generic_inst_type(option_sym, opt_args, 1)
 
         // List[str] for str.split(), and ListIter[str] for its .iter().
         let str_args: List[i32] = List.new()
@@ -8410,13 +8410,13 @@ impl Sema:
                     return self.moved_field_path_syms[(start + count - 1)]
         0
 
-    mut fn clear_moved_fields_for_binding(sym: i32):
+    mut fn clear_moved_fields_for_binding(sym: i32) -> Unit:
         var i = self.moved_field_base_syms.len() as i32 - 1
         while i >= 0:
             if self.moved_field_base_syms[i] == sym:
                 self.remove_moved_field_entry(i)
             i = i - 1
-        let _ = self.explicitly_partial_syms.remove(sym)
+        self.explicitly_partial_syms.remove(sym)
 
     mut fn clear_moved_fields_for_place_expr(node: i32):
         let path = self.field_move_path_for_expr(node)
@@ -9267,7 +9267,7 @@ impl Sema:
                             result = 1
                             break
                     vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     // D72 (§2.5.1, #1431): a `Drop` struct whose all-zero storage can be a
@@ -9531,7 +9531,7 @@ impl Sema:
                         result = 1
                         break
                 vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     mut fn type_carries_user_drop(tid: i32) -> i32:
@@ -9578,7 +9578,7 @@ impl Sema:
                             result = 1
                             break
                     vidx = vidx + 1
-        let _ = self.needs_drop_visit.remove(resolved as i32)
+        self.needs_drop_visit.remove(resolved as i32)
         result
 
     // `moved`: `origin_node` moves or consumes the origin (a `move`, a
@@ -10800,8 +10800,6 @@ impl Sema:
             // #714 (D5 supersession, spec §3.8): a plain call is always legal;
             // the transfer was marked moved at check time and later uses diagnose
             // there. This pass keeps recording sites for move-sites analytics.
-            let _ = arg_node
-            let _ = file_id
             if self.sig_param_uses_value_ref_abi(callee_sig, callee_pi) != 0:
                 continue
 
@@ -12003,7 +12001,7 @@ impl Sema:
             else: // TypeKind.TY_RANGE
                 out = self.is_copy(self.get_type_d0(resolved))
 
-            let _ = self.copy_visit_stack.remove(resolved as i32)
+            self.copy_visit_stack.remove(resolved as i32)
             return out
         if tk == TypeKind.TY_ENUM:
             let enum_name = self.get_type_d0(resolved)
