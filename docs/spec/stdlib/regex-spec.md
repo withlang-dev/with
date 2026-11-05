@@ -156,7 +156,7 @@ body scope. These are desugared to local let bindings:
 ```
 // Source:
 if line =~ /^(\w+)\s*=\s*(.+)$/:
-    use($1, $2)
+    handle($1, $2)
 
 // Desugared to:
 let __match = Regex.captures(/^(\w+)\s*=\s*(.+)$/, line)
@@ -164,7 +164,7 @@ if __match.is_some():
     let $0 = __match.unwrap().get(0).unwrap()
     let $1 = __match.unwrap().get(1).unwrap()
     let $2 = __match.unwrap().get(2).unwrap()
-    use($1, $2)
+    handle($1, $2)
 ```
 
 The `$N` tokens are lexed as identifiers with a `$` prefix.
@@ -336,7 +336,7 @@ The With-facing API wraps PCRE2's internals in an ergonomic interface.
 ### The `Regex` type
 
 ```
-type Regex = {
+type Regex {
     code: *mut pcre2_real_code_8,       // compiled pattern
     pattern: str,                        // original pattern string
     num_captures: i32,
@@ -374,13 +374,13 @@ Internally calls `pcre2_match_8`.
 fn Regex.captures(self: &Self, text: str) -> Option[Captures]
 fn Regex.captures_all(self: &Self, text: str) -> List[Captures]
 
-type Match = {
+type Match {
     start: i32,
     end: i32,
     text: str,
 }
 
-type Captures = {
+type Captures {
     groups: List[Option[Match]],
     named: HashMap[str, i32],
 }

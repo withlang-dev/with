@@ -884,7 +884,7 @@ type Shape { dims: [usize; 8], rank: i32 }
 match items:
     []              => "empty"
     [only]          => "single"
-    [first, ..rest] => "head: {first}, {rest.len()} more"
+    [first, ..rest] => f"head: {first}, {rest.len()} more"
 ```
 
 **Multidimensional arrays (D119).** `[T; d1, d2, …]` writes a nested
@@ -922,7 +922,7 @@ fields occupy exactly their declared bit width with no padding.
 
 ```
 @[bitpacked]
-type Flags = {
+type Flags {
     enabled: bool,         // 1 bit
     priority: u3,          // 3 bits
     mode: u4,              // 4 bits
@@ -932,7 +932,7 @@ type Flags = {
 
 ```
 @[bitpacked]
-type IpHeader = {
+type IpHeader {
     version: u4,           // 4 bits
     ihl: u4,               // 4 bits
     dscp: u6,              // 6 bits
@@ -983,9 +983,9 @@ let p = &f.priority     // error: cannot take address of bitpacked field
 
 ```
 let flags = Flags { enabled: true, priority: 5, mode: 12 }
-let byte = flags as u8    // 0b_1_101_1100 = 0xBC
+let byte = flags as u8    // 0b_1_101_1100 = 0xDC
 
-let flags2 = 0xBCu8 as Flags
+let flags2 = 0xDCu8 as Flags
 // flags2.enabled == true, flags2.priority == 5, flags2.mode == 12
 ```
 
@@ -1022,7 +1022,7 @@ type, and writing it is an error that suggests `List`:
 let a = [1, 2, 3]                      // List[isize]: brackets make a List
 let v: List[i32] = [1, 2, 3]            // List[i32]: the demand types the elements
 let t: [i32; 4] = [1, 2, 3, 4]         // fixed array: its type is demanded
-for flag in ["-v", "-q"]: use(flag)    // List[str]; never grown or kept
+for flag in ["-v", "-q"]: apply(flag)  // List[str]; never grown or kept
 print(total([1, 2, 3]))                // fn total(xs: &List[i32])
 var ys = []                            // List: `push` says what it holds,
 ys.push(big)                           // and `big: i64` its element type
@@ -1208,7 +1208,7 @@ enum Token:
 // .is_tint() -> bool
 // .as_tint() -> Option[i64]           .as_tint_ref() -> Option[&i64]
 // .as_tstr() -> Option[str]           .as_tstr_ref() -> Option[&str]
-// .as_tbool() -> Option[bool]         .as_tbool_ref() -> Option[&bool>
+// .as_tbool() -> Option[bool]         .as_tbool_ref() -> Option[&bool]
 // (no .as_tnull — no data)
 ```
 

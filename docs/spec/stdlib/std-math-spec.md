@@ -52,7 +52,7 @@ std.math types.
 
 ```
 @[drop]
-type Array = {
+type Array {
     storage: *mut Storage,
     view: View,
 }
@@ -67,19 +67,19 @@ same rules.
 ### View
 
 ```
-type View = {
+type View {
     offset: usize,          // byte offset into storage
     shape: Shape,
     strides: Strides,
     dtype: DType,
 }
 
-type Shape = {
+type Shape {
     dims: [i64; 8],
     rank: i32,
 }
 
-type Strides = {
+type Strides {
     elems: [i64; 8],        // byte strides
     rank: i32,
 }
@@ -91,7 +91,7 @@ is pure arithmetic — no allocation, no memory access.
 ### Storage
 
 ```
-type Storage = {
+type Storage {
     ptr: *mut u8,
     size: usize,
     refcount: i32,
@@ -553,7 +553,7 @@ error: cannot broadcast shapes [3, 4] and [5]
 ## Part 11: Printing
 
 ```
-println(f"{a}")
+print(f"{a}")
 ```
 
 Produces:

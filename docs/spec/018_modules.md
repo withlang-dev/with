@@ -433,7 +433,7 @@ fn start -> Never:
     // Initialize hardware
     let peripherals = c_import("stm32f4xx.h")
     // ...
-    loop
+    loop:
         // main loop
 ```
 
@@ -482,7 +482,7 @@ fn on_panic(info: &PanicInfo) -> Never:
 @[entry]
 fn start -> Never:
     let led = gpio_init(GPIOA, PIN_5, .Output)
-    loop
+    loop:
         gpio_toggle(led)
         delay_ms(500)
 ```

@@ -140,7 +140,7 @@ These modules are prerequisites for serious programs. Implement first.
 **Status (2026-09-22): not started.** No `lib/std/path.w`; path logic is duplicated privately in `lib/std/build.w` (`tool_path_dirname`, `build_path_dirname`). Native With; first in the refreshed sequencing.
 
 ```
-type Path = {
+type Path {
     inner: str,
 }
 
@@ -183,7 +183,7 @@ With uses `with.toml` for project configuration. The language must
 parse its own config format.
 
 ```
-type TomlValue =
+enum TomlValue:
     | String(str)
     | Integer(i64)
     | Float(f64)
@@ -204,7 +204,7 @@ fn TomlTable.get_bool(self: &Self, key: &str) -> Option[bool]
 fn TomlTable.get_array(self: &Self, key: &str) -> Option[&List[TomlValue]]
 fn TomlTable.get_table(self: &Self, key: &str) -> Option[&TomlTable]
 
-type TomlError = {
+type TomlError {
     message: str,
     line: i32,
     column: i32,
@@ -266,7 +266,7 @@ the assertion vocabulary.
 **Status (2026-09-22): not started.** No `Buf`; the endian helpers still live privately in `lib/std/crypto/endian.w` (see 3.7).
 
 ```
-type Buf = {
+type Buf {
     data: List[u8],
     read_pos: usize,
     write_pos: usize,
@@ -338,7 +338,7 @@ fn Buf.reset_read(self: &mut Self)
 fn Buf.compact(self: &mut Self)
 fn Buf.clear(self: &mut Self)
 
-type BufError =
+enum BufError:
     | Underflow
     | Overflow
 ```
@@ -362,7 +362,7 @@ These modules make With viable for production CLI tools and servers.
 **Status (2026-09-22): not started.** `lib/std/context.w` carries a `trait Logger`/`NoopLogger` (see 2.5) that this module should absorb or build on.
 
 ```
-enum Level =
+enum Level:
     | Trace
     | Debug
     | Info
@@ -407,7 +407,7 @@ trait Error:
 fn wrap[E: Error](err: E, msg: str) -> ContextError[E]
 fn chain(err: &dyn Error) -> ErrorChain
 
-type ErrorChain = {
+type ErrorChain ephemeral {
     current: &dyn Error,
 }
 
@@ -454,7 +454,7 @@ fn to_lower(cp: i32) -> i32
 fn to_title(cp: i32) -> i32
 
 // Unicode category
-enum Category =
+enum Category:
     | Letter
     | Mark
     | Number
@@ -479,7 +479,7 @@ the common cases, not the full Thai/Hangul complexity in v1).
 **Status (2026-09-22): not started.** No `FlagSet`; argument parsing is ad hoc in `build.w` and the tools. Native With.
 
 ```
-type FlagSet = {
+type FlagSet {
     name: str,
     description: str,
 }
@@ -534,7 +534,7 @@ fn Context.value[V](self: &Self, key: str) -> Option[&V]
 // Async integration
 async fn Context.wait_done(self: &Self)
 
-type ContextError =
+enum ContextError:
     | Cancelled
     | DeadlineExceeded
 ```
@@ -542,7 +542,7 @@ type ContextError =
 **Integration with `with` blocks:**
 
 ```
-with with_timeout(ctx, 5.seconds()) as (ctx, cancel):
+with with_timeout(ctx, 5.secs()) as (ctx, cancel):
     let result = do_work(ctx).await
     // ctx automatically cancelled when `with` scope exits
 ```
@@ -563,8 +563,8 @@ async fn fetch_data(ctx: &Context) -> Result[Data, Error]:
 
     // Or await cancellation alongside work
     select:
-        data = http_get(url).await -> Ok(data)
-        _ = ctx.wait_done().await -> Err(ContextError.Cancelled)
+        data = http_get(url).await => Ok(data)
+        _ = ctx.wait_done().await => Err(ContextError.Cancelled)
 ```
 
 Context forms a tree. Cancelling a parent cancels all children.
@@ -592,9 +592,9 @@ These round out the standard library for production use.
 ```
 // std.archive.tar
 
-type TarReader = { ... }
-type TarWriter = { ... }
-type TarEntry = {
+type TarReader { ... }
+type TarWriter { ... }
+type TarEntry {
     name: str,
     size: i64,
     mode: i32,
@@ -629,11 +629,11 @@ and large files. UStar format for writing.
 
 ```
 // Address types
-type IpAddr =
+enum IpAddr:
     | V4(u8, u8, u8, u8)
     | V6([u8; 16])
 
-type SocketAddr = {
+type SocketAddr {
     ip: IpAddr,
     port: u16,
 }
@@ -669,8 +669,8 @@ DNS resolution requires system configuration awareness
 **Status (2026-09-22): not started.** Native With (the format is small).
 
 ```
-type CsvReader = { ... }
-type CsvWriter = { ... }
+type CsvReader { ... }
+type CsvWriter { ... }
 
 fn CsvReader.from_str(data: &str) -> CsvReader
 fn CsvReader.from_file(path: &str) -> Result[CsvReader, CsvError]
@@ -704,7 +704,7 @@ The tokenizer sketched below is derivable from it when a streaming
 consumer appears; `expat` was not needed.
 
 ```
-type XmlToken =
+enum XmlToken:
     | StartElement(str, List[XmlAttr])
     | EndElement(str)
     | CharData(str)
@@ -712,12 +712,12 @@ type XmlToken =
     | ProcessingInstruction(str, str)
     | Doctype(str)
 
-type XmlAttr = {
+type XmlAttr {
     name: str,
     value: str,
 }
 
-type XmlTokenizer = { ... }
+type XmlTokenizer { ... }
 
 fn XmlTokenizer.from_str(data: &str) -> XmlTokenizer
 gen fn XmlTokenizer.tokens(self: &mut Self) -> Result[XmlToken, XmlError]
@@ -781,7 +781,7 @@ Currently internal to the crypto modules — expose it.
 fn stack_trace() -> List[StackFrame]
 fn print_stack_trace()
 
-type StackFrame = {
+type StackFrame {
     function: str,
     file: str,
     line: i32,
@@ -790,7 +790,7 @@ type StackFrame = {
 fn on_panic(handler: fn(&str))
 fn memory_usage() -> MemoryStats
 
-type MemoryStats = {
+type MemoryStats {
     allocated: usize,
     freed: usize,
     peak: usize,
@@ -815,7 +815,7 @@ reaches 1.0.
 **Status (2026-09-22): private partial.** `http_parse_url`/`HttpUrl`/`http_resolve_redirect` are private inside `lib/std/http.w`; this module is their promotion.
 
 ```
-type Url = {
+type Url {
     scheme: str,
     host: str,
     port: Option[u16],
@@ -840,8 +840,8 @@ RFC 3986 compliant parsing.
 **Status (2026-09-22): not started.** `io.w` has `Stdin.lines()` returning a whole `List[str]`; no `BufReader`/`BufWriter`.
 
 ```
-type BufReader = { ... }
-type BufWriter = { ... }
+type BufReader { ... }
+type BufWriter { ... }
 
 fn BufReader.new(fd: i32) -> BufReader
 fn BufReader.new_sized(fd: i32, capacity: usize) -> BufReader
@@ -884,7 +884,7 @@ fn current_exe() -> Result[Path, Error]
 **Status (2026-09-22): not started.** Native With.
 
 ```
-type Version = {
+type Version {
     major: i32,
     minor: i32,
     patch: i32,

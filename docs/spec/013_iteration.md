@@ -13,14 +13,14 @@ ephemeral struct* that implements `Iter`:
 
 ```
 // IMPOSSIBLE: opaque return type hides the ephemerality
-fn find_matches(text: &str, pat: &str) -> dyn Iter[StrView]
+fn find_matches(text: &str, pat: &str) -> dyn Iter[&str]
 
 // POSSIBLE: concrete ephemeral struct — caller inherits restriction
-type MatchIter = ephemeral { text: StrView, pat: StrView, pos: usize }
-impl Iter[StrView] for MatchIter: ...
+type MatchIter ephemeral { text: &str, pat: &str, pos: isize }
+impl Iter[&str] for MatchIter: ...
 
 fn find_matches(text: &str, pat: &str) -> MatchIter:
-    MatchIter { text: text.as_view(), pat: pat.as_view(), pos: 0 }
+    MatchIter { text, pat, pos: 0 }
 // Caller's binding is ephemeral — cannot store, must use in this scope
 ```
 
@@ -33,19 +33,18 @@ ephemerality, preventing the caller from knowing the restriction.
 
 ```
 // 1. Collect into owned container (small allocation cost)
-fn find_matches(text: &String, pat: &str) -> List[String]:
-    text.split(pat) |> map(s => s.to_string()) |> collect()
+fn find_matches(text: &str, pat: &str) -> List[str]:
+    text.split(pat) |> collect[List]()
 
 // 2. Generator (lazy, zero-copy, no allocation; the caller's `for`
 //    body sees each view while the generator runs, §13.4)
-gen fn find_matches(text: &String, pat: &str) -> StrView:
+gen fn find_matches(text: &str, pat: &str) -> &str:
     for segment in text.split(pat):
         yield segment
 
 // 3. Process inline (no function boundary)
 let results = text.split(pat)
     |> filter(s => s.len() > 0)
-    |> map(s => s.to_string())
     |> collect[List]()
 ```
 
@@ -75,7 +74,7 @@ for x in my_list:
 
 // ERROR: conflicting Iter implementations
 impl Iter[u8] for MyBuffer: ...
-impl Iter[String] for MyBuffer: ...   // REJECTED: MyBuffer already implements Iter[u8]
+impl Iter[str] for MyBuffer: ...      // REJECTED: MyBuffer already implements Iter[u8]
 ```
 
 This restriction replaces the need for associated types on `Iter`
@@ -397,7 +396,7 @@ Labeled blocks are statement-position only. They are not expressions,
 and they do not produce a value. This is valid:
 
 ```
-fn parse_header(input: bytes) -> Result[Header, Error]:
+fn parse_header(input: []u8) -> Result[Header, str]:
     'parse:
         if input.len() < 4: break 'parse
         let magic = input[0..4]
