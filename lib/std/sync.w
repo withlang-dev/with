@@ -79,11 +79,14 @@ pub resource type RwReadGuard[T] ephemeral {
     ptr: *mut u8,
 }
 
-/// Write guard from `RwLock.enter_mut()`.
+/// Write guard from `RwLock.write()` / `RwLock.enter_mut()`.
 @[no_await_guard]
 pub resource type RwWriteGuard[T] ephemeral {
     ptr: *mut u8,
 }
+
+pub type RwLockReadGuard[T] = RwReadGuard[T]
+pub type RwLockWriteGuard[T] = RwWriteGuard[T]
 
 /// Runs an initializer at most once. If the initializer panics and execution
 /// resumes, the Once is reset so a later caller can retry.
@@ -139,6 +142,11 @@ pub fn Mutex.new[T](value: T) -> Mutex[T]:
 pub fn mutex_new(value: i64) -> Mutex[i64]:
     Mutex.new(value)
 
+/// Acquire the mutex (`with m.lock() as data:` or `with m.lock() as mut data:`).
+pub fn Mutex.lock[T](self: &Self) -> MutexGuardMut[T]:
+    unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
+    MutexGuardMut { ptr: self.ptr }
+
 /// Acquire the mutex for reading.
 pub fn Mutex.enter[T](self: &Self) -> MutexGuard[T]:
     unsafe { sync_mutex_lock_state(self.ptr as *mut MutexState) }
@@ -165,6 +173,13 @@ impl[T] Scoped[&T] for MutexGuard[T]:
         unsafe { (*state).value as &T }
 
     // The guard's Drop releases the lock when the `with` ends.
+    fn with_exit(self: &Self) -> Unit: ()
+
+impl[T] Scoped[&T] for MutexGuardMut[T]:
+    fn with_enter(self: &Self) -> &T:
+        let state = self.ptr as *mut MutexState
+        unsafe { (*state).value as &T }
+
     fn with_exit(self: &Self) -> Unit: ()
 
 impl[T] ScopedMut[T] for MutexGuardMut[T]:
@@ -232,6 +247,30 @@ pub fn RwLock.new[T](value: T) -> RwLock[T]:
 pub fn rwlock_new(value: i64) -> RwLock[i64]:
     RwLock.new(value)
 
+/// Acquire for reading (`with rw.read() as data:`).
+pub fn RwLock.read[T](self: &Self) -> RwReadGuard[T]:
+    let state = self.ptr as *mut RwLockState
+    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+    while true:
+        let old = (unsafe *word).load(.Acquire)
+        if old >= 0:
+            match (unsafe *word).compare_exchange(old, old + 1, .Acquire, .Relaxed):
+                Ok(_) => return RwReadGuard { ptr: self.ptr }
+                Err(_) => ()
+        sync_wait_for_progress()
+    RwReadGuard { ptr: self.ptr }
+
+/// Acquire for writing (`with rw.write() as mut data:` or `with rw.write() as data:`).
+pub fn RwLock.write[T](self: &Self) -> RwWriteGuard[T]:
+    let state = self.ptr as *mut RwLockState
+    let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
+    while true:
+        match (unsafe *word).compare_exchange(0, -1, .Acquire, .Relaxed):
+            Ok(_) => return RwWriteGuard { ptr: self.ptr }
+            Err(_) => ()
+        sync_wait_for_progress()
+    RwWriteGuard { ptr: self.ptr }
+
 /// Acquire for reading.
 pub fn RwLock.enter[T](self: &Self) -> RwReadGuard[T]:
     let state = self.ptr as *mut RwLockState
@@ -274,6 +313,13 @@ impl[T] Scoped[&T] for RwReadGuard[T]:
     // The guard's Drop releases the lock when the `with` ends.
     fn with_exit(self: &Self) -> Unit: ()
 
+impl[T] Scoped[&T] for RwWriteGuard[T]:
+    fn with_enter(self: &Self) -> &T:
+        let state = self.ptr as *mut RwLockState
+        unsafe { (*state).value as &T }
+
+    fn with_exit(self: &Self) -> Unit: ()
+
 impl[T] ScopedMut[T] for RwWriteGuard[T]:
     fn with_enter_mut(self: &Self) -> T:
         let state = self.ptr as *mut RwLockState
@@ -301,8 +347,8 @@ pub fn rwlock_read(rw: &RwLock[i64]) -> i64:
     let guard = rw.enter()
     guard.exit()
 
-/// Write a new value inside a RwLock.
-pub fn RwLock.write[T](self: &Self, value: T) -> Unit:
+/// Set a new value inside a RwLock.
+pub fn RwLock.set[T](self: &Self, value: T) -> Unit:
     let state = self.ptr as *mut RwLockState
     let word = (&raw mut (unsafe *state).state as *mut i32) as *mut Atomic[i32]
     while true:

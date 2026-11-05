@@ -2617,7 +2617,10 @@ impl Sema:
                 sema_phase_bug("BUG: frozen Atomic type has wrong arg count")
             if self.atomic_payload_type_is_valid(gi_args[0]) == false:
                 sema_phase_bug("BUG: frozen Atomic type has invalid payload")
-        self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
+        let inst = self.find_generic_inst_type(gi_base_sym, gi_args, gi_arg_count) as i32
+        if let Some(expanded) = self.generic_alias_inst_targets.get(inst):
+            return expanded
+        inst
 
     fn resolve_type_expr_frozen(node: i32) -> TypeId:
         if node == 0:
@@ -35438,7 +35441,7 @@ impl Sema:
             return false
         let owner = self.pool_resolve(self.get_generic_inst_base(resolved as i32))
         let method_name = self.pool_resolve(field)
-        (owner == "Mutex" and method_name == "set") or (owner == "RwLock" and method_name == "write")
+        (owner == "Mutex" and method_name == "set") or (owner == "RwLock" and method_name == "set")
 
     // §21.1 (D22; #1778, #1783): a view stored into the storage a place
     // reaches — a container's element (`h.v.push(x)`), a field (`h.r = x`),
@@ -35599,9 +35602,9 @@ impl Sema:
             return true
         if owner_name == "Receiver" and method_name == "recv":
             return true
-        if owner_name == "Mutex" and (method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
+        if owner_name == "Mutex" and (method_name == "lock" or method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
             return true
-        if owner_name == "RwLock" and (method_name == "enter" or method_name == "enter_mut" or method_name == "write"):
+        if owner_name == "RwLock" and (method_name == "read" or method_name == "write" or method_name == "enter" or method_name == "enter_mut" or method_name == "set"):
             return true
         if owner_name == "Once" and method_name == "call_once":
             return true
@@ -36733,6 +36736,7 @@ impl Sema:
         CallBuiltin.None
 
     mut fn check_method_call_parts_inner(expr: i32, field: i32, extra_start: i32, arg_count: i32, node: i32, known_recv_ty: i32) -> i32:
+        let mc_call_expected_ty = if self.has_expected_type != 0: self.expected_expr_type as i32 else: 0
         // D65 phase 5 (#2043): the method this call resolved to, when it is
         // not the one its spelling names (D66: a variadic contract's case).
         // MirLower reads it, never the spelling.
@@ -36905,6 +36909,30 @@ impl Sema:
                             if self.is_plain_numeric_type(lazy_value):
                                 let lazy_params: List[i32] = List.new()
                                 mc_expected = self.ensure_fn_type(lazy_params, 0, lazy_value as TypeId) as i32
+                // #3042 (§10.7, D165): when `List.traverse` is checked against
+                // an expected `Option[List[U]]` or `Result[List[U], E]`, pass
+                // `Option[U]` / `Result[U, E]` as the closure's expected return
+                // type so return-polymorphic calls (`s.parse()`) infer `U`.
+                if mc_expected != 0 and mc_is_closure and field == self.syms.traverse and ai == 0 and mc_call_expected_ty != 0:
+                    let trav_recv = self.resolve_alias(self.auto_deref_ref_ptr_type(self.resolve_alias(obj_type)) as TypeId)
+                    let trav_exp = self.resolve_alias(mc_call_expected_ty as TypeId)
+                    if self.get_type_kind(trav_recv) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(trav_recv as i32) == self.syms.list and self.get_type_kind(trav_exp) == TypeKind.TY_GENERIC_INST:
+                        let trav_elem = self.get_generic_inst_arg(trav_recv as i32, 0)
+                        let trav_exp_base = self.get_generic_inst_base(trav_exp as i32)
+                        var trav_closure_ret: i32 = 0
+                        if trav_exp_base == self.syms.option:
+                            let trav_inner = self.resolve_alias(self.get_generic_inst_arg(trav_exp as i32, 0) as TypeId)
+                            if self.get_type_kind(trav_inner) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(trav_inner as i32) == self.syms.list:
+                                trav_closure_ret = self.ensure_option_type_for(self.get_generic_inst_arg(trav_inner as i32, 0))
+                        else if trav_exp_base == self.syms.result:
+                            let trav_ok = self.resolve_alias(self.get_generic_inst_arg(trav_exp as i32, 0) as TypeId)
+                            let trav_err = self.get_generic_inst_arg(trav_exp as i32, 1)
+                            if self.get_type_kind(trav_ok) == TypeKind.TY_GENERIC_INST and self.get_generic_inst_base(trav_ok as i32) == self.syms.list:
+                                trav_closure_ret = self.ensure_result_type_for(self.get_generic_inst_arg(trav_ok as i32, 0), trav_err)
+                        if trav_elem != 0 and trav_closure_ret != 0:
+                            let trav_params: List[i32] = List.new()
+                            trav_params.push(trav_elem)
+                            mc_expected = self.ensure_fn_type(trav_params, 1, trav_closure_ret as TypeId) as i32
             if mc_expected == 0 and static_type_sym != 0 and self.static_receiver_type_is_known(expr):
                 mc_expected = self.static_generic_method_expected_arg_type(obj_type as i32, field, ai)
             if mc_expected == 0 and field == self.syms.spawn_method and ai == 0:

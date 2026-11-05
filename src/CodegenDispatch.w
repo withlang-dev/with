@@ -15754,7 +15754,7 @@ impl Codegen:
             // value returned in the program's place.
             if not self.mir_local_ptrs.get(0).is_some() or (self.mir_local_types.get(0) ?? 0) == 0:
                 return false
-            if self.async_block_rbuf != 0:
+            if self.async_block_rbuf != 0 and self.current_function == self.async_block_fn:
                 let ab_ret_ptr_opt = self.mir_local_ptrs.get(0)
                 if ab_ret_ptr_opt.is_some():
                     var ab_ret_ty = self.current_ret_type
@@ -16364,6 +16364,10 @@ impl Codegen:
         let saved_fn_name_sym = self.current_function_name_sym
         let saved_fn_node = self.current_function_node
         let saved_ret = self.current_ret_type
+        let saved_async_rbuf = self.async_block_rbuf
+        let saved_async_fn = self.async_block_fn
+        self.async_block_rbuf = 0
+        self.async_block_fn = 0
         let saved_owner = self.current_method_owner_sym
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
@@ -16747,6 +16751,8 @@ impl Codegen:
         self.current_function_node = saved_fn_node
         self.current_function_tier_node = saved_tier_node
         self.current_ret_type = saved_ret
+        self.async_block_rbuf = saved_async_rbuf
+        self.async_block_fn = saved_async_fn
         self.current_method_owner_sym = saved_owner
         self.local_allocas = saved_allocas
         self.local_types = saved_types
@@ -19107,6 +19113,7 @@ impl Codegen:
         let saved_fn = self.current_function
         let saved_ret = self.current_ret_type
         let saved_async_rbuf = self.async_block_rbuf
+        let saved_async_fn = self.async_block_fn
         let saved_bb = wl_get_insert_block(self.builder)
         let saved_allocas = move self.local_allocas
         let saved_types = move self.local_types
@@ -19160,6 +19167,7 @@ impl Codegen:
 
         // Set rbuf flag so TK_RETURN stores result into result_buf
         self.async_block_rbuf = rbuf_arg
+        self.async_block_fn = tramp_fn
 
         // Create return alloca for MIR local 0. Void results keep the dead i32
         // slot — alloca of void is invalid LLVM and traps in DataLayout.
@@ -19207,6 +19215,7 @@ impl Codegen:
 
         // 7. Restore codegen state
         self.async_block_rbuf = saved_async_rbuf
+        self.async_block_fn = saved_async_fn
         self.mir_local_ptrs = saved_mir_locals
         self.mir_local_values = saved_mir_values
         self.mir_memory_locals = saved_mir_memory_locals

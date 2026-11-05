@@ -462,7 +462,7 @@ comptime fn make_soa[T: type](capacity: usize) -> SoaStorage[T]:
 comptime fn hash_str(s: str) -> u64:
     var h: u64 = 5381
     for c in s.bytes():
-        h = h * 33 + c as u64
+        h = h *% 33 +% c as u64
     h
 
 const SHADER_PARAM_ID = comptime hash_str("world_matrix")
