@@ -2972,14 +2972,14 @@ fn with_cimport_fn_attributes(session: i64, idx: i32) -> str:
 // honors the attribute — the attribute as written is the only spelling
 // all targets share (D147 point 1). A trailing attribute on a typedef of
 // an anonymous record is outside the record's extent and not seen here.
-unsafe fn cursor_has_packed_attr(cursor: CXCursor) -> i32:
-    if clang_Cursor_hasAttrs(cursor) == 0: return 0
+unsafe fn cursor_has_packed_attr(cursor: CXCursor) -> bool:
+    if clang_Cursor_hasAttrs(cursor) == 0: return false
     let extent = clang_getCursorExtent(cursor)
     let tu = clang_Cursor_getTranslationUnit(cursor)
     var tokens: *mut CXToken = 0 as *mut CXToken
     var token_count: u32 = 0
     clang_tokenize(tu, extent, &raw mut tokens, &raw mut token_count)
-    var found: i32 = 0
+    var found = false
     var depth: i32 = 0
     var armed = false
     var ti: u32 = 0
@@ -2995,25 +2995,18 @@ unsafe fn cursor_has_packed_attr(cursor: CXCursor) -> i32:
         else:
             if c_strcmp(cstr, "(\0" as *const u8) == 0: depth = depth + 1
             else if c_strcmp(cstr, ")\0" as *const u8) == 0: depth = depth - 1
-            else if c_strcmp(cstr, "packed\0" as *const u8) == 0 or c_strcmp(cstr, "__packed__\0" as *const u8) == 0: found = 1
+            else if c_strcmp(cstr, "packed\0" as *const u8) == 0 or c_strcmp(cstr, "__packed__\0" as *const u8) == 0: found = true
         clang_disposeString(sp)
-        if found != 0: break
+        if found: break
         ti = ti + 1
     if tokens as i64 != 0:
         clang_disposeTokens(tu, tokens, token_count)
     found
 
-fn with_cimport_decl_has_packed_attr(session: i64, idx: i32) -> i32:
+fn with_ci_cursor_has_packed_attr(session: i64, cursor_idx: i32) -> bool:
     unsafe:
         let s = session as *mut CImportSession
-        if s as i64 == 0 or idx < 0 or idx >= (*s).decl_count: return 0
-        let cursor = *(((*s).decls as i64 + idx as i64 * 32) as *const CXCursor)
-        cursor_has_packed_attr(cursor)
-
-fn with_ci_cursor_has_packed_attr(session: i64, cursor_idx: i32) -> i32:
-    unsafe:
-        let s = session as *mut CImportSession
-        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return 0
+        if s as i64 == 0 or cursor_idx < 0 or cursor_idx >= (*s).cursor_count: return false
         let cursor = *(((*s).cursors as i64 + cursor_idx as i64 * 32) as *const CXCursor)
         cursor_has_packed_attr(cursor)
 

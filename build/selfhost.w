@@ -1182,7 +1182,7 @@ fn bs_check_doc_repl_cli(ctx: &ActionCtx, compiler_path: &str, case_dir: &str) -
         "use std.string.parse\n" ++
         "type Boxed { v: i32 }\n" ++
         "fn add_box(b: Boxed, d: i32): b.v + d\n" ++
-        "var n: i32 = parse(\"10\").unwrap()\n" ++
+        "var n = parse(\"10\")\n" ++
         "print(f\"first={n}\")\n" ++
         "n = add_box(Boxed { v: n }, 32)\n" ++
         "print(f\"second={n}\")\n" ++

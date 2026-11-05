@@ -6035,16 +6035,16 @@ fn repl_bin_path -> str:
     let suffix = if with_sysinfo_os() == "Windows": ".exe" else: ""
     f"out/tmp/with-repl-{with_getpid()}-{with_clock_nanos()}" ++ suffix
 
-fn check_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
+fn check_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> bool:
     var comp = cli_check_compilation(no_std, alloc_mode, runtime_available, prelude_mode)
     comp.set_debug_info(false)
     comp.set_statements_entry(true)
     let paths: List[str] = ["<repl>"]
     let texts: List[str] = [source ++ ""]
     if not comp.check_source_texts(paths, texts):
-        return 1
+        return false
     comp.print_warnings()
-    0
+    true
 
 fn run_repl_unit(source: &str, no_std: bool, alloc_mode: bool, runtime_available: bool, prelude_mode: i32) -> i32:
     let bin_path = repl_bin_path()
@@ -6148,18 +6148,16 @@ fn run_repl_command(argc: i32, no_std: bool, alloc_mode: bool, runtime_available
         if repl_line_is_import(head):
             session_imports.push(head)
             let check_src = repl_build_unit(session_imports, session_decls, session_stmts, "", true)
-            let rc = check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode)
-            if rc != 0:
+            if not check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode):
                 session_imports.pop()
-                return rc
+                return 1
             continue
         if repl_line_is_decl(head):
             session_decls.push(entry)
             let check_src = repl_build_unit(session_imports, session_decls, session_stmts, "", true)
-            let rc = check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode)
-            if rc != 0:
+            if not check_repl_unit(check_src, no_std, alloc_mode, runtime_available, prelude_mode):
                 session_decls.pop()
-                return rc
+                return 1
             continue
 
         let run_src = repl_build_unit(session_imports, session_decls, session_stmts, entry, true)

@@ -2861,7 +2861,7 @@ fn ci_bitfield_plan_cursor(session: i64, decl_cursor: i32, name: &str) -> CiBitP
     // type where Itanium and MSVC pack it), so no one-target layout can
     // prove D147's agreement for it. Checked after the loop: a unit the
     // host layout already condemns keeps its more specific refusal.
-    if plan.refusal.len() == 0 and with_ci_cursor_has_packed_attr(session, decl_cursor) != 0:
+    if plan.refusal.len() == 0 and with_ci_cursor_has_packed_attr(session, decl_cursor):
         plan.refusal = name ++ ": a packed record's bitfield units are laid out differently by clang's targets, so one layout cannot serve every target (D147 point 1)"
     plan
 

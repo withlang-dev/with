@@ -12,7 +12,7 @@ use std.string.parse
 type Boxed { v: i32 }
 fn add_box(b: Boxed, d: i32): b.v + d
 
-var n: i32 = parse("10").unwrap()
+var n = parse("10")
 print(n)
 n = add_box(Boxed { v: n }, 32)
 print(n)
