@@ -3969,7 +3969,8 @@ impl CCodegen:
             // C has no `==` on a struct.
             if d0 == BinaryOp.OP_EQ or d0 == BinaryOp.OP_NEQ:
                 let eq_tid = self.operand_sema_tid(body, d1)
-                if eq_tid > 0 and self.key_type_has_walk(self.sema.resolve_alias(eq_tid as TypeId) as i32):
+                let eq_resolved = if eq_tid > 0: self.sema.resolve_alias(eq_tid as TypeId) as i32 else: 0
+                if eq_tid > 0 and (self.sema.concrete_key_sigs.contains(eq_resolved) or self.key_type_has_walk(eq_resolved)):
                     // The walk reads both sides by address: each is held in
                     // a temporary (a constant operand is no lvalue).
                     let eq_c = self.c_type(eq_tid, 0)
@@ -10376,8 +10377,9 @@ impl CCodegen:
     mut fn map_key_args_text(key_tid: i32) -> str:
         let resolved = self.sema.resolve_alias(key_tid as TypeId) as i32
         let tk = self.sema.get_type_kind(resolved as TypeId)
-        if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved): return "1, 0, 0"
-        if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR: return "0, 0, 0"
+        if not self.sema.concrete_key_sigs.contains(resolved):
+            if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved): return "1, 0, 0"
+            if tk == TypeKind.TY_INT or tk == TypeKind.TY_BOOL or tk == TypeKind.TY_PTR: return "0, 0, 0"
         let hash_fn = self.key_hash_fn_name(resolved)
         let eq_fn = self.key_eq_fn_name(resolved)
         "2, " ++ hash_fn ++ ", " ++ eq_fn
@@ -12153,11 +12155,61 @@ impl CCodegen:
             return self.sema.get_generic_inst_base(resolved) == self.sema.syms.list or self.std_box_pointee_tid(resolved) != 0 or self.generic_inst_is_declared_struct(resolved)
         false
 
-    mut fn key_refuse_projection(resolved: i32) -> bool:
-        if self.sema.concrete_key_sigs.contains(resolved):
-            self.fail("emit-c: a map key of type " ++ self.sema.type_name(resolved) ++ " hashes and compares by its key projection, which the C backend does not call yet (#3011)")
-            return true
-        false
+    // #3011 (§11.7, D96): a type with a key projection (`Key.key`) hashes and
+    // compares by calling its projection, feeding or comparing the projected
+    // key and dropping any owned temporary it built.
+    mut fn concrete_key_project_stmt(dst: &str, lv: &str, resolved: i32, key_ret: i32, body_sym: i32) -> str:
+        let sig = self.sig_index_for_sym(body_sym)
+        let p_tid = if sig >= 0: self.sema.sig_param_type(sig, 0) else: 0
+        let by_ref = self.fn_param_is_c_pointer(body_sym, 0) != 0 or (p_tid > 0 and self.sema.get_type_kind(self.sema.resolve_alias(p_tid as TypeId)) == TypeKind.TY_REF)
+        let arg = if by_ref: "&(" ++ lv ++ ")" else: lv
+        if self.returns_array(key_ret):
+            return " " ++ self.c_decl(key_ret, dst) ++ "; " ++ self.fn_c_name(body_sym) ++ "((void*)" ++ dst ++ ", " ++ arg ++ ");"
+        " " ++ self.c_decl(key_ret, dst) ++ " = " ++ self.fn_c_name(body_sym) ++ "(" ++ arg ++ ");"
+
+    mut fn ensure_key_proj_glue(kind: &str, resolved: i32) -> str:
+        let name = f"__with_keyproj_{kind}_{resolved}"
+        if self.glue_done.contains(name):
+            return name
+        self.mark_glue_done(name)
+        let mono: i32 = self.sema.concrete_key_mono_syms.get(resolved) ?? 0
+        let body_sym = self.canonical_body_sym(mono)
+        if body_sym == 0:
+            self.fail("emit-c: the key projection of map key type " ++ self.sema.type_name(resolved) ++ " has no lowered body to call")
+            return name
+        let sig_idx = self.sig_index_for_sym(body_sym)
+        let key_sig: i32 = self.sema.concrete_key_sigs.get(resolved) ?? sig_idx
+        let key_ret = if sig_idx >= 0: self.c_sig_return_type(sig_idx) else: self.sema.sig_return_type(key_sig)
+        let key_ret_resolved = self.sema.resolve_alias(key_ret as TypeId) as i32
+        let is_non_str_ref = self.sema.get_type_kind(key_ret_resolved as TypeId) == TypeKind.TY_REF and not self.sema.type_layout_is_str_view(key_ret_resolved)
+        let inner_tid = if is_non_str_ref: self.sema.get_type_d0(key_ret_resolved as TypeId) else: key_ret
+        let param_c = self.glue_param_c_type(resolved)
+        let is_array = self.sema.get_type_kind(resolved as TypeId) == TypeKind.TY_ARRAY
+        if kind == "hash":
+            let sig = "static void " ++ name ++ "(" ++ param_c ++ "* p, uint8_t* st)"
+            self.glue_protos.push(sig ++ ";\n")
+            let proj = self.concrete_key_project_stmt("__kp", if is_array: "p" else: "(*p)", resolved, key_ret, body_sym)
+            let target_lv = if is_non_str_ref: "(*(" ++ self.glue_param_c_type(self.sema.resolve_alias(inner_tid as TypeId) as i32) ++ "*)__kp)" else: "__kp"
+            let target_tid = if is_non_str_ref: inner_tid else: key_ret
+            let feed = self.key_hash_text(target_lv, target_tid, "st")
+            let drop_kp = self.drop_call_text("__kp", key_ret, false)
+            let drop_part = if drop_kp.len() > 0: " " ++ drop_kp else: ""
+            self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ proj ++ feed ++ drop_part ++ " " ++ cc_rbrace() ++ "\n")
+        else:
+            let sig = "static int32_t " ++ name ++ "(" ++ param_c ++ "* a, " ++ param_c ++ "* b)"
+            self.glue_protos.push(sig ++ ";\n")
+            let proja = self.concrete_key_project_stmt("__ka", if is_array: "a" else: "(*a)", resolved, key_ret, body_sym)
+            let projb = self.concrete_key_project_stmt("__kb", if is_array: "b" else: "(*b)", resolved, key_ret, body_sym)
+            let inner_c = if is_non_str_ref: self.glue_param_c_type(self.sema.resolve_alias(inner_tid as TypeId) as i32) else: ""
+            let lva = if is_non_str_ref: "(*(" ++ inner_c ++ "*)__ka)" else: "__ka"
+            let lvb = if is_non_str_ref: "(*(" ++ inner_c ++ "*)__kb)" else: "__kb"
+            let target_tid = if is_non_str_ref: inner_tid else: key_ret
+            let eq = self.key_eq_text(lva, lvb, target_tid)
+            let drop_kb = self.drop_call_text("__kb", key_ret, false)
+            let drop_ka = self.drop_call_text("__ka", key_ret, false)
+            let drops = (if drop_kb.len() > 0: " " ++ drop_kb else: "") ++ (if drop_ka.len() > 0: " " ++ drop_ka else: "")
+            self.glue_defs.push(sig ++ " " ++ cc_lbrace() ++ proja ++ projb ++ " int32_t __eq = " ++ eq ++ " ? 1 : 0;" ++ drops ++ " return __eq; " ++ cc_rbrace() ++ "\n")
+        name
 
     // A type with an `eq` of its own (derived or written) compares by it:
     // its specialization (Sema's concrete_eq_mono_syms), each argument
@@ -12166,7 +12218,7 @@ impl CCodegen:
         let mono: i32 = self.sema.concrete_eq_mono_syms.get(resolved) ?? 0
         let body_sym = self.canonical_body_sym(mono)
         if body_sym == 0:
-            self.fail("emit-c: the eq of map key type " ++ self.sema.type_name(resolved) ++ " has no lowered body to call (#2180)")
+            self.fail("emit-c: the eq of map key type " ++ self.sema.type_name(resolved) ++ " has no lowered body to call")
             return "0"
         let sig = self.sig_index_for_sym(body_sym)
         var args = ""
@@ -12181,8 +12233,9 @@ impl CCodegen:
     // Statements feeding the value at `lv` (of `tid`) to the hasher `st`.
     mut fn key_hash_text(lv: &str, tid: i32, st: &str) -> str:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
-        if self.key_refuse_projection(resolved):
-            return ""
+        if self.sema.concrete_key_sigs.contains(resolved):
+            let proj_name = self.ensure_key_proj_glue("hash", resolved)
+            return " " ++ proj_name ++ "(" ++ self.glue_arg(lv, resolved) ++ ", " ++ st ++ ");"
         let tk = self.sema.get_type_kind(resolved as TypeId)
         if tk == TypeKind.TY_STR or self.sema.type_layout_is_str_view(resolved):
             return " with_hasher_write_str(" ++ st ++ ", " ++ lv ++ ");"
@@ -12196,8 +12249,9 @@ impl CCodegen:
     // An expression: whether the values at `la` and `lb` (of `tid`) are equal.
     mut fn key_eq_text(la: &str, lb: &str, tid: i32) -> str:
         let resolved = self.sema.resolve_alias(tid as TypeId) as i32
-        if self.key_refuse_projection(resolved):
-            return "0"
+        if self.sema.concrete_key_sigs.contains(resolved):
+            let proj_name = self.ensure_key_proj_glue("eq", resolved)
+            return proj_name ++ "(" ++ self.glue_arg(la, resolved) ++ ", " ++ self.glue_arg(lb, resolved) ++ ")"
         if self.sema.concrete_eq_sigs.contains(resolved):
             return self.concrete_eq_call_text(la, lb, resolved)
         let tk = self.sema.get_type_kind(resolved as TypeId)

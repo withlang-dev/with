@@ -126,9 +126,7 @@ module demand, the default type when none does, and two demands are an
 error (#2097).
 **Changelog v7.19:** implicit fills, 2026-10-03 (D87). §7.3a: an implicit
 fill observes the binding and never consumes it; a non-Copy `implicit T`
-is passed explicitly; `std.context` APIs take `implicit &Context`. The
-implementation is NON-COMPLIANT until it catches up (no `std.context`
-API takes an `implicit` parameter yet).
+is passed explicitly; `std.context` APIs take `implicit &Context`.
 **Changelog v7.18:** #1930 answers and the `from` grammar, 2026-10-03
 (D83 and D84 amendments). §9.5: a bare name that resolves to a receiver
 field and to any other name in scope is an error at that use; a

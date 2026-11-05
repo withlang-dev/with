@@ -3979,6 +3979,141 @@ impl Sema:
                 self.diags.emit(diag)
                 return
 
+    // D184 (§29.15, #2984): a script helper that captures an ephemeral binding
+    // (directly or through a helper it calls) is non-escaping, so it cannot be
+    // spawned, stored, returned, or used as a function value. Runs after
+    // finalize_closure_arg_checks so every body's captures, the call graph,
+    // and each closure's escaping state are settled.
+    fn script_body_captured_ephemeral_sym(start_body: i32, direct: &HashMap[i32, i32], index: &SemaGlobalCallIndex) -> i32:
+        if direct.contains(start_body):
+            return direct.get(start_body).unwrap()
+        var seen: HashMap[i32, i32] = sema_new_map_i32_i32()
+        var work: List[i32] = List.new()
+        seen.insert(start_body, 1)
+        work.push(start_body)
+        var w = 0
+        while w < work.len():
+            var ci: i32 = index.head.get(work[w]) ?? -1
+            w = w + 1
+            while ci >= 0:
+                let ts: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 3]
+                let tc: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 4]
+                for ti in ts..ts + tc:
+                    let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                    if direct.contains(target):
+                        return direct.get(target).unwrap()
+                    if not seen.contains(target):
+                        seen.insert(target, 1)
+                        work.push(target)
+                ci = index.next[ci]
+        0
+
+    mut fn emit_script_nonescaping_helper_error(helper_sym: i32, view_sym: i32, node: i32, file: i32):
+        if node <= 0 or helper_sym == 0 or view_sym == 0:
+            return
+        let helper_name = self.pool_resolve(self.decl_call_name(helper_sym))
+        let view_name = self.pool_resolve(view_sym)
+        let diag = Diagnostic.err("script helper `" ++ helper_name ++ "` captures ephemeral binding `" ++ view_name ++ "` and is non-escaping: it cannot be spawned, stored, returned, or used as a value (§29.15, D184)", Span { file, start: self.ast.get_start(node), end: self.ast.get_end(node) })
+        self.diags.emit(diag)
+
+    mut fn check_script_nonescaping_helpers():
+        if self.ast.script_binding_count() == 0 or self.script_capture_records.len() == 0:
+            return
+        var direct: HashMap[i32, i32] = sema_new_map_i32_i32()
+        for ri in 0..self.script_capture_records.len() / 4:
+            let rbody: i32 = self.script_capture_records[ri * 4]
+            let rsym: i32 = self.script_capture_records[ri * 4 + 1]
+            let rtid: i32 = self.script_slot_types.get(rsym) ?? 0
+            if rtid != 0 and self.type_is_ephemeral_value(rtid) and not direct.contains(rbody):
+                direct.insert(rbody, rsym)
+        if direct.len() == 0:
+            return
+        let index = self.global_call_index()
+        var reported: HashMap[i32, i32] = sema_new_map_i32_i32()
+
+        // 1. Value reference, store, or return (`fn_value_ident_sigs`, excluding
+        //    bare pipeline stages `x |> h` whose `fn_callable_values` mark was
+        //    cleared because `x |> h` is a direct call).
+        var vi = 0
+        while vi + 2 < self.script_fn_value_uses.len():
+            let vnode: i32 = self.script_fn_value_uses[vi]
+            let vfile: i32 = self.script_fn_value_uses[vi + 1]
+            let is_extern_coercion: i32 = self.script_fn_value_uses[vi + 2]
+            vi += 3
+            if is_extern_coercion == 0 and not self.fn_callable_values.contains(vnode):
+                continue
+            let vsig: i32 = self.fn_value_ident_sigs.get(vnode) ?? -1
+            if vsig < 0 or reported.contains(vnode):
+                continue
+            let view_sym = self.script_body_captured_ephemeral_sym(vsig, direct, index)
+            if view_sym != 0:
+                reported.insert(vnode, 1)
+                let ident_sym = if self.ast.kind(vnode) == NodeKind.NK_IDENT: self.ast.get_data0(vnode) else: self.sig_names[vsig]
+                self.emit_script_nonescaping_helper_error(ident_sym, view_sym, vnode, vfile)
+
+        // 2. Async script helper (`async fn h()` spawns a Task) and escaping
+        //    closure bodies (`caller < -1` with `!is_non_escaping_closure`).
+        var reported_async_sigs: HashMap[i32, i32] = sema_new_map_i32_i32()
+        for ci in 0..self.global_calls.len() / GLOBAL_CALL_STRIDE:
+            let caller: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE]
+            let call_node: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 1]
+            let call_file: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 2]
+            let ts: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 3]
+            let tc: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 4]
+            let callee: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 5]
+            if callee >= 0 and callee < self.sig_names.len() and self.task_fns.contains(self.sig_names[callee]):
+                let async_view = self.script_body_captured_ephemeral_sym(callee, direct, index)
+                if async_view != 0:
+                    reported_async_sigs.insert(callee, 1)
+                    if not reported.contains(call_node):
+                        reported.insert(call_node, 1)
+                        self.emit_script_nonescaping_helper_error(self.sig_names[callee], async_view, call_node, call_file)
+            if caller < -1 and not self.ast.is_non_escaping_closure((-2 - caller) as NodeId):
+                for ti in ts..ts + tc:
+                    let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                    if target >= 0 and target < self.sig_names.len() and not reported.contains(call_node):
+                        let cl_view = self.script_body_captured_ephemeral_sym(target, direct, index)
+                        if cl_view != 0:
+                            reported.insert(call_node, 1)
+                            self.emit_script_nonescaping_helper_error(self.sig_names[target], cl_view, call_node, call_file)
+
+        for di in 0..self.ast.decl_count():
+            let decl = self.ast.get_decl(di)
+            if self.ast.kind(decl) != NodeKind.NK_FN_DECL or not self.ast.is_script_helper(decl):
+                continue
+            if (self.ast.get_data2(decl) & FnFlags.ASYNC) == 0:
+                continue
+            let fn_sym = self.fn_decl_semantic_symbol_at(decl, self.ast.get_data0(decl), di)
+            let sig = self.get_sig(fn_sym)
+            if sig >= 0 and not reported_async_sigs.contains(sig) and not reported.contains(decl as i32):
+                let decl_view = self.script_body_captured_ephemeral_sym(sig, direct, index)
+                if decl_view != 0:
+                    reported.insert(decl as i32, 1)
+                    self.emit_script_nonescaping_helper_error(fn_sym, decl_view, decl as i32, self.ast.file(decl) as i32)
+
+        // 3. Async blocks (`async: mid()`) spawning a call to a non-escaping helper.
+        var abi = 0
+        while abi + 1 < self.script_async_blocks.len():
+            let ab_node: i32 = self.script_async_blocks[abi]
+            let ab_file: i32 = self.script_async_blocks[abi + 1]
+            abi += 2
+            let ab_start = self.ast.get_start(ab_node)
+            let ab_end = self.ast.get_end(ab_node)
+            for ci in 0..self.global_calls.len() / GLOBAL_CALL_STRIDE:
+                let call_node: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 1]
+                let call_file: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 2]
+                if call_file != ab_file or self.ast.get_start(call_node) < ab_start or self.ast.get_end(call_node) > ab_end:
+                    continue
+                let ts: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 3]
+                let tc: i32 = self.global_calls[ci * GLOBAL_CALL_STRIDE + 4]
+                for ti in ts..ts + tc:
+                    let target: i32 = self.global_call_targets[ti * GLOBAL_TARGET_STRIDE]
+                    if target >= 0 and target < self.sig_names.len() and not reported.contains(call_node):
+                        let ab_view = self.script_body_captured_ephemeral_sym(target, direct, index)
+                        if ab_view != 0:
+                            reported.insert(call_node, 1)
+                            self.emit_script_nonescaping_helper_error(self.sig_names[target], ab_view, call_node, call_file)
+
     // D175 (§9.1c): runtime globals initialize in dependency order. An
     // initializer may read every global its body reads and every global a
     // body its calls run reads, transitively: a callee, a callable it hands
@@ -12471,6 +12606,9 @@ impl Sema:
 
 
         if kind == NodeKind.NK_ASYNC_BLOCK:
+            if self.ast.script_binding_count() > 0:
+                self.script_async_blocks.push(node)
+                self.script_async_blocks.push(self.local_file_id)
             self.record_global_concurrency_evidence(node, "async block")
             self.require_async_runtime(node, "async")
             self.note_allocation_site(node, AllocConstructKind.ASYNC_FIBER, false, 0)
@@ -13102,6 +13240,11 @@ impl Sema:
             self.script_capture_records.push(sym)
             self.script_capture_records.push(node)
             self.script_capture_records.push(self.local_file_id)
+            if self.current_fn_sig_idx >= 0 and self.global_effect_body() != self.current_fn_sig_idx:
+                self.script_capture_records.push(self.current_fn_sig_idx)
+                self.script_capture_records.push(sym)
+                self.script_capture_records.push(node)
+                self.script_capture_records.push(self.local_file_id)
             if self.type_is_ephemeral_value(tid): self.script_nonescaping_helpers.insert(self.current_fn_decl_node, 1)
             // D128 meets D184: the helper's read is a use of an integer-literal
             // binding and settles its width when main has not; a later use in
@@ -13214,6 +13357,10 @@ impl Sema:
                     self.fn_callable_values.insert(node, 1)
                     self.typed_expr_types.insert(node, mono_tid)
                     self.fn_value_ident_sigs.insert(node, mono_sig)
+                    if self.ast.script_binding_count() > 0:
+                        self.script_fn_value_uses.push(node)
+                        self.script_fn_value_uses.push(self.local_file_id)
+                        self.script_fn_value_uses.push(0)
                     self.note_callable_value(mono_sig, mono_tid)
                     return mono_tid
             self.emit_error("generic function `" ++ self.pool_resolve(sym) ++ "` as a value needs an expected function type to instantiate it (§12): annotate the binding or parameter, or call it", node)
@@ -13271,6 +13418,10 @@ impl Sema:
                 if matches and expected_kind == TypeKind.TY_EXTERN_FN:
                     self.typed_expr_types.insert(node, expected as i32)
                     self.fn_value_ident_sigs.insert(node, sig_idx)
+                    if self.ast.script_binding_count() > 0:
+                        self.script_fn_value_uses.push(node)
+                        self.script_fn_value_uses.push(self.local_file_id)
+                        self.script_fn_value_uses.push(1)
                     self.note_callable_value(sig_idx, expected as i32)
                     return expected as i32
             // D65 (§12): a function named as a value (a callee resolves in
@@ -13278,6 +13429,10 @@ impl Sema:
             self.fn_callable_values.insert(node, 1)
             self.typed_expr_types.insert(node, value_tid)
             self.fn_value_ident_sigs.insert(node, sig_idx)
+            if self.ast.script_binding_count() > 0:
+                self.script_fn_value_uses.push(node)
+                self.script_fn_value_uses.push(self.local_file_id)
+                self.script_fn_value_uses.push(0)
             self.note_callable_value(sig_idx, value_tid)
             return value_tid
         if (sig_idx >= 0 or self.generic_fn_node_for_symbol(sym) != 0) and self.symbol_visible_from_current(sym) == false:
@@ -14650,6 +14805,7 @@ impl Sema:
         let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
         if fn_sym == 0:
             return sema_operator_candidate_none()
+        self.ensure_body_typed(fn_sym, sig)
         SemaOperatorCandidate { sig, fn_sym, owner_sym }
 
     // The owner whose methods implement a binary operator for `tid` beside
@@ -14712,6 +14868,7 @@ impl Sema:
         let fn_sym = self.lookup_method_fn(owner_sym, method_sym)
         if fn_sym == 0:
             return sema_operator_candidate_none()
+        self.ensure_body_typed(fn_sym, sig)
         SemaOperatorCandidate { sig, fn_sym, owner_sym }
 
     mut fn check_unary_neg_operator_method(node: i32, operand: i32) -> i32:
@@ -16990,6 +17147,23 @@ impl Sema:
         let kind = self.ast.kind(node)
         if kind == NodeKind.NK_GROUPED or kind == NodeKind.NK_CAST or kind == NodeKind.NK_COMPTIME:
             return self.expr_borrows_owned_temp_iter(self.ast.get_data0(node))
+        // #3004 (D142, §13.5): an implicit `.iter()` inserted on a pipeline's
+        // left operand (`[1, 2] |> map(...)`) or an iterable argument
+        // (`xs.iter().zip([1, 2])`, D186) borrows an owned temporary receiver
+        // the same way a spelled `.iter()` call below does.
+        if (self.pipeline_implicit_iter.contains(node) or self.implicit_iter_args.contains(node)) and self.implicit_iter_yields_views(node):
+            var impl_recv = if kind == NodeKind.NK_PIPELINE and self.pipeline_implicit_iter.contains(node): self.ast.get_data0(node) else: node
+            while impl_recv != 0 and self.ast.kind(impl_recv) == NodeKind.NK_GROUPED:
+                impl_recv = self.ast.get_data0(impl_recv)
+            if self.place_root_sym(impl_recv) == 0:
+                let impl_ty_opt = self.typed_expr_types.get(impl_recv)
+                if impl_ty_opt.is_some():
+                    let impl_ty: i32 = impl_ty_opt.unwrap()
+                    let impl_tk = self.get_type_kind(self.resolve_alias(impl_ty as TypeId))
+                    if impl_tk != TypeKind.TY_REF and impl_tk != TypeKind.TY_PTR and impl_tk != TypeKind.TY_SLICE:
+                        return true
+        if kind == NodeKind.NK_BLOCK:
+            return self.expr_borrows_owned_temp_iter(self.ast.get_data2(node))
         if kind == NodeKind.NK_PIPELINE:
             if self.expr_borrows_owned_temp_iter(self.ast.get_data0(node)) != 0:
                 return true
@@ -17004,14 +17178,16 @@ impl Sema:
             return false
         let callee = self.ast.get_data0(node)
         if self.ast.kind(callee) == NodeKind.NK_FIELD_ACCESS:
-            let recv = self.ast.get_data0(callee)
+            var recv = self.ast.get_data0(callee)
+            while recv != 0 and self.ast.kind(recv) == NodeKind.NK_GROUPED:
+                recv = self.ast.get_data0(recv)
             let method = self.ast.get_data1(callee)
             if self.place_root_sym(recv) == 0:
                 let recv_ty_opt = self.typed_expr_types.get(recv)
                 if recv_ty_opt.is_some():
                     let recv_ty: i32 = recv_ty_opt.unwrap()
                     let recv_tk = self.get_type_kind(self.resolve_alias(recv_ty as TypeId))
-                    if recv_tk != TypeKind.TY_REF and recv_tk != TypeKind.TY_PTR:
+                    if recv_tk != TypeKind.TY_REF and recv_tk != TypeKind.TY_PTR and recv_tk != TypeKind.TY_SLICE:
                         let owner_sym = self.method_owner_symbol_for_type(recv_ty)
                         if owner_sym != 0:
                             var ios = false
@@ -19131,6 +19307,9 @@ impl Sema:
             return
         if self.reject_view_into_temporary(expr_node, "returns"):
             return
+        if self.expr_borrows_owned_temp_iter(expr_node):
+            self.emit_error_with_help("returned ephemeral value borrows a temporary that dies when this function returns", report_node, "return an owned collection (e.g. `|> collect[List]()`), or take the collection as a `&` parameter")
+            return
         var deps: List[i32] = List.new()
         deps = self.collect_expr_view_deps(expr_node, deps)
         for i in 0..deps.len():
@@ -21041,6 +21220,7 @@ impl Sema:
             let method_fn_sym = self.lookup_method_fn(owner_sym, member)
             let sig_idx = self.lookup_method_sig(owner_sym, member)
             if sig_idx >= 0:
+                self.ensure_body_typed(method_fn_sym, sig_idx)
                 let ret = self.sig_return_type(sig_idx)
                 let recv_resolved = self.resolve_alias(recv_type as TypeId)
                 if self.get_type_kind(recv_resolved) == TypeKind.TY_GENERIC_INST:
@@ -28453,6 +28633,7 @@ impl Sema:
                     self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, node)
         self.comp_resolved.insert(node, fn_sym)
         self.qualified_extension_call_nodes.insert(node, 1)
+        self.ensure_body_typed(fn_sym, sig_idx)
         self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
         self.record_call_view_origins(node, sig_idx, 0, 0, extra_start, arg_count, false)
         self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
@@ -28532,6 +28713,7 @@ impl Sema:
                     self.note_call_arg_coercion(expected_ty, actual_ty, arg_node, node)
         self.comp_resolved.insert(node, fn_sym)
         self.qualified_extension_call_nodes.insert(node, 1)
+        self.ensure_body_typed(fn_sym, sig_idx)
         self.propagate_method_call_param_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
         self.record_call_view_origins(node, sig_idx, 0, 0, extra_start, arg_count, false)
         self.note_sig_call_global_effects(node, sig_idx, 0, 0, extra_start, arg_count, false)
@@ -37202,6 +37384,7 @@ impl Sema:
             let method_fn_sym = self.lookup_method_fn(type_name_sym, field)
             let sig_idx = self.lookup_method_sig(type_name_sym, field)
             if sig_idx >= 0:
+                self.ensure_body_typed(method_fn_sym, sig_idx)
                 // #1201: `Type.method()` on a method that takes `self`, with too few
                 // arguments for the receiver to be among them. It reached codegen
                 // and failed LLVM verification ("Incorrect number of arguments").
@@ -37857,6 +38040,7 @@ impl Sema:
             let method_fn_sym = self.lookup_method_fn(static_type_sym, field)
             let sig_idx = self.lookup_method_sig(static_type_sym, field)
             if sig_idx >= 0:
+                self.ensure_body_typed(method_fn_sym, sig_idx)
                 if self.check_comptime_method_restriction(method_fn_sym, node):
                     return 0
                 if method_fn_sym != 0:
